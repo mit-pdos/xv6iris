@@ -351,7 +351,7 @@ Section WpSmodePtCtl.
 
 
 
-  Lemma wp_cret_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_cret_s_zca_r_later (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -378,7 +378,7 @@ Section WpSmodePtCtl.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    ( ▷ ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗
@@ -387,7 +387,7 @@ Section WpSmodePtCtl.
       sr_inv R -∗
       pc_is tgt -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Halign.
@@ -450,8 +450,56 @@ Section WpSmodePtCtl.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv [$Hpc' $Hnpc] [Hfmap]").
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
+  Qed.
+
+  Lemma wp_cret_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (ra : mword 5)
+      (m : regfile)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    uint ra <> 0 ->
+    bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
+    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      sr_inv R -∗
+      pc_is tgt -∗
+      gpr_file m -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Halign.
+    iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
+    iApply (wp_cret_s_zca_r_later R Φ pc ra m mstatus0 mie_v mdv0 menvcfg0
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Halign
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr [Hcont]").
+    iNext. iExact "Hcont".
   Qed.
 
 

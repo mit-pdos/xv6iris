@@ -46,6 +46,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import WpDecodeBridge.
+Require Import SwtchCtx.
 Local Open Scope Z_scope.
 Require Import WpSmodePtCtl.
 Import Defs.
@@ -244,12 +245,7 @@ Definition swtch_prog : list vop_s :=
     VSld false (mword_of_int 104) (mword_of_int 11) (mword_of_int 27) ].
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
-   at byte offset 8*i -- ra sp s0 s1 s2 .. s11. *)
-Definition ctx_regs : list (mword 5) :=
-  [ mword_of_int 1;  mword_of_int 2;  mword_of_int 8;  mword_of_int 9;
-    mword_of_int 18; mword_of_int 19; mword_of_int 20; mword_of_int 21;
-    mword_of_int 22; mword_of_int 23; mword_of_int 24; mword_of_int 25;
-    mword_of_int 26; mword_of_int 27 ].
+   at byte offset 8*i -- ra sp s0 s1 s2 .. s11 ([ctx_regs] in SwtchCtx.v). *)
 Definition ctx_regs_nat : list nat :=
   [ 1; 2; 8; 9; 18; 19; 20; 21; 22; 23; 24; 25; 26; 27 ]%nat.
 
@@ -404,25 +400,7 @@ Section WpSwtchVc.
     done.
   Qed.
 
-  (* ================================================================== *)
-  (* struct context: ownership of its 14 saved-register cells.           *)
-  (* ================================================================== *)
-  Fixpoint ctx_cells_at (c : mword 64) (off : Z) (vs : list (mword 64)) : iProp Σ :=
-    match vs with
-    | [] => emp
-    | v :: rest => ((add_vec c (mword_of_int off)) ↦₈ v ∗ ctx_cells_at c (off + 8) rest)%I
-    end.
-  Definition ctx_cells (c : mword 64) (vs : list (mword 64)) : iProp Σ :=
-    ctx_cells_at c 0 vs.
-
-  (* the callee-saved register image of a machine file, in field order. *)
-  Definition callee_img (m : regfile) : list (mword 64) :=
-    map (fun r => m !!! Regidx r) ctx_regs.
-
-  (* the pc a [ret] to saved return address [ra] lands on (low bit cleared);
-     matches wp_cret_s_zca_pt's target expression. *)
-  Definition ctx_pc (ra : mword 64) : mword 64 :=
-    update_vec_dec (add_vec ra (sign_extend' 64 (zeros' 12))) 0 ('b"0").
+  (* [ctx_cells] / [callee_img] / [ctx_pc] live in SwtchCtx.v. *)
 
   (* a heap segment's denotation IS the ctx-cell ownership of its values. *)
   Lemma seg_cells_ctx (rho : nat -> mword 64) (breg : nat) (c : mword 64)
@@ -453,230 +431,10 @@ Section WpSwtchVc.
     destruct l; [reflexivity | simpl in H; lia].
   Qed.
 
-  (* -------------------------------------------------------------------- *)
-  (* valid_context sc Phi P c : the context saved at [c] admits a WP to     *)
-  (* run.  It owns c's 14 saved-register cells and is the wand from (config    *)
-  (* bundle [sc] + pc at c.ra + a gpr file whose callee-saved regs are c's    *)
-  (* saved values, caller-saved arbitrary) to a whole-machine [WP Loop @ E    *)
-  (* {{Phi}}].  On resumption the continuation is handed, for the             *)
-  (* (existentially quantified) context [cret] that resumed c, both           *)
-  (* [▷ valid_context sc Phi P cret] AND [P cret] -- a caller-chosen         *)
-  (* predicate about the resumer.  [P] is fixed along the whole chain; the    *)
-  (* resumer stays existential (any context / any CPU may resume c), and      *)
-  (* [P cret] is where a caller threads coupling info (e.g. CPU-locality for a *)
-  (* scheduler), or just [True] for the fully generic spec.  The S-mode        *)
-  (* configuration is abstracted as the single resource [sc], so this          *)
-  (* definition does NOT depend on the individual CSR parameters.  Well-       *)
-  (* defined Iris [fixpoint] because the recursive occurrence is under [▷].    *)
-  (* -------------------------------------------------------------------- *)
-  Local Definition valid_context_pre
-      (sc : iProp Σ) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> iPropO Σ)
-      (rec : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ := fun c =>
-    (∃ vs : list (mword 64),
-      ⌜length vs = 14%nat⌝ ∗
-      ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
-      ctx_cells c vs ∗
-      (∀ (m : regfile),
-         ⌜callee_img m = vs⌝ -∗ sc -∗
-         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
-         (∃ cret : mword 64, ▷ rec cret ∗ P cret) -∗
-         WP (Loop : expr riscv_lang) {{ Phi }}))%I.
+  (* [valid_context] and its fixpoint machinery live in SwtchCtx.v; the
+     sconf-tier whole-function swtch spec lives in SpecSwtch.v /
+     WpSwtchSconf.v. *)
 
-  Local Instance valid_context_pre_contractive sc Phi (P : mword 64 -d> iPropO Σ) :
-    Contractive (valid_context_pre sc Phi P).
-  Proof. solve_contractive. Qed.
-
-  Definition valid_context (sc : iProp Σ) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ :=
-    fixpoint (valid_context_pre sc Phi P).
-
-  Lemma valid_context_unfold (sc : iProp Σ) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> iPropO Σ) (c : mword 64) :
-    valid_context sc Phi P c ⊣⊢
-      valid_context_pre sc Phi P (valid_context sc Phi P) c.
-  Proof. apply (fixpoint_unfold (valid_context_pre sc Phi P) c). Qed.
-
-  Section SwtchSpec.
-    Context (R : s_regime) (Phi : mval -> iProp Σ).
-    Context (γc : gname) (bsie : mword 1) (dq : dfrac).
-
-    (* the ambient S-mode machine configuration a running kernel thread holds:
-       the config bundle [smode_config] (keyed by the SIE ghost name [γc], which
-       hides the concrete CSR values), the caller's half of that SIE ghost var,
-       and the page-table invariant.  This is exactly what the cleaned-up
-       acquire/release consume and return; a resumed context receives it too. *)
-    Definition sconf : iProp Σ :=
-      (smode_config γc dq ∗ ghost_var γc (1/2) bsie ∗ sr_inv R)%I.
-
-    (* -------------------------------------------------------------------- *)
-    (* valid_context P c : "the context saved at [c] admits a WP to run".  It  *)
-    (* owns c's 14 saved-register cells and is the wand from (config + pc at   *)
-    (* c.ra + a gpr file whose callee-saved regs are c's saved values,         *)
-    (* caller-saved arbitrary) to a whole-machine WP.  On resumption the       *)
-    (* continuation is handed, for the (existentially quantified) context      *)
-    (* [cret] that resumed c, both [▷ valid_context P cret] (cret is now the    *)
-    (* suspended, valid one) AND [P cret] -- a caller-chosen predicate about    *)
-    (* the resumer.  [P] is fixed along the whole chain; the resumer stays      *)
-    (* existential (any context / any CPU may resume c), and [P cret] is where  *)
-    (* a caller threads coupling info (e.g. CPU-locality for a scheduler), or   *)
-    (* just [True] for the fully generic spec.  Well-defined Iris [fixpoint]    *)
-    (* because the recursive occurrence is guarded by a [▷].                   *)
-    (* -------------------------------------------------------------------- *)
-    (* [valid_context_pre] / [valid_context] / [valid_context_unfold] are
-       defined ABOVE this section (parameterized by the abstract config bundle
-       [sc], the mask [E], and [Phi]); here they are instantiated at [sconf]. *)
-
-    (* ================================================================== *)
-    (* THE SPEC.  swtch(old,new): given [valid_context P new] (new is a valid  *)
-    (* suspended context whose resumer must satisfy [P]) and [P old] (old, the *)
-    (* context resuming new this round, does satisfy P), runs new's saved WP.  *)
-    (* The last premise is the caller's own return continuation: what old runs *)
-    (* when it is later resumed -- and it LEARNS, for the (existential)         *)
-    (* resumer [cret], both [▷ valid_context P cret] and [P cret].             *)
-    (* ================================================================== *)
-    Lemma wp_swtch (P : mword 64 -d> iPropO Σ) (oldc newc : mword 64)
-        (m0 : regfile) (old_vs : list (mword 64)) :
-      length old_vs = 14%nat ->
-      m0 !!! Regidx (mword_of_int 10) = oldc ->
-      m0 !!! Regidx (mword_of_int 11) = newc ->
-      eq_vec (access_vec_dec (ctx_pc (m0 !!! Regidx (mword_of_int 1))) 0) ('b"0") = true ->
-      kernel_text -∗
-      sconf -∗ pc_is (mword_of_int KernelSyms.swtch) -∗ gpr_file m0 -∗
-      ctx_cells oldc old_vs -∗
-      valid_context sconf Phi P newc -∗
-      P oldc -∗
-      (∀ (m : regfile),
-         ⌜callee_img m = callee_img m0⌝ -∗ sconf -∗
-         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
-         (∃ cret : mword 64, ▷ valid_context sconf Phi P cret ∗ P cret) -∗
-         WP (Loop : expr riscv_lang) {{ Phi }}) -∗
-      WP (Loop : expr riscv_lang) {{ Phi }}.
-    Proof.
-      iIntros (Hlen_old Holdc Hnewc Hal_old)
-        "#Ht Hconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
-      iEval (rewrite /sconf) in "Hconf".
-      iDestruct "Hconf" as "(Hsm & Hgc & Htlbinv)".
-      iDestruct (smode_config_unbundle γc dq with "Hsm")
-        as "(Hhw & Hinv & Hhs & Hpriv & Hmsb & Hmieb & Hmenvb)".
-      iDestruct "Hhw" as "#Hhw". iDestruct "Hinv" as "#Hinv".
-      iDestruct "Hmsb" as (mstatus0)
-        "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
-      iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
-      iDestruct "Hmenvb" as (menvcfg0)
-        "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %HFIOM & %Hmenvval0)".
-      iEval (rewrite (valid_context_unfold sconf Phi P newc) /valid_context_pre) in "Hvalidnew".
-      iDestruct "Hvalidnew" as (new_vs)
-        "(%Hlen_new & %Hal_new & Hnewcells & Hnewwand)".
-      (* the symbolic environment: 0..31 = current file m0; 32..45 = new's saved
-         values; 46..59 = old's arbitrary current cell contents. *)
-      iDestruct (gpr_file_dom with "Hfile") as "[%Hdom Hfile]".
-      iDestruct (gpr_file_x0 m0 (mword_of_int 0) ltac:(vm_compute; reflexivity)
-                   with "Hfile") as "[%Hx0 Hfile]".
-      set (rho := fun k : nat =>
-             if (k <? 32)%nat
-             then m0 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
-             else if (k <? 46)%nat then nth (k - 32) new_vs (mword_of_int 0)
-             else nth (k - 46) old_vs (mword_of_int 0)).
-      assert (Hden : vregs_den rho vregs_init = m0).
-      { apply (vregs_den_init_agree _ _ Hx0). intros k Hk.
-        unfold rho. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
-      assert (Hrho10 : rho 10%nat = oldc) by (unfold rho; exact Holdc).
-      assert (Hrho11 : rho 11%nat = newc) by (unfold rho; exact Hnewc).
-      assert (Hmapold : map (fun w => rho w)
-                [46;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat = old_vs).
-      { unfold rho; cbn.
-        apply (list14_nth old_vs (mword_of_int 0) Hlen_old). }
-      assert (Hmapnew : map (fun w => rho w)
-                [32;33;34;35;36;37;38;39;40;41;42;43;44;45]%nat = new_vs).
-      { unfold rho; cbn.
-        apply (list14_nth new_vs (mword_of_int 0) Hlen_new). }
-      iDestruct (swtch_code with "Ht") as "Hcode".
-      iEval (rewrite -Hden) in "Hfile".
-      (* ---- run the 28-instruction straight-line block ---- *)
-      iApply (wp_vc_block_s_den_r R swtch_prog Phi
-                (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
-                (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
-                rho mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
-                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                      Hpc Hfile Hcode [Holdcells Hnewcells] []").
-      { rewrite /vheap_own /swtch_heap0 big_sepL_app.
-        rewrite (seg_cells_ctx rho 10 oldc 0 _ Hrho10).
-        rewrite (seg_cells_ctx rho 11 newc 0 _ Hrho11).
-        rewrite Hmapold Hmapnew.
-        rewrite -/(ctx_cells oldc old_vs) -/(ctx_cells newc new_vs).
-        iFrame "Holdcells Hnewcells". }
-      { rewrite /vheap4_own. cbn [vheap4]. done. }
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
-      (* ---- split the post-block heap into old's (now current callee regs) and
-             new's (unchanged) contexts ---- *)
-      iEval (rewrite /vheap_own /swtch_heap1 big_sepL_app
-                     (seg_cells_ctx rho 10 oldc 0 ctx_regs_nat Hrho10)
-                     (seg_cells_ctx rho 11 newc 0
-                        [32;33;34;35;36;37;38;39;40;41;42;43;44;45]%nat Hrho11))
-        in "Hheap".
-      assert (Hmapcallee : map (fun w => rho w) ctx_regs_nat = callee_img m0).
-      { unfold callee_img, ctx_regs, ctx_regs_nat, rho; cbn. reflexivity. }
-      iEval (rewrite Hmapcallee Hmapnew) in "Hheap".
-      iDestruct "Hheap" as "[Holdpart Hnewpart]".
-      (* ---- build [valid_context P oldc] from old's restored cells + the
-             caller's own return continuation [Hwold] ---- *)
-      iAssert (valid_context sconf Phi P oldc) with "[Holdpart Hwold]" as "Hvoldc".
-      { rewrite (valid_context_unfold sconf Phi P oldc) /valid_context_pre.
-        iExists (callee_img m0).
-        iSplit.
-        { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
-        iSplit.
-        { iPureIntro.
-          assert (Hn0 : nth 0 (callee_img m0) (mword_of_int 0)
-                        = m0 !!! Regidx (mword_of_int 1 : mword 5))
-            by (unfold callee_img, ctx_regs; cbn; reflexivity).
-          rewrite Hn0. exact Hal_old. }
-        rewrite -/(ctx_cells oldc (callee_img m0)).
-        iFrame "Holdpart". iExact "Hwold". }
-      (* ---- the trailing c.ret returns to new's saved return address ---- *)
-      assert (Hm1 : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5)
-                  = nth 0 new_vs (mword_of_int 0)).
-      { rewrite (vregs_den_lookup rho swtch_regs1 (Regidx (mword_of_int 1 : mword 5))
-                   (SX 32 0) ltac:(vm_compute; reflexivity)).
-        rewrite sval_den_SX0. unfold rho. cbn. reflexivity. }
-      assert (Hlow : eq_vec (access_vec_dec
-                 (update_vec_dec (add_vec
-                    (vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5))
-                    (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true).
-      { rewrite Hm1. exact Hal_new. }
-      assert (Hcallee_new :
-                callee_img (vregs_den rho swtch_regs1) = new_vs).
-      { rewrite <- Hmapnew. unfold callee_img, ctx_regs; cbn [map nth].
-        repeat f_equal;
-          (erewrite vregs_den_lookup by (vm_compute; reflexivity);
-           apply sval_den_SX0). }
-      iDestruct (swi_ret with "Ht") as "Hret".
-      iApply (wp_cret_s_zca_r R Phi
-                (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
-                (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
-                mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
- HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-                ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
-                with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
-                      Hpc Hfile Hret [Hnewwand Hvoldc HP Hsie Hgc]").
-      iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-      (* ---- hand control to new's saved WP, giving it (as its resumer [oldc])
-             [▷ valid_context P oldc] together with [P oldc] ---- *)
-      iAssert sconf with
-        "[Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Hgc Htlbinv]" as "Hconf".
-      { rewrite /sconf.
-        iDestruct (smode_config_rebuild γc dq mstatus0 mie_v mdv0 menvcfg0
-                     HSIE HMPRV HSXL HMXR Hleg Hmm HPBMTE Hpmm Hlpe HFIOM Hmenvval0
-                     with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv") as "Hsm".
-        iFrame "Hsm Hgc Htlbinv". }
-      iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
-                with "[] Hconf Hpc Hfile [Hvoldc HP]").
-      { iPureIntro. exact Hcallee_new. }
-      iExists oldc. iSplitL "Hvoldc"; [iNext; iExact "Hvoldc" | iExact "HP"].
-    Qed.
-  End SwtchSpec.
 
 End WpSwtchVc.
 

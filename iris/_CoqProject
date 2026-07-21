@@ -193,6 +193,7 @@ WpSconfCsr.v
 WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
+ProcGeom.v
 KernelRvcDecode.v
 KernelBaseDecode.v
 WpPushOffTop.v
@@ -212,7 +213,15 @@ WpInitlock.v
 TrampPt.v
 VcGen.v
 VcGenS.v
+SwtchCtx.v
 WpSwtchVc.v
+SpecSwtch.v
+WpSwtchSconf.v
+SchedCtx.v
+SpecMyproc.v
+WpMyprocDecode.v
+SpecSched.v
+SpecYield.v
 WpWakeup.v
 SpecWakeupLoop.v
 WpSconfWakeupLoop.v

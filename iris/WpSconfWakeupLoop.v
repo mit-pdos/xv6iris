@@ -37,6 +37,7 @@ Require Import VcGenS.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import SpecAcquire SpecRelease.
 Require Import WpWakeup SpecWakeup WpKalloc.
+Require Import SchedCtx.
 Require Import SpecWakeupLoop.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -73,15 +74,12 @@ Section WpSconfWakeupLoop.
      wk_lockcells γs)%I.
 
   (* wakeup only RELAYS parked contexts (SLEEPING->RUNNABLE, untouched), never
-     resumes them, so the smode-flavoured [proc_lock_res] (whose [proc_ctx]
-     embeds a [valid_context] over the smode [sconf R gc bsie dq]) is threaded
-     OPAQUELY here: the wakeup CODE runs over the sie-agnostic sconf world while
-     the proc-lock RESOURCE stays the existing one (it ports later, with the
-     scheduler).  Hence the smode [R/gc/bsie/dq] parameters -- carried, never
-     inspected. *)
+     resumes them, so [proc_lock_res] (SchedCtx.v, whose context slot is the
+     ▷-guarded [proc_ctx] over the scheduler swtch chain) is threaded OPAQUELY
+     here: the ▷-slot is carried between elim and intro/wakeup, never stripped.
+     The loop's own [γ root_ppn Φ γs] parameters index the invariant. *)
   Lemma wp_wakeup_loop_sconf
       (γ : gname) (root_ppn : mword 44)
-      (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac)
       (Φ : mval -> iProp Σ)
       (γs : list gname) (spF a0f rtp chan : mword 64) (noffv : mword 32)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
@@ -93,7 +91,7 @@ Section WpSconfWakeupLoop.
     wk_noff_rel (wk_noff_acq noffv) = noffv ->
     (neq_vec (sign_extend' 64 noffv) zero_reg = false <-> lvl = 0%nat) ->
     (10 <= av)%nat ->
-    procs_inv Rreg Φ γc bsie dq γs -∗
+    procs_inv γ root_ppn Φ γs -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x58]. *)
     ( ∀ Mexit : regfile,
         ⌜ Mexit !!! Regidx csp_rs1 = spF
@@ -266,7 +264,7 @@ Section WpSconfWakeupLoop.
       (* ---- myproc(): a0 = proc_addr j (j<NPROC), callee-saved preserved.  Lend
          the deep custody (K := 10); intr_count [lvl] unchanged. ---- *)
       iDestruct "Hres" as "(Hnoffc & Hintc & Hlockcells)".
-      iApply (wp_myproc_sconf γ root_ppn Φ Mj lvl av ltac:(lia)
+      iApply (wp_myproc_sconf_any γ root_ppn Φ Mj lvl av ltac:(lia)
                 ltac:(rewrite HMjra; vm_compute; reflexivity)
                 with "Hsc Hhs Hcg Hcnt Htlb Htext Hpc [-]").
       iIntros (j mret) "%Hj %Hreta0 %Hpres Hsc Hhs Hcg Hcnt Htlb Hpc".
@@ -335,7 +333,7 @@ Section WpSconfWakeupLoop.
         iEval (rewrite Hpp40) in "Hpc".
         (* the per-proc lock for proc[k] and its protected resource. *)
         destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
-        iDestruct (procs_inv_lookup Rreg Φ γc bsie dq γs k γk Hγk with "Hpinv") as "#Hlockk".
+        iDestruct (procs_inv_lookup γ root_ppn Φ γs k γk Hγk with "Hpinv") as "#Hlockk".
         iDestruct (big_sepL_lookup_acc _ _ _ _ Hγk with "Hlockcells") as "[Hcpuk Hlockback]".
         iDestruct "Hintc" as (iv) "Hintc".
         (* sp/tp preserved through myproc. *)
@@ -382,7 +380,7 @@ Section WpSconfWakeupLoop.
         { rewrite /M42 upd_ne; [| vm_compute; discriminate].
           rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmret4. }
         (* acquire(&proc[k]->lock): intr_count lvl -> S lvl; returns locked + proc_lock_res. *)
-        iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γk "proc"%string (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) M42
+        iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γk "proc"%string (proc_lock_res γ root_ppn Φ γs γk (proc_addr k)) M42
                   (zero_reg : mword 64) noffv iv lvl av
                   ltac:(rewrite HM42tp; exact Hmycpu_nz)
                   ltac:(rewrite HM42ra; vm_compute; reflexivity)
@@ -398,7 +396,7 @@ Section WpSconfWakeupLoop.
                         = mword_of_int (KernelSyms.wakeup + 0x46)).
         { rewrite HM42ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc46) in "Hpc".
-        iDestruct (proc_lock_res_elim Rreg Φ γc bsie dq γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpch & Hctx)".
+        iDestruct (proc_lock_res_elim γ root_ppn Φ γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpch & Hctx)".
         (* the acquire-returned cpu/noff/int cells: rewrite their addresses into
            the [wk_cpu_addr (proc_addr k)] / [wk_noff_addr a0f] forms release wants. *)
         iEval (rewrite HM42a0) in "Hcpu2".
@@ -432,7 +430,7 @@ Section WpSconfWakeupLoop.
                      (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
                    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn Mr av -∗ tlb_inv_pt root_ppn -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
-                   locked γk -∗ proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k) -∗
+                   locked γk -∗ proc_lock_res γ root_ppn Φ γs γk (proc_addr k) -∗
                    WP (Loop : expr riscv_lang) {{ Φ }})%I
           with "[Hcnt Hnoff2 Hint2 Hcpu2 Hlockback Hframe Htail]"
           as "Hrel".
@@ -499,7 +497,7 @@ Section WpSconfWakeupLoop.
           assert (Hal5 : eq_vec (access_vec_dec (update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
             by (rewrite HMr2c_ra; vm_compute; reflexivity).
           (* release(&proc[k]->lock): intr_count S lvl -> lvl. *)
-          iApply (Release.wp_release_sconf γ root_ppn Φ γk (proc_addr k) "proc"%string (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) Mr2c
+          iApply (Release.wp_release_sconf γ root_ppn Φ γk (proc_addr k) "proc"%string (proc_lock_res γ root_ppn Φ γs γk (proc_addr k)) Mr2c
                     (mycpu_ret rtp) nacq ivc
                     lvl av (dqi:=DfracOwn 1)
                     Hlka2 Hmine2 Hrel_coup Hnf_pos Hal5 ltac:(lia)
@@ -677,7 +675,7 @@ Section WpSconfWakeupLoop.
                             (sign_extend' 64 (mword_of_int 8162 : mword 13))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite H48tgt) in "Hpc".
-          iDestruct (proc_lock_res_intro Rreg Φ γc bsie dq γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
+          iDestruct (proc_lock_res_intro γ root_ppn Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
           iApply ("Hrel" $! M48 with "[%] Hsc Hhs Hcg Htlb Hpc Htok HR").
           repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_4 | exact HM48_18
                         | exact HM48_19 | exact HM48_20 | exact HM48_21
@@ -761,7 +759,7 @@ Section WpSconfWakeupLoop.
                               (sign_extend' 64 (mword_of_int 8156 : mword 13))
                             = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite H4etgt) in "Hpc".
-            iDestruct (proc_lock_res_intro Rreg Φ γc bsie dq γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
+            iDestruct (proc_lock_res_intro γ root_ppn Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
             iApply ("Hrel" $! M4e with "[%] Hsc Hhs Hcg Htlb Hpc Htok HR").
             repeat split; [exact HM4e_9 | exact HM4e_2 | exact HM4e_4 | exact HM4e_18
                           | exact HM4e_19 | exact HM4e_20 | exact HM4e_21
@@ -796,11 +794,11 @@ Section WpSconfWakeupLoop.
                             = mword_of_int (KernelSyms.wakeup + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite Hpc56) in "Hpc".
             (* reassemble proc_lock_res via the wakeup transition. *)
-            assert (Hnc : (if needs_ctx st then proc_ctx Rreg Φ γc bsie dq γk (proc_addr k) else emp)%I
-                          = proc_ctx Rreg Φ γc bsie dq γk (proc_addr k))
+            assert (Hnc : (if needs_ctx st then ▷ proc_ctx γ root_ppn Φ γs (proc_addr k) else emp)%I
+                          = (▷ proc_ctx γ root_ppn Φ γs (proc_addr k))%I)
               by (rewrite Hst_sl needs_ctx_SLEEPING; reflexivity).
             iEval (rewrite Hnc) in "Hctx".
-            iDestruct (proc_lock_res_wakeup Rreg Φ γc bsie dq γk (proc_addr k) ch with "Hpst Hpch Hctx") as "HR".
+            iDestruct (proc_lock_res_wakeup γ root_ppn Φ γs γk (proc_addr k) ch with "Hpst Hpch Hctx") as "HR".
             (* ---- 0x56 c.j release ---- *)
             iPoseProof (wki_56 with "Htext") as "Hi56".
             assert (H56tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64)
@@ -831,15 +829,14 @@ Section WpSconfWakeupLoop.
   (* per-cpu push_off scratch (noff + EXISTENTIAL intena + lock words), and  *)
   (* procs_inv; the arithmetic side conditions (mycpu non-null, noff round-  *)
   (* trip, and the noff<->intr_count coupling) are the caller's obligations. *)
-  (* proc_lock_res is threaded opaquely (Rreg/gc/bsie/dq), as in the loop.   *)
+  (* proc_lock_res (SchedCtx.v) is threaded opaquely, ▷-slot untouched.      *)
   (* ===================================================================== *)
   Lemma wp_wakeup_sconf
       (γ : gname) (root_ppn : mword 44)
-      (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac)
       (Φ : mval -> iProp Σ)
       (m : regfile) (γs : list gname) (a0f : mword 64)
       (noffv : mword 32) (lvl K : nat)
-    : wp_wakeup_sconf_body γ root_ppn Rreg γc bsie dq Φ m γs a0f noffv lvl K.
+    : wp_wakeup_sconf_body γ root_ppn Φ m γs a0f noffv lvl K.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt Hcoupling Halign.
@@ -850,7 +847,7 @@ Section WpSconfWakeupLoop.
     iIntros (M vpad) "%Hpro Hsc Hhs Hcg Htlb Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM18 & HM19 & HM21 & HM20 & HMcsp & HM1 & HM4 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
     (* ---- the loop, with the epilogue as its exit continuation ---- *)
-    iPoseProof (wp_wakeup_loop_sconf γ root_ppn Rreg γc bsie dq Φ γs spF a0f
+    iPoseProof (wp_wakeup_loop_sconf γ root_ppn Φ γs spF a0f
                   (m !!! Regidx (mword_of_int 4 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) noffv
                   (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                   (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))

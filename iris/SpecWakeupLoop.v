@@ -24,10 +24,11 @@ Require Import IntrDefs WpIntenaBits.
 Require Import IntrDefs.
 Require Import SpecAcquire SpecRelease.
 Require Import WpWakeup SpecWakeup WpKalloc.
+Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f : mword 64) (noffv : mword 32) (lvl K : nat) :=
+    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f : mword 64) (noffv : mword 32) (lvl K : nat) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   let rettgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -44,7 +45,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
   intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
   wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
-  wk_lockcells γs -∗ procs_inv Rreg Φ γc bsie dq γs -∗
+  wk_lockcells γs -∗ procs_inv γ root_ppn Φ γs -∗
   ( ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn Mf K -∗
@@ -58,6 +59,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
 Module Type WAKEUPLOOP.
   Parameter wp_wakeup_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f : mword 64) (noffv : mword 32) (lvl K : nat),
-      wp_wakeup_sconf_body γ root_ppn Rreg γc bsie dq Φ m γs a0f noffv lvl K.
+      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f : mword 64) (noffv : mword 32) (lvl K : nat),
+      wp_wakeup_sconf_body γ root_ppn Φ m γs a0f noffv lvl K.
 End WAKEUPLOOP.

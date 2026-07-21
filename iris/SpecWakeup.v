@@ -25,7 +25,7 @@ From Kernel Require KernelSyms.
 
 Notation WK := KernelSyms.wakeup.
 
-Axiom wp_myproc_sconf :
+Axiom wp_myproc_sconf_any :
   forall {Σ : gFunctors} {HR : riscvGS Σ} {HL : lockG Σ} {HS : sieG Σ} {CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
     (m : regfile) (n K : nat),

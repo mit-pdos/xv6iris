@@ -61,6 +61,9 @@ are working on that effort — the relevant `projects/` file.
   mappages / walk proofs (`KvmSpec.v`).
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
+- **[`yield-sched.md`](projects/yield-sched.md)** — yield/sched/myproc specs and
+  proofs: the sconf-tier swtch port, the global scheduler-chain predicate
+  `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
 
 ### `completed/` — finished projects, archived for reference
 
