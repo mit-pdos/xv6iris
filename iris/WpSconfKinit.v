@@ -26,12 +26,15 @@ Require Import KallocInv.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpInitlock WpSconfInitlock WpSconfFreerange.
+Require Import WpInitlock SpecInitlock SpecFreerange.
 Require Import WpKinitDecode.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecKinit.
 Local Open Scope Z_scope.
 Import Defs.
+
+Module KinitProof (Freerange : FREERANGE) (Initlock : INITLOCK) : KINIT.
 
 Section WpSconfKinit.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
@@ -42,55 +45,10 @@ Section WpSconfKinit.
   Lemma wp_kinit_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile)
       (ps : list (mword 64)) (K ncnt : nat)
-      (vlock : bv 32) (vname vcpu : bv 64) :
-    let pcE : mword 64 := mword_of_int KI in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let lk : mword 64 := mword_of_int KernelSyms.kmem in
-    let fl : mword 64 := mword_of_int (KernelSyms.kmem + 24) in
-    let c_name := add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)) in
-    let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let endaddr : mword 64 := mword_of_int 0x80023558 in
-    let phystop : mword 64 := mword_of_int 0x88000000 in
-    let s1entry := add_vec (and_vec (add_vec endaddr (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
-    (22 <= K)%nat ->
-    ncnt = 0%nat ->
-    eq_vec (zero_reg : mword 64) cpuv = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    prun phystop s1entry ps ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m K -∗
-    intr_count γ root_ppn ncnt -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    lk ↦₄ vlock -∗
-    c_name ↦₈ vname -∗
-    c_cpu ↦₈ vcpu -∗
-    fl ↦₈ (mword_of_int 0 : mword 64) -∗
-    ([∗ list] p ∈ ps, page_own p) -∗
-    a_noff ↦₄ (zeros' 32 : mword 32) -∗
-    (∃ iv : mword 32, a_int ↦₄ iv) -∗
-    ( ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mr K -∗
-      intr_count γ root_ppn ncnt -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      is_kmem γl γk lk fl -∗
-      kalloc_avail γk (Some (length ps)) -∗
-      a_noff ↦₄ (zeros' 32 : mword 32) -∗
-      (∃ iv : mword 32, a_int ↦₄ iv) -∗
-      (∃ nm : mword 64, c_name ↦₈ nm) -∗
-      c_cpu ↦₈ (zero_reg : mword 64) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (vlock : bv 32) (vname vcpu : bv 64)
+    : wp_kinit_sconf_body γ root_ppn Φ m ps K ncnt vlock vname vcpu.
   Proof.
+    cbv beta delta [wp_kinit_sconf_body].
     intros pcE sp0 ret_tgt cpuv a_noff a_int lk fl c_name c_cpu endaddr phystop s1entry
       HK Hncnt Hmycpu Hretm Hprun.
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
@@ -234,7 +192,7 @@ Section WpSconfKinit.
     assert (HR7tp : R7 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5))
       by (rewrite /R7 upd_ne; [exact HR6tp | vm_compute; discriminate]).
     (* initlock(&kmem.lock, "kmem") : owns lk's 3 struct fields, returns them init'd *)
-    iApply (wp_initlock_sconf γ root_ppn Φ R7 vlock vname vcpu (K - 2)
+    iApply (Initlock.wp_initlock_sconf γ root_ppn Φ R7 vlock vname vcpu (K - 2)
               ltac:(lia)
               ltac:(rewrite HR7ra; vm_compute; reflexivity)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc [Hlock] [Hname] [Hcpu]").
@@ -332,7 +290,7 @@ Section WpSconfKinit.
     assert (HR12ra : R12 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KI + 0x28) : mword 64) 4)
       by (rewrite /R12; apply upd_eq).
     (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads the count *)
-    iApply (wp_freerange_sconf γ root_ppn Φ γl γk lk fl R12 ps (K - 2) ncnt
+    iApply (Freerange.wp_freerange_sconf γ root_ppn Φ γl γk lk fl R12 ps (K - 2) ncnt
               ltac:(lia) Hncnt
               ltac:(rewrite HR12tp; exact Hmycpu)
               ltac:(rewrite HR12ra; vm_compute; reflexivity)
@@ -452,3 +410,5 @@ Section WpSconfKinit.
   Qed.
 
 End WpSconfKinit.
+
+End KinitProof.

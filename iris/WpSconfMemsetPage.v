@@ -30,48 +30,27 @@ Require Import StackOwn.
 Require Import KallocInv.
 Require Import IntrDefs.
 Require Import IntrDefs.
-Require Import WpSconfMemset.
+Require Import SpecMemset.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import KptTree.
 Require Import Riscv.rv64d.
+Require Import SpecMemsetPage.
 Import Defs.
 
-Notation MS := KernelSyms.memset.
+
+Module MemsetPageProof (Memset : MEMSET) : MEMSETPAGE.
 
 Section WpSconfMemsetPage.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   Lemma wp_memset_page_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (cval : mword 64) :
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let a1_idx : mword 5 := mword_of_int 11 in
-    let a2_idx : mword 5 := mword_of_int 12 in
-    let pcE := mword_of_int MS in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
-    let p := m0 !!! Regidx a0_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (2 <= n)%nat ->
-    page_valid p ->
-    m0 !!! Regidx a1_idx = cval ->
-    m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    page_own p -∗
-    ( ∀ mfin,
-      sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mfin n -∗ tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      page_own p -∗
-      ⌜ callee_saved m0 mfin ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (m0 : regfile) (n : nat) (cval : mword 64)
+    : wp_memset_page_sconf_body γ root_ppn Φ m0 n cval.
   Proof.
+    cbv beta delta [wp_memset_page_sconf_body].
     intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt Hn Hpv Hcval Ha2 Hret0.
     set (ra_idx := (mword_of_int 1 : mword 5)).
     set (s0_idx := (mword_of_int 8 : mword 5)).
@@ -138,7 +117,7 @@ Section WpSconfMemsetPage.
     { unfold sp', imm_entry, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     (* --- PREFIX: 0x00..0x10 --- *)
-    iApply (wp_memset_prefix_sconf γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
+    iApply (Memset.wp_memset_prefix_sconf γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
               wval_add Hn Hsp' Hn0 Hvalue_add
               with "Hsc Hhs Hcg Htlbinv Hpc
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 [-]").
@@ -166,7 +145,7 @@ Section WpSconfMemsetPage.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       rewrite -Hcval. reflexivity. }
     (* --- LOOP: 0x14..0x1a --- *)
-    iApply (wp_memset_loop_sconf γ root_ppn Φ 4096 p wval_add cval a1_idx a4_idx a5_idx imm_bne
+    iApply (Memset.wp_memset_loop_sconf γ root_ppn Φ 4096 p wval_add cval a1_idx a4_idx a5_idx imm_bne
               olds (n - 2)%nat
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -175,7 +154,7 @@ Section WpSconfMemsetPage.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               minstr_cce minstr_cd2 minstr_cd4
-              4096 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
+              4096%nat 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hbuf [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbuf".
     set (m7 := <[Regidx a5_idx := regval_into_reg (ms_addr p 4096)]> m6).
@@ -193,7 +172,7 @@ Section WpSconfMemsetPage.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
     (* the suffix's ret target is built from ra0e := ra0, so [Hret0] IS its Hal0 *)
-    iApply (wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
+    iApply (Memset.wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
               Hret0
               with "Hsc Hhs Hcg Htlbinv HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
@@ -232,3 +211,5 @@ Section WpSconfMemsetPage.
   Qed.
 
 End WpSconfMemsetPage.
+
+End MemsetPageProof.

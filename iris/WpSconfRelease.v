@@ -28,13 +28,13 @@ Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock KernelRvcDecode.
-Require Import WpMycpu WpSconfHolding.
-Require Import WpSconfPushOff.
+Require Import WpMycpu SpecHolding.
+Require Import SpecPushOff.
 Require Import WpRelease.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecRelease.
 Import Defs.
 
-Notation RL := KernelSyms.release.
 
 Local Lemma addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
 Proof.
@@ -48,6 +48,8 @@ Proof.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
 
+Module ReleaseProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE.
+
 Section WpSconfRelease.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
@@ -55,49 +57,10 @@ Section WpSconfRelease.
   Lemma wp_release_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (R : iProp Σ)
       (m : regfile)
-      (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) {dqi : dfrac} :
-    let pcE : mword 64 := mword_of_int RL in
-    let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-    let storeval_noff := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-    eq_vec cpuold cpuv = true ->
-    (neq_vec nv1 zero_reg = false <-> n = 0%nat) ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (10 <= av)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m av -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    is_lock γl lka R -∗
-    locked γl -∗
-    R -∗
-    a_cpu ↦₈ cpuold -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄{ dqi } intenav -∗
-    intr_count γ root_ppn (S n) -∗
-    ( ∀ mr,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mr av -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      a_cpu ↦₈ (zero_reg : mword 64) -∗
-      a_noff ↦₄ storeval_noff -∗
-      a_int ↦₄{ dqi } intenav -∗
-      intr_count γ root_ppn n -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) {dqi : dfrac}
+    : wp_release_sconf_body γ root_ppn Φ γl lka R m cpuold noffv intenav n av dqi.
   Proof.
+    cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 a_cpu sp0 cpuv a_noff a_int nv1 storeval_noff ret_tgt
            Hlka Hmine Hcoup Hnoffpos Hal0 Hav.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hlock Htoken HR Hcpu Hnoff Hint Hcnt Hcont".
@@ -218,7 +181,7 @@ Section WpSconfRelease.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_ne; [| vm_compute; discriminate].
       exact HcspR0. }
-    iApply (wp_holding_lockinv_locked_s_sconf γ root_ppn Φ γl lka R R3 (av - 4)%nat cpuold (dqc := DfracOwn 1)
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ root_ppn Φ γl lka R R3 (av - 4)%nat cpuold (dqc := DfracOwn 1)
               ltac:(rewrite Ha0R3; exact Hlka)
               ltac:(rewrite HtpR3; exact Hmine)
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
@@ -294,7 +257,7 @@ Section WpSconfRelease.
     assert (HcspM1 : M1 !!! Regidx csp_rs1 = spr).
     { rewrite /M1 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspR3. }
-    iApply (wp_pop_off_sconf γ root_ppn Φ M1 (av - 4)%nat noffv intenav n (dqi := dqi)
+    iApply (PushOff.wp_pop_off_sconf γ root_ppn Φ M1 (av - 4)%nat noffv intenav n (dqi := dqi)
               Hcoup Hnoffpos
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -498,3 +461,5 @@ Section WpSconfRelease.
   Qed.
 
 End WpSconfRelease.
+
+End ReleaseProof.

@@ -1,6 +1,6 @@
 (* WpSconfKfree.v -- kfree over the SIE-agnostic sconf world (kalloc cone,
    stage 8).  The sconf mirror of [wp_kfree] (WpKfree.v): memset (before the
-   lock, interrupts at ambient level) runs SIE-blind via wp_memset_page_sconf;
+   lock, interrupts at ambient level) runs SIE-blind via MemsetPage.wp_memset_page_sconf;
    the acquire/critical-section/release run at the disabled level, threading
    the counting token [intr_count] net-zero (acquire n->S n, release S n->n).
    sp moves only at the prologue/epilogue (4-slot frame), traded through
@@ -33,14 +33,17 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpIntenaBits.
-Require Import WpSconfMemsetPage WpSconfAcquire WpSconfRelease.
+Require Import SpecMemsetPage SpecAcquire SpecRelease.
 Require Import WpKalloc WpKfree.
+Require Import SpecKfree.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 (* [kfree_nv1_cancel_pure] moved to WpKalloc.v -- shared with kalloc's own
    acquire/release-shaped noff counter, next to [kalloc_sp_cancel]. *)
+
+Module KfreeProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELEASE) : KFREE.
 
 Section WpSconfKfree.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
@@ -52,62 +55,10 @@ Section WpSconfKfree.
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
       (cpuold : mword 64) (noffv intena_old : mword 32)
-      (on : option nat) (n : nat) (K : nat) :
-    let pcE : mword 64 := mword_of_int KF in
-    let p := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    (* acquire's noff-increment store value (function of the ghost noff alone) *)
-    let po_noff_a5 := sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-    let po_noff_store := (autocast (T := mword) (subrange_vec_dec po_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    (* release's noff-decrement store value (its pop_off restores noff = noffv);
-       returned in the [a_noff] cell so a repeated caller can re-thread it. *)
-    let noff_ret := (autocast (T := mword) (subrange_vec_dec
-        (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store)
-            (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
-        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    (14 <= K)%nat ->
-    eq_vec (cpuold : mword 64) cpuv = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    lk = mword_of_int KernelSyms.kmem ->
-    fl = mword_of_int (KernelSyms.kmem + 24) ->
-    (* the hardware noff counter is in lockstep with the ghost token level *)
-    (neq_vec (sign_extend' 64 noffv) zero_reg = false <-> n = 0%nat) ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 po_noff_store) = false ->
-    eq_vec (sign_extend' 64
-       (if eq_vec (sign_extend' 64 noffv) zero_reg then (zeros' 32) else intena_old)) zero_reg = true ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m K -∗
-    intr_count γ root_ppn n -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    is_lock γl lk (kmem_res γk fl) -∗
-    kfree_pre p -∗
-    kalloc_avail γk on -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄ intena_old -∗
-    a_cpu ↦₈ cpuold -∗
-    ( ∀ mr,
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mr K -∗
-      intr_count γ root_ppn n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      kalloc_avail γk (avail_inc on) -∗
-      a_cpu ↦₈ (zero_reg : mword 64) -∗
-      a_noff ↦₄ noff_ret -∗
-      (∃ iv : mword 32, a_int ↦₄ iv) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (on : option nat) (n : nat) (K : nat)
+    : wp_kfree_sconf_body γ root_ppn Φ γl γk lk fl m cpuold noffv intena_old on n K.
   Proof.
+    cbv beta delta [wp_kfree_sconf_body].
     intros pcE p sp0 ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
       HK Hcpune Hretm Hlk Hfl Hnoff_lvl Hnoffpos Hintena0.
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hkmem Hpre Havail Hqnoff Hqint Hqcpu Hcont".
@@ -380,7 +331,7 @@ Section WpSconfKfree.
     set (R14 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 1 : mword 64)]> R13).
     assert (Hpp32 : add_vec_int (mword_of_int (KF + 0x30) : mword 64) 2 = mword_of_int (KF + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp32) in "Hpc".
-    (* ===== MEMSET(p, 1, 4096): jal + wp_memset_page_sconf (deep-2 lent) ===== *)
+    (* ===== MEMSET(p, 1, 4096): jal + MemsetPage.wp_memset_page_sconf (deep-2 lent) ===== *)
     assert (Hp10_14 : R14 !!! Regidx (mword_of_int 10 : mword 5) = p).
     { rewrite /R14 upd_ne; [| vm_compute; discriminate].
       rewrite /R13 upd_ne; [| vm_compute; discriminate].
@@ -431,7 +382,7 @@ Section WpSconfKfree.
     { rewrite /Mms upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HMmssp : Mms !!! Regidx csp_rs1 = spr)
       by (rewrite /Mms upd_ne; [ exact Hsp_14 | vm_compute; discriminate ]).
-    iApply (wp_memset_page_sconf γ root_ppn Φ Mms (K - 4)%nat (mword_of_int 1 : mword 64)
+    iApply (MemsetPage.wp_memset_page_sconf γ root_ppn Φ Mms (K - 4)%nat (mword_of_int 1 : mword 64)
               ltac:(lia)
               ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
               ltac:(rewrite HMmsra; vm_compute; reflexivity)
@@ -543,7 +494,7 @@ Section WpSconfKfree.
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [| vm_compute; discriminate].
       rewrite Hp10. apply add_vec_zero_l. }
-    iApply (wp_acquire_sconf γ root_ppn Φ γl (kmem_res γk fl) Kacq
+    iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γl (kmem_res γk fl) Kacq
               cpuold noffv intena_old n (K - 4)%nat
               ltac:(rewrite HKacqtp; exact Hcpune)
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
@@ -660,7 +611,7 @@ Section WpSconfKfree.
     { exact (kfree_nv1_cancel_pure noffv). }
     assert (kfree_nv1_cancel : neq_vec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)) zero_reg = false <-> n = 0%nat).
     { rewrite Hnv1eq. exact Hnoff_lvl. }
-    iApply (wp_release_sconf γ root_ppn Φ γl lk (kmem_res γk fl) Rrel
+    iApply (Release.wp_release_sconf γ root_ppn Φ γl lk (kmem_res γk fl) Rrel
               (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
               po_noff_store
               (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
@@ -841,3 +792,5 @@ Section WpSconfKfree.
   Qed.
 
 End WpSconfKfree.
+
+End KfreeProof.

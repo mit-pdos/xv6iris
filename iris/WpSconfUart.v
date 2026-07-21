@@ -29,46 +29,23 @@ Require Import WpUart WpSmodeUart WpSmodePtUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import SpecUart.
 Import Defs.
+
+Module UartProof : UART.
 
 Section WpSconfUart.
 Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ}.
 Context `{CID : CpuId}.
 
-Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+  Lemma wp_sb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ) :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-  let lppn := kpt_leaf_ppn uart_vpn in
-  (0 <= off < uart_size)%Z ->
-  (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-     ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
-  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-  zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
-  zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m n -∗
-  tlb_inv_pt root_ppn -∗
-  pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-  dev_inv γd -∗
-  R -∗
-  (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
-     uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
-  ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    S -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
-Proof.
+    (m : regfile) (n : nat) (R S : iProp Σ)
+    : wp_sb_uart_s_sconf_body γ root_ppn γd off Φ pc is_rvc rs2 rs1 imm m n R S.
+  Proof.
+    cbv beta delta [wp_sb_uart_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hident Hpa.
   iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv HR Hacc Hcont".
   iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
@@ -200,43 +177,13 @@ Proof.
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
 Qed.
 
-Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+  Lemma wp_lb_uart_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let ldval := fun (b : bv 8) =>
-        (extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b) : mword 64) in
-  let lppn := kpt_leaf_ppn uart_vpn in
-  (0 <= off < uart_size)%Z ->
-  uint rd <> 0 ->
-  rd <> csp_rs1 ->
-  (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-     ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
-  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-  autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-  zero_extend' 64 (concat_vec lppn (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = uart_pa off ->
-  zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m n -∗
-  tlb_inv_pt root_ppn -∗
-  pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
-  dev_inv γd -∗
-  R -∗
-  (∀ u b u', ⌜ uart_read u off = Some (b, u') ⌝ -∗
-     uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S b) -∗
-  ( ∀ b : bv 8,
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (ldval b)]> m) n -∗
-    tlb_inv_pt root_ppn -∗
-    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    S b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
-Proof.
+    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ)
+    : wp_lb_uart_s_sconf_body γ root_ppn γd off Φ pc is_rvc is_unsigned rd rs1 imm m n R S.
+  Proof.
+    cbv beta delta [wp_lb_uart_s_sconf_body].
   intros ea a8 ldval lppn Hoff Hrd Hrdsp Hcanon Hvpn_def Hident Hpa.
   iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv HR Hacc Hcont".
   iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
@@ -377,3 +324,5 @@ Proof.
 Qed.
 
 End WpSconfUart.
+
+End UartProof.

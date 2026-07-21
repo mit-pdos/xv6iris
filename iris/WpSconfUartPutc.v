@@ -35,11 +35,14 @@ Require Import KptTree.
 Require Import DevModel WpUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfUart.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl SpecUart.
 Require Import WpUartPutcSync WpUartPutcSyncFull.
+Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+
+Module UartPutcProof (Uart : UART) : UARTPUTC.
 
 Section WpSconfUartPutc.
   Context `{!riscvGS Σ, !sieG Σ}.
@@ -139,7 +142,7 @@ Section WpSconfUartPutc.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp Haddr) "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (wp_lb_uart_s_sconf γ root_ppn γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_lb_uart_s_sconf γ root_ppn γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
               ltac:(unfold uart_size; lia) Hrd Hrdsp
@@ -179,7 +182,7 @@ Section WpSconfUartPutc.
   Proof.
     iIntros (Haddr) "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
     set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
-    iApply (wp_sb_uart_s_sconf γ root_ppn γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf γ root_ppn γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
               ltac:(unfold uart_size; lia)
@@ -539,42 +542,10 @@ Section WpSconfUartPutc.
       (Φ : mval -> iProp Σ)
       (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32)
-      {dqm dqm2 : dfrac} :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let pcE := mword_of_int UPS in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let a00 := m0 !!! Regidx a0_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let sb : mword 8 := autocast (T := mword)
-       (subrange_vec_dec (and_vec (add_vec zero_reg a00)
-          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
-    (4 <= K)%nat ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    eq_vec (sign_extend' 64 pv) zero_reg = false ->
-    neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m0 K -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
-    (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-    ( ∀ mf,
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mf K -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
-      (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-      uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      {dqm dqm2 : dfrac}
+    : wp_uartputc_sconf_body γ root_ppn γd Φ m0 K l pv pkv dqm dqm2.
   Proof.
+    cbv beta delta [wp_uartputc_sconf_body].
     intros ra_idx a0_idx pcE sp0 ra0 a00 ret_tgt sb HK Hal0 Hpv Hpkv.
     iIntros "Hsc Hhs Hcg Htlbinv #Ht Hpc Hpk Hpkd #Hdinv Hown #Hoff Hcont".
     set (spr := add_vec (m0 !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -794,3 +765,5 @@ Section WpSconfUartPutc.
   Qed.
 
 End WpSconfUartPutc.
+
+End UartPutcProof.

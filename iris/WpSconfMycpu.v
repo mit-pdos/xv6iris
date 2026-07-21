@@ -26,39 +26,20 @@ Require Import IntrDefs.
 Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecMycpu.
 Import Defs.
+
+Module MycpuProof : MYCPU.
 
 Section WpSconfMycpu.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   Lemma wp_mycpu_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let tp_idx : mword 5 := mword_of_int 4 in
-    let a0_idx : mword 5 := mword_of_int 10 in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let sp0 := m0 !!! Regidx csp_rs1 in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (2 <= n)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m0 n -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    ( ∀ m' : regfile,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn m' n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m0 m' /\
-        m' !!! Regidx a0_idx = mycpu_ret (m0 !!! Regidx tp_idx) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (m0 : regfile) (n : nat)
+    : wp_mycpu_sconf_body γ root_ppn Φ m0 n.
   Proof.
+    cbv beta delta [wp_mycpu_sconf_body].
     intros ra_idx tp_idx a0_idx pcE sp0 ra0 ret_tgt Hal0 Hn.
     (* the per-instruction register-map chain (private to the proof) *)
     set (s0_idx := (mword_of_int 8 : mword 5)).
@@ -296,30 +277,10 @@ Section WpSconfMycpu.
      sp), and callee_saved composes across the ra write. *)
   Lemma wp_call_mycpu_sconf_cs (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
-      (m : regfile) (n : nat) :
-    let ra_idx : mword 5 := mword_of_int 1 in
-    let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
-    let pcE := mword_of_int KernelSyms.mycpu in
-    let ra0 := m0 !!! Regidx ra_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec P (sign_extend' 64 jimm) = pcE ->
-    eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (2 <= n)%nat ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is P -∗
-    instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    ( ∀ mo,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn mo n -∗ tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mo /\
-        mo !!! Regidx (mword_of_int 10 : mword 5)
-          = mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (m : regfile) (n : nat)
+    : wp_call_mycpu_sconf_cs_body γ root_ppn Φ P jimm m n.
   Proof.
+    cbv beta delta [wp_call_mycpu_sconf_cs_body].
     intros ra_idx m0 pcE ra0 ret_tgt Htarget Halpce Hal0 Hn.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hjal Hcont".
     iApply (wp_jal_s_sconf γ root_ppn Φ P (mword_of_int 1) jimm m n
@@ -343,3 +304,5 @@ Section WpSconfMycpu.
   Qed.
 
 End WpSconfMycpu.
+
+End MycpuProof.

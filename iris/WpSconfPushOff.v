@@ -19,12 +19,11 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu WpSconfMycpu WpPushOffTop WpPopOff.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu SpecMycpu WpPushOffTop WpPopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecPushOff.
 Import Defs.
 
-Notation PO := KernelSyms.push_off.
-Notation PP := KernelSyms.pop_off.
 
 (* +0x24  0x10016073  csrsi sstatus,2 (rd = x0) -- pop_off's intr_on,
    never reached by the old SIE=0-only proof, so its facts are new. *)
@@ -83,6 +82,8 @@ Proof.
   apply avi0.
 Qed.
 
+
+Module PushOffProof (Mycpu : MYCPU) : PUSHOFF.
 
 Section WpSconfPushOff.
   Context `{!riscvGS Σ, !sieG Σ}.
@@ -262,7 +263,7 @@ Section WpSconfPushOff.
       by (rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hnoff Hpp24 Hpp16 Hpp8 Hgap Hcont".
     iPoseProof (poi_18 with "Htext") as "Hi18".
-    iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ P (mword_of_int 0xcfe : mword 21) ms av
+    iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ P (mword_of_int 0xcfe : mword 21) ms av
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi18 [-]").
@@ -530,43 +531,9 @@ Section WpSconfPushOff.
   Lemma wp_push_off_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat)
       (noff intena_old : mword 32) (a0f : mword 64) (n : nat)
-      :
-    let sp0 := m !!! Regidx csp_rs1 in
-    (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
-       read [sstatus_read mstatus0]) are reconstructed inside the proof over the
-       unbundled mstatus0; the statement stays mstatus0-free. *)
-    let noff_a5 := sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-    let noff_store := (autocast (T := mword) (subrange_vec_dec noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let a_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let caller_ret := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
-    mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
-    (6 <= av)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m av -∗
-    intr_count γ root_ppn n -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is (mword_of_int (PO + 0x00) : mword 64) -∗
-    a_noff ↦₄ noff -∗
-    a_intena ↦₄ intena_old -∗
-    ( ∀ (ms : mword 64) (mfin : regfile),
-      ⌜ sconf_ms_facts ms ⌝ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mfin av -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is caller_ret -∗
-      ⌜ callee_saved m mfin ⌝ -∗
-      a_noff ↦₄ noff_store -∗
-      a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg
-                   then po_intena_val ms else intena_old) -∗
-      intr_count γ root_ppn (S n) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    : wp_push_off_sconf_body γ root_ppn Φ m av noff intena_old a0f n.
   Proof.
+    cbv beta delta [wp_push_off_sconf_body].
     intros sp0 noff_a5 noff_store a_noff a_intena caller_ret Hcret0 Ha0 Hav.
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
@@ -670,7 +637,7 @@ Section WpSconfPushOff.
     assert (Hm0csp10 : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PO + 0x10) : mword 64) 4)]> N3) !!! Regidx csp_rs1 = spd)
       by (rewrite upd_ne; [ exact Hcsp3n | vm_compute; discriminate ]).
     iPoseProof (poi_10 with "Htext") as "Hi10".
-    iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3 (av - 4)%nat
+    iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3 (av - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi10 [-]").
@@ -733,7 +700,7 @@ Section WpSconfPushOff.
       assert (Hm0csp2c : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PO + 0x2c) : mword 64) 4)]> N5) !!! Regidx csp_rs1 = spd)
         by (rewrite upd_ne; [ exact HcspN5 | vm_compute; discriminate ]).
       iPoseProof (poi_2c with "Htext") as "Hi2c".
-      iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5 (av - 4)%nat
+      iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5 (av - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
                 with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi2c [-]").
@@ -1105,42 +1072,10 @@ Section WpSconfPushOff.
   (* ------------------------------------------------------------------- *)
   Lemma wp_pop_off_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat)
-      (noffv intenav : mword 32) (n : nat) {dqi : dfrac} :
-    let pcE : mword 64 := mword_of_int PP in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec a0v (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-    let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (* the counting token's level mirrors the noff cell: the machine
-       branch [noff-1 == 0] holds iff we are popping to level 0. *)
-    (neq_vec nv1 zero_reg = false <-> n = 0%nat) ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (4 <= av)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m av -∗
-    intr_count γ root_ppn (S n) -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄{ dqi } intenav -∗
-    ( ∀ mf,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mf av -∗
-      intr_count γ root_ppn n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mf ⌝ -∗
-      a_noff ↦₄ storeval -∗
-      a_int ↦₄{ dqi } intenav -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (noffv intenav : mword 32) (n : nat) {dqi : dfrac}
+    : wp_pop_off_sconf_body γ root_ppn Φ m av noffv intenav n dqi.
   Proof.
+    cbv beta delta [wp_pop_off_sconf_body].
     intros pcE sp0 a0v a_noff a_int nv1 storeval ret_tgt Hcoup Hnoffpos Hal0 Hav.
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     set (P0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
@@ -1211,7 +1146,7 @@ Section WpSconfPushOff.
     (* ---- 0x08: jal ra,mycpu ---- *)
     assert (Hcsp1 : P1 !!! Regidx csp_rs1 = spd)
       by (rewrite /P1 upd_ne; [exact Hcsp0 | vm_compute; discriminate]).
-    iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) P1 (av - 2)%nat
+    iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) P1 (av - 2)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi08 [-]").
@@ -1796,3 +1731,5 @@ Section WpSconfPushOff.
   Qed.
 
 End WpSconfPushOff.
+
+End PushOffProof.

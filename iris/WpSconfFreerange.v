@@ -7,7 +7,7 @@
 
    The loop threads: [sconf]/[sie_cap]/[intr_count] (net-zero -- kfree's
    acquire/release pair restores the level), the three per-CPU scratch cells
-   (returned by the strengthened [wp_kfree_sconf]), a DEEP [stack_own] slice
+   (returned by the strengthened [Kfree.wp_kfree_sconf]), a DEEP [stack_own] slice
    lent to kfree (kfree wants 14 below its sp), and a big-sep of [page_own] over
    the pages to be freed. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -30,14 +30,17 @@ Require Import KallocInv.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSconfKfree.
+Require Import SpecKfree.
 Require Import WpFreerangeDecode.
 From Kernel Require KernelSyms.
 Require Import RiscvExec RiscvTryStep RiscvFetchExec WpLeafCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecFreerange.
 Local Open Scope Z_scope.
 Import Defs.
 
+
+Module FreerangeProof (Kfree : KFREE) : FREERANGE.
 
 Section WpSconfFreerange.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
@@ -48,13 +51,6 @@ Section WpSconfFreerange.
   (* ================================================================= *)
   Notation FR := KernelSyms.freerange.
 
-  Definition PGSIZEv : mword 64 := mword_of_int 4096.
-  Definition negPGSIZEv : mword 64 := mword_of_int (-4096).   (* the ~0xfff page mask *)
-
-  (* [avail_inc] applied [k] times -- the page-count token after freeing [k]
-     pages.  freerange starts at [Some 0] and ends at [Some (length ps)]. *)
-  Fixpoint avail_inc_n (on : option nat) (k : nat) : option nat :=
-    match k with O => on | S k' => avail_inc (avail_inc_n on k') end.
 
   Lemma avail_inc_n_comm (on : option nat) (k : nat) :
     avail_inc_n (avail_inc on) k = avail_inc (avail_inc_n on k).
@@ -67,15 +63,6 @@ Section WpSconfFreerange.
      loop register [s1] currently holds [p + PGSIZE].  The list terminates the
      moment [s1 >u pa_end] (no full page left); each entry is [s1 - PGSIZE],
      page-valid, and the residual [prun] threads [s1 += PGSIZE]. *)
-  Fixpoint prun (pa_end s1 : mword 64) (ps : list (mword 64)) : Prop :=
-    match ps with
-    | [] => zopz0zI_u pa_end s1 = true
-    | p :: rest =>
-        zopz0zI_u pa_end s1 = false
-        /\ p = add_vec s1 negPGSIZEv
-        /\ page_valid p
-        /\ prun pa_end (add_vec s1 PGSIZEv) rest
-    end.
 
   (* [>=u] is the negation of [<u]: ties the bgeu back-edge to the bltu entry. *)
   Lemma zge_negb_zlt (a b : mword 64) : zopz0zKzJ_u a b = negb (zopz0zI_u a b).
@@ -243,51 +230,10 @@ Section WpSconfFreerange.
   Lemma wp_freerange_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat) :
-    let pcE : mword 64 := mword_of_int FR in
-    let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let s1entry := add_vec (and_vec (add_vec pa_start (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
-    (20 <= K)%nat ->
-    ncnt = 0%nat ->
-    eq_vec (zero_reg : mword 64) cpuv = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    lk = mword_of_int KernelSyms.kmem ->
-    fl = mword_of_int (KernelSyms.kmem + 24) ->
-    prun pa_end s1entry ps ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m K -∗
-    intr_count γ root_ppn ncnt -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    is_lock γl lk (kmem_res γk fl) -∗
-    ([∗ list] p ∈ ps, page_own p) -∗
-    a_noff ↦₄ (zeros' 32 : mword 32) -∗
-    (∃ iv : mword 32, a_int ↦₄ iv) -∗
-    a_cpu ↦₈ (zero_reg : mword 64) -∗
-    kalloc_avail γk (Some 0%nat) -∗
-    ( ∀ mr,
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mr K -∗
-      intr_count γ root_ppn ncnt -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      a_noff ↦₄ (zeros' 32 : mword 32) -∗
-      (∃ iv : mword 32, a_int ↦₄ iv) -∗
-      a_cpu ↦₈ (zero_reg : mword 64) -∗
-      kalloc_avail γk (Some (length ps)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (ps : list (mword 64)) (K ncnt : nat)
+    : wp_freerange_sconf_body γ root_ppn Φ γl γk lk fl m ps K ncnt.
   Proof.
+    cbv beta delta [wp_freerange_sconf_body].
     intros pcE pa_start pa_end sp0 ret_tgt cpuv a_noff a_int a_cpu s1entry
       HK Hncnt Hmycpu Hretm Hlk Hfl Hprun.
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -685,7 +631,7 @@ Section WpSconfFreerange.
         assert (HM2ra : M2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (FR + 0x2e) : mword 64) 4) by (rewrite /M2; apply upd_eq).
         (* ---- kfree(p) ---- *)
         iDestruct "Hqint" as (ivl) "Hqint".
-        iApply (wp_kfree_sconf γ root_ppn Φ γl γk lk fl M2 zero_reg (zeros' 32) ivl on ncnt (K - 6)
+        iApply (Kfree.wp_kfree_sconf γ root_ppn Φ γl γk lk fl M2 zero_reg (zeros' 32) ivl on ncnt (K - 6)
                   ltac:(lia)
                   ltac:(rewrite HM2tp; exact Hmycpu)
                   ltac:(rewrite HM2ra; vm_compute; reflexivity)
@@ -871,3 +817,5 @@ Section WpSconfFreerange.
   Qed.
 
 End WpSconfFreerange.
+
+End FreerangeProof.

@@ -35,8 +35,9 @@ Require Import IntrDefs WpIntenaBits.
 Require Import IntrDefs.
 Require Import VcGenS.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSconfAcquire WpSconfRelease.
-Require Import WpWakeup WpSconfWakeup WpKalloc.
+Require Import SpecAcquire SpecRelease.
+Require Import WpWakeup SpecWakeup WpKalloc.
+Require Import SpecWakeupLoop.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -51,6 +52,8 @@ Lemma wk_release_nv1_cancel (noffv : mword 32) :
      (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
   = sign_extend' 64 noffv.
 Proof. unfold wk_noff_acq. exact (kfree_nv1_cancel_pure noffv). Qed.
+
+Module WakeupLoopProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : WAKEUPLOOP.
 
 Section WpSconfWakeupLoop.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
@@ -379,7 +382,7 @@ Section WpSconfWakeupLoop.
         { rewrite /M42 upd_ne; [| vm_compute; discriminate].
           rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmret4. }
         (* acquire(&proc[k]->lock): intr_count lvl -> S lvl; returns locked + proc_lock_res. *)
-        iApply (wp_acquire_sconf γ root_ppn Φ γk (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) M42
+        iApply (Acquire.wp_acquire_sconf γ root_ppn Φ γk (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) M42
                   (zero_reg : mword 64) noffv iv lvl av
                   ltac:(rewrite HM42tp; exact Hmycpu_nz)
                   ltac:(rewrite HM42ra; vm_compute; reflexivity)
@@ -496,7 +499,7 @@ Section WpSconfWakeupLoop.
           assert (Hal5 : eq_vec (access_vec_dec (update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
             by (rewrite HMr2c_ra; vm_compute; reflexivity).
           (* release(&proc[k]->lock): intr_count S lvl -> lvl. *)
-          iApply (wp_release_sconf γ root_ppn Φ γk (proc_addr k) (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) Mr2c
+          iApply (Release.wp_release_sconf γ root_ppn Φ γk (proc_addr k) (proc_lock_res Rreg Φ γc bsie dq γk (proc_addr k)) Mr2c
                     (mycpu_ret rtp) nacq ivc
                     lvl av (dqi:=DfracOwn 1)
                     Hlka2 Hmine2 Hrel_coup Hnf_pos Hal5 ltac:(lia)
@@ -835,38 +838,14 @@ Section WpSconfWakeupLoop.
       (Rreg : s_regime) (γc : gname) (bsie : mword 1) (dq : dfrac)
       (Φ : mval -> iProp Σ)
       (m : regfile) (γs : list gname) (a0f : mword 64)
-      (noffv : mword 32) (lvl K : nat) :
-    let sp0 := m !!! Regidx csp_rs1 in
-    let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
-    let rettgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    (18 <= K)%nat ->
-    (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-    length γs = NPROC ->
-    mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
-    eq_vec (zero_reg : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    zopz0zKzJ_s zero_reg (sign_extend' 64 (wk_noff_acq noffv)) = false ->
-    wk_noff_rel (wk_noff_acq noffv) = noffv ->
-    (neq_vec (sign_extend' 64 noffv) zero_reg = false <-> lvl = 0%nat) ->
-    eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn m K -∗
-    intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
-    wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
-    wk_lockcells γs -∗ procs_inv Rreg Φ γc bsie dq γs -∗
-    ( ∀ Mf : regfile,
-        ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-        sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn Mf K -∗
-        intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
-        kernel_text -∗ pc_is rettgt -∗
-        wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
-        wk_lockcells γs -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (noffv : mword 32) (lvl K : nat)
+    : wp_wakeup_sconf_body γ root_ppn Rreg γc bsie dq Φ m γs a0f noffv lvl K.
   Proof.
+    cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hmycpu Hmycpu_nz Hnf_pos Hnf_rt Hcoupling Halign.
     iIntros "Hsc Hhs Hcg Hcnt Htlb #Htext Hpc Hnoffc Hintc Hlockcells #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
-    iApply (wp_wakeup_prologue_sconf γ root_ppn Φ m K ltac:(lia) Hdom
+    iApply (Wakeup.wp_wakeup_prologue_sconf γ root_ppn Φ m K ltac:(lia) Hdom
               with "Hsc Hhs Hcg Htlb Htext Hpc [-]").
     iIntros (M vpad) "%Hpro Hsc Hhs Hcg Htlb Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM18 & HM19 & HM21 & HM20 & HMcsp & HM1 & HM4 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
@@ -889,7 +868,7 @@ Section WpSconfWakeupLoop.
                        Hsc Hhs Hcg Hcnt Htlb Htextx Hpc Hres Hframe".
       iDestruct "Hres" as "(Hnoffc & Hintc & Hlockcells)".
       iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
-      iApply (wp_wakeup_epilogue_sconf γ root_ppn Φ Mexit K
+      iApply (Wakeup.wp_wakeup_epilogue_sconf γ root_ppn Φ Mexit K
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
@@ -932,3 +911,5 @@ Section WpSconfWakeupLoop.
   Qed.
 
 End WpSconfWakeupLoop.
+
+End WakeupLoopProof.

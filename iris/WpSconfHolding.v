@@ -26,12 +26,12 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock.
-Require Import KernelRvcDecode WpMycpu WpSconfMycpu.
+Require Import KernelRvcDecode WpMycpu SpecMycpu.
 Require Import WpHolding WpHoldingInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecHolding.
 Import Defs.
 
-Notation HD := KernelSyms.holding.
 
 Local Lemma addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
 Proof.
@@ -46,6 +46,8 @@ Proof.
 Qed.
 
 
+Module HoldingProof (Mycpu : MYCPU) : HOLDING.
+
 Section WpSconfHolding.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
@@ -53,35 +55,10 @@ Section WpSconfHolding.
   Lemma wp_holding_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (R : iProp Σ)
       (m : regfile) (n : nat)
-      (cpuold : mword 64) {dqc : dfrac} :
-    let pcE : mword 64 := mword_of_int HD in
-    let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-    eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (6 <= n)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    is_lock γl lka R -∗
-    a_cpu ↦₈{ dqc } cpuold -∗
-    ( ∀ mh,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mh n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mh /\
-        mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) ⌝ -∗
-      a_cpu ↦₈{ dqc } cpuold -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (cpuold : mword 64) {dqc : dfrac}
+    : wp_holding_lockinv_s_sconf_body γ root_ppn Φ γl lka R m n cpuold dqc.
   Proof.
+    cbv beta delta [wp_holding_lockinv_s_sconf_body].
     intros pcE lk a_cpu sp0 ret_tgt Hlka Hnotmine Hal0 Hn.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hlock Hcpu Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
@@ -270,7 +247,7 @@ Section WpSconfHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (HD + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat
+    iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (HD + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi16 [-]").
@@ -535,37 +512,10 @@ Section WpSconfHolding.
   Lemma wp_holding_lockinv_locked_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (R : iProp Σ)
       (m : regfile) (n : nat)
-      (cpuold : mword 64) {dqc : dfrac} :
-    let pcE : mword 64 := mword_of_int HD in
-    let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-    eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = true ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (6 <= n)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    is_lock γl lka R -∗
-    locked γl -∗
-    a_cpu ↦₈{ dqc } cpuold -∗
-    ( ∀ mh,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mh n -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mh /\
-        mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-      locked γl -∗
-      a_cpu ↦₈{ dqc } cpuold -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (cpuold : mword 64) {dqc : dfrac}
+    : wp_holding_lockinv_locked_s_sconf_body γ root_ppn Φ γl lka R m n cpuold dqc.
   Proof.
+    cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
     intros pcE lk a_cpu sp0 ret_tgt Hlka Hmine Hal0 Hn.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc #Hlock Htok Hcpu Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
@@ -711,7 +661,7 @@ Section WpSconfHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (HD + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat
+    iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (HD + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi16 [-]").
@@ -974,3 +924,5 @@ Section WpSconfHolding.
   Qed.
 
 End WpSconfHolding.
+
+End HoldingProof.

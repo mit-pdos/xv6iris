@@ -21,13 +21,15 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock WpAmo WpIntenaBits KernelRvcDecode.
-Require Import WpMycpu WpSconfMycpu WpSconfHolding.
-Require Import WpSconfPushOff.
+Require Import WpMycpu SpecMycpu SpecHolding.
+Require Import SpecPushOff.
 Require Import WpAcquireTop.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecAcquire.
 Import Defs.
 
-Notation AQ := KernelSyms.acquire.
+
+Module AcquireProof (Mycpu : MYCPU) (Holding : HOLDING) (PushOff : PUSHOFF) : ACQUIRE.
 
 Section WpSconfAcquire.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
@@ -152,48 +154,10 @@ Section WpSconfAcquire.
   Lemma wp_acquire_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γl : gname) (R : iProp Σ)
       (m : regfile)
-      (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat) :
-    let pcE : mword 64 := mword_of_int AQ in
-    let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-    let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-    let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-    let po_noff_a5 := sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-    let po_noff_store := (autocast (T := mword) (subrange_vec_dec po_noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec cpuold cpuv = false ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    (10 <= av)%nat ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m av -∗
-    intr_count γ root_ppn n -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    is_lock γl lk0 R -∗
-    a_cpu ↦₈ cpuold -∗
-    a_noff ↦₄ noffv -∗
-    a_int ↦₄ intena_old -∗
-    ( ∀ (ms : mword 64) (mfin : regfile),
-      ⌜ sconf_ms_facts ms ⌝ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mfin av -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mfin ⌝ -∗
-      locked γl -∗ R -∗
-      a_cpu ↦₈ cpuv -∗
-      a_noff ↦₄ po_noff_store -∗
-      a_int ↦₄ (if eq_vec (sign_extend' 64 noffv) zero_reg
-                then po_intena_val ms else intena_old) -∗
-      intr_count γ root_ppn (S n) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat)
+    : wp_acquire_sconf_body γ root_ppn Φ γl R m cpuold noffv intena_old n av.
   Proof.
+    cbv beta delta [wp_acquire_sconf_body].
     intros pcE lk0 a_cpu sp0 cpuv a_noff a_int po_noff_a5 po_noff_store ret_tgt Hnotmine Hal0 Hav.
     iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hlock Hcpu Hnoff Hint Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
@@ -308,7 +272,7 @@ Section WpSconfAcquire.
       rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       exact HcspA0. }
-    iApply (wp_push_off_sconf γ root_ppn Φ A3 (av - 4)%nat noffv intena_old cpuv n
+    iApply (PushOff.wp_push_off_sconf γ root_ppn Φ A3 (av - 4)%nat noffv intena_old cpuv n
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
               ltac:(rewrite HtpA3; reflexivity)
               ltac:(lia)
@@ -369,7 +333,7 @@ Section WpSconfAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_holding_lockinv_s_sconf γ root_ppn Φ γl lk0 R B2 (av - 4)%nat cpuold (dqc := DfracOwn 1)
+    iApply (Holding.wp_holding_lockinv_s_sconf γ root_ppn Φ γl lk0 R B2 (av - 4)%nat cpuold (dqc := DfracOwn 1)
               Hlkb
               ltac:(rewrite HtpB2; exact Hnotmine)
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
@@ -435,7 +399,7 @@ Section WpSconfAcquire.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
     iPoseProof (aqi_24 with "Htext") as "Hi24".
-    iApply (wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (AQ + 0x24)) (mword_of_int 0xcb8 : mword 21) B8 (av - 4)%nat
+    iApply (Mycpu.wp_call_mycpu_sconf_cs γ root_ppn Φ (mword_of_int (AQ + 0x24)) (mword_of_int 0xcb8 : mword 21) B8 (av - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hi24 [-]").
@@ -697,3 +661,5 @@ Section WpSconfAcquire.
   Qed.
 
 End WpSconfAcquire.
+
+End AcquireProof.

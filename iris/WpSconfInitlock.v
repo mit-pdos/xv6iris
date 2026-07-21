@@ -36,8 +36,11 @@ Require Import SRegime.
 Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecInitlock.
 Local Open Scope Z_scope.
 Import Defs.
+
+Module InitlockProof : INITLOCK.
 
 Section WpSconfInitlock.
   Context `{!riscvGS Σ}.
@@ -55,37 +58,10 @@ Section WpSconfInitlock.
   Lemma wp_initlock_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile)
       (vlock : bv 32) (vname vcpu : bv 64)
-      (K : nat) :
-    let pcE : mword 64 := mword_of_int IL in
-    let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
-    let name := m !!! Regidx (mword_of_int 11 : mword 5) in
-    let sp0 := m !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    let c_name := add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)) in
-    let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
-    (2 <= K)%nat ->
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m K -∗
-    tlb_inv_pt root_ppn -∗
-    kernel_text -∗ pc_is pcE -∗
-    lk ↦₄ vlock -∗
-    c_name ↦₈ vname -∗
-    c_cpu ↦₈ vcpu -∗
-    ( ∀ mr,
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mr K -∗
-      tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ⌜ callee_saved m mr ⌝ -∗
-      lk ↦₄ (mword_of_int 0 : mword 32) -∗
-      c_name ↦₈ name -∗
-      c_cpu ↦₈ (zero_reg : mword 64) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (K : nat)
+    : wp_initlock_sconf_body γ root_ppn Φ m vlock vname vcpu K.
   Proof.
+    cbv beta delta [wp_initlock_sconf_body].
     intros pcE lk name sp0 ret_tgt c_name c_cpu HK Hretm.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hlock Hname Hcpu Hcont".
@@ -284,3 +260,5 @@ Section WpSconfInitlock.
   Qed.
 
 End WpSconfInitlock.
+
+End InitlockProof.

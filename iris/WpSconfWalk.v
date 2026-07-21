@@ -28,16 +28,19 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpMemsetS WpMemsetInstr.
-Require Import WpSconfMemset.
-Require Import WpSconfKalloc.
+Require Import SpecMemset.
+Require Import SpecKalloc.
 Require Import WpWalkInstr UserBits.
 Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import RiscvExec RiscvTryStep.
+Require Import SpecWalk.
 Import Defs.
 Local Open Scope Z_scope.
 
+
+Module WalkProof (Kalloc : KALLOC) (Memset : MEMSET) : WALK.
 
 Section WpSconfWalk.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
@@ -736,7 +739,7 @@ Section WpSconfWalk.
     { unfold sp', imm_entry, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     (* --- PREFIX: 0x00..0x10 --- *)
-    iApply (wp_memset_prefix_sconf γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
+    iApply (Memset.wp_memset_prefix_sconf γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz
               wval_add ltac:(lia) Hsp' Hn0 Hvalue_add
               with "Hsc Hhs Hcg Htlbinv Hpc
                     Hi0 Hi2 Hi4 Hi6 Hi8 Hi10 Hi12 Hi14 Hi16 [-]").
@@ -764,7 +767,7 @@ Section WpSconfWalk.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       rewrite -Hcval. reflexivity. }
     (* --- LOOP: 0x14..0x1a --- *)
-    iApply (wp_memset_loop_sconf γ root_ppn Φ 4096 p wval_add cval a1_idx a4_idx a5_idx imm_bne
+    iApply (Memset.wp_memset_loop_sconf γ root_ppn Φ 4096 p wval_add cval a1_idx a4_idx a5_idx imm_bne
               olds (n - 2)%nat
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -773,7 +776,7 @@ Section WpSconfWalk.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               minstr_cce minstr_cd2 minstr_cd4
-              4096 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
+              4096%nat 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hsc Hhs Hcg Htlbinv Htext Hpc Hbuf [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc Hbuf".
     set (m7 := <[Regidx a5_idx := regval_into_reg (ms_addr p 4096)]> m6).
@@ -789,7 +792,7 @@ Section WpSconfWalk.
     { unfold m7, m6, m5, m4, m3, m2, m1.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
-    iApply (wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
+    iApply (Memset.wp_memset_suffix_sconf γ root_ppn Φ m7 (n - 2)%nat ra0 s00
               Hret0
               with "Hsc Hhs Hcg Htlbinv HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
@@ -998,7 +1001,7 @@ Section WpSconfWalk.
       by (rewrite /J upd_eq; reflexivity).
     assert (Hretk : eq_vec (access_vec_dec (update_vec_dec (add_vec (J !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true).
     { rewrite HJ1. vm_compute. reflexivity. }
-    iApply (wp_kalloc_sconf γ root_ppn Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
+    iApply (Kalloc.wp_kalloc_sconf γ root_ppn Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
               J qcpu (zeros' 32 : mword 32) qint None lvl (K - 8)%nat
               ltac:(lia)
               ltac:(rewrite HJ4; exact Hqne)
@@ -1302,39 +1305,10 @@ Section WpSconfWalk.
   (* ================================================================= *)
   Lemma wp_walk_sconf (γ : gname) (root_ppn : mword 44) (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
-      (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) :
-    let va := mm !!! Regidx (mword_of_int 11) in
-    let vpn := svpn_of va in
-    let sp0 := mm !!! Regidx csp_rs1 in
-    let ret_tgt := update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0") in
-    lvl = 0%nat ->
-    (22 <= K)%nat ->
-    mm !!! Regidx (mword_of_int 10)
-      = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) ->
-    mm !!! Regidx (mword_of_int 12) = mword_of_int 1 ->
-    (uint va < 2 ^ 38)%Z ->
-    pt_rep0 t m ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mm K -∗ intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
-    kernel_text -∗
-    pc_is (mword_of_int WK) -∗
-    ptree_own 2 (DfracOwn 1) t -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : regfile) (t' : ptree),
-      sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mr K -∗ intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
-      pc_is ret_tgt -∗
-      ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-      ⌜callee_saved mm mr⌝ -∗
-      ⌜ptree_same_rep0 t t'⌝ -∗
-      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
-        \/ (exists p2 p1 w0,
-             ptree_level0 t' vpn p2 p1 w0 /\
-             mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat)
+    : wp_walk_sconf_body γ root_ppn γa Φ mm t m K lvl.
   Proof.
+    cbv beta delta [wp_walk_sconf_body].
     intros va vpn sp0 ret_tgt Hlvl HK Ha0 Ha2 Hva Hrep.
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -2798,3 +2772,5 @@ Section WpSconfWalk.
   Qed.
 
 End WpSconfWalk.
+
+End WalkProof.

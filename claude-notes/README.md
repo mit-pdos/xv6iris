@@ -46,6 +46,10 @@ are working on that effort — the relevant `projects/` file.
 - **[`tlb-translation.md`](design/tlb-translation.md)** — the kvmmake-faithful
   all-4KB kernel page table, TLB/page-walk/translation, userret / trampoline /
   user page table, and the `CommonWalk.v` page-table-walk proof technique.
+- **[`spec-modules.md`](design/spec-modules.md)** — function specs as module
+  types: the `SpecF.v` / sealed-functor / `LinkF.v` shape that keeps a function
+  proof off its callees' proofs, so the build does not serialize along the
+  kernel call graph.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel
@@ -79,6 +83,10 @@ their durable design notes, gotchas, and reusable recipes.
   initlock + freerange, over kfree), all proved axiom-clean over sconf. The
   page-count token is threaded through to kinit's postcondition; the caller
   supplies the pages precondition.
+- **[`spec-module-migration.md`](completed/spec-module-migration.md)** — all 19
+  whole-function proofs moved onto the spec / sealed-functor / link shape; no
+  function proof depends on another function's proof any more. The recipe lives
+  in [`design/spec-modules.md`](design/spec-modules.md).
 - **[`user-mode-ptree-port.md`](completed/user-mode-ptree-port.md)** — porting
   user-mode execution onto the ptree page-table layer (UserPt → `utlb_inv_pt`);
   the port and its cleanup are done. The remaining execution-side hypotheses
