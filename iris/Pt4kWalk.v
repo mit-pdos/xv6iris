@@ -461,62 +461,6 @@ Section TrampWalk.
   Definition tramp_walk_out : PTW_Output 39 :=
     Build_PTW_Output 39 lppn (autocast (T := mword) pte0) (Physaddr a0) 0 PBMT_PMA false.
 
-  Lemma exec_rec_pt_walk_l0 (acc : Acc (Zwf 0) 0) :
-    exec (_rec_pt_walk 39 vpn access Supervisor mxr do_sum p0 0 false tt 0 acc) s
-    = Some (Ok (tramp_walk_out, tt), s).
-  Proof.
-    destruct acc.
-    cbn [_rec_pt_walk].
-    rewrite exec_catch_early_return.
-    assert (Hae1 : exec (Defs.assert_exp' (0 >=? 0) "recursion limit reached") s = Some (eq_refl, s))
-      by (unfold Defs.assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s))
-      by (unfold Defs.assert_exp'; cbn match; apply exec_returnm).
-    rewrite (execR_liftR_seq _ _ _ _ _ Hae2).
-    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
-      replace a with a0 by reflexivity;
-      replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_liftR_seq _ _ _ _ _
-               (exec_read_pte_S a0 region0 pte0 s
-                  HA Hord Hrange0 HR Hmatch0 (pte_addr_at_aligned8 p0 idx0) Hpte0 Hc0 Hsig0 Hh0 Hdev0 Hbytes0)).
-    match goal with |- context[Mk_PTE_Flags (@subrange_vec_dec ?w _ 7 0)] =>
-      change w with 64 end.
-    rewrite (mk_pte_flags lppn lflags Hlf).
-    unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-    rewrite (mk_pte_ext lppn lflags ltac:(lia)).
-    rewrite (execR_liftR_seq _ _ _ _ _ (Hinv0 s)).
-    cbn match.
-    rewrite Hnl0. cbv iota beta.
-    change (Z.gtb 0 0) with false. cbv iota beta.
-    match goal with |- context[Defs.bind0 ?A ?B] =>
-      assert (HAB : execR (Defs.bind0 A B) s = Some (inr (PTE_Check_Success tt), s)) end.
-    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
-      rewrite execR_liftR. rewrite (Hchk0 s). cbn match. reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ HAB).
-    cbv iota beta. cbn match.
-    change (Z.gtb 0 0) with false. cbv iota beta.
-    (* Svnapot probe: enabled, but the PTE's N bit is 0; the ppn stage
-       returns [autocast (PPN_of_PTE pte0)]. *)
-    match goal with |- context[Defs.bind (and_boolM ?A ?B) ?f] =>
-      assert (Hppn : execR (Defs.bind (and_boolM A B) f) s
-                     = Some (inr (autocast (T := mword) (PPN_of_PTE (mk_pte lppn lflags))), s)) end.
-    { rewrite (execR_bind_Some _ _ _ false s).
-      2:{ unfold and_boolM.
-          rewrite (execR_liftR_seq _ _ _ _ _ (exec_currentlyEnabled_Svnapot s HmisaS)).
-          cbv iota beta. rewrite HextN0. apply execR_returnR_fwd. }
-      cbv iota beta. apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hppn).
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg menvcfg s)).
-    rewrite Hmenv. rewrite HPBMTE. cbv iota beta.
-    rewrite execR_bind. rewrite execR_returnR. cbn match.
-    rewrite execR_returnR. cbn match.
-    unfold tramp_walk_out.
-    rewrite HG0. cbn [orb].
-    unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota beta.
-    rewrite (mk_pte_ppn_field lppn lflags ltac:(lia)).
-    rewrite !autocast_id. reflexivity.
-  Qed.
 
 
 

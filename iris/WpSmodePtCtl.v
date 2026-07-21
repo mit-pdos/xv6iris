@@ -141,26 +141,8 @@ Local Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
 (* helper: exec_csr_id_write_callback_sstatus *)
 
 (* helper: exec_hartSupports_H *)
-Local Lemma exec_hartSupports_H s : exec (hartSupports Ext_H) s = Some (false, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_H) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)).
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_hartSupports_Sv32 *)
-Local Lemma exec_hartSupports_Sv32 s : exec (hartSupports Ext_Sv32) s = Some (false, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Sv32) 0) with true by reflexivity. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)).
-  replace (andb false (Z.eqb xlen 32)) with false by (vm_compute; reflexivity).
-  apply exec_returnM.
-Qed.
 
 (* helper: exec_have_nominal_privLevel *)
 
