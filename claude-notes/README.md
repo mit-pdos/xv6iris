@@ -64,6 +64,10 @@ are working on that effort — the relevant `projects/` file.
 - **[`yield-sched.md`](projects/yield-sched.md)** — yield/sched/myproc specs and
   proofs: the sconf-tier swtch port, the global scheduler-chain predicate
   `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
+- **[`sleeplock.md`](projects/sleeplock.md)** — the sleeplock subsystem
+  (initsleeplock / acquiresleep / releasesleep / holdingsleep): the
+  `is_sleeplock`/`sl_res` lock abstraction over the inner spinlock, and the
+  assumed `sleep()` contract (`SpecSleep.v`).
 
 ### `completed/` — finished projects, archived for reference
 

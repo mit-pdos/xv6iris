@@ -277,3 +277,14 @@ WpSconfPlicinit.v
 LinkPlicinit.v
 WpSconfPlicinithart.v
 LinkPlicinithart.v
+SleepLock.v
+SpecSleep.v
+SpecInitsleeplock.v
+SpecAcquiresleep.v
+SpecReleasesleep.v
+SpecHoldingsleep.v
+WpSleeplockDecode.v
+WpSconfInitsleeplock.v
+LinkInitsleeplock.v
+WpSconfReleasesleep.v
+LinkReleasesleep.v

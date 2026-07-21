@@ -95,6 +95,11 @@ Definition p_context (pa : mword 64) : mword 64 := add_vec pa (mword_of_int cont
 Definition p_lkcpu (pa : mword 64) : mword 64 :=
   add_vec pa (sign_extend' 64 (mword_of_int 16 : mword 12)).
 
+(* the pid word (int at +48), in the exact address form of the [lw rd,48(a0)]
+   reads after a myproc() call (acquiresleep/holdingsleep). *)
+Definition p_pid (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 48 : mword 12)).
+
 (* enum procstate codes (kernel/proc.h): UNUSED=0 USED=1 SLEEPING=2
    RUNNABLE=3 RUNNING=4 ZOMBIE=5. *)
 Definition SLEEPING : mword 32 := mword_of_int 2.
