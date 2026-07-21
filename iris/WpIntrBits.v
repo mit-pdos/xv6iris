@@ -40,11 +40,20 @@ Ltac zn_norm :=
 (* Chase one Z.testbit through the bv_concat/bv_extract tower.            *)
 Ltac tb_rw :=
   zn_norm;
-  (* NB: the boolean-identity cleanup (orb_false / andb rewrites) is the LAST
-     branch, not the first.  As the first branch it was retried -- re-scanning
-     the whole goal -- after every structural rewrite, and dominated ~70% of
-     this file's compile time (per Ltac profiling).  Deprioritised, it fires
-     only once the structural chase is stuck, cutting this file's build ~2.5x. *)
+  (* The two structural rewrites -- bv_extract_unsigned and bv_concat_unsigned'
+     -- account for ~68% of this file (per Ltac profiling): a symbolic-mstatus
+     read chases a testbit through a 5-deep update_slice tower, so the tower
+     expands to a large bv_extract/bv_concat term.  Peeling ONE occurrence per
+     iteration of a `repeat (first [...])` re-scans and re-typechecks that whole
+     term every step -- O(n^2).  Instead alternate BULK passes that rewrite ALL
+     occurrences at once (`rewrite ?lem`): extracts expose concats, concats
+     expose the next layer's extracts, repeat until saturated.  ~2.4x on the
+     deep tb2 lemmas.  The two rewrites are kept in the cleanup loop below as a
+     fallback for any stragglers the bulk pass leaves un-normalised. *)
+  repeat (progress (rewrite ?bv_extract_unsigned; rewrite ?bv_concat_unsigned'; zn_norm));
+  (* Cleanup: the wrap/shift/lor identities (side-conditioned, so not `?`-batchable)
+     plus the boolean-identity normalisation LAST -- as the first branch it was
+     retried after every structural rewrite and re-scanned the whole goal. *)
   repeat (first
     [ rewrite bv_extract_unsigned
     | rewrite bv_concat_unsigned'
