@@ -2,9 +2,8 @@
    world.  [wp_memset_page_sconf] is now a THIN WRAPPER over the general
    whole-function memset spec [MEMSET.wp_memset_sconf] (WpMemsetArray.v)
    instantiated at the fixed page count len = 4096: it bridges [page_own p] to
-   memset's per-byte buffer, derives the general spec's bound preconditions
-   (nonzero count, 32-bit count, no 2^64 wraparound) from [page_valid p], and
-   rebuilds [page_own p] from the written buffer on the way out. *)
+   memset's per-byte buffer and rebuilds [page_own p] from the written buffer
+   on the way out. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -45,15 +44,12 @@ Section WpSconfMemsetPage.
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add p j) ↦ₘ b)%I) with "Hpage")
       as (olds) "Hbuf".
-    (* --- derive the general spec's bound preconditions from [page_valid] --- *)
+    (* --- the count register holds 4096 --- *)
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
-    assert (Hnw : uint p + Z.of_nat 4096 < 2 ^ 64).
-    { destruct Hpv as [_ [_ Hhi]]. unfold kmem_hi in Hhi.
-      change (Z.of_nat 4096) with 4096. change (2 ^ 64) with 18446744073709551616. lia. }
     (* --- apply the general memset spec at len = 4096 --- *)
     iApply (MemsetArray.wp_memset_sconf γ root_ppn Φ m0 n 4096 cval olds
-              Hn ltac:(lia) ltac:(vm_compute; reflexivity) Hnw Hcval Ha2' Hret0
+              Hn ltac:(vm_compute; reflexivity) Hcval Ha2' Hret0
               with "Hsc Hhs Hcg Htlbinv Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (mfin) "Hsc Hhs Hcg Htlbinv Hpc Hbuf %Hcs".

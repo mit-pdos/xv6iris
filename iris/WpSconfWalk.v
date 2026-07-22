@@ -652,7 +652,6 @@ Section WpSconfWalk.
     let p := m0 !!! Regidx a0_idx in
     let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
-    page_valid p ->
     m0 !!! Regidx a1_idx = cval ->
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
@@ -670,7 +669,7 @@ Section WpSconfWalk.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hpv Hcval Ha2 Hret0 Hn.
+    intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hcval Ha2 Hret0 Hn.
     iIntros "Hsc Hhs Hcg Htlbinv #Htext Hpc Hpage Hcont".
     (* bridge [page_own p] to memset's per-byte buffer, then hand it to the
        general array-memset spec at len = 4096 (KEEPING the written bytes). *)
@@ -679,13 +678,8 @@ Section WpSconfWalk.
       as (olds) "Hbuf".
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
-    assert (Hnw : uint p + Z.of_nat 4096 < 2 ^ 64).
-    { destruct Hpv as [_ [_ Hhi]]. unfold kmem_hi in Hhi.
-      assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
-      assert (E4 : Z.of_nat 4096 = 4096%Z) by (vm_compute; reflexivity).
-      rewrite E64 E4. lia. }
     iApply (MemsetArray.wp_memset_sconf γ root_ppn Φ m0 n 4096 cval olds
-              Hn ltac:(lia) ltac:(vm_compute; reflexivity) Hnw Hcval Ha2' Hret0
+              Hn ltac:(vm_compute; reflexivity) Hcval Ha2' Hret0
               with "Hsc Hhs Hcg Htlbinv Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (mfin) "Hsc Hhs Hcg Htlbinv Hpc Hbuf %Hcs".
@@ -961,7 +955,6 @@ Section WpSconfWalk.
       rewrite (callee_saved_lookup Hkcs (csp_rs1 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HspJ. }
     iApply (wp_memset_page_zero_sconf γ root_ppn Φ N4 (K - 8)%nat (mword_of_int 0 : mword 64)
-              ltac:(rewrite HN4a0; exact Hpv)
               ltac:(rewrite /N4; rewrite upd_ne; [| reg_neq];
                     rewrite /N3 upd_eq; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite /N4 /N3;

@@ -262,22 +262,19 @@ Section WpSconfMemset.
 
 
   (* =================================================================== *)
-  (*  memset PREFIX over sconf (memset+0x00..+0x10): the 2-slot frame      *)
-  (*  alloc (c.addi sp,-16, a push trading 2 off the avail count), the two *)
-  (*  c.sdsp saves into the freed frame cells, c.addi4spn s0, the n<>0     *)
-  (*  c.beqz fall-through, and the a4 end-pointer setup.  Hands the two     *)
-  (*  full frame cells (ra0/s0) out to the loop.                            *)
+  (*  memset HEAD over sconf (memset+0x00..+0x06): the 2-slot frame alloc  *)
+  (*  (c.addi sp,-16, a push trading 2 off the avail count), the two       *)
+  (*  c.sdsp saves into the freed frame cells, and c.addi4spn s0.  Stops   *)
+  (*  at the c.beqz on the count, handing the two full frame cells         *)
+  (*  (ra0/s0) out to whichever arm of it runs.                            *)
   (* =================================================================== *)
-  Lemma wp_memset_prefix_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat)
-      (imm_entry shamt_l shamt_r : mword 6) (nzimm_s0 imm8_beqz : mword 8)
-      (wval_add : mword 64)
-    : wp_memset_prefix_sconf_body γ root_ppn Φ m0 n imm_entry shamt_l shamt_r nzimm_s0 imm8_beqz wval_add.
+  Lemma wp_memset_head_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8)
+    : wp_memset_head_sconf_body γ root_ppn Φ m0 n imm_entry nzimm_s0.
   Proof.
-    cbv beta delta [wp_memset_prefix_sconf_body].
-    intros ra_idx s0_idx a0_idx a2_idx a4_idx a5_idx pcE sp0 sp' pa_ra pa_s0
-      ra0 s00 m1 m2 m3 m4 m5 m6 Hn2 Hsp' Hn0 Hvalue_add.
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hi00 Hi02 Hi04 Hi06 Hi08 Hi0a Hi0c Hi0e Hi10 Hcont".
+    cbv beta delta [wp_memset_head_sconf_body].
+    intros ra_idx s0_idx pcE sp0 sp' pa_ra pa_s0 ra0 s00 m1 m2 Hn2 Hsp'.
+    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hi00 Hi02 Hi04 Hi06 Hcont".
     assert (Hcsp1 : m1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     (* ---- 0x00: c.addi sp,-16 -- the frame push ---- *)
     iApply (wp_caddi_sp_push_s_sconf γ root_ppn Φ pcE imm_entry m0 n 2 Hn2 Hsp'
@@ -316,29 +313,69 @@ Section WpSconfMemset.
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi06 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
-    assert (Hpp08 : add_vec_int (mword_of_int (MS + 0x06) : mword 64) 2 = mword_of_int (MS + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp08 : add_vec_int (mword_of_int (MS + 0x06) : mword 64) 2 = add_vec_int (pcE : mword 64) 8) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1) with m2.
+    (* frame cells hold ra0/s00 at pa_ra/pa_s0 (via Hcsp1: m1!!!csp = sp') *)
+    iEval (rewrite Hcsp1 Hra0v) in "Hbra".
+    iEval (rewrite Hcsp1 Hs00v) in "Hbs0".
+    iApply ("Hcont" with "Hsc Hhs Hcg Htlbinv Hpc Hbra Hbs0").
+  Qed.
+
+  (* =================================================================== *)
+  (*  memset SKIP over sconf (memset+0x08, taken): a zero count jumps      *)
+  (*  straight to the epilogue -- nothing written, no register moved.      *)
+  (* =================================================================== *)
+  Lemma wp_memset_skip_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (M : regfile) (n : nat) (imm8_beqz : mword 8)
+    : wp_memset_skip_sconf_body γ root_ppn Φ M n imm8_beqz.
+  Proof.
+    cbv beta delta [wp_memset_skip_sconf_body].
+    intros a2_idx pcE Hz Htgt.
+    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hi08 Hcont".
+    assert (Hal : eq_vec (access_vec_dec
+                    (add_vec (add_vec_int (pcE : mword 64) 8)
+                       (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0"))))) 0) ('b"0") = true)
+      by (rewrite Htgt; vm_compute; reflexivity).
+    iApply (wp_cbeqz_taken_s_sconf γ root_ppn Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx M n
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hz Hal
+              with "Hsc Hhs Hcg Htlbinv Hpc Hi08 [-]").
+    iNext.
+    iIntros "Hhs Hsc Hcg Htlbinv Hpc".
+    iEval (rewrite Htgt) in "Hpc".
+    iApply ("Hcont" with "Hsc Hhs Hcg Htlbinv Hpc").
+  Qed.
+
+  (* =================================================================== *)
+  (*  memset SETUP over sconf (memset+0x08..+0x10): the nonzero-count      *)
+  (*  c.beqz fall-through, the (unsigned int) count truncation, the a5     *)
+  (*  cursor and the a4 end-pointer setup.  Ends at the loop top.          *)
+  (* =================================================================== *)
+  Lemma wp_memset_setup_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8)
+      (wval_add : mword 64)
+    : wp_memset_setup_sconf_body γ root_ppn Φ M n shamt_l shamt_r imm8_beqz wval_add.
+  Proof.
+    cbv beta delta [wp_memset_setup_sconf_body].
+    intros a0_idx a2_idx a4_idx a5_idx pcE m3 m4 m5 m6 Hn0 Hvalue_add.
+    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hi08 Hi0a Hi0c Hi0e Hi10 Hcont".
     (* ---- 0x08: c.beqz a2,cea : n<>0, fall through ---- *)
-    assert (Hn0' : eq_vec (m2 !!! Regidx a2_idx) zero_reg = false).
-    { unfold m2, m1, a2_idx. rewrite upd_ne; [| vm_compute; discriminate].
-      rewrite upd_ne; [| vm_compute; discriminate]. exact Hn0. }
-    iApply (wp_cbeqz_fall_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x08)) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx m2 (n - 2)%nat
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hn0'
+    iApply (wp_cbeqz_fall_s_sconf γ root_ppn Φ (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx M n
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hn0
               with "Hsc Hhs Hcg Htlbinv Hpc Hi08 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
-    assert (Hpp0a : add_vec_int (mword_of_int (MS + 0x08) : mword 64) 2 = mword_of_int (MS + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpp0a : add_vec_int (add_vec_int (pcE : mword 64) 8) 2 = mword_of_int (MS + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- 0x0a: c.mv a5,a0 ---- *)
-    iApply (wp_cmv_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x0a)) a5_idx a0_idx m2 (n - 2)%nat
+    iApply (wp_cmv_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x0a)) a5_idx a0_idx M n
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0a [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     assert (Hpp0c : add_vec_int (mword_of_int (MS + 0x0a) : mword 64) 2 = mword_of_int (MS + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
-    change (<[Regidx a5_idx := regval_into_reg (add_vec zero_reg (m2 !!! Regidx a0_idx))]> m2) with m3.
+    change (<[Regidx a5_idx := regval_into_reg (add_vec zero_reg (M !!! Regidx a0_idx))]> M) with m3.
     (* ---- 0x0c: c.slli a2,shamt_l ---- *)
-    iApply (wp_cslli_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x0c)) (Regidx a2_idx) a2_idx shamt_l m3 (n - 2)%nat
+    iApply (wp_cslli_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x0c)) (Regidx a2_idx) a2_idx shamt_l m3 n
               eq_refl ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0c [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
@@ -346,7 +383,7 @@ Section WpSconfMemset.
     iEval (rewrite Hpp0e) in "Hpc".
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3) with m4.
     (* ---- 0x0e: c.srli a2,shamt_r ---- *)
-    iApply (wp_csrli_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x0e)) (Cregidx (mword_of_int 4)) a2_idx shamt_r m4 (n - 2)%nat
+    iApply (wp_csrli_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x0e)) (Cregidx (mword_of_int 4)) a2_idx shamt_r m4 n
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hsc Hhs Hcg Htlbinv Hpc Hi0e [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
@@ -354,17 +391,14 @@ Section WpSconfMemset.
     iEval (rewrite Hpp10) in "Hpc".
     change (<[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4) with m5.
     (* ---- 0x10: add a4,a2,a0 (end pointer) ---- *)
-    iApply (wp_add_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x10)) a4_idx a2_idx a0_idx wval_add m5 (n - 2)%nat
+    iApply (wp_add_s_sconf γ root_ppn Φ (mword_of_int (MS + 0x10)) a4_idx a2_idx a0_idx wval_add m5 n
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hvalue_add
               with "Hsc Hhs Hcg Htlbinv Hpc Hi10 [-]").
     iIntros "Hhs Hsc Hcg Htlbinv Hpc".
     assert (Hpp14 : add_vec_int (mword_of_int (MS + 0x10) : mword 64) 4 = add_vec_int (pcE : mword 64) 20) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
-    (* frame cells hold ra0/s00 at pa_ra/pa_s0 (via Hcsp1: m1!!!csp = sp') *)
-    iEval (rewrite Hcsp1 Hra0v) in "Hbra".
-    iEval (rewrite Hcsp1 Hs00v) in "Hbs0".
-    iApply ("Hcont" with "Hsc Hhs Hcg Htlbinv Hpc Hbra Hbs0").
+    iApply ("Hcont" with "Hsc Hhs Hcg Htlbinv Hpc").
   Qed.
 
 End WpSconfMemset.

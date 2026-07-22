@@ -151,23 +151,24 @@ none of the usual `vm_compute` address steps apply. What replaces them:
 one shape. The external contract is **`SpecMemset`** (`Module Type MEMSET`,
 `wp_memset_sconf`): memset of an ARBITRARY `len`-byte array at base `p`, stated
 over the per-byte buffer `[∗ list] j ∈ seq 0 len, (pa_add p j) ↦ₘ …` (in→`olds`,
-out→`cbyte`) plus `callee_saved`, with preconditions `0 < len`, `len < 2^32` (the
-source's `(unsigned int)n` count truncation — a `slli/srli`-by-32 round-trip,
-identity below 2^32; see `slli32_srli32`) and `uint p + len < 2^64` (no address
-wraparound; see `ms_cmp_bound`, the `len`-general `ms_cmp_page`). It is proven in
-`WpMemsetArray.v` as a functor `MemsetArrayProof (Memset : MEMSET_PARTS)` composing
-the piecemeal prefix/loop/suffix.
+out→`cbyte`) plus `callee_saved`. Its ONLY constraint on the count is
+`len < 2^32` (the source's `(unsigned int)n` count truncation — a
+`slli/srli`-by-32 round-trip, identity below 2^32; see `slli32_srli32`).
+`len = 0` is allowed, and so is an array that wraps the 64-bit address space:
+the caller's buffer is indexed by `pa_add`, which wraps exactly as the hardware's
+cursor does, so a no-wrap precondition would buy nothing. It is proven in
+`WpMemsetArray.v` as a functor `MemsetArrayProof (Memset : MEMSET_PARTS)`.
 
-Those piecemeal parts are **`SpecMemsetParts`** (`Module Type MEMSET_PARTS`,
-`wp_memset_prefix/loop/suffix_sconf`) — NOT the external spec; only
-`WpMemsetArray` consumes them. (Historically `SpecMemset` held the parts; it is
+`MEMSET_PARTS` (**`SpecMemsetParts`**) is the piecemeal interface memset's own
+proof is cut into — NOT the external spec, and not for callers: only
+`WpMemsetArray` consumes it. (Historically `SpecMemset` held the parts; it is
 now `SpecMemsetParts`, and the general spec took the `SpecMemset` name.)
 
 Both narrower memset users are **instances of the general spec at `len = 4096`**,
 each a functor over `MEMSET` that bridges its own buffer abstraction around
 `wp_memset_sconf`: `WpSconfMemsetPage` (`page_own p` in and out, contents
 forgotten) and walk's `wp_memset_page_zero_sconf` (`page_own p` in, the written
-`cbyte` buffer kept). Neither re-composes prefix/loop/suffix. This also lifted
+`cbyte` buffer kept). Neither re-composes the parts. This also lifted
 the ~20 s inline memset composition out of the `WpSconfWalk` critical-path file
 into the separately-compilable `WpMemsetArray`.
 

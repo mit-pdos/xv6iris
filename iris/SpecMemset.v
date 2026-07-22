@@ -28,10 +28,13 @@ Import Defs.
 Notation MS := KernelSyms.memset.
 
 (* memset(p, cval, len): fills [len] bytes at base [p] with [cval]'s low byte.
-   [len] must be nonzero and fit in 32 bits (the C source truncates the count
-   to [unsigned int] via a slli/srli round-trip), and the array must not wrap
-   the 64-bit address space.  memset saves ra/s0 in a 2-slot frame, so it needs
-   2 of the [n] available stack slots and returns them (avail [n] preserved). *)
+   [len] need only fit in 32 bits (the C source truncates the count to
+   [unsigned int] via a slli/srli round-trip); len = 0 is allowed (the source's
+   [n == 0] test skips the loop) and so is an array that wraps the 64-bit
+   address space -- the caller's buffer is indexed by [pa_add], which wraps
+   exactly as the hardware's pointer increment does.  memset saves ra/s0 in a
+   2-slot frame, so it needs 2 of the [n] available stack slots and returns
+   them (avail [n] preserved). *)
 Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
     (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) :=
@@ -44,9 +47,7 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
   (2 <= n)%nat ->
-  (0 < len)%nat ->
   (Z.of_nat len < 2 ^ 32)%Z ->
-  (uint p + Z.of_nat len < 2 ^ 64)%Z ->
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
