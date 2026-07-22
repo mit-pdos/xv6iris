@@ -40,6 +40,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpIntenaBits.
 Require Import KernelRvcDecode.
 Require Import VcGen.
+Require Import ProcGeom.
 Require Import WpWakeup.
 Require Import SchedCtx.
 Require Import SleepLock.
@@ -95,14 +96,16 @@ Section WpSconfReleasesleep.
   Lemma wp_releasesleep_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (av : nat)
-    : wp_releasesleep_sconf_body γ root_ppn Φ γs γl γsl s R m pd av.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat)
+    : wp_releasesleep_sconf_body γ root_ppn Φ γs γl γsl s R m pd pme av.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
-    intros pcE slk cpuv a_noff a_int ret_tgt Hcpune Hretm Hav.
+    intros pcE slk ret_tgt Htp Hretm Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hslp Hslk Hpid HRcaller Hcpu Hnoff Hint Hlockcells #Hpinv Hcont".
+    assert (Hcpune : eq_vec (zero_reg : mword 64) (mycpu_ret cid_word) = false)
+      by (apply mycpu_ret_nonzero; apply tp_ok_cid).
+    iIntros "Hsc Hhs Hcg Hcnt Htlbinv #Htext Hpc #Hslp Hslk Hpid HRcaller Hcpu Hnoff Hint Hlockcells Hcur #Hpinv Hcont".
     iDestruct (is_sleeplock_lock with "Hslp") as "#Hlockinv".
     iDestruct "Hint" as (iv0) "Hint".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
@@ -225,13 +228,13 @@ Section WpSconfReleasesleep.
     { rewrite /Kacq upd_ne; [| vm_compute; discriminate]. exact HA_a0_a0. }
     assert (HKacqra : Kacq !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RSL + 0x14) : mword 64) 4)
       by (rewrite /Kacq; apply upd_eq).
-    assert (HKacqtp : Kacq !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+    assert (HKacqtp : Kacq !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
     { rewrite /Kacq upd_ne; [| vm_compute; discriminate].
       rewrite /A_a0 upd_ne; [| vm_compute; discriminate].
       rewrite /A_s2 upd_ne; [| vm_compute; discriminate].
       rewrite /A_s1 upd_ne; [| vm_compute; discriminate].
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
-      rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
+      rewrite /R1 upd_ne; [exact Htp | vm_compute; discriminate]. }
     assert (HKacqs1 : Kacq !!! Regidx (mword_of_int 9 : mword 5) = slk).
     { rewrite /Kacq upd_ne; [| vm_compute; discriminate].
       rewrite /A_a0 upd_ne; [| vm_compute; discriminate].
@@ -311,26 +314,29 @@ Section WpSconfReleasesleep.
     iEval (rewrite Htgtwk) in "Hpc".
     assert (HCwkra : Cwk !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RSL + 0x22) : mword 64) 4)
       by (rewrite /Cwk; apply upd_eq).
-    assert (HCwktp : Cwk !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+    assert (HCwktp : Cwk !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
     { rewrite /Cwk upd_ne; [| vm_compute; discriminate].
       rewrite /A_wa0 upd_ne; [| vm_compute; discriminate].
       rewrite (callee_saved_lookup Hpins (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HKacqtp. }
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
-    iApply (WakeupLoop.wp_wakeup_sconf γ root_ppn Φ Cwk γs cpuv (mword_of_int 1 : mword 32) 1%nat (av - 4)%nat
+    iApply (WakeupLoop.wp_wakeup_sconf γ root_ppn Φ Cwk γs (mycpu_ret cid_word) pme (mword_of_int 1 : mword 32) 1%nat (av - 4)%nat
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
+              HCwktp
               ltac:(rewrite HCwktp; reflexivity)
               ltac:(rewrite HCwktp; exact Hcpune)
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(split; [intro Hh; exfalso; vm_compute in Hh; discriminate | intro Hh; discriminate])
+              ltac:(split; [intro Hh; exfalso; vm_compute in Hh; discriminate | intro Hh; discriminate])
+              ltac:(vm_compute; reflexivity)
               ltac:(rewrite HCwkra; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Hcnt Htlbinv Htext Hpc [Hnoff2] [Hint2] Hlockcells Hpinv [-]").
+              with "Hsc Hhs Hcg Hcnt Htlbinv Htext Hpc [Hnoff2] [Hint2] Hlockcells Hcur Hpinv [-]").
     { iExact "Hnoff2". }
     { iExists _. iExact "Hint2". }
-    iIntros (Mwk) "[%Hwkcs %Hwkdom] Hsc Hhs Hcg Hcnt Htlbinv Htext2 Hpc Hnoff3 Hint3 Hlockcells".
+    iIntros (Mwk) "[%Hwkcs %Hwkdom] Hsc Hhs Hcg Hcnt Htlbinv Htext2 Hpc Hnoff3 Hint3 Hlockcells Hcur".
     assert (Hpc26 : update_vec_dec (add_vec (Cwk !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (RSL + 0x26)).
     { rewrite HCwkra. apply bv_eq; vm_compute; reflexivity. }
@@ -364,7 +370,7 @@ Section WpSconfReleasesleep.
       rewrite /A_ra0 upd_eq. rewrite HMwks2. apply add_vec_zero_l. }
     assert (HKrelra : Krel !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (RSL + 0x28) : mword 64) 4)
       by (rewrite /Krel; apply upd_eq).
-    assert (HKreltp : Krel !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
+    assert (HKreltp : Krel !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
     { rewrite /Krel upd_ne; [| vm_compute; discriminate].
       rewrite /A_ra0 upd_ne; [| vm_compute; discriminate].
       rewrite (callee_saved_lookup Hwkcs (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)).
@@ -386,7 +392,7 @@ Section WpSconfReleasesleep.
     iDestruct (sl_res_close_free γsl slk R with "Hslkw Hslk Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γ root_ppn Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
-              cpuv (mword_of_int 1 : mword 32) iv3 0%nat (av - 4)%nat (dqi:=DfracOwn 1)
+              (mycpu_ret cid_word) (mword_of_int 1 : mword 32) iv3 0%nat (av - 4)%nat (dqi:=DfracOwn 1)
               ltac:(rewrite HKrela0; apply wk_add_vec_0)
               ltac:(rewrite HKreltp; apply wk_eq_vec_refl)
               ltac:(split; [intro Hh; reflexivity | intro Hh; vm_compute; reflexivity])
@@ -505,7 +511,7 @@ Section WpSconfReleasesleep.
     assert (Hretf : update_vec_dec (add_vec (Q34 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HQ34ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q34 with "[%] Hsc Hhs Hcg Hcnt Htlbinv Hpc [Hcpu3] [Hnoff4] [Hint4] Hlockcells").
+    iApply ("Hcont" $! Q34 with "[%] Hsc Hhs Hcg Hcnt Htlbinv Hpc [Hcpu3] [Hnoff4] [Hint4] Hlockcells Hcur").
     2:{ iExact "Hcpu3". }
     2:{ iExact "Hnoff4". }
     2:{ iExists _. iExact "Hint4". }

@@ -77,9 +77,9 @@ word is caller-threaded pinned `zero_reg` pre/post.
   `p_pid pj ↦₄{dq} pidv`, running-thread bundle through to sleep; post
   `sleeplocked γsl ∗ sl_pid slk ↦₄ pidv ∗ R`.  26 ≤ av.
 - SpecReleasesleep.v: holder's bundle in, nothing lock-side out; wakeup's
-  resources (`wk_lockcells γs`, `procs_inv`); tp GENERIC (no myproc) — cells
-  at `mycpu_ret (m!!!x4)`, premise `eq_vec zero_reg cpuv = false` (wakeup
-  convention).  22 ≤ av.
+  resources (`wk_lockcells γs`, `cur_proc pme` for any pme, `procs_inv`);
+  tp = cid_word (wakeup runs over the proven myproc, so its interface pins
+  the hart and threads the current-process resource).  22 ≤ av.
 - SpecHoldingsleep.v: holder variant only (all xv6 call sites assert held):
   token + `sl_pid ↦₄ pidv` + `cur_proc p` + `p_pid p ↦₄{dq} pidv` ⇒ returns
   a0 = 1.  tp = cid_word.  16 ≤ av.
@@ -127,9 +127,12 @@ word is caller-threaded pinned `zero_reg` pre/post.
       for threading intr_count/▷sched_vc across a taken-leaf back edge —
       see design/kernel-proofs.md).
 - [x] Full clean build; coverage: sleeplock.c 4/4 proven, 254/254 bytes.
-      (releasesleep carries wakeup's PRE-EXISTING debt — the
-      wp_myproc_sconf_any axiom and WpSconfWakeup.v's Admitted — inherited
-      via WAKEUPLOOP, out of this project's scope; see yield-sched.md.)
+      (releasesleep carries wakeup's PRE-EXISTING debt — the single
+      Admitted at WpSconfWakeup.v:479, a prologue proof whose script looks
+      complete but was left un-Qed'd — inherited via WAKEUPLOOP, out of
+      this project's scope.  The wp_myproc_sconf_any axiom is gone:
+      upstream rewired wakeup onto the proven myproc, which added
+      `cur_proc pme` + tp = cid_word to releasesleep's spec.)
 
 Future (out of scope): a non-holder holdingsleep variant (needs a pid
 disequality resource; no xv6 call site wants it).

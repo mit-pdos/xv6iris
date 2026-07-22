@@ -12,10 +12,11 @@
 
    The holder surrenders the token, the pid field and the protected
    resource back into the lock.  The body wakes every process sleeping on
-   the lock, so the <thread resources> include wakeup()'s: procs_inv and
-   the whole per-proc lock-cpu cell array [wk_lockcells].  Unlike
-   acquiresleep, no myproc() is called, so tp stays generic (the per-cpu
-   cells live at [mycpu_ret (m !!! tp)], wakeup's own convention). *)
+   the lock, so the <thread resources> include wakeup()'s: procs_inv, the
+   whole per-proc lock-cpu cell array [wk_lockcells], and -- since wakeup
+   runs over the PROVEN myproc -- the current-process resource
+   [cur_proc pme] (any pme; releasesleep does not inspect it) with
+   tp = cid_word. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -47,15 +48,13 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
     (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pd : mword 32) (av : nat) :=
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-  let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                    (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-  eq_vec (zero_reg : mword 64) cpuv = false ->
+  (* the hart id is the ambient CpuId (wakeup runs over the proven myproc) *)
+  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
   sconf γ -∗
@@ -70,10 +69,11 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   sl_pid slk ↦₄ pd -∗
   R -∗
   sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-  a_noff ↦₄ (mword_of_int 0 : mword 32) -∗
-  (∃ iv : mword 32, a_int ↦₄ iv) -∗
+  a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
+  (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   (* wakeup's resources *)
   wk_lockcells γs -∗
+  cur_proc pme -∗
   procs_inv γ root_ppn Φ γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
@@ -84,9 +84,10 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
       tlb_inv_pt root_ppn -∗
       pc_is ret_tgt -∗
       sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-      a_noff ↦₄ (mword_of_int 0 : mword 32) -∗
-      (∃ iv : mword 32, a_int ↦₄ iv) -∗
+      a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
+      (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
       wk_lockcells γs -∗
+      cur_proc pme -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -96,6 +97,6 @@ Module Type RELEASESLEEP.
       (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (av : nat),
-      wp_releasesleep_sconf_body γ root_ppn Φ γs γl γsl s R m pd av.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat),
+      wp_releasesleep_sconf_body γ root_ppn Φ γs γl γsl s R m pd pme av.
 End RELEASESLEEP.
