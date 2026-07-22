@@ -121,7 +121,6 @@ UserMem.v
 UserFetch.v
 UserCompute.v
 UserStepFull.v
-UserArms.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
@@ -190,7 +189,6 @@ LinkWakeup.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
-WpPushOffMem.v
 WpPushOffCsr.v
 WpMycpu.v
 ProcGeom.v
