@@ -39,7 +39,7 @@ Definition cpuid_ret (tp : mword 64) : mword 64 :=
   sign_extend' 64 (subrange_vec_dec tp 31 0 : mword 32).
 
 Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -48,16 +48,10 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m0 n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
   ( ∀ m' : regfile,
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn m' n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m' n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = cpuid_ret (m0 !!! Regidx tp_idx) ⌝ -∗
@@ -68,7 +62,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
    [instr P false (JAL (jimm, ra))] whose target is [cpuid] runs the callee and
    returns to [P+4]. *)
 Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -80,13 +74,11 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m n -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
   ( ∀ mo,
-    hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-    sie_cap_gpr γ root_ppn mo n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mo n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
       mo !!! Regidx a0_idx = cpuid_ret (m !!! Regidx tp_idx) ⌝ -∗
@@ -96,10 +88,10 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_cpuid_sconf_body γ root_ppn Φ m0 n.
+      (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
+      wp_cpuid_sconf_body γ Φ m0 n.
   Parameter wp_call_cpuid_sconf_cs :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat),
-      wp_call_cpuid_sconf_cs_body γ root_ppn Φ P jimm m n.
+      (γ : gname) (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat),
+      wp_call_cpuid_sconf_cs_body γ Φ P jimm m n.
 End CPUID.

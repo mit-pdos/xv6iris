@@ -43,7 +43,7 @@ Import Defs.
 Notation RSL := KernelSyms.releasesleep.
 
 Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+    (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) :=
@@ -55,11 +55,8 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  intr_count γ root_ppn 0 -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
+  intr_count γ 0 -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle, surrendered back into the lock *)
@@ -72,14 +69,11 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   (* wakeup's resources *)
   wk_lockcells γs -∗
   cur_proc pme -∗
-  procs_inv γ root_ppn Φ γs -∗
+  procs_inv γ Φ γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mf av -∗
-      intr_count γ root_ppn 0 -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ mf av -∗
+      intr_count γ 0 -∗
       pc_is ret_tgt -∗
       sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
       a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -92,9 +86,9 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat),
-      wp_releasesleep_sconf_body γ root_ppn Φ γs γl γsl s R m pd pme av.
+      wp_releasesleep_sconf_body γ Φ γs γl γsl s R m pd pme av.
 End RELEASESLEEP.

@@ -25,7 +25,7 @@ From Kernel Require KernelSyms.
 Notation UPS := KernelSyms.uartputc_sync.
 
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) :=
+    (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.uartputc_sync in
@@ -39,19 +39,13 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{C
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   eq_vec (sign_extend' 64 pv) zero_reg = false ->
   neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m0 K -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m0 K -∗
   kernel_text -∗ pc_is pcE -∗
   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
   dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
   ( ∀ mf,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mf K -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mf K -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
@@ -63,6 +57,6 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{C
 Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac},
-      wp_uartputc_sconf_body γ root_ppn γd Φ m0 K l pv pkv dqm dqm2.
+      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac},
+      wp_uartputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
 End UARTPUTC.

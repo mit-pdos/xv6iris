@@ -35,16 +35,16 @@ Section WpSconfTrapinit.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_trapinit_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_trapinit_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64)
-    : wp_trapinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
+    : wp_trapinit_sconf_body γ Φ m K vlock vname vcpu.
   Proof.
     cbv beta delta [wp_trapinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK Hretm.
     (* &"time" is proof-local: the spec speaks of the lock's NAME, not of the
        address the image happens to keep the literal at. *)
     pose (name := (mword_of_int time_name_str : mword 64)).
-    iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "time" string literal (4 chars + NUL), read out of the data image *)
     assert (Htime : forall j b, cstring_bytes "time"%string !! j = Some b ->
                       KernelData.kernel_data !! (time_name_str + Z.of_nat j)%Z = Some b).
@@ -54,14 +54,14 @@ Section WpSconfTrapinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl Htime
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K TI
+    iApply (ILW.wp_initlock_wrapper_sconf γ Φ m K TI
               (mword_of_int 5) (mword_of_int 22) (mword_of_int 3646) (mword_of_int 3430)
               (mword_of_int 2090862) lk name "time"%string vlock vname vcpu HK Hretm
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
+              with "Hcg Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
     iApply (tri_code with "Htext").
   Qed.
 

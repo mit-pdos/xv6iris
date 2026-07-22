@@ -46,28 +46,25 @@ Section WpSconfUartAccess.
      hands back the token and -- IF the read byte says THRE was set -- the
      [uart_out_lb] bound that makes the observation survive to a later THR
      write ([uart_tx_ready_persists], WpUart.v). *)
-  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     m !!! Regidx rs1 = uart_pa 5 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd -∗ uart_tx_own γd l -∗
     ( ∀ b : bv 8,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Haddr) "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf γ root_ppn γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
+    iIntros (Hrd Hrdsp Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
+    iApply (Uart.wp_lb_uart_s_sconf γ γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
               ltac:(unfold uart_size; lia) Hrd Hrdsp
@@ -75,7 +72,7 @@ Section WpSconfUartAccess.
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hdinv Hown [] [Hcont]").
+              with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
     - iIntros (u b u') "%Hread Hg Hown".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
@@ -85,8 +82,8 @@ Section WpSconfUartAccess.
         iModIntro. iFrame "Hs Hout Htx Hdl Hown". iIntros (_). iExact "Hlb".
       + iModIntro. iFrame "Hs Hout Htx Hdl Hown".
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
-    - iIntros (b) "Hhs Hsc Hcg Htlbinv Hpc [Hown Hlb]".
-      iApply ("Hcont" $! b with "Hhs Hsc Hcg Htlbinv Hpc Hown Hlb").
+    - iIntros (b) "Hcg Hpc [Hown Hlb]".
+      iApply ("Hcont" $! b with "Hcg Hpc Hown Hlb").
   Qed.
 
   (* The THR write (offset 0).  The caller brings the transmitter token, the
@@ -94,25 +91,23 @@ Section WpSconfUartAccess.
      [uart_tx_ready_persists] turns them into [uart_write_thr_acc]'s two
      premises at the write's own state, so the byte provably lands in the FIFO.
      Postcondition: the grown token plus a permanent [uart_sent] record. *)
-  Lemma wp_uart_thr_write_s_sconf (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+  Lemma wp_uart_thr_write_s_sconf (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) :
     m !!! Regidx rs1 = uart_pa 0 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    ( sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
       uart_sent γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Haddr) "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
+    iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
     set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
-    iApply (Uart.wp_sb_uart_s_sconf γ root_ppn γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf γ γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
               ltac:(unfold uart_size; lia)
@@ -120,7 +115,7 @@ Section WpSconfUartAccess.
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hdinv Hown [] [Hcont]").
+              with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
     - iIntros (u u') "%Hwrite Hg Hown".
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
       iDestruct (uart_tx_ready_persists γd u l with "Hown Hlb Hoff Htx Hout Hdl") as %[Hempty Hdlab].
@@ -136,8 +131,8 @@ Section WpSconfUartAccess.
       iDestruct (uart_dlab_auth_stable γd u u' (uart_write_dlab_0 _ _ _ Hwrite) with "Hdl") as "Hdl".
       iEval (rewrite Hacc') in "Hown". iEval (rewrite Hacc') in "Hsent".
       iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hown Hsent".
-    - iIntros "Hhs Hsc Hcg Htlbinv Hpc [Hown Hsent]".
-      iApply ("Hcont" with "Hhs Hsc Hcg Htlbinv Hpc Hown Hsent").
+    - iIntros "Hcg Hpc [Hown Hsent]".
+      iApply ("Hcont" with "Hcg Hpc Hown Hsent").
   Qed.
 
 End WpSconfUartAccess.

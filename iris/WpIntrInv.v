@@ -221,22 +221,22 @@ Section WpIntrInv.
   (* callback's obligation is [wp_exec_step_hart_active_inv]'s.           *)
   (* =================================================================== *)
   Lemma wp_exec_step_intr (γ : gname) (handler pc0 : mword 64)
-      (root_ppn : mword 44) (menvcfg0 : mword 64)
+      (root_ppn : mword 44)
       (m : regfile)
       (Φ : mval -> iProp Σ) :
     sret_tgt pc0 = pc0 ->
-    intr_inv γ handler root_ppn menvcfg0 -∗
+    intr_inv γ handler -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     intr_config γ -∗
     pc_is pc0 -∗
     gpr_file m -∗
-    intr_frame root_ppn menvcfg0 m -∗
+    intr_frame root_ppn m -∗
     (∀ σ,
        ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
        intr_config γ -∗
        pc_is pc0 -∗
        gpr_file m -∗
-       intr_frame root_ppn menvcfg0 m -∗
+       intr_frame root_ppn m -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (retval : mword 32) (s_exec : mstate),
          ⌜ exec (run_hart_active 0) σ
@@ -343,9 +343,9 @@ Section WpIntrInv.
       assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
       iEval (rewrite Htm) in "Hms".
       (* ---- the invariant's handler WP discharges the whole handler ---- *)
-      iAssert (intr_handler_spec handler root_ppn menvcfg0) with "[]" as "#Hsp".
+      iAssert (intr_handler_spec handler) with "[]" as "#Hsp".
       { iApply "Hspec". iPureIntro. exact Hb1. }
-      iApply ("Hsp" $! elp0 ms pc0 mie_v mdv0 m Φ
+      iApply ("Hsp" $! root_ppn elp0 ms pc0 mie_v mdv0 m Φ
                 with "[%] [%] [%] Hhs Hpriv Hms Hmie Hmdl Hsepc [$Hpcr $Hnpc] Hfile HF").
       { exact Hmsf. }
       { exact Hpc0. }

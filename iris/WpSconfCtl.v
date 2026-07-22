@@ -176,26 +176,23 @@ Section WpSconfCtl.
   (* fence rw,w -- state-preserving; the config is opened only for the    *)
   (* priv/menvcfg side conditions.                                        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_fence_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_fence_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (m : regfile) (n : nat) :
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
                            Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    ( sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
+    iIntros "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
               (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
                       Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
@@ -215,36 +212,34 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hhs' [Hpriv Hmsx Hmiex Hmenv] Hcg Htlbinv [$Hpc' $Hnpc]").
-    iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption.
+    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
+      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* c.j -- unconditional jump; a backward jump is a loop back edge, so   *)
   (* the continuation is UNDER A LATER (straight-line callers [iNext]).   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cj_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_cj_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (jimm : mword 21)
       (m : regfile) (n : nat) :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc true (JAL (jimm, zreg)) -∗
-    ( ▷ ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    ( ▷ ( sie_cap_gpr γ m n -∗
       pc_is tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros tgt Hal0.
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true (JAL (jimm, zreg))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
+    iIntros "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc true (JAL (jimm, zreg))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -277,35 +272,32 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
+    iAssert (sconf γ) with "[$Hhw $Hsc2]" as "Hsc".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
     iNext.
-    iApply ("Hcont" with "Hhs' [$Hhw $Hsc2] Hcg Htlbinv [$Hpc' $Hnpc]").
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* jal rd -- link write + jump.                                         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_jal_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_jal_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc false (JAL (imm, Regidx rd)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Hal0) "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false (JAL (imm, Regidx rd))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
+    iIntros (Hrd Hrdsp Hal0) "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false (JAL (imm, Regidx rd))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -362,37 +354,35 @@ Section WpSconfCtl.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ root_ppn m
+    iDestruct (sie_cap_retarget γ m
                  (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hhs' [$Hhw $Hsc2] Hcg Htlbinv [$Hpc' $Hnpc]").
+    iAssert (sconf γ) with "[$Hhw $Hsc2]" as "Hsc".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* c.ret (jalr x0, 0(ra)) -- no register write; the bundle is opened    *)
   (* for the LPE/priv/misa side conditions and reassembled.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cret_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_cret_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
       (m : regfile) (n : nat) :
     let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
     uint ra <> 0 ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗ sconf γ -∗
-      sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    ( sie_cap_gpr γ m n -∗
       pc_is tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros tgt Hra Halign.
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfile Hnpc [Hreg Hmem]".
+    iIntros "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -444,10 +434,11 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hhs' [Hpriv Hmsx Hmiex Hmenv] Hcg Htlbinv [$Hpc' $Hnpc]").
-    iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-    iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption.
+    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
+      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
 End WpSconfCtl.

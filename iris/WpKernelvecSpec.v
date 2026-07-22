@@ -80,24 +80,28 @@ Section WpKernelvecSpec.
   Context `{CID : CpuId}.
 
   (* =================================================================== *)
-  Lemma kernelvec_handler_spec (root_ppn : mword 44) (menvcfg0 : mword 64) :
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    _get_MEnvcfg_LPE menvcfg0 = ('b"0") ->
-    eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
+  (* [root_ppn] is introduced per trap (the contract's leading universal);
+     the frame pins menvcfg to MENVCFG_S, so the old menvcfg0 hypotheses
+     are concrete facts here. *)
+  Lemma kernelvec_handler_spec :
     hw_config -∗
     minstret_inv -∗
     kernel_text -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64)
-      root_ppn menvcfg0.
+    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64).
   Proof.
-    intros HPBMTE Hmenvval0 Hpmm Hlpe0 HFIOM.
     iIntros "#Hhw #Hinv #Htext".
     iModIntro.
-    iIntros (elp_v ms pc0 mie_v mdv0 m Φ)
+    iIntros (root_ppn elp_v ms pc0 mie_v mdv0 m Φ)
       "%Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hpc Hfile HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+    assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
+      by (vm_compute; reflexivity).
+    assert (Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM MENVCFG_S) = PMM_Disabled)
+      by (vm_compute; reflexivity).
+    assert (Hlpe0 : _get_MEnvcfg_LPE MENVCFG_S = ('b"0"))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (HFIOM : eq_vec (_get_MEnvcfg_FIOM MENVCFG_S) ('b"1") = false)
+      by (vm_compute; reflexivity).
     iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
     (* re-address kernelvec's 17 sparse save windows as [pa_stk] slots *)
     pose proof (kv_slot_addr0 m) as Hb32.
@@ -174,12 +178,12 @@ Section WpKernelvecSpec.
     iMod (ghost_var_alloc (_get_Mstatus_SIE (trap_ms elp_v ms))) as (γk) "Hg".
     iEval (rewrite -Qp.half_half) in "Hg".
     iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
-    iApply (wp_kernelvec root_ppn γk m (trap_ms elp_v ms) mie_v mdv0 menvcfg0 pc0
+    iApply (wp_kernelvec root_ppn γk m (trap_ms elp_v ms) mie_v mdv0 MENVCFG_S pc0
               w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 Φ
               (trap_ms_SIE_false elp_v ms)
               (trap_ms_MPRV_false elp_v ms HMPRV0)
               (trap_ms_SXL_eq elp_v ms HSXL)
-              Hmm HPBMTE Hmenvval0
+              Hmm HPBMTE eq_refl
               (trap_ms_MXR_true elp_v ms HMXR)
               Hpmm
               (trap_ms_TSR_false elp_v ms HTSR)

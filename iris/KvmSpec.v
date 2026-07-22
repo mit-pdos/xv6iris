@@ -236,8 +236,8 @@ Section KvmSpecs.
   (* a0 = msg.                                                              *)
   (* ------------------------------------------------------------------- *)
   Definition panic_wp : iProp Σ :=
-    (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (root_ppn : mword 44) (m : regfile) (avail : nat),
-       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr γ root_ppn m avail -∗
+    (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (m : regfile) (avail : nat),
+       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr γ m avail -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* ------------------------------------------------------------------- *)

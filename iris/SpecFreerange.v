@@ -43,7 +43,7 @@ Fixpoint prun (pa_end s1 : mword 64) (ps : list (mword 64)) : Prop :=
   end.
 
 Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -60,11 +60,8 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  intr_count γ root_ppn ncnt -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
+  intr_count γ ncnt -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
@@ -73,11 +70,8 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   a_cpu ↦₈ (zero_reg : mword 64) -∗
   kalloc_avail γk (Some 0%nat) -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    intr_count γ root_ppn ncnt -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
+    intr_count γ ncnt -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     a_noff ↦₄ (zeros' 32 : mword 32) -∗
@@ -90,6 +84,6 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 Module Type FREERANGE.
   Parameter wp_freerange_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat),
-      wp_freerange_sconf_body γ root_ppn Φ γl γk lk fl m ps K ncnt.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat),
+      wp_freerange_sconf_body γ Φ γl γk lk fl m ps K ncnt.
 End FREERANGE.

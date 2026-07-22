@@ -36,7 +36,7 @@ Notation MS := KernelSyms.memset.
    2-slot frame, so it needs 2 of the [n] available stack slots and returns
    them (avail [n] preserved). *)
 Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+    (γ : gname) (Φ : mval -> iProp Σ)
     (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -51,13 +51,11 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦ₘ olds j) -∗
   ( ∀ mfin,
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mfin n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mfin n -∗
     pc_is ret_tgt -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦ₘ cbyte) -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
@@ -67,7 +65,7 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type MEMSET.
   Parameter wp_memset_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γ : gname) (Φ : mval -> iProp Σ)
       (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8),
-      wp_memset_sconf_body γ root_ppn Φ m0 n len cval olds.
+      wp_memset_sconf_body γ Φ m0 n len cval olds.
 End MEMSET.

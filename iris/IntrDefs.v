@@ -233,27 +233,37 @@ Section IntrDefs.
   (* =================================================================== *)
   Definition kv_frame_slots : nat := 32.
 
-  Definition intr_frame (root_ppn : mword 44) (menvcfg0 : mword 64)
+  (* menvcfg is pinned to [MENVCFG_S] here rather than parameterized: the
+     handler contract below is only PROVABLE at that value (its own fetches
+     need [cfg_ok], the PT walk needs PBMTE=0 / ADUE), and S-mode never runs
+     at any other value, so a parameter would only ever be instantiated at
+     [MENVCFG_S] anyway. *)
+  Definition intr_frame (root_ppn : mword 44)
       (m : regfile) : iProp Σ :=
-    (menvcfg ↦ᵣ menvcfg0 ∗
+    (menvcfg ↦ᵣ MENVCFG_S ∗
      tlb_inv_pt root_ppn ∗
      stack_own (m !!! Regidx csp_rs1) kv_frame_slots)%I.
 
   (* [intr_frame] depends on [m] only through sp: any register write that
      PRESERVES sp transports the frame to the new map.  (An sp-moving
      instruction instead re-carves its stack explicitly.) *)
-  Lemma intr_frame_retarget (root_ppn : mword 44) (menvcfg0 : mword 64)
+  Lemma intr_frame_retarget (root_ppn : mword 44)
       (m m' : regfile) :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    intr_frame root_ppn menvcfg0 m -∗ intr_frame root_ppn menvcfg0 m'.
+    intr_frame root_ppn m -∗ intr_frame root_ppn m'.
   Proof.
     iIntros (Hsp) "(Hmenv & Htlbinv & Hstk)".
     iFrame "Hmenv Htlbinv". rewrite Hsp. iExact "Hstk".
   Qed.
 
-  Definition intr_handler_spec (handler : mword 64)
-      (root_ppn : mword 44) (menvcfg0 : mword 64) : iProp Σ :=
-    (□ ∀ (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
+  (* [root_ppn] is UNIVERSAL, per trap: the handler's proof (kernelvec +
+     the kerneltrap contract) is uniform in the kernel root, and quantifying
+     it here -- rather than parameterizing the spec -- is what lets every
+     resource above ([intr_inv]/[intr_restore]/[intr_count]/[sie_arm]) be
+     root-free: an interrupted instruction instantiates the spec at whatever
+     root its translation slot ([strans_inv]) is currently holding. *)
+  Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
+    (□ ∀ (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
          (m : regfile) (Φ : mval -> iProp Σ),
         ⌜ intr_ms_facts ms ⌝ -∗
         ⌜ sret_tgt pc0 = pc0 ⌝ -∗
@@ -266,7 +276,7 @@ Section IntrDefs.
         sepc ↦ᵣ pc0 -∗
         pc_is handler -∗
         gpr_file m -∗
-        intr_frame root_ppn menvcfg0 m -∗
+        intr_frame root_ppn m -∗
         ( hart_state ↦ᵣ HART_ACTIVE tt -∗
           cur_privilege ↦ᵣ Supervisor -∗
           mstatus ↦ᵣ sret_ms5 (trap_ms elp_v ms) -∗
@@ -275,12 +285,12 @@ Section IntrDefs.
           (∃ v : mword 64, sepc ↦ᵣ v) -∗
           pc_is pc0 -∗
           gpr_file m -∗
-          intr_frame root_ppn menvcfg0 m -∗
+          intr_frame root_ppn m -∗
           WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
-  Global Instance intr_handler_spec_persistent handler root_ppn menvcfg0 :
-    Persistent (intr_handler_spec handler root_ppn menvcfg0).
+  Global Instance intr_handler_spec_persistent handler :
+    Persistent (intr_handler_spec handler).
   Proof. apply _. Qed.
 
   (* =================================================================== *)
@@ -294,34 +304,31 @@ Section IntrDefs.
 
   Definition intrN : namespace := nroot .@ "intr".
 
-  Definition intr_inv_body (γ : gname) (handler : mword 64)
-      (root_ppn : mword 44) (menvcfg0 : mword 64) : iProp Σ :=
+  Definition intr_inv_body (γ : gname) (handler : mword 64) : iProp Σ :=
     (∃ b : mword 1,
        ghost_var γ (1/4) b ∗
        stvec ↦ᵣ handler ∗
-       □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ intr_handler_spec handler root_ppn menvcfg0))%I.
+       □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ intr_handler_spec handler))%I.
 
-  Definition intr_inv (γ : gname) (handler : mword 64)
-      (root_ppn : mword 44) (menvcfg0 : mword 64) : iProp Σ :=
+  Definition intr_inv (γ : gname) (handler : mword 64) : iProp Σ :=
     (⌜ trapVectorMode_forwards (_get_Mtvec_Mode handler) = TV_Direct ⌝ ∗
      ⌜ stvec_base handler = handler ⌝ ∗
-     inv intrN (intr_inv_body γ handler root_ppn menvcfg0))%I.
+     inv intrN (intr_inv_body γ handler))%I.
 
-  Global Instance intr_inv_persistent γ handler root_ppn menvcfg0 :
-    Persistent (intr_inv γ handler root_ppn menvcfg0).
+  Global Instance intr_inv_persistent γ handler :
+    Persistent (intr_inv γ handler).
   Proof. apply _. Qed.
 
-  Lemma intr_inv_alloc E (γ : gname) (b : mword 1) (handler : mword 64)
-      (root_ppn : mword 44) (menvcfg0 : mword 64) :
+  Lemma intr_inv_alloc E (γ : gname) (b : mword 1) (handler : mword 64) :
     trapVectorMode_forwards (_get_Mtvec_Mode handler) = TV_Direct ->
     stvec_base handler = handler ->
     ghost_var γ (1/4) b -∗
     stvec ↦ᵣ handler -∗
-    □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ intr_handler_spec handler root_ppn menvcfg0) ={E}=∗
-    intr_inv γ handler root_ppn menvcfg0.
+    □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ intr_handler_spec handler) ={E}=∗
+    intr_inv γ handler.
   Proof.
     iIntros (Htvd Hsb) "Hq Hstv #Hspec".
-    iMod (inv_alloc intrN E (intr_inv_body γ handler root_ppn menvcfg0)
+    iMod (inv_alloc intrN E (intr_inv_body γ handler)
             with "[Hq Hstv]") as "#Hi".
     { iNext. rewrite /intr_inv_body. iExists b. iFrame "Hq Hstv". iExact "Hspec". }
     iModIntro. iSplit; [done |]. iSplit; [done |]. iExact "Hi".
@@ -329,16 +336,15 @@ Section IntrDefs.
 
   (* allocation with interrupts DISABLED needs no handler spec: the guarded
      implication is vacuous. *)
-  Lemma intr_inv_alloc_off E (γ : gname) (handler : mword 64)
-      (root_ppn : mword 44) (menvcfg0 : mword 64) :
+  Lemma intr_inv_alloc_off E (γ : gname) (handler : mword 64) :
     trapVectorMode_forwards (_get_Mtvec_Mode handler) = TV_Direct ->
     stvec_base handler = handler ->
     ghost_var γ (1/4) ('b"0" : mword 1) -∗
     stvec ↦ᵣ handler ={E}=∗
-    intr_inv γ handler root_ppn menvcfg0.
+    intr_inv γ handler.
   Proof.
     iIntros (Htvd Hsb) "Hq Hstv".
-    iApply (intr_inv_alloc E γ _ handler root_ppn menvcfg0 Htvd Hsb with "Hq Hstv").
+    iApply (intr_inv_alloc E γ _ handler Htvd Hsb with "Hq Hstv").
     iModIntro. iIntros (Hb).
     exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
     vm_compute in Hb. discriminate.
@@ -393,18 +399,32 @@ Section IntrDefs.
   Definition intr_off_tok (γ : gname) : iProp Σ :=
     ghost_var γ (1/4/2)%Qp ('b"0" : mword 1).
 
-  Definition sie_arm (γ : gname) (root_ppn : mword 44) : iProp Σ :=
+  Definition sie_arm (γ : gname) : iProp Σ :=
     (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∨
      (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
-      (∃ handler : mword 64, intr_inv γ handler root_ppn MENVCFG_S) ∗
+      (∃ handler : mword 64, intr_inv γ handler) ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v)))%I.
 
-  Definition sie_cap (γ : gname) (root_ppn : mword 44)
-      (m : regfile) (avail : nat) : iProp Σ :=
+  (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
+     S-mode translation invariant, its root hidden.  Clients thread the
+     capability and never name the kernel root; a step engine or data leaf
+     opens the slot, works at the skolem root, and repacks it.  This is the
+     single place the eventual Bare boot regime will join as a disjunct
+     ([bare_inv ∨ ...], SRegime.v), making the whole capability tier -- and
+     every whole-function spec over it -- regime-oblivious. *)
+  Definition strans_inv : iProp Σ :=
+    (∃ root_ppn : mword 44, tlb_inv_pt root_ppn)%I.
+
+  Lemma strans_inv_intro (root_ppn : mword 44) :
+    tlb_inv_pt root_ppn -∗ strans_inv.
+  Proof. iIntros "H". iExists root_ppn. iExact "H". Qed.
+
+  Definition sie_cap (γ : gname) (m : regfile) (avail : nat) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
-     sie_arm γ root_ppn)%I.
+     strans_inv ∗
+     sie_arm γ)%I.
 
   (* [sie_cap_gpr] bundles [sie_cap] with the register file [gpr_file m], so a
      caller threads ONE resource carrying the register file [m] once, instead of
@@ -414,62 +434,86 @@ Section IntrDefs.
      [iEval rewrite]).  Leaves unfold it to read/update [gpr_file]; the
      [IntoSep]/[FromSep] instances make [iDestruct "H" as "[Hcap Hfile]"] and
      providing [$Hcap $Hfile] just work while it stays folded elsewhere. *)
-  Definition sie_cap_gpr (γ : gname) (root_ppn : mword 44)
+  (* [sie_cap_gpr] -- THE ambient kernel-execution bundle: everything an
+     S-mode whole-function spec threads besides pc / instr / kernel_text.
+     hart_state (ACTIVE) + the v2 config [sconf] + the capability [sie_cap]
+     (stack carve + translation slot + SIE arm) + the register file
+     [gpr_file m].  Kept a FOLDED [Definition] (not a notation): while
+     threaded through a whole-function proof the map [m] appears once
+     (halving the per-instruction map unification / [iEval rewrite]).
+     Leaves unfold it via [sie_cap_gpr_split]/[_join]; NOTE the σ-callback
+     of the step engines threads only the hart_state-LESS residue
+     ([sconf] + [sie_cap] + [gpr_file]) -- the engine holds hart_state
+     across the step and hands it back to the final continuation. *)
+  Definition sie_cap_gpr (γ : gname)
       (m : regfile) (avail : nat) : iProp Σ :=
-    (sie_cap γ root_ppn m avail ∗ gpr_file m)%I.
+    (hart_state ↦ᵣ HART_ACTIVE tt ∗
+     sconf γ ∗
+     sie_cap γ m avail ∗
+     gpr_file m)%I.
 
-  Global Instance sie_cap_gpr_into_sep γ root_ppn m avail :
-    IntoSep (sie_cap_gpr γ root_ppn m avail) (sie_cap γ root_ppn m avail) (gpr_file m).
-  Proof. rewrite /IntoSep /sie_cap_gpr. by iIntros "$". Qed.
+  Global Instance sie_cap_gpr_into_sep γ m avail :
+    IntoSep (sie_cap_gpr γ m avail)
+            (hart_state ↦ᵣ HART_ACTIVE tt)
+            (sconf γ ∗ sie_cap γ m avail ∗ gpr_file m).
+  Proof. rewrite /IntoSep /sie_cap_gpr. by iIntros "($ & $ & $ & $)". Qed.
 
-  Global Instance sie_cap_gpr_from_sep γ root_ppn m avail :
-    FromSep (sie_cap_gpr γ root_ppn m avail) (sie_cap γ root_ppn m avail) (gpr_file m).
-  Proof. rewrite /FromSep /sie_cap_gpr. by iIntros "[$ $]". Qed.
+  Global Instance sie_cap_gpr_from_sep γ m avail :
+    FromSep (sie_cap_gpr γ m avail)
+            (hart_state ↦ᵣ HART_ACTIVE tt)
+            (sconf γ ∗ sie_cap γ m avail ∗ gpr_file m).
+  Proof. rewrite /FromSep /sie_cap_gpr. by iIntros "[$ [$ [$ $]]]". Qed.
 
   (* Foolproof split/join for the ports (no instance-resolution surprises). *)
-  Lemma sie_cap_gpr_split γ root_ppn m avail :
-    sie_cap_gpr γ root_ppn m avail -∗ sie_cap γ root_ppn m avail ∗ gpr_file m.
+  Lemma sie_cap_gpr_split γ m avail :
+    sie_cap_gpr γ m avail -∗
+    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf γ ∗ sie_cap γ m avail ∗ gpr_file m.
   Proof. by iIntros "$". Qed.
 
-  Lemma sie_cap_gpr_join γ root_ppn m avail :
-    sie_cap γ root_ppn m avail -∗ gpr_file m -∗ sie_cap_gpr γ root_ppn m avail.
-  Proof. iIntros "Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
+  Lemma sie_cap_gpr_join γ m avail :
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    sconf γ -∗
+    sie_cap γ m avail -∗
+    gpr_file m -∗
+    sie_cap_gpr γ m avail.
+  Proof. iIntros "Hhs Hsc Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
 
   (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof
      threading [sie_cap_gpr] can read the map's x0 slot and keep the bundle. *)
-  Lemma sie_cap_gpr_x0 γ root_ppn m avail (i : mword 5) :
+  Lemma sie_cap_gpr_x0 γ m avail (i : mword 5) :
     uint i = 0 ->
-    sie_cap_gpr γ root_ppn m avail -∗
-    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr γ root_ppn m avail.
+    sie_cap_gpr γ m avail -∗
+    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr γ m avail.
   Proof.
     intro Hi. iIntros "Hcg".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (gpr_file_x0 m i Hi with "Hfile") as "[%Hx Hfile]".
     iSplitR; [ iPureIntro; exact Hx | ].
-    iApply (sie_cap_gpr_join with "Hcap Hfile").
+    iApply (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile").
   Qed.
 
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
-  Lemma sie_cap_acc (γ : gname) (root_ppn : mword 44)
+  Lemma sie_cap_acc (γ : gname)
       (m : regfile) (avail : nat) :
-    sie_cap γ root_ppn m avail ⊣⊢
+    sie_cap γ m avail ⊣⊢
     stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
-    sie_arm γ root_ppn.
+    strans_inv ∗
+    sie_arm γ.
   Proof.
     rewrite /sie_cap stack_own_app. iSplit.
-    - iIntros "[[Hkv Hdeep] Harm]". iFrame.
-    - iIntros "(Hkv & Hdeep & Harm)". iFrame.
+    - iIntros "[[Hkv Hdeep] [Htr Harm]]". iFrame.
+    - iIntros "(Hkv & Hdeep & Htr & Harm)". iFrame.
   Qed.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
-  Lemma sie_cap_retarget (γ : gname) (root_ppn : mword 44)
+  Lemma sie_cap_retarget (γ : gname)
       (m m' : regfile) (avail : nat) :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    sie_cap γ root_ppn m avail -∗ sie_cap γ root_ppn m' avail.
+    sie_cap γ m avail -∗ sie_cap γ m' avail.
   Proof.
-    iIntros (Hsp) "[Hstk Harm]". iFrame "Harm". rewrite Hsp. iExact "Hstk".
+    iIntros (Hsp) "(Hstk & Htr & Harm)". iFrame "Htr Harm". rewrite Hsp. iExact "Hstk".
   Qed.
 
   (* sp DECREMENT by k slots (sp' = sp - 8k, a prologue's frame
@@ -477,14 +521,14 @@ Section IntrDefs.
      can't-go-below-zero check) and the freed frame region [sp', sp) --
      the top k slots, ABOVE the new sp and therefore trap-stable --
      comes OUT for the client. *)
-  Lemma sie_cap_push (γ : gname) (root_ppn : mword 44)
+  Lemma sie_cap_push (γ : gname)
       (m m' : regfile) (avail k : nat) :
     (k <= avail)%nat ->
     m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
-    sie_cap γ root_ppn m avail -∗
-    sie_cap γ root_ppn m' (avail - k) ∗ stack_own (m !!! Regidx csp_rs1) k.
+    sie_cap γ m avail -∗
+    sie_cap γ m' (avail - k) ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
-    iIntros (Hk Hsp') "[Hstk Harm]". iFrame "Harm".
+    iIntros (Hk Hsp') "(Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + avail)%nat
       with (k + (kv_frame_slots + (avail - k)))%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hrest]".
@@ -494,14 +538,14 @@ Section IntrDefs.
   (* sp INCREMENT by k slots (sp' = sp + 8k, an epilogue's frame
      release): the function's frame [sp, sp') = the top k slots at sp'
      is fed back IN and k returns to [avail]. *)
-  Lemma sie_cap_pop (γ : gname) (root_ppn : mword 44)
+  Lemma sie_cap_pop (γ : gname)
       (m m' : regfile) (avail k : nat) :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
     stack_own (m' !!! Regidx csp_rs1) k -∗
-    sie_cap γ root_ppn m avail -∗
-    sie_cap γ root_ppn m' (avail + k).
+    sie_cap γ m avail -∗
+    sie_cap γ m' (avail + k).
   Proof.
-    iIntros (Hsp) "Hframe [Hstk Harm]". iFrame "Harm".
+    iIntros (Hsp) "Hframe (Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + (avail + k))%nat
       with (k + (kv_frame_slots + avail))%nat by lia.
     iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
@@ -509,25 +553,25 @@ Section IntrDefs.
 
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
-  Lemma sie_cap_grow (γ : gname) (root_ppn : mword 44)
+  Lemma sie_cap_grow (γ : gname)
       (m : regfile) (avail k : nat) :
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
-    sie_cap γ root_ppn m avail -∗
-    sie_cap γ root_ppn m (avail + k).
+    sie_cap γ m avail -∗
+    sie_cap γ m (avail + k).
   Proof.
-    iIntros "Hdeep [Hstk Harm]". iFrame "Harm".
+    iIntros "Hdeep (Hstk & Htr & Harm)". iFrame "Htr Harm".
     rewrite Nat.add_assoc. iApply stack_own_app. iFrame "Hstk Hdeep".
   Qed.
 
   (* ... and release the k deepest slots back out. *)
-  Lemma sie_cap_shrink (γ : gname) (root_ppn : mword 44)
+  Lemma sie_cap_shrink (γ : gname)
       (m : regfile) (avail k : nat) :
     (k <= avail)%nat ->
-    sie_cap γ root_ppn m avail -∗
-    sie_cap γ root_ppn m (avail - k) ∗
+    sie_cap γ m avail -∗
+    sie_cap γ m (avail - k) ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
   Proof.
-    iIntros (Hk) "[Hstk Harm]". iFrame "Harm".
+    iIntros (Hk) "(Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + avail)%nat
       with ((kv_frame_slots + (avail - k)) + k)%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hdeep]".
@@ -547,41 +591,41 @@ Section IntrDefs.
   (* the trap CSRs) -- the enable flip is sound whenever csrsi actually  *)
   (* executes, so no intena correlation is needed in the token itself.   *)
   (* =================================================================== *)
-  Definition intr_restore (γ : gname) (root_ppn : mword 44) : iProp Σ :=
+  Definition intr_restore (γ : gname) : iProp Σ :=
     ((∃ handler : mword 64,
-        intr_inv γ handler root_ppn MENVCFG_S ∗
-        ▷ intr_handler_spec handler root_ppn MENVCFG_S) ∗
+        intr_inv γ handler ∗
+        ▷ intr_handler_spec handler) ∗
      (∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v))%I.
 
-  Definition intr_count (γ : gname) (root_ppn : mword 44) (n : nat) : iProp Σ :=
+  Definition intr_count (γ : gname) (n : nat) : iProp Σ :=
     match n with
     | O => (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1)
-            ∨ (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn))%I
-    | S _ => (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn)%I
+            ∨ (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ))%I
+    | S _ => (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ)%I
     end.
 
   (* enter the push/pop discipline at level 0 from raw SIE-token
      ownership (the boot path: interrupts start disabled, the boot holds
      the spare eighth + the trap CSRs + the freshly allocated invariant) *)
-  Lemma intr_count_init (γ : gname) (root_ppn : mword 44) :
-    intr_off_tok γ -∗ intr_restore γ root_ppn -∗ intr_count γ root_ppn 0.
+  Lemma intr_count_init (γ : gname) :
+    intr_off_tok γ -∗ intr_restore γ -∗ intr_count γ 0.
   Proof. iIntros "Htok Hres". iRight. iFrame "Htok Hres". Qed.
 
   (* n > 0 implies interrupts disabled: any fraction of '0' pins the arm *)
-  Lemma intr_count_pos_off (γ : gname) (root_ppn : mword 44) (n : nat) :
-    intr_count γ root_ppn (S n) -∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn.
+  Lemma intr_count_pos_off (γ : gname) (n : nat) :
+    intr_count γ (S n) -∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ.
   Proof. iIntros "[Htok Hres]". iFrame. Qed.
 
   (* at the '0' arm (cap-eighth-'0'), [intr_count n] yields the count
      eighth-'0' + the restore payload -- the n=0 '1'-branch is refuted
      by ghost agreement with the cap. *)
-  Lemma intr_count_get_off (γ : gname) (root_ppn : mword 44) (n : nat) :
+  Lemma intr_count_get_off (γ : gname) (n : nat) :
     ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
-    intr_count γ root_ppn n -∗
+    intr_count γ n -∗
     ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ root_ppn.
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ.
   Proof.
     iIntros "Hcap Hcnt". destruct n.
     - iDestruct "Hcnt" as "[Hc1 | [Hc0 Hres]]".
@@ -594,9 +638,9 @@ Section IntrDefs.
   (* at the '1' arm (cap-eighth-'1'), [intr_count n] forces n=0 and
      yields the count eighth-'1' -- the S-case and the n=0 '0'-branch
      both carry a '0' eighth, refuted by agreement. *)
-  Lemma intr_count_get_on (γ : gname) (root_ppn : mword 44) (n : nat) :
+  Lemma intr_count_get_on (γ : gname) (n : nat) :
     ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) -∗
-    intr_count γ root_ppn n -∗
+    intr_count γ n -∗
     ⌜ n = 0%nat ⌝ ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1)
                   ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1).
   Proof.
@@ -614,21 +658,21 @@ Section IntrDefs.
   (* rebuild [intr_restore] from its pieces, re-introducing the later on
      the persistent handler spec (needed after a branch's [iNext] strips
      it). *)
-  Lemma intr_restore_intro (γ : gname) (root_ppn : mword 44) (h : mword 64) :
-    intr_inv γ h root_ppn MENVCFG_S -∗
-    intr_handler_spec h root_ppn MENVCFG_S -∗
+  Lemma intr_restore_intro (γ : gname) (h : mword 64) :
+    intr_inv γ h -∗
+    intr_handler_spec h -∗
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_restore γ root_ppn.
+    intr_restore γ.
   Proof.
     iIntros "#Hi #Hs Hsep Hsca Hstv". iFrame "Hsep Hsca Hstv".
     iExists h. iFrame "Hi". iNext. iExact "Hs".
   Qed.
 
-  Lemma intr_count_pack_S (γ : gname) (root_ppn : mword 44) (n : nat) :
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_restore γ root_ppn -∗
-    intr_count γ root_ppn (S n).
+  Lemma intr_count_pack_S (γ : gname) (n : nat) :
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_restore γ -∗
+    intr_count γ (S n).
   Proof. iIntros "Hc0 Hres". iFrame. Qed.
 
   (* =================================================================== *)

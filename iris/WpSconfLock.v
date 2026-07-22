@@ -69,7 +69,7 @@ Section WpSconfLock.
   Context `{!lockG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_clw_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_clw_lockinv_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) :
@@ -77,30 +77,25 @@ Section WpSconfLock.
     pa = lk ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     is_lock γl lk s R -∗
     ( ∀ v : mword 32,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pa Hpalk Hrd Hrdsp.
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Hcont".
     iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
+    iApply (wp_instr_s_sconf γ m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc Hsi".
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Htr" as (root_ppn) "Htlbinv".
     (* unbundle the config: the data path needs MPRV/SXL/MXR/PMM + values *)
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
@@ -288,25 +283,27 @@ Section WpSconfLock.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
-    iApply ("Hcont" $! v with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
-                          [$Hpc' $Hnpc]").
+    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
+    { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+    iDestruct (sie_cap_retarget γ m
+                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iApply ("Hcont" $! v with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
   (* the read-while-HOLDING twin: the free branch of the lock invariant
      is refuted by token exclusivity, so the read provably sees a
      nonzero word and the token rides through untouched.               *)
-  Lemma wp_clw_lockinv_locked_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_clw_lockinv_locked_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) :
@@ -314,10 +311,7 @@ Section WpSconfLock.
     pa = lk ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     is_lock γl lk s R -∗
@@ -325,22 +319,20 @@ Section WpSconfLock.
     ( ∀ v : mword 32,
       ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ -∗
       locked γl -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pa Hpalk Hrd Hrdsp.
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Htok Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
     iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc true
+    iApply (wp_instr_s_sconf γ m n Φ pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc Hsi".
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Htr" as (root_ppn) "Htlbinv".
     (* unbundle the config: the data path needs MPRV/SXL/MXR/PMM + values *)
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
@@ -530,19 +522,21 @@ Section WpSconfLock.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
-    iApply ("Hcont" $! v with "[//] Htok Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
-                          [$Hpc' $Hnpc]").
+    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
+    { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+    iDestruct (sie_cap_retarget γ m
+                 (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n Hsp with "Hcap") as "Hcap".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iApply ("Hcont" $! v with "[//] Htok Hcg [$Hpc' $Hnpc]").
   Qed.
 
 
@@ -551,38 +545,33 @@ Section WpSconfLock.
   (* sw zero -- release's unlock store through the lock invariant: the    *)
   (* token and R go back in with the zeroed word.                         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sw_zero_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_sw_zero_lockinv_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     pa = lk ->
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     is_lock γl lk s R -∗
     locked γl -∗
     R -∗
-    ( hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn m n -∗
-      tlb_inv_pt root_ppn -∗
+    ( sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pa Hpalk.
     set (storeval := (mword_of_int 0 : mword 32)).
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Htok HRes Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok HRes Hcont".
     iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
+    iApply (wp_instr_s_sconf γ m n Φ pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc Hsi".
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Htr" as (root_ppn) "Htlbinv".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
@@ -753,13 +742,15 @@ Section WpSconfLock.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
-    iApply ("Hcont" with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
-                          [$Hpc' $Hnpc]").
+    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
+    { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
 
@@ -769,7 +760,7 @@ Section WpSconfLock.
   (* word's disjunct (w=0 ∗ locked ∗ R | w≠0) goes to the caller, the     *)
   (* swapped-in nonzero mark reseals the invariant.                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_amoswap_lockinv_s_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_amoswap_lockinv_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (s : string) (R : iProp Σ)
       (pc : mword 64) (rd rs2 rs1 : mword 5)
       (m : regfile) (n : nat) :
@@ -778,16 +769,12 @@ Section WpSconfLock.
     neq_vec (sign_extend' 64 (amoswap_stored (m !!! Regidx rs2))) zero_reg = true ->
     uint rd <> 0 ->
     rd <> csp_rs1 ->
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn m n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc false (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd)) -∗
     is_lock γl lk s R -∗
     ( ∀ w : mword 32,
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n -∗
       pc_is (add_vec_int pc 4) -∗
       (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked γl ∗ R
        ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
@@ -796,13 +783,14 @@ Section WpSconfLock.
   Proof.
     intros pa Hpalk Hstz Hrd Hrdsp.
     set (a8 := pa). set (ea := pa).
-    iIntros "Hsc Hhs Hcg Htlbinv Hpc Hinstr #Hlock Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Hcont".
     iDestruct (is_lock_inv with "Hlock") as "#Hlkinv".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "[Hcap Hfile]".
-    iApply (wp_instr_s_sconf γ root_ppn m n Φ pc false
+    iApply (wp_instr_s_sconf γ m n Φ pc false
               (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
-              with "Hsc Hhs Hcap Htlbinv Hpc Hfile Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Htlbinv Hfmap Hnpc [Hreg [Hmem Hdev]]".
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg [Hmem Hdev]]".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Htr" as (root_ppn) "Htlbinv".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
@@ -1004,20 +992,22 @@ Section WpSconfLock.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ root_ppn m
-                 (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hcap Hfmap") as "Hcg".
-    iNext.
-    iApply ("Hcont" $! w with "Hhs' [Hpriv Hms Hhalf Hmiex Hmenv] Hcg Htlbinv
-                          [$Hpc' $Hnpc] Hbr").
+    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
+    { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+    assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+    iDestruct (sie_cap_retarget γ m
+                 (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n Hsp with "Hcap") as "Hcap".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iNext.
+    iApply ("Hcont" $! w with "Hcg [$Hpc' $Hnpc] Hbr").
   Qed.
 
 

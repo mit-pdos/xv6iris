@@ -49,7 +49,7 @@ Import Defs.
 Notation PLIC_COMPLETE := KernelSyms.plic_complete.
 
 Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+    (γ : gname) (γd : uart_names)
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -61,17 +61,11 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
   (* plic_complete's own max depth: its 32-byte frame (4 slots) plus the two
      slots cpuid's frame needs below it. *)
   (6 <= n)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m0 n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd -∗
   ( ∀ m' : regfile,
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn m' n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m' n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -80,7 +74,7 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
 Module Type PLIC_COMPLETE.
   Parameter wp_plic_complete_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (γd : uart_names)
+      (γ : gname) (γd : uart_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_plic_complete_sconf_body γ root_ppn γd Φ m0 n.
+      wp_plic_complete_sconf_body γ γd Φ m0 n.
 End PLIC_COMPLETE.

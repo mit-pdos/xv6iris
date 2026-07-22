@@ -23,7 +23,7 @@ Require Import KptTree.
 Notation MS := KernelSyms.memset.
 
 Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -36,13 +36,11 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m0 n -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
   page_own p -∗
   ( ∀ mfin,
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mfin n -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mfin n -∗
     pc_is ret_tgt -∗
     page_own p -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
@@ -52,6 +50,6 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type MEMSETPAGE.
   Parameter wp_memset_page_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64),
-      wp_memset_page_sconf_body γ root_ppn Φ m0 n cval.
+      (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64),
+      wp_memset_page_sconf_body γ Φ m0 n cval.
 End MEMSETPAGE.

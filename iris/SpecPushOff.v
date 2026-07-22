@@ -23,7 +23,7 @@ Notation PO := KernelSyms.push_off.
 Notation PP := KernelSyms.pop_off.
 
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
      unbundled mstatus0; the statement stays mstatus0-free. *)
@@ -36,31 +36,25 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
   mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
   (6 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  intr_count γ root_ppn n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
+  intr_count γ n -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.push_off + 0x00) : mword 64) -∗
   a_noff ↦₄ noff -∗
   a_intena ↦₄ intena_old -∗
   ( ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn mfin av -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mfin av -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
     a_noff ↦₄ noff_store -∗
     a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg
                  then po_intena_val ms else intena_old) -∗
-    intr_count γ root_ppn (S n) -∗
+    intr_count γ (S n) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) (dqi : dfrac) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) (dqi : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
   let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
@@ -74,20 +68,14 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (4 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  intr_count γ root_ppn (S n) -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
+  intr_count γ (S n) -∗
   kernel_text -∗ pc_is pcE -∗
   a_noff ↦₄ noffv -∗
   a_int ↦₄{ dqi } intenav -∗
   ( ∀ mf,
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn mf av -∗
-    intr_count γ root_ppn n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mf av -∗
+    intr_count γ n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mf ⌝ -∗
     a_noff ↦₄ storeval -∗
@@ -98,10 +86,10 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat),
-      wp_push_off_sconf_body γ root_ppn Φ m av noff intena_old a0f n.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat),
+      wp_push_off_sconf_body γ Φ m av noff intena_old a0f n.
   Parameter wp_pop_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) {dqi : dfrac},
-      wp_pop_off_sconf_body γ root_ppn Φ m av noffv intenav n dqi.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) {dqi : dfrac},
+      wp_pop_off_sconf_body γ Φ m av noffv intenav n dqi.
 End PUSHOFF.

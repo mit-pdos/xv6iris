@@ -40,7 +40,7 @@ Import Defs.
 Notation SL := KernelSyms.sleep.
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+    (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
     (m : regfile) (av : nat) :=
@@ -58,13 +58,10 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  intr_count γ root_ppn 1 -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
+  intr_count γ 1 -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γ root_ppn Φ γs -∗
+  procs_inv γ Φ γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
   is_lock γk lka sk Rk -∗
   locked γk -∗
@@ -76,14 +73,11 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ root_ppn Φ γs (a_cpu_ctx cid_word) -∗
+  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
   ( ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sconf γ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn mf av -∗
-      intr_count γ root_ppn 1 -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ mf av -∗
+      intr_count γ 1 -∗
       pc_is ret_tgt -∗
       (* lk reacquired, with its resource *)
       locked γk -∗
@@ -95,16 +89,16 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
       (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
       p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ root_ppn Φ γs (a_cpu_ctx cid_word) -∗
+      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat),
-      wp_sleep_sconf_body γ root_ppn Φ γs j γl γk lka sk Rk m av.
+      wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av.
 End SLEEP.

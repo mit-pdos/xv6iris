@@ -78,8 +78,8 @@ The resumer predicate is THREE-place, `P c cret tpv`:
 
 ### 3. swtch over the sconf tier (SpecSwtch.v — DONE; WpSwtchSconf.v proof — TODO)
 
-`swconf γ root_ppn := sconf γ ∗ hart_state ∗ tlb_inv_pt root_ppn ∗
-sie_arm γ root_ppn ∗ intr_count γ root_ppn 1` (SwtchCtx.v).  The STACK does
+`swconf γ := sconf γ ∗ hart_state ∗ strans_inv ∗
+sie_arm γ ∗ intr_count γ 1` (SwtchCtx.v).  The STACK does
 not cross: each coroutine's `stack_own` is captured in its continuation
 closure; `sie_cap_gpr` is rebuilt on resume from `sie_arm` + fresh
 `gpr_file` (sp pinned by callee_img).  `intr_count 1`: xv6 asserts noff==1

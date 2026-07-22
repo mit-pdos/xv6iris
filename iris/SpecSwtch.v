@@ -30,7 +30,7 @@ Import Defs.
 Notation SW := KernelSyms.swtch.
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+    (γ : gname) (Φ : mval -> iProp Σ)
     (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64)) :=
   length old_vs = 14%nat ->
@@ -39,20 +39,20 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   eq_vec (access_vec_dec (ctx_pc (m0 !!! Regidx (mword_of_int 1 : mword 5))) 0)
     ('b"0") = true ->
   kernel_text -∗
-  swconf γ root_ppn -∗
+  swconf γ -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   gpr_file m0 -∗
   ctx_cells oldc old_vs -∗
-  ▷ valid_context (swconf γ root_ppn) Φ P newc -∗
+  ▷ valid_context (swconf γ) Φ P newc -∗
   P newc oldc (m0 !!! Regidx (mword_of_int 4 : mword 5)) -∗
   ( ∀ (m : regfile),
       ⌜callee_img m = callee_img m0⌝ -∗
-      swconf γ root_ppn -∗
+      swconf γ -∗
       pc_is (ctx_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       gpr_file m -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ cret : mword 64,
-         ▷ valid_context (swconf γ root_ppn) Φ P cret ∗
+         ▷ valid_context (swconf γ) Φ P cret ∗
          P oldc cret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
       WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -60,8 +60,8 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γ : gname) (Φ : mval -> iProp Σ)
       (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64)),
-      wp_swtch_sconf_body γ root_ppn Φ P oldc newc m0 old_vs.
+      wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs.
 End SWTCH.

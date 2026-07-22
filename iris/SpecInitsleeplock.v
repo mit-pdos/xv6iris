@@ -36,7 +36,7 @@ Notation ISL := KernelSyms.initsleeplock.
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007548.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+    (γ : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
     (av : nat) :=
@@ -47,10 +47,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
                    (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (6 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
@@ -64,10 +61,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
   sl_name_field slk ↦₈ vname -∗
   sl_pid slk ↦₄ vpid -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr av -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr av -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -84,9 +78,9 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
       (av : nat),
-      wp_initsleeplock_sconf_body γ root_ppn Φ m s vlocked vlk vpid vlkname vcpu vname av.
+      wp_initsleeplock_sconf_body γ Φ m s vlocked vlk vpid vlkname vcpu vname av.
 End INITSLEEPLOCK.

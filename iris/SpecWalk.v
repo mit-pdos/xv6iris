@@ -30,7 +30,7 @@ Import Defs.
 Notation WK := KernelSyms.walk.
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) :=
+    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0") in
@@ -41,15 +41,13 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   mm !!! Regidx (mword_of_int 12) = mword_of_int 1 ->
   (uint va < 2 ^ 38)%Z ->
   pt_rep0 t m ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn mm K -∗ intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ mm K -∗ intr_count γ lvl -∗
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
   ( ∀ (mr : regfile) (t' : ptree),
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗ intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗ intr_count γ lvl -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
@@ -65,6 +63,6 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
 Module Type WALK.
   Parameter wp_walk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat),
-      wp_walk_sconf_body γ root_ppn γa Φ mm t m K lvl.
+      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat),
+      wp_walk_sconf_body γ γa Φ mm t m K lvl.
 End WALK.

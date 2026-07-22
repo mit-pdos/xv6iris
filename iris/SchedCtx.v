@@ -46,9 +46,10 @@ Local Open Scope Z_scope.
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
-  (* the ambient S-mode world: the SIE ghost name, the kernel page table,
-     the whole-machine postcondition. *)
-  Context (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ).
+  (* the ambient S-mode world: the SIE ghost name and the whole-machine
+     postcondition.  (The kernel page table rides inside [swconf]'s
+     translation slot; no root parameter.) *)
+  Context (γ : gname) (Φ : mval -> iProp Σ).
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
 
@@ -97,7 +98,7 @@ Section SchedCtx.
 
   (* the scheduler-chain valid context (fixed sc / Phi / P instantiation). *)
   Definition sched_vc (c : mword 64) : iProp Σ :=
-    valid_context (swconf γ root_ppn) Φ p_sched c.
+    valid_context (swconf γ) Φ p_sched c.
 
   (* ------------------------------------------------------------------ *)
   (* Payload intro/elim.  Discrimination is by the resumed context's own  *)

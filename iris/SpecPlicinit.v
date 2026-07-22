@@ -49,24 +49,18 @@ Definition plicinit_plic (p : plic_state) : plic_state :=
             (p_pending p) (p_claimed p) (p_enable p) (p_thresh p).
 
 Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : plic_state) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : plic_state) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m0 n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
   plic_frag p -∗
   ( ∀ m' : regfile,
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn m' n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ m' n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     plic_frag (plicinit_plic p) -∗
@@ -76,6 +70,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : plic_state),
-      wp_plicinit_sconf_body γ root_ppn Φ m0 n p.
+      (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : plic_state),
+      wp_plicinit_sconf_body γ Φ m0 n p.
 End PLICINIT.

@@ -143,22 +143,37 @@ statement) closed by `exact (<generic> (kpt_regime root_ppn) <explicit
 binders>)` — NEVER a Definition (an implicit `dq` would become positional and
 churn every call site).
 
-STAGE (d) — the only remaining stage, then the Bare boot path opens: flip the
-kalloc cone's whole-function statements from `tlb_inv_pt root_ppn` to `sr_inv R`
-— memset_page, mycpu, push_off/pop_off(+Csr/Mem), holding, acquire(+Top),
-release, kalloc.  Bodies change only leaf names `_pt`→`_r` applied at R.  Keep
-old-name kpt instances for unconverted callers (kfree, wakeup, …, migrate
-lazily).  KvmSpec.v's `Variable SINV` becomes `Variable R : s_regime`
-(`SINV := sr_inv R`).  Additive at every step, `make proofs` green per commit;
-never rename what the interrupt sweep's files reference.
+STAGE (d) — SUPERSEDED by the sie_cap_gpr refactor (design/interrupts.md):
+whole-function specs no longer name ANY translation invariant — they thread the
+bundle `sie_cap_gpr γ m n`, whose translation slot `strans_inv := ∃ root,
+tlb_inv_pt root` (IntrDefs.v) is opened at a skolem root only inside engines
+and data/device leaves.  The old plan (flip statements from `tlb_inv_pt
+root_ppn` to `sr_inv R`) is therefore dead: statements are already
+regime-OBLIVIOUS.  What remains to open the Bare boot path is localized in the
+engine tier, not the spec tier:
+
+  1. `strans_inv` grows the disjunct: `bare_inv ∨ ∃ root, tlb_inv_pt root`.
+  2. The funnel `wp_instr_s_sconf`'s '0' arm dispatches per disjunct to
+     `wp_instr_s_config_regime` at `bare_regime` / `kpt_regime root` (both
+     instances proven); the sconf DATA/device leaves' internals likewise
+     dispatch (their regime-generic `_r` underpinnings already exist).
+  3. The '1' arm (interrupts enabled) needs the kpt disjunct.  Two options:
+     (a) refute Bare at SIE=1 (xv6 never enables S-interrupts before
+     kvminithart) via a one-shot token parked in `bare_inv`; or (b) — nicer,
+     ghost-free — make `intr_frame` carry `strans_inv` instead of
+     `tlb_inv_pt root` and prove `kernelvec_handler_spec` regime-generically
+     (kernelvec under Bare is identity translation), making enabled execution
+     legal in either regime.  Decide when building it.
+  4. KvmSpec.v's `Variable R : s_regime` threading of `sr_inv R` may become
+     redundant once the slot is a disjunction (the walk/mappages/kvmmap proofs
+     are sconf-tier and reach translation through the slot) — revisit then.
 
 Gotcha: WpSmodePtUart stays kpt-specific — its DEV absorption needs kpt-shaped
-premises; add dev fields to the record only when a Bare device access is
-actually needed (proving panic/printf rather than axiomatizing `panic_wp`).
+premises; a Bare device access (uartinit/printf during boot) instead needs a
+bare arm in the sconf UART leaves' slot dispatch (`bare_absorb_dev` exists).
 
 ORTHOGONALITY (interrupt sweep): regime (which translation invariant fetches go
-through) and SIE-agnosticism (the sconf bundle) are independent axes; the
-sweep's v2 engines should eventually take a regime argument too, and
+through) and SIE-agnosticism (the sconf bundle) are independent axes;
 TrampStepPt's Variable-INV engine is a candidate to re-express as an `s_regime`
 keyed on the trampoline va instead of `addr_is_ram` — follow-ups, not blockers.
 

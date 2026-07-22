@@ -35,16 +35,16 @@ Section WpSconfFileinit.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_fileinit_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_fileinit_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64)
-    : wp_fileinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
+    : wp_fileinit_sconf_body γ Φ m K vlock vname vcpu.
   Proof.
     cbv beta delta [wp_fileinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK Hretm.
     (* &"ftable" is proof-local: the spec speaks of the lock's NAME, not of the
        address the image happens to keep the literal at. *)
     pose (name := (mword_of_int ftable_name_str : mword 64)).
-    iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "ftable" string literal (6 chars + NUL), read out of the data image *)
     assert (Hftable : forall j b, cstring_bytes "ftable"%string !! j = Some b ->
                         KernelData.kernel_data !! (ftable_name_str + Z.of_nat j)%Z = Some b).
@@ -54,14 +54,14 @@ Section WpSconfFileinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl Hftable
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K FI
+    iApply (ILW.wp_initlock_wrapper_sconf γ Φ m K FI
               (mword_of_int 3) (mword_of_int 30) (mword_of_int 1468) (mword_of_int 1212)
               (mword_of_int 2083804) lk name "ftable"%string vlock vname vcpu HK Hretm
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
+              with "Hcg Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
     iApply (fii_code with "Htext").
   Qed.
 

@@ -26,7 +26,7 @@ Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (noffv : mword 32) (lvl K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (noffv : mword 32) (lvl K : nat) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   let rettgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -55,15 +55,15 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
   (neq_vec nv1 zero_reg = false <-> lvl = 0%nat) ->
   zopz0zKzJ_s zero_reg (sign_extend' 64 noff1) = false ->
   eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn m K -∗
-  intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
+  intr_count γ lvl -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
   wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
-  wk_lockcells γs -∗ cur_proc pme -∗ procs_inv γ root_ppn Φ γs -∗
+  wk_lockcells γs -∗ cur_proc pme -∗ procs_inv γ Φ γs -∗
   ( ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn Mf K -∗
-      intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ Mf K -∗
+      intr_count γ lvl -∗
       kernel_text -∗ pc_is rettgt -∗
       wk_noff_addr a0f ↦₄ noffv -∗ (∃ iv : mword 32, wk_intena_addr a0f ↦₄ iv) -∗
       wk_lockcells γs -∗ cur_proc pme -∗
@@ -73,6 +73,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
 Module Type WAKEUPLOOP.
   Parameter wp_wakeup_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (noffv : mword 32) (lvl K : nat),
-      wp_wakeup_sconf_body γ root_ppn Φ m γs a0f pme noffv lvl K.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (noffv : mword 32) (lvl K : nat),
+      wp_wakeup_sconf_body γ Φ m γs a0f pme noffv lvl K.
 End WAKEUPLOOP.

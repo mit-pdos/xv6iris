@@ -36,7 +36,7 @@ Definition time_name_str : Z := 0x80007248%Z.
    caller's ghost step, not trapinit's -- it need only add the invariant
    ([is_lock_intro]).  The "time" literal itself is read out of [kernel_data]. *)
 Definition wp_trapinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.trapinit in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let lk : mword 64 := mword_of_int KernelSyms.tickslock in
@@ -44,19 +44,13 @@ Definition wp_trapinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (4 <= K)%nat ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -68,6 +62,6 @@ Definition wp_trapinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
 Module Type TRAPINIT.
   Parameter wp_trapinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64),
-      wp_trapinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64),
+      wp_trapinit_sconf_body γ Φ m K vlock vname vcpu.
 End TRAPINIT.

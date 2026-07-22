@@ -69,7 +69,7 @@ Definition ilw_code `{!riscvGS Σ} `{CID : CpuId} (F : Z)
    them out of the image with [kernel_data_string], at its own literal's length),
    and the shape stays independent of the data image. *)
 Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
     (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) :=
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -84,10 +84,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
   add_vec (add_vec (mword_of_int (F + 0x08) : mword 64) (auipc_off uname)) (sign_extend' 64 iname) = name ->
   add_vec (add_vec (mword_of_int (F + 0x10) : mword 64) (auipc_off ulk)) (sign_extend' 64 ilk) = lk ->
   add_vec (mword_of_int (F + 0x18) : mword 64) (sign_extend' 64 j) = mword_of_int KernelSyms.initlock ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
   kernel_text -∗ ilw_code F uname ulk iname ilk j -∗ pc_is (mword_of_int F : mword 64) -∗
   (* the name string literal: DUPLICABLE, so the member keeps its copy *)
   name ↦ₛ□ s -∗
@@ -95,10 +92,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -112,8 +106,8 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
 Module Type INITLOCK_WRAPPER.
   Parameter wp_initlock_wrapper_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
       (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64),
-      wp_initlock_wrapper_sconf_body γ root_ppn Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu.
+      wp_initlock_wrapper_sconf_body γ Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu.
 End INITLOCK_WRAPPER.

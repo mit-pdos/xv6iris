@@ -26,7 +26,7 @@ From Kernel Require KernelSyms.
 Notation KM := KernelSyms.kvmmap.
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) :=
+    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of va in
@@ -47,14 +47,14 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   pt_rep0 t m ->
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
   panic_wp -∗
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn mm K -∗
-  intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗ kernel_text -∗
+  sie_cap_gpr γ mm K -∗
+  intr_count γ lvl -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
   ( ∀ (mr : regfile) (t' : ptree),
-    sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗ sie_cap_gpr γ root_ppn mr K -∗
-    intr_count γ root_ppn lvl -∗ tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
+    intr_count γ lvl -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
@@ -67,6 +67,6 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type KVMMAP.
   Parameter wp_kvmmap_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat),
-      wp_kvmmap_sconf_body γ root_ppn γa Φ mm t m npages perm lvl K.
+      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat),
+      wp_kvmmap_sconf_body γ γa Φ mm t m npages perm lvl K.
 End KVMMAP.

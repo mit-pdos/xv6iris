@@ -62,7 +62,7 @@ Lemma uartinit_post_dlab_off (u0 : uart_state) : uart_dlab (uartinit_post u0) = 
 Proof. reflexivity. Qed.
 
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state) (vlock : bv 32) (vname vcpu : bv 64) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let lk : mword 64 := mword_of_int KernelSyms.tx_lock in
@@ -70,10 +70,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (4 <= K)%nat ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
   (* [kernel_data] supplies the "uart" string literal uartinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -82,10 +79,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     uart_frag (uartinit_post u0) -∗
@@ -100,6 +94,6 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state) (vlock : bv 32) (vname vcpu : bv 64),
-      wp_uartinit_sconf_body γ root_ppn Φ m K u0 vlock vname vcpu.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state) (vlock : bv 32) (vname vcpu : bv 64),
+      wp_uartinit_sconf_body γ Φ m K u0 vlock vname vcpu.
 End UARTINIT.

@@ -52,17 +52,20 @@ Section WpSwtchSconf.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_swtch_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_swtch_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64)) :
-    wp_swtch_sconf_body γ root_ppn Φ P oldc newc m0 old_vs.
+    wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hal_old)
       "#Ht Hswconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
     (* ---- unbundle swconf / sconf into the raw CSR resources ---- *)
     iEval (rewrite /swconf) in "Hswconf".
-    iDestruct "Hswconf" as "(Hsc & Hhs & Htlbinv & Hsiearm & Hintr)".
+    iDestruct "Hswconf" as "(Hsc & Hhs & Htr & Hsiearm & Hintr)".
+    (* open the translation slot at its skolem root; instantiate the regime
+       engines at that root and refold [strans_inv] when handing [swconf] back *)
+    iDestruct "Htr" as (root_ppn) "Htlbinv".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -71,17 +74,17 @@ Section WpSwtchSconf.
     iDestruct "Hmenvx" as (menvcfg0)
       "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     (* ---- SIE = 0 from the intr_count-1 eighth agreeing with sconf's tied half ---- *)
-    iDestruct (intr_count_pos_off γ root_ppn 0 with "Hintr") as "[Hq0 Hrestore]".
+    iDestruct (intr_count_pos_off γ 0 with "Hintr") as "[Hq0 Hrestore]".
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).
     (* re-pack [intr_count 1] NOW (folded): a folded [intr_count] has no leading
        ▷, so it rides through the c.ret's [iNext] untouched -- whereas the raw
        [intr_restore] carries an internal ▷ that [iNext] would strip. *)
-    iDestruct (intr_count_pack_S γ root_ppn 0 with "Hq0 Hrestore") as "Hintr".
+    iDestruct (intr_count_pack_S γ 0 with "Hq0 Hrestore") as "Hintr".
     (* ---- strip the ▷ off the target VC: keep the resume wand ▷'d ---- *)
     iApply fupd_wp.
-    iEval (rewrite (valid_context_unfold (swconf γ root_ppn) Φ P newc)
+    iEval (rewrite (valid_context_unfold (swconf γ) Φ P newc)
                    /valid_context_pre bi.later_exist) in "Hvalidnew".
     iDestruct "Hvalidnew" as (new_vs) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & Hnewwand)".
@@ -137,9 +140,9 @@ Section WpSwtchSconf.
     iEval (rewrite Hmapcallee Hmapnew) in "Hheap".
     iDestruct "Hheap" as "[Holdpart Hnewpart]".
     (* ---- build [valid_context P oldc] from old's restored cells + the caller cont ---- *)
-    iAssert (valid_context (swconf γ root_ppn) Φ P oldc)
+    iAssert (valid_context (swconf γ) Φ P oldc)
       with "[Holdpart Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold (swconf γ root_ppn) Φ P oldc) /valid_context_pre.
+    { rewrite (valid_context_unfold (swconf γ) Φ P oldc) /valid_context_pre.
       iExists (callee_img m0).
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
@@ -197,12 +200,14 @@ Section WpSwtchSconf.
     (* the c.ret's [iNext] stripped [intr_count]'s internal ▷ (on the handler
        spec); re-introduce it via [intr_restore_intro] and re-pack. *)
     iDestruct "Hintr" as "(Hq0 & (%h & #Hinv_h & #Hspec_h) & Hsepc & Hscause & Hstval)".
-    iDestruct (intr_restore_intro γ root_ppn h
+    iDestruct (intr_restore_intro γ h
                  with "Hinv_h Hspec_h Hsepc Hscause Hstval") as "Hrestore".
-    iDestruct (intr_count_pack_S γ root_ppn 0 with "Hq0 Hrestore") as "Hintr".
-    iAssert (swconf γ root_ppn)
+    iDestruct (intr_count_pack_S γ 0 with "Hq0 Hrestore") as "Hintr".
+    iAssert (swconf γ)
       with "[Hsc Hhs Htlbinv Hsiearm Hintr]" as "Hswconf".
-    { rewrite /swconf. iFrame "Hsc Hhs Htlbinv Hsiearm Hintr". }
+    { rewrite /swconf. iFrame "Hsc Hhs Hsiearm Hintr".
+      (* refold [strans_inv] at the skolem root the entry destructured *)
+      iExists root_ppn. iExact "Htlbinv". }
     iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
               with "[] Hswconf Hpc Hfile Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hcallee_new. }

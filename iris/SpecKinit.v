@@ -27,7 +27,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Notation KI := KernelSyms.kinit.
 
 Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
@@ -45,11 +45,8 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   eq_vec (zero_reg : mword 64) cpuv = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   prun phystop s1entry ps ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  intr_count γ root_ppn ncnt -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
+  intr_count γ ncnt -∗
   (* [kernel_data] supplies the "kmem" string literal kinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -61,11 +58,8 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   a_noff ↦₄ (zeros' 32 : mword 32) -∗
   (∃ iv : mword 32, a_int ↦₄ iv) -∗
   ( ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    intr_count γ root_ppn ncnt -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
+    intr_count γ ncnt -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     is_kmem γl γk lk fl -∗
@@ -79,6 +73,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
 Module Type KINIT.
   Parameter wp_kinit_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (vlock : bv 32) (vname vcpu : bv 64),
-      wp_kinit_sconf_body γ root_ppn Φ m ps K ncnt vlock vname vcpu.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (vlock : bv 32) (vname vcpu : bv 64),
+      wp_kinit_sconf_body γ Φ m ps K ncnt vlock vname vcpu.
 End KINIT.

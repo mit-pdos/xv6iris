@@ -27,7 +27,7 @@ From Kernel Require KernelSyms.
 Notation KF := KernelSyms.kfree.
 
 Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfree in
   let p := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
@@ -55,11 +55,8 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   zopz0zKzJ_s zero_reg (sign_extend' 64 po_noff_store) = false ->
   eq_vec (sign_extend' 64
      (if eq_vec (sign_extend' 64 noffv) zero_reg then (zeros' 32) else intena_old)) zero_reg = true ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  intr_count γ root_ppn n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
+  intr_count γ n -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   kfree_pre p -∗
@@ -68,11 +65,8 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   a_int ↦₄ intena_old -∗
   a_cpu ↦₈ cpuold -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    intr_count γ root_ppn n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
+    intr_count γ n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (avail_inc on) -∗
@@ -85,6 +79,6 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
 Module Type KFREE.
   Parameter wp_kfree_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat),
-      wp_kfree_sconf_body γ root_ppn Φ γl γk lk fl m cpuold noffv intena_old on n K.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat),
+      wp_kfree_sconf_body γ Φ γl γk lk fl m cpuold noffv intena_old on n K.
 End KFREE.

@@ -29,13 +29,12 @@ Notation WK := KernelSyms.wakeup.
    to use the proven [wp_myproc_sconf] directly (SpecWakeupLoop.v). *)
 
 Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
   ( ∀ (M : regfile) (vpad : mword 64),
       ⌜ M !!! Regidx (mword_of_int 9)  = proc_addr 0
@@ -53,8 +52,7 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ M !!! Regidx (mword_of_int 26) = m !!! Regidx (mword_of_int 26)
       /\ M !!! Regidx (mword_of_int 27) = m !!! Regidx (mword_of_int 27)
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap M)) ⌝ -∗
-      sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn M (K - 8) -∗ tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ M (K - 8) -∗
       pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
       wk_fcell spF 7 ↦₈ (m !!! Regidx (mword_of_int 1)) -∗
       wk_fcell spF 6 ↦₈ (m !!! Regidx (mword_of_int 8)) -∗
@@ -68,15 +66,14 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) :=
   let spF := M !!! Regidx csp_rs1 in
   let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) in
   let rettgt := update_vec_dec (add_vec vra (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
   eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
-  sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn M (K - 8) -∗ tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ M (K - 8) -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗
   wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗
   wk_fcell spF 4 ↦₈ vs2 -∗ wk_fcell spF 3 ↦₈ vs3 -∗ wk_fcell spF 2 ↦₈ vs4 -∗
@@ -98,8 +95,7 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
       /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sconf γ -∗ hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sie_cap_gpr γ root_ppn Mf K -∗ tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ Mf K -∗
       pc_is rettgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -107,10 +103,10 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
 Module Type WAKEUP.
   Parameter wp_wakeup_prologue_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (K : nat),
-      wp_wakeup_prologue_sconf_body γ root_ppn Φ m K.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat),
+      wp_wakeup_prologue_sconf_body γ Φ m K.
   Parameter wp_wakeup_epilogue_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64),
-      wp_wakeup_epilogue_sconf_body γ root_ppn Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad.
+      (γ : gname) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64),
+      wp_wakeup_epilogue_sconf_body γ Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad.
 End WAKEUP.

@@ -27,7 +27,7 @@ From Kernel Require KernelSyms.
 Notation AK := KernelSyms.kalloc.
 
 Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
@@ -49,11 +49,8 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   zopz0zKzJ_s zero_reg (sign_extend' 64 po_noff_store) = false ->
   eq_vec (sign_extend' 64
      (if eq_vec (sign_extend' 64 noffv) zero_reg then (zeros' 32) else intena_old)) zero_reg = true ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  intr_count γ root_ppn n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
+  intr_count γ n -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
@@ -61,11 +58,8 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   a_int ↦₄ intena_old -∗
   a_cpu ↦₈ cpuold -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    intr_count γ root_ppn n -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
+    intr_count γ n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_post γk on (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -78,6 +72,6 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type KALLOC.
   Parameter wp_kalloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat),
-      wp_kalloc_sconf_body γ root_ppn Φ γl γk fl m cpuold noffv intena_old on n K.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (on : option nat) (n : nat) (K : nat),
+      wp_kalloc_sconf_body γ Φ γl γk fl m cpuold noffv intena_old on n K.
 End KALLOC.

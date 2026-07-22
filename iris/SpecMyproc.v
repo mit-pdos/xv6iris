@@ -32,7 +32,7 @@ Import Defs.
 Notation MP := KernelSyms.myproc.
 
 Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+    (γ : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av n : nat) (noffv intena_old : mword 32) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.myproc in
   (* the noff cell value after push_off's increment (its own storeval form);
@@ -54,22 +54,16 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   zopz0zKzJ_s zero_reg (sign_extend' 64 noff1) = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (10 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  intr_count γ root_ppn n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
+  intr_count γ n -∗
   kernel_text -∗ pc_is pcE -∗
   a_cpu_noff cid_word ↦₄ noffv -∗
   a_cpu_int cid_word ↦₄ intena_old -∗
   cur_proc p -∗
   ( ∀ (ms : mword 64) (mf : regfile),
       ⌜ sconf_ms_facts ms ⌝ -∗
-      hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
-      sie_cap_gpr γ root_ppn mf av -∗
-      intr_count γ root_ppn n -∗
-      tlb_inv_pt root_ppn -∗
+      sie_cap_gpr γ mf av -∗
+      intr_count γ n -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = p ⌝ -∗
@@ -83,7 +77,7 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type MYPROC.
   Parameter wp_myproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+      (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av n : nat) (noffv intena_old : mword 32) (p : mword 64),
-      wp_myproc_sconf_body γ root_ppn Φ m av n noffv intena_old p.
+      wp_myproc_sconf_body γ Φ m av n noffv intena_old p.
 End MYPROC.

@@ -75,7 +75,7 @@ their durable design notes, gotchas, and reusable recipes.
   spinlock, the holder-carried pid cell, and acquiresleep's sleep-retry iLöb
   loop over the proven `SLEEP` interface.
 - **[`sie-cap-avail.md`](completed/sie-cap-avail.md)** — folded the free stack
-  into `sie_cap γ root m avail` (avail = slots available to kernel code); sp
+  into the sie capability with an avail parameter (avail = slots available to kernel code); sp
   push/pop specs (`wp_caddi{,16}sp_{push,pop}_s_sconf`), the sp-aware VCgen
   executor, and the whole function tier (mycpu … kvmmap, plus the kinit cone)
   ported off the separate deep-`stack_own` conjunct. Full clean build green.

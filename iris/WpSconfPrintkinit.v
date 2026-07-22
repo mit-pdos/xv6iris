@@ -36,16 +36,16 @@ Section WpSconfPrintkinit.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_printkinit_sconf (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_printkinit_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64)
-    : wp_printkinit_sconf_body γ root_ppn Φ m K vlock vname vcpu.
+    : wp_printkinit_sconf_body γ Φ m K vlock vname vcpu.
   Proof.
     cbv beta delta [wp_printkinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK Hretm.
     (* &"pr" is proof-local: the spec speaks of the lock's NAME, not of the
        address the image happens to keep the literal at. *)
     pose (name := (mword_of_int pr_name_str : mword 64)).
-    iIntros "Hsc Hhs Hcg Htlbinv #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "pr" string literal (2 chars + NUL), read out of the data image *)
     assert (Hpr : forall j b, cstring_bytes "pr"%string !! j = Some b ->
                     KernelData.kernel_data !! (pr_name_str + Z.of_nat j)%Z = Some b).
@@ -55,14 +55,14 @@ Section WpSconfPrintkinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl Hpr
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf γ root_ppn Φ m K PK
+    iApply (ILW.wp_initlock_wrapper_sconf γ Φ m K PK
               (mword_of_int 6) (mword_of_int 18) (mword_of_int 1982) (mword_of_int 2694)
               (mword_of_int 782) lk name "pr"%string vlock vname vcpu HK Hretm
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hsc Hhs Hcg Htlbinv Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
+              with "Hcg Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
     iApply (pki_code with "Htext").
   Qed.
 

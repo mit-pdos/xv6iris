@@ -25,7 +25,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Notation IL := KernelSyms.initlock.
 
 Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initlock in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -34,10 +34,7 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (2 <= K)%nat ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m K -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m K -∗
   kernel_text -∗ pc_is pcE -∗
   (* the string argument [a1] points at: DUPLICABLE (persistent) ownership,
      so the caller keeps its copy and initlock can seal it into the lock. *)
@@ -46,10 +43,7 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   ( ∀ mr,
-    sconf γ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sie_cap_gpr γ root_ppn mr K -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -63,6 +57,6 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
 Module Type INITLOCK.
   Parameter wp_initlock_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat),
-      wp_initlock_sconf_body γ root_ppn Φ m vlock vname vcpu s K.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat),
+      wp_initlock_sconf_body γ Φ m vlock vname vcpu s K.
 End INITLOCK.

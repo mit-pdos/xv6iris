@@ -135,15 +135,15 @@ Section Swconf.
   (* switch carries from the suspending to the resumed party.  The STACK  *)
   (* does not cross -- each coroutine's [stack_own] is captured inside     *)
   (* the continuation closure it leaves behind, and [sie_cap_gpr] is       *)
-  (* rebuilt on resume from the received [sie_arm] + fresh [gpr_file]      *)
+  (* rebuilt on resume from the received pieces + fresh [gpr_file]         *)
   (* (sp is pinned by [callee_img]).  [intr_count 1]: xv6 asserts          *)
   (* noff == 1 at every scheduler swtch (exactly one push_off              *)
   (* outstanding on both sides).                                           *)
   (* ------------------------------------------------------------------ *)
-  Definition swconf (γ : gname) (root_ppn : mword 44) : iProp Σ :=
+  Definition swconf (γ : gname) : iProp Σ :=
     (sconf γ ∗
      hart_state ↦ᵣ HART_ACTIVE tt ∗
-     tlb_inv_pt root_ppn ∗
-     sie_arm γ root_ppn ∗
-     intr_count γ root_ppn 1)%I.
+     strans_inv ∗
+     sie_arm γ ∗
+     intr_count γ 1)%I.
 End Swconf.

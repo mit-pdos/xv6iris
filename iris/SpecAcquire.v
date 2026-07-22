@@ -25,7 +25,7 @@ Import Defs.
 Notation AQ := KernelSyms.acquire.
 
 Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -39,11 +39,8 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   eq_vec cpuold cpuv = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (10 <= av)%nat ->
-  sconf γ -∗
-  hart_state ↦ᵣ HART_ACTIVE tt -∗
-  sie_cap_gpr γ root_ppn m av -∗
-  intr_count γ root_ppn n -∗
-  tlb_inv_pt root_ppn -∗
+  sie_cap_gpr γ m av -∗
+  intr_count γ n -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
   a_cpu ↦₈ cpuold -∗
@@ -51,10 +48,7 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   a_int ↦₄ intena_old -∗
   ( ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap_gpr γ root_ppn mfin av -∗
-    tlb_inv_pt root_ppn -∗
+    sie_cap_gpr γ mfin av -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl -∗ R -∗
@@ -62,13 +56,13 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
     a_noff ↦₄ po_noff_store -∗
     a_int ↦₄ (if eq_vec (sign_extend' 64 noffv) zero_reg
               then po_intena_val ms else intena_old) -∗
-    intr_count γ root_ppn (S n) -∗
+    intr_count γ (S n) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type ACQUIRE.
   Parameter wp_acquire_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (root_ppn : mword 44) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat),
-      wp_acquire_sconf_body γ root_ppn Φ γl s R m cpuold noffv intena_old n av.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat),
+      wp_acquire_sconf_body γ Φ γl s R m cpuold noffv intena_old n av.
 End ACQUIRE.
