@@ -456,16 +456,29 @@ Section WpSconfWakeupPro.
       rewrite /R3 upd_ne; [| congruence].
       rewrite /R2 upd_ne; [| congruence].
       rewrite /R1 upd_ne; [reflexivity | congruence]. }
-    repeat split.
-    - (* s1 = &proc[0] -- peel R9..R6 with the upd_ne LEMMA (keeps R8/R9's
-         symbolic add_vec values opaque) before [exact]; a bare [exact] forces
-         kernel conversion through the transparent tower and hangs. *)
+    (* Split the conjunction with [apply conj] -- NOT [repeat split]: over the
+       transparent [regfile] tower, [split]'s [eq_refl] would close many
+       conjuncts by kernel conversion, poisoning the async [Qed] (and scrambling
+       which goals remain).  Peel every leaf with the upd_ne / upd_eq LEMMAS
+       (values stay opaque) before each [exact]/[reflexivity]. *)
+    repeat apply conj.
+    - (* s1 (reg 9) = &proc[0] *)
       rewrite /R9 upd_ne; [| vm_compute; discriminate].
       rewrite /R8 upd_ne; [| vm_compute; discriminate].
       rewrite /R7 upd_ne; [| vm_compute; discriminate].
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       exact Hs1proc.
-    - (* s4 = a0 (chan) *)
+    - (* s2 (reg 18) = &proc[64] *) exact Hs2proc.
+    - (* s3 (reg 19) = 2 *)
+      rewrite /R9 upd_ne; [| vm_compute; discriminate].
+      rewrite /R8 upd_ne; [| vm_compute; discriminate].
+      rewrite /R7 upd_ne; [| vm_compute; discriminate].
+      rewrite /R6 upd_eq. reflexivity.
+    - (* s5 (reg 21) = 3 *)
+      rewrite /R9 upd_ne; [| vm_compute; discriminate].
+      rewrite /R8 upd_ne; [| vm_compute; discriminate].
+      rewrite /R7 upd_eq. reflexivity.
+    - (* s4 (reg 20) = a0 (chan) = m!!!10 *)
       rewrite /R9 upd_ne; [| vm_compute; discriminate].
       rewrite /R8 upd_ne; [| vm_compute; discriminate].
       rewrite /R7 upd_ne; [| vm_compute; discriminate].
@@ -475,8 +488,26 @@ Section WpSconfWakeupPro.
       rewrite /R3 upd_eq. unfold regval_into_reg. rewrite add_vec_zero_l.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate].
+    - (* csp = spF *)
+      rewrite /R9 upd_ne; [| vm_compute; discriminate].
+      rewrite /R8 upd_ne; [| vm_compute; discriminate].
+      rewrite /R7 upd_ne; [| vm_compute; discriminate].
+      rewrite /R6 upd_ne; [| vm_compute; discriminate].
+      rewrite /R5 upd_ne; [| vm_compute; discriminate].
+      rewrite /R4 upd_ne; [| vm_compute; discriminate].
+      rewrite /R3 upd_ne; [| vm_compute; discriminate].
+      rewrite /R2 upd_ne; [| vm_compute; discriminate].
+      exact HspR1.
+    - (* ra (reg 1) = m!!!1 *) apply Hthread; vm_compute; discriminate.
+    - (* tp (reg 4) = m!!!4 *) apply Hthread; vm_compute; discriminate.
+    - (* s6 (reg 22) *) apply Hthread; vm_compute; discriminate.
+    - (* s7 (reg 23) *) apply Hthread; vm_compute; discriminate.
+    - (* s8 (reg 24) *) apply Hthread; vm_compute; discriminate.
+    - (* s9 (reg 25) *) apply Hthread; vm_compute; discriminate.
+    - (* s10 (reg 26) *) apply Hthread; vm_compute; discriminate.
+    - (* s11 (reg 27) *) apply Hthread; vm_compute; discriminate.
     - intro r. apply rf_to_gmap_dom.
-  Admitted.
+  Qed.
 
 End WpSconfWakeupPro.
 

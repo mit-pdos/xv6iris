@@ -283,10 +283,14 @@ All three carry `m !!! Regidx x4 = cid_word`.
       pop-shape premises at (noffv, lvl); WakeupLoopProof is a functor
       over MYPROC; cur_proc rides in wk_res_sconf.  Full build green.
 
-DISCOVERED PRE-EXISTING DEBT (not from this project): `WpSconfWakeup.v:479`
-`wp_wakeup_prologue_sconf` is `Admitted` (since the spec-module migration,
-a4eb750) — wakeup's whole-function chain rests on it via Print Assumptions.
-Needs an owner.
+- [x] S9: the pre-existing `wp_wakeup_prologue_sconf` Admitted
+      (WpSconfWakeup.v, since a4eb750) is Qed'd — wakeup's whole chain is
+      now axiom-clean (Sail baseline + funext only).  Root cause: the
+      migration dropped 12 of the 15 postcondition conjuncts AND a stale
+      SpecWakeup.vo masked it; plus `repeat split` closing register
+      conjuncts by kernel conversion over the transparent regfile tower
+      (use `repeat apply conj` + lemma peels — recorded in
+      completed/regfile-migration.md).
 
 Remaining cleanup (small, unowned): move `own_ctx` from SpecSched.v into
 SwtchCtx.v; consider a `wp_cret_s_zca_r_later_pt` wrapper and a

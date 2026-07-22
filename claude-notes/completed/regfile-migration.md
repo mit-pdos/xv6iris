@@ -80,3 +80,13 @@ first, `reg_neq`-guarded disequality).
 4. Access `gpr_file` through `gpr_file_lookup_acc` / `gpr_file_insert_acc`; if
    you go through `big_sepM_*` directly, get the lookup fact from
    `rf_to_gmap_lookup f (Regidx r)` and bridge the output with `rf_to_gmap_upd`.
+
+
+- **`repeat split` is itself unsafe as the conjunction splitter over the
+  transparent regfile tower**: `split`'s `eq_refl` closes register-lookup
+  conjuncts by KERNEL CONVERSION over the deep update tower (scrambling which
+  goals remain, and poisoning the async `Qed`).  Use `repeat apply conj`
+  (splits `/\` only, never closes a leaf by conversion), then peel every leaf
+  with the `upd_ne`/`upd_eq` LEMMAS before `exact`/`reflexivity`.  (Found in
+  wp_wakeup_prologue_sconf's recovery; the old gmap regfile got away with
+  `repeat split` only because `lookup_total` didn't reduce by conversion.)
