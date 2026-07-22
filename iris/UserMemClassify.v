@@ -1526,6 +1526,117 @@ Proof.
 Qed.
 
 
+(* ===================================================================== *)
+(* §11a SHARED GLUE for the memory arms.                                   *)
+(*                                                                         *)
+(*  Every memory arm -- base (+4) and compressed (+2) alike -- opens by     *)
+(*  transporting post_fetch_cfg's facts (plus hw_config's misa/pma/htif and *)
+(*  user_cfg's senvcfg) across the [set_reg _ nextPC (va+n)] that the fetch *)
+(*  left behind, and closes by re-packing the engine's Ok/Err result into   *)
+(*  base_post / rvc_post.  Both halves are instruction-size generic, so ONE *)
+(*  prologue lemma serves n=2 and n=4 and one closer serves every           *)
+(*  compressed arm (base_finish_mem, in §BaseMemArms, is its +4 twin).      *)
+(* ===================================================================== *)
+Section MemArmGlue.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma u_result_ok_trap (e : ExceptionType) (xv pcx : mword 64) :
+    user_exc e = true ->
+    u_result_ok (rv64d_types.Trap (User, make_sync_exception e xv, pcx)).
+  Proof. intro Hue. unfold u_result_ok. right; left. exists e, xv, pcx. split; [reflexivity | exact Hue]. Qed.
+
+  (* The seven config premises EVERY mem_exec_* engine takes, named once.  *)
+  Definition u_engine_cfg (s : mstate) : Prop :=
+    register_lookup cur_privilege s.(sregs) = User
+    /\ user_mstatus_ok (register_lookup mstatus s.(sregs))
+    /\ register_lookup misa s.(sregs) = MISA_C
+    /\ register_lookup menvcfg s.(sregs) = MENVCFG_S
+    /\ register_lookup senvcfg s.(sregs) = (mword_of_int 0 : mword 64)
+    /\ register_lookup htif_tohost_base s.(sregs) = None
+    /\ pma_allows_all (register_lookup pma_regions s.(sregs)).
+
+  (* PROLOGUE.  Pure conclusion, so the caller keeps its mstate_interp and  *)
+  (* user_cfg -- one line replaces the arms' 25-line transport block.       *)
+  Lemma post_fetch_uconfig (C : ucfg) (n : Z) (sigma_f : mstate) (va : mword 64)
+      (mi : bool) :
+    post_fetch_cfg sigma_f va mi ->
+    mstate_interp (set_reg sigma_f nextPC (add_vec_int va n)) -∗
+    hw_config -∗ user_cfg C -∗
+    ⌜u_engine_cfg (set_reg sigma_f nextPC (add_vec_int va n))
+     /\ register_lookup PC (set_reg sigma_f nextPC (add_vec_int va n)).(sregs) = va
+     /\ exec (currentlyEnabled Ext_Zca) sigma_f = Some (true, sigma_f)
+     /\ register_lookup (R_bool minstret_increment) sigma_f.(sregs) = mi⌝.
+  Proof.
+    intros (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
+    iIntros "(Hreg & Hgh & Hdev) #Hhw Hcfg".
+    iDestruct (hwcfg_misa (set_reg sigma_f nextPC (add_vec_int va n))
+                 with "Hreg Hhw") as %Hmisa.
+    iDestruct (ucfg_senvcfg C (set_reg sigma_f nextPC (add_vec_int va n))
+                 with "Hreg Hcfg") as %Hsenv.
+    iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
+      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
+    iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif.
+    iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpmav.
+    assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
+    { rewrite <- Hmisa. symmetry.
+      apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
+    iPureIntro. unfold u_engine_cfg. split_and!.
+    - apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ].
+    - rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs))
+                 sigma_f (add_vec_int va n) ltac:(vm_compute; reflexivity) eq_refl).
+      exact Hmsok.
+    - exact Hmisa.
+    - apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ].
+    - exact Hsenv.
+    - exact Hhtif.
+    - rewrite Hpmav; exact Hpmaall.
+    - apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lpc ].
+    - exact (s0_zca sigma_f Lmisaf).
+    - exact Lmi.
+  Qed.
+
+  (* EPILOGUE (compressed).  The missing member of UserTotalU's finish_rvc_* *)
+  (* family: an ExecuteAs redirect whose base instruction lands in a NEW     *)
+  (* state s_x with a possibly-updated gpr map g'.                          *)
+  Lemma rvc_finish_mem (C : ucfg) (pt : uptd)
+      (E : coPset) (sigma sigma_f : mstate) (va : mword 64) (h : mword 16)
+      (g g' : regfile) (ci bi : instruction) (r0 : ExecutionResult) (s_x : mstate) :
+    register_lookup (R_bool minstret_increment) sigma_f.(sregs)
+       = register_lookup (R_bool minstret_increment) sigma.(sregs) ->
+    exec (ext_decode_compressed h) sigma_f = Some (ci, sigma_f) ->
+    exec (currentlyEnabled Ext_Zca) sigma_f = Some (true, sigma_f) ->
+    exec (execute ci) (set_reg sigma_f nextPC (add_vec_int va 2))
+       = Some (ExecuteAs bi, set_reg sigma_f nextPC (add_vec_int va 2)) ->
+    exec (execute bi) (set_reg sigma_f nextPC (add_vec_int va 2)) = Some (r0, s_x) ->
+    u_result_ok r0 ->
+    match r0 with ExecuteAs _ => False | _ => True end ->
+    register_lookup (R_bool minstret_increment) s_x.(sregs)
+       = register_lookup (R_bool minstret_increment)
+           (set_reg sigma_f nextPC (add_vec_int va 2)).(sregs) ->
+    register_lookup nextPC s_x.(sregs)
+       = register_lookup nextPC (set_reg sigma_f nextPC (add_vec_int va 2)).(sregs) ->
+    mstate_interp s_x -∗ gpr_file g' -∗ nextPC ↦ᵣ add_vec_int va 2 -∗
+    user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Lmi Hdecc Hzca Hex1 Hex2 Hok Hnex Hmi Hnpc.
+    iIntros "Hint Hgpr Hnpc Hupt Hcfg". unfold rvc_post.
+    iModIntro. iExists ci, r0, s_x, g', (add_vec_int va 2).
+    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
+    iPureIntro. split_and!.
+    - exact Hdecc.
+    - exact Hzca.
+    - right. exists bi. split; [exact Hex1 | exact Hex2].
+    - exact Hok.
+    - exact Hnex.
+    - rewrite Hmi. unfold set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity].
+    - rewrite Hnpc. unfold set_reg; cbn [sregs]. apply register_lookup_set.
+  Qed.
+
+End MemArmGlue.
+
 Section MemReadTotal.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -1692,304 +1803,6 @@ Section MemReadTotal.
       iSplitR; [iPureIntro; exact Hnpc |].
       unfold mstate_interp. iSplitL "Hreg Hgh Hdev". { iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
       iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
-  Qed.
-
-
-  Lemma exec_execute_C_LH_U (uimm : mword 2) (rdc rsc1 : cregidx) (st : mstate) :
-    exec (execute (C_LH (uimm, rdc, rsc1))) st
-      = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1, creg2reg_idx rdc, false, 2)), st).
-  Proof. apply exec_returnm. Qed.
-
-  Lemma arm_C_LH_u (C : ucfg) (pt : uptd)
-      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
-    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-    exec (ext_decode_compressed h) sigma_f = Some (C_LH p, sigma_f) ->
-    hw_config -∗
-    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-    rvc_post C pt E sigma sigma_f va h g.
-  Proof.
-    intros Hcfg Hdec.
-    destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-    destruct p as [[uimm rdc] rsc1]. destruct rdc as [i0]. destruct rsc1 as [i1].
-    iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-    set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-    iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-    iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-    iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-    iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-    iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-    assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-    assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-    assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-    { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-                 (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-    assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-      by (rewrite Hpma2v; exact Hpmaall).
-    assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-    { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-    pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-    iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-    iMod (mem_exec_load_k pt 2 ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_2 (or_introl eq_refl)
-            (zero_extend' 12 uimm) (zero_extend' 5 (concat_vec ('b"1") i1))
-            (zero_extend' 5 (concat_vec ('b"1") i0)) false g s2
-            (creg_nz i0) Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    - iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LH (uimm, Cregidx i0, Cregidx i1)), RETIRE_SUCCESS, s_x,
-        (<[Regidx (zero_extend' 5 (concat_vec ('b"1") i0)) := v]> g), (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), false, 2)).
-        split; [ exact (exec_execute_C_LH_U uimm (Cregidx i0) (Cregidx i1) s2) | exact Hexec ].
-      + left; reflexivity.
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LH (uimm, Cregidx i0, Cregidx i1)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), false, 2)).
-        split; [ exact (exec_execute_C_LH_U uimm (Cregidx i0) (Cregidx i1) s2) | exact Hexec ].
-      + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  Qed.
-
-
-  Lemma exec_execute_C_LHU_U (uimm : mword 2) (a b : cregidx) (st : mstate) :
-    exec (execute (C_LHU (uimm, a, b))) st
-      = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx b, creg2reg_idx a, true, 2)), st).
-  Proof. apply exec_returnm. Qed.
-
-  Lemma arm_C_LHU_u (C : ucfg) (pt : uptd)
-      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
-    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-    exec (ext_decode_compressed h) sigma_f = Some (C_LHU p, sigma_f) ->
-    hw_config -∗
-    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-    rvc_post C pt E sigma sigma_f va h g.
-  Proof.
-    intros Hcfg Hdec.
-    destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-    destruct p as [[uimm rdc] rsc1]. destruct rsc1 as [i1]. destruct rdc as [i0].
-    iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-    set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-    iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-    iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-    iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-    iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-    iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-    assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-    assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-    assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-    { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-                 (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-    assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-      by (rewrite Hpma2v; exact Hpmaall).
-    assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-    { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-    pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-    iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-    iMod (mem_exec_load_k pt 2 ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_2 (or_introl eq_refl)
-            (zero_extend' 12 uimm) (zero_extend' 5 (concat_vec ('b"1") i1))
-            (zero_extend' 5 (concat_vec ('b"1") i0)) true g s2
-            (creg_nz i0) Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    - iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LHU (uimm, Cregidx i0, Cregidx i1)), RETIRE_SUCCESS, s_x,
-        (<[Regidx (zero_extend' 5 (concat_vec ('b"1") i0)) := v]> g), (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), true, 2)).
-        split; [ exact (exec_execute_C_LHU_U uimm (Cregidx i0) (Cregidx i1) s2) | exact Hexec ].
-      + left; reflexivity.
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LHU (uimm, Cregidx i0, Cregidx i1)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), true, 2)).
-        split; [ exact (exec_execute_C_LHU_U uimm (Cregidx i0) (Cregidx i1) s2) | exact Hexec ].
-      + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  Qed.
-
-  Lemma exec_execute_C_LW_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
-    exec (execute (C_LW (uimm, a, b))) st
-      = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx a, creg2reg_idx b, false, 4)), st).
-  Proof. apply exec_returnm. Qed.
-
-  Lemma arm_C_LW_u (C : ucfg) (pt : uptd)
-      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
-    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-    exec (ext_decode_compressed h) sigma_f = Some (C_LW p, sigma_f) ->
-    hw_config -∗
-    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-    rvc_post C pt E sigma sigma_f va h g.
-  Proof.
-    intros Hcfg Hdec.
-    destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-    destruct p as [[uimm rsc] rdc]. destruct rsc as [i1]. destruct rdc as [i0].
-    iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-    set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-    iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-    iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-    iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-    iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-    iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-    assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-    assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-    assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-    { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-                 (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-    assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-      by (rewrite Hpma2v; exact Hpmaall).
-    assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-    { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-    pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-    iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-    iMod (mem_exec_load_k pt 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 (or_intror (or_introl eq_refl))
-            (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 (concat_vec ('b"1") i1))
-            (zero_extend' 5 (concat_vec ('b"1") i0)) false g s2
-            (creg_nz i0) Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    - iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LW (uimm, Cregidx i1, Cregidx i0)), RETIRE_SUCCESS, s_x,
-        (<[Regidx (zero_extend' 5 (concat_vec ('b"1") i0)) := v]> g), (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), false, 4)).
-        split; [ exact (exec_execute_C_LW_U uimm (Cregidx i1) (Cregidx i0) s2) | exact Hexec ].
-      + left; reflexivity.
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LW (uimm, Cregidx i1, Cregidx i0)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), false, 4)).
-        split; [ exact (exec_execute_C_LW_U uimm (Cregidx i1) (Cregidx i0) s2) | exact Hexec ].
-      + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  Qed.
-
-  Lemma exec_execute_C_LD_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
-    exec (execute (C_LD (uimm, a, b))) st
-      = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx a, creg2reg_idx b, false, 8)), st).
-  Proof. apply exec_returnm. Qed.
-
-  Lemma arm_C_LD_u (C : ucfg) (pt : uptd)
-      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-      (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
-    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-    exec (ext_decode_compressed h) sigma_f = Some (C_LD p, sigma_f) ->
-    hw_config -∗
-    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-    rvc_post C pt E sigma sigma_f va h g.
-  Proof.
-    intros Hcfg Hdec.
-    destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-    destruct p as [[uimm rsc] rdc]. destruct rsc as [i1]. destruct rdc as [i0].
-    iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-    set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-    iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-    iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-    iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-    iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-    iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-    iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-    assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-    assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-      by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-    assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-    { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-                 (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-    assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-      by (rewrite Hpma2v; exact Hpmaall).
-    assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-    { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-    pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-    iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-    iMod (mem_exec_load_k pt 8 ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_8 (or_intror (or_intror eq_refl))
-            (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 (concat_vec ('b"1") i1))
-            (zero_extend' 5 (concat_vec ('b"1") i0)) false g s2
-            (creg_nz i0) Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    - iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LD (uimm, Cregidx i1, Cregidx i0)), RETIRE_SUCCESS, s_x,
-        (<[Regidx (zero_extend' 5 (concat_vec ('b"1") i0)) := v]> g), (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), false, 8)).
-        split; [ exact (exec_execute_C_LD_U uimm (Cregidx i1) (Cregidx i0) s2) | exact Hexec ].
-      + left; reflexivity.
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LD (uimm, Cregidx i1, Cregidx i0)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-      iPureIntro. split_and!.
-      + exact Hdec.
-      + exact Hzcaf.
-      + right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), false, 8)).
-        split; [ exact (exec_execute_C_LD_U uimm (Cregidx i1) (Cregidx i0) s2) | exact Hexec ].
-      + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
   Qed.
 
 End MemReadTotal.
@@ -2227,64 +2040,34 @@ Lemma arm_C_LBU_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   rvc_post C pt E sigma sigma_f va h g.
 Proof.
   intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct p as [[uimm rdc] rsc1]. destruct rdc as [i0]. destruct rsc1 as [i1].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lpc2 : register_lookup PC s2.(sregs) = va)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lpc ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry.
-    apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 2 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp2 & Hmsok2 & Hmisa2 & Lmenv2 & Hsenv2 & Hhtif2 & Hpma2) & Lpc2 & Hzcaf & Lmi).
   iMod (mem_exec_load_1 pt (zero_extend' 12 uimm)
           (zero_extend' 5 (concat_vec ('b"1") i1))
           (zero_extend' 5 (concat_vec ('b"1") i0)) true g va s2
           (creg_nz i0) Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Lpc2 Hpma2
           with "Hint Hgpr Hupt") as "[HOk | HErr]".
   - iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_LBU (uimm, Cregidx i0, Cregidx i1)), RETIRE_SUCCESS, s_x,
-      (<[Regidx (zero_extend' 5 (concat_vec ('b"1") i0)) := v]> g), (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), true, 1)).
-      split; [ exact (exec_execute_C_LBU_U uimm (Cregidx i0) (Cregidx i1) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
+    iApply (rvc_finish_mem C pt E sigma sigma_f va h g _
+              (C_LBU (uimm, Cregidx i0, Cregidx i1))
+              (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1),
+                     creg2reg_idx (Cregidx i0), true, 1))
+              RETIRE_SUCCESS s_x Lmi Hdec Hzcaf
+              (exec_execute_C_LBU_U uimm (Cregidx i0) (Cregidx i1) s2) Hexec
+              u_result_ok_retire I Hmi Hnpceq
+              with "Hint Hgpr Hnpc Hupt Hcfg").
   - iDestruct "HErr" as (e vaX) "(%Hexec & %Hue & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_LBU (uimm, Cregidx i0, Cregidx i1)),
-      (rv64d_types.Trap (User, make_sync_exception e vaX, va)), s2, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1), creg2reg_idx (Cregidx i0), true, 1)).
-      split; [ exact (exec_execute_C_LBU_U uimm (Cregidx i0) (Cregidx i1) s2) | exact Hexec ].
-    + right; left; exists e, vaX, va; split; [reflexivity | exact Hue].
-    + rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
+    iApply (rvc_finish_mem C pt E sigma sigma_f va h g _
+              (C_LBU (uimm, Cregidx i0, Cregidx i1))
+              (LOAD (zero_extend' 12 uimm, creg2reg_idx (Cregidx i1),
+                     creg2reg_idx (Cregidx i0), true, 1))
+              (rv64d_types.Trap (User, make_sync_exception e vaX, va)) s2 Lmi Hdec Hzcaf
+              (exec_execute_C_LBU_U uimm (Cregidx i0) (Cregidx i1) s2) Hexec
+              (u_result_ok_trap e vaX va Hue) I eq_refl eq_refl
+              with "Hint Hgpr Hnpc Hupt Hcfg").
 Qed.
 
 Section MemArmsU2.
@@ -2395,63 +2178,32 @@ Lemma arm_C_SB_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   rvc_post C pt E sigma sigma_f va h g.
 Proof.
   intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lpc2 : register_lookup PC s2.(sregs) = va)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lpc ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry.
-    apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 2 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp2 & Hmsok2 & Hmisa2 & Lmenv2 & Hsenv2 & Hhtif2 & Hpma2) & Lpc2 & Hzcaf & Lmi).
   iMod (mem_exec_store_1 pt (zero_extend' 12 uimm)
           (zero_extend' 5 (concat_vec ('b"1") i2))
           (zero_extend' 5 (concat_vec ('b"1") i1)) g va s2
           Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Lpc2 Hpma2
           with "Hint Hgpr Hupt") as "[HOk | HErr]".
   - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SB (uimm, Cregidx i1, Cregidx i2)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 uimm, creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 1)).
-      split; [ exact (exec_execute_C_SB_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
+    iApply (rvc_finish_mem C pt E sigma sigma_f va h g _
+              (C_SB (uimm, Cregidx i1, Cregidx i2))
+              (STORE (zero_extend' 12 uimm, creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 1))
+              RETIRE_SUCCESS s_x Lmi Hdec Hzcaf
+              (exec_execute_C_SB_U uimm (Cregidx i1) (Cregidx i2) s2) Hexec
+              u_result_ok_retire I Hmi Hnpceq
+              with "Hint Hgpr Hnpc Hupt Hcfg").
   - iDestruct "HErr" as (e vaX) "(%Hexec & %Hue & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SB (uimm, Cregidx i1, Cregidx i2)),
-      (rv64d_types.Trap (User, make_sync_exception e vaX, va)), s2, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 uimm, creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 1)).
-      split; [ exact (exec_execute_C_SB_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + right; left; exists e, vaX, va; split; [reflexivity | exact Hue].
-    + rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
+    iApply (rvc_finish_mem C pt E sigma sigma_f va h g _
+              (C_SB (uimm, Cregidx i1, Cregidx i2))
+              (STORE (zero_extend' 12 uimm, creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 1))
+              (rv64d_types.Trap (User, make_sync_exception e vaX, va)) s2 Lmi Hdec Hzcaf
+              (exec_execute_C_SB_U uimm (Cregidx i1) (Cregidx i2) s2) Hexec
+              (u_result_ok_trap e vaX va Hue) I eq_refl eq_refl
+              with "Hint Hgpr Hnpc Hupt Hcfg").
 Qed.
 
 (* ===================================================================== *)
@@ -2850,366 +2602,6 @@ Section MemStoreEngine.
 
 End MemStoreEngine.
 
-Lemma exec_execute_C_SW_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
-  exec (execute (C_SW (uimm, a, b))) st
-    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx b, creg2reg_idx a, 4)), st).
-Proof. apply exec_returnm. Qed.
-
-Lemma arm_C_SW_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
-    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
-  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-  exec (ext_decode_compressed h) sigma_f = Some (C_SW p, sigma_f) ->
-  hw_config -∗
-  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-  rvc_post C pt E sigma sigma_f va h g.
-Proof.
-  intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-  destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  iMod (mem_exec_store_k pt 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-          ltac:(vm_compute; reflexivity) exec_write_ram_plain_4 (or_intror (or_introl eq_refl))
-          (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 (concat_vec ('b"1") i2)) (zero_extend' 5 (concat_vec ('b"1") i1)) g s2
-          Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-          with "Hint Hgpr Hupt") as "[HOk | HErr]".
-  - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SW (uimm, Cregidx i1, Cregidx i2)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 4)).
-      split; [ exact (exec_execute_C_SW_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SW (uimm, Cregidx i1, Cregidx i2)),
-      (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 4)).
-      split; [ exact (exec_execute_C_SW_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-Qed.
-
-Lemma exec_execute_C_SD_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
-  exec (execute (C_SD (uimm, a, b))) st
-    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx b, creg2reg_idx a, 8)), st).
-Proof. apply exec_returnm. Qed.
-
-Lemma arm_C_SD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
-    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
-  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-  exec (ext_decode_compressed h) sigma_f = Some (C_SD p, sigma_f) ->
-  hw_config -∗
-  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-  rvc_post C pt E sigma sigma_f va h g.
-Proof.
-  intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-  destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  iMod (mem_exec_store_k pt 8 ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
-          ltac:(vm_compute; reflexivity) exec_write_ram_plain_8 (or_intror (or_intror eq_refl))
-          (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 (concat_vec ('b"1") i2)) (zero_extend' 5 (concat_vec ('b"1") i1)) g s2
-          Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-          with "Hint Hgpr Hupt") as "[HOk | HErr]".
-  - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SD (uimm, Cregidx i1, Cregidx i2)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 8)).
-      split; [ exact (exec_execute_C_SD_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SD (uimm, Cregidx i1, Cregidx i2)),
-      (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 8)).
-      split; [ exact (exec_execute_C_SD_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-Qed.
-
-Lemma exec_execute_C_SH_U (uimm : mword 2) (a b : cregidx) (st : mstate) :
-  exec (execute (C_SH (uimm, a, b))) st
-    = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx b, creg2reg_idx a, 2)), st).
-Proof. apply exec_returnm. Qed.
-
-Lemma arm_C_SH_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
-    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
-  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-  exec (ext_decode_compressed h) sigma_f = Some (C_SH p, sigma_f) ->
-  hw_config -∗
-  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-  rvc_post C pt E sigma sigma_f va h g.
-Proof.
-  intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-  destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  iMod (mem_exec_store_k pt 2 ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
-          ltac:(vm_compute; reflexivity) exec_write_ram_plain_2 (or_introl eq_refl)
-          (zero_extend' 12 uimm) (zero_extend' 5 (concat_vec ('b"1") i2)) (zero_extend' 5 (concat_vec ('b"1") i1)) g s2
-          Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-          with "Hint Hgpr Hupt") as "[HOk | HErr]".
-  - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SH (uimm, Cregidx i1, Cregidx i2)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 uimm, creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 2)).
-      split; [ exact (exec_execute_C_SH_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SH (uimm, Cregidx i1, Cregidx i2)),
-      (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 uimm, creg2reg_idx (Cregidx i2), creg2reg_idx (Cregidx i1), 2)).
-      split; [ exact (exec_execute_C_SH_U uimm (Cregidx i1) (Cregidx i2) s2) | exact Hexec ].
-    + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-Qed.
-
-Lemma exec_execute_C_SWSP_U (uimm : mword 6) (rs2 : regidx) (st : mstate) :
-  exec (execute (C_SWSP (uimm, rs2))) st
-    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), rs2, sp, 4)), st).
-Proof. apply exec_returnm. Qed.
-
-Lemma arm_C_SWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
-    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
-  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-  exec (ext_decode_compressed h) sigma_f = Some (C_SWSP p, sigma_f) ->
-  hw_config -∗
-  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-  rvc_post C pt E sigma sigma_f va h g.
-Proof.
-  intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-  destruct p as [uimm rs2]. destruct rs2 as [r2].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  iMod (mem_exec_store_k pt 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-          ltac:(vm_compute; reflexivity) exec_write_ram_plain_4 (or_intror (or_introl eq_refl))
-          (zero_extend' 12 (concat_vec uimm ('b"00"))) r2 (zero_extend' 5 ('b"10")) g s2
-          Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-          with "Hint Hgpr Hupt") as "[HOk | HErr]".
-  - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SWSP (uimm, Regidx r2)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), Regidx r2, sp, 4)).
-      split; [ exact (exec_execute_C_SWSP_U uimm (Regidx r2) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SWSP (uimm, Regidx r2)),
-      (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), Regidx r2, sp, 4)).
-      split; [ exact (exec_execute_C_SWSP_U uimm (Regidx r2) s2) | exact Hexec ].
-    + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-Qed.
-
-Lemma exec_execute_C_SDSP_U (uimm : mword 6) (rs2 : regidx) (st : mstate) :
-  exec (execute (C_SDSP (uimm, rs2))) st
-    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), rs2, sp, 8)), st).
-Proof. apply exec_returnm. Qed.
-
-Lemma arm_C_SDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
-    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
-    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
-  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
-  exec (ext_decode_compressed h) sigma_f = Some (C_SDSP p, sigma_f) ->
-  hw_config -∗
-  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
-  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
-  rvc_post C pt E sigma sigma_f va h g.
-Proof.
-  intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-  destruct p as [uimm rs2]. destruct rs2 as [r2].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  iMod (mem_exec_store_k pt 8 ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
-          ltac:(vm_compute; reflexivity) exec_write_ram_plain_8 (or_intror (or_intror eq_refl))
-          (zero_extend' 12 (concat_vec uimm ('b"000"))) r2 (zero_extend' 5 ('b"10")) g s2
-          Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-          with "Hint Hgpr Hupt") as "[HOk | HErr]".
-  - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SDSP (uimm, Regidx r2)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx r2, sp, 8)).
-      split; [ exact (exec_execute_C_SDSP_U uimm (Regidx r2) s2) | exact Hexec ].
-    + left; reflexivity.
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-    unfold rvc_post. iModIntro.
-    iExists (C_SDSP (uimm, Regidx r2)),
-      (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-    iFrame "Hint Hgpr Hnpc Hupt Hcfg".
-    iPureIntro. split_and!.
-    + exact Hdec.
-    + exact Hzcaf.
-    + right. exists (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), Regidx r2, sp, 8)).
-      split; [ exact (exec_execute_C_SDSP_U uimm (Regidx r2) s2) | exact Hexec ].
-    + right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-    + rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-    + rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-Qed.
-
 (* ===================================================================== *)
 (* §14 SP-loads (C_LWSP/C_LDSP): rd is a full regidx that CAN be 0.  The    *)
 (*     rd=0 path retires WITHOUT a gpr write (wX x0 = no-op):               *)
@@ -3297,6 +2689,354 @@ Section MemLoadRd0.
 
 End MemLoadRd0.
 
+(* ===================================================================== *)
+(* §14a WHOLE-ARM GENERICS.  mem_exec_store_k/mem_exec_load_k(_rd0) are      *)
+(*     already instruction-size generic in k -- the only thing that varied  *)
+(*     across the 11 k-width compressed arms (C_SW/SD/SH/SWSP/SDSP,          *)
+(*     C_LH/LHU/LW/LD/LWSP/LDSP) was the concrete instruction, offset and    *)
+(*     width baked into each arm's forwarding step.  Abstracting that over  *)
+(*     a `forall st, exec (execute ci) st = Some (ExecuteAs base, st)`       *)
+(*     hypothesis collapses all of them to ONE store lemma and ONE load     *)
+(*     lemma (the load one internalizing the rd=0/rd<>0 split so it also    *)
+(*     covers the two SP-relative loads).  arm_C_LBU_u/_C_SB_u stay outside *)
+(*     (width-1 engines, whose Err shape differs -- see the module header). *)
+(* ===================================================================== *)
+Section MemArmGenericK.
+  Context `{!riscvGS Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma arm_c_store_u (C : ucfg) (pt : uptd) (E : coPset) (sigma sigma_f : mstate)
+      (va : mword 64) (g : regfile) (h : mword 16) (ci : instruction)
+      (k : Z) (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096))
+      (Huintk : uint (to_bits 64 k) = k)
+      (Hwrite_plain_k : forall (addr : mword 64) (dd : mword (8 * k)) s,
+         dev_addr addr = false ->
+         exec (write_ram rv64d_types.Write_plain (Physaddr addr) k dd tt) s
+         = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) dd) s.(mdev)))
+      (HkW : k = 2 \/ k = 4 \/ k = 8)
+      (off : mword 12) (rs2 rs1 : mword 5) :
+    (forall st : mstate, exec (execute ci) st
+        = Some (ExecuteAs (STORE (off, Regidx rs2, Regidx rs1, k)), st)) ->
+    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+    exec (ext_decode_compressed h) sigma_f = Some (ci, sigma_f) ->
+    hw_config -∗ mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Hforward Hcfg Hdec.
+    iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
+    set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
+    iDestruct (post_fetch_uconfig C 2 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+      as %((Lcp2 & Hmsok2 & Hmisa2 & Lmenv2 & Hsenv2 & Hhtif2 & Hpma2) & Lpc2 & Hzcaf & Lmi).
+    iMod (mem_exec_store_k pt k Hk Hk8 Hkdvd Huintk Hwrite_plain_k HkW
+            off rs2 rs1 g s2
+            Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
+            with "Hint Hgpr Hupt") as "[HOk | HErr]".
+    - iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
+      iApply (rvc_finish_mem C pt E sigma sigma_f va h g _
+                ci (STORE (off, Regidx rs2, Regidx rs1, k))
+                RETIRE_SUCCESS s_x Lmi Hdec Hzcaf
+                (Hforward s2) Hexec
+                u_result_ok_retire I Hmi Hnpceq
+                with "Hint Hgpr Hnpc Hupt Hcfg").
+    - iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
+      iApply (rvc_finish_mem C pt E sigma sigma_f va h g _
+                ci (STORE (off, Regidx rs2, Regidx rs1, k))
+                (rv64d_types.Trap (User, make_sync_exception e xv, pcx)) s_x Lmi Hdec Hzcaf
+                (Hforward s2) Hexec
+                (u_result_ok_trap e xv pcx Hue) I Hmi Hnpceq
+                with "Hint Hgpr Hnpc Hupt Hcfg").
+  Qed.
+
+  Lemma arm_c_load_u (C : ucfg) (pt : uptd) (E : coPset) (sigma sigma_f : mstate)
+      (va : mword 64) (g : regfile) (h : mword 16) (ci : instruction)
+      (k : Z) (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096))
+      (Huintk : uint (to_bits 64 k) = k)
+      (Hread_plain_k : forall (addr : mword 64) (w : mword (8 * k)) s,
+         dev_addr addr = false ->
+         (forall j : nat, (N.of_nat j < Z.to_N k)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+         exec (read_ram rv64d_types.Read_plain (Physaddr addr) k false) s = Some ((w, default_meta), s))
+      (HkW : k = 2 \/ k = 4 \/ k = 8)
+      (off : mword 12) (rs1 rd : mword 5) (is_unsigned : bool) :
+    (forall st : mstate, exec (execute ci) st
+        = Some (ExecuteAs (LOAD (off, Regidx rs1, Regidx rd, is_unsigned, k)), st)) ->
+    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+    exec (ext_decode_compressed h) sigma_f = Some (ci, sigma_f) ->
+    hw_config -∗ mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Hforward Hcfg Hdec.
+    iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
+    set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
+    iDestruct (post_fetch_uconfig C 2 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+      as %((Lcp2 & Hmsok2 & Hmisa2 & Lmenv2 & Hsenv2 & Hhtif2 & Hpma2) & Lpc2 & Hzcaf & Lmi).
+    destruct (Z.eqb (uint rd) 0) eqn:Hrd0.
+    - apply Z.eqb_eq in Hrd0.
+      iMod (mem_exec_load_k_rd0 pt k Hk Hk8 Hkdvd Huintk Hread_plain_k HkW
+              off rs1 rd is_unsigned g s2
+              Hrd0 Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
+              with "Hint Hgpr Hupt") as "[HOk | HErr]".
+      + iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
+        iApply (rvc_finish_mem C pt E sigma sigma_f va h g g
+                  ci (LOAD (off, Regidx rs1, Regidx rd, is_unsigned, k))
+                  RETIRE_SUCCESS s_x Lmi Hdec Hzcaf
+                  (Hforward s2) Hexec
+                  u_result_ok_retire I Hmi Hnpceq
+                  with "Hint Hgpr Hnpc Hupt Hcfg").
+      + iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
+        iApply (rvc_finish_mem C pt E sigma sigma_f va h g g
+                  ci (LOAD (off, Regidx rs1, Regidx rd, is_unsigned, k))
+                  (rv64d_types.Trap (User, make_sync_exception e xv, pcx)) s_x Lmi Hdec Hzcaf
+                  (Hforward s2) Hexec
+                  (u_result_ok_trap e xv pcx Hue) I Hmi Hnpceq
+                  with "Hint Hgpr Hnpc Hupt Hcfg").
+    - apply Z.eqb_neq in Hrd0.
+      iMod (mem_exec_load_k pt k Hk Hk8 Hkdvd Huintk Hread_plain_k HkW
+              off rs1 rd is_unsigned g s2
+              Hrd0 Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
+              with "Hint Hgpr Hupt") as "[HOk | HErr]".
+      + iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
+        iApply (rvc_finish_mem C pt E sigma sigma_f va h g (<[Regidx rd := v]> g)
+                  ci (LOAD (off, Regidx rs1, Regidx rd, is_unsigned, k))
+                  RETIRE_SUCCESS s_x Lmi Hdec Hzcaf
+                  (Hforward s2) Hexec
+                  u_result_ok_retire I Hmi Hnpceq
+                  with "Hint Hgpr Hnpc Hupt Hcfg").
+      + iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
+        iApply (rvc_finish_mem C pt E sigma sigma_f va h g g
+                  ci (LOAD (off, Regidx rs1, Regidx rd, is_unsigned, k))
+                  (rv64d_types.Trap (User, make_sync_exception e xv, pcx)) s_x Lmi Hdec Hzcaf
+                  (Hforward s2) Hexec
+                  (u_result_ok_trap e xv pcx Hue) I Hmi Hnpceq
+                  with "Hint Hgpr Hnpc Hupt Hcfg").
+  Qed.
+
+  Lemma exec_execute_C_LH_U (uimm : mword 2) (rdc rsc1 : cregidx) (st : mstate) :
+    exec (execute (C_LH (uimm, rdc, rsc1))) st
+      = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1, creg2reg_idx rdc, false, 2)), st).
+  Proof. apply exec_returnm. Qed.
+
+  Lemma arm_C_LH_u (C : ucfg) (pt : uptd)
+      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+      (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+    exec (ext_decode_compressed h) sigma_f = Some (C_LH p, sigma_f) ->
+    hw_config -∗
+    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Hcfg Hdec.
+    destruct p as [[uimm rdc] rsc1]. destruct rdc as [i0]. destruct rsc1 as [i1].
+    iApply (arm_c_load_u C pt E sigma sigma_f va g h (C_LH (uimm, Cregidx i0, Cregidx i1)) 2
+              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_2 (or_introl eq_refl)
+              (zero_extend' 12 uimm) (zero_extend' 5 (concat_vec ('b"1") i1))
+              (zero_extend' 5 (concat_vec ('b"1") i0)) false
+              (exec_execute_C_LH_U uimm (Cregidx i0) (Cregidx i1)) Hcfg Hdec).
+  Qed.
+
+  Lemma exec_execute_C_LHU_U (uimm : mword 2) (a b : cregidx) (st : mstate) :
+    exec (execute (C_LHU (uimm, a, b))) st
+      = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx b, creg2reg_idx a, true, 2)), st).
+  Proof. apply exec_returnm. Qed.
+
+  Lemma arm_C_LHU_u (C : ucfg) (pt : uptd)
+      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+      (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+    exec (ext_decode_compressed h) sigma_f = Some (C_LHU p, sigma_f) ->
+    hw_config -∗
+    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Hcfg Hdec.
+    destruct p as [[uimm rdc] rsc1]. destruct rsc1 as [i1]. destruct rdc as [i0].
+    iApply (arm_c_load_u C pt E sigma sigma_f va g h (C_LHU (uimm, Cregidx i0, Cregidx i1)) 2
+              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_2 (or_introl eq_refl)
+              (zero_extend' 12 uimm) (zero_extend' 5 (concat_vec ('b"1") i1))
+              (zero_extend' 5 (concat_vec ('b"1") i0)) true
+              (exec_execute_C_LHU_U uimm (Cregidx i0) (Cregidx i1)) Hcfg Hdec).
+  Qed.
+
+  Lemma exec_execute_C_LW_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
+    exec (execute (C_LW (uimm, a, b))) st
+      = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx a, creg2reg_idx b, false, 4)), st).
+  Proof. apply exec_returnm. Qed.
+
+  Lemma arm_C_LW_u (C : ucfg) (pt : uptd)
+      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+      (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+    exec (ext_decode_compressed h) sigma_f = Some (C_LW p, sigma_f) ->
+    hw_config -∗
+    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Hcfg Hdec.
+    destruct p as [[uimm rsc] rdc]. destruct rsc as [i1]. destruct rdc as [i0].
+    iApply (arm_c_load_u C pt E sigma sigma_f va g h (C_LW (uimm, Cregidx i1, Cregidx i0)) 4
+              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_4 (or_intror (or_introl eq_refl))
+              (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 (concat_vec ('b"1") i1))
+              (zero_extend' 5 (concat_vec ('b"1") i0)) false
+              (exec_execute_C_LW_U uimm (Cregidx i1) (Cregidx i0)) Hcfg Hdec).
+  Qed.
+
+  Lemma exec_execute_C_LD_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
+    exec (execute (C_LD (uimm, a, b))) st
+      = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx a, creg2reg_idx b, false, 8)), st).
+  Proof. apply exec_returnm. Qed.
+
+  Lemma arm_C_LD_u (C : ucfg) (pt : uptd)
+      (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+      (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+    post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+    exec (ext_decode_compressed h) sigma_f = Some (C_LD p, sigma_f) ->
+    hw_config -∗
+    mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+    gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+    rvc_post C pt E sigma sigma_f va h g.
+  Proof.
+    intros Hcfg Hdec.
+    destruct p as [[uimm rsc] rdc]. destruct rsc as [i1]. destruct rdc as [i0].
+    iApply (arm_c_load_u C pt E sigma sigma_f va g h (C_LD (uimm, Cregidx i1, Cregidx i0)) 8
+              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_8 (or_intror (or_intror eq_refl))
+              (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 (concat_vec ('b"1") i1))
+              (zero_extend' 5 (concat_vec ('b"1") i0)) false
+              (exec_execute_C_LD_U uimm (Cregidx i1) (Cregidx i0)) Hcfg Hdec).
+  Qed.
+
+End MemArmGenericK.
+
+Lemma exec_execute_C_SW_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
+  exec (execute (C_SW (uimm, a, b))) st
+    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx b, creg2reg_idx a, 4)), st).
+Proof. apply exec_returnm. Qed.
+
+Lemma arm_C_SW_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+    (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+  exec (ext_decode_compressed h) sigma_f = Some (C_SW p, sigma_f) ->
+  hw_config -∗
+  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+  rvc_post C pt E sigma sigma_f va h g.
+Proof.
+  intros Hcfg Hdec.
+  destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
+  iApply (arm_c_store_u C pt E sigma sigma_f va g h (C_SW (uimm, Cregidx i1, Cregidx i2)) 4
+            ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_write_ram_plain_4 (or_intror (or_introl eq_refl))
+            (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 (concat_vec ('b"1") i2))
+            (zero_extend' 5 (concat_vec ('b"1") i1))
+            (exec_execute_C_SW_U uimm (Cregidx i1) (Cregidx i2)) Hcfg Hdec).
+Qed.
+
+Lemma exec_execute_C_SD_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
+  exec (execute (C_SD (uimm, a, b))) st
+    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx b, creg2reg_idx a, 8)), st).
+Proof. apply exec_returnm. Qed.
+
+Lemma arm_C_SD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+    (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
+  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+  exec (ext_decode_compressed h) sigma_f = Some (C_SD p, sigma_f) ->
+  hw_config -∗
+  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+  rvc_post C pt E sigma sigma_f va h g.
+Proof.
+  intros Hcfg Hdec.
+  destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
+  iApply (arm_c_store_u C pt E sigma sigma_f va g h (C_SD (uimm, Cregidx i1, Cregidx i2)) 8
+            ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_write_ram_plain_8 (or_intror (or_intror eq_refl))
+            (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 (concat_vec ('b"1") i2))
+            (zero_extend' 5 (concat_vec ('b"1") i1))
+            (exec_execute_C_SD_U uimm (Cregidx i1) (Cregidx i2)) Hcfg Hdec).
+Qed.
+
+Lemma exec_execute_C_SH_U (uimm : mword 2) (a b : cregidx) (st : mstate) :
+  exec (execute (C_SH (uimm, a, b))) st
+    = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx b, creg2reg_idx a, 2)), st).
+Proof. apply exec_returnm. Qed.
+
+Lemma arm_C_SH_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+    (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
+  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+  exec (ext_decode_compressed h) sigma_f = Some (C_SH p, sigma_f) ->
+  hw_config -∗
+  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+  rvc_post C pt E sigma sigma_f va h g.
+Proof.
+  intros Hcfg Hdec.
+  destruct p as [[uimm rsc1] rsc2]. destruct rsc1 as [i1]. destruct rsc2 as [i2].
+  iApply (arm_c_store_u C pt E sigma sigma_f va g h (C_SH (uimm, Cregidx i1, Cregidx i2)) 2
+            ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_write_ram_plain_2 (or_introl eq_refl)
+            (zero_extend' 12 uimm) (zero_extend' 5 (concat_vec ('b"1") i2))
+            (zero_extend' 5 (concat_vec ('b"1") i1))
+            (exec_execute_C_SH_U uimm (Cregidx i1) (Cregidx i2)) Hcfg Hdec).
+Qed.
+
+Lemma exec_execute_C_SWSP_U (uimm : mword 6) (rs2 : regidx) (st : mstate) :
+  exec (execute (C_SWSP (uimm, rs2))) st
+    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), rs2, sp, 4)), st).
+Proof. apply exec_returnm. Qed.
+
+Lemma arm_C_SWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
+  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+  exec (ext_decode_compressed h) sigma_f = Some (C_SWSP p, sigma_f) ->
+  hw_config -∗
+  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+  rvc_post C pt E sigma sigma_f va h g.
+Proof.
+  intros Hcfg Hdec.
+  destruct p as [uimm rs2]. destruct rs2 as [r2].
+  iApply (arm_c_store_u C pt E sigma sigma_f va g h (C_SWSP (uimm, Regidx r2)) 4
+            ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_write_ram_plain_4 (or_intror (or_introl eq_refl))
+            (zero_extend' 12 (concat_vec uimm ('b"00"))) r2 (zero_extend' 5 ('b"10"))
+            (exec_execute_C_SWSP_U uimm (Regidx r2)) Hcfg Hdec).
+Qed.
+
+Lemma exec_execute_C_SDSP_U (uimm : mword 6) (rs2 : regidx) (st : mstate) :
+  exec (execute (C_SDSP (uimm, rs2))) st
+    = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), rs2, sp, 8)), st).
+Proof. apply exec_returnm. Qed.
+
+Lemma arm_C_SDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+    (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
+    (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
+  post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
+  exec (ext_decode_compressed h) sigma_f = Some (C_SDSP p, sigma_f) ->
+  hw_config -∗
+  mstate_interp (set_reg sigma_f nextPC (add_vec_int va 2)) -∗
+  gpr_file g -∗ nextPC ↦ᵣ add_vec_int va 2 -∗ user_pt_inv pt -∗ user_cfg C -∗
+  rvc_post C pt E sigma sigma_f va h g.
+Proof.
+  intros Hcfg Hdec.
+  destruct p as [uimm rs2]. destruct rs2 as [r2].
+  iApply (arm_c_store_u C pt E sigma sigma_f va g h (C_SDSP (uimm, Regidx r2)) 8
+            ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_write_ram_plain_8 (or_intror (or_intror eq_refl))
+            (zero_extend' 12 (concat_vec uimm ('b"000"))) r2 (zero_extend' 5 ('b"10"))
+            (exec_execute_C_SDSP_U uimm (Regidx r2)) Hcfg Hdec).
+Qed.
+
 Lemma exec_execute_C_LWSP_U (uimm : mword 6) (rd : regidx) (st : mstate) :
   exec (execute (C_LWSP (uimm, rd))) st
     = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), sp, rd, false, 4)), st).
@@ -3313,89 +3053,12 @@ Lemma arm_C_LWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   rvc_post C pt E sigma sigma_f va h g.
 Proof.
   intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct p as [uimm rd]. destruct rd as [r].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  destruct (Z.eqb (uint r) 0) eqn:Hrd0.
-  - apply Z.eqb_eq in Hrd0.
-    iMod (mem_exec_load_k_rd0 pt 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 (or_intror (or_introl eq_refl))
-            (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 ('b"10")) r false g s2
-            Hrd0 Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    + iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LWSP (uimm, Regidx r)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), sp, Regidx r, false, 4)).
-        split; [ exact (exec_execute_C_LWSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * left; reflexivity.
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    + iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LWSP (uimm, Regidx r)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), sp, Regidx r, false, 4)).
-        split; [ exact (exec_execute_C_LWSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - apply Z.eqb_neq in Hrd0.
-    iMod (mem_exec_load_k pt 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 (or_intror (or_introl eq_refl))
-            (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 ('b"10")) r false g s2
-            Hrd0 Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    + iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LWSP (uimm, Regidx r)), RETIRE_SUCCESS, s_x, (<[Regidx r := v]> g), (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), sp, Regidx r, false, 4)).
-        split; [ exact (exec_execute_C_LWSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * left; reflexivity.
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    + iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LWSP (uimm, Regidx r)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), sp, Regidx r, false, 4)).
-        split; [ exact (exec_execute_C_LWSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
+  iApply (arm_c_load_u C pt E sigma sigma_f va g h (C_LWSP (uimm, Regidx r)) 4
+            ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_read_ram_plain_4 (or_intror (or_introl eq_refl))
+            (zero_extend' 12 (concat_vec uimm ('b"00"))) (zero_extend' 5 ('b"10")) r false
+            (exec_execute_C_LWSP_U uimm (Regidx r)) Hcfg Hdec).
 Qed.
 
 Lemma exec_execute_C_LDSP_U (uimm : mword 6) (rd : regidx) (st : mstate) :
@@ -3414,89 +3077,12 @@ Lemma arm_C_LDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   rvc_post C pt E sigma sigma_f va h g.
 Proof.
   intros Hcfg Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct p as [uimm rd]. destruct rd as [r].
-  iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
-  set (s2 := set_reg sigma_f nextPC (add_vec_int va 2)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s2 with "Hreg Hhw") as %Hmisa2.
-  iDestruct (ucfg_senvcfg C s2 with "Hreg Hcfg") as %Hsenv2.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif2.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma2v.
-  assert (Lcp2 : register_lookup cur_privilege s2.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv2 : register_lookup menvcfg s2.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok2 : user_mstatus_ok (register_lookup mstatus s2.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma2 : pma_allows_all (register_lookup pma_regions s2.(sregs)))
-    by (rewrite Hpma2v; exact Hpmaall).
-  assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
-  { rewrite <- Hmisa2. symmetry. apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]. }
-  pose proof (s0_zca sigma_f Lmisaf) as Hzcaf.
-  iAssert (mstate_interp s2) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
-  destruct (Z.eqb (uint r) 0) eqn:Hrd0.
-  - apply Z.eqb_eq in Hrd0.
-    iMod (mem_exec_load_k_rd0 pt 8 ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_8 (or_intror (or_intror eq_refl))
-            (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 ('b"10")) r false g s2
-            Hrd0 Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    + iDestruct "HOk" as (s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LDSP (uimm, Regidx r)), RETIRE_SUCCESS, s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, Regidx r, false, 8)).
-        split; [ exact (exec_execute_C_LDSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * left; reflexivity.
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    + iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LDSP (uimm, Regidx r)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, Regidx r, false, 8)).
-        split; [ exact (exec_execute_C_LDSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-  - apply Z.eqb_neq in Hrd0.
-    iMod (mem_exec_load_k pt 8 ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
-            ltac:(vm_compute; reflexivity) exec_read_ram_plain_8 (or_intror (or_intror eq_refl))
-            (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 ('b"10")) r false g s2
-            Hrd0 Lcp2 Hmsok2 Hmisa2 Lmenv2 Hsenv2 Hhtif2 Hpma2
-            with "Hint Hgpr Hupt") as "[HOk | HErr]".
-    + iDestruct "HOk" as (v s_x) "(%Hexec & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LDSP (uimm, Regidx r)), RETIRE_SUCCESS, s_x, (<[Regidx r := v]> g), (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, Regidx r, false, 8)).
-        split; [ exact (exec_execute_C_LDSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * left; reflexivity.
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
-    + iDestruct "HErr" as (e xv pcx s_x) "(%Hexec & %Hue & %Hmi & %Hnpceq & Hint & Hgpr & Hupt)".
-      unfold rvc_post. iModIntro.
-      iExists (C_LDSP (uimm, Regidx r)),
-        (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), s_x, g, (add_vec_int va 2).
-      iFrame "Hint Hgpr Hnpc Hupt Hcfg". iPureIntro. split_and!.
-      * exact Hdec.
-      * exact Hzcaf.
-      * right. exists (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, Regidx r, false, 8)).
-        split; [ exact (exec_execute_C_LDSP_U uimm (Regidx r) s2) | exact Hexec ].
-      * right; left; exists e, xv, pcx; split; [reflexivity | exact Hue].
-      * rewrite Hmi. rewrite (reg_nextPC_transp (R_bool minstret_increment) (register_lookup (R_bool minstret_increment) sigma_f.(sregs)) sigma_f (add_vec_int va 2) ltac:(vm_compute; reflexivity) eq_refl). exact Lmi.
-      * rewrite Hnpceq. unfold s2, set_reg; cbn [sregs]. apply register_lookup_set.
+  iApply (arm_c_load_u C pt E sigma sigma_f va g h (C_LDSP (uimm, Regidx r)) 8
+            ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+            exec_read_ram_plain_8 (or_intror (or_intror eq_refl))
+            (zero_extend' 12 (concat_vec uimm ('b"000"))) (zero_extend' 5 ('b"10")) r false
+            (exec_execute_C_LDSP_U uimm (Regidx r)) Hcfg Hdec).
 Qed.
 
 (* ===================================================================== *)
@@ -3713,11 +3299,6 @@ Section BaseMemArms.
     - rewrite Hnpc. unfold set_reg; cbn [sregs]. apply register_lookup_set.
   Qed.
 
-  Lemma u_result_ok_trap (e : ExceptionType) (xv pcx : mword 64) :
-    user_exc e = true ->
-    u_result_ok (rv64d_types.Trap (User, make_sync_exception e xv, pcx)).
-  Proof. intro Hue. unfold u_result_ok. right; left. exists e, xv, pcx. split; [reflexivity | exact Hue]. Qed.
-
 End BaseMemArms.
 
 Lemma arm_LOAD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
@@ -3733,29 +3314,11 @@ Lemma arm_LOAD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   base_post C pt E sigma sigma_f va w g.
 Proof.
   intros Hcfg Hwidth Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct rs1 as [rs1]. destruct rd as [rd].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s0 := set_reg sigma_f nextPC (add_vec_int va 4)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s0 with "Hreg Hhw") as %Hmisa0.
-  iDestruct (ucfg_senvcfg C s0 with "Hreg Hcfg") as %Hsenv0.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif0.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma0v.
-  assert (Lcp0 : register_lookup cur_privilege s0.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lpc0 : register_lookup PC s0.(sregs) = va)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lpc ]).
-  assert (Lmenv0 : register_lookup menvcfg s0.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok0 : user_mstatus_ok (register_lookup mstatus s0.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 4) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma0 : pma_allows_all (register_lookup pma_regions s0.(sregs)))
-    by (rewrite Hpma0v; exact Hpmaall).
-  iAssert (mstate_interp s0) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 4 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp0 & Hmsok0 & Hmisa0 & Lmenv0 & Hsenv0 & Hhtif0 & Hpma0) & Lpc0 & _ & Lmi).
   (* dispatch on width, then rd = 0 / rd <> 0 *)
   destruct Hwidth as [Hw|[Hw|[Hw|Hw]]]; subst width.
   - (* width 1 *)
@@ -3907,29 +3470,11 @@ Lemma arm_STORE_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   base_post C pt E sigma sigma_f va w g.
 Proof.
   intros Hcfg Hwidth Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct rs2 as [rs2]. destruct rs1 as [rs1].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s0 := set_reg sigma_f nextPC (add_vec_int va 4)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s0 with "Hreg Hhw") as %Hmisa0.
-  iDestruct (ucfg_senvcfg C s0 with "Hreg Hcfg") as %Hsenv0.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif0.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma0v.
-  assert (Lcp0 : register_lookup cur_privilege s0.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lpc0 : register_lookup PC s0.(sregs) = va)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lpc ]).
-  assert (Lmenv0 : register_lookup menvcfg s0.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok0 : user_mstatus_ok (register_lookup mstatus s0.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 4) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma0 : pma_allows_all (register_lookup pma_regions s0.(sregs)))
-    by (rewrite Hpma0v; exact Hpmaall).
-  iAssert (mstate_interp s0) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 4 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp0 & Hmsok0 & Hmisa0 & Lmenv0 & Hsenv0 & Hhtif0 & Hpma0) & Lpc0 & _ & Lmi).
   destruct Hwidth as [Hw|[Hw|[Hw|Hw]]]; subst width.
   - (* width 1 *)
     iMod (mem_exec_store_1 pt imm rs2 rs1 g va s0
@@ -4776,27 +4321,11 @@ Lemma arm_LOADRES_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   base_post C pt E sigma sigma_f va w g.
 Proof.
   intros Hcfg Hwidth Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct rs1 as [rs1]. destruct rd as [rd].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s0 := set_reg sigma_f nextPC (add_vec_int va 4)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s0 with "Hreg Hhw") as %Hmisa0.
-  iDestruct (ucfg_senvcfg C s0 with "Hreg Hcfg") as %Hsenv0.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif0.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma0v.
-  assert (Lcp0 : register_lookup cur_privilege s0.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv0 : register_lookup menvcfg s0.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok0 : user_mstatus_ok (register_lookup mstatus s0.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 4) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma0 : pma_allows_all (register_lookup pma_regions s0.(sregs)))
-    by (rewrite Hpma0v; exact Hpmaall).
-  iAssert (mstate_interp s0) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 4 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp0 & Hmsok0 & Hmisa0 & Lmenv0 & Hsenv0 & Hhtif0 & Hpma0) & _ & _ & Lmi).
   destruct Hwidth as [Hw|Hw]; subst width.
   - (* width 4 *)
     iMod (mem_exec_lr_k pt 4 aq rl (or_introl eq_refl) user_pt_vmem_read_addr_lr_g4
@@ -5621,27 +5150,11 @@ Lemma arm_STORECON_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   base_post C pt E sigma sigma_f va w g.
 Proof.
   intros Hcfg Hwidth Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct rs2 as [rs2]. destruct rs1 as [rs1]. destruct rd as [rd].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s0 := set_reg sigma_f nextPC (add_vec_int va 4)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s0 with "Hreg Hhw") as %Hmisa0.
-  iDestruct (ucfg_senvcfg C s0 with "Hreg Hcfg") as %Hsenv0.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif0.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma0v.
-  assert (Lcp0 : register_lookup cur_privilege s0.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv0 : register_lookup menvcfg s0.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok0 : user_mstatus_ok (register_lookup mstatus s0.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 4) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma0 : pma_allows_all (register_lookup pma_regions s0.(sregs)))
-    by (rewrite Hpma0v; exact Hpmaall).
-  iAssert (mstate_interp s0) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 4 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp0 & Hmsok0 & Hmisa0 & Lmenv0 & Hsenv0 & Hhtif0 & Hpma0) & _ & _ & Lmi).
   destruct Hwidth as [Hw|Hw]; subst width.
   - iMod (mem_exec_sc_k pt 4 aq rl (or_introl eq_refl) user_pt_vmem_write_addr_sc_g4
             rs2 rs1 rd g s0 Lcp0 Hmsok0 Hmisa0 Lmenv0 Hsenv0 Hhtif0 Hpma0
@@ -6998,27 +6511,11 @@ Lemma arm_AMO_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
   base_post C pt E sigma sigma_f va w g.
 Proof.
   intros Hcfg Hwidth Hdec.
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
   destruct rs2 as [rs2]. destruct rs1 as [rs1]. destruct rd as [rd].
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s0 := set_reg sigma_f nextPC (add_vec_int va 4)).
-  iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s0 with "Hreg Hhw") as %Hmisa0.
-  iDestruct (ucfg_senvcfg C s0 with "Hreg Hcfg") as %Hsenv0.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif0.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma0v.
-  assert (Lcp0 : register_lookup cur_privilege s0.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv0 : register_lookup menvcfg s0.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Hmsok0 : user_mstatus_ok (register_lookup mstatus s0.(sregs))).
-  { rewrite (reg_nextPC_transp mstatus (register_lookup mstatus sigma_f.(sregs)) sigma_f
-               (add_vec_int va 4) ltac:(vm_compute; reflexivity) eq_refl). exact Hmsok. }
-  assert (Hpma0 : pma_allows_all (register_lookup pma_regions s0.(sregs)))
-    by (rewrite Hpma0v; exact Hpmaall).
-  iAssert (mstate_interp s0) with "[Hreg Hgh Hdev]" as "Hint". { iFrame "Hreg Hgh Hdev". }
+  iDestruct (post_fetch_uconfig C 4 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp0 & Hmsok0 & Hmisa0 & Lmenv0 & Hsenv0 & Hhtif0 & Hpma0) & _ & _ & Lmi).
   destruct Hwidth as [Hw|[Hw|[Hw|[Hw|Hw]]]]; subst width.
   - (* width 1 *)
     iMod (mem_exec_amo_k 1 ltac:(lia) ltac:(lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
@@ -7513,31 +7010,12 @@ Lemma arm_ZICBOP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
 Proof.
   intros Hcfg Hdec.
   destruct p as [[cbop rs1] offset]. destruct rs1 as [rs1].
-  destruct Hcfg as (Lpc & Lcp & Hmsok & Lmenv & Hva2 & Lmi).
-  destruct Hmsok as (HSXLf & HMPRVf & HMXRf & _ & _).
   iIntros "#Hhw Hint Hgpr Hnpc Hupt Hcfg".
   set (s0 := set_reg sigma_f nextPC (add_vec_int va 4)).
+  iDestruct (post_fetch_uconfig C 4 sigma_f va _ Hcfg with "Hint Hhw Hcfg")
+    as %((Lcp0 & Hmsok0 & Hmisa0 & Lmenv0 & Hsenv0 & Hhtif0 & Hpma0) & _ & _ & Lmi).
+  destruct Hmsok0 as (HSXL0 & HMPRV0 & HMXR0 & _ & _).
   iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
-  iDestruct (hwcfg_misa s0 with "Hreg Hhw") as %Hmisa0.
-  iDestruct (ucfg_senvcfg C s0 with "Hreg Hcfg") as %Hsenv0.
-  iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-    "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
-  iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif0.
-  iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpma0v.
-  assert (Lcp0 : register_lookup cur_privilege s0.(sregs) = User)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lcp ]).
-  assert (Lmenv0 : register_lookup menvcfg s0.(sregs) = MENVCFG_S)
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | exact Lmenv ]).
-  assert (Emst : register_lookup mstatus s0.(sregs) = register_lookup mstatus sigma_f.(sregs))
-    by (apply reg_nextPC_transp; [ vm_compute; reflexivity | reflexivity ]).
-  assert (HMPRV0 : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s0.(sregs))) ('b"1") = false)
-    by (rewrite Emst; exact HMPRVf).
-  assert (HMXR0 : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s0.(sregs))) ('b"0") = true)
-    by (rewrite Emst; exact HMXRf).
-  assert (HSXL0 : _get_Mstatus_SXL (register_lookup mstatus s0.(sregs)) = 'b"10")
-    by (rewrite Emst; exact HSXLf).
-  assert (Hpma0 : pma_allows_all (register_lookup pma_regions s0.(sregs)))
-    by (rewrite Hpma0v; exact Hpmaall).
   iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
   iMod (exec_execute_ZICBOP_u cbop rs1 offset pt.(ud_root) pt.(ud_tfp) pt.(ud_um) pt.(ud_data) s0
           Lcp0 HMPRV0 HMXR0 Hmisa0 Lmenv0 Hsenv0 Hhtif0 HSXL0 Hpma0 Hwf Hcov
