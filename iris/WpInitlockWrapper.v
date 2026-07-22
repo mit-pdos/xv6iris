@@ -20,14 +20,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
-Require Import WpGpr InstrBytes WpMmodeLeafBase WpAuipc.
+Require Import WpMmodeLeafBase WpAuipc.
 Require Import AlignBits.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import StackOwn CalleeSaved.
-Require Import KernelText KernelDataInv.
-Require Import IntrDefs WpSmodeIntr.
-Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpInitlock SpecInitlock.
 From Kernel Require KernelSyms.

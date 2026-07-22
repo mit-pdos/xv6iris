@@ -13,12 +13,10 @@ Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import RegFile.
-Require Import WpGpr.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
-Require Import CalleeSaved StackOwn.
 Require Import KptTree.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpWakeup.
 From Kernel Require KernelSyms.

@@ -21,7 +21,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpMemsetS.
-Require Import WpLock KallocInv.
+Require Import WpLock.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

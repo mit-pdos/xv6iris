@@ -11,16 +11,16 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import KptTree.
-Require Import StackOwn CalleeSaved.
+Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
-Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
-Require Import WpInitlock SpecInitlock SpecFreerange.
+Require Import IntrDefs.
+Require Import SpecFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 

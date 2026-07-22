@@ -23,14 +23,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import KernelText.
 Require Import RegFile.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KptTree.
 Require Import DevModel WpUart.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import SpecUart.
 Require Import WpUartPutcSync.

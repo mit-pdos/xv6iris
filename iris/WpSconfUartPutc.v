@@ -25,15 +25,14 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText WpAuipc.
 Require Import RegFile.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
 Require Import KptTree.
-Require Import DevModel WpUart.
-Require Import IntrDefs WpSmodeIntr.
+Require Import WpUart.
+Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl SpecUart.
 Require Import WpUartPutcSync WpUartPutcSyncFull.

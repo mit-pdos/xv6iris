@@ -12,7 +12,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
-Require Import TrampPt.
+Require Import KptExecMap.
 Require Import SmodeCore SmodeCorePt KptTree UptTree PtFetchGen.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

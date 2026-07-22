@@ -20,11 +20,11 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import DevModel RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpGpr InstrBytes WpMmodeLeafBase.
+Require Import WpLoad WpGpr WpMmodeLeafBase.
 Require Import RegFile.
 Require Import KptPt.
 Require Import SmodeCore WpSmodeGpr.
-Require Import KptTree SmodeCorePt SRegime.
+Require Import SmodeCorePt SRegime.
 Require Import WpUart WpSmodeUart WpSmodePtUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.

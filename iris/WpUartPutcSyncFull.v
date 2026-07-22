@@ -21,22 +21,14 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import InstrBytes.
-Require Import WpRvcBridge KernelText StackOwn.
-Require Import WpGpr.
-Require Import RegFile.
+Require Import WpRvcBridge KernelText.
 Require Import WpMmodeLeafBase.
-Require Import SRegime.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
-Require Import VcGen VcGenS.
-Require Import CalleeSaved.
 Require Import WpUart.
-Require Import WpUartPutcSync.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KptTree.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtCtl.
 Import Defs.
 
 Notation UPS := KernelSyms.uartputc_sync.

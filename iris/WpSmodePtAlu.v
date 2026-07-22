@@ -13,7 +13,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SRegime.
-Require Import SmodeCore WpAuipc.
+Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
 Require Import WpSmodePtLeaves.
 Require Import RegFile.

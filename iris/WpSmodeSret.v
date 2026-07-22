@@ -33,7 +33,6 @@ Require Import WpGprMret.
 Require Import SmodeCore.
 (* sret_ms1..5 / sret_newpriv / sret_tgt -- the post-execute CSR tower this
    WP produces -- live with their bit theory in MstatusBits.v. *)
-Require Import MstatusBits.
 Local Open Scope Z_scope.
 Import Defs.
 

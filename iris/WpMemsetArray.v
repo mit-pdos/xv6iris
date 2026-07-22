@@ -19,20 +19,16 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes.
-Require Import WpGpr.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore KernelText WpMemsetS.
+Require Import SmodeCore WpMemsetS.
 Require Import WpMemsetInstr WpMemsetPage.
 Require Import CalleeSaved.
 Require Import StackOwn.
-Require Import IntrDefs.
 Require Import SpecMemsetParts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-Require Import KptTree.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
 Import Defs.

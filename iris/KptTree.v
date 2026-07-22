@@ -45,7 +45,8 @@ Require Import CommonWalk.
 Require Import PtTree.
 Require Import PtTreeAdue.
 Require Import KptPt.
-Require Import TrampPt.
+Require Import KptExecMap.
+Require Import Pt4kWalk.
 Require Import SmodeCore.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

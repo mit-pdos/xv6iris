@@ -19,23 +19,17 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import DevModel.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecodeBridge WpRvcBridge KernelText.
-Require Import WpGpr.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
-Require Import WpAuipc.
 Require Import WpUart.
-Require Import CalleeSaved.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Require Import SRegime.
-Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
-Require Import WpSmodePtMemWrap WpSmodePtUart.
 Import Defs.
 
 (* ===================================================================== *)

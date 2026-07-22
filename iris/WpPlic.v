@@ -22,12 +22,11 @@ Require Import RegFile.
 Require Import KptPt.
 Require Import SmodeCore WpSmodeGpr.
 Require Import KptTree SmodeCorePt SRegime.
-Require Import PlicPlan WpUart WpSmodeUart WpSmodePtUart.
+Require Import PlicPlan WpUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import WpPlicExec.
-Require Import MemAccessGen.
 Import Defs.
 
 (* the width-4 store tower's store word [wv] is a double [autocast]/subrange of

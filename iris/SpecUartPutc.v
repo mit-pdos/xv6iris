@@ -13,17 +13,12 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile.
-Require Import WpGpr.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KptTree.
-Require Import DevModel WpUart.
-Require Import IntrDefs WpSmodeIntr.
+Require Import WpUart.
 Require Import IntrDefs.
-Require Import SpecUart.
-Require Import WpUartPutcSync WpUartPutcSyncFull.
+Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 

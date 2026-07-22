@@ -23,8 +23,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes KernelText.
 Require Import RegFile WpGpr.
 Require Import SmodeCore.
-Require Import KptTree.
-Require Import IntrDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Import Defs.

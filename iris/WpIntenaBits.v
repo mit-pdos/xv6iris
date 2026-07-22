@@ -5,7 +5,7 @@
 Require Import SailStdpp.Operators_mwords SailStdpp.MachineWord SailStdpp.Values SailStdpp.TypeCasts.
 From stdpp Require Import bitvector.definitions.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvExtras WpGprCsrwCommon WpGprCsrwC.
+Require Import WpGprCsrwCommon.
 From Stdlib Require Import ZArith Lia.
 
 (* the value the srli/andi chain computes from the saved sstatus view

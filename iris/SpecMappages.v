@@ -12,17 +12,15 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
-Require Import WpGpr WpLock WpMmodeLeafBase.
+Require Import WpLock.
 Require Import RegFile.
-Require Import CalleeSaved StackOwn.
+Require Import CalleeSaved.
 Require Import KptTree.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.
-Require Import UserBits.
-Require Import SpecWalk.
 From Kernel Require KernelSyms.
 
 Notation MP := KernelSyms.mappages.

@@ -11,20 +11,17 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords Sai
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import RegFile.
-Require Import SRegime SmodeCore.
-Require Import ProcGeom SpecMyproc.
+Require Import SmodeCore.
+Require Import ProcGeom.
 Require Import InstrBytes KernelText.
-Require Import WpGpr.
 Require Import WpMycpu.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
-Require Import RiscvExtras.
 Require Import KptTree.
-Require Import IntrDefs WpIntenaBits.
 Require Import IntrDefs.
-Require Import SpecAcquire SpecRelease.
-Require Import WpWakeup SpecWakeup WpKalloc.
+Require Import IntrDefs.
+Require Import WpWakeup.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 

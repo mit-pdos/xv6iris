@@ -14,7 +14,6 @@ Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
@@ -27,15 +26,12 @@ Require Import PtBuild KvmSpec.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpMemsetS WpMemsetInstr.
-Require Import SpecMemsetParts.
 Require Import SpecMemset.
 Require Import SpecKalloc.
 Require Import WpWalkInstr UserBits.
 Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import RiscvExec RiscvTryStep.
 Require Import SpecWalk.
 Import Defs.
 Local Open Scope Z_scope.

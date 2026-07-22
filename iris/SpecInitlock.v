@@ -9,17 +9,15 @@ From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import WpGpr InstrBytes WpMmodeLeafBase.
-Require Import SmodePte.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import SmodeCore.
-Require Import KptTree SmodeCorePt.
-Require Import StackOwn CalleeSaved.
+Require Import KptTree.
+Require Import CalleeSaved.
 Require Import KernelText.
-Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
-Require Import WpInitlock WpLock.
-Require Import SRegime.
+Require Import IntrDefs.
+Require Import WpLock.
 Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

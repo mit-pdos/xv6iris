@@ -15,10 +15,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
-Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import WpGpr WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KptTree.
-Require Import StackOwn KernelText.
+Require Import StackOwn.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import VcGen.

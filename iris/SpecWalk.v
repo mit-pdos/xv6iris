@@ -10,30 +10,21 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile.
-Require Import WpGpr.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpLock.
-Require Import CommonWalk PtTree KptTree.
+Require Import PtTree KptTree.
 Require Import PtBuild KvmSpec.
-Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
-Require Import WpMemsetS.
-Require Import SpecMemsetParts.
-Require Import SpecKalloc.
-Require Import WpWalkInstr UserBits.
-Require Import WpMemsetPage.
+Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import RiscvExec RiscvTryStep.
 Import Defs.
 
 Notation WK := KernelSyms.walk.

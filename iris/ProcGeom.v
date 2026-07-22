@@ -26,7 +26,6 @@ From iris.base_logic.lib Require Import gen_heap invariants.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
-Require Import RegFile.
 Require Import WpMycpu.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

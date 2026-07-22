@@ -13,17 +13,14 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import RegFile.
-Require Import WpGpr WpLock WpMmodeLeafBase.
-Require Import CalleeSaved StackOwn.
+Require Import WpLock.
+Require Import CalleeSaved.
 Require Import KptTree.
 Require Import IntrDefs.
 Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import Riscv.riscv_extras.
-Require Import UserBits.
-Require Import WpKvmmap.
-Require Import SpecMappages.
 From Kernel Require KernelSyms.
 
 Notation KM := KernelSyms.kvmmap.

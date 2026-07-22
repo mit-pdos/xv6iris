@@ -56,7 +56,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile WpGpr MinstretInv InstrBytes WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree SmodeCorePt.
-Require Import WpSmodeSret MstatusBits AlignBits.
+Require Import MstatusBits AlignBits.
 Require Import IntrDefs WpIntrInv.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

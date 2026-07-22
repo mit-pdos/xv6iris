@@ -31,15 +31,12 @@ From iris.base_logic.lib Require Import invariants own ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
-Require Import SRegime.
 Require Import SmodeCore.
 Require Import RegFile.
-Require Import InstrBytes RiscvFetchExec WpGpr KernelText.
+Require Import InstrBytes RiscvFetchExec KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import VcGen.
-Require Import KernelRvcDecode.
-Require Import WpSwtchVc.
 Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge WpKallocDecode.
 From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.

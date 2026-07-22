@@ -35,11 +35,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode KernelText.
-Require Import RegFile.
-Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import SRegime.
 Require Import SmodeCore KernelRvcDecode.
 Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
@@ -48,7 +45,6 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import WpDecodeBridge.
 Require Import SwtchCtx.
 Local Open Scope Z_scope.
-Require Import WpSmodePtCtl.
 Import Defs.
 
 (* ====================================================================== *)
