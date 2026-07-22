@@ -1,6 +1,16 @@
-(* WpLeafCommon.v — small helper lemmas shared by the WpGpr* leaf files,
-   moved verbatim out of WpEntry.v so the leaves need not depend on the
-   (slow-to-compile) WpEntry.v.  WpEntry.v re-imports this file. *)
+(* ExecCommon.v — shared Sail symbolic-executor reduction facts: [exec e s =
+   Some (v, s')] lemmas, the instruction-word constants they are keyed by, and
+   the two dispatch-peeling tactics (skip_csr_false_clauses, csr_dispatch_eq).
+
+   There is NO weakest precondition here — no WP, no iProp, no separation
+   logic — which is why the file is not called Wp*.  It sits near the root of
+   the graph (RiscvLang/RiscvExec/RiscvTryStep/RiscvFetchExec only) so that
+   anything needing a bare executor fact can reach it without importing a WP
+   family file.  Facts that are keyed only by the model, not by a privilege
+   mode or an instruction family, belong here.
+
+   (Originally split verbatim out of WpEntry.v so the leaves need not depend
+   on that slow file; WpEntry.v re-imports this one.) *)
 From Stdlib Require Import ZArith.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -234,6 +244,25 @@ Qed.
 Lemma exec_read_CSR_csrr s :
   exec (read_CSR csr_csrr) s = Some (register_lookup mhartid s.(sregs), s).
 Proof. exact (exec_read_reg (R_bitvector_64 mhartid) s). Qed.
+
+(* [architecture Supervisor] reduces to RV64 whenever mstatus.SXL says so.
+   A privilege-generic model fact -- it says nothing about CSR writes, and the
+   page-table files (SmodePte, UserTranslate) need it without wanting the
+   CSRW-B family, so it lives here at the bottom rather than in WpGprCsrwB.v. *)
+Lemma exec_architecture_Supervisor s :
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" ->
+  exec (architecture Supervisor) s = Some (RV64, s).
+Proof.
+  intro HSXL. unfold architecture. cbn match.
+  match goal with |- exec (Defs.bind ?L _) s = _ =>
+    assert (Hin : exec L s = Some (_get_Mstatus_SXL (register_lookup mstatus s.(sregs)), s)) end.
+  { rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hin).
+  unfold architecture_bits_backwards. rewrite HSXL.
+  replace (eq_vec ('b"10") ('b"01")) with false by (vm_compute; reflexivity). cbn match.
+  replace (eq_vec ('b"10") ('b"10")) with true by (vm_compute; reflexivity). cbn match.
+  apply exec_returnM.
+Qed.
 
 (* wX to x0 is a no-op (write discarded).  Twin of [exec_rX_bits_x0]. *)
 

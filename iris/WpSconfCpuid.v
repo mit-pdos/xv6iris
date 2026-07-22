@@ -32,7 +32,7 @@ Require Import SmodeCore.
 Require Import KptTree.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import WpDecode WpLeafCommon WpDecodeBridge.
+Require Import WpDecode ExecCommon WpDecodeBridge.
 Require Import KernelRvcDecode WpRvcBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 From Kernel Require KernelInstrs.

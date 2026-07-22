@@ -34,7 +34,7 @@ Require Import SmodeCore.
 Require Import KptTree KptPt.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
-Require Import WpDecode WpLeafCommon WpDecodeBridge.
+Require Import WpDecode ExecCommon WpDecodeBridge.
 Require Import KernelRvcDecode WpRvcBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import DevModel WpPlic WpPlicExec SpecPlicinit.

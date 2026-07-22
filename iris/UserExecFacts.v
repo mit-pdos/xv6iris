@@ -501,7 +501,7 @@ Qed.
 (* clears bit 0 explicitly, so it needs no such premise -- only the        *)
 (* Zicfilp-off reduction for [update_elp_state].                           *)
 (* ===================================================================== *)
-Require Import WpLeafCommon WpIntrCore UserBits.
+Require Import ExecCommon WpIntrCore UserBits.
 
 Lemma exec_execute_JAL_total (imm : mword 21) (ird : mword 5) (s : mstate) :
   exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->

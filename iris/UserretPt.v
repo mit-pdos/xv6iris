@@ -16,7 +16,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
-Require Import WpLoad WpLeafCommon WpGpr WpMmodeLeafBase.
+Require Import WpLoad ExecCommon WpGpr WpMmodeLeafBase.
 Require Import SmodePte Pt4kWalk TrampPt.
 Require Import SmodeCorePt WpSmodeGpr UptTree.
 Require Import TrampStepPt.

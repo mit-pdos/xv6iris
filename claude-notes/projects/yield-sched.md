@@ -274,6 +274,20 @@ All three carry `m !!! Regidx x4 = cid_word`.
       R elim and cleared after resume (sched's ∃ch' post is immediately
       overwritten); all five call-boundary noff forms closed by vm_compute.
 
+- [x] S8: wakeup rewired onto the proven myproc; the `wp_myproc_sconf_any`
+      AXIOM IS DELETED (tree is myproc-axiom-free).  wakeup's spec gained
+      `cur_proc pme` with pme UNCONSTRAINED (wakeup may run from interrupt
+      context where c->proc is 0; the self-skip beq destructs on the raw
+      register comparison and needs no structure on pme — the old axiom's
+      ∃j outputs were never used), the tp premise, and myproc's two
+      pop-shape premises at (noffv, lvl); WakeupLoopProof is a functor
+      over MYPROC; cur_proc rides in wk_res_sconf.  Full build green.
+
+DISCOVERED PRE-EXISTING DEBT (not from this project): `WpSconfWakeup.v:479`
+`wp_wakeup_prologue_sconf` is `Admitted` (since the spec-module migration,
+a4eb750) — wakeup's whole-function chain rests on it via Print Assumptions.
+Needs an owner.
+
 Remaining cleanup (small, unowned): move `own_ctx` from SpecSched.v into
 SwtchCtx.v; consider a `wp_cret_s_zca_r_later_pt` wrapper and a
 swconf-across-iNext helper (see S2b notes); check SpecCpuid (landed

@@ -9,7 +9,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode.
 Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
-Require Export WpLeafCommon.
+Require Export ExecCommon.
 Require Import WpDecodeBridge.
 
 (* ---------------------------------------------------------------------- *)

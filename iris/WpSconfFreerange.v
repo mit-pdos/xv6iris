@@ -33,7 +33,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKfree.
 Require Import WpFreerangeDecode.
 From Kernel Require KernelSyms.
-Require Import RiscvExec RiscvTryStep RiscvFetchExec WpLeafCommon.
+Require Import RiscvExec RiscvTryStep RiscvFetchExec ExecCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
 Local Open Scope Z_scope.
