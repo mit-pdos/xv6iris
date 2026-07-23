@@ -788,7 +788,7 @@ Section ProofWakeupLoop.
     : wp_wakeup_sconf_body γ Φ m γs a0f pme lvl K eb C.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
-    intros sp0 spF rettgt HK Hdom Hlen Hmtp Hmycpu Hmycpu_nz Hlvl Halign.
+    intros sp0 spF rettgt HK Hdom Hlen Hmtp Hmycpu Hmycpu_nz Hlvl.
     iIntros "Hcg Hown #Htext Hpc Hlockcells #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
     iApply (Wakeup.wp_wakeup_prologue_sconf γ Φ m K ltac:(lia) Hdom
@@ -818,7 +818,7 @@ Section ProofWakeupLoop.
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
                 (m !!! Regidx (mword_of_int 21 : mword 5)) vpad
-                ltac:(lia) Hedom Halign
+                ltac:(lia) Hedom
                 with "Hcg Htextx Hpc [Hf7] [Hf6] [Hf5] [Hf4] [Hf3] [Hf2] [Hf1] [Hf0] [-]").
       { iEval (rewrite Hecsp). iExact "Hf7". }
       { iEval (rewrite Hecsp). iExact "Hf6". }

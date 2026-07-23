@@ -57,7 +57,7 @@ Section ProofWakeupEpi.
     : wp_wakeup_epilogue_sconf_body γ Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad.
   Proof.
     cbv beta delta [wp_wakeup_epilogue_sconf_body].
-    intros spF sp0 rettgt HK8 Hdom Halign.
+    intros spF sp0 rettgt HK8 Hdom.
     iIntros "Hcg #Htext Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0 Hcont".
     iPoseProof (wki_58 with "Htext") as "Hi58".
     iPoseProof (wki_5a with "Htext") as "Hi5a".

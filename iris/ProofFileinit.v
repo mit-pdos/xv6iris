@@ -40,7 +40,7 @@ Section ProofFileinit.
     : wp_fileinit_sconf_body γ Φ m K vlock vname vcpu.
   Proof.
     cbv beta delta [wp_fileinit_sconf_body].
-    intros pcE ret_tgt lk c_name c_cpu HK Hretm.
+    intros pcE ret_tgt lk c_name c_cpu HK.
     (* &"ftable" is proof-local: the spec speaks of the lock's NAME, not of the
        address the image happens to keep the literal at. *)
     pose (name := (mword_of_int ftable_name_str : mword 64)).
@@ -56,7 +56,7 @@ Section ProofFileinit.
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf γ Φ m K FI
               (mword_of_int 3) (mword_of_int 30) (mword_of_int 1468) (mword_of_int 1212)
-              (mword_of_int 2083804) lk name "ftable"%string vlock vname vcpu HK Hretm
+              (mword_of_int 2083804) lk name "ftable"%string vlock vname vcpu HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

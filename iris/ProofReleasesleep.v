@@ -298,7 +298,6 @@ Section ProofReleasesleep.
               ltac:(rewrite HCwktp; reflexivity)
               ltac:(rewrite HCwktp; exact Hcpune)
               ltac:(lia)
-              ltac:(rewrite HCwkra; vm_compute; reflexivity)
               with "Hcg Hown Htext Hpc Hlockcells Hpinv [-]").
     iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hown Htext2 Hpc Hlockcells".
     assert (Hpc26 : ret_pc (Cwk !!! Regidx (mword_of_int 1 : mword 5))
