@@ -272,10 +272,15 @@ def render_svg(steps, span, jobs=None, W=960, H=380):
 
 
 def md_table(headers, rows):
-    out = ["| " + " | ".join(headers) + " |",
+    # A literal `|` in a cell (common in tactic snippets like `first [a | b]`)
+    # ends the column early in GitHub's table parser -- escape it, even inside
+    # the backtick code spans (GitHub renders `\|` back to `|` there).
+    def cell(c):
+        return str(c).replace("|", "\\|")
+    out = ["| " + " | ".join(cell(h) for h in headers) + " |",
            "|" + "|".join("---" for _ in headers) + "|"]
     for r in rows:
-        out.append("| " + " | ".join(str(c) for c in r) + " |")
+        out.append("| " + " | ".join(cell(c) for c in r) + " |")
     return "\n".join(out)
 
 
