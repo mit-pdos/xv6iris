@@ -53,7 +53,7 @@ jobs:
     timeout-minutes: 600
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Full history so the pre-push rebase onto main can work.
           fetch-depth: 0
@@ -70,7 +70,7 @@ jobs:
             default: https://opam.ocaml.org
 
       - name: Cache opam switch
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: _opam
           key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}

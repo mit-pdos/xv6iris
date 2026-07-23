@@ -29,7 +29,7 @@ jobs:
     runs-on: coqdev
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Creates a project-local opam switch in $GITHUB_WORKSPACE/_opam and loads
       # its environment, so plain `opam exec -- …` targets that switch.
@@ -56,7 +56,7 @@ jobs:
       # clobbers setup-ocaml's fresh switch and yields "No switch is currently
       # set".  Scoping by runner.name keeps each runner's cache to itself.
       - name: Cache opam switch
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: _opam
           key: ${{ runner.os }}-${{ runner.name }}-opam-5.3-${{ hashFiles('.github/coq-deps.txt') }}
