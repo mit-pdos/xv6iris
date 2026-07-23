@@ -933,19 +933,22 @@ Section ProofMappages.
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
               = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt9c) in "Hpc".
+      (* same hoist as the loop re-entry: F1 (= <[10:=..]>M11) doesn't touch
+         sp/tp/24-27, so peel each agreement with mr ONCE and hand the epilogue
+         its premises as [eq_trans] terms, not re-elaborated inline peels. *)
+      assert (Hfsp : F1 !!! Regidx csp_rs1 = mr !!! Regidx csp_rs1) by peel_reg.
+      assert (Hftp : F1 !!! Regidx (mword_of_int 4 : mword 5) = mr !!! Regidx (mword_of_int 4 : mword 5)) by peel_reg.
+      assert (Hf24 : F1 !!! Regidx (mword_of_int 24 : mword 5) = mr !!! Regidx (mword_of_int 24 : mword 5)) by peel_reg.
+      assert (Hf25 : F1 !!! Regidx (mword_of_int 25 : mword 5) = mr !!! Regidx (mword_of_int 25 : mword 5)) by peel_reg.
+      assert (Hf26 : F1 !!! Regidx (mword_of_int 26 : mword 5) = mr !!! Regidx (mword_of_int 26 : mword 5)) by peel_reg.
+      assert (Hf27 : F1 !!! Regidx (mword_of_int 27 : mword 5) = mr !!! Regidx (mword_of_int 27 : mword 5)) by peel_reg.
       iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t tS m npages (S k) perm K lvl eb p C on (consumed + g)%nat HK
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmrsp)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmrtp)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr24)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr25)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
-                ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                      repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
+                (eq_trans Hfsp Hmrsp)
+                (eq_trans Hftp Hmrtp)
+                (eq_trans Hf24 Hmr24)
+                (eq_trans Hf25 Hmr25)
+                (eq_trans Hf26 Hmr26)
+                (eq_trans Hf27 Hmr27)
                 HbaseS HrepS HnodesS
                 ltac:(left; split; [lia |];
                       rewrite /F1 upd_eq;
@@ -1002,35 +1005,41 @@ Section ProofMappages.
     { rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5.
       repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
-    (* loop *)
+    (* loop: re-establish the invariant for M12.  M12..M5 only touch regs 15
+       and 9 (the set-chain above), so every OTHER register still agrees with
+       the walk-return map mr.  Peel that agreement ONCE per register as a
+       named assert (peel_reg is one-layer, O(depth)); IH then gets each premise
+       as a plain [eq_trans] term.  Replaces 11 inline [ltac:(rewrite /M12../M5;
+       ...)] args -- each re-unfolded the whole 8-deep chain and was re-elaborated
+       against the iApply's evars, the file's hot spot. *)
+    assert (Hag_sp : M12 !!! Regidx csp_rs1 = mr !!! Regidx csp_rs1) by peel_reg.
+    assert (Hag18 : M12 !!! Regidx (mword_of_int 18 : mword 5) = mr !!! Regidx (mword_of_int 18 : mword 5)) by peel_reg.
+    assert (Hag19 : M12 !!! Regidx (mword_of_int 19 : mword 5) = mr !!! Regidx (mword_of_int 19 : mword 5)) by peel_reg.
+    assert (Hag20 : M12 !!! Regidx (mword_of_int 20 : mword 5) = mr !!! Regidx (mword_of_int 20 : mword 5)) by peel_reg.
+    assert (Hag21 : M12 !!! Regidx (mword_of_int 21 : mword 5) = mr !!! Regidx (mword_of_int 21 : mword 5)) by peel_reg.
+    assert (Hag22 : M12 !!! Regidx (mword_of_int 22 : mword 5) = mr !!! Regidx (mword_of_int 22 : mword 5)) by peel_reg.
+    assert (Hag_tp : M12 !!! Regidx (mword_of_int 4 : mword 5) = mr !!! Regidx (mword_of_int 4 : mword 5)) by peel_reg.
+    assert (Hag24 : M12 !!! Regidx (mword_of_int 24 : mword 5) = mr !!! Regidx (mword_of_int 24 : mword 5)) by peel_reg.
+    assert (Hag25 : M12 !!! Regidx (mword_of_int 25 : mword 5) = mr !!! Regidx (mword_of_int 25 : mword 5)) by peel_reg.
+    assert (Hag26 : M12 !!! Regidx (mword_of_int 26 : mword 5) = mr !!! Regidx (mword_of_int 26 : mword 5)) by peel_reg.
+    assert (Hag27 : M12 !!! Regidx (mword_of_int 27 : mword 5) = mr !!! Regidx (mword_of_int 27 : mword 5)) by peel_reg.
     iApply (IH (S k) M12 tS (consumed + g)%nat
               Hlvl HK ltac:(lia) ltac:(lia) Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmrsp)
+              (eq_trans Hag_sp Hmrsp)
               HM12s1
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr18)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr19)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr20)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr21)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr22)
+              (eq_trans Hag18 Hmr18)
+              (eq_trans Hag19 Hmr19)
+              (eq_trans Hag20 Hmr20)
+              (eq_trans Hag21 Hmr21)
+              (eq_trans Hag22 Hmr22)
               ltac:(rewrite HM12s7v; exact Hmr23)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmrtp)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr24)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr25)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
-              ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
-                    repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
+              (eq_trans Hag_tp Hmrtp)
+              (eq_trans Hag24 Hmr24)
+              (eq_trans Hag25 Hmr25)
+              (eq_trans Hag26 Hmr26)
+              (eq_trans Hag27 Hmr27)
               HbaseS HrepS HnodesS Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -1427,13 +1436,17 @@ Section ProofMappages.
       repeat (rewrite upd_ne; [| reg_neq]).
       rewrite add_vec_zero_l.
       rewrite mappages_va0. reflexivity. }
+    (* hoist the deepest premise (sp, 12-deep over P2..P13): peel the agreement
+       with W1 ONCE, then hand it over as an [eq_trans] term instead of an inline
+       re-elaborated whole-chain peel. *)
+    assert (HPsp : P13 !!! Regidx csp_rs1 = W1 !!! Regidx csp_rs1)
+      by (rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2;
+          repeat (rewrite upd_ne; [| reg_neq]); reflexivity).
     iApply (wp_mappages_loop_sconf γ γa Φ mm t m npages perm K lvl eb p C on npages 0%nat P13 t 0%nat
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
-              ltac:(rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2;
-                    repeat (rewrite upd_ne; [| reg_neq]);
-                    exact HspW1)
+              (eq_trans HPsp HspW1)
               HP13s1
               ltac:(rewrite /P13 /P12 /P11 /P10;
                     repeat (rewrite upd_ne; [| reg_neq]);
