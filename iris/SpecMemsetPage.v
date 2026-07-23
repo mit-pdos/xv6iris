@@ -18,7 +18,6 @@ Require Import KallocInv.
 Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KptTree.
 
 Notation MS := KernelSyms.memset.
 

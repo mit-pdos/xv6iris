@@ -15,7 +15,6 @@ Require Import InstrBytes KernelText.
 Require Import WpLock.
 Require Import RegFile.
 Require Import CalleeSaved.
-Require Import KptTree.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import KallocInv.

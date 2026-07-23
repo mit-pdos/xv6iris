@@ -13,7 +13,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpMycpu WpLock.

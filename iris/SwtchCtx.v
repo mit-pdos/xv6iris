@@ -17,7 +17,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile WpGpr.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import IntrDefs.
 Local Open Scope Z_scope.
 

@@ -50,7 +50,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import DevModel PlicPlan WpUart.

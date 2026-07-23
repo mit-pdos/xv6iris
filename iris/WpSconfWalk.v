@@ -21,7 +21,7 @@ Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import VcGen.
-Require Import CommonWalk PtTree KptTree.
+Require Import CommonWalk PtTree.
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.

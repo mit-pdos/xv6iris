@@ -29,7 +29,6 @@ Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import RiscvExtras.
-Require Import KptTree.
 Require Import IntrDefs WpIntenaBits.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.

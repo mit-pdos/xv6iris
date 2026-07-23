@@ -19,7 +19,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpLock.
-Require Import PtTree KptTree.
+Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs.
 Require Import IntrDefs.

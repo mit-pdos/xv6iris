@@ -30,7 +30,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import RegFile WpGpr InstrBytes WpMmodeLeafBase WpMmodeShiftiop StackOwn.
-Require Import SmodeCore WpAuipc KptTree.
+Require Import SmodeCore WpAuipc.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

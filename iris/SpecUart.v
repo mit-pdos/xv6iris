@@ -13,7 +13,6 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import KptPt.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import WpUart WpSmodeUart.
 Require Import IntrDefs.
 Require Import IntrDefs.

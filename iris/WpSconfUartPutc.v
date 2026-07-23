@@ -30,7 +30,6 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
-Require Import KptTree.
 Require Import WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.

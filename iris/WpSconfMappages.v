@@ -18,7 +18,6 @@ Require Import InstrBytes KernelText.
 Require Import WpLock WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
-Require Import KptTree.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen.

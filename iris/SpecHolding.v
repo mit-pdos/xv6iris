@@ -12,7 +12,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import IntrDefs.

@@ -13,7 +13,6 @@ Require Import InstrBytes.
 Require Import RegFile.
 From Stdlib Require Import FunctionalExtensionality.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import IntrDefs.

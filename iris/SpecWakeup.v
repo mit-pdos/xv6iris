@@ -15,7 +15,6 @@ Require Import InstrBytes KernelText.
 Require Import RegFile.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
-Require Import KptTree.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpWakeup.

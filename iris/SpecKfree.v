@@ -18,7 +18,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpMycpu WpLock.
-Require Import KptTree.
 Require Import IntrDefs.
 Require Import IntrDefs.
 From Kernel Require KernelInstrs.

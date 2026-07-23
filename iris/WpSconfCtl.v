@@ -26,7 +26,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes WpDecode ExecCommon WpGpr WpGprCsrwCommon RegFile.
 Require Import SmodeCore.
-Require Import KptTree WpSmodePtCtl.
+Require Import WpSmodePtCtl.
 Require Import WpMmodeLeafBase.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.

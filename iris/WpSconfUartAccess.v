@@ -26,7 +26,6 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import DevModel WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.

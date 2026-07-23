@@ -16,7 +16,6 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KptTree.
 Require Import StackOwn KernelText.
 Require Import IntrDefs.
 Require Import WpMemsetS.

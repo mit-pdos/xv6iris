@@ -15,7 +15,6 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import KptTree.
 Require Import WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.

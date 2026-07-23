@@ -18,7 +18,6 @@ Require Import WpMycpu.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
-Require Import KptTree.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpWakeup.

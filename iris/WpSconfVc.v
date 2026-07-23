@@ -45,7 +45,6 @@ Require Import SmodeCore.
 Require Import RegFile.
 Require Import VcGen VcGenS.
 Require Import StackOwn.
-Require Import KptTree.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem.
 Local Open Scope Z_scope.

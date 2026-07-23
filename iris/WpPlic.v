@@ -21,7 +21,7 @@ Require Import WpLoad WpGpr InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import KptPt.
 Require Import SmodeCore WpSmodeGpr.
-Require Import KptTree SmodeCorePt SRegime.
+Require Import SmodeCorePt SRegime.
 Require Import PlicPlan WpUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.

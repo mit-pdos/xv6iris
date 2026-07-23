@@ -24,11 +24,10 @@ From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WpGpr WpGprCsrwCommon.
 Require Import SmodeCore WpMmodeLeafBase.
-Require Import KptTree.
 (* exec_execute_csrr_sstatus: the exported copy lives in WpPopOff.v (the
    WpSmodePtCtl one is Local); the csr-write reduction chain
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
