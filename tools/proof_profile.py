@@ -187,6 +187,48 @@ def concurrency_steps(intervals):
     return steps
 
 
+def render_ascii(steps, span, jobs=None, width=70, height=14):
+    """Monospace block-chart of concurrency vs time (renders inline in the CI
+    step summary, where a real image/SVG can't).  Each column is a time bin;
+    bar height is the time-averaged number of compiles in flight over that bin,
+    smoothed with the 1/8-block glyphs."""
+    if not steps or span <= 0:
+        return "(no timeline data)"
+    peak = max(c for _, c in steps)
+    ymax = max(peak, 1)
+    # step function as [start, end, count) segments
+    segs = []
+    for i, (t, c) in enumerate(steps):
+        end = steps[i + 1][0] if i + 1 < len(steps) else span
+        segs.append((t, end, c))
+
+    def avg(a, b):                       # time-weighted mean concurrency on [a,b)
+        if b <= a:
+            return 0.0
+        tot = 0.0
+        for s, e, c in segs:
+            lo, hi = max(a, s), min(b, e)
+            if hi > lo:
+                tot += c * (hi - lo)
+        return tot / (b - a)
+
+    cols = [avg(span * i / width, span * (i + 1) / width) for i in range(width)]
+    blocks = " ▁▂▃▄▅▆▇█"                 # 0/8 .. 8/8, filling from the cell bottom
+    out = []
+    for r in range(height - 1, -1, -1):  # top row down
+        line = []
+        for v in cols:
+            eighths = v / ymax * height * 8
+            cell = int(round(eighths - r * 8))
+            line.append(blocks[0 if cell < 0 else 8 if cell > 8 else cell])
+        lab = f"{ymax:>3} ┤" if r == height - 1 else "    │"
+        out.append(lab + "".join(line))
+    out.append("  0 ┼" + "─" * width)
+    end = f"{int(round(span))}s"
+    out.append("     0s" + " " * (width - 2 - len(end)) + end)
+    return "\n".join(out)
+
+
 # ---------------------------------------------------------------------------
 # rendering
 # ---------------------------------------------------------------------------
@@ -390,10 +432,12 @@ def main():
         md.append("_no dependency data (need `.CoqMakefile.d` + per-file times)_")
 
     md.append("\n### Parallelism over time\n")
-    md.append("See the **parallelism.svg** build artifact. "
-              f"Peak {maxpar}× concurrent, average {avgpar:.1f}×; "
-              f"~{serial:.0f}s of the {span:.0f}s wall runs ≤1 compile in flight "
-              "(the serial tail no amount of `-j` can shrink).\n")
+    md.append(f"compiles in flight (peak {maxpar}× · avg {avgpar:.1f}×"
+              + (f" · -j{args.jobs}" if args.jobs else "") + "):\n")
+    md.append("```\n" + render_ascii(steps, span, jobs=args.jobs) + "\n```")
+    md.append(f"~{serial:.0f}s of the {span:.0f}s wall runs ≤1 compile in flight "
+              "(the serial tail no amount of `-j` can shrink). "
+              "Higher-res **parallelism.svg** is in the build artifact.\n")
 
     report_md = "\n".join(md) + "\n"
     with open(os.path.join(args.out_dir, "report.md"), "w") as f:
