@@ -69,7 +69,7 @@ Context `{CID : CpuId}.
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (Hpma_all (uart_pa off) 1) as (region_st & Hmatch_st & _ & _ & Hwrite_st & _).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
@@ -215,7 +215,7 @@ Qed.
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (Hpma_all (uart_pa off) 1) as (region_st & Hmatch_st & _ & _ & Hwrite_st & _).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
@@ -349,7 +349,7 @@ Qed.
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+      %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (Hpma_all (uart_pa off) 1) as (region_ld & Hmatch_ld & _ & Hread_ld & _ & _).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.

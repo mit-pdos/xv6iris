@@ -367,7 +367,7 @@ Section WpUldPt.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (Hpma_all tfpa 8) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc
               (LOAD (imm, Regidx (mword_of_int 10), Regidx rd, false, 8))
@@ -947,7 +947,7 @@ Section WpUaluUsretPt.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0)".
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     pose proof (mword1_not_lp elp0 Help_np) as Help0.
     iApply (wp_instr_u_pt uroot tfp um Φ va pa false (SRET tt)
               mstatus0 mie_v mdv0 menvcfg0 (DfracOwn 1)

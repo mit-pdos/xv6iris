@@ -224,6 +224,9 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ}
        (* the kernel-mapping auth, minted over the static map (rwx-kmap);
           the client stores it in the Bare translation slot *)
        kmap_auth kmap_M0 ∗
+       (* ... and the persisted static-claims bundle (uniform-claims):
+          the client threads it into hw_config *)
+       kmap_static_claims ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic))
        ={⊤}=∗
        ([∗ list] c ∈ cs, WP (LoopE c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
@@ -251,8 +254,15 @@ Proof.
   iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
   iEval (rewrite -Qp.half_half) in "Hp".
   iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
-  iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth _]".
+  iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
   set (HR := RiscvGS Σ Hinv _ f Hgen _ _ γu γp _ γk).
+  (* persist the ~49k static fragments into the claims bundle
+     (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
+  iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
+  { rewrite /kmap_static_claims. iApply big_sepM_bupd.
+    iApply (big_sepM_mono with "Hkfrags").
+    iIntros (vpn e Hlk) "Hfrag".
+    by iMod (ghost_map_elem_persist with "Hfrag") as "$". }
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
   (* rwx-kmap init split at etext: split the raw heap fragments into the
      sub-[text_end] half (upgraded to [↦ₓ] via [Hram] and PERSISTED to
@@ -292,6 +302,7 @@ Proof.
     { iApply big_sepL_enum_to_set. iExact "Helems". }
     iFrame "Htext Hdata". iSplitL "Hkauth".
     { iFrame "Hkauth". iPureIntro. exact kmap_wf_M0. }
+    iSplitR; [iExact "Hkbundle" |].
     iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
   iModIntro.
   iExists
@@ -348,7 +359,7 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & Huf & Hpf)".
+  iIntros "(Hwires & _ & _ & _ & _ & Huf & Hpf)".
   (* allocate the four UART ghosts at the initial device state *)
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
   iMod (dev_inv_alloc _ γ with "[Huf Hpf Hacc Hout Htx Hdl]") as "#Hinv".

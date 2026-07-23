@@ -190,6 +190,28 @@ Section KMap.
     - iRight. iExact "Hfrag".
   Qed.
 
+  (* ---- the persistent STATIC-CLAIMS bundle (uniform-claims stage A') --
+     every identity mapping's fragment, minted and persisted at adequacy
+     init and carried in [hw_config]; the extraction lemma below replaces
+     pure static-claim construction once [kmap_at] becomes fragment-only
+     (stage B').  Never normalized: extraction is by [big_sepM_lookup] +
+     [kmap_M0_lookup]. ---- *)
+
+  Definition kmap_static_claims : iProp Σ :=
+    ([∗ map] vpn ↦ e ∈ kmap_M0, vpn ↪[kmap_name]□ e)%I.
+
+  Global Instance kmap_static_claims_persistent : Persistent kmap_static_claims.
+  Proof. apply _. Qed.
+
+  Lemma kmap_static_claims_at (vpn : mword 27) (pc : kperm) :
+    kmap_static vpn pc ->
+    kmap_static_claims -∗ kmap_at vpn (kpt_leaf_ppn vpn) pc.
+  Proof.
+    iIntros (Hs) "#Hb". iRight.
+    iApply (big_sepM_lookup _ _ vpn (kpt_leaf_ppn vpn, pc) with "Hb").
+    rewrite kmap_M0_lookup. unfold kmap_static in Hs. rewrite Hs. reflexivity.
+  Qed.
+
   (* ---- derived facts ---- *)
 
   (* the Bare-arm honoring fact: against the EXACT static auth, every

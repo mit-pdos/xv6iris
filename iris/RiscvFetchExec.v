@@ -8,6 +8,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
+Require Import KMap.   (* kmap_static_claims, carried in hw_config *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -136,7 +137,11 @@ Section HwConfig.
         the bit pins above: MISA_C = 0x800000000014112D has S/C/U/M/A set, and
         mseccfg = 0 gives PMM = Disabled and MLPE = false. *)
      ⌜ misa0 = MISA_C ⌝ ∗
-     ⌜ mseccfg0 = mword_of_int 0 ⌝)%I.
+     ⌜ mseccfg0 = mword_of_int 0 ⌝ ∗
+     (* the static kernel-mapping claims bundle (KMap, uniform-claims):
+        persistent, minted at adequacy init -- the ambient source of
+        identity-mapping fragments (device vas, boot-time image) *)
+     kmap_static_claims)%I.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.
