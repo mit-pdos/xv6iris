@@ -4,7 +4,7 @@ Goal: whole-function sconf-tier specs+proofs for kernel/sleeplock.c, with a
 separation-logic lock interface mirroring the spinlock's (WpLock.v).
 `sleep()` was initially stated here as an ASSUMED contract; upstream then
 landed the PROVEN sleep (SpecSleep.v is now `Module Type SLEEP`, proof in
-WpSconfSleep.v, LinkSleep.v), so acquiresleep consumes it as an ordinary
+ProofSleep.v, LinkSleep.v), so acquiresleep consumes it as an ordinary
 functor parameter — no sleeplock proof rests on a sleep axiom.
 
 ## The cast (image addresses from KernelSyms; disasm in xv6-riscv/kernel/kernel.asm)
@@ -84,7 +84,7 @@ word is caller-threaded pinned `zero_reg` pre/post.
   token + `sl_pid ↦₄ pidv` + `cur_proc p` + `p_pid p ↦₄{dq} pidv` ⇒ returns
   a0 = 1.  tp = cid_word.  16 ≤ av.
 
-### Proof-plan notes (for the WpSconf* agents)
+### Proof-plan notes (for the Proof* agents)
 
 - Functor deps: Initsleeplock(INITLOCK); Acquiresleep(ACQUIRE, RELEASE,
   MYPROC + the wp_sleep_sconf axiom); Releasesleep(ACQUIRE, RELEASE,
@@ -116,19 +116,19 @@ word is caller-threaded pinned `zero_reg` pre/post.
       kdc_* / WpFreerangeDecode fdc_*; fresh sldec_* templates.  Note:
       exec_execute_C_LW / exec_execute_C_SW are defined here — promote to
       WpMmodeLeafBase.v if another decode file needs them).
-- [x] WpSconfInitsleeplock.v + LinkInitsleeplock.v (functor over INITLOCK).
-- [x] WpSconfHoldingsleep.v + LinkHoldingsleep.v (ACQUIRE/RELEASE/MYPROC).
-- [x] WpSconfReleasesleep.v + LinkReleasesleep.v (ACQUIRE/RELEASE/
+- [x] ProofInitsleeplock.v + LinkInitsleeplock.v (functor over INITLOCK).
+- [x] ProofHoldingsleep.v + LinkHoldingsleep.v (ACQUIRE/RELEASE/MYPROC).
+- [x] ProofReleasesleep.v + LinkReleasesleep.v (ACQUIRE/RELEASE/
       WAKEUPLOOP; the WAKEUPLOOP-typed link module is named `WakeupLoop`).
 - [x] Merged upstream's proven sleep/sched/yield; SpecSleep.v is upstream's
       proven interface; the transient sleep MANIFEST_ASSUMED entry dropped.
-- [x] WpSconfAcquiresleep.v + LinkAcquiresleep.v (functor over ACQUIRE/
+- [x] ProofAcquiresleep.v + LinkAcquiresleep.v (functor over ACQUIRE/
       RELEASE/MYPROC/SLEEP; the sleep-retry loop is the worked iLöb example
       for threading intr_count/▷sched_vc across a taken-leaf back edge —
       see design/kernel-proofs.md).
 - [x] Full clean build; coverage: sleeplock.c 4/4 proven, 254/254 bytes.
       (releasesleep carries wakeup's PRE-EXISTING debt — the single
-      Admitted at WpSconfWakeup.v:479, a prologue proof whose script looks
+      Admitted at ProofWakeup.v:479, a prologue proof whose script looks
       complete but was left un-Qed'd — inherited via WAKEUPLOOP, out of
       this project's scope.  The wp_myproc_sconf_any axiom is gone:
       upstream rewired wakeup onto the proven myproc, which added

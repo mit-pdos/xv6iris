@@ -9,7 +9,7 @@ Every whole-function proof under `iris/` is in this shape. Keep new ones in it.
 
 ## The three files
 
-For each kernel function `F` (`Spec<F>.v`, `WpSconf<F>.v`, `Link<F>.v`):
+For each kernel function `F` (`Spec<F>.v`, `Proof<F>.v`, `Link<F>.v`):
 
 **`Spec<F>.v`** — the public interface, stated once, plus the symbol-address
 notation and any pure spec vocabulary:
@@ -30,16 +30,16 @@ Module Type ACQUIRE.
 End ACQUIRE.
 ```
 
-It requires only the definitional layer — never a `WpSconf*` proof file. A
+It requires only the definitional layer — never a `Proof*` proof file. A
 callee's proof-file require becomes that callee's `Spec` file. Spec files
 compile in ~2 s.
 
-**`WpSconf<F>.v`** — the proof, a *sealed functor* over its callees' interfaces.
+**`Proof<F>.v`** — the proof, a *sealed functor* over its callees' interfaces.
 The lemma keeps its original header and concludes with the `_body`:
 
 ```coq
 Module AcquireProof (Mycpu : MYCPU) (Holding : HOLDING) (PushOff : PUSHOFF) : ACQUIRE.
-Section WpSconfAcquire.
+Section ProofAcquire.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
 
@@ -49,7 +49,7 @@ Section WpSconfAcquire.
     cbv beta delta [wp_acquire_sconf_body].
     intros pcE lk0 a_cpu … Hnotmine Hal0 Hav.      (* the original first tactic *)
     …
-End WpSconfAcquire.
+End ProofAcquire.
 End AcquireProof.
 ```
 
@@ -63,7 +63,7 @@ proofs:
 ```coq
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import SpecAcquire SpecMycpu SpecHolding SpecPushOff.
-Require Import LinkMycpu LinkHolding LinkPushOff WpSconfAcquire.
+Require Import LinkMycpu LinkHolding LinkPushOff ProofAcquire.
 
 Module Acquire := AcquireProof Mycpu Holding PushOff.
 ```
@@ -121,7 +121,7 @@ initsleeplock, uartinit, pipealloc, virtio_disk_init) are unrelated.
 - A member `F` supplies only: its `Wp<F>Decode.v` (the shared `mdec_*`
   compressed templates plus the five base words carrying its own immediates)
   ending in an `<f>_code : kernel_text -∗ ilw_code …` bundle; a `Spec<F>.v` in
-  the usual shape; and a `WpSconf<F>.v` that is one `iApply` — `Module ILW :=
+  the usual shape; and a `Proof<F>.v` that is one `iApply` — `Module ILW :=
   InitlockWrapperProof Initlock.` inside the function's own functor, four
   `ltac:(apply bv_eq; vm_compute; reflexivity)` relocation discharges, and
   `iApply (<f>_code with "Htext")`. ~60 lines instead of ~250.
@@ -166,10 +166,10 @@ now `SpecMemsetParts`, and the general spec took the `SpecMemset` name.)
 
 Both narrower memset users are **instances of the general spec at `len = 4096`**,
 each a functor over `MEMSET` that bridges its own buffer abstraction around
-`wp_memset_sconf`: `WpSconfMemsetPage` (`page_own p` in and out, contents
+`wp_memset_sconf`: `ProofMemsetPage` (`page_own p` in and out, contents
 forgotten) and walk's `wp_memset_page_zero_sconf` (`page_own p` in, the written
 `cbyte` buffer kept). Neither re-composes the parts. This also lifted
-the ~20 s inline memset composition out of the `WpSconfWalk` critical-path file
+the ~20 s inline memset composition out of the `ProofWalk` critical-path file
 into the separately-compilable `WpMemsetArray`.
 
 ## Gotchas (all hit in practice)
@@ -201,15 +201,15 @@ into the separately-compilable `WpMemsetArray`.
   file**, so a caller that needs one gets it from `Require Import Spec<F>`
   (`Import` is not transitive, so it must require the Spec directly).
 - **Pure spec vocabulary moves down into the Spec file.** `PGSIZEv`,
-  `negPGSIZEv` and `prun` moved out of `WpSconfFreerange`'s section, and the
-  `wp_myproc_sconf_any` axiom out of `WpSconfWakeup`, because callers' *statements*
+  `negPGSIZEv` and `prun` moved out of `ProofFreerange`'s section, and the
+  `wp_myproc_sconf_any` axiom out of `ProofWakeup`, because callers' *statements*
   mention them.
 - Spec files must not `Require Export` (the ssreflect-`by` propagation hazard in
   [`code-organization.md`](code-organization.md) applies here too).
 
 ## Adding a new function
 
-Write `Spec<F>.v` first (interface + notation), then `WpSconf<F>.v` as a functor
+Write `Spec<F>.v` first (interface + notation), then `Proof<F>.v` as a functor
 over the callees you need, then the one-line `Link<F>.v`, and add all three to
 `_CoqProject`. Only lemmas another file consumes belong in the `Module Type`;
 everything else stays hidden behind the seal.

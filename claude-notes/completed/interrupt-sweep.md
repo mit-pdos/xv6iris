@@ -53,9 +53,9 @@ so the analysis is not lost.
   agreement and delegate each arm to its existing SIE-0/SIE-1 engine (no
   fetch-drive duplication).  The raw-cell `wp_instr_s_config_tlbinv_pt` is the
   '0' arm's body and the mycpu fraction-island's entry — it STAYS.
-- Leaf layer: WpSconf{Alu,Btype,Ctl,Mem,Lock,Uart,Csr}.v; VCgen `WpSconfVc.v`
+- Leaf layer: Proof{Alu,Btype,Ctl,Mem,Lock,Uart,Csr}.v; VCgen `WpSconfVc.v`
   (`wp_vc_block_s_sconf` — now sp-AWARE via the `vsstate` push/pop ledger, no
-  `vblock_no_sp` guard).  Whole functions: WpSconf{Mycpu,PushOff,Holding,
+  `vblock_no_sp` guard).  Whole functions: Proof{Mycpu,PushOff,Holding,
   Release,Acquire,Kalloc,Kfree,Wakeup,WakeupLoop,Memset,MemsetPage,Initlock,
   Walk,Mappages,Kvmmap,Freerange,Kinit}.v.
 - Import direction: leaf files import IntrDefs/WpSmodeIntr; WpIntrInv imports no
@@ -147,7 +147,7 @@ so the analysis is not lost.
   find witness" trap applies — use compute/congruence + explicit
   Z.le/lt_trans); `Z.land y 1` via a local ones-based helper.
 - **Device leaf over the funnel** (template `wp_sb_uart_s_sconf` /
-  `wp_lb_uart_s_sconf`, WpSconfUart.v): open `dev_inv` across the funnel
+  `wp_lb_uart_s_sconf`, ProofUart.v): open `dev_inv` across the funnel
   callback's own step (devN disjoint from minstretN AND intrN — arm-blind, like
   the lock leaves lockN); run the ghost step through the caller's accessor wand
   while the invariant is open; instantiate the REGIME machinery at `kpt_regime`

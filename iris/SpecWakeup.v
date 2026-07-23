@@ -24,7 +24,7 @@ Notation WK := KernelSyms.wakeup.
 
 (* The old [wp_myproc_sconf_any] axiom (a weaker, current-process-free ∃-j
    interface for myproc) is GONE: myproc is now PROVEN (SpecMyproc.v /
-   WpSconfMyproc.v / LinkMyproc.v), and wakeup threads the [cur_proc] resource
+   ProofMyproc.v / LinkMyproc.v), and wakeup threads the [cur_proc] resource
    to use the proven [wp_myproc_sconf] directly (SpecWakeupLoop.v). *)
 
 Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}

@@ -1,7 +1,7 @@
 (* WpPlic.v: the S-mode, width-4 PLIC MMIO STORE weakest-precondition over
    the SIE-agnostic [sconf] bundle.
 
-   A width-1 -> width-4 adaptation of [wp_sb_uart_s_sconf] (WpSconfUart.v),
+   A width-1 -> width-4 adaptation of [wp_sb_uart_s_sconf] (ProofUart.v),
    with the UART device leaf swapped for the width-4 PLIC device-store tower
    ([exec_execute_STORE_4_gpr_S_walk_dev], WpPlicExec.v).  The device ghost is
    handled through the RAW [plic_frag] half (the caller owns [plic_frag p] and

@@ -1,9 +1,9 @@
 (* WpMemsetArray.v -- the GENERAL whole-function WP for the kernel's [memset],
    over the SIE-agnostic sconf world.  [wp_memset_sconf] composes the sconf
-   prefix/loop/suffix (WpSconfMemset.v / SpecMemsetParts) at an ARBITRARY byte count
+   prefix/loop/suffix (ProofMemset.v / SpecMemsetParts) at an ARBITRARY byte count
    [len], threading the [sie_cap_gpr γ m n] bundle (sconf + hart_state +
    sie_cap + gpr_file).  This is memset's real contract; the page-level spec
-   (WpSconfMemsetPage) and walk's page-zeroing step are instances at len = 4096.
+   (ProofMemsetPage) and walk's page-zeroing step are instances at len = 4096.
 
    Two pure facts generalize the page proof away from the fixed 4096:
    [slli32_srli32] (the source's [(unsigned int)n] count truncation is the

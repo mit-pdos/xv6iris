@@ -114,9 +114,9 @@ Specs (interface only — Require the definitional layer, never a proof file):
     plan admits — that is how plic_claim learns its result is a real irq id.
 
 Whole-function proofs (functor/`_body`/seal discipline, design/spec-modules.md):
-`WpSconfCpuid.v` + `LinkCpuid.v`, `WpSconfPlicinit.v` + `LinkPlicinit.v`, and —
-each a `Module …Proof (Cpuid : CPUID)` — `WpSconfPlicinithart.v`,
-`WpSconfPlicClaim.v`, `WpSconfPlicComplete.v` with their `Link*.v`.
+`ProofCpuid.v` + `LinkCpuid.v`, `ProofPlicinit.v` + `LinkPlicinit.v`, and —
+each a `Module …Proof (Cpuid : CPUID)` — `ProofPlicinithart.v`,
+`ProofPlicClaim.v`, `ProofPlicComplete.v` with their `Link*.v`.
 
 Shared leaves added for these proofs (at their proper altitude, NOT in the
 function files): `wp_lui_s_sconf` and `wp_slliw_s_sconf` in `WpSconfAlu.v`,

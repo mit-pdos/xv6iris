@@ -11,7 +11,7 @@ All 19 whole-function proofs: mycpu, holding, push_off/pop_off, acquire,
 release, memset, memset_page, initlock, uart, uartputc, wakeup, wakeup_loop,
 kfree, kalloc, freerange, kinit, walk, mappages, kvmmap. Each gained a
 `Spec<F>.v` (interface + symbol notation) and a one-line `Link<F>.v`; each
-`WpSconf<F>.v` became a sealed functor over its callees' module types.
+`Proof<F>.v` became a sealed functor over its callees' module types.
 
 **Zero function-proof → function-proof build edges remain** (checked with
 `coqdep` over `_CoqProject`): every function proof now depends only on `Spec`
@@ -32,13 +32,13 @@ matched exactly.
 - **After**: the incremental build is green. **A clean-build wall time was not
   measured** — worth doing once to confirm the projection below.
 - Projection from the dependency graph: wall ≈ the ~190 s infrastructure floor
-  plus the single longest function file, `WpSconfWalk` (~112 s) — roughly 310 s.
+  plus the single longest function file, `ProofWalk` (~112 s) — roughly 310 s.
 
 ## Next levers
 
 With the chain gone the build is bounded by its two longest single items:
 
-- **`WpSconfWalk`** (~112 s) — the dominant cost is the five funnel `iApply`s at
+- **`ProofWalk`** (~112 s) — the dominant cost is the five funnel `iApply`s at
   the level-1/0 termination arms (~18–22 s each); see the walk bullets in
   [`../optimization.md`](../optimization.md).
 - **the infrastructure prefix** — `WpIntrBits` (61 s) → `IntrDefs` →

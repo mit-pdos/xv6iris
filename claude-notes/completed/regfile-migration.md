@@ -5,7 +5,7 @@ not a `gmap regidx (mword 64)`. The whole tree is on it — the only mention of 
 old map type left is `RegFile.v`'s own `rf_to_gmap` bridge. This file keeps the
 durable rules for working with that representation; the migration itself is done.
 
-**Why.** The 5–7 s funnel `iApply`s in WpSconfWalk were ~67–80 % register-map
+**Why.** The 5–7 s funnel `iApply`s in ProofWalk were ~67–80 % register-map
 lookup peeling (`peel_reg` walking a deep `<[Regidx k := v]>` gmap chain, one
 ssreflect `rewrite lookup_total_insert{,_ne}` per layer), not proofmode cost
 (`pm_reduce` was 2.5 %). A function rep resolves `M !!! Regidx j` in one
@@ -47,7 +47,7 @@ variant is fast but HANGS on symbolic `add_vec` values.)
 The ONE hazard of transparency: a whole-function proof's **async `Qed`**
 re-reduces the deep update tower whenever a `callee_saved` conjunct was closed by
 bare `reflexivity` / `repeat split` (kernel conversion over the tower × 14
-conjuncts) — pathological (~9 min / >1 GB on `WpSconfWakeup`). **Discharge every
+conjuncts) — pathological (~9 min / >1 GB on `ProofWakeup`). **Discharge every
 such conjunct and every register lookup side goal with `reg_lookup`, never
 `reflexivity` / `repeat split`.** A `reg_lookup` proof term is a vm-cast the
 kernel re-checks cheaply. Watch for this when a `repeat split` silently
@@ -62,7 +62,7 @@ re-measuring (see durable-notes.md profiling).
 
 ## `reg_lookup` vs the local `peel_reg`
 
-`WpSconfWalk.v` and `WpSconfMappages.v` define a local `peel_reg` that peels via
+`ProofWalk.v` and `ProofMappages.v` define a local `peel_reg` that peels via
 the `upd_eq`/`upd_ne` LEMMAS (values stay opaque). These are not leftovers —
 use that variant, not `reg_lookup`, where the target is a **symbolic hit** (e.g.
 `M !!! csp = spr` with `spr = add_vec sp0 …`), since `reg_lookup`'s `vm_compute`

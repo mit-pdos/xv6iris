@@ -80,7 +80,7 @@ Lemma yddec_sw_a5_24 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* the specialized C_SW -> STORE bridge (leaf-friendly Regidx / mword_of_int
-   form; mirror of WpSconfPlicinit.plexec_sw40). *)
+   form; mirror of ProofPlicinit.plexec_sw40). *)
 Lemma yd_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
 Proof. vm_compute. reflexivity. Qed.
 Lemma yd_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).

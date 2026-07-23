@@ -925,7 +925,7 @@ Section WpSconfAlu.
   Qed.
 
 
-  (* srl/ori/andi -- moved here from WpSconfWalk.v (leaves belong in the leaf file). *)
+  (* srl/ori/andi -- moved here from ProofWalk.v (leaves belong in the leaf file). *)
   Lemma wp_srl_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) :
@@ -996,7 +996,7 @@ Section WpSconfAlu.
   Qed.
 
 
-  (* base-width OR -- moved here from WpSconfMappages.v (dedup: leaf belongs in the leaf file). *)
+  (* base-width OR -- moved here from ProofMappages.v (dedup: leaf belongs in the leaf file). *)
   Lemma wp_or_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) :

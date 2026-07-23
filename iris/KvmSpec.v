@@ -61,7 +61,7 @@
       holds with ANY postcondition.  The specs thread a [panic_wp]
       hypothesis of that shape (an eventual lemma: uartputc + a Löb spin
       loop; an axiom in the interim -- as myproc once was, now proven and
-      axiom-free in SpecMyproc/WpSconfMyproc).  With the failure
+      axiom-free in SpecMyproc/ProofMyproc).  With the failure
       arm absorbed by panic, kvmmap's and kvmmake's posts state FULL
       success -- no freelist-size preconditions anywhere; the only
       nonemptiness demand is kvmmake's root-page kalloc (whose null

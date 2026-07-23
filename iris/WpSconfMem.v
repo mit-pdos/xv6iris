@@ -1170,7 +1170,7 @@ Section WpSconfMem.
   Qed.
 
   (* c.sw x0 store (width-4 sibling of wp_sd_zero_s_sconf); moved here from
-     WpSconfInitlock.v -- a store leaf belongs in the leaf file. *)
+     ProofInitlock.v -- a store leaf belongs in the leaf file. *)
   Lemma wp_sw_zero_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 32) :

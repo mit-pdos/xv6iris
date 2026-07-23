@@ -161,7 +161,7 @@ wp_swtch_sconf's ▷ premise.  `proc_lock_res_intro/elim/wakeup` mirror the
 old WpWakeup shapes (wakeup carries the ▷-slot untouched SLEEPING→RUNNABLE).
 
 WpWakeup.v keeps its decode/leaf/loop content but its ProcInv section is
-REPLACED by SchedCtx.v; SpecWakeupLoop/WpSconfWakeupLoop/LinkWakeupLoop get
+REPLACED by SchedCtx.v; SpecWakeupLoop/ProofWakeupLoop/LinkWakeupLoop get
 the parameter rename (`proc_lock_res Rreg Φ γc bsie dq γk pa` →
 `proc_lock_res γ root_ppn Φ γs γk pa`, likewise procs_inv — the old
 Rreg/γc/bsie/dq params DISAPPEAR; γ/root_ppn are already in the loop's
@@ -174,7 +174,7 @@ the proven myproc through wakeup is future work).
 
 All three carry `m !!! Regidx x4 = cid_word`.
 
-- `SpecMyproc.v` (DONE) / `WpSconfMyproc.v` (functor over PUSHOFF) /
+- `SpecMyproc.v` (DONE) / `ProofMyproc.v` (functor over PUSHOFF) /
   `LinkMyproc.v`: `wp_myproc_sconf γ root_ppn Φ m av n noffv intena_old p`;
   premises: tp = cid_word, pop_off's two premises stated at the
   incremented-cell form `noff1` (level/cell correlation ↔ n, positivity),
@@ -187,7 +187,7 @@ All three carry `m !!! Regidx x4 = cid_word`.
   `ld a5,48(pid_lock-form)` address reconciles to `a_cpu_proc cid_word` by
   add_vec-shuffle + vm_compute on constants (both reduce to `cpus` + the
   same sextw-shift term; the shift chain is mycpu_a5's exact form).
-- `SpecSched.v` / `WpSconfSched.v` (functor over MYPROC, HOLDING) /
+- `SpecSched.v` / `ProofSched.v` (functor over MYPROC, HOLDING) /
   `LinkSched.v`: pre: tp = cid_word, j < NPROC, γs!!j = Some γl,
   needs_ctx st = true, ~16 ≤ av; resources: sconf tier + intr_count 1 +
   procs_inv (holding's is_lock) + `proc_held j γl st ch` + `cpu_cells j` +
@@ -197,7 +197,7 @@ All three carry `m !!! Regidx x4 = cid_word`.
   fresh ▷ sched_vc, intr_count 1.  Panic arms refuted by: holding_locked
   (a0=1), noff cell = 1, needs_ctx_not_RUNNING, SIE=0 via intr_count-1
   ghost agreement (wp_csrr_sstatus_s_sconf).
-- `SpecYield.v` / `WpSconfYield.v` (functor over MYPROC, ACQUIRE, SCHED,
+- `SpecYield.v` / `ProofYield.v` (functor over MYPROC, ACQUIRE, SCHED,
   RELEASE) / `LinkYield.v`: pre: tp = cid_word, j < NPROC, γs!!j = Some γl,
   ~20 ≤ av, intr_count 0, procs_inv, `cur_proc (proc_addr j)`, noff cell
   ↦₄ 0, ∃-intena, `p_lkcpu (proc_addr j) ↦₈ zero_reg` (lock free; acquire's
@@ -250,16 +250,16 @@ All three carry `m !!! Regidx x4 = cid_word`.
       Require Export ProcGeom; axiom renamed wp_myproc_sconf_any; loop
       lemmas dropped the dead Rreg/γc/bsie/dq params; the ▷-slot change was
       fully mechanical — no later-strip needed anywhere in wakeup).
-- [x] S3: myproc PROVEN (WpMyprocDecode/WpSconfMyproc/LinkMyproc; no spec
+- [x] S3: myproc PROVEN (WpMyprocDecode/ProofMyproc/LinkMyproc; no spec
       friction; noff_push_pop_id exact with no bounds; load-address
       reconciliation = assoc/comm + one vm_compute pid_lock+48 = cpus).
-- [x] S4: sched PROVEN (WpSchedDecode/WpSconfSched/LinkSched; no spec
+- [x] S4: sched PROVEN (WpSchedDecode/ProofSched/LinkSched; no spec
       friction — the p_sched round trip closed exactly as designed; the
       reconciliation core is `sched_reconcile{,2}` pulling `mycpu_a5
       cid_word` out front so the rest closes by vm_compute on constants;
       arity note: p_sched/cpu_cells/proc_held take only γs-side args,
       procs_inv/proc_lock_res/sched_vc take (γ root_ppn Φ γs)).
-- [x] S5: yield PROVEN (WpYieldDecode/WpSconfYield/LinkYield; no
+- [x] S5: yield PROVEN (WpYieldDecode/ProofYield/LinkYield; no
       Admitted/Axiom).  `own_ctx` currently lives in SpecSched.v — move to
       SwtchCtx.v at the next SwtchCtx touch.
 - [x] S6: full clean build green (make -j16, zero Errors); durable lessons
@@ -267,7 +267,7 @@ All three carry `m !!! Regidx x4 = cid_word`.
       scheduler-chain protocol, ▷-slot lock invariant, cur_proc/cid_word,
       set-chain peel + named-assert callee_saved discipline).
 
-- [x] S7: sleep(chan, lk) PROVEN (SpecSleep/WpSleepDecode/WpSconfSleep/
+- [x] S7: sleep(chan, lk) PROVEN (SpecSleep/WpSleepDecode/ProofSleep/
       LinkSleep; no new axioms).  The condition lock (arbitrary γk/Rk)
       enters held — locked γk ∗ Rk ∗ lk->cpu ↦ mycpu_ret cid_word — and
       exits reacquired; noff runs 1→2→1 around the park (acquire(p->lock)
@@ -285,7 +285,7 @@ All three carry `m !!! Regidx x4 = cid_word`.
       over MYPROC; cur_proc rides in wk_res_sconf.  Full build green.
 
 - [x] S9: the pre-existing `wp_wakeup_prologue_sconf` Admitted
-      (WpSconfWakeup.v, since a4eb750) is Qed'd — wakeup's whole chain is
+      (ProofWakeup.v, since a4eb750) is Qed'd — wakeup's whole chain is
       now axiom-clean (Sail baseline + funext only).  Root cause: the
       migration dropped 12 of the 15 postcondition conjuncts AND a stale
       SpecWakeup.vo masked it; plus `repeat split` closing register
@@ -298,7 +298,7 @@ SwtchCtx.v; consider a `wp_cret_s_zca_r_later_pt` wrapper and a
 swconf-across-iNext helper (see S2b notes); check SpecCpuid (landed
 upstream mid-project) against the tp = cid_word convention; lift the
 frame-bridge + addv arithmetic helpers duplicated across
-WpSconfSched/Yield/Sleep into a shared low-altitude home (StackOwn.v).
+ProofSched/Yield/Sleep into a shared low-altitude home (StackOwn.v).
 
 Future (out of scope): the scheduler() loop proof (consumes p_sched's first
 disjunct / supplies the second), sleep(), wiring cur_proc through wakeup to

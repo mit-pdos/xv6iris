@@ -7,8 +7,8 @@
    the two arguments, one [jal initlock], and the epilogue, differing ONLY in
    the function's entry address and in the three relocated immediates.  So there
    is one proof, and a member instantiates it rather than re-deriving it: see
-   [WpInitlockWrapper.v] for the proof and [WpSconfPrintkinit.v] /
-   [WpSconfTrapinit.v] / [WpSconfFileinit.v] for the three instances.
+   [WpInitlockWrapper.v] for the proof and [ProofPrintkinit.v] /
+   [ProofTrapinit.v] / [ProofFileinit.v] for the three instances.
 
    [ilw_code F ...] is that instruction pattern at entry [F]; a member's
    Wp<F>Decode.v proves [kernel_text -* ilw_code ...] from its own decodes. *)

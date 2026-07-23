@@ -69,11 +69,11 @@ Address gotcha: `release`'s `m` is `Rrel` (not kfree's m), so its post cells are
 keyed on `Rrel!!!{4,10}` — convert with the same facts kfree used to pass them
 IN (`rewrite HRrela0 -Hlk` for cpu; `rewrite HRreltp -Ha0fcpu` for noff/int).
 
-## freerange (DONE, axiom-clean) — WpSconfFreerange.v, over sconf
+## freerange (DONE, axiom-clean) — ProofFreerange.v, over sconf
 
 `wp_freerange_sconf` proved (funext + model platform axioms only).  Also in the
 file: the strengthened `wp_kfree_sconf` post now RETURNS the three per-CPU cells
-(WpSconfKfree.v: `a_cpu ↦₈ 0`, `a_noff ↦₄ noff_ret`, `∃iv a_int ↦₄ iv`); the
+(ProofKfree.v: `a_cpu ↦₈ 0`, `a_noff ↦₄ noff_ret`, `∃iv a_int ↦₄ iv`); the
 decode layer `WpFreerangeDecode.v` (`fri_00..fri_46`, obtained by
 `Eval vm_compute in decode_c_pure/ext_decode` probes); four new leaves
 (`wp_bltu_taken`/`wp_bgeu_fall`/`wp_bgeu_taken`/`wp_cand_s_sconf`).
@@ -105,7 +105,7 @@ Key facts that made it go:
   `kalloc_avail γk on0`, each kfree increments (`avail_inc`), so after freeing
   `#ps` pages the post is `kalloc_avail γk (avail_inc^#ps on0)`.
 
-## kinit (DONE, axiom-clean) — WpSconfKinit.v
+## kinit (DONE, axiom-clean) — ProofKinit.v
 
 `wp_kinit_sconf` proved (funext + model platform axioms only).  Straight-line:
 2-slot c.addi frame (like initlock), `jal initlock` (wp_initlock_sconf), the

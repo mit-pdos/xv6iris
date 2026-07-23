@@ -6,7 +6,7 @@ Require Import RiscvExtras.
 Require Import VcGen.
 Require Import WpIntenaBits.
 Require Import WpGprCsrwCommon.
-(* helper bridges for WpSconfPushOff -- pure bit-vector facts *)
+(* helper bridges for ProofPushOff -- pure bit-vector facts *)
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import IntrDefs.

@@ -48,7 +48,7 @@
    This file proves the separation-logic CORE of those triples -- the ghost
    count lemmas ([kmem_avail_dec]/[kmem_avail_inc]/[kalloc_avail_zero]) and how
    the invariant reassembles ([kmem_res_close]/[kmem_res_push]).  The
-   instruction-level proofs (WpSconfKalloc/WpSconfKfree) open [is_kmem] around
+   instruction-level proofs (ProofKalloc/ProofKfree) open [is_kmem] around
    kalloc/kfree's loads/stores and discharge the triples using these lemmas. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
@@ -445,7 +445,7 @@ Section Kalloc.
 
   (* Intended Hoare triples -- the operation is the kernel's kalloc/kfree
      instruction stream, discharged by the instruction-level proofs
-     (WpSconfKalloc / WpSconfKfree), which open [is_kmem] around their atomic
+     (ProofKalloc / ProofKfree), which open [is_kmem] around their atomic
      loads/stores and apply the transfer lemmas above:
 
        {{ is_kmem γ γk lk fl ∗ kalloc_avail γk on }}

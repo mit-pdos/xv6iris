@@ -901,7 +901,7 @@ Section WpSconfBtype.
   Qed.
 
 
-  (* beqz (x0) fall-through -- moved here from WpSconfWalk.v. *)
+  (* beqz (x0) fall-through -- moved here from ProofWalk.v. *)
   Lemma wp_beqz_x0_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) :

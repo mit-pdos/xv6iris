@@ -114,7 +114,7 @@ thread the reduced avail and discharge their `K'≤·` premise by `ltac:(lia)`.
 
 - `wp_csrci_sstatus_s_sconf` (WpSconfCsr.v) used `n` for the `intr_count`
   nesting level; that binder is RENAMED to `k` (sits BEFORE `m`; the stack
-  `n` sits after `m`). Callers (WpSconfPushOff) must adapt.
+  `n` sits after `m`). Callers (ProofPushOff) must adapt.
 - After a push k / pop k pair the count is `(n - k) + k`, not syntactically
   `n` — restore with `replace ((n - k) + k)%nat with n by lia` (needs k ≤ n).
 - Stale-`.vo` ripple: any file importing IntrDefs but NOT mentioning sie_cap
