@@ -2594,3 +2594,162 @@ Proof.
   intros Hz. rewrite pb_moi_unsigned. apply bv_wrap_small.
   unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616. lia.
 Qed.
+
+(* ===================================================================== *)
+(* pt_nodes: the number of allocated TABLE PAGES in a ptree (kalloc     *)
+(* consumption during walks).  Level-indexed like ptree_own, since the  *)
+(* function-typed [kids] field precludes structural tree recursion      *)
+(* (rwx-kmap kvm-spec worklist (i).1).                                   *)
+(* ===================================================================== *)
+(* generic list helpers *)
+Lemma sum_list_with_ext' {A} (f g : A -> nat) (l : list A) :
+  (forall x, x ∈ l -> f x = g x) -> sum_list_with f l = sum_list_with g l.
+Proof.
+  induction l as [|a l IH]; [reflexivity|]. intro H. cbn.
+  rewrite (H a); [| apply elem_of_cons; left; reflexivity].
+  rewrite IH; [reflexivity|]. intros x Hx. apply H, elem_of_cons; right; exact Hx.
+Qed.
+
+Lemma sum_list_with_0 {A} (l : list A) : sum_list_with (fun _ => 0%nat) l = 0%nat.
+Proof. induction l; [reflexivity | cbn; lia]. Qed.
+
+Lemma sum_list_with_override {A} `{EqDecision A} (g : A -> nat) (l : list A) (x0 : A) (v : nat) :
+  base.NoDup l -> x0 ∈ l ->
+  (sum_list_with (fun k => if decide (k = x0) then v else g k) l + g x0)%nat
+  = (sum_list_with g l + v)%nat.
+Proof.
+  induction l as [|a l IH]; intros Hnd Hin; [by apply elem_of_nil in Hin |].
+  pose proof (@NoDup_cons_1_1 _ _ _ Hnd) as Ha. pose proof (@NoDup_cons_1_2 _ _ _ Hnd) as Hnd'. cbn.
+  destruct (decide (a = x0)) as [->|Hne].
+  - rewrite (sum_list_with_ext' (fun k => if decide (k = x0) then v else g k) g l).
+    2:{ intros k Hk. destruct (decide (k = x0)) as [->|]; [exfalso; exact (Ha Hk) | reflexivity]. }
+    lia.
+  - apply elem_of_cons in Hin as [->|Hin]; [contradiction|].
+    pose proof (IH Hnd' Hin) as HIH. lia.
+Qed.
+
+(* ===== the node count ===== *)
+Fixpoint pt_nodes_lvl (lvl : nat) (t : ptree) {struct lvl} : nat :=
+  S (match lvl with
+     | O => 0%nat
+     | S lvl' => sum_list_with (fun k => match pt_kids t (mword_of_int k) with
+                                         | Some c => pt_nodes_lvl lvl' c
+                                         | None => 0%nat end)
+                               (seqZ 0 512)
+     end).
+
+Definition pt_nodes (t : ptree) : nat := pt_nodes_lvl 2 t.
+
+Definition pt_kid_nodes (lvl : nat) (oc : option ptree) : nat :=
+  match oc with Some c => pt_nodes_lvl lvl c | None => 0%nat end.
+
+Lemma pt_nodes_lvl_S (lvl' : nat) (t : ptree) :
+  pt_nodes_lvl (S lvl') t
+  = S (sum_list_with (fun k => pt_kid_nodes lvl' (pt_kids t (mword_of_int k))) (seqZ 0 512)).
+Proof. reflexivity. Qed.
+
+Lemma pt_nodes_lvl_empty (lvl : nat) (b : mword 44) : pt_nodes_lvl lvl (pt_empty_node b) = 1%nat.
+Proof.
+  destruct lvl; [reflexivity|]. rewrite pt_nodes_lvl_S.
+  rewrite (sum_list_with_ext' _ (fun _ => 0%nat)).
+  - rewrite sum_list_with_0. reflexivity.
+  - intros k _. reflexivity.
+Qed.
+
+Lemma pt_nodes_lvl_kids_ext (lvl : nat) (t t' : ptree) :
+  (forall i : mword 9, pt_kids t i = pt_kids t' i) -> pt_nodes_lvl lvl t = pt_nodes_lvl lvl t'.
+Proof.
+  destruct lvl; [reflexivity|]. intro H. rewrite !pt_nodes_lvl_S. f_equal.
+  apply sum_list_with_ext'. intros k _. unfold pt_kid_nodes. rewrite H. reflexivity.
+Qed.
+
+Lemma pt_nodes_lvl_kids_upd (lvl' : nat) (t : ptree) (i : mword 9) (c : option ptree) :
+  (pt_nodes_lvl (S lvl') (pt_upd_kid t i c) + pt_kid_nodes lvl' (pt_kids t i))%nat
+  = (pt_nodes_lvl (S lvl') t + pt_kid_nodes lvl' c)%nat.
+Proof.
+  rewrite !pt_nodes_lvl_S.
+  pose (F := fun k : Z => pt_kid_nodes lvl' (pt_kids t (mword_of_int k))).
+  assert (Hx0 : (0 <= bv_unsigned i < 512)%Z).
+  { pose proof (bv_unsigned_in_range 9 i) as [Hlo Hhi].
+    match type of Hhi with _ < ?m => assert (m = 512) as EM by (vm_compute; reflexivity) end.
+    rewrite EM in Hhi. split; [exact Hlo | exact Hhi]. }
+  rewrite (sum_list_with_ext'
+             (fun k => pt_kid_nodes lvl' (pt_kids (pt_upd_kid t i c) (mword_of_int k)))
+             (fun k => if decide (k = bv_unsigned i) then pt_kid_nodes lvl' c else F k)
+             (seqZ 0 512)).
+  2:{ intros k Hk. apply elem_of_seqZ in Hk.
+      destruct (decide (mword_of_int k = i)) as [He | Hne].
+      - assert (k = bv_unsigned i) as Hk0.
+        { rewrite <- He. symmetry. apply pt_mword9_unsigned.
+          change (0 + 512)%Z with 512%Z in Hk; exact Hk. }
+        rewrite Hk0. rewrite pt_mword9_id.
+        destruct (decide (bv_unsigned i = bv_unsigned i)) as [_ | Hcon];
+          [| exfalso; apply Hcon; reflexivity].
+        rewrite pt_upd_kid_same. reflexivity.
+      - rewrite decide_False.
+        + unfold F. rewrite (pt_upd_kid_other t i c (mword_of_int k) Hne). reflexivity.
+        + intro Hk0. apply Hne. rewrite Hk0. apply pt_mword9_id. }
+  pose proof (sum_list_with_override F (seqZ 0 512) (bv_unsigned i) (pt_kid_nodes lvl' c)
+                (NoDup_seqZ 0 512)
+                (proj2 (elem_of_seqZ 0 512 (bv_unsigned i))
+                       ltac:(change (0 + 512)%Z with 512%Z; exact Hx0))) as Hov.
+  assert (HFx0 : F (bv_unsigned i) = pt_kid_nodes lvl' (pt_kids t i)).
+  { unfold F. rewrite pt_mword9_id. reflexivity. }
+  rewrite HFx0 in Hov. rewrite !Nat.add_succ_l. rewrite Hov. reflexivity.
+Qed.
+
+Lemma pt_nodes_lvl_upd_kid_eq (lvl' : nat) (t : ptree) (i : mword 9) (c : option ptree) :
+  pt_kid_nodes lvl' c = pt_kid_nodes lvl' (pt_kids t i) ->
+  pt_nodes_lvl (S lvl') (pt_upd_kid t i c) = pt_nodes_lvl (S lvl') t.
+Proof. intro H. pose proof (pt_nodes_lvl_kids_upd lvl' t i c). lia. Qed.
+
+Lemma pt_nodes_lvl_upd_ent (lvl : nat) (t : ptree) (i : mword 9) (w : mword 64) :
+  pt_nodes_lvl lvl (pt_upd_ent t i w) = pt_nodes_lvl lvl t.
+Proof. apply pt_nodes_lvl_kids_ext. intro j. rewrite pt_upd_ent_kids. reflexivity. Qed.
+
+(* fresh-slot graft: +1 at any level that reaches the slot *)
+Lemma pt_nodes_lvl_graft (lvl' : nat) (t : ptree) (i : mword 9) (b : mword 44) :
+  pt_kids t i = None ->
+  pt_nodes_lvl (S lvl') (pt_graft t i b) = S (pt_nodes_lvl (S lvl') t).
+Proof.
+  intro H. unfold pt_graft.
+  pose proof (pt_nodes_lvl_kids_upd lvl' (pt_upd_ent t i (pt_ptr_pte b)) i (Some (pt_empty_node b))) as Hm.
+  rewrite pt_upd_ent_kids in Hm. rewrite H in Hm. cbn [pt_kid_nodes] in Hm.
+  rewrite (pt_nodes_lvl_upd_ent (S lvl') t i (pt_ptr_pte b)) in Hm.
+  cbn [pt_kid_nodes] in Hm. rewrite (pt_nodes_lvl_empty lvl' b) in Hm. lia.
+Qed.
+
+Lemma pt_nodes_graft2 (t : ptree) (vpn : mword 27) (b : mword 44) :
+  pt_kids t (vpn_idx 2 vpn) = None ->
+  pt_nodes (pt_graft2 t vpn b) = S (pt_nodes t).
+Proof.
+  intro H. unfold pt_nodes, pt_graft2.
+  exact (pt_nodes_lvl_graft 1 t (vpn_idx 2 vpn) b H).
+Qed.
+
+Lemma pt_nodes_graft1 (t : ptree) (vpn : mword 27) (b : mword 44) (c1 : ptree) :
+  pt_kids t (vpn_idx 2 vpn) = Some c1 ->
+  pt_kids c1 (vpn_idx 1 vpn) = None ->
+  pt_nodes (pt_graft1 t vpn b) = S (pt_nodes t).
+Proof.
+  intros H1 H0. unfold pt_nodes, pt_graft1. rewrite H1.
+  pose proof (pt_nodes_lvl_kids_upd 1 t (vpn_idx 2 vpn) (Some (pt_graft1_kid c1 vpn b))) as Hm.
+  rewrite H1 in Hm. cbn [pt_kid_nodes] in Hm.
+  assert (Hgk : pt_nodes_lvl 1 (pt_graft1_kid c1 vpn b) = S (pt_nodes_lvl 1 c1))
+    by exact (pt_nodes_lvl_graft 0 c1 (vpn_idx 1 vpn) b H0).
+  rewrite Hgk in Hm. cbn [pt_kid_nodes] in Hm. lia.
+Qed.
+
+Lemma pt_nodes_set_leaf (t : ptree) (vpn : mword 27) (w : mword 64) :
+  pt_nodes (ptree_set_leaf t vpn w) = pt_nodes t.
+Proof.
+  unfold pt_nodes, ptree_set_leaf.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:H1; [| reflexivity].
+  destruct (pt_kids c1 (vpn_idx 1 vpn)) as [c0|] eqn:H0; [| reflexivity].
+  apply (pt_nodes_lvl_upd_kid_eq 1 t (vpn_idx 2 vpn)).
+  rewrite H1. cbn [pt_kid_nodes].
+  apply (pt_nodes_lvl_upd_kid_eq 0 c1 (vpn_idx 1 vpn)).
+  rewrite H0. cbn [pt_kid_nodes].
+  apply pt_nodes_lvl_upd_ent.
+Qed.
+

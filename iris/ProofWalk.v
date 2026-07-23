@@ -87,7 +87,7 @@ Section ProofWalk.
   (* ================================================================= *)
   Lemma wp_walk_epilogue_sconf (γ : gname) (γa : gname) (Φ : mval -> iProp Σ)
       (mm Mf : regfile) (t tf : ptree) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -102,7 +102,9 @@ Section ProofWalk.
     Mf !!! Regidx (mword_of_int 26 : mword 5) = mm !!! Regidx (mword_of_int 26) ->
     Mf !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     ptree_same_rep0 t tf ->
-    ((Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
+    pt_nodes tf = (pt_nodes t + q)%nat ->
+    (((Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
+        /\ avail_zero (avail_sub on q))
      \/ (exists p2 p1 w0, ptree_level0 tf vpn p2 p1 w0
           /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = pt_addr0 p1 vpn)) ->
     sie_cap_gpr γ Mf (K - 8)%nat -∗ cpu_own γ lvl eb p C -∗
@@ -117,22 +119,24 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : regfile) (t' : ptree),
+    kalloc_env γa (avail_sub on q) (mm !!! Regidx (mword_of_int 4)) -∗
+    ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
-      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
+      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
+           /\ avail_zero (avail_sub on g))
         \/ (exists p2 p1 w0,
              ptree_level0 t' vpn p2 p1 w0 /\
              mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va vpn sp0 spr ret_tgt HK Hsp Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hpay.
+    intros va vpn sp0 spr ret_tgt HK Hsp Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hnodes Hpay.
     iIntros "Hcg Hcnt #Htext Hpc
              Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
              Hptree Henv Hcont".
@@ -321,7 +325,8 @@ Section ProofWalk.
               with "Hcg Hpc Hi64 [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iApply ("Hcont" $! E9 tf with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%]").
+    iApply ("Hcont" $! E9 tf q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%]").
+    { exact Hnodes. }
     { (* callee_saved mm E9 *)
       unfold callee_saved.
       split.
@@ -362,7 +367,7 @@ Section ProofWalk.
   (* ================================================================= *)
   Lemma wp_walk_tail_sconf (γ : gname) (γa : gname) (Φ : mval -> iProp Σ)
       (mm Mf : regfile) (t tf : ptree) (b0 : mword 44) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -381,6 +386,7 @@ Section ProofWalk.
     Mf !!! Regidx (mword_of_int 26 : mword 5) = mm !!! Regidx (mword_of_int 26) ->
     Mf !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     ptree_same_rep0 t tf ->
+    pt_nodes tf = (pt_nodes t + q)%nat ->
     (exists p2 p1 w0, ptree_level0 tf vpn p2 p1 w0
        /\ pt_addr0 p1 vpn = u_pte_addr b0 (vpn_idx 0 vpn)) ->
     sie_cap_gpr γ Mf (K - 8)%nat -∗ cpu_own γ lvl eb p C -∗
@@ -395,22 +401,24 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : regfile) (t' : ptree),
+    kalloc_env γa (avail_sub on q) (mm !!! Regidx (mword_of_int 4)) -∗
+    ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
-      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
+      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
+           /\ avail_zero (avail_sub on g))
         \/ (exists p2 p1 w0,
              ptree_level0 t' vpn p2 p1 w0 /\
              mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va vpn sp0 spr ret_tgt HK Hva' Hsp Hs3 Hs1 Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hlvl.
+    intros va vpn sp0 spr ret_tgt HK Hva' Hsp Hs3 Hs1 Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hnodes Hlvl.
     iIntros "Hcg Hcnt #Htext Hpc
              Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
              Hptree Henv Hcont".
@@ -481,7 +489,7 @@ Section ProofWalk.
         by (apply bv_eq; vm_compute; reflexivity).
       exact (walk_slot_addr0 b0 va Hva'). }
     (* funnel into the shared epilogue *)
-    iApply (wp_walk_epilogue_sconf γ γa Φ mm T4 t tf K lvl eb p C HK
+    iApply (wp_walk_epilogue_sconf γ γa Φ mm T4 t tf K lvl eb p C on q HK
               ltac:(rewrite /T4 /T3 /T2 /T1;
                     repeat (rewrite upd_ne; [| reg_neq]);
                     exact Hsp)
@@ -503,7 +511,7 @@ Section ProofWalk.
               ltac:(rewrite /T4 /T3 /T2 /T1;
                     repeat (rewrite upd_ne; [| reg_neq]);
                     exact Hx27)
-              Hsame
+              Hsame Hnodes
               ltac:(destruct Hlvl as (p2 & p1 & w0 & Hl0 & Heq);
                     right; exists p2, p1, w0; split;
                     [exact Hl0 | rewrite HT4a0 Heq; reflexivity])
@@ -685,7 +693,8 @@ Section ProofWalk.
       (mm Mf : regfile) (tf : ptree)
       (tG : mword 44 -> ptree) (N clvl : nat)
       (cellA : mword 64) (w0 : bv 64) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (F : iProp Σ) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (F : iProp Σ)
+      (on : option nat) (g : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -721,7 +730,7 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own N (DfracOwn 1) tf -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
     F -∗
     (* SUCCESS: page allocated, grafted; rejoin the loop at +0x40 *)
     ( ∀ (Mo : regfile) (b : mword 44),
@@ -740,7 +749,7 @@ Section ProofWalk.
       pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
       pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
       ptree_own N (DfracOwn 1) (tG b) -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on (S g)) (mm !!! Regidx (mword_of_int 4)) -∗
       F -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* FAILURE: kalloc returned 0; the tree is untouched, exit at +0x52 *)
@@ -748,6 +757,7 @@ Section ProofWalk.
       ⌜forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
          Mo !!! Regidx c = Mf !!! Regidx c⌝ -∗
       ⌜Mo !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0⌝ -∗
+      ⌜avail_zero (avail_sub on g)⌝ -∗
       sie_cap_gpr γ Mo (K - 8)%nat -∗ cpu_own γ lvl eb p C -∗
       pc_is (mword_of_int (WK + 0x52)) -∗
       pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -759,7 +769,7 @@ Section ProofWalk.
       pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
       pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
       ptree_own N (DfracOwn 1) tf -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
       F -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -789,7 +799,7 @@ Section ProofWalk.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
     (* ---- kalloc() through the env bundle ---- *)
-    iDestruct "Henv" as (γk qcpu) "(%Hqne & %H0ne & #Hlock & #Havail & Hqcpu)".
+    iDestruct "Henv" as (γk qcpu) "(%Hqne & %H0ne & #Hlock & Havail & Hqcpu)".
     assert (HspJ : J !!! Regidx csp_rs1 = spr).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Hsp. }
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
@@ -797,7 +807,7 @@ Section ProofWalk.
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (WK + 0x76) : mword 64) 4)
       by (rewrite /J upd_eq; reflexivity).
     iApply (Kalloc.wp_kalloc_sconf γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J qcpu None lvl eb p C (K - 8)%nat
+              J qcpu (avail_sub on g) lvl eb p C (K - 8)%nat
               ltac:(lia)
               ltac:(rewrite HJ4; exact Hqne)
               ltac:(rewrite HJ4; exact Hcid)
@@ -818,17 +828,16 @@ Section ProofWalk.
         (add_vec zero_reg (mr !!! Regidx (mword_of_int 10 : mword 5)))]> mr).
     assert (Hpp7c : add_vec_int (mword_of_int (WK + 0x7a) : mword 64) 2 = mword_of_int (WK + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7c) in "Hpc".
-    (* rebuild kalloc_env from the returned cpu cell *)
-    iAssert (kalloc_env γa (mm !!! Regidx (mword_of_int 4)))
-      with "[Hcpu2]" as "Henv".
-    { iExists γk, (zero_reg : mword 64).
-      iSplitR. { iPureIntro. exact H0ne. }
-      iSplitR. { iPureIntro. exact H0ne. }
-      iFrame "Hlock". iFrame "Havail".
-      iExact "Hcpu2". }
     (* +0x7c c.beqz a0: the null/success split *)
-    iDestruct "Hkpost" as "[(%Hnull & _ & _) | (%Hpv & Hpage & _)]".
+    iDestruct "Hkpost" as "[(%Hnull & %Hz & Havail2) | (%Hpv & Hpage & Havail2)]".
     { (* ---- NULL: exit through the epilogue with a0 = 0 ---- *)
+      (* rebuild kalloc_env from the returned cpu cell, count unchanged *)
+      iAssert (kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)))
+        with "[Hcpu2 Havail2]" as "Henv".
+      { iExists γk, (zero_reg : mword 64).
+        iSplitR. { iPureIntro. exact H0ne. }
+        iSplitR. { iPureIntro. exact H0ne. }
+        iFrame "Hlock". iFrame "Havail2". iExact "Hcpu2". }
       assert (HN1a0 : N1 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10 : mword 5)).
       { rewrite /N1. rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
       iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (WK + 0x7c)) (mword_of_int 235 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
@@ -843,7 +852,7 @@ Section ProofWalk.
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 235 : mword 8) ('b"0"))))
               = mword_of_int (WK + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt52) in "Hpc".
-      iApply ("Hfail" $! N1 with "[%] [%] Hcg Hcnt Hpc
+      iApply ("Hfail" $! N1 with "[%] [%] [%] Hcg Hcnt Hpc
                 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree Henv HF").
       { intros c Hcs Hc9.
         rewrite /N1. rewrite upd_ne;
@@ -852,8 +861,16 @@ Section ProofWalk.
         rewrite /J. rewrite upd_ne;
           [| intros Habs; injection Habs as Habs2; subst c; vm_compute in Hcs; discriminate].
         reflexivity. }
-      { rewrite HN1a0 Hnull; reflexivity. } }
+      { rewrite HN1a0 Hnull; reflexivity. }
+      { exact Hz. } }
     (* ---- SUCCESS: page p, memset(0), graft, store, rejoin ---- *)
+    (* rebuild kalloc_env from the returned cpu cell, count decremented one step *)
+    iAssert (kalloc_env γa (avail_sub on (S g)) (mm !!! Regidx (mword_of_int 4)))
+      with "[Hcpu2 Havail2]" as "Henv".
+    { rewrite avail_sub_S. iExists γk, (zero_reg : mword 64).
+      iSplitR. { iPureIntro. exact H0ne. }
+      iSplitR. { iPureIntro. exact H0ne. }
+      iFrame "Hlock". iFrame "Havail2". iExact "Hcpu2". }
     iPoseProof (wi_7e with "Htext") as "Hi7e".
     iPoseProof (wi_80 with "Htext") as "Hi80".
     iPoseProof (wi_82 with "Htext") as "Hi82".
@@ -1066,7 +1083,7 @@ Section ProofWalk.
   (* fuel-generic walk loop *)
   Lemma wp_walk_loop_sconf (γ : gname) (γa : gname) (Φ : mval -> iProp Σ)
       (mm Mf : regfile) (t cur : ptree) (L : nat) (w : mword 64) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (g : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn := svpn_of va in
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1103,23 +1120,27 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own L (DfracOwn 1) cur -∗
-    (∀ (curf : ptree),
+    (∀ (curf : ptree) (d : nat),
        ptree_own L (DfracOwn 1) curf -∗
        ⌜ptree_same_rep0_lvl L cur curf⌝ -∗
+       ⌜pt_nodes_lvl L curf = (pt_nodes_lvl L cur + d)%nat⌝ -∗
        (∃ tf : ptree,
           ptree_own 2 (DfracOwn 1) tf ∗
           ⌜ptree_same_rep0 t tf⌝ ∗
+          ⌜pt_nodes tf = (pt_nodes t + g + d)%nat⌝ ∗
           ⌜forall leaf : ptree,
              ptree_leaf_lvl L curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝)) -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : regfile) (t' : ptree),
+    kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+    ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
-      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
+      ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
+           /\ avail_zero (avail_sub on g))
         \/ (exists p2 p1 w0,
              ptree_level0 t' vpn p2 p1 w0 /\
              mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
@@ -1127,7 +1148,7 @@ Section ProofWalk.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros va vpn sp0 spr ret_tgt Hlvl HK Hva.
-    revert Mf cur w. induction L as [| L' IH]; intros Mf cur w HL Hsp Hs3 Hs4 Hs5 Hs1 Hs6 Hx4 Hx23 Hx24 Hx25 Hx26 Hx27 Hverdict Hcid.
+    revert g Mf cur w. induction L as [| L' IH]; intros g Mf cur w HL Hsp Hs3 Hs4 Hs5 Hs1 Hs6 Hx4 Hx23 Hx24 Hx25 Hx26 Hx27 Hverdict Hcid.
     { exfalso; lia. }
     iIntros "Hcg Hcnt #Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Hrestore Henv Hcont".
     iPoseProof (wi_3a with "Htext") as "Hi3a".
@@ -1196,15 +1217,19 @@ Section ProofWalk.
         rewrite (walk_descend_base pte Hv Hp). rewrite Hu. reflexivity. }
       (* descend the ownership; extend the restore *)
       iDestruct (ptree_own_descend L' (DfracOwn 1) cur c (vpn_idx (S L') vpn) Hkids with "Hown") as "[Hownc Hframe]".
-      iAssert (∀ curf : ptree, ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' c curf⌝ -∗
+      iAssert (∀ (curf : ptree) (d : nat), ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' c curf⌝ -∗
+                 ⌜pt_nodes_lvl L' curf = (pt_nodes_lvl L' c + d)%nat⌝ -∗
                  (∃ tf : ptree, ptree_own 2 (DfracOwn 1) tf ∗ ⌜ptree_same_rep0 t tf⌝ ∗
+                    ⌜pt_nodes tf = (pt_nodes t + g + d)%nat⌝ ∗
                     ⌜forall leaf, ptree_leaf_lvl L' curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝))%I
         with "[Hframe Hrestore]" as "Hrestore'".
-      { iIntros (curf) "Hownf %Hsr".
+      { iIntros (curf d) "Hownf %Hsr %Hd".
         iDestruct ("Hframe" $! curf with "Hownf") as "Hup".
-        iDestruct ("Hrestore" $! (pt_upd_kid cur (vpn_idx (S L') vpn) (Some curf)) with "Hup [%]") as (tf) "(Htf & %Hsame & %Hleaf)".
+        iDestruct ("Hrestore" $! (pt_upd_kid cur (vpn_idx (S L') vpn) (Some curf)) d with "Hup [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf)".
         { exact (ptree_same_rep0_lvl_upd_kid L' cur (vpn_idx (S L') vpn) c curf Hkids Hsr). }
-        iExists tf. iFrame "Htf". iSplit; [done|]. iPureIntro. intros leaf Hlf.
+        { pose proof (pt_nodes_lvl_kids_upd L' cur (vpn_idx (S L') vpn) (Some curf)) as Hm.
+          rewrite Hkids in Hm. cbn [pt_kid_nodes] in Hm. lia. }
+        iExists tf. iFrame "Htf". iSplit; [done|]. iSplit; [iPureIntro; exact Hnd|]. iPureIntro. intros leaf Hlf.
         apply Hleaf.
         assert (Hbcf : u_next_base pte = pt_base curf).
         { destruct Hsr as (Hbc & _ & _). rewrite Hu. symmetry. exact Hbc. }
@@ -1252,12 +1277,13 @@ Section ProofWalk.
         iIntros "Hcg Hpc".
         assert (Hpp46 : add_vec_int (mword_of_int (WK + 0x42) : mword 64) 4 = mword_of_int (WK + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp46) in "Hpc".
-        iDestruct ("Hrestore'" $! c with "Hownc [%]") as (tf) "(Htf & %Hsame & %Hleaf)".
+        iDestruct ("Hrestore'" $! c 0%nat with "Hownc [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf)".
         { apply ptree_same_rep0_lvl_refl. }
+        { lia. }
         assert (Hl2 : ptree_leaf_lvl 2 tf vpn c) by (apply Hleaf; reflexivity).
         destruct (ptree_leaf_lvl_2 tf vpn c Hl2) as (p2 & p1 & Hl0tf & Hunb).
-        iApply (wp_walk_tail_sconf γ γa Φ mm M9 t tf (pt_base c) K lvl eb p C HK Hva
-                  HspM9 HM9s3 HM9s1 HM9x4 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hsame
+        iApply (wp_walk_tail_sconf γ γa Φ mm M9 t tf (pt_base c) K lvl eb p C on g HK Hva
+                  HspM9 HM9s3 HM9s1 HM9x4 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hsame ltac:(lia)
                   ltac:(exists p2, p1, (pt_ents c (vpn_idx 0 vpn)); split;
                         [exact Hl0tf | unfold pt_addr0; rewrite Hunb; reflexivity])
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
@@ -1270,7 +1296,7 @@ Section ProofWalk.
         iNext. iIntros "Hcg Hpc".
         assert (Hbk26 : add_vec (mword_of_int (WK + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (WK + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hbk26) in "Hpc".
-        iApply (IH M9 c w ltac:(lia) HspM9 HM9s3 HM9s4 HM9s5 HM9s1 HM9s6 HM9x4 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hnv Hcid
+        iApply (IH g M9 c w ltac:(lia) HspM9 HM9s3 HM9s4 HM9s5 HM9s1 HM9s6 HM9x4 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hnv Hcid
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownc Hrestore' Henv Hcont").
       + exfalso; lia.
     - (* ===================== V=0: allocate under the empty slot ========= *)
@@ -1312,7 +1338,7 @@ Section ProofWalk.
       iCombine "Hrestore Hcont" as "HF".
       iApply (wp_walk_alloc_sconf γ γa Φ mm M6 cur
                 (fun b => pt_graft cur (vpn_idx (S L') vpn) b) (S L') L'
-                (u_pte_addr (pt_base cur) (vpn_idx (S L') vpn)) pte K lvl eb p C _ Hlvl HK
+                (u_pte_addr (pt_base cur) (vpn_idx (S L') vpn)) pte K lvl eb p C _ on g Hlvl HK
                 HspM6 HM6s18 HM6s6 HM6x4 HM6x23 HM6x24 HM6x25 HM6x26 HM6x27
                 (ptree_own_graft L' (DfracOwn 1) cur (vpn_idx (S L') vpn) Hkids)
                 Hcid
@@ -1321,17 +1347,22 @@ Section ProofWalk.
         iIntros (Mo b) "%Hcs %Hb9 Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownb Henv HF".
         iDestruct "HF" as "[Hrestore Hcont]".
         iDestruct (ptree_own_descend L' (DfracOwn 1) (pt_graft cur (vpn_idx (S L') vpn) b) (pt_empty_node b) (vpn_idx (S L') vpn) (pt_graft_kid cur (vpn_idx (S L') vpn) b) with "Hownb") as "[Hownc Hframe]".
-        iAssert (∀ curf : ptree, ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' (pt_empty_node b) curf⌝ -∗
+        iAssert (∀ (curf : ptree) (d : nat), ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' (pt_empty_node b) curf⌝ -∗
+                   ⌜pt_nodes_lvl L' curf = (pt_nodes_lvl L' (pt_empty_node b) + d)%nat⌝ -∗
                    (∃ tf : ptree, ptree_own 2 (DfracOwn 1) tf ∗ ⌜ptree_same_rep0 t tf⌝ ∗
+                      ⌜pt_nodes tf = (pt_nodes t + S g + d)%nat⌝ ∗
                       ⌜forall leaf, ptree_leaf_lvl L' curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝))%I
           with "[Hframe Hrestore]" as "Hrestore'".
-        { iIntros (curf) "Hownf %Hsr".
+        { iIntros (curf d) "Hownf %Hsr %Hd".
           iDestruct ("Hframe" $! curf with "Hownf") as "Hup".
-          iDestruct ("Hrestore" $! (pt_upd_kid (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (Some curf)) with "Hup [%]") as (tf) "(Htf & %Hsame & %Hleaf)".
+          iDestruct ("Hrestore" $! (pt_upd_kid (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (Some curf)) (1 + d)%nat with "Hup [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf)".
           { eapply ptree_same_rep0_lvl_trans.
             - exact (ptree_same_rep0_lvl_graft L' cur (vpn_idx (S L') vpn) b Hkids Hez).
             - exact (ptree_same_rep0_lvl_upd_kid L' (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (pt_empty_node b) curf (pt_graft_kid cur (vpn_idx (S L') vpn) b) Hsr). }
-          iExists tf. iFrame "Htf". iSplit; [done|]. iPureIntro. intros leaf Hlf.
+          { pose proof (pt_nodes_lvl_kids_upd L' (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (Some curf)) as Hm.
+            rewrite (pt_graft_kid cur (vpn_idx (S L') vpn) b) in Hm. cbn [pt_kid_nodes] in Hm.
+            rewrite (pt_nodes_lvl_graft L' cur (vpn_idx (S L') vpn) b Hkids) in Hm. lia. }
+          iExists tf. iFrame "Htf". iSplit; [done|]. iSplit; [iPureIntro; lia|]. iPureIntro. intros leaf Hlf.
           apply Hleaf.
           assert (Hbcf : u_next_base (pt_ents (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn)) = pt_base curf).
           { rewrite pt_graft_ent pt_ptr_pte_base. destruct Hsr as (Hbc & _ & _). rewrite Hbc pt_empty_node_base. reflexivity. }
@@ -1395,12 +1426,13 @@ Section ProofWalk.
           iIntros "Hcg Hpc".
           assert (Hpp46 : add_vec_int (mword_of_int (WK + 0x42) : mword 64) 4 = mword_of_int (WK + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp46) in "Hpc".
-          iDestruct ("Hrestore'" $! (pt_empty_node b) with "Hownc [%]") as (tf) "(Htf & %Hsame & %Hleaf)".
+          iDestruct ("Hrestore'" $! (pt_empty_node b) 0%nat with "Hownc [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf)".
           { apply ptree_same_rep0_lvl_refl. }
+          { lia. }
           assert (Hl2 : ptree_leaf_lvl 2 tf vpn (pt_empty_node b)) by (apply Hleaf; reflexivity).
           destruct (ptree_leaf_lvl_2 tf vpn (pt_empty_node b) Hl2) as (p2 & p1 & Hl0tf & Hunb).
-          iApply (wp_walk_tail_sconf γ γa Φ mm Rb t tf (pt_base (pt_empty_node b)) K lvl eb p C HK Hva
-                    HspRb HRbs3 HRbs1 HRbx4 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27 Hsame
+          iApply (wp_walk_tail_sconf γ γa Φ mm Rb t tf (pt_base (pt_empty_node b)) K lvl eb p C on (S g) HK Hva
+                    HspRb HRbs3 HRbs1 HRbx4 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27 Hsame ltac:(lia)
                     ltac:(exists p2, p1, (pt_ents (pt_empty_node b) (vpn_idx 0 vpn)); split;
                           [exact Hl0tf | unfold pt_addr0; rewrite Hunb; reflexivity])
                     with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
@@ -1413,17 +1445,18 @@ Section ProofWalk.
           iNext. iIntros "Hcg Hpc".
           assert (Hbk26 : add_vec (mword_of_int (WK + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (WK + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hbk26) in "Hpc".
-          iApply (IH Rb (pt_empty_node b) w ltac:(lia) HspRb HRbs3 HRbs4 HRbs5 HRbs1 HRbs6 HRbx4 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27
+          iApply (IH (S g) Rb (pt_empty_node b) w ltac:(lia) HspRb HRbs3 HRbs4 HRbs5 HRbs1 HRbs6 HRbx4 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27
                     (or_intror (ptree_blocks0_lvl_empty _ b vpn))
                     Hcid
                     with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownc Hrestore' Henv Hcont").
         * exfalso; lia.
       + (* ---- Hfail: kalloc returned 0; return 0 through the tail's epilogue ---- *)
-        iIntros (Mo) "%Hcs %Ha0 Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF".
+        iIntros (Mo) "%Hcs %Ha0 %Havz Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF".
         iDestruct "HF" as "[Hrestore Hcont]".
-        iDestruct ("Hrestore" $! cur with "Hown [%]") as (tf) "(Htf & %Hsame & %Hleaf)".
+        iDestruct ("Hrestore" $! cur 0%nat with "Hown [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf)".
         { apply ptree_same_rep0_lvl_refl. }
-        iApply (wp_walk_epilogue_sconf γ γa Φ mm Mo t tf K lvl eb p C HK
+        { lia. }
+        iApply (wp_walk_epilogue_sconf γ γa Φ mm Mo t tf K lvl eb p C on g HK
                   ltac:(rewrite (Hcs csp_rs1 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HspM6)
                   ltac:(rewrite (Hcs (mword_of_int 4) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x4)
                   ltac:(rewrite (Hcs (mword_of_int 23) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x23)
@@ -1431,16 +1464,16 @@ Section ProofWalk.
                   ltac:(rewrite (Hcs (mword_of_int 25) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x25)
                   ltac:(rewrite (Hcs (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x26)
                   ltac:(rewrite (Hcs (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x27)
-                  Hsame
-                  ltac:(left; exact Ha0)
+                  Hsame ltac:(lia)
+                  ltac:(left; split; [exact Ha0 | exact Havz])
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
   Qed.
 
   Lemma wp_walk_sconf (γ : gname) (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ)
-    : wp_walk_sconf_body γ γa Φ mm t m K lvl eb p C.
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
+    : wp_walk_sconf_body γ γa Φ mm t m K lvl eb p C on.
   Proof.
     cbv beta delta [wp_walk_sconf_body].
     intros va vpn ret_tgt Hlvl HK Ha0 Ha2 Hva Hrep Hcid.
@@ -1740,21 +1773,24 @@ Section ProofWalk.
     assert (HW9x27 : W9 !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27)).
     { rewrite /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     (* identity restore: at level 2 the fuel-generic relation IS the whole-tree one *)
-    iAssert (∀ curf : ptree, ptree_own 2 (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl 2 t curf⌝ -∗
+    iAssert (∀ (curf : ptree) (d : nat), ptree_own 2 (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl 2 t curf⌝ -∗
+               ⌜pt_nodes_lvl 2 curf = (pt_nodes_lvl 2 t + d)%nat⌝ -∗
                (∃ tf : ptree, ptree_own 2 (DfracOwn 1) tf ∗ ⌜ptree_same_rep0 t tf⌝ ∗
+                  ⌜pt_nodes tf = (pt_nodes t + 0 + d)%nat⌝ ∗
                   ⌜forall leaf, ptree_leaf_lvl 2 curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝))%I
       as "Hrestore".
-    { iIntros (curf) "Hown %Hsr". iExists curf. iFrame "Hown". iPureIntro. split.
+    { iIntros (curf d) "Hown %Hsr %Hd". iExists curf. iFrame "Hown". iPureIntro. split; [|split].
       - apply ptree_same_rep0_lvl_2. exact Hsr.
+      - unfold pt_nodes. lia.
       - intros leaf Hlf. exact Hlf. }
     destruct (m !! vpn) as [wv|] eqn:Hmv.
     - destruct (proj1 Hrep vpn wv Hmv) as (p2 & p1 & Hmaps).
-      iApply (wp_walk_loop_sconf γ γa Φ mm W9 t t 2 wv K lvl eb p C Hlvl HK Hva' ltac:(lia)
+      iApply (wp_walk_loop_sconf γ γa Φ mm W9 t t 2 wv K lvl eb p C on 0%nat Hlvl HK Hva' ltac:(lia)
                 HspW9 HW9s3 HW9s4' HW9s5 HW9s1 HW9s6 HW9x4 HW9x23 HW9x24 HW9x25 HW9x26 HW9x27
                 (or_introl (ptree_maps_maps_lvl2 t vpn p2 p1 wv Hmaps))
                 Hcid
                 with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree Hrestore Henv Hcont").
-    - iApply (wp_walk_loop_sconf γ γa Φ mm W9 t t 2 (mword_of_int 0) K lvl eb p C Hlvl HK Hva' ltac:(lia)
+    - iApply (wp_walk_loop_sconf γ γa Φ mm W9 t t 2 (mword_of_int 0) K lvl eb p C on 0%nat Hlvl HK Hva' ltac:(lia)
                 HspW9 HW9s3 HW9s4' HW9s5 HW9s1 HW9s6 HW9x4 HW9x23 HW9x24 HW9x25 HW9x26 HW9x27
                 (or_intror (ptree_blocks0_blocks0_lvl2 t vpn (proj2 Hrep vpn Hmv)))
                 Hcid

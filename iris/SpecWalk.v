@@ -30,7 +30,7 @@ Import Defs.
 Notation WK := KernelSyms.walk.
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -48,15 +48,17 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
-  kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-  ( ∀ (mr : regfile) (t' : ptree),
+  kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
+  ( ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+    ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+    kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ptree_same_rep0 t t'⌝ -∗
-    ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
+    ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
+         /\ avail_zero (avail_sub on g))
       \/ (exists p2 p1 w0,
            ptree_level0 t' vpn p2 p1 w0 /\
            mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
@@ -66,6 +68,6 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
 Module Type WALK.
   Parameter wp_walk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_walk_sconf_body γ γa Φ mm t m K lvl eb p C.
+      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat),
+      wp_walk_sconf_body γ γa Φ mm t m K lvl eb p C on.
 End WALK.

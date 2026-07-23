@@ -44,8 +44,8 @@ Section ProofKvmmap.
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ)
-    : wp_kvmmap_sconf_body γ γa Φ mm t m npages perm lvl K eb p C.
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
+    : wp_kvmmap_sconf_body γ γa Φ mm t m npages perm lvl K eb p C on.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -194,7 +194,7 @@ Section ProofKvmmap.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       reflexivity. }
     (* the call *)
-    iApply (Mappages.wp_mappages_sconf γ γa Φ P6 t m npages perm lvl (K - 2)%nat eb p C
+    iApply (Mappages.wp_mappages_sconf γ γa Φ P6 t m npages perm lvl (K - 2)%nat eb p C on
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)
@@ -207,7 +207,7 @@ Section ProofKvmmap.
               ltac:(rewrite HP6tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HP6tp). iExact "Henv". }
-    iIntros (mr t' k) "Hcg Hcnt Hpc Hptree Henv %Hkcs %Hbase' %Hrep' %Hpay".
+    iIntros (mr t' k g) "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpay".
     iEval (rewrite HP6tp) in "Henv".
     (* pc back at +0x12; the frame cells recovered *)
     assert (HP6link : P6 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KM + 0x0e) : mword 64) 4).
@@ -228,7 +228,7 @@ Section ProofKvmmap.
     iPoseProof (ki_16 with "Htext") as "Hi16'".
     iPoseProof (ki_18 with "Htext") as "Hi18'".
     iPoseProof (ki_1a with "Htext") as "Hi1a'".
-    destruct Hpay as [(Hkn & Ha0z) | (Hklt & Ha0m1)].
+    destruct Hpay as [(Hkn & Ha0z) | (Hklt & Ha0m1 & _)].
     2:{ (* ---- mappages FAILED (a0 = -1): bnez TAKEN -> panic ---- *)
       iApply (wp_cbnez_taken_s_sconf γ Φ (mword_of_int (KM + 0x12)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
                 mr (K - 2)%nat
@@ -352,7 +352,8 @@ Section ProofKvmmap.
               with "Hcg Hpc Hi1a' [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iApply ("Hcont" $! E3 t' with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%]").
+    iApply ("Hcont" $! E3 t' g with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%]").
+    { exact Hnodes. }
     { (* callee_saved mm E3 *)
       pose proof (fun c Hc => callee_saved_lookup Hkcs c Hc) as Hcs.
       unfold callee_saved.

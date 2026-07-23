@@ -82,6 +82,37 @@ Definition avail_inc (on : option nat) : option nat :=
 Definition avail_zero (on : option nat) : Prop :=
   match on with Some n => n = 0%nat | None => True end.
 
+(* iterated predecessor: the counter after [k] successful kallocs.  Defined
+   THROUGH [avail_dec] so each step is one [Nat.iter] unfold (walk/mappages
+   per-step accounting); [avail_sub_Some] gives the closed form (kvmmake
+   budget arithmetic). *)
+Definition avail_sub (on : option nat) (k : nat) : option nat :=
+  Nat.iter k avail_dec on.
+
+Lemma avail_sub_0 (on : option nat) : avail_sub on 0%nat = on.
+Proof. reflexivity. Qed.
+Lemma avail_sub_S (on : option nat) (k : nat) :
+  avail_sub on (S k) = avail_dec (avail_sub on k).
+Proof. reflexivity. Qed.
+Lemma avail_sub_None (k : nat) : avail_sub None k = None.
+Proof. induction k as [|k IH]; [reflexivity | rewrite avail_sub_S IH; reflexivity]. Qed.
+Lemma avail_sub_Some (n k : nat) : avail_sub (Some n) k = Some (n - k)%nat.
+Proof.
+  induction k as [|k IH]; [rewrite avail_sub_0; f_equal; lia |].
+  rewrite avail_sub_S IH. unfold avail_dec. f_equal. lia.
+Qed.
+
+(* composing two consumption runs: [a] then [b] more kallocs = [a+b] kallocs.
+   The walk chain uses this to fold per-iteration node growth additively
+   (mappages' loop accumulator) without any nat subtraction. *)
+Lemma avail_sub_add (on : option nat) (a b : nat) :
+  avail_sub on (a + b)%nat = avail_sub (avail_sub on a) b.
+Proof.
+  induction b as [|b IH].
+  - rewrite Nat.add_0_r. reflexivity.
+  - rewrite Nat.add_succ_r. rewrite !avail_sub_S. rewrite IH. reflexivity.
+Qed.
+
 Section Kalloc.
   Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
 

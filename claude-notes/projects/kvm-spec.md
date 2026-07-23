@@ -173,7 +173,91 @@ execution never fills the TLB, kvminithart's first sfence zeroes it anyway, so
 after `csrw satp` the proof builds `tlb_inv_pt` directly from `pt_rep t kvm_map`
 + `tlb_ok_pt_empty`, and the second sfence is an ordinary Sv39 step.
 
-### 2. wp_kvmmake / wp_proc_mapstacks / wp_kvminit (NOT STARTED)
+### 2. wp_kvmmake / wp_proc_mapstacks / wp_kvminit (ACTIVE — directed
+    2026-07-23; the rwx-kmap machinery that blocked this is DONE)
+
+USER DECISIONS (2026-07-23):
+- NO panic arm anywhere in the cone: kalloc's counting ghost guarantees
+  success — the kvminit cone takes a sufficiently large count as a
+  PRECONDITION.  This REQUIRES re-specing the proven walk/mappages/
+  kvmmap chain off the count-unknown steady state (`kalloc_avail γk
+  None`, ret=0 arms) onto counted mode.
+- kvm_map shape is free, BUT the deliverable must PROVE it matches the
+  kpt mapping invariants: pt_rep0 t kvm_map_full ⟹ kpt_tree_spec_gen
+  root M_target t with M_target = kmap_M0 ∪ (64 kstack entries via the
+  existential pas).  KEY FACT easing the bridge: kpt_tree_spec_gen's
+  maps-clause admits ANY A/D variant, and pte_set_ad (mk_pte ppn
+  (kperm_flags pc)) 0 0 IS the A/D-clear perm|V word mappages writes
+  (0x0B text / 0x07 data) — the bridge is pointwise, no A/D massaging.
+
+COUNT-ACCOUNTING DESIGN (decided; REFINED 2026-07-23 — user: "mappages
+will also get invoked later with None", so None is a PERMANENT
+first-class mode, not a compat shim.  ONE parametric spec per function):
+kalloc consumption through the walk chain = TREE NODE GROWTH.  Define
+`pt_nodes t : nat` (allocated table pages in t).  Re-spec:
+- `kalloc_env γ on tp` generalizes over `on : option nat`; counts move
+  by KallocInv's `on_pred` per successful kalloc, i.e. the post carries
+  `kalloc_env γ (on ⊖ (pt_nodes t' - pt_nodes t)) tp` (None-preserving
+  iterated on_pred).
+- VOCABULARY (aligned to KallocInv's existing family — no aliases): the
+  counting primitives are `avail_zero` (True at None, n = 0 at Some n),
+  `avail_dec` (None-preserving pred), and the NEW
+  `avail_sub on k := Nat.iter k avail_dec on` — defined THROUGH
+  avail_dec so each kalloc step is one Nat.iter unfold (recurrences
+  free), with the derived closed form
+  `avail_sub_Some : avail_sub (Some n) k = Some (n - k)` for caller-side
+  budget lia.  `kalloc_post` (KallocInv l.432) already has exactly the
+  two-arm shape (success ⇒ avail_dec, failure ⇒ avail_zero witness).
+- POST-COUNT via EXISTENTIAL GROWTH (revised 2026-07-23 during the
+  ProofMappages rework — the nat-subtraction form was deficient: walk's
+  growth monotonicity `pt_nodes t ≤ pt_nodes t'` is true of the code
+  but NOT derivable from ptree_same_rep0, which is direction-symmetric,
+  so telescoping subtractions across mappages' loop was unprovable):
+  every post in the chain carries
+  `∃ g : nat, ⌜pt_nodes t' = pt_nodes t + g⌝ ∗
+     kalloc_env γ (avail_sub on g) tp`
+  (failure arms: `⌜avail_zero (avail_sub on g)⌝`) — additive, no nat
+  subtraction anywhere, exactly what the walk proof natively produces at
+  each exit; composition uses
+  `avail_sub_add : avail_sub on (a+b) = avail_sub (avail_sub on a) b`
+  (KallocInv, by Nat.iter_add).  UNIFORM across walk/mappages/kvmmap.
+- FAILURE-ARM SHAPE (the key trick — no prospective-growth
+  preconditions on mappages): the ret=0/-1 arm gains
+  `⌜avail_zero (avail_sub on (pt_nodes t' - pt_nodes t))⌝` — a failing
+  kalloc consumes nothing and fires exactly when the counter hit zero
+  after the prior growth.
+  Under None the arm is alive exactly as today; under a counted budget
+  the CALLER refutes it arithmetically: consumed-so-far ≤ total possible
+  growth < initial budget ⟹ on_post = Some (n₀ - consumed) ≠ Some 0.
+  Walk needs no `2 ≤ n` precondition; nobody states 2·npages bounds.
+- kvmmake consumes exactly 1 (root) + node growth of the six regions
+  (l1s: dev/dram/high = 3; l0s: 33 dev + 64 dram + 1 tramp/kstack-shared
+  = 98 tables past the root ⟹ 102 total — CONFIRM in proof) and
+  proc_mapstacks 64 stack pages ⟹ kvminit precondition
+  `K_kvminit ≤ n` with K_kvminit = 166 (constant, spec-preference form;
+  pin exact value during the kvmmake witness computation); its proof
+  refutes every inner failure arm from the budget arithmetic.
+Do NOT use loose 2-per-page preconditions (2·31977 for the data region
+alone exceeds the ~32.7k pages kinit provides).
+
+Worklist order: (i) DONE 2026-07-23, full build green 301/301 — the
+whole counted tier: pt_nodes layer (PtBuild), avail_sub/avail_sub_add
+(KallocInv), the ∃g-form spec surface (KvmSpec + Spec{Walk,Mappages,
+Kvmmap}), and the re-proofs (Proof{Walk,Mappages,Kvmmap}; walk's kalloc
+passes the live count, mappages' loop invariant is the additive
+consumed-form composed via avail_sub_add; a new word_pointsto_ram
+helper refutes the slot-null sub-case: an owned RAM cell address is
+nonzero, so mappages' -1 return can only be kalloc exhaustion).
+(ii) constants + kvm_map literal +
+the M-correspondence bridge lemma; (iii) proc_mapstacks/kvmmake/kvminit
+specs (KvmSpec.v) — sign-off shape below is superseded by the above;
+OPEN at (iii): kvmmap keeps panic_wp for None mode (the panic branch is
+xv6 code); decide then whether the counted cone gets a derived
+kvmmap-without-panic_wp form (budget refutes the -1 arm, branch proven
+unreachable) so kvminit's spec is panic_wp-free; (iv) decode catalogs;
+(v) whole-function proofs.
+
+### 2-ORIG. wp_kvmmake / wp_proc_mapstacks / wp_kvminit (original checkpoint)
 
 A large, design-heavy NEW LAYER; walk + mappages + kvmmap are the building
 blocks.  Full design checkpoint:

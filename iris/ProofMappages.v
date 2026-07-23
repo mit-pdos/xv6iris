@@ -73,6 +73,21 @@ Section ProofMappages.
     rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
   Qed.
 
+  (* an owned word cell sits in RAM ([ram_base = 0x80000000]); pure conclusion,
+     so [iDestruct ... as %H] keeps the cell.  Used to rule out a NULL (=0) walk
+     result on the level0 (success) arm -- addr 0 is not RAM, so the return
+     address of a genuine slot is nonzero and the -1 return can only come from
+     kalloc exhaustion (the avail_zero witness). *)
+  Lemma word_pointsto_ram (a : mword 64) (dq : dfrac) (w : mword 64) :
+    word_pointsto a dq w ⊢ ⌜addr_is_ram a⌝.
+  Proof.
+    iIntros "Hw". iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "Hb0".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iDestruct (mem_ram with "Hb0") as %Hram0.
+    iPureIntro. exact (addr_is_ram_pa0 a Hram0).
+  Qed.
+
 
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x9c..+0xb0) -- sconf mirror.                 *)
@@ -81,7 +96,7 @@ Section ProofMappages.
       (Φ : mval -> iProp Σ)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
     let ppn0 := (autocast (T := mword) (subrange_vec_dec (mm !!! Regidx (mword_of_int 13)) 55 12) : mword 44) in
@@ -97,8 +112,10 @@ Section ProofMappages.
     Mf !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     pt_base tf = pt_base t ->
     pt_rep0 tf (pt_insert_run m vpn0 ppn0 perm k) ->
+    pt_nodes tf = (pt_nodes t + q)%nat ->
     ((k = npages /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
-     \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1))) ->
+     \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1)
+         /\ avail_zero (avail_sub on q))) ->
     sie_cap_gpr γ Mf (K - 10)%nat -∗ cpu_own γ lvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (MP + 0x9c)) -∗
@@ -113,22 +130,24 @@ Section ProofMappages.
     pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : regfile) (t' : ptree) (k' : nat),
+    kalloc_env γa (avail_sub on q) (mm !!! Regidx (mword_of_int 4)) -∗
+    ( ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
       ⌜ (k' = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
         \/ ((k' < npages)%nat /\
-            mr !!! Regidx (mword_of_int 10) = mword_of_int (-1)) ⌝ -∗
+            mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
+            avail_zero (avail_sub on g)) ⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va vpn0 ppn0 sp0 spr ret_tgt HK Hsp Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hpay.
+    intros va vpn0 ppn0 sp0 spr ret_tgt HK Hsp Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hpay.
     iIntros "Hcg Hcnt #Htext Hpc
              Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
              Hptree Henv Hcont".
@@ -340,7 +359,8 @@ Section ProofMappages.
     { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
       repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
-    iApply ("Hcont" $! E10 tf k with "Hcg Hcnt Hpc Hptree Henv [%] [%] [%] [%]").
+    iApply ("Hcont" $! E10 tf k q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%]").
+    { exact Hnodes. }
     { (* callee_saved mm E10 *)
       unfold callee_saved.
       split.
@@ -380,6 +400,8 @@ Section ProofMappages.
     { exact Hrep. }
     { rewrite HE10a0. exact Hpay. }
   Qed.
+  (* NB: with g := q the payload/env forms coincide with the epilogue's;
+     Hpay already carries [avail_zero (avail_sub on q)] on the -1 arm. *)
 
   (* ================================================================= *)
   (* THE LOOP (+0x3e..+0x68): induction on the REMAINING page count.    *)
@@ -388,9 +410,9 @@ Section ProofMappages.
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ)
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
       (rem : nat) :
-    forall (k : nat) (Mk : regfile) (tk : ptree),
+    forall (k : nat) (Mk : regfile) (tk : ptree) (consumed : nat),
     let va := mm !!! Regidx (mword_of_int 11) in
     let pa := mm !!! Regidx (mword_of_int 13) in
     let vpn0 := svpn_of va in
@@ -427,6 +449,7 @@ Section ProofMappages.
     Mk !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     pt_base tk = pt_base t ->
     pt_rep0 tk (pt_insert_run m vpn0 ppn0 perm k) ->
+    pt_nodes tk = (pt_nodes t + consumed)%nat ->
     mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
     sie_cap_gpr γ Mk (K - 10)%nat -∗ cpu_own γ lvl eb p C -∗
     kernel_text -∗
@@ -442,24 +465,26 @@ Section ProofMappages.
     pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
-    kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
-    ( ∀ (mr : regfile) (t' : ptree) (k' : nat),
+    kalloc_env γa (avail_sub on consumed) (mm !!! Regidx (mword_of_int 4)) -∗
+    ( ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
+      ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
       ⌜ (k' = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
         \/ ((k' < npages)%nat /\
-            mr !!! Regidx (mword_of_int 10) = mword_of_int (-1)) ⌝ -∗
+            mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
+            avail_zero (avail_sub on g)) ⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    induction rem as [| rem' IH]; intros k Mk tk va pa vpn0 ppn0 sp0 spr ret_tgt
+    induction rem as [| rem' IH]; intros k Mk tk consumed va pa vpn0 ppn0 sp0 spr ret_tgt
       Hlvl HK Hkrem Hrem Hroot Hvaal Hpaal Hpermreg Hpok Hvab Hpab Hnone
-      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hcid;
+      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hcid;
       [lia |].
     iIntros "Hcg Hcnt #Htext Hpc
              Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -560,7 +585,7 @@ Section ProofMappages.
     assert (Hvpnk : svpn_of (add_vec va (mword_of_int (4096 * Z.of_nat k))) = vpn_at vpn0 k)
       by (apply svpn_of_run; lia).
     (* the walk call *)
-    iApply (Walk.wp_walk_sconf γ γa Φ W4 tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p C
+    iApply (Walk.wp_walk_sconf γ γa Φ W4 tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p C (avail_sub on consumed)
               Hlvl ltac:(lia)
               HW4a0 HW4a2
               ltac:(rewrite HW4a1; rewrite uint_unsigned; rewrite Hvak_u; lia)
@@ -568,8 +593,10 @@ Section ProofMappages.
               ltac:(rewrite HW4tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HW4tp). iExact "Henv". }
-    iIntros (mr t') "Hcg Hcnt Hpc Hptree Henv %Hkcs %Hsame %Hpay".
+    iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hg Henv %Hkcs %Hsame %Hpay".
     iEval (rewrite HW4tp) in "Henv".
+    iEval (rewrite <- (avail_sub_add on consumed g)) in "Henv".
+    assert (Ht'nodes : pt_nodes t' = (pt_nodes t + (consumed + g))%nat) by lia.
     (* pc back at +0x48 *)
     assert (Hlink : W4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (MP + 0x44) : mword 64) 4).
     { rewrite /W4 upd_eq. reflexivity. }
@@ -646,20 +673,10 @@ Section ProofMappages.
     assert (Hrep' : pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k))
       by (exact (pt_rep0_same tk t' _ Hsame Hrep)).
     rewrite HW4a1 in Hpay. rewrite Hvpnk in Hpay.
-    (* massage the payload into ZERO vs NONZERO-slot *)
-    assert (Hzcase :
-        mr !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0
-        \/ (exists p2 p1 w0,
-             ptree_level0 t' (vpn_at vpn0 k) p2 p1 w0 /\
-             mr !!! Regidx (mword_of_int 10 : mword 5) = pt_addr0 p1 (vpn_at vpn0 k) /\
-             mr !!! Regidx (mword_of_int 10 : mword 5) <> mword_of_int 0)).
-    { destruct Hpay as [Hz | (p2 & p1 & w0 & Hl0 & Ha0v)]; [left; exact Hz |].
-      destruct (decide (mr !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0))
-        as [He | Hne]; [left; exact He |].
-      right. exists p2, p1, w0. auto. }
-    clear Hpay.
-    destruct Hzcase as [Ha0z | (p2 & p1 & w0 & Hl0 & Ha0v & Ha0nz)].
-    { (* ---- walk returned NULL: ret -1 ---- *)
+    (* the walk returns either NULL (a0=0, kalloc exhausted => avail_zero) or
+       the L0 slot address; the latter is an OWNED RAM cell, hence nonzero. *)
+    destruct Hpay as [(Ha0z & Havz) | (p2 & p1 & w0 & Hl0 & Ha0v)].
+    { (* ---- walk returned NULL: ret -1 (avail_zero) ---- *)
       iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (MP + 0x48)) (mword_of_int 41 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
                 mr (K - 10)%nat
                 ltac:(vm_compute; reflexivity)
@@ -682,22 +699,28 @@ Section ProofMappages.
           (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> mr).
       assert (Hpp9c : add_vec_int (mword_of_int (MP + 0x9a) : mword 64) 2 = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp9c) in "Hpc".
-      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t t' m npages k perm K lvl eb p C HK
+      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t t' m npages k perm K lvl eb p C on (consumed + g)%nat HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrsp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrtp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr24)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr25)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr26)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr27)
-                Hbase' Hrep'
-                ltac:(right; split; [lia |];
-                      rewrite /F1 upd_eq;
-                      apply bv_eq; vm_compute; reflexivity)
+                Hbase' Hrep' Ht'nodes
+                ltac:(right; split; [lia |]; split;
+                      [ rewrite /F1 upd_eq; apply bv_eq; vm_compute; reflexivity
+                      | rewrite (avail_sub_add on consumed g); exact Havz ])
                 with "Hcg Hcnt Htext Hpc
                       Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
                       Hptree Henv Hcont").
     }
     (* ---- walk returned the L0 slot: store the leaf ---- *)
+    iDestruct (ptree_own_level0_upd (DfracOwn 1) t' (vpn_at vpn0 k) p2 p1 w0 Hl0 with "Hptree") as "[Hcell Hupd]".
+    iDestruct (word_pointsto_ram with "Hcell") as %Hslotram.
+    assert (Ha0nz : mr !!! Regidx (mword_of_int 10 : mword 5) <> mword_of_int 0).
+    { rewrite Ha0v. intro Heq. rewrite Heq in Hslotram.
+      unfold addr_is_ram in Hslotram. destruct Hslotram as [Hlo _].
+      apply (proj2 (Z.leb_le _ _)) in Hlo. vm_compute in Hlo. discriminate. }
     assert (Hw0z : w0 = mword_of_int 0).
     { apply (pt_rep0_level0_zero t' (pt_insert_run m vpn0 ppn0 perm k) (vpn_at vpn0 k) p2 p1 w0 Hrep').
       - apply pt_insert_run_lookup_None; [lia | lia |].
@@ -714,8 +737,7 @@ Section ProofMappages.
     iIntros "Hcg Hpc".
     assert (Hpp4a : add_vec_int (mword_of_int (MP + 0x48) : mword 64) 2 = mword_of_int (MP + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4a) in "Hpc".
-    (* the remap-check cell *)
-    iDestruct (ptree_own_level0_upd (DfracOwn 1) t' (vpn_at vpn0 k) p2 p1 w0 Hl0 with "Hptree") as "[Hcell Hupd]".
+    (* the remap-check cell (Hcell/Hupd already extracted above to prove a0<>0) *)
     assert (Hea0 : forall X : mword 64,
         add_vec X (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))) = X).
     { intro X.
@@ -861,6 +883,8 @@ Section ProofMappages.
     set (tS := ptree_set_leaf t' (vpn_at vpn0 k) (mappages_pte ppn0 perm k)).
     assert (HbaseS : pt_base tS = pt_base t).
     { rewrite /tS ptree_set_leaf_base. exact Hbase'. }
+    assert (HnodesS : pt_nodes tS = (pt_nodes t + (consumed + g))%nat).
+    { rewrite /tS pt_nodes_set_leaf. exact Ht'nodes. }
     assert (HrepS : pt_rep0 tS (pt_insert_run m vpn0 ppn0 perm (S k))).
     { destruct (mappages_pte_class (add_vec_int ppn0 (Z.of_nat k)) perm Hpok) as (Hv & Hlf & Hnap & Hpb).
       cbn [pt_insert_run].
@@ -909,7 +933,7 @@ Section ProofMappages.
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
               = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt9c) in "Hpc".
-      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t tS m npages (S k) perm K lvl eb p C HK
+      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t tS m npages (S k) perm K lvl eb p C on (consumed + g)%nat HK
                 ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
                       repeat (rewrite upd_ne; [| reg_neq]); exact Hmrsp)
                 ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
@@ -922,7 +946,7 @@ Section ProofMappages.
                       repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
                 ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
                       repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
-                HbaseS HrepS
+                HbaseS HrepS HnodesS
                 ltac:(left; split; [lia |];
                       rewrite /F1 upd_eq;
                       apply bv_eq; vm_compute; reflexivity)
@@ -979,7 +1003,7 @@ Section ProofMappages.
       repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
     (* loop *)
-    iApply (IH (S k) M12 tS
+    iApply (IH (S k) M12 tS (consumed + g)%nat
               Hlvl HK ltac:(lia) ltac:(lia) Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
@@ -1007,7 +1031,7 @@ Section ProofMappages.
                     repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
               ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
                     repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
-              HbaseS HrepS Hcid
+              HbaseS HrepS HnodesS Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
                     Hptree Henv Hcont").
@@ -1018,8 +1042,8 @@ Section ProofMappages.
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ)
-    : wp_mappages_sconf_body γ γa Φ mm t m npages perm lvl K eb p C.
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
+    : wp_mappages_sconf_body γ γa Φ mm t m npages perm lvl K eb p C on.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -1403,7 +1427,7 @@ Section ProofMappages.
       repeat (rewrite upd_ne; [| reg_neq]).
       rewrite add_vec_zero_l.
       rewrite mappages_va0. reflexivity. }
-    iApply (wp_mappages_loop_sconf γ γa Φ mm t m npages perm K lvl eb p C npages 0%nat P13 t
+    iApply (wp_mappages_loop_sconf γ γa Φ mm t m npages perm K lvl eb p C on npages 0%nat P13 t 0%nat
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
@@ -1439,7 +1463,7 @@ Section ProofMappages.
               ltac:(peel_reg)
               ltac:(peel_reg)
               ltac:(peel_reg)
-              eq_refl Hrep Hcid
+              eq_refl Hrep ltac:(lia) Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 [S10]
                     Hptree Henv Hcont").

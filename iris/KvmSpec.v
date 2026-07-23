@@ -118,13 +118,13 @@ Section KvmSpecs.
      ghost is the persistent sealed witness [kalloc_avail γk None] (count
      unknown, kalloc may fail), so every kalloc call threads [on := None] and
      the bundle trivially re-establishes. *)
-  Definition kalloc_env (γ : gname) (tp : mword 64) : iProp Σ :=
+  Definition kalloc_env (γ : gname) (on : option nat) (tp : mword 64) : iProp Σ :=
     (∃ (γk : gname * gname) (qcpu : mword 64),
       ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
       ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
-      kalloc_avail γk None ∗
+      kalloc_avail γk on ∗
       add_vec (mword_of_int KernelSyms.kmem : mword 64)
         (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈ qcpu)%I.
 
@@ -145,7 +145,7 @@ Section KvmSpecs.
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
        (eb : bool) (p : mword 64) (C : iProp Σ)
        (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (n : nat),
+       (m : gmap (mword 27) (mword 64)) (n : nat) (on : option nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let vpn := svpn_of va in
       ⌜(22 <= n)%nat⌝ -∗
@@ -159,19 +159,21 @@ Section KvmSpecs.
       pc_is (mword_of_int KernelSyms.walk) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
       cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree),
+      ( ∀ (mr : regfile) (t' : ptree) (g : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
-        kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+        kalloc_env γ (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
         cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜ptree_same_rep0 t t'⌝ -∗
-        ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)   (* alloc failed *)
+        ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0   (* alloc failed *)
+             /\ avail_zero (avail_sub on g))
           \/ (exists p2 p1 w0,
                ptree_level0 t' vpn p2 p1 w0 /\
                mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
@@ -190,7 +192,7 @@ Section KvmSpecs.
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
        (eb : bool) (p : mword 64) (C : iProp Σ)
        (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
+       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat) (on : option nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let pa := mm !!! Regidx (mword_of_int 13) in
       let vpn0 := svpn_of va in
@@ -213,22 +215,24 @@ Section KvmSpecs.
       pc_is (mword_of_int KernelSyms.mappages) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
       cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree) (k : nat),
+      ( ∀ (mr : regfile) (t' : ptree) (k : nat) (g : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
-        kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+        kalloc_env γ (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
         cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
         ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
         ⌜ (k = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
           \/ ((k < npages)%nat /\
-              mr !!! Regidx (mword_of_int 10) = mword_of_int (-1)) ⌝ -∗
+              mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
+              avail_zero (avail_sub on g)) ⌝ -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
       WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
@@ -251,7 +255,7 @@ Section KvmSpecs.
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
        (eb : bool) (p : mword 64) (C : iProp Σ)
        (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
+       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat) (on : option nat),
       let va := mm !!! Regidx (mword_of_int 11) in
       let pa := mm !!! Regidx (mword_of_int 12) in
       let vpn0 := svpn_of va in
@@ -275,15 +279,16 @@ Section KvmSpecs.
       pc_is (mword_of_int KernelSyms.kvmmap) -∗
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
       cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree),
+      ( ∀ (mr : regfile) (t' : ptree) (g : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
         pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
-        kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
+        kalloc_env γ (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
         cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
