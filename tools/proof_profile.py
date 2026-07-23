@@ -41,17 +41,24 @@ from collections import defaultdict
 # ---------------------------------------------------------------------------
 
 def parse_build_log(path):
-    """`Foo.vo (real: 12.34, user: .., sys: .., mem: N ko)` -> {'Foo': 12.34}."""
-    real = {}
+    """`Foo.vo (real: 12.34, user: 11.9, ..)` -> (real, cpu) dicts.
+
+    real = wall clock (%e): what the file took start-to-finish, INCLUDING time
+    lost to the -j build's concurrent compiles / other runner load -- so it is
+    not comparable across runs.  cpu = user+sys (%U+%S): the actual computation,
+    which contention adds *wait* to but not CPU, so it is load-robust and the
+    honest measure of a file's intrinsic cost."""
+    real, cpu = {}, {}
     if not path or not os.path.exists(path):
-        return real
-    pat = re.compile(r'(\S+)\.vo \(real: ([\d.]+),')
+        return real, cpu
+    pat = re.compile(r'(\S+)\.vo \(real: ([\d.]+), user: ([\d.]+), sys: ([\d.]+),')
     with open(path, errors="replace") as f:
         for line in f:
             m = pat.search(line)
             if m and '/' not in m.group(1):
                 real[m.group(1)] = float(m.group(2))
-    return real
+                cpu[m.group(1)] = float(m.group(3)) + float(m.group(4))
+    return real, cpu
 
 
 def parse_deps(path):
@@ -355,7 +362,7 @@ def main():
     deps_path = args.deps or os.path.join(iris, ".CoqMakefile.d")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    real = parse_build_log(args.build_log)
+    real, cpu = parse_build_log(args.build_log)
     deps, targets = parse_deps(deps_path)
     stmts, n_timing = parse_timings(iris)
 
@@ -366,9 +373,11 @@ def main():
 
     intervals, span = build_timeline(iris, real)
     steps = concurrency_steps(intervals)
-    sigma_cpu = sum(real.values())
+    total_wall = sum(real.values())   # Σ of per-file wall (the parallel work)
+    total_cpu = sum(cpu.values())     # Σ of per-file CPU (user+sys)
     maxpar = max([c for _, c in steps], default=0)
-    avgpar = (sigma_cpu / span) if span > 0 else 0.0
+    # avg parallelism = total parallel work / wall span -> uses wall, not CPU
+    avgpar = (total_wall / span) if span > 0 else 0.0
     # wall spent effectively serial (<=1 compile in flight)
     serial = 0.0
     for i in range(len(steps)):
@@ -379,16 +388,14 @@ def main():
 
     linecache = {}
     stmts.sort(reverse=True)
-    byfile_stmt = defaultdict(float)
-    for secs, fbase, _, _ in stmts:
-        byfile_stmt[fbase] += secs
 
     # ---- report.md (the step-summary view) ----
     md = []
     md.append("## Proof build profile (iris/)\n")
     md.append(
-        f"- **wall span** {span:.0f}s  ·  **ΣCPU** {sigma_cpu:.0f}s  ·  "
-        f"**critical path** {crit_len:.0f}s ({len(chain)} files)\n"
+        f"- **wall span** {span:.0f}s  ·  **ΣCPU** {total_cpu:.0f}s  ·  "
+        f"**Σwall** {total_wall:.0f}s  ·  "
+        f"**critical path** {crit_len:.0f}s, wall-weighted ({len(chain)} files)\n"
         f"- **avg parallelism** {avgpar:.1f}×  ·  **peak** {maxpar}×"
         + (f" (of -j{args.jobs})" if args.jobs else "")
         + f"  ·  **~{serial:.0f}s effectively serial** (≤1 compile in flight)\n"
@@ -403,14 +410,17 @@ def main():
     md.append(md_table(["secs", "location", "statement"], rows)
               if rows else "_no `.v.timing` files found (build with `TIMING=1`)_")
 
-    md.append("\n### Most expensive files (wall, incl. async Qed)\n")
+    md.append("\n### Most expensive files\n")
+    md.append("Ranked by **CPU** (user+sys) — load-robust and comparable across "
+              "runs.  `wall` is this run's start-to-finish incl. `-j` contention, "
+              "so it is not comparable between runs; it is what the file cost the "
+              "critical path *this* time.\n")
     onpath = set(chain)
     rows = []
-    for name, dur in sorted(real.items(), key=lambda x: -x[1])[:args.top]:
-        rows.append([f"{dur:.1f}", f"`{name}`",
-                     f"{byfile_stmt.get(name, 0.0):.1f}",
+    for name, c in sorted(cpu.items(), key=lambda x: -x[1])[:args.top]:
+        rows.append([f"{c:.1f}", f"{real.get(name, 0.0):.1f}", f"`{name}`",
                      "●" if name in onpath else ""])
-    md.append(md_table(["wall", "file", "tactic-Σ", "crit"], rows)
+    md.append(md_table(["cpu", "wall", "file", "crit"], rows)
               if rows else "_no per-file times (build with `TIMED=1`)_")
 
     md.append("\n### Longest dependency chain (critical path)\n")
@@ -449,17 +459,17 @@ def main():
 
     # ---- report-full.txt (everything, for the artifact) ----
     with open(os.path.join(args.out_dir, "report-full.txt"), "w") as f:
-        f.write(f"wall span {span:.1f}s  ΣCPU {sigma_cpu:.1f}s  "
-                f"critical path {crit_len:.1f}s  "
+        f.write(f"wall span {span:.1f}s  ΣCPU {total_cpu:.1f}s  "
+                f"Σwall {total_wall:.1f}s  critical path {crit_len:.1f}s (wall)  "
                 f"peak {maxpar}x  avg {avgpar:.2f}x  serial ~{serial:.1f}s\n\n")
         f.write(f"== top {min(1000, len(stmts))} statements by cost "
                 f"(of {len(stmts)}) ==\n")
         for secs, fbase, off, cmd in stmts[:1000]:
             ln = offset_to_line(iris, linecache, fbase, off)
             f.write(f"{secs:8.3f}  {fbase}.v:{ln:<6} {snippet(cmd, 80)}\n")
-        f.write("\n== ALL files by wall ==\n")
-        for name, dur in sorted(real.items(), key=lambda x: -x[1]):
-            f.write(f"{dur:8.2f}  {name}"
+        f.write("\n== ALL files by cpu (user+sys) | wall ==\n")
+        for name, c in sorted(cpu.items(), key=lambda x: -x[1]):
+            f.write(f"cpu {c:8.2f}  wall {real.get(name, 0.0):8.2f}  {name}"
                     f"{'  [crit]' if name in onpath else ''}\n")
         f.write("\n== critical path ==\n")
         cum = 0.0
