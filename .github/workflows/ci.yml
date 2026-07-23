@@ -114,7 +114,10 @@ jobs:
       # Consumes the TIMED log + the .v.timing files + coqdep's .CoqMakefile.d +
       # the .vo mtimes to report the most expensive statements and files, the
       # longest require chain (the critical path — the build is critical-path
-      # bound, so this is the real floor), and a parallelism-over-time plot.
+      # bound, so this is the real floor), and an inline parallelism-over-time
+      # chart.  The whole report is written straight to the job's step summary
+      # (GitHub sanitizes raw SVG/images out of the summary, so the chart is
+      # drawn in Unicode); no artifact upload -- everything is on the run page.
       # Stdlib-only Python; `continue-on-error` so a profiler hiccup never fails
       # an otherwise-green build.  Runs only on a successful build (no `if:`),
       # so the timing data is complete.
@@ -129,17 +132,6 @@ jobs:
           # Tidy the workspace so the .v.timing files don't linger for later
           # steps (checkout wipes them next run regardless, but be explicit).
           rm -f iris/*.v.timing
-
-      - name: Upload build profile
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: proof-build-profile
-          path: |
-            ${{ runner.temp }}/profile/parallelism.svg
-            ${{ runner.temp }}/profile/report-full.txt
-            ${{ runner.temp }}/profile/report.md
-          if-no-files-found: ignore
 
       # ---- 4. Dead-code report (iris/) ----
       # Informational only: find_dead.py reads the .glob files the step above

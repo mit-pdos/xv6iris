@@ -437,7 +437,7 @@ def main():
     md.append("```\n" + render_ascii(steps, span, jobs=args.jobs) + "\n```")
     md.append(f"~{serial:.0f}s of the {span:.0f}s wall runs ≤1 compile in flight "
               "(the serial tail no amount of `-j` can shrink). "
-              "Higher-res **parallelism.svg** is in the build artifact.\n")
+              "A standalone `parallelism.svg` is also written to the output dir.\n")
 
     report_md = "\n".join(md) + "\n"
     with open(os.path.join(args.out_dir, "report.md"), "w") as f:
