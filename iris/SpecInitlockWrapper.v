@@ -71,11 +71,10 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
     (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) :=
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (4 <= K)%nat ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (* the function's own code is 2-byte aligned, so the jalr back from initlock
      lands exactly on the epilogue at F+0x1c *)
   eq_vec (access_vec_dec (mword_of_int (F + 0x1c) : mword 64) 0) ('b"0") = true ->

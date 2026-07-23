@@ -68,10 +68,9 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
     (γ : gname) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) :=
   let spF := M !!! Regidx csp_rs1 in
   let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) in
-  let rettgt := update_vec_dec (add_vec vra (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let rettgt := ret_pc vra in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
-  eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
   sie_cap_gpr γ M (K - 8) -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗
   wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗

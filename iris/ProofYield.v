@@ -107,7 +107,7 @@ Section ProofYield.
     : wp_yield_sconf_body γ Φ γs j γl m av eb C.
   Proof.
     cbv beta delta [wp_yield_sconf_body].
-    intros pcE pj ret_tgt Htp Hj Hgl Hal Hav.
+    intros pcE pj ret_tgt Htp Hj Hgl Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hlk0 Hown Hvc Hcont".
     (* ------------------------------------------------------------------ *)
@@ -207,12 +207,11 @@ Section ProofYield.
     iApply (Myproc.wp_myproc_sconf γ Φ A2 (av - 4)%nat 0 eb (proc_addr j) C
               HtpA2
               ltac:(lia)
-              ltac:(rewrite HA2ra; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
     iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
-    assert (Hpc0e : update_vec_dec (add_vec (A2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc0e : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (YD + 0x0e)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0e) in "Hpc".
     (* +0x0e: c.mv s1,a0 : s1 := a0 = proc_addr j *)
@@ -255,7 +254,6 @@ Section ProofYield.
     iApply (Acquire.wp_acquire_sconf γ Φ γl "proc"%string
               (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (zero_reg : mword 64) 0 eb (proc_addr j) C (av - 4)%nat
               ltac:(rewrite HtpB1; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
-              ltac:(rewrite HB1ra; vm_compute; reflexivity)
               HtpB1
               ltac:(lia)
               ltac:(lia)
@@ -265,7 +263,7 @@ Section ProofYield.
     iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hlkcpu Hcpu Hpay".
     (* reconcile acquire's lock-cpu cell back to the proc_addr form. *)
     iEval (rewrite Ha0_B1 HtpB1) in "Hlkcpu".
-    assert (Hpc14 : update_vec_dec (add_vec (B1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (YD + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
     (* unpack the lock resource; drop the (possibly ▷-guarded) context slot. *)
@@ -328,7 +326,7 @@ Section ProofYield.
       by (rewrite /C1 upd_eq; reflexivity).
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
     iApply (Sched.wp_sched_sconf γ Φ γs j γl RUNNABLE ch0 C1 (av - 4)%nat eb
-              HtpC1 Hj Hgl (needs_ctx_RUNNABLE) ltac:(rewrite HC1ra; vm_compute; reflexivity) ltac:(lia)
+              HtpC1 Hj Hgl (needs_ctx_RUNNABLE) ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hlkcpu] Hcpuemp Hown Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hlkcpu". }
     iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Hcpuemp Hown' Hvc'".
@@ -336,7 +334,7 @@ Section ProofYield.
     (* re-inject the opaque context-slot payload into the returned bundle. *)
     iAssert (cpu_own γ 1 eb (proc_addr j) C) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
-    assert (Hpc1c : update_vec_dec (add_vec (C1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc1c : ret_pc (C1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (YD + 0x1c)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
     (* the s1 value threads (callee-saved) through sched. *)
@@ -390,13 +388,10 @@ Section ProofYield.
     (* reconcile the lock-cpu / noff / intena cell addresses for release. *)
     assert (Hcpueq_rel : eq_vec (mycpu_ret cid_word) (mycpu_ret (D1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
       by (rewrite HtpD1; apply eq_vec_true_iff; reflexivity).
-    assert (Halr_rel : eq_vec (access_vec_dec (update_vec_dec (add_vec (D1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HD1ra; vm_compute; reflexivity).
     iApply (Release.wp_release_sconf γ Φ γl (proc_addr j) "proc"%string
               (proc_lock_res γ Φ γs γl (proc_addr j)) D1 (mycpu_ret cid_word) 0 eb (proc_addr j) C (av - 4)%nat
               Hlka
               Hcpueq_rel
-              Halr_rel
               HtpD1
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 [Hlkcpu] Hcpu Hpay [-]").
@@ -404,7 +399,7 @@ Section ProofYield.
     iIntros (mrel) "Hcg Hpc %Hcs_rel Hlkcpu Hcpu".
     (* reconcile release's post lock-cpu cell back to the proc_addr form. *)
     iEval (rewrite Ha0_D1) in "Hlkcpu".
-    assert (Hpc22 : update_vec_dec (add_vec (D1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc22 : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (YD + 0x22)) by (rewrite HD1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
     (* ------------------------------------------------------------------ *)
@@ -513,14 +508,12 @@ Section ProofYield.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE4ra; exact Hal).
     iPoseProof (ydi_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (YD + 0x2a)) (mword_of_int 1 : mword 5) E4 av
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     (* ------------------------------------------------------------------ *)

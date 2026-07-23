@@ -1355,10 +1355,8 @@ Section WpStartThm.
     assert (Hlinkv : add_vec_int st_pc59 4 = st_ra_link) by (vm_compute; reflexivity).
     assert (Hjal_al : is_aligned_paddr (Physaddr (add_vec st_pc59 (sign_extend' 64 sjimm59))) 4 = true)
       by (vm_compute; reflexivity).
-    assert (Hcretv : cret_target st_ra_link = st_pc60)
+    assert (Hcretv : ret_pc st_ra_link = st_pc60)
       by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hcret_al : is_aligned_paddr (Physaddr (cret_target st_ra_link)) 2 = true)
-      by (vm_compute; reflexivity).
     assert (Hctgtv : ctgt st_main = st_main)
       by (apply bv_eq; vm_compute; reflexivity).
     pose proof (st_s0_16 sp0) as Hs016.
@@ -1745,7 +1743,7 @@ Section WpStartThm.
     iApply (wp_timerinit Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0 menvcfg0) (ti_sp1 sp0)
               st_ra_link sp0 (st_menv_adue menvcfg0) stimecmp0 mcounteren0
               (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) 2
-              ltac:(lia) Hpmp1 Htor_ra Htor_s0 Hcret_al L59sp L59ra L59s0
+              ltac:(lia) Hpmp1 Htor_ra Htor_s0 L59sp L59ra L59s0
               with "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hstc Htistk Htext").
     iEval (rewrite Hcretv).
     iIntros (tv) "Hmm HpcfA HpaA Hpc Hfile Hmenv Hmcen Hstc Htistk".

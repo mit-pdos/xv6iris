@@ -212,8 +212,8 @@ Section ProofKvmmap.
     (* pc back at +0x12; the frame cells recovered *)
     assert (HP6link : P6 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KM + 0x0e) : mword 64) 4).
     { rewrite /P6 upd_eq. reflexivity. }
-    assert (Hret12 : update_vec_dec (P6 !!! Regidx (mword_of_int 1 : mword 5)) 0 ('b"0" : mword 1) = mword_of_int (KM + 0x12)).
-    { rewrite HP6link. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hret12 : ret_pc (P6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KM + 0x12)).
+    { rewrite HP6link. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret12) in "Hpc".
     (* recovered facts *)
     assert (Hmrsp : mr !!! Regidx csp_rs1 = spr).
@@ -345,14 +345,10 @@ Section ProofKvmmap.
     { rewrite /E3. rewrite upd_ne; [| vm_compute; discriminate].
       rewrite /E2. rewrite upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_eq. reflexivity. }
-    assert (Hrt : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0" : mword 1) = ret_tgt).
-    { rewrite HE3ra.
-      replace (sign_extend' 64 (zeros' 12) : mword 64) with (mword_of_int 0 : mword 64)
-        by (apply bv_eq; vm_compute; reflexivity).
-      rewrite kv_addv_zero. reflexivity. }
+    assert (Hrt : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt).
+    { rewrite HE3ra. reflexivity. }
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (KM + 0x1a)) (mword_of_int 1 : mword 5) E3 K
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hrt; exact (bit0_update0_64 (mm !!! Regidx (mword_of_int 1))))
               with "Hcg Hpc Hi1a' [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".

@@ -180,7 +180,7 @@ Section ProofMemset.
     : wp_memset_suffix_sconf_body γ Φ M n ra0e s00e.
   Proof.
     cbv beta delta [wp_memset_suffix_sconf_body].
-    intros spd sp0up ret_tgt Hal0.
+    intros spd sp0up ret_tgt.
     set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0e]> M).
     set (M5 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00e]> M4).
     set (M6 := <[Regidx csp_rs1 := regval_into_reg
@@ -247,13 +247,11 @@ Section ProofMemset.
     { rewrite /M6 upd_ne; [| vm_compute; discriminate].
       rewrite /M5 upd_ne; [| vm_compute; discriminate].
       rewrite /M4. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (M6 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HM6ra; exact Hal0).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (MS + 0x24)) (mword_of_int 1 : mword 5) M6 (n + 2)%nat
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2e [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (M6 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HM6ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! M6 with "Hcg Hpc [%]").

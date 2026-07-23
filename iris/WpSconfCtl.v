@@ -368,9 +368,8 @@ Section WpSconfCtl.
   Lemma wp_cret_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
       (m : regfile) (n : nat) :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let tgt := ret_pc (m !!! Regidx ra) in
     uint ra <> 0 ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
     ( sie_cap_gpr γ m n -∗
@@ -378,7 +377,7 @@ Section WpSconfCtl.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros tgt Hra Halign.
+    intros tgt Hra.
     iIntros "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf γ m n Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
               with "Hcg Hpc Hinstr").
@@ -424,11 +423,11 @@ Section WpSconfCtl.
       assert (Htgt : update_vec_dec (add_vec
                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs))
                 (sign_extend' 64 (zeros' 12))) 0 ('b"0") = tgt)
-        by (rewrite Lra'; reflexivity).
+        by (rewrite Lra'; apply ret_pc_jalr).
       rewrite <- Htgt.
       apply (exec_execute_JALR_ret_zca (zeros' 12) ra (zero_extend' 5 ('b"00") : mword 5) s_pc
                Hra ltac:(vm_compute; reflexivity) Hzic Hzca).
-      rewrite Htgt. exact Halign. }
+      rewrite Htgt. apply ret_pc_aligned. }
     iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)

@@ -509,8 +509,6 @@ Section WpTimerinitThm.
     (* data side: TOR entry 0 grants both 8-byte stack slots. *)
     pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_ra sp0) 8 ->
     pmp_tor0_grants pmpcfg1 pmpaddrs (ti_ea_s0 sp0) 8 ->
-    (* the return target (= ra0 with bit 0 cleared) is 2-aligned (C ext). *)
-    is_aligned_paddr (Physaddr (cret_target ra0)) 2 = true ->
     (* entry register file: sp/ra/s0 (ra0 stays SYMBOLIC -- the caller's
        return address; timerinit spills and reloads it). *)
     m !!! Regidx csp_rs1 = sp0 ->
@@ -536,7 +534,7 @@ Section WpTimerinitThm.
       mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg1 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
-      pc_is (cret_target ra0) -∗
+      pc_is (ret_pc ra0) -∗
       gpr_file (ti_mout m sp0 menv0 mcen0 tv ra0 s00) -∗
       menvcfg ↦ᵣ menvcfg_legalized menv0 (ti_menv1 menv0) -∗
       mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
@@ -545,7 +543,7 @@ Section WpTimerinitThm.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hn2 Hpmp Htor_ra Htor_s0 Hret_al Hsp Hra Hs0.
+    intros Hn2 Hpmp Htor_ra Htor_s0 Hsp Hra Hs0.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hstc Hstk #Htext Hcont".
     iDestruct (stack_own_split_1 sp0 2 n ltac:(lia) with "Hstk") as "[Htop Hdeep]".
     iDestruct (stack_own_2_elim with "Htop") as (vold_ra vold_s0) "[Hstkra Hstks0]".
@@ -844,11 +842,8 @@ Section WpTimerinitThm.
     (* ---- 29. c.ret ---- *)
     assert (L29ra : ti_mout m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx ti_ra = ra0)
       by (ti_unfold; ti_look).
-    assert (Hret_al' : is_aligned_paddr (Physaddr
-              (cret_target (ti_mout m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx ti_ra))) 2 = true)
-      by (rewrite L29ra; exact Hret_al).
     iApply (wp_cret_gpr_zca Φ ti_pc29 ti_ra (ti_mout m sp0 menv0 mcen0 tv ra0 s00) pmpcfg1 q
-              Hpmp Hnz_ra Hret_al'
+              Hpmp Hnz_ra
               with "Hmm Hpmpc Hpc Hfile Hi29").
     iEval (rewrite L29ra). iIntros "Hmm Hpmpc Hpc Hfile".
 

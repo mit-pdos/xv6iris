@@ -356,7 +356,7 @@ Section WpSmodePtCtl.
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let tgt := ret_pc (m !!! Regidx ra) in
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -365,7 +365,6 @@ Section WpSmodePtCtl.
     menvcfg0 = MENVCFG_S ->
     uint ra <> 0 ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -390,7 +389,7 @@ Section WpSmodePtCtl.
       WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Halign.
+    intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe.
     iIntros "#Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
@@ -440,11 +439,11 @@ Section WpSmodePtCtl.
       assert (Htgt : update_vec_dec (add_vec
                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs))
                 (sign_extend' 64 (zeros' 12))) 0 ('b"0") = tgt)
-        by (rewrite Lra'; reflexivity).
+        by (rewrite Lra'; apply ret_pc_jalr).
       rewrite <- Htgt.
       apply (exec_execute_JALR_ret_zca (zeros' 12) ra (zero_extend' 5 ('b"00") : mword 5) s_pc
                Hra ltac:(vm_compute; reflexivity) Hzic Hzca).
-      rewrite Htgt. exact Halign. }
+      rewrite Htgt. apply ret_pc_aligned. }
     iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
@@ -460,7 +459,7 @@ Section WpSmodePtCtl.
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
-    let tgt := update_vec_dec (add_vec (m !!! Regidx ra) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let tgt := ret_pc (m !!! Regidx ra) in
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -469,7 +468,6 @@ Section WpSmodePtCtl.
     menvcfg0 = MENVCFG_S ->
     uint ra <> 0 ->
     bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ->
-    eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -494,10 +492,10 @@ Section WpSmodePtCtl.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Halign.
+    intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     iApply (wp_cret_s_zca_r_later R Φ pc ra m mstatus0 mie_v mdv0 menvcfg0
-              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe Halign
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr [Hcont]").
     iNext. iExact "Hcont".
   Qed.

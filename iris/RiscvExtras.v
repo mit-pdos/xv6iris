@@ -7,7 +7,7 @@ From iris.program_logic Require Import lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import SailStdpp.Base SailStdpp.TypeCasts.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Local Open Scope Z_scope.
@@ -407,6 +407,62 @@ Proof.
   unfold bit_to_bool, eq_vec, get_word in H1.
   rewrite MachineWord.MachineWord.eqb_true_iff in H1.
   rewrite H1. reflexivity.
+Qed.
+
+(* ====================================================================== *)
+(* ret_pc: THE canonical return-target pc.                                 *)
+(*                                                                         *)
+(* Every RISC-V return-family instruction lands on its saved return        *)
+(* address with the low bit cleared: [jalr x0, 0(ra)] and the compressed   *)
+(* [c.ret] compute [(ra + 0) & ~1]; [mret]/[sret] take the *epc value and   *)
+(* clear bit 0.  [ret_pc v] is that value -- with NO useless               *)
+(* [add_vec .. (sign_extend' 64 (zeros' 12))] (which adds zero, a noop).    *)
+(* Used as the pc of EVERY return postcondition: leaf return WPs produce    *)
+(* it, whole-function specs state it, and the swtch context predicate       *)
+(* names its resume pc with it.  [ret_pc_jalr] bridges the raw form the     *)
+(* model's jalr emits; [ret_pc_aligned] is the 2-alignment fact (bit 0 is   *)
+(* cleared by construction), so return WPs need no alignment premise.       *)
+(* ====================================================================== *)
+Definition ret_pc (v : mword 64) : mword 64 := update_vec_dec v 0 ('b"0").
+
+(* the [add_vec .. zeros] the model's [execute_JALR] produces collapses to
+   [ret_pc]: adding the sign-extended 12-bit zero immediate is a noop. *)
+Lemma add_vec_zeros_r (v : mword 64) :
+  add_vec v (sign_extend' 64 (zeros' 12 : mword 12)) = v.
+Proof.
+  unfold add_vec, word_binop, with_word', with_word, MachineWord.MachineWord.add.
+  apply bv_add_0_r. vm_compute. reflexivity.
+Qed.
+
+Lemma ret_pc_jalr (v : mword 64) :
+  update_vec_dec (add_vec v (sign_extend' 64 (zeros' 12 : mword 12))) 0 ('b"0") = ret_pc v.
+Proof. unfold ret_pc. rewrite add_vec_zeros_r. reflexivity. Qed.
+
+Lemma bv_unsigned_b0 : bv_unsigned ('b"0" : mword 1) = 0.
+Proof. vm_compute. reflexivity. Qed.
+
+(* a return pc is always 2-aligned: [ret_pc] clears bit 0 by construction. *)
+Lemma ret_pc_aligned (v : mword 64) :
+  eq_vec (access_vec_dec (ret_pc v) 0) ('b"0") = true.
+Proof.
+  unfold ret_pc, eq_vec, access_vec_dec, access_mword_dec, update_vec_dec, update_mword_dec, get_word.
+  rewrite MachineWord.MachineWord.eqb_true_iff. apply bv_eq.
+  cbv [MachineWord.MachineWord.slice MachineWord.MachineWord.update_slice].
+  rewrite !bv_extract_unsigned.
+  rewrite !bv_concat_unsigned; [ | vm_compute; reflexivity | vm_compute; reflexivity ].
+  rewrite bv_unsigned_b0.
+  assert (Hz : forall b : bv 0, bv_unsigned b = 0).
+  { intros b. pose proof (bv_unsigned_in_range _ b) as Hr.
+    change (bv_modulus 0) with 1 in Hr. lia. }
+  rewrite !Hz.
+  rewrite !Z.shiftl_0_l !Z.shiftr_0_r !Z.lor_0_l !Z.lor_0_r.
+  assert (Hk : Z.of_N (MachineWord.MachineWord.Z_idx 0 + MachineWord.MachineWord.Z_idx 1) = 1).
+  { vm_compute. reflexivity. }
+  rewrite Hk.
+  rewrite Z.shiftl_mul_pow2; [ | lia ].
+  change (2 ^ 1) with 2.
+  unfold bv_wrap. change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
+  rewrite Z_mod_mult. reflexivity.
 Qed.
 
 (* THE BRIDGE: the j-th byte of the fetch window for the instruction at byte

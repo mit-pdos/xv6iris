@@ -29,12 +29,11 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let pcE := mword_of_int KernelSyms.memset in
   let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
   let p := m0 !!! Regidx a0_idx in
-  let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc ra0 in
   (2 <= n)%nat ->
   page_valid p ->
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
   page_own p -∗

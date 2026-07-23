@@ -38,7 +38,7 @@ Section ProofMemsetPage.
     : wp_memset_page_sconf_body γ Φ m0 n cval.
   Proof.
     cbv beta delta [wp_memset_page_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2 Hret0.
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
@@ -49,7 +49,7 @@ Section ProofMemsetPage.
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* --- apply the general memset spec at len = 4096 --- *)
     iApply (MemsetArray.wp_memset_sconf γ Φ m0 n 4096 cval olds
-              Hn ltac:(vm_compute; reflexivity) Hcval Ha2' Hret0
+              Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (mfin) "Hcg Hpc Hbuf %Hcs".

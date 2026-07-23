@@ -56,7 +56,7 @@ Section ProofInitlock.
     : wp_initlock_sconf_body γ Φ m vlock vname vcpu s K.
   Proof.
     cbv beta delta [wp_initlock_sconf_body].
-    intros pcE lk name ret_tgt c_name c_cpu HK Hretm.
+    intros pcE lk name ret_tgt c_name c_cpu HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hcg #Htext Hpc #Hstr Hlock Hname Hcpu Hcont".
@@ -218,13 +218,11 @@ Section ProofInitlock.
       rewrite /R3 upd_eq.
       unfold regval_into_reg.
       rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
-    assert (Hretaligned : eq_vec (access_vec_dec (update_vec_dec (add_vec (R5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HR5ra; exact Hretm).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (IL + 0x18)) (mword_of_int 1 : mword 5) R5 K
-              ltac:(vm_compute; discriminate) Hretaligned
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi18 [-]").
     iIntros "Hcg Hpc".
-    assert (Hretf : update_vec_dec (add_vec (R5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hretf : ret_pc (R5 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HR5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* the name field is now written for good: discard its fraction, so what

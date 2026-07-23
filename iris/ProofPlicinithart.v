@@ -196,7 +196,7 @@ Section ProofPlicinithart.
     : wp_plicinithart_sconf_body γ γd Φ m0 n.
   Proof.
     cbv beta delta [wp_plicinithart_sconf_body].
-    intros ra_idx tp_idx pcE ra0 ret_tgt Hretok Hhart Hn.
+    intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a0_idx := (mword_of_int 10 : mword 5)).
     set (a4_idx := (mword_of_int 14 : mword 5)).
@@ -282,14 +282,13 @@ Section ProofPlicinithart.
               (mword_of_int 2081840 : mword 21) m2 (n - 2)%nat
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi08 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
     destruct Hmo as [Hmo_cs Hmo_a0].
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PH + 0x08) : mword 64) 4)
-                       (sign_extend' 64 (zeros' 12))) 0 ('b"0") = (mword_of_int (PH + 0x0c) : mword 64))
+    assert (Hpc0c : ret_pc (add_vec_int (mword_of_int (PH + 0x08) : mword 64) 4)
+                       = (mword_of_int (PH + 0x0c) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
     (* the register file's x0 slot, needed to read the [zero] source operands *)
@@ -498,13 +497,11 @@ Section ProofPlicinithart.
     assert (HN11ra : N11 !!! Regidx ra_idx = ra0).
     { unfold N11, N10. repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold N9. rewrite upd_eq. reflexivity. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (N11 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HN11ra; exact Hretok).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (PH + 0x32)) ra_idx N11 n
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi32 [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (N11 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (N11 !!! Regidx ra_idx) = ret_tgt)
       by (rewrite HN11ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! N11 with "Hcg Hpc [%]").

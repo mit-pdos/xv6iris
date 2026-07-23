@@ -31,8 +31,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      cells and the counting token ride inside [cpu_own]: the noff cell IS the
      level [n], the intena cell records [eb] once n ≥ 1, so no cell arguments
      and no level-mirror premises appear here. *)
-  let caller_ret := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-  eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
+  let caller_ret := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the tp register holds THIS cpu's id (the chain-wide convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the noff increment stays in int range *)
@@ -55,11 +54,10 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* both panic checks (intr_get(), noff < 1) and the noff-1 == 0 branch are
      facts of [cpu_own]: the level is S n > 0, SIE is pinned '0' by the count
      eighth, and the final pop's re-enable branch reads intena = [eb]. *)
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (4 <= av)%nat ->
   sie_cap_gpr γ m av -∗

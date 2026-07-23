@@ -28,12 +28,11 @@ Notation AK := KernelSyms.kalloc.
 Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_cpu := add_vec (mword_of_int KernelSyms.kmem : mword 64) (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (14 <= K)%nat ->
   eq_vec (cpuold : mword 64) cpuv = false ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->

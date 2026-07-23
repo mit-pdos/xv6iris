@@ -243,14 +243,13 @@ Section ProofWakeupLoop.
       iApply (Myproc.wp_myproc_sconf γ Φ Mj av lvl eb pme C
                 HMjtp
                 ltac:(lia)
-                ltac:(rewrite HMjra; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Hown Htext Hpc [-]").
       iIntros (msmp mret) "%Hmsmp Hcg Hown Hpc %Hpresc".
       destruct Hpresc as [Hpres _].
       (* pc is now wakeup+0x3c (myproc's bit-0-cleared return target) *)
-      assert (Hret3c : update_vec_dec (add_vec (Mj !!! Regidx (mword_of_int 1 : mword 5))
-                         (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+      assert (Hret3c : ret_pc (Mj !!! Regidx (mword_of_int 1 : mword 5))
+                        
                        = mword_of_int (KernelSyms.wakeup + 0x3c)).
       { rewrite HMjra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret3c) in "Hpc".
@@ -361,8 +360,7 @@ Section ProofWakeupLoop.
         iApply (Acquire.wp_acquire_sconf γ Φ γk "proc"%string (proc_lock_res γ Φ γs γk (proc_addr k)) M42
                   (zero_reg : mword 64) lvl eb pme C av
                   ltac:(rewrite HM42tp; exact Hmycpu_nz)
-                  ltac:(rewrite HM42ra; vm_compute; reflexivity)
-                  ltac:(rewrite HM42tp; exact Hrtp_cid)
+                  ltac:(etransitivity; [ exact HM42tp | exact Hrtp_cid ])
                   ltac:(lia)
                   ltac:(lia)
                   with "Hcg Hown Htext Hpc [Hlockk] [Hcpuk] [-]").
@@ -370,7 +368,7 @@ Section ProofWakeupLoop.
         { iEval (rewrite HM42a0). iExact "Hcpuk". }
         iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hcpu2 Hown Hpay".
         (* acquire returned: pc = wakeup+0x46, cpu_own (S lvl) + trap_csrs_pay lvl eb. *)
-        assert (Hpc46 : update_vec_dec (add_vec (M42 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+        assert (Hpc46 : ret_pc (M42 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KernelSyms.wakeup + 0x46)).
         { rewrite HM42ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc46) in "Hpc".
@@ -453,20 +451,18 @@ Section ProofWakeupLoop.
             by (rewrite HMr2c_a0; apply wk_add_vec_0).
           assert (Hmine2 : eq_vec (mycpu_ret rtp) (mycpu_ret (Mr2c !!! Regidx (mword_of_int 4 : mword 5))) = true)
             by (rewrite HMr2c_tp; apply wk_eq_vec_refl).
-          assert (Hal5 : eq_vec (access_vec_dec (update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-            by (rewrite HMr2c_ra; vm_compute; reflexivity).
           assert (HMr2c_tpc : Mr2c !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
             by (rewrite HMr2c_tp; exact Hrtp_cid).
           (* release(&proc[k]->lock): cpu_own S lvl -> lvl (pay consumed). *)
           iApply (Release.wp_release_sconf γ Φ γk (proc_addr k) "proc"%string (proc_lock_res γ Φ γs γk (proc_addr k)) Mr2c
                     (mycpu_ret rtp) lvl eb pme C av
-                    Hlka2 Hmine2 Hal5 HMr2c_tpc
+                    Hlka2 Hmine2 HMr2c_tpc
                     ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR [Hcpu2] Hown Hpay [-]").
           { iEval (rewrite HMr2c_a0). iExact "Hcpu2". }
           iIntros (mr) "Hcg Hpc %Hpinsr Hcpu3 Hown".
           (* pc = wakeup+0x30 (release's return target). *)
-          assert (Hpc30 : update_vec_dec (add_vec (Mr2c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+          assert (Hpc30 : ret_pc (Mr2c !!! Regidx (mword_of_int 1 : mword 5))
                           = mword_of_int (KernelSyms.wakeup + 0x30)).
           { rewrite HMr2c_ra. apply bv_eq; vm_compute; reflexivity. }
           iEval (rewrite Hpc30) in "Hpc".

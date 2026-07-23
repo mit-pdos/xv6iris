@@ -28,7 +28,7 @@ Notation KI := KernelSyms.kinit.
 Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let lk : mword 64 := mword_of_int KernelSyms.kmem in
   let fl : mword 64 := mword_of_int (KernelSyms.kmem + 24) in
@@ -40,7 +40,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   (22 <= K)%nat ->
   ncnt = 0%nat ->
   eq_vec (zero_reg : mword 64) cpuv = false ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (* the tp register holds THIS cpu's id (freerange cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   prun phystop s1entry ps ->

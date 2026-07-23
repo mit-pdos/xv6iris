@@ -148,7 +148,7 @@ Section ProofSched.
     : wp_sched_sconf_body γ Φ γs j γl st ch m av eb.
   Proof.
     cbv beta delta [wp_sched_sconf_body].
-    intros pcE pj ret_tgt Htp Hj Hgl Hneeds Hal Hav.
+    intros pcE pj ret_tgt Htp Hj Hgl Hneeds Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hprocs Hheld Hcpu Hown Hvc Hcont".
     (* the cpu bundle [cpu_own γ 1 eb pj emp] arrives whole at level 1; unfold
@@ -277,7 +277,6 @@ Section ProofSched.
     iApply (Myproc.wp_myproc_sconf γ Φ A2 (av - 6)%nat 1 eb (proc_addr j) emp
               HtpA2
               ltac:(vm_compute; reflexivity)
-              ltac:(rewrite HA2ra; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
     iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
@@ -287,7 +286,7 @@ Section ProofSched.
     iEval (rewrite /cpu_own) in "Hcpu".
     iDestruct "Hcpu" as "(_ & Hnoff & Hint & Hcnt & Hcur & _)".
     set (iv := intena_val eb : mword 32).
-    assert (Hpc12 : update_vec_dec (add_vec (A2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc12 : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SD + 0x12)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc12) in "Hpc".
     (* +0x12 c.mv s1,a0 : s1 := a0 = proc_addr j *)
@@ -336,19 +335,17 @@ Section ProofSched.
       by (rewrite /B1 upd_eq; reflexivity).
     assert (Hcpueq : eq_vec (mycpu_ret cid_word) (mycpu_ret (B1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
       by (rewrite HtpB1; apply eq_vec_true_iff; reflexivity).
-    assert (Halign_hd : eq_vec (access_vec_dec (update_vec_dec (add_vec (B1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HB1ra; vm_compute; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl (proc_addr j) "proc"%string
               (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (av - 6)%nat (mycpu_ret cid_word) (dqc := DfracOwn 1)
-              Hlkb Hcpueq Halign_hd ltac:(lia)
+              Hlkb Hcpueq ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked [Hlkcpu] [-]").
     { iEval (rewrite Hpacpu). iExact "Hlkcpu". }
     iIntros (mh) "Hcg Hpc %Hmh Hlocked Hlkcpu".
     iEval (rewrite Hpacpu) in "Hlkcpu".
     destruct Hmh as [Hcs_mh Ha0_mh].
-    assert (Hpc18 : update_vec_dec (add_vec (add_vec_int (mword_of_int (SD + 0x14) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc18 : ret_pc (add_vec_int (mword_of_int (SD + 0x14) : mword 64) 4)
                     = mword_of_int (SD + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
-    (* pc after holding = ret_tgt = ctx_pc(B1!!!x1) = SD+0x18. *)
+    (* pc after holding = ret_tgt = ret_pc(B1!!!x1) = SD+0x18. *)
     iEval (rewrite HB1ra Hpc18) in "Hpc".
     (* +0x18 c.beqz a0 : a0 = 1, falls through. *)
     iPoseProof (sdi_18 with "Htext") as "Hi18".
@@ -852,8 +849,6 @@ Section ProofSched.
     { rewrite /Mc upd_ne; [| vm_compute; discriminate]. rewrite /D14 upd_ne; [| vm_compute; discriminate].
       rewrite /D13 upd_eq HD12a1 HD12a5. unfold a_cpu_ctx, mycpu_ret.
       apply sched_reconcile2. vm_compute. reflexivity. }
-    assert (Hal_ret : eq_vec (access_vec_dec (ctx_pc (Mc !!! Regidx (mword_of_int 1 : mword 5))) 0) ('b"0") = true)
-      by (rewrite Hra_Mc; vm_compute; reflexivity).
     (* FULL-BUNDLE swtch: hand [sie_cap_gpr] and [cpu_own] whole (the swtch
        proof internally carves the stack/off-eighth and parks them in the OLD
        record).  Refold the check-chain cells into the level-1 [cpu_own]. *)
@@ -867,7 +862,7 @@ Section ProofSched.
     (* apply swtch. *)
     iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj
-              Hctxlen Holdc Hnewc Hal_ret
+              Hctxlen Holdc Hnewc
               with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP] [-]").
     { iEval (rewrite Htp_Mc). iExact "HP". }
     iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
@@ -908,7 +903,7 @@ Section ProofSched.
     { change (Regidx csp_rs1) with (Regidx (mword_of_int 2 : mword 5)).
       rewrite Hm2. change (Regidx (mword_of_int 2 : mword 5)) with (Regidx csp_rs1). exact Hcsp_Mc. }
     (* pc lands on the saved return address SD+0x72. *)
-    assert (Hpctgt : ctx_pc (m' !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (SD + 0x72))
+    assert (Hpctgt : ret_pc (m' !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (SD + 0x72))
       by (rewrite Hm1 Hra_Mc; vm_compute; reflexivity).
     iEval (rewrite Hpctgt) in "Hpc".
     (* the returned cpu bundle came back at the RESUMER's base [eb'] (the wand
@@ -1153,14 +1148,12 @@ Section ProofSched.
       rewrite /E8 upd_ne; [| vm_compute; discriminate]. rewrite /E7 upd_ne; [| vm_compute; discriminate].
       rewrite /E6 upd_ne; [| vm_compute; discriminate]. rewrite /E5 upd_ne; [| vm_compute; discriminate].
       rewrite /E4 upd_eq. reflexivity. }
-    assert (Hal_final : eq_vec (access_vec_dec (update_vec_dec (add_vec (Ef !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HEfra; exact Hal).
     iPoseProof (sdi_8a with "Htext") as "Hi8a".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (SD + 0x8a)) (mword_of_int 1 : mword 5) Ef av
-              ltac:(vm_compute; discriminate) Hal_final
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi8a [-]").
     iIntros "Hcg Hpc".
-    assert (Hret_final : update_vec_dec (add_vec (Ef !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hret_final : ret_pc (Ef !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HEfra; reflexivity).
     iEval (rewrite Hret_final) in "Hpc".
     (* ------------------------------------------------------------------ *)

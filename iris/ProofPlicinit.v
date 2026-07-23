@@ -201,7 +201,7 @@ Section ProofPlicinit.
     : wp_plicinit_sconf_body γ Φ m0 n p.
   Proof.
     cbv beta delta [wp_plicinit_sconf_body].
-    intros ra_idx pcE ra0 ret_tgt Hretok Hn.
+    intros ra_idx pcE ra0 ret_tgt Hn.
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a4_idx := (mword_of_int 14 : mword 5)).
     set (a5_idx := (mword_of_int 15 : mword 5)).
@@ -389,13 +389,11 @@ Section ProofPlicinit.
     assert (Hm7ra : m7 !!! Regidx ra_idx = ra0).
     { unfold m7, m6; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold m5. rewrite upd_eq. reflexivity. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (m7 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite Hm7ra; exact Hretok).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (PL + 0x18)) ra_idx m7 n
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi18 [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (m7 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (m7 !!! Regidx ra_idx) = ret_tgt)
       by (rewrite Hm7ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! m7 with "Hcg Hpc [%] Hp").

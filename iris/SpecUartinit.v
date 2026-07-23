@@ -63,12 +63,11 @@ Proof. reflexivity. Qed.
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.tx_lock in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (4 <= K)%nat ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   sie_cap_gpr γ m K -∗
   (* [kernel_data] supplies the "uart" string literal uartinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)

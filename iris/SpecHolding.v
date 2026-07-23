@@ -27,10 +27,9 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (6 <= n)%nat ->
   sie_cap_gpr γ m n -∗
   kernel_text -∗ pc_is pcE -∗
@@ -50,10 +49,9 @@ Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lock
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eq_vec cpuold (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = true ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (6 <= n)%nat ->
   sie_cap_gpr γ m n -∗
   kernel_text -∗ pc_is pcE -∗

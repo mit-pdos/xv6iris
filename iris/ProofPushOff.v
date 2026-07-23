@@ -105,8 +105,7 @@ Section ProofPushOff.
       (M : regfile) (av : nat) (ra0e s00e : mword 64) :
     let spd := M !!! Regidx csp_rs1 in
     let sp0up := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) in
-    let ret_tgt := update_vec_dec (add_vec ra0e (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+    let ret_tgt := ret_pc ra0e in
     sie_cap_gpr γ M av -∗
     kernel_text -∗ pc_is (mword_of_int (PP + 0x28) : mword 64) -∗
     add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ ra0e -∗
@@ -120,7 +119,7 @@ Section ProofPushOff.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros spd sp0up ret_tgt Hal0.
+    intros spd sp0up ret_tgt.
     set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0e]> M).
     set (M5 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00e]> M4).
     set (M6 := <[Regidx csp_rs1 := regval_into_reg
@@ -191,13 +190,11 @@ Section ProofPushOff.
     { rewrite /M6 upd_ne; [| vm_compute; discriminate].
       rewrite /M5 upd_ne; [| vm_compute; discriminate].
       rewrite /M4. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (M6 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HM6ra; exact Hal0).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1 : mword 5) M6 (av + 2)%nat
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2e [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (M6 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HM6ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! M6 with "Hcg Hpc [%]").
@@ -220,8 +217,7 @@ Section ProofPushOff.
         (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
     let storeval := (autocast (T := mword)
         (subrange_vec_dec noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-    let cret_tgt := update_vec_dec (add_vec ra0e (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-    eq_vec (access_vec_dec cret_tgt 0) ('b"0") = true ->
+    let cret_tgt := ret_pc ra0e in
     (2 <= av)%nat ->
     sie_cap_gpr γ ms av -∗
     kernel_text -∗ pc_is P -∗
@@ -250,7 +246,7 @@ Section ProofPushOff.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros P spm a0v a8_noff a8_p24 a8_p16 a8_p8 sp0up noff_a5 storeval cret_tgt Hret0 Hav.
+    intros P spm a0v a8_noff a8_p24 a8_p16 a8_p8 sp0up noff_a5 storeval cret_tgt Hav.
     set (s00 := ms !!! Regidx (mword_of_int 8 : mword 5)).
     assert (Hm0sp : (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> ms) !!! Regidx csp_rs1 = spm)
       by (rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
@@ -258,7 +254,7 @@ Section ProofPushOff.
     iPoseProof (poi_18 with "Htext") as "Hi18".
     iApply (Mycpu.wp_call_mycpu_sconf_cs γ Φ P (mword_of_int 0xcfe : mword 21) ms av
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
+              ltac:(lia)
               with "Hcg Htext Hpc Hi18 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
     destruct Hmo as [Hmo_cs Hmo_a0].
@@ -276,7 +272,7 @@ Section ProofPushOff.
         (add_vec (M6 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> M6).
     (* normalise pc = ret_tgt to PO+0x1c *)
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc1c : update_vec_dec (add_vec (add_vec_int P 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc1c : ret_pc (add_vec_int P 4)
                     = (mword_of_int (PO + 0x1c) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
     (* ---- 0x1c: c.lw a5,120(a0) : a5 := zext32(noff) ---- *)
@@ -413,9 +409,7 @@ Section ProofPushOff.
       rewrite /M4. apply upd_eq. }
     iPoseProof (poi_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (PO + 0x2a)) (mword_of_int 1 : mword 5) M7 (av + 4)%nat
-
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hra7; exact Hret0)
               with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hra7) in "Hpc".
@@ -527,7 +521,7 @@ Section ProofPushOff.
     : wp_push_off_sconf_body γ Φ m av n eb p C.
   Proof.
     cbv beta delta [wp_push_off_sconf_body].
-    intros caller_ret Hcret0 Ha0cid Hnbound Hav.
+    intros caller_ret Ha0cid Hnbound Hav.
     pose (a0f := mycpu_ret cid_word : mword 64).
     pose (noff := noff_val n : mword 32).
     assert (Ha0 : mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f)
@@ -639,7 +633,7 @@ Section ProofPushOff.
     iPoseProof (poi_10 with "Htext") as "Hi10".
     iApply (Mycpu.wp_call_mycpu_sconf_cs γ Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3 (av - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
+              ltac:(lia)
               with "Hcg Htext Hpc Hi10 [-]").
     iIntros (mo1) "Hcg Hpc %Hmo4".
     set (N4 := mo1).
@@ -652,7 +646,7 @@ Section ProofPushOff.
     assert (Ha0_10 : N4 !!! Regidx (mword_of_int 10 : mword 5) = a0f).
     { rewrite Hmo4a0 HN3tp. exact Ha0. }
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc14 : update_vec_dec (add_vec (add_vec_int (mword_of_int (PO + 0x10) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc14 : ret_pc (add_vec_int (mword_of_int (PO + 0x10) : mword 64) 4)
                     = (mword_of_int (PO + 0x14) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
     (* ---- 0x14: c.lw a5,120(a0) : a5 := noff ---- *)
@@ -709,7 +703,7 @@ Section ProofPushOff.
       iPoseProof (poi_2c with "Htext") as "Hi2c".
       iApply (Mycpu.wp_call_mycpu_sconf_cs γ Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5 (av - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-                ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
+                ltac:(lia)
                 with "Hcg Htext Hpc Hi2c [-]").
       iIntros (mo2) "Hcg Hpc %Hmo6".
       set (N6 := mo2).
@@ -737,7 +731,7 @@ Section ProofPushOff.
         rewrite Hs1_4 /N3 upd_eq /N2 upd_eq.
         rewrite addv_zero_l. reflexivity. }
       iEval (rewrite upd_eq) in "Hpc".
-      assert (Hpc30 : update_vec_dec (add_vec (add_vec_int (mword_of_int (PO + 0x2c) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+      assert (Hpc30 : ret_pc (add_vec_int (mword_of_int (PO + 0x2c) : mword 64) 4)
                       = (mword_of_int (PO + 0x30) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc30) in "Hpc".
       (* ---- 0x30: srli a5,s1,1 ---- *)
@@ -791,7 +785,7 @@ Section ProofPushOff.
       (* ---- apply the suffix with ms = N8 ---- *)
       iApply (wp_push_off_suffix_sconf γ Φ N8 (av - 4)%nat noff
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5)) (m !!! Regidx (mword_of_int 9 : mword 5)) vgap
- Hcret0 ltac:(lia)
+ ltac:(lia)
                 with "Hcg Htext Hpc [Hnoff] [Hr24] [Hr16] [Hr8] [Hgap] [-]").
       { iEval (rewrite Ha0_18t). iExact "Hnoff". }
       { iEval (rewrite HcspN8). iExact "Hr24". }
@@ -970,7 +964,7 @@ Section ProofPushOff.
       (* ---- apply the suffix with ms = N5 ---- *)
       iApply (wp_push_off_suffix_sconf γ Φ N5 (av - 4)%nat noff
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5)) (m !!! Regidx (mword_of_int 9 : mword 5)) vgap
- Hcret0 ltac:(lia)
+ ltac:(lia)
                 with "Hcg Htext Hpc [Hnoff] [Hr24] [Hr16] [Hr8] [Hgap] [-]").
       { iEval (rewrite Ha0_18f). iExact "Hnoff". }
       { iEval (rewrite HcspN5). iExact "Hr24". }
@@ -1112,7 +1106,7 @@ Section ProofPushOff.
     : wp_pop_off_sconf_body γ Φ m av n eb p C.
   Proof.
     cbv beta delta [wp_pop_off_sconf_body].
-    intros pcE ret_tgt Hal0 Ha0cid Hav.
+    intros pcE ret_tgt Ha0cid Hav.
     pose (a0v := mycpu_ret cid_word : mword 64).
     pose (noffv := noff_val (S n) : mword 32).
     pose (intenav := intena_val eb : mword 32).
@@ -1199,7 +1193,7 @@ Section ProofPushOff.
       by (rewrite /P1 upd_ne; [exact Hcsp0 | vm_compute; discriminate]).
     iApply (Mycpu.wp_call_mycpu_sconf_cs γ Φ (mword_of_int (PP + 0x08)) (mword_of_int 0xc94 : mword 21) P1 (av - 2)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
+              ltac:(lia)
               with "Hcg Htext Hpc Hi08 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
     set (Cr := mo).
@@ -1212,7 +1206,7 @@ Section ProofPushOff.
       by (rewrite /Cr Hmo_a0 HtpP1 Ha0; reflexivity).
     assert (HcspC' : Cr !!! Regidx csp_rs1 = spd) by (rewrite /Cr HcspC; exact Hcsp1).
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc0c : update_vec_dec (add_vec (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc0c : ret_pc (add_vec_int (mword_of_int (PP + 0x08) : mword 64) 4)
                     = (mword_of_int (PP + 0x0c) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
     (* ---- 0x0c: csrr a5,sstatus -- the interrupts-off sanity check ---- *)
@@ -1355,7 +1349,6 @@ Section ProofPushOff.
       iEval (rewrite Htgt28) in "Hpc".
       iApply (wp_pop_off_epi_sconf γ Φ P6 (av - 2)%nat
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
-                Hal0
                 with "Hcg Htext Hpc [Hr8] [Hr0] [-]").
       { iEval (rewrite HcspP6). iExact "Hr8". }
       { iEval (rewrite HcspP6). iExact "Hr0". }
@@ -1526,7 +1519,6 @@ Section ProofPushOff.
         iEval (rewrite Htgt28') in "Hpc".
         iApply (wp_pop_off_epi_sconf γ Φ P7 (av - 2)%nat
                   (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
-                  Hal0
                   with "Hcg Htext Hpc [Hr8] [Hr0] [-]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }
@@ -1694,7 +1686,6 @@ Section ProofPushOff.
         iEval (rewrite Hpc28) in "Hpc".
         iApply (wp_pop_off_epi_sconf γ Φ P7 (av - 2)%nat
                   (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
-                  Hal0
                   with "Hcg Htext Hpc [Hr8] [Hr0] [-]").
         { iEval (rewrite HcspP7). iExact "Hr8". }
         { iEval (rewrite HcspP7). iExact "Hr0". }

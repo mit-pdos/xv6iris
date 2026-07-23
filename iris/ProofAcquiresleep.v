@@ -148,7 +148,7 @@ Section ProofAcquiresleep.
     : wp_acquiresleep_sconf_body γ Φ γs j γl γsl s R m pidv av eb C dq.
   Proof.
     cbv beta delta [wp_acquiresleep_sconf_body].
-    intros pcE slk pj ret_tgt Htp Hj Halret Hav.
+    intros pcE slk pj ret_tgt Htp Hj Hav.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := pa_stk sp0 4).
     set (cpuv := mycpu_ret cid_word).
@@ -310,7 +310,6 @@ Section ProofAcquiresleep.
     iApply (Acquire.wp_acquire_sconf γ Φ γl "sleep lock"%string (sl_res γsl slk R) Maq
               (zero_reg : mword 64) 0%nat eb pj C (av - 4)%nat
               ltac:(rewrite HMaqtp; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
-              ltac:(rewrite HMaqra; vm_compute; reflexivity)
               HMaqtp
               ltac:(lia)
               ltac:(lia)
@@ -319,7 +318,7 @@ Section ProofAcquiresleep.
     { iEval (rewrite HMaqa0). iExact "Hlkcpu". }
     iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hlkcpu Hown Hpay".
     (* pc = +0x18; anchor the lock cpu word to [sl_lkcpu slk] at [cpuv] *)
-    assert (Hpc18 : update_vec_dec (add_vec (Maq !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc18 : ret_pc (Maq !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (ASL + 0x18)) by (rewrite HMaqra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     iEval (rewrite HMaqa0) in "Hlkcpu".
@@ -396,12 +395,11 @@ Section ProofAcquiresleep.
       iApply (Myproc.wp_myproc_sconf γ Φ E2 (av - 4)%nat 1%nat eb pj C
                 ltac:(exact HE2tp)
                 ltac:(lia)
-                ltac:(rewrite HE2ra; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Hown Htext Hpc").
       iIntros (ms_m mfm) "%Hms_m Hcg Hown Hpc %Hmp".
       destruct Hmp as (Hmp_cs & Hmp_a0).
-      assert (Hpc30 : update_vec_dec (add_vec (E2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+      assert (Hpc30 : ret_pc (E2 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (ASL + 0x30)) by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc30) in "Hpc".
       (* mfm!!!a0 = pj *)
@@ -480,16 +478,14 @@ Section ProofAcquiresleep.
       { rewrite HE5a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
       assert (Hrel_cpu : eq_vec cpuv (mycpu_ret (E5 !!! Regidx (mword_of_int 4 : mword 5))) = true).
       { rewrite HE5tp. rewrite /cpuv. apply eq_vec_true_iff. reflexivity. }
-      assert (Hrel_al : eq_vec (access_vec_dec (update_vec_dec (add_vec (E5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-        by (rewrite HE5ra; vm_compute; reflexivity).
       iApply (Release.wp_release_sconf γ Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) E5
                 cpuv 0%nat eb pj C (av - 4)%nat
-                Hrel_lka Hrel_cpu Hrel_al HE5tp ltac:(lia)
+                Hrel_lka Hrel_cpu HE5tp ltac:(lia)
                 with "Hcg Htext Hpc [] Htok HRc [Hlkcpu] Hown Hpay [-]").
       { iApply (is_sleeplock_lock with "Hslk"). }
       { iEval (rewrite HE5a0). change (add_vec (sl_lk slk) (sign_extend' 64 (mword_of_int 16 : mword 12))) with (sl_lkcpu slk). iExact "Hlkcpu". }
       iIntros (mrel) "Hcg Hpc %Hrelcs Hlkcpu Hown".
-      assert (Hpc3a : update_vec_dec (add_vec (E5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+      assert (Hpc3a : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (ASL + 0x3a)) by (rewrite HE5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc3a) in "Hpc".
       iEval (rewrite HE5a0) in "Hlkcpu".
@@ -593,13 +589,11 @@ Section ProofAcquiresleep.
       assert (HQ42ra : Q42 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5)).
       { rewrite /Q42 upd_ne; [| reg_neq]. rewrite /Q40 upd_ne; [| reg_neq]. rewrite /Q3e upd_ne; [| reg_neq].
         rewrite /Q3c upd_ne; [| reg_neq]. rewrite /Q3a upd_eq. reflexivity. }
-      assert (Hretal : eq_vec (access_vec_dec (update_vec_dec (add_vec (Q42 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-        by (rewrite HQ42ra; exact Halret).
       iApply (wp_cret_s_sconf γ Φ (mword_of_int (ASL + 0x44)) (mword_of_int 1 : mword 5) Q42 av
-                ltac:(vm_compute; discriminate) Hretal
+                ltac:(vm_compute; discriminate)
                 with "Hcg Hpc Hi44 [-]").
       iIntros "Hcg Hpc".
-      assert (Hretf : update_vec_dec (add_vec (Q42 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+      assert (Hretf : ret_pc (Q42 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HQ42ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
       (* callee_saved m Q42.  s3..s11/tp thread through release+myproc back to M
@@ -697,14 +691,13 @@ Section ProofAcquiresleep.
       { rewrite HL2a1. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
       iApply (Sleep.wp_sleep_sconf γ Φ γs j γpl γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L2 (av - 4)%nat eb C
                 HL2tp Hj Hjpl Hsl_lka
-                ltac:(rewrite HL2ra; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Hown Hpay Htext Hpc Hpinv [] Htok HRc [Hlkcpu] Hplk Hctx Hsched [-]").
       { iApply (is_sleeplock_lock with "Hslk"). }
       { iEval (rewrite HL2a1). change (add_vec (sl_lk slk) (sign_extend' 64 (mword_of_int 16 : mword 12))) with (sl_lkcpu slk). iExact "Hlkcpu". }
       iIntros (mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok HRc Hlkcpu Hplk Hctx Hsched".
       (* pc = +0x24; anchor cells *)
-      assert (Hpc24 : update_vec_dec (add_vec (L2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+      assert (Hpc24 : ret_pc (L2 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (ASL + 0x24)) by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc24) in "Hpc".
       iEval (rewrite HL2a1) in "Hlkcpu".

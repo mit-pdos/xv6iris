@@ -65,8 +65,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.plic_claim in
   let ra0 := m0 !!! Regidx ra_idx in
-  let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  let ret_tgt := ret_pc ra0 in
   bv_unsigned (m0 !!! Regidx tp_idx) < Z.of_nat dev_ncpu ->
   (* plic_claim's own max depth: its 16-byte frame (2 slots) plus the two
      slots cpuid's frame needs below it. *)

@@ -49,11 +49,10 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
     (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
-                   (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
   (* the hart id is the ambient CpuId (wakeup runs over the proven myproc) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ 0 eb pme C -∗

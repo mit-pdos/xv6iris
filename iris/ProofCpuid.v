@@ -152,7 +152,7 @@ Section ProofCpuid.
     : wp_cpuid_sconf_body γ Φ m0 n.
   Proof.
     cbv beta delta [wp_cpuid_sconf_body].
-    intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hal0 Hn.
+    intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hn.
     (* the per-instruction register-map chain (private to the proof) *)
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (imm_entry := (mword_of_int 48 : mword 6)).
@@ -295,13 +295,11 @@ Section ProofCpuid.
     assert (Hm7ra : m7 !!! Regidx ra_idx = ra0).
     { unfold m7, m6; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold m5. rewrite upd_eq. reflexivity. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (m7 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite Hm7ra; exact Hal0).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (KernelSyms.cpuid + 0x12)) ra_idx m7 n
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi12 [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (m7 !!! Regidx ra_idx) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (m7 !!! Regidx ra_idx) = ret_tgt)
       by (rewrite Hm7ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! m7 with "Hcg Hpc [%]").
@@ -337,7 +335,7 @@ Section ProofCpuid.
     : wp_call_cpuid_sconf_cs_body γ Φ P jimm m n.
   Proof.
     cbv beta delta [wp_call_cpuid_sconf_cs_body].
-    intros ra_idx tp_idx a0_idx m0 pcE ra0 ret_tgt Htarget Halpce Hal0 Hn.
+    intros ra_idx tp_idx a0_idx m0 pcE ra0 ret_tgt Htarget Halpce Hn.
     iIntros "Hcg #Htext Hpc Hjal Hcont".
     iApply (wp_jal_s_sconf γ Φ P (mword_of_int 1) jimm m n
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -345,7 +343,7 @@ Section ProofCpuid.
               with "Hcg Hpc Hjal [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Htarget) in "Hpc".
-    iApply (wp_cpuid_sconf γ Φ m0 n Hal0 Hn
+    iApply (wp_cpuid_sconf γ Φ m0 n Hn
               with "Hcg Htext Hpc [-]").
     iIntros (m') "Hcg Hpc %Hcs".
     iApply ("Hcont" $! m' with "Hcg Hpc [%]").

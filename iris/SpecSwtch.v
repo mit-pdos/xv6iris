@@ -41,8 +41,6 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   length old_vs = 14%nat ->
   m0 !!! Regidx (mword_of_int 10 : mword 5) = oldc ->
   m0 !!! Regidx (mword_of_int 11 : mword 5) = newc ->
-  eq_vec (access_vec_dec (ctx_pc (m0 !!! Regidx (mword_of_int 1 : mword 5))) 0)
-    ('b"0") = true ->
   kernel_text -∗
   (* THE FULL AMBIENT BUNDLES, both directions: the suspender hands its
      whole [sie_cap_gpr] (stack + avail included -- they park in ITS
@@ -66,7 +64,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr γ m av -∗
       cpu_own γ 1 eb' p emp -∗
-      pc_is (ctx_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
+      pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ cret : mword 64,
          ▷ valid_context γ Φ P cret p ∗

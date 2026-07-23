@@ -52,8 +52,7 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
-  let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  let ret_tgt := ret_pc ra0 in
   (2 <= n)%nat ->
   sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗

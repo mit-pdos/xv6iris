@@ -46,14 +46,13 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let s1entry := add_vec (and_vec (add_vec pa_start (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (20 <= K)%nat ->
   ncnt = 0%nat ->
   eq_vec (zero_reg : mword 64) cpuv = false ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (* the tp register holds THIS cpu's id (kfree cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   lk = mword_of_int KernelSyms.kmem ->

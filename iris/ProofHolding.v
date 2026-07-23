@@ -57,7 +57,7 @@ Section ProofHolding.
     : wp_holding_lockinv_s_sconf_body γ Φ γl lka s R m n cpuold dqc.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
-    intros pcE lk a_cpu ret_tgt Hlka Hnotmine Hal0 Hn.
+    intros pcE lk a_cpu ret_tgt Hlka Hnotmine Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Hcpu Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
@@ -101,14 +101,12 @@ Section ProofHolding.
       assert (HraH2 : H2 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5)).
       { rewrite /H2 upd_ne; [| vm_compute; discriminate].
         rewrite /H1 upd_ne; [| vm_compute; discriminate]. reflexivity. }
-      assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (H2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-        by (rewrite HraH2; exact Hal0).
       iPoseProof (hi_06 with "Htext") as "Hi06".
       iApply (wp_cret_s_sconf γ Φ (mword_of_int (HD + 0x06)) (mword_of_int 1 : mword 5) H2 n
-                ltac:(vm_compute; discriminate) Hal0'
+                ltac:(vm_compute; discriminate)
                 with "Hcg Hpc Hi06 [-]").
       iIntros "Hcg Hpc".
-      assert (Hra_final : update_vec_dec (add_vec (H2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+      assert (Hra_final : ret_pc (H2 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HraH2; reflexivity).
       iEval (rewrite Hra_final) in "Hpc".
       iApply ("Hcont" $! H2 with "Hcg Hpc [%] Hcpu").
@@ -248,7 +246,7 @@ Section ProofHolding.
     iPoseProof (his_16 with "Htext") as "Hi16".
     iApply (Mycpu.wp_call_mycpu_sconf_cs γ Φ (mword_of_int (HD + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
+              ltac:(lia)
               with "Hcg Htext Hpc Hi16 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
     set (C := mo).
@@ -265,7 +263,7 @@ Section ProofHolding.
     assert (Hs1val : C !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg cpuold).
     { rewrite /C Hs1C /S4 upd_eq /S3 upd_eq. reflexivity. }
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (HD + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc1a : ret_pc (add_vec_int (mword_of_int (HD + 0x16) : mword 64) 4)
                     = (mword_of_int (HD + 0x1a) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sub a0,s1,a0 ---- *)
@@ -396,14 +394,12 @@ Section ProofHolding.
       rewrite /S9 upd_ne; [| vm_compute; discriminate].
       rewrite /S8 upd_ne; [| vm_compute; discriminate].
       rewrite /S7. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (S10 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HS10ra; exact Hal0).
     iPoseProof (his_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (HD + 0x2a)) (mword_of_int 1 : mword 5) S10 n
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (S10 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (S10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HS10ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! S10 with "Hcg Hpc [%] Hcpu").
@@ -515,7 +511,7 @@ Section ProofHolding.
     : wp_holding_lockinv_locked_s_sconf_body γ Φ γl lka s R m n cpuold dqc.
   Proof.
     cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
-    intros pcE lk a_cpu ret_tgt Hlka Hmine Hal0 Hn.
+    intros pcE lk a_cpu ret_tgt Hlka Hmine Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htok Hcpu Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
@@ -663,7 +659,7 @@ Section ProofHolding.
     iPoseProof (his_16 with "Htext") as "Hi16".
     iApply (Mycpu.wp_call_mycpu_sconf_cs γ Φ (mword_of_int (HD + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
+              ltac:(lia)
               with "Hcg Htext Hpc Hi16 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
     set (C := mo).
@@ -680,7 +676,7 @@ Section ProofHolding.
     assert (Hs1val : C !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg cpuold).
     { rewrite /C Hs1C /S4 upd_eq /S3 upd_eq. reflexivity. }
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc1a : update_vec_dec (add_vec (add_vec_int (mword_of_int (HD + 0x16) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc1a : ret_pc (add_vec_int (mword_of_int (HD + 0x16) : mword 64) 4)
                     = (mword_of_int (HD + 0x1a) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sub a0,s1,a0 ---- *)
@@ -811,14 +807,12 @@ Section ProofHolding.
       rewrite /S9 upd_ne; [| vm_compute; discriminate].
       rewrite /S8 upd_ne; [| vm_compute; discriminate].
       rewrite /S7. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (S10 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HS10ra; exact Hal0).
     iPoseProof (his_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (HD + 0x2a)) (mword_of_int 1 : mword 5) S10 n
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (S10 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (S10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HS10ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! S10 with "Hcg Hpc [%] Htok Hcpu").

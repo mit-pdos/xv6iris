@@ -35,10 +35,8 @@ Definition ctx_regs : list (mword 5) :=
 Definition callee_img (m : regfile) : list (mword 64) :=
   map (fun r => m !!! Regidx r) ctx_regs.
 
-(* the pc a [ret] to saved return address [ra] lands on (low bit cleared);
-   matches wp_cret_s_zca's target expression. *)
-Definition ctx_pc (ra : mword 64) : mword 64 :=
-  update_vec_dec (add_vec ra (sign_extend' 64 (zeros' 12))) 0 ('b"0").
+(* The pc a coroutine resumes on is [ret_pc] of its saved return address
+   (RiscvExtras): the [c.ret] the swtch epilogue executes clears bit 0. *)
 
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
@@ -122,14 +120,14 @@ Section SwtchCtx.
       : mword 64 -d> mword 64 -d> iPropO Σ := fun c p =>
     (∃ (vs : list (mword 64)) (av : nat),
       ⌜length vs = 14%nat⌝ ∗
-      ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
+      ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (nth 1 vs (mword_of_int 0)) (kv_frame_slots + av) ∗
       (∀ (m : regfile) (eb' : bool),
          ⌜callee_img m = vs⌝ -∗
          sie_cap_gpr γ m av -∗
          cpu_own γ 1 eb' p emp -∗
-         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗
+         pc_is (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
          (∃ cret : mword 64,
             ▷ rec cret p ∗ P c cret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗

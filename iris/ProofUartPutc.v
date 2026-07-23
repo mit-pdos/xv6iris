@@ -382,7 +382,7 @@ Section ProofUartPutc.
     : wp_uartputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
-    intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hal0 Hpv Hpkv.
+    intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hpv Hpkv.
     pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Ht Hpc Hpk Hpkd #Hdinv Hown #Hoff Hcont".
     set (spr := add_vec (m0 !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -555,13 +555,11 @@ Section ProofUartPutc.
       rewrite /Q48 upd_ne; [| vm_compute; discriminate].
       rewrite /Q46 upd_eq.
       rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
-    assert (Hretaligned : eq_vec (access_vec_dec (update_vec_dec (add_vec (Q4c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HQ4cra; exact Hal0).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (UPS + 0x4e)) (mword_of_int 1 : mword 5) Q4c K
-              ltac:(vm_compute; discriminate) Hretaligned
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi4e [-]").
     iIntros "Hcg Hpc".
-    assert (Hretf : update_vec_dec (add_vec (Q4c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hretf : ret_pc (Q4c !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ4cra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iApply ("Hcont" $! Q4c with "Hcg Hpc [%] Hpk Hpkd Hown Hsent").

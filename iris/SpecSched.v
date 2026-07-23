@@ -48,13 +48,12 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
     (m : regfile) (av : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
   let pj := proc_addr j in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
-                   (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   needs_ctx st = true ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (16 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   kernel_text -∗ pc_is pcE -∗

@@ -28,11 +28,10 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
   let pcE : mword 64 := mword_of_int KernelSyms.initlock in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (2 <= K)%nat ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   sie_cap_gpr γ m K -∗
   kernel_text -∗ pc_is pcE -∗
   (* the string argument [a1] points at: DUPLICABLE (persistent) ownership,

@@ -130,7 +130,7 @@ Section WpMemsetArray.
     : wp_memset_sconf_body γ Φ m0 n 0 cval olds.
   Proof.
     cbv beta delta [wp_memset_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2 Hret0.
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
     pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     set (ra_idx := (mword_of_int 1 : mword 5)).
     set (s0_idx := (mword_of_int 8 : mword 5)).
@@ -176,7 +176,6 @@ Section WpMemsetArray.
     { unfold m2. rewrite upd_ne; [| vm_compute; discriminate].
       unfold m1. apply upd_eq. }
     iApply (Memset.wp_memset_suffix_sconf γ Φ m2 (n - 2)%nat ra0 s00
-              Hret0
               with "Hcg HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
@@ -202,7 +201,7 @@ Section WpMemsetArray.
   Proof.
     intro Hlen0.
     cbv beta delta [wp_memset_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2 Hret0.
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
   pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     set (ra_idx := (mword_of_int 1 : mword 5)).
     set (s0_idx := (mword_of_int 8 : mword 5)).
@@ -335,7 +334,6 @@ Section WpMemsetArray.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
     iApply (Memset.wp_memset_suffix_sconf γ Φ m7 (n - 2)%nat ra0 s00
-              Hret0
               with "Hcg HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }

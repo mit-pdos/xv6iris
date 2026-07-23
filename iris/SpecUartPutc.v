@@ -30,12 +30,11 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{C
   let pcE := mword_of_int KernelSyms.uartputc_sync in
   let ra0 := m0 !!! Regidx ra_idx in
   let a00 := m0 !!! Regidx a0_idx in
-  let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc ra0 in
   let sb : mword 8 := autocast (T := mword)
      (subrange_vec_dec (and_vec (add_vec zero_reg a00)
         (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
   (4 <= K)%nat ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   eq_vec (sign_extend' 64 pv) zero_reg = false ->
   neq_vec (sign_extend' 64 pkv) zero_reg = false ->
   sie_cap_gpr γ m0 K -∗

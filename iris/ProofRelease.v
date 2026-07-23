@@ -59,7 +59,7 @@ Section ProofRelease.
   Proof.
     cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 a_cpu cpuv ret_tgt
-           Hlka Hmine Hal0 Htp Hav.
+           Hlka Hmine Htp Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hcpu Hown Hpay Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
@@ -182,7 +182,6 @@ Section ProofRelease.
     iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka s R R3 (av - 4)%nat cpuold (dqc := DfracOwn 1)
               ltac:(rewrite Ha0R3; exact Hlka)
               ltac:(rewrite HtpR3; exact Hmine)
-              ltac:(rewrite upd_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hlock Htoken [Hcpu] [-]").
     { iEval (rewrite Ha0R3). iExact "Hcpu". }
@@ -191,7 +190,7 @@ Section ProofRelease.
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Htph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc10 : update_vec_dec (add_vec (add_vec_int (mword_of_int (RL + 0x0c) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc10 : ret_pc (add_vec_int (mword_of_int (RL + 0x0c) : mword 64) 4)
                     = (mword_of_int (RL + 0x10) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc10) in "Hpc".
     (* ---- 0x10: c.beqz a0 falls (a0 = 1) ---- *)
@@ -256,13 +255,12 @@ Section ProofRelease.
     { rewrite /M1 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspR3. }
     iApply (PushOff.wp_pop_off_sconf γ Φ M1 (av - 4)%nat n eb p C
-              ltac:(rewrite upd_eq; vm_compute; reflexivity)
-              ltac:(rewrite HtpM1; exact Htp)
+              ltac:(exact (eq_trans HtpM1 Htp))
               ltac:(lia)
               with "Hcg Hown Hpay Htext Hpc [-]").
     iIntros (mf) "Hcg Hown Hpc %Hmf".
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc22 : update_vec_dec (add_vec (add_vec_int (mword_of_int (RL + 0x1e) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc22 : ret_pc (add_vec_int (mword_of_int (RL + 0x1e) : mword 64) 4)
                     = (mword_of_int (RL + 0x22) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
     destruct Hmf as (Hcspf & Htpf & Hs0f & Hs1f & Hs2f & Hs3f & Hs4f & Hs5f & Hs6f & Hs7f & Hs8f & Hs9f & Hs10f & Hs11f).
@@ -357,14 +355,12 @@ Section ProofRelease.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE4ra; exact Hal0).
     iPoseProof (rli_2a with "Htext") as "Hi2a".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (RL + 0x2a)) (mword_of_int 1 : mword 5) E4 av
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! E4 with "Hcg Hpc [%] Hcpu Hown").

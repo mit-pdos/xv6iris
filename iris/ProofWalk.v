@@ -314,14 +314,10 @@ Section ProofWalk.
     (* +0x64 ret *)
     assert (HE9ra : E9 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1)).
     { peel_reg. }
-    assert (Hrt : update_vec_dec (add_vec (E9 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0" : mword 1) = ret_tgt).
-    { rewrite HE9ra.
-      replace (sign_extend' 64 (zeros' 12) : mword 64) with (mword_of_int 0 : mword 64)
-        by (apply bv_eq; vm_compute; reflexivity).
-      rewrite kv_addv_zero. reflexivity. }
+    assert (Hrt : ret_pc (E9 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt).
+    { rewrite HE9ra. reflexivity. }
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (WK + 0x64)) (mword_of_int 1 : mword 5) E9 K
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hrt; exact (bit0_update0_64 (mm !!! Regidx (mword_of_int 1))))
               with "Hcg Hpc Hi64 [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
@@ -647,7 +643,7 @@ Section ProofWalk.
     let sp0 := m0 !!! Regidx csp_rs1 in
     let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
     let p := m0 !!! Regidx a0_idx in
-    let ret_tgt := update_vec_dec (add_vec ra0 (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let ret_tgt := ret_pc ra0 in
     let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
     m0 !!! Regidx a1_idx = cval ->
     m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
@@ -674,7 +670,7 @@ Section ProofWalk.
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     iApply (MemsetArray.wp_memset_sconf γ Φ m0 n 4096 cval olds
-              Hn ltac:(vm_compute; reflexivity) Hcval Ha2' Hret0
+              Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
@@ -800,21 +796,18 @@ Section ProofWalk.
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Htp. }
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (WK + 0x76) : mword 64) 4)
       by (rewrite /J upd_eq; reflexivity).
-    assert (Hretk : eq_vec (access_vec_dec (update_vec_dec (add_vec (J !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true).
-    { rewrite HJ1. vm_compute. reflexivity. }
     iApply (Kalloc.wp_kalloc_sconf γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
               J qcpu None lvl eb p C (K - 8)%nat
               ltac:(lia)
               ltac:(rewrite HJ4; exact Hqne)
-              Hretk
               ltac:(rewrite HJ4; exact Hcid)
               ltac:(reflexivity)
               ltac:(rewrite Hlvl; vm_compute; reflexivity)
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu [-]").
     iIntros (mr) "Hcg Hcnt Hpc %Hkcs Hkpost Hcpu2".
     (* the return pc: +0x7a *)
-    assert (Hret7a : update_vec_dec (add_vec (J !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0" : mword 1) = mword_of_int (WK + 0x7a)).
-    { rewrite HJ1. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hret7a : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (WK + 0x7a)).
+    { rewrite HJ1. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret7a) in "Hpc".
     (* +0x7a c.mv s1,a0 *)
     iApply (wp_cmv_s_sconf γ Φ (mword_of_int (WK + 0x7a)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
@@ -942,7 +935,7 @@ Section ProofWalk.
               with "Hcg Htext Hpc [Hpage] [-]").
     { iEval (rewrite HN4a0). iExact "Hpage". }
     iIntros (mfin) "Hcg Hpc Hbytes %Hmcs".
-    assert (Hret86 : update_vec_dec (add_vec (N4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0" : mword 1) = mword_of_int (WK + 0x86)).
+    assert (Hret86 : ret_pc (N4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (WK + 0x86)).
     { rewrite /N4 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret86) in "Hpc".
     (* the zero page as a description node *)

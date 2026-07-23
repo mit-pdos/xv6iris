@@ -49,7 +49,7 @@ Section ProofKinit.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
     intros pcE ret_tgt cpuv lk fl c_name c_cpu endaddr phystop s1entry
-      HK Hncnt Hmycpu Hretm Htp Hprun.
+      HK Hncnt Hmycpu Htp Hprun.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hcont".
@@ -210,7 +210,6 @@ Section ProofKinit.
     (* initlock(&kmem.lock, "kmem") : owns lk's 3 struct fields, returns them init'd *)
     iApply (Initlock.wp_initlock_sconf γ Φ R7 vlock vname vcpu "kmem"%string (K - 2)
               ltac:(lia)
-              ltac:(rewrite HR7ra; vm_compute; reflexivity)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HR7a1). iExact "Hstr". }
     { iEval (rewrite HR7a0). iExact "Hlock". }
@@ -218,7 +217,7 @@ Section ProofKinit.
     { iEval (rewrite HR7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock". iEval (rewrite HR7a0) in "Hlname". iEval (rewrite HR7a0) in "Hcpu".
-    assert (Hpcil : update_vec_dec (add_vec (R7 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KI + 0x1c)).
+    assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KI + 0x1c)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
     (* ===== newlock ghost: allocate is_kmem γl γk lk fl + kalloc_avail (Some 0) ===== *)
@@ -313,7 +312,6 @@ Section ProofKinit.
     iApply (Freerange.wp_freerange_sconf γ Φ γl γk lk fl R12 ps (K - 2) ncnt eb pcur C
               ltac:(lia) Hncnt
               ltac:(rewrite HR12tp; exact Hmycpu)
-              ltac:(rewrite HR12ra; vm_compute; reflexivity)
               ltac:(rewrite HR12tp; exact Htp)
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun)
@@ -321,7 +319,7 @@ Section ProofKinit.
     { iExact "Hcpu". }
     { iExact "Havail". }
     iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Hqcpu Havail".
-    assert (Hpcfr : update_vec_dec (add_vec (R12 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KI + 0x2c)).
+    assert (Hpcfr : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KI + 0x2c)).
     { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcfr) in "Hpc".
     pose proof Hfrcs as Hfrcs_full. unfold callee_saved in Hfrcs.
@@ -382,13 +380,11 @@ Section ProofKinit.
     { rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_eq; reflexivity. }
-    assert (Hretaligned : eq_vec (access_vec_dec (update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE3ra; exact Hretm).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (KI + 0x32)) (mword_of_int 1 : mword 5) E3 K
-              ltac:(vm_compute; discriminate) Hretaligned
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi32 [-]").
     iIntros "Hcg Hpc".
-    assert (Hretf : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hretf : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail Hqcpu").

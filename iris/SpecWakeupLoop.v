@@ -28,7 +28,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
-  let rettgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (18 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
@@ -37,7 +37,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
   eq_vec (zero_reg : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
   (* myproc/acquire's push_off keeps the transient noff increment in range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  eq_vec (access_vec_dec rettgt 0) ('b"0") = true ->
   sie_cap_gpr γ m K -∗
   cpu_own γ lvl eb pme C -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗

@@ -74,7 +74,7 @@ Section WpSwtchSconf.
     wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
-    iIntros (Hlen_old Holdc Hnewc Hal_old)
+    iIntros (Hlen_old Holdc Hnewc)
       "#Ht Hcg Hcpuown Hpc Holdcells Hvalidnew HP Hwold".
     (* The record no longer parks [eb] or an avail copy: its resume wand is
        [∀ m eb'], so the resumer supplies cpu_own at ITS OWN [eb']; the
@@ -178,11 +178,7 @@ Section WpSwtchSconf.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.
-      { iPureIntro.
-        assert (Hn0 : nth 0 (callee_img m0) (mword_of_int 0)
-                      = m0 !!! Regidx (mword_of_int 1 : mword 5))
-          by (unfold callee_img, ctx_regs; cbn; reflexivity).
-        rewrite Hn0. exact Hal_old. }
+      { iPureIntro. apply ret_pc_aligned. }
       rewrite -/(ctx_cells oldc (callee_img m0)).
       iFrame "Holdpart".
       iSplitL "Hstk".
@@ -201,11 +197,6 @@ Section WpSwtchSconf.
     { rewrite (vregs_den_lookup rho swtch_regs1 (Regidx (mword_of_int 4 : mword 5))
                  (SX 4 0) ltac:(vm_compute; reflexivity)).
       rewrite sval_den_SX0. unfold rho. cbn. reflexivity. }
-    assert (Hlow : eq_vec (access_vec_dec
-               (update_vec_dec (add_vec
-                  (vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5))
-                  (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true).
-    { rewrite Hm1. exact Hal_new. }
     assert (Hcallee_new :
               callee_img (vregs_den rho swtch_regs1) = new_vs).
     { rewrite <- Hmapnew. unfold callee_img, ctx_regs; cbn [map nth].
@@ -222,7 +213,7 @@ Section WpSwtchSconf.
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
               ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
+              ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hret
                     [Hnewwand Hvoldc Hnewpart HP Hhalf Hq0 Hcpuown Hstk_t]").

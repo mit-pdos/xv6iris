@@ -28,10 +28,9 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eq_vec cpuold cpuv = true ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->

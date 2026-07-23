@@ -396,7 +396,7 @@ Section WpSwtchVc.
     done.
   Qed.
 
-  (* [ctx_cells] / [callee_img] / [ctx_pc] live in SwtchCtx.v. *)
+  (* [ctx_cells] / [callee_img] / [ret_pc] live in SwtchCtx.v. *)
 
   (* a heap segment's denotation IS the ctx-cell ownership of its values. *)
   Lemma seg_cells_ctx (rho : nat -> mword 64) (breg : nat) (c : mword 64)

@@ -41,6 +41,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec.
+(* [ret_pc] & the shared mword identities are used pervasively downstream. *)
+Require Export RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.

@@ -172,7 +172,7 @@ Section ProofMyproc.
     : wp_myproc_sconf_body γ Φ m av n eb p C.
   Proof.
     cbv beta delta [wp_myproc_sconf_body].
-    intros pcE ret_tgt Htp Hpos Halret Hav.
+    intros pcE ret_tgt Htp Hpos Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc Hcont".
     iPoseProof (mpi_00 with "Htext") as "Hi00".
@@ -273,14 +273,13 @@ Section ProofMyproc.
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspA0. }
     (* the noff/intena cells + counting token ride inside cpu_own *)
     iApply (PushOff.wp_push_off_sconf γ Φ A2 (av - 4)%nat n eb p C
-              ltac:(rewrite upd_eq; vm_compute; reflexivity)
               HtpA2
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc [-]").
     iIntros (ms MP1) "%Hmsf Hcg Hown Hpay Hpc %Hmp1".
     iEval (rewrite upd_eq) in "Hpc".
-    assert (Hpc0e : update_vec_dec (add_vec (add_vec_int (mword_of_int (MP + 0x0a) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc0e : ret_pc (add_vec_int (mword_of_int (MP + 0x0a) : mword 64) 4)
                     = (mword_of_int (MP + 0x0e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0e) in "Hpc".
     (* tp carried through push_off by callee_saved *)
@@ -427,13 +426,12 @@ Section ProofMyproc.
     assert (HB9ra : B9 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (MP + 0x26))
       by (rewrite /B9 upd_eq; apply bv_eq; vm_compute; reflexivity).
     iApply (PushOff.wp_pop_off_sconf γ Φ B9 (av - 4)%nat n eb p C
-              ltac:(rewrite HB9ra; vm_compute; reflexivity)
               HtpB9
               ltac:(lia)
               with "Hcg Hown Hpay Htext Hpc [-]").
     iIntros (MP2) "Hcg Hown Hpc %Hmp2".
     iEval (rewrite HB9ra) in "Hpc".
-    assert (Hpc26 : update_vec_dec (add_vec (mword_of_int (MP + 0x26) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
+    assert (Hpc26 : ret_pc (mword_of_int (MP + 0x26) : mword 64)
                     = (mword_of_int (MP + 0x26) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
     (* ---- 0x26: c.mv a0,s1 ---- *)
@@ -556,14 +554,12 @@ Section ProofMyproc.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE4ra; exact Halret).
     iPoseProof (mpi_30 with "Htext") as "Hi30".
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (MP + 0x30)) (mword_of_int 1 : mword 5) E4 av
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi30 [-]").
     iIntros "Hcg Hpc".
-    assert (Hra_final : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! ms E4 with "[%] Hcg Hown Hpc [%]").

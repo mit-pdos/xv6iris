@@ -78,7 +78,7 @@ Section ProofFreerange.
       (γk : gname * gname) (onf : option nat) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
-    let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+    let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
     (6 <= K)%nat ->
     eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
     Me !!! Regidx csp_rs1 = spr ->
@@ -196,13 +196,11 @@ Section ProofFreerange.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_eq; reflexivity. }
-    assert (Hretaligned : eq_vec (access_vec_dec (update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE4ra; exact Hretm).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (FR + 0x46)) (mword_of_int 1 : mword 5) E4 K
-              ltac:(vm_compute; discriminate) Hretaligned
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi46 [-]").
     iIntros "Hcg Hpc".
-    assert (Hretf : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hretf : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] Hqcpu Havail").
@@ -233,7 +231,7 @@ Section ProofFreerange.
   Proof.
     cbv beta delta [wp_freerange_sconf_body].
     intros pcE pa_start pa_end ret_tgt cpuv a_cpu s1entry
-      HK Hncnt Hmycpu Hretm Htp Hlk Hfl Hprun.
+      HK Hncnt Hmycpu Htp Hlk Hfl Hprun.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages Hqcpu Havail Hcont".
@@ -445,7 +443,7 @@ Section ProofFreerange.
                 with "Hcg Hpc Hi1a [-]").
       iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt3e) in "Hpc".
-      iApply (frepi γ Φ m R8 K ncnt eb pcur C a_cpu γk (Some 0%nat) ltac:(lia) Hretm HR8sp HR8cs
+      iApply (frepi γ Φ m R8 K ncnt eb pcur C a_cpu γk (Some 0%nat) ltac:(lia) ltac:(apply ret_pc_aligned) HR8sp HR8cs
                 with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Hqcpu Havail Hcont").
       { iExists vs20; iExact "Hslot4". }
       { iExists vs30; iExact "Hslot5". }
@@ -631,7 +629,6 @@ Section ProofFreerange.
         iApply (Kfree.wp_kfree_sconf γ Φ γl γk lk fl M2 zero_reg on ncnt eb pcur C (K - 6)
                   ltac:(lia)
                   ltac:(rewrite HM2tp; exact Hmycpu)
-                  ltac:(rewrite HM2ra; vm_compute; reflexivity)
                   ltac:(rewrite HM2tp; exact Htp)
                   Hlk Hfl
                   ltac:(lia)
@@ -639,7 +636,7 @@ Section ProofFreerange.
         { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HM2a0; exact Hpvq | rewrite HM2a0; iExact "Hpage"]. }
         { iExact "Hqcpu". }
         iIntros (mkf) "Hcg Hcnt Hpc %Hkfcs Havail Hqcpu".
-        assert (Hkfret : update_vec_dec (add_vec (M2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (FR + 0x32)).
+        assert (Hkfret : ret_pc (M2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (FR + 0x32)).
         { rewrite HM2ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hkfret) in "Hpc".
         pose proof Hkfcs as Hkfcs_full. unfold callee_saved in Hkfcs.
@@ -760,7 +757,7 @@ Section ProofFreerange.
           simpl in Hcount.
           iEval (rewrite Hcount) in "Havail".
           iApply (frepi γ Φ m N3 K ncnt eb pcur C a_cpu γk (Some (length (p0 :: rest))) ltac:(lia)
-                    Hretm HN3sp HN3cs
+                    ltac:(apply ret_pc_aligned) HN3sp HN3cs
                     with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Hqcpu Havail Hcont").
           { iExists _; iExact "Hc4". }
           { iExists _; iExact "Hc5". }

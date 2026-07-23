@@ -50,13 +50,12 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let a_cpu_k := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
-                   (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ 1 eb pj C -∗

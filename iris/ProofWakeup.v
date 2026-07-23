@@ -204,13 +204,11 @@ Section ProofWakeupEpi.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_eq. reflexivity. }
-    assert (Hral : eq_vec (access_vec_dec (update_vec_dec (add_vec (E8 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE8ra; exact Halign).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (WK + 0x68)) (mword_of_int 1 : mword 5) E8 K
-              ltac:(vm_compute; discriminate) Hral
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi68 [-]").
     iIntros "Hcg Hpc".
-    assert (Hretf : update_vec_dec (add_vec (E8 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = rettgt)
+    assert (Hretf : ret_pc (E8 !!! Regidx (mword_of_int 1 : mword 5)) = rettgt)
       by (rewrite HE8ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     iApply ("Hcont" $! E8 with "[%] Hcg Hpc").

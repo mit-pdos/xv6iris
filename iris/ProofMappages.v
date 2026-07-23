@@ -329,14 +329,10 @@ Section ProofMappages.
     (* +0xb0 ret *)
     assert (HE10ra : E10 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1)).
     { peel_reg. }
-    assert (Hrt : update_vec_dec (add_vec (E10 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0" : mword 1) = ret_tgt).
-    { rewrite HE10ra.
-      replace (sign_extend' 64 (zeros' 12) : mword 64) with (mword_of_int 0 : mword 64)
-        by (apply bv_eq; vm_compute; reflexivity).
-      rewrite kv_addv_zero. reflexivity. }
+    assert (Hrt : ret_pc (E10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt).
+    { rewrite HE10ra. reflexivity. }
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (MP + 0xb0)) (mword_of_int 1 : mword 5) E10 K
               ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hrt; exact (bit0_update0_64 (mm !!! Regidx (mword_of_int 1))))
               with "Hcg Hpc Hib0 [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
@@ -577,8 +573,8 @@ Section ProofMappages.
     (* pc back at +0x48 *)
     assert (Hlink : W4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (MP + 0x44) : mword 64) 4).
     { rewrite /W4 upd_eq. reflexivity. }
-    assert (Hret48 : update_vec_dec (W4 !!! Regidx (mword_of_int 1 : mword 5)) 0 ('b"0" : mword 1) = mword_of_int (MP + 0x48)).
-    { rewrite Hlink. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hret48 : ret_pc (W4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (MP + 0x48)).
+    { rewrite Hlink. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret48) in "Hpc".
     (* recovered callee-saved registers *)
     assert (Hmr9 : mr !!! Regidx (mword_of_int 9 : mword 5)

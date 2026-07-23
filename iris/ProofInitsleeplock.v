@@ -75,7 +75,7 @@ Section ProofInitsleeplock.
     : wp_initsleeplock_sconf_body γ Φ m s vlocked vlk vpid vlkname vcpu vname av.
   Proof.
     cbv beta delta [wp_initsleeplock_sconf_body].
-    intros pcE slk name ret_tgt Hretm Hav.
+    intros pcE slk name ret_tgt Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg #Htext Hpc #Hstr #Hnames Hlocked Hlk Hlkname Hcpu Hnamefield Hpid Hcont".
@@ -299,7 +299,6 @@ Section ProofInitsleeplock.
     (* ===== jal initlock: initlock(&lk->lk, "sleep lock") ===== *)
     iApply (Initlock.wp_initlock_sconf γ Φ A7 vlk vlkname vcpu "sleep lock"%string (av - 4)
               ltac:(lia)
-              ltac:(rewrite HA7ra; vm_compute; reflexivity)
               with "Hcg Htext Hpc [] [Hlk] [Hlkname] [Hcpu]").
     { iEval (rewrite HA7a1). iExact "Hstr". }
     { iEval (rewrite HA7a0). iExact "Hlk". }
@@ -307,7 +306,7 @@ Section ProofInitsleeplock.
     { iEval (rewrite HA7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlk Hlname Hcpu".
     iEval (rewrite HA7a0) in "Hlk". iEval (rewrite HA7a0) in "Hlname". iEval (rewrite HA7a0) in "Hcpu".
-    assert (Hpcil : update_vec_dec (add_vec (A7 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (ISL + 0x1e)).
+    assert (Hpcil : ret_pc (A7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (ISL + 0x1e)).
     { rewrite HA7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
     (* project the registers we need out of initlock's callee_saved fact *)
@@ -444,13 +443,11 @@ Section ProofInitsleeplock.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
-    assert (Hal0' : eq_vec (access_vec_dec (update_vec_dec (add_vec (E5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
-      by (rewrite HE5ra; exact Hretm).
     iApply (wp_cret_s_sconf γ Φ (mword_of_int (ISL + 0x34)) (mword_of_int 1 : mword 5) E5 av
-              ltac:(vm_compute; discriminate) Hal0'
+              ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi34 [-]").
     iIntros "Hcg Hpc".
-    assert (Hretf : update_vec_dec (add_vec (E5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
+    assert (Hretf : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* ===== hand everything back to the caller ===== *)
