@@ -89,10 +89,10 @@ errors. `sie_cap` now carries the `avail` slot count end-to-end (see
   its map; new direct `wp_caddi{_sp,16sp}_{push,pop}_s_sconf`), and the
   sp-aware VCgen executor (`vsstate`/`vc_step_sp_s`/`wp_vc_block_s_sconf` +
   `stack_own_base`).
-- **Stage 5 — function tier (all Qed):** Mycpu, Memset, UartPutc, Wakeup,
+- **Stage 5 — function tier (all Qed):** Mycpu, Memset, UartPutc, WakeupParts,
   MemsetPage, Holding, PushOff (the hard one — `intr_count n` collides with
   avail, so its avail binder is `av`), Acquire, Release (av=K−? via the
-  push_off/pop_off `av` args), Kfree, Initlock, WakeupLoop, Kalloc, Walk,
+  push_off/pop_off `av` args), Kfree, Initlock, Wakeup, Kalloc, Walk,
   Mappages, Kvmmap — plus the kinit cone the effort merged in over three
   upstream pulls (Kfree gained the `kalloc_avail` page-count ghost; then
   Freerange; then kinit). Per-function `K ≤ n` frame bounds: mycpu 2, initlock

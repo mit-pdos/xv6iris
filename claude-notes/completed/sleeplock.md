@@ -88,7 +88,7 @@ word is caller-threaded pinned `zero_reg` pre/post.
 
 - Functor deps: Initsleeplock(INITLOCK); Acquiresleep(ACQUIRE, RELEASE,
   MYPROC + the wp_sleep_sconf axiom); Releasesleep(ACQUIRE, RELEASE,
-  WAKEUPLOOP); Holdingsleep(ACQUIRE, RELEASE, MYPROC).
+  WAKEUP); Holdingsleep(ACQUIRE, RELEASE, MYPROC).
 - Noff-cell forms across an acquire: the cell comes back as
   `wk_noff_acq (mword_of_int 0)` etc. (WpWakeup.v) — rewrite computed forms
   to literals with `apply bv_eq; vm_compute; reflexivity` asserts.
@@ -119,7 +119,7 @@ word is caller-threaded pinned `zero_reg` pre/post.
 - [x] ProofInitsleeplock.v + LinkInitsleeplock.v (functor over INITLOCK).
 - [x] ProofHoldingsleep.v + LinkHoldingsleep.v (ACQUIRE/RELEASE/MYPROC).
 - [x] ProofReleasesleep.v + LinkReleasesleep.v (ACQUIRE/RELEASE/
-      WAKEUPLOOP; the WAKEUPLOOP-typed link module is named `WakeupLoop`).
+      WAKEUP; the WAKEUP-typed link module is named `Wakeup`).
 - [x] Merged upstream's proven sleep/sched/yield; SpecSleep.v is upstream's
       proven interface; the transient sleep MANIFEST_ASSUMED entry dropped.
 - [x] ProofAcquiresleep.v + LinkAcquiresleep.v (functor over ACQUIRE/
@@ -128,8 +128,8 @@ word is caller-threaded pinned `zero_reg` pre/post.
       see design/kernel-proofs.md).
 - [x] Full clean build; coverage: sleeplock.c 4/4 proven, 254/254 bytes.
       (releasesleep carries wakeup's PRE-EXISTING debt — the single
-      Admitted at ProofWakeup.v:479, a prologue proof whose script looks
-      complete but was left un-Qed'd — inherited via WAKEUPLOOP, out of
+      Admitted at ProofWakeupParts.v:479, a prologue proof whose script looks
+      complete but was left un-Qed'd — inherited via WAKEUP, out of
       this project's scope.  The wp_myproc_sconf_any axiom is gone:
       upstream rewired wakeup onto the proven myproc, which added
       `cur_proc pme` + tp = cid_word to releasesleep's spec.)

@@ -1,5 +1,5 @@
-(* LinkWakeup.v -- instantiates the Wakeup proof against its callees'
+(* LinkWakeup.v -- instantiates the wakeup proof against its callees'
    proofs.  Sealed, so this is the only place the two ever meet. *)
-Require Import ProofWakeup.
+Require Import LinkMyproc LinkAcquire LinkRelease LinkWakeupParts ProofWakeup.
 
-Module Wakeup := WakeupProof.
+Module Wakeup := WakeupProof Myproc Acquire Release WakeupParts.

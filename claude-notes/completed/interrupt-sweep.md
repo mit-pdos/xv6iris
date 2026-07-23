@@ -56,7 +56,7 @@ so the analysis is not lost.
 - Leaf layer: Proof{Alu,Btype,Ctl,Mem,Lock,Uart,Csr}.v; VCgen `WpSconfVc.v`
   (`wp_vc_block_s_sconf` — now sp-AWARE via the `vsstate` push/pop ledger, no
   `vblock_no_sp` guard).  Whole functions: Proof{Mycpu,PushOff,Holding,
-  Release,Acquire,Kalloc,Kfree,Wakeup,WakeupLoop,Memset,MemsetPage,Initlock,
+  Release,Acquire,Kalloc,Kfree,WakeupParts,Wakeup,Memset,MemsetPage,Initlock,
   Walk,Mappages,Kvmmap,Freerange,Kinit}.v.
 - Import direction: leaf files import IntrDefs/WpSmodeIntr; WpIntrInv imports no
   leaf file; WpKernelvecSpec does — keep the kernelvec cap on top.

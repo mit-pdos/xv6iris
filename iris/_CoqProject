@@ -183,9 +183,9 @@ LinkMappages.v
 SpecKvmmap.v
 ProofKvmmap.v
 LinkKvmmap.v
-SpecWakeup.v
-ProofWakeup.v
-LinkWakeup.v
+SpecWakeupParts.v
+ProofWakeupParts.v
+LinkWakeupParts.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
@@ -235,9 +235,9 @@ WpSleepDecode.v
 ProofSleep.v
 LinkSleep.v
 WpWakeup.v
-SpecWakeupLoop.v
-ProofWakeupLoop.v
-LinkWakeupLoop.v
+SpecWakeup.v
+ProofWakeup.v
+LinkWakeup.v
 SpecInitlock.v
 ProofInitlock.v
 LinkInitlock.v

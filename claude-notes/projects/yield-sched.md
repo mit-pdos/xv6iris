@@ -161,12 +161,12 @@ wp_swtch_sconf's ▷ premise.  `proc_lock_res_intro/elim/wakeup` mirror the
 old WpWakeup shapes (wakeup carries the ▷-slot untouched SLEEPING→RUNNABLE).
 
 WpWakeup.v keeps its decode/leaf/loop content but its ProcInv section is
-REPLACED by SchedCtx.v; SpecWakeupLoop/ProofWakeupLoop/LinkWakeupLoop get
+REPLACED by SchedCtx.v; SpecWakeup/ProofWakeup/LinkWakeup get
 the parameter rename (`proc_lock_res Rreg Φ γc bsie dq γk pa` →
 `proc_lock_res γ root_ppn Φ γs γk pa`, likewise procs_inv — the old
 Rreg/γc/bsie/dq params DISAPPEAR; γ/root_ppn are already in the loop's
 scope).  The old smode-level `wp_myproc` axiom in WpWakeup.v is unused —
-delete.  SpecWakeup's `wp_myproc_sconf` AXIOM is renamed
+delete.  SpecWakeupParts's `wp_myproc_sconf` AXIOM is renamed
 `wp_myproc_sconf_any` (wakeup threads no current-process resource; wiring
 the proven myproc through wakeup is future work).
 
@@ -281,14 +281,14 @@ All three carry `m !!! Regidx x4 = cid_word`.
       context where c->proc is 0; the self-skip beq destructs on the raw
       register comparison and needs no structure on pme — the old axiom's
       ∃j outputs were never used), the tp premise, and myproc's two
-      pop-shape premises at (noffv, lvl); WakeupLoopProof is a functor
+      pop-shape premises at (noffv, lvl); WakeupProof is a functor
       over MYPROC; cur_proc rides in wk_res_sconf.  Full build green.
 
 - [x] S9: the pre-existing `wp_wakeup_prologue_sconf` Admitted
-      (ProofWakeup.v, since a4eb750) is Qed'd — wakeup's whole chain is
+      (ProofWakeupParts.v, since a4eb750) is Qed'd — wakeup's whole chain is
       now axiom-clean (Sail baseline + funext only).  Root cause: the
       migration dropped 12 of the 15 postcondition conjuncts AND a stale
-      SpecWakeup.vo masked it; plus `repeat split` closing register
+      SpecWakeupParts.vo masked it; plus `repeat split` closing register
       conjuncts by kernel conversion over the transparent regfile tower
       (use `repeat apply conj` + lemma peels — recorded in
       completed/regfile-migration.md).

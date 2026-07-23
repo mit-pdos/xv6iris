@@ -40,7 +40,7 @@ Require Import ProcGeom.
 Require Import WpWakeup.
 Require Import SleepLock.
 Require Import WpSleeplockDecode.
-Require Import SpecAcquire SpecRelease SpecWakeupLoop.
+Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
 Import Defs.
@@ -62,7 +62,7 @@ Proof.
   rewrite HAB. apply kv_addv_zero.
 Qed.
 
-Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (WakeupLoop : WAKEUPLOOP) : RELEASESLEEP.
+Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
@@ -290,7 +290,7 @@ Section ProofReleasesleep.
       rewrite (callee_saved_lookup Hpins (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HKacqtp. }
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
-    iApply (WakeupLoop.wp_wakeup_sconf γ Φ Cwk γs (mycpu_ret cid_word) pme 1%nat (av - 4)%nat eb C
+    iApply (Wakeup.wp_wakeup_sconf γ Φ Cwk γs (mycpu_ret cid_word) pme 1%nat (av - 4)%nat eb C
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
