@@ -120,7 +120,7 @@ Section Kalloc.
     apply (Z.divide_trans 8 4096); [ exists 512; reflexivity | exact Hal ].
   Qed.
 
-  (* --- bridge to the kernel data region (KptExecMap's [addr_in_data]) ---
+  (* --- bridge to the kernel data region (RiscvPtsto's [addr_is_kdata]) ---
 
      [uint]/[bv_unsigned] bridge and the additive-offset fact for [pa_add],
      re-derived here rather than pulled from SmodePte.v (which drags in the

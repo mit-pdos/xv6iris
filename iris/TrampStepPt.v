@@ -570,8 +570,8 @@ Section TrampFetchInst.
             (exec_is_shadow_stack_fetch σ)
             Lpma with "Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
-    iDestruct "Hinv" as (satp1 tlbvec1 t1)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
+    iDestruct "Hinv" as (satp1 tlbvec1 t1 M)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
       "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc0") as %Lc.
@@ -585,8 +585,8 @@ Section TrampFetchInst.
     iSplit; [iPureIntro; rewrite Lc; exact HX |].
     iSplit; [iPureIntro; rewrite La; exact Hcov |].
     iFrame "Hri Hgh".
-    iApply (tlb_inv_pt_intro root_ppn satp1 tlbvec1 t1
-              Hmode Hasid Hppn Htlbok Hspec Hpmawimpl with "Hsatp Htlb Ht").
+    iApply (tlb_inv_pt_intro root_ppn satp1 tlbvec1 t1 M
+              Hmode Hasid Hppn Htlbok Hspec Hpmawimpl with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
               HA Hord Hpmarimpl HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.

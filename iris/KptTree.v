@@ -46,6 +46,7 @@ Require Import PtTree.
 Require Import PtTreeAdue.
 Require Import KptPt.
 Require Import KptExecMap.
+Require Import KMap.
 Require Import Pt4kWalk.
 Require Import SmodeCore.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -57,8 +58,6 @@ Import Defs.
 (* ===================================================================== *)
 
 (* the constant per-leaf A/D assignment picked out by two flag bits *)
-Definition kpt_adf_of (a d : mword 1) : kpt_adf :=
-  fun _ => (eq_vec a ('b"1"), eq_vec d ('b"1")).
 
 Lemma kpt_lflags_bound (vpn : mword 27) : 0 <= kpt_lflags vpn < 1024.
 Proof.
@@ -68,134 +67,27 @@ Qed.
 
 (* an A/D variant of the canonical kernel leaf IS the §12 leaf at the
    corresponding constant assignment *)
-Lemma pte_set_ad_kpt_leaf (vpn : mword 27) (a d : mword 1) :
-  pte_set_ad (kpt_leaf_pte vpn) a d = kpt_leaf_pte_ad (kpt_adf_of a d) vpn.
-Proof.
-  unfold kpt_leaf_pte, kpt_leaf_pte_ad, mk_pte.
-  rewrite (pte_set_ad_zext_concat (kpt_leaf_ppn vpn) (kpt_lflags vpn) a d
-             (kpt_lflags_bound vpn)).
-  assert (Hz : (mword_of_int
-                  (Z.lor (Z.land (kpt_lflags vpn) 831)
-                     (Z.lor (Z.shiftl (bv_unsigned a) 6)
-                            (Z.shiftl (bv_unsigned d) 7))) : mword 10)
-               = mword_of_int (kpt_lflags_ad (kpt_adf_of a d) vpn)).
-  { unfold kpt_lflags_ad, kpt_lflags, PTE_RAM_ad, PTE_DEV_ad, PTE_RAM, PTE_DEV,
-      kpt_ad_bits, kpt_adf_of.
-    destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-      destruct (Z.leb 0x80000 (bv_unsigned vpn));
-      apply bv_eq; vm_compute; reflexivity. }
-  rewrite Hz. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* §2 Per-leaf dispatch facts for the tree's leaves: exactly the shapes   *)
 (*    [ptree_maps] and the walk lemmas consume, discharged from §12.      *)
 (* ===================================================================== *)
 
-Lemma kpt_variant_flags (vpn : mword 27) (a d : mword 1) :
-  subrange_vec_dec (pte_set_ad (kpt_leaf_pte vpn) a d) 7 0
-  = (mword_of_int (kpt_lflags_ad (kpt_adf_of a d) vpn) : mword 8).
-Proof.
-  rewrite pte_set_ad_kpt_leaf. unfold kpt_leaf_pte_ad.
-  apply mk_pte_flags. apply kpt_lflags_ad_bound.
-Qed.
 
-Lemma kpt_variant_ext (vpn : mword 27) (a d : mword 1) :
-  ext_bits_of_PTE (pte_set_ad (kpt_leaf_pte vpn) a d)
-  = Mk_PTE_Ext (mword_of_int 0).
-Proof.
-  rewrite pte_set_ad_kpt_leaf. unfold kpt_leaf_pte_ad.
-  unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-  rewrite mk_pte_ext; [reflexivity |].
-  pose proof (kpt_lflags_ad_bound (kpt_adf_of a d) vpn). lia.
-Qed.
 
 (* classification: every A/D variant of a kernel leaf is a valid 4K leaf
    with clear extension bits *)
-Lemma kpt_variant_valid (vpn : mword 27) (a d : mword 1) :
-  pte_valid (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  intros s. unfold Mk_PTE_Flags.
-  rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_inv_red_ad.
-Qed.
 
-Lemma kpt_variant_leaf (vpn : mword 27) (a d : mword 1) :
-  pte_leaf (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  unfold pte_leaf, Mk_PTE_Flags.
-  rewrite kpt_variant_flags.
-  apply kpt_nonleaf_red_ad.
-Qed.
 
-Lemma kpt_variant_no_napot (vpn : mword 27) (a d : mword 1) :
-  pte_no_napot (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  unfold pte_no_napot.
-  rewrite kpt_variant_ext.
-  apply kpt_extN_red.
-Qed.
 
-Lemma kpt_variant_pbmt0 (vpn : mword 27) (a d : mword 1) :
-  pte_pbmt0 (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  unfold pte_pbmt0.
-  rewrite kpt_variant_ext.
-  vm_compute. reflexivity.
-Qed.
 
 (* permission checks pass regardless of A/D (fetch needs the DRAM base) *)
-Lemma kpt_variant_check_fetch (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
-  kpt_dram_vpn vpn ->
-  pte_check_ok (InstructionFetch tt) Supervisor mxr do_sum
-    (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  intros Hdram s. unfold Mk_PTE_Flags.
-  rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_fetch_ad. exact Hdram.
-Qed.
 
-Lemma kpt_variant_check_load (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
-  pte_check_ok (Load Data) Supervisor mxr do_sum
-    (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  intros s. unfold Mk_PTE_Flags.
-  rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_load_ad.
-Qed.
 
-Lemma kpt_variant_check_store (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
-  pte_check_ok (Store Data) Supervisor mxr do_sum
-    (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  intros s. unfold Mk_PTE_Flags.
-  rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_store_ad.
-Qed.
 
 (* AMO variants of KptPt's check lemmas (A/D-variant leaf passes the
    check for amoswap.w at Supervisor). *)
-Lemma kpt_check_amo_ad (adf : kpt_adf) (vpn : mword 27) :
-  forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
-          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof.
-  intros mxr do_sum s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
-Qed.
 
-Lemma kpt_variant_check_amo (vpn : mword 27) (a d : mword 1) (mxr do_sum : bool) :
-  pte_check_ok (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
-    (pte_set_ad (kpt_leaf_pte vpn) a d).
-Proof.
-  intros s. unfold Mk_PTE_Flags.
-  rewrite kpt_variant_flags. rewrite kpt_variant_ext.
-  apply kpt_check_amo_ad.
-Qed.
 
 (* ===================================================================== *)
 (* §2c CLASS-KEYED LEAVES WITH ARBITRARY PPN (rwx-kmap).  The same        *)
@@ -411,68 +303,13 @@ Qed.
 
 (* the trampoline vpn sits at the top of the VA space, far above every
    kernel-mapped (DRAM / device) vpn *)
-Lemma kpt_mapped_not_tramp (vpn : mword 27) :
-  kpt_mapped vpn -> vpn <> tramp_vpn.
-Proof.
-  intros Hm ->.
-  destruct Hm as [Hd | Hd]; unfold kpt_dram_vpn, kpt_dev_vpn in Hd;
-    (assert (Hu : bv_unsigned tramp_vpn = 67108863) by (vm_compute; reflexivity));
-    lia.
-Qed.
 
 (* ===================================================================== *)
 (* §3 The layout-free kernel mapping spec.                                *)
 (* ===================================================================== *)
 
-Definition kpt_tree_spec (root : mword 44) (t : ptree) : Prop :=
-  pt_base t = root /\
-  (forall vpn, kpt_mapped vpn ->
-     exists p2 p1 (a d : mword 1),
-       ptree_maps t vpn p2 p1 (pte_set_ad (kpt_leaf_pte vpn) a d)) /\
-  (exists p2 p1 (a d : mword 1),
-     ptree_maps t tramp_vpn p2 p1 (pte_set_ad pte_tramp a d)) /\
-  (forall vpn, ~ kpt_mapped vpn -> vpn <> tramp_vpn -> ptree_blocks t vpn).
 
 (* the spec survives the ADUE write-back of any mapped vpn's leaf *)
-Lemma kpt_tree_spec_set_leaf (root : mword 44) (t : ptree)
-    (vpn : mword 27) (p2 p1 p0 : mword 64) (a d : mword 1) :
-  kpt_tree_spec root t ->
-  ptree_maps t vpn p2 p1 p0 ->
-  kpt_mapped vpn ->
-  (exists a0 d0 : mword 1, p0 = pte_set_ad (kpt_leaf_pte vpn) a0 d0) ->
-  kpt_tree_spec root (ptree_set_leaf t vpn (pte_set_ad p0 a d)).
-Proof.
-  intros (Hbase & Hmap & Htramp & Hblk) Hmaps Hm (a0 & d0 & Hp0).
-  assert (Hvar : pte_set_ad p0 a d = pte_set_ad (kpt_leaf_pte vpn) a d).
-  { rewrite Hp0. apply pte_set_ad_absorb. }
-  split; [| split; [| split]].
-  - (* the base page is untouched *)
-    rewrite <- Hbase.
-    unfold ptree_set_leaf.
-    destruct (pt_kids t (vpn_idx 2 vpn)); [| reflexivity].
-    destruct (pt_kids p (vpn_idx 1 vpn)); reflexivity.
-  - intros vpn' Hm'.
-    destruct (decide (vpn' = vpn)) as [-> | Hne].
-    + exists p2, p1, a, d.
-      rewrite <- Hvar.
-      apply (ptree_set_leaf_maps_self t vpn p2 p1 p0); [exact Hmaps | ..];
-        rewrite Hvar.
-      * apply kpt_variant_valid.
-      * apply kpt_variant_leaf.
-      * apply kpt_variant_no_napot.
-      * apply kpt_variant_pbmt0.
-    + destruct (Hmap vpn' Hm') as (q2 & q1 & a' & d' & Hm2).
-      exists q2, q1, a', d'.
-      apply (ptree_set_leaf_maps_other t vpn vpn' _ _ _ _ Hne Hm2).
-  - (* the trampoline path is untouched: the written vpn is DRAM/device *)
-    destruct Htramp as (q2 & q1 & a' & d' & Hm2).
-    exists q2, q1, a', d'.
-    apply (ptree_set_leaf_maps_other t vpn tramp_vpn _ _ _ _
-             (not_eq_sym (kpt_mapped_not_tramp vpn Hm)) Hm2).
-  - intros vpn' Hm' Hnt.
-    apply (ptree_set_leaf_blocks t vpn vpn' p2 p1 p0); [exact Hmaps |].
-    apply (Hblk vpn' Hm' Hnt).
-Qed.
 
 (* ===================================================================== *)
 (* §3b THE GENERALIZED (M-INDEXED) MAPPING SPEC (rwx-kmap).  The region   *)
@@ -585,38 +422,6 @@ Qed.
 
 (* ... and of the trampoline leaf itself (an S-mode fetch through the
    trampoline mapping may set its A bit) *)
-Lemma kpt_tree_spec_set_leaf_tramp (root : mword 44) (t : ptree)
-    (p2 p1 p0 : mword 64) (a d : mword 1) :
-  kpt_tree_spec root t ->
-  ptree_maps t tramp_vpn p2 p1 p0 ->
-  (exists a0 d0 : mword 1, p0 = pte_set_ad pte_tramp a0 d0) ->
-  kpt_tree_spec root (ptree_set_leaf t tramp_vpn (pte_set_ad p0 a d)).
-Proof.
-  intros (Hbase & Hmap & Htramp & Hblk) Hmaps (a0 & d0 & Hp0).
-  assert (Hvar : pte_set_ad p0 a d = pte_set_ad pte_tramp a d).
-  { rewrite Hp0. apply pte_set_ad_absorb. }
-  split; [| split; [| split]].
-  - rewrite <- Hbase.
-    unfold ptree_set_leaf.
-    destruct (pt_kids t (vpn_idx 2 tramp_vpn)); [| reflexivity].
-    destruct (pt_kids p (vpn_idx 1 tramp_vpn)); reflexivity.
-  - intros vpn' Hm'.
-    destruct (Hmap vpn' Hm') as (q2 & q1 & a' & d' & Hm2).
-    exists q2, q1, a', d'.
-    apply (ptree_set_leaf_maps_other t tramp_vpn vpn' _ _ _ _
-             (kpt_mapped_not_tramp vpn' Hm') Hm2).
-  - exists p2, p1, a, d.
-    rewrite <- Hvar.
-    apply (ptree_set_leaf_maps_self t tramp_vpn p2 p1 p0); [exact Hmaps | ..];
-      rewrite Hvar.
-    + exact (proj1 (tramp_variant a d)).
-    + exact (proj1 (proj2 (tramp_variant a d))).
-    + exact (proj1 (proj2 (proj2 (tramp_variant a d)))).
-    + exact (proj2 (proj2 (proj2 (tramp_variant a d)))).
-  - intros vpn' Hm' Hnt.
-    apply (ptree_set_leaf_blocks t tramp_vpn vpn' p2 p1 p0); [exact Hmaps |].
-    apply (Hblk vpn' Hm' Hnt).
-Qed.
 
 (* ===================================================================== *)
 (* §4 THE GENERALIZED KERNEL TRANSLATION INVARIANT.  Same satp / PMP      *)
@@ -628,43 +433,54 @@ Section KptTreeInv.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
+  (* The generalized invariant (rwx-kmap): the table is constrained by the
+     M-INDEXED spec [kpt_tree_spec_gen], and the kernel-mapping auth
+     [kmap_auth M] (KMap.v) rides inside.  The signature keeps only
+     [root_ppn] -- M is existential -- so [intr_frame]/[strans_inv] and
+     every other carrier is unchanged. *)
   Definition tlb_inv_pt (root_ppn : mword 44) : iProp Σ :=
-    (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree),
+    (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree)
+       (M : gmap (mword 27) (mword 44 * kperm)),
        satp ↦ᵣ satp0 ∗
        ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
        ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
        ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
        tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
-       ⌜ kpt_tree_spec root_ppn t ⌝ ∗
+       ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
+       kmap_auth M ∗
        ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
        ptree_own 2 (DfracOwn 1) t ∗
        pmp_config root_ppn)%I.
 
   Lemma tlb_inv_pt_intro (root_ppn : mword 44) (satp0 : mword 64)
-      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree) :
+      (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree)
+      (M : gmap (mword 27) (mword 44 * kperm)) :
     _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_ok_pt (mword_of_int 0) t tlbvec ->
-    kpt_tree_spec root_ppn t ->
+    kpt_tree_spec_gen root_ppn M t ->
     (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
-    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ ptree_own 2 (DfracOwn 1) t -∗
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kmap_auth M -∗
+    ptree_own 2 (DfracOwn 1) t -∗
     pmp_config root_ppn -∗
     tlb_inv_pt root_ppn.
   Proof.
-    intros Hmode Hasid Hppn Hok Hspec Hpmaw. iIntros "Hsatp Htlb Ht Hpmp".
-    iExists satp0, tlbvec, t. iFrame "Hsatp Htlb Ht Hpmp". iPureIntro. tauto.
+    intros Hmode Hasid Hppn Hok Hspec Hpmaw. iIntros "Hsatp Htlb HM Ht Hpmp".
+    iExists satp0, tlbvec, t, M. iFrame "Hsatp Htlb HM Ht Hpmp". iPureIntro. tauto.
   Qed.
 
   Lemma tlb_inv_pt_open (root_ppn : mword 44) :
     tlb_inv_pt root_ppn -∗
-    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree),
+    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree)
+      (M : gmap (mword 27) (mword 44 * kperm)),
       satp ↦ᵣ satp0 ∗
       ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ⌝ ∗
       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
-      ⌜ kpt_tree_spec root_ppn t ⌝ ∗
+      ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
+      kmap_auth M ∗
       ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
       ptree_own 2 (DfracOwn 1) t ∗
       pmp_config root_ppn.
@@ -673,18 +489,20 @@ Section KptTreeInv.
 End KptTreeInv.
 
 (* the variant leaf's output ppn is the identity leaf ppn *)
-Lemma kpt_variant_ppn (vpn : mword 27) (a d : mword 1) :
+
+(* ... and for the class-keyed leaf with ARBITRARY ppn (rwx-kmap) *)
+Lemma kperm_variant_ppn' (ppn : mword 44) (pc : kperm) (a d : mword 1) :
   autocast (T := mword) ((autocast (T := mword)
-     (PPN_of_PTE (pte_set_ad (kpt_leaf_pte vpn) a d : mword 64))) : mword 44)
-  = kpt_leaf_ppn vpn.
+     (PPN_of_PTE (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d : mword 64))) : mword 44)
+  = ppn.
 Proof.
   rewrite !autocast_id.
   rewrite pte_set_ad_ppn.
-  unfold kpt_leaf_pte, PPN_of_PTE.
+  unfold PPN_of_PTE.
   change (Z.eqb 64 32) with false. cbv iota.
   rewrite autocast_id.
   apply mk_pte_ppn_field.
-  pose proof (kpt_lflags_bound vpn). lia.
+  pose proof (kperm_flags_bound pc). lia.
 Qed.
 
 (* ===================================================================== *)
@@ -1160,14 +978,21 @@ Section KptTranslateIris.
   Context `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
-  Lemma tlb_inv_pt_translateAddr (root_ppn : mword 44) (va : mword 64) (σ : mstate) :
+  (* THE re-keyed absorption (rwx-kmap): keyed on a kernel-mapping CLAIM
+     [kmap_at (svpn_of va) ppn pc] instead of blanket [addr_is_ram]; the
+     output pa is the claim's ppn re-concatenated with the page offset
+     (identity consumers instantiate ppn := kpt_leaf_ppn (svpn_of va) and
+     pa := va via [ram_ident_4k]).  Single-path: both claim arms land in
+     the same M-clause leaf via [kmap_at_lookup]. *)
+  Lemma tlb_inv_pt_translateAddr_at (root_ppn : mword 44) (va pa : mword 64)
+      (ppn : mword 44) (pc : kperm) (σ : mstate) :
     (forall (a d : mword 1) (mxr do_sum : bool),
-       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (kpt_leaf_pte (svpn_of va)) a d)) ->
-    kpt_mapped (svpn_of va) ->
+       pte_check_ok acc Supervisor mxr do_sum
+         (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d)) ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
     register_lookup misa σ.(sregs) = MISA_C ->
     register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -1177,19 +1002,22 @@ Section KptTranslateIris.
       = Some (Supervisor, σ) ->
     exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    kmap_at (svpn_of va) ppn pc -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
-        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
   Proof.
-    intros Hchk Hmapd Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0 tlbvec t)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
+    intros Hchk Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iIntros "Hat Hri Hgh Hinv".
+    iDestruct "Hinv" as (satp0 tlbvec t M)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
+    iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
+    iDestruct (kmap_auth_wf with "HM") as %Hwf.
     pose proof (Hpmawimpl _ Hall) as Hpmaw.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
@@ -1199,7 +1027,10 @@ Section KptTranslateIris.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     set (vpn := svpn_of va) in *.
     pose proof Hspec as (Hbase & Hmapspec & Htrampspec & Hblkspec).
-    destruct (Hmapspec vpn Hmapd) as (p2 & p1 & a0 & d0 & Hmaps).
+    destruct (Hmapspec vpn (ppn, pc) HMlk) as (p2 & p1 & a0 & d0 & Hmaps).
+    assert (Hlf : kpt_leaf_pte_of vpn (ppn, pc) = mk_pte ppn (kperm_flags pc))
+      by reflexivity.
+    rewrite Hlf in Hmaps.
     assert (HA' : pmpAddrMatchType_encdec_backwards
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
       by (rewrite Hpcv; exact HA).
@@ -1218,23 +1049,24 @@ Section KptTranslateIris.
     pose proof (Hpmarimpl _ Hall) as Hpmar.
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
-            (PPN_of_PTE (kpt_leaf_pte vpn : mword 64))) : mword 44)) : mword 44)
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va).
-    { rewrite <- (kpt_variant_ppn vpn ('b"1") ('b"1")) in Hid4k.
+            (PPN_of_PTE (mk_pte ppn (kperm_flags pc) : mword 64))) : mword 44)) : mword 44)
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
+    { rewrite <- (kperm_variant_ppn' ppn pc ('b"1") ('b"1")) in Hid4k.
       rewrite pte_set_ad_ppn in Hid4k. exact Hid4k. }
     assert (Hvar : forall a d : mword 1,
-       pte_valid (pte_set_ad (kpt_leaf_pte vpn) a d) /\
-       pte_leaf (pte_set_ad (kpt_leaf_pte vpn) a d) /\
-       pte_no_napot (pte_set_ad (kpt_leaf_pte vpn) a d) /\
-       pte_pbmt0 (pte_set_ad (kpt_leaf_pte vpn) a d)).
+       pte_valid (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d) /\
+       pte_leaf (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d) /\
+       pte_no_napot (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d) /\
+       pte_pbmt0 (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d)).
     { intros a d. repeat split.
-      - apply kpt_variant_valid.
-      - apply kpt_variant_leaf.
-      - apply kpt_variant_no_napot.
-      - apply kpt_variant_pbmt0. }
+      - apply kperm_variant_valid.
+      - apply kperm_variant_leaf.
+      - apply kperm_variant_no_napot.
+      - apply kperm_variant_pbmt0. }
     assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
       by exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode).
-    iMod (ptree_translateAddr_own acc Supervisor root_ppn t (kpt_leaf_pte vpn) va va satp0
+    iMod (ptree_translateAddr_own acc Supervisor root_ppn t
+            (mk_pte ppn (kperm_flags pc)) va pa satp0
             tlbvec p2 p1 a0 d0 σ
             Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
             Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
@@ -1246,15 +1078,15 @@ Section KptTranslateIris.
     iSplit; [iPureIntro; exact Hmdev |].
     iSplit; [iPureIntro; exact Hsregs |].
     iFrame "Hri Hgh".
-    assert (Hspec' : kpt_tree_spec root_ppn t').
+    assert (Hspec' : kpt_tree_spec_gen root_ppn M t').
     { destruct Htsh as [-> | (a1 & d1 & ->)]; [exact Hspec |].
-      rewrite <- (pte_set_ad_absorb (kpt_leaf_pte vpn) a0 d0 a1 d1).
-      exact (kpt_tree_spec_set_leaf root_ppn t vpn p2 p1
-               (pte_set_ad (kpt_leaf_pte vpn) a0 d0) a1 d1
-               Hspec Hmaps Hmapd
-               (ex_intro _ a0 (ex_intro _ d0 eq_refl))). }
-    iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t'
-              Hmode Hasid Hppn Htlbok' Hspec' Hpmawimpl with "Hsatp Htlb Ht").
+      rewrite <- (pte_set_ad_absorb (mk_pte ppn (kperm_flags pc)) a0 d0 a1 d1).
+      apply (kpt_tree_spec_gen_set_leaf root_ppn M t vpn (ppn, pc) p2 p1
+               (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) a1 d1
+               Hspec Hmaps HMlk (kmap_wf_tramp M Hwf)).
+      exists a0, d0. rewrite Hlf. reflexivity. }
+    iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t' M
+              Hmode Hasid Hppn Htlbok' Hspec' Hpmawimpl with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
               HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa").
   Qed.
@@ -1290,8 +1122,9 @@ Section KptTranslateIris.
   Proof.
     intros Hchk Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     iIntros "Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0 tlbvec t)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hpmawimpl & Ht & Hpmp)".
+    iDestruct "Hinv" as (satp0 tlbvec t M)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
+    iDestruct (kmap_auth_wf with "HM") as %Hwf.
     pose proof (Hpmawimpl _ Hall) as Hpmaw.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
@@ -1339,16 +1172,16 @@ Section KptTranslateIris.
     iSplit; [iPureIntro; exact Hmdev |].
     iSplit; [iPureIntro; exact Hsregs |].
     iFrame "Hri Hgh".
-    assert (Hspec' : kpt_tree_spec root_ppn t').
+    assert (Hspec' : kpt_tree_spec_gen root_ppn M t').
     { destruct Htsh as [-> | (a1 & d1 & ->)]; [exact Hspec |].
       rewrite Hvpn.
       rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
-      exact (kpt_tree_spec_set_leaf_tramp root_ppn t p2 p1
+      exact (kpt_tree_spec_gen_set_leaf_tramp root_ppn M t p2 p1
                (pte_set_ad pte_tramp a0 d0) a1 d1
-               Hspec Hmaps0
+               Hspec Hmaps0 (kmap_wf_tramp M Hwf)
                (ex_intro _ a0 (ex_intro _ d0 eq_refl))). }
-    iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t'
-              Hmode Hasid Hppn Htlbok' Hspec' Hpmawimpl with "Hsatp Htlb Ht").
+    iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t' M
+              Hmode Hasid Hppn Htlbok' Hspec' Hpmawimpl with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
               HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa").
   Qed.
@@ -1361,49 +1194,179 @@ Section KptTranslateIrisAcc.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  Definition tlb_inv_pt_translateAddr_fetch :=
-    fun root_ppn va σ (Hram : addr_is_ram va) =>
-      tlb_inv_pt_translateAddr (InstructionFetch tt) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_fetch (svpn_of va) a d mxr do_sum
-                                 (ram_svpn_range va Hram))
-        (or_introl (ram_svpn_range va Hram))
-        (RiscvExtras.ram_canonical va Hram)
-        (ram_ident_4k va Hram).
+  (* IDENTITY instantiations of [tlb_inv_pt_translateAddr_at] (rwx-kmap):
+     the claim is constructed from the caller's REGION fact via the pure
+     static arm (kmap_at_static ∘ *_svpn_class), the output pa is [va]
+     itself via [ram_ident_4k], and the check obligation is the class-
+     keyed [kperm_variant_check_*].  Note the re-keying: FETCH now needs
+     [addr_is_text] (an S-mode fetch through a data page is unprovable),
+     STORE/AMO need [addr_is_kdata]; LOAD keeps blanket [addr_is_ram]
+     (both classes grant R — the class is region-decided internally). *)
 
-  Definition tlb_inv_pt_translateAddr_load :=
-    fun root_ppn va σ (Hram : addr_is_ram va) =>
-      tlb_inv_pt_translateAddr (Load Data) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_load (svpn_of va) a d mxr do_sum)
-        (or_introl (ram_svpn_range va Hram))
-        (RiscvExtras.ram_canonical va Hram)
-        (ram_ident_4k va Hram).
+  Lemma tlb_inv_pt_translateAddr_fetch (root_ppn : mword 44) (va : mword 64)
+      (σ : mstate) (Htxt : addr_is_text va) :
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege (InstructionFetch tt) (register_lookup mstatus σ.(sregs)) Supervisor) σ
+      = Some (Supervisor, σ) ->
+    exec (is_shadow_stack_access (InstructionFetch tt)) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+  Proof.
+    intros Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    pose proof (addr_is_text_ram va Htxt) as Hram.
+    iApply (tlb_inv_pt_translateAddr_at (InstructionFetch tt) root_ppn va va
+              (kpt_leaf_ppn (svpn_of va)) KP_rx σ
+              (fun a d mxr do_sum => kperm_variant_check_fetch _ a d mxr do_sum)
+              (RiscvExtras.ram_canonical va Hram)
+              (ram_ident_4k va Hram)
+              Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall).
+    iApply kmap_at_static. exact (text_svpn_class va Htxt).
+  Qed.
 
-  Definition tlb_inv_pt_translateAddr_store :=
-    fun root_ppn va σ (Hram : addr_is_ram va) =>
-      tlb_inv_pt_translateAddr (Store Data) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum)
-        (or_introl (ram_svpn_range va Hram))
-        (RiscvExtras.ram_canonical va Hram)
-        (ram_ident_4k va Hram).
+  Lemma tlb_inv_pt_translateAddr_load (root_ppn : mword 44) (va : mword 64)
+      (σ : mstate) (Hram : addr_is_ram va) :
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege (Load Data) (register_lookup mstatus σ.(sregs)) Supervisor) σ
+      = Some (Supervisor, σ) ->
+    exec (is_shadow_stack_access (Load Data)) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (Load Data)) σ
+        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+  Proof.
+    intros Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    destruct (ram_svpn_static va Hram) as (pc & Hcls).
+    iApply (tlb_inv_pt_translateAddr_at (Load Data) root_ppn va va
+              (kpt_leaf_ppn (svpn_of va)) pc σ
+              (fun a d mxr do_sum => kperm_variant_check_load _ pc a d mxr do_sum)
+              (RiscvExtras.ram_canonical va Hram)
+              (ram_ident_4k va Hram)
+              Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall).
+    iApply kmap_at_static. exact Hcls.
+  Qed.
 
-  (* DEVICE-side instantiations: same absorption route for any kpt-mapped
-     device vpn (e.g. the UART page); membership/canonicality/identity are
-     supplied by the caller for the concrete device address. *)
+  Lemma tlb_inv_pt_translateAddr_store (root_ppn : mword 44) (va : mword 64)
+      (σ : mstate) (Hkd : addr_is_kdata va) :
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege (Store Data) (register_lookup mstatus σ.(sregs)) Supervisor) σ
+      = Some (Supervisor, σ) ->
+    exec (is_shadow_stack_access (Store Data)) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (Store Data)) σ
+        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+  Proof.
+    intros Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    pose proof (addr_is_kdata_ram va Hkd) as Hram.
+    iApply (tlb_inv_pt_translateAddr_at (Store Data) root_ppn va va
+              (kpt_leaf_ppn (svpn_of va)) KP_rw σ
+              (fun a d mxr do_sum => kperm_variant_check_store _ a d mxr do_sum)
+              (RiscvExtras.ram_canonical va Hram)
+              (ram_ident_4k va Hram)
+              Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall).
+    iApply kmap_at_static. exact (kdata_svpn_class va Hkd).
+  Qed.
+
   Definition tlb_inv_pt_translateAddr_tramp_fetch :=
     fun root_ppn va pa σ =>
       tlb_inv_pt_translateAddr_tramp (InstructionFetch tt) root_ppn va pa σ
         (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum).
 
-  Definition tlb_inv_pt_translateAddr_load_dev :=
-    fun root_ppn va σ (Hdev : kpt_dev_vpn (svpn_of va)) =>
-      tlb_inv_pt_translateAddr (Load Data) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_load (svpn_of va) a d mxr do_sum)
-        (or_intror Hdev).
+  (* DEVICE-side instantiations: the device pages are RW-class static
+     entries, so the claim comes from [kmap_class_rw ∘ or_intror];
+     canonicality/identity stay caller-supplied for the concrete device
+     address (as before). *)
+  Lemma tlb_inv_pt_translateAddr_load_dev (root_ppn : mword 44) (va : mword 64)
+      (σ : mstate) (Hdev : kpt_dev_vpn (svpn_of va)) :
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege (Load Data) (register_lookup mstatus σ.(sregs)) Supervisor) σ
+      = Some (Supervisor, σ) ->
+    exec (is_shadow_stack_access (Load Data)) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (Load Data)) σ
+        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+  Proof.
+    intros Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iApply (tlb_inv_pt_translateAddr_at (Load Data) root_ppn va va
+              (kpt_leaf_ppn (svpn_of va)) KP_rw σ
+              (fun a d mxr do_sum => kperm_variant_check_load _ KP_rw a d mxr do_sum)
+              Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall).
+    iApply kmap_at_static. apply kmap_class_rw. right. exact Hdev.
+  Qed.
 
-  Definition tlb_inv_pt_translateAddr_store_dev :=
-    fun root_ppn va σ (Hdev : kpt_dev_vpn (svpn_of va)) =>
-      tlb_inv_pt_translateAddr (Store Data) root_ppn va σ
-        (fun a d mxr do_sum => kpt_variant_check_store (svpn_of va) a d mxr do_sum)
-        (or_intror Hdev).
+  Lemma tlb_inv_pt_translateAddr_store_dev (root_ppn : mword 44) (va : mword 64)
+      (σ : mstate) (Hdev : kpt_dev_vpn (svpn_of va)) :
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege (Store Data) (register_lookup mstatus σ.(sregs)) Supervisor) σ
+      = Some (Supervisor, σ) ->
+    exec (is_shadow_stack_access (Store Data)) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (Store Data)) σ
+        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+  Proof.
+    intros Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iApply (tlb_inv_pt_translateAddr_at (Store Data) root_ppn va va
+              (kpt_leaf_ppn (svpn_of va)) KP_rw σ
+              (fun a d mxr do_sum => kperm_variant_check_store _ a d mxr do_sum)
+              Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall).
+    iApply kmap_at_static. apply kmap_class_rw. right. exact Hdev.
+  Qed.
 
 End KptTranslateIrisAcc.

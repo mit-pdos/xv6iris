@@ -1168,7 +1168,7 @@ Section WpSmodePtMemLeaves.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
-    iMod (sr_absorb R (Load Data) a8 s_pc
+    iMod (sr_absorb_region R (Load Data) a8 s_pc
             (or_intror (or_introl eq_refl)) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
@@ -1372,7 +1372,7 @@ Section WpSmodePtMemLeaves.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
-    iMod (sr_absorb R (Load Data) a8 s_pc
+    iMod (sr_absorb_region R (Load Data) a8 s_pc
             (or_intror (or_introl eq_refl)) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
@@ -1576,8 +1576,12 @@ Section WpSmodePtMemLeaves.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
-    iMod (sr_absorb R (Store Data) a8 s_pc
-            (or_intror (or_intror (or_introl eq_refl))) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+    iAssert (⌜addr_is_kdata a8⌝)%I as %Hkdata.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hbk".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_kdata with "Hbk") as %Hrk. rewrite pa_add_0 in Hrk. iPureIntro. exact Hrk. }
+    iMod (sr_absorb_region R (Store Data) a8 s_pc
+            (or_intror (or_intror (or_introl eq_refl))) Hkdata Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -1770,8 +1774,13 @@ Section WpSmodePtMemLeaves.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
-    iMod (sr_absorb R (Store Data) a8 s_pc
-            (or_intror (or_intror (or_introl eq_refl))) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+    iAssert (⌜addr_is_kdata a8⌝)%I as %Hkdata.
+    { iDestruct (word_pointsto_bytes with "Hbytes") as "Hb".
+      iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_kdata with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+    iMod (sr_absorb_region R (Store Data) a8 s_pc
+            (or_intror (or_intror (or_introl eq_refl))) Hkdata Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)

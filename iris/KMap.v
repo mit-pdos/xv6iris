@@ -104,14 +104,14 @@ Qed.
 (* §2 The ghost: [kmap_at] claims over an explicitly-named auth.          *)
 (* ===================================================================== *)
 
-(* CpuId-style gname-in-class bundle (cf. [riscvGS]'s [uart_name]): the
-   instance is constructed at adequacy init from [kmap_alloc]'s gname. *)
-Class kmapGS (Σ : gFunctors) := KmapGS {
-  kmap_inG :: ghost_mapG Σ (mword 27) (mword 44 * kperm);
-  kmap_name : gname;
-}.
+(* The ghost lives in [riscvGS] itself ([riscv_kmapGS] + [kmap_name] --
+   rwx-kmap decision a0): [tlb_inv_pt] rides inside [sie_cap_gpr], so a
+   separate class would have to be threaded through every sconf-tier
+   file; like the device gnames it is global, not per-hart.  Adequacy
+   mints the auth at init ([kmap_alloc]) and passes the gname into the
+   [RiscvGS] constructor. *)
 
-(* allocation (adequacy/boot): ONE update mints the auth over the whole
+(* allocation (adequacy init): ONE update mints the auth over the whole
    ~49k-entry static map -- the returned static fragments are dropped,
    static claims use the pure arm instead *)
 Lemma kmap_alloc `{!ghost_mapG Σ (mword 27) (mword 44 * kperm)} :
@@ -122,7 +122,7 @@ Proof.
 Qed.
 
 Section KMap.
-  Context `{!kmapGS Σ}.
+  Context `{!riscvGS Σ}.
 
   (* THE claim.  Static arm: identity-only by construction (the ppn is
      pinned to [kpt_leaf_ppn vpn]).  Ghost arm: a persisted fragment. *)
@@ -145,6 +145,12 @@ Section KMap.
   Lemma kmap_auth_intro (M : gmap (mword 27) (mword 44 * kperm)) :
     kmap_wf M -> ghost_map_auth kmap_name 1 M -∗ kmap_auth M.
   Proof. iIntros (Hwf) "Hauth". iFrame "Hauth". iPureIntro. exact Hwf. Qed.
+
+  (* pure-conclusion extraction (an [iDestruct … as %] of this keeps the
+     auth in the spatial context) *)
+  Lemma kmap_auth_wf (M : gmap (mword 27) (mword 44 * kperm)) :
+    kmap_auth M -∗ ⌜kmap_wf M⌝.
+  Proof. iIntros "[_ %Hwf]". iPureIntro. exact Hwf. Qed.
 
   (* ---- the three working lemmas ---- *)
 

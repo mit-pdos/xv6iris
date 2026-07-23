@@ -25,6 +25,7 @@ Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
 Require Import KptExecMap.
 Require Import Pt4kWalk.
 Require Import SmodeCore KptTree UptTree TrampStepPt.
+Require Import KMap.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -786,16 +787,30 @@ End Pt2TrampInst.
 (* ---- the two concrete spec instances: both page-table specs carry a
    trampoline clause and survive the trampoline A/D write-back ---------- *)
 
-Lemma kpt_pt2_tramp_spec (kroot : mword 44) : pt2_tramp_spec (kpt_tree_spec kroot).
+
+(* the M-indexed analogue (rwx-kmap §5f): the generalized spec survives the
+   trampoline A/D write-back; its [M !! tramp_vpn = None] premise is supplied
+   from [kmap_auth]'s wf conjunct at the use site. *)
+Lemma kpt_pt2_tramp_spec_gen (kroot : mword 44)
+    (M : gmap (mword 27) (mword 44 * kperm)) :
+  M !! tramp_vpn = None -> pt2_tramp_spec (kpt_tree_spec_gen kroot M).
 Proof.
-  split.
+  intro Htn. split.
   - intros t Hspec. exact (proj1 (proj2 (proj2 Hspec))).
   - intros t a1 d1 Hspec.
     destruct (proj1 (proj2 (proj2 Hspec))) as (p2 & p1 & a0 & d0 & Hmaps).
     rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
-    exact (kpt_tree_spec_set_leaf_tramp kroot t p2 p1 _ a1 d1 Hspec Hmaps
+    exact (kpt_tree_spec_gen_set_leaf_tramp kroot M t p2 p1 _ a1 d1 Hspec Hmaps Htn
              (ex_intro _ a0 (ex_intro _ d0 eq_refl))).
 Qed.
+
+(* the parked kernel table + its mapping auth, threaded across the pt2
+   window as one token (rwx-kmap §5f: "auth rides in pt_frame"). *)
+Section KptFrame.
+  Context `{!riscvGS Σ}.
+  Definition kpt_frame (kroot : mword 44) : iProp Σ :=
+    (∃ M, pt_frame (kpt_tree_spec_gen kroot M) ∗ kmap_auth M)%I.
+End KptFrame.
 
 Lemma upt_pt2_tramp_spec (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
   upt_map_wf um -> pt2_tramp_spec (upt_tree_spec uroot tfp um).

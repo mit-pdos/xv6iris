@@ -15,9 +15,13 @@
      root+36+j = l0_dram j (level-0):       512 identity DRAM leaves each.
    Deliberate DEVIATIONS from kvmmake (kept to avoid touching the spec
    layer above the leaves; see iris/CLAUDE.md):
-     - DRAM is uniformly R|W|X (xv6 maps kernel text R|X and data R|W;
-       distinguishing them would add an addr-in-text/data premise to every
-       fetch/store leaf);
+     - DRAM is now split per kvmmake at the tree/invariant layer (rwx-kmap):
+       kernel text [ram_base, text_end) is R|X and data [text_end, PHYSTOP)
+       is R|W, classified by §15's [kperm]/[kmap_class] and carried through
+       the M-indexed [kpt_tree_spec_gen] (KptTree).  The §1 byte-level image
+       constants ([PTE_RAM]/[kpt_lflags]/[kpt_mem]) are uniformly R|W|X and
+       survive only as the pre-tree byte-level [tlb_inv] layer that
+       SmodeCore still consumes;
      - leaf A/D bits are PRESET in the default instance (xv6 leaves them
        clear).  §12 below generalizes the whole layer over a per-leaf A/D
        assignment [kpt_adf].  This build is Svadu (menvcfg.ADUE = 1): an
@@ -309,43 +313,6 @@ Definition pma_allows_pte_read (regions : list PMA_Region) : Prop :=
 (*     and derives every per-slot fact from [kpt_ok]/[kpt_mem].           *)
 (* ===================================================================== *)
 
-Section KptRamTranslate.
-Context (access : MemoryAccessType mem_payload).
-Context (root : mword 44).
-Context (menvcfg0 satp0 va : mword 64).
-Context (s : mstate).
-
-Local Notation vpn := (svpn_of va).
-Local Notation pmpaddr0 := (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0).
-
-Hypothesis Hok : kpt_ok root.
-Hypothesis Hmem : kpt_mem s root.
-Hypothesis Hram : addr_is_ram va.
-(* access front matter *)
-Hypothesis Heff : exec (effectivePrivilege access (register_lookup mstatus s.(sregs)) Supervisor) s = Some (Supervisor, s).
-Hypothesis Hss : exec (is_shadow_stack_access access) s = Some (false, s).
-Hypothesis Hchk0 : forall (mxr do_sum : bool) s', exec (check_PTE_permission access Supervisor mxr do_sum (Mk_PTE_Flags (mword_of_int PTE_RAM)) (Mk_PTE_Ext (mword_of_int 0)) tt) s' = Some (PTE_Check_Success tt, s').
-(* ambient config *)
-Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
-Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
-Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
-Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
-Hypothesis Hppn : autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root.
-Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
-Hypothesis HmisaS : eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true.
-Hypothesis Hmenv : register_lookup menvcfg s.(sregs) = menvcfg0.
-Hypothesis HPBMTE : eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true.
-Hypothesis Hhtif : register_lookup htif_tohost_base s.(sregs) = None.
-(* PMP TOR entry 0 covers RAM *)
-Hypothesis HA : pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
-Hypothesis Hord : zopz0zKzJ_u (zeros' 64) pmpaddr0 = false.
-Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
-Hypothesis Hcov : ram_base + ram_size <= uint pmpaddr0 * 4.
-Hypothesis Hpma : pma_allows_pte_read (register_lookup pma_regions s.(sregs)).
-
-
-End KptRamTranslate.
 
 (* transport [kpt_mem] across a memory-preserving state change *)
 
@@ -367,28 +334,11 @@ Definition kpt_adf : Type := mword 27 -> bool * bool.
 (* flag byte: base perms (V|R|W[|X]) + A (bit 6) + D (bit 7) *)
 Definition kpt_ad_bits (ad : bool * bool) : Z :=
   (if fst ad then 64 else 0) + (if snd ad then 128 else 0).
-Definition PTE_RAM_ad (ad : bool * bool) : Z := 0x0F + kpt_ad_bits ad.
-Definition PTE_DEV_ad (ad : bool * bool) : Z := 0x07 + kpt_ad_bits ad.
-
-Definition kpt_lflags_ad (adf : kpt_adf) (vpn : mword 27) : Z :=
-  if Z.leb 0x80000 (bv_unsigned vpn) then PTE_RAM_ad (adf vpn) else PTE_DEV_ad (adf vpn).
-
-Definition kpt_leaf_pte_ad (adf : kpt_adf) (vpn : mword 27) : mword 64 :=
-  mk_pte (kpt_leaf_ppn vpn) (kpt_lflags_ad adf vpn).
 
 
 
-Definition kpt_mem_ad (adf : kpt_adf) (s : mstate) (root : mword 44) : Prop :=
-  kpt_slot_in s (pte_addr_at root (mword_of_int 0)) (mk_pte (kpt_l1_dev root) PTE_PTR)
-  /\ kpt_slot_in s (pte_addr_at root (mword_of_int 2)) (mk_pte (kpt_l1_dram root) PTE_PTR)
-  /\ (forall i : mword 9, 96 <= bv_unsigned i < 129 ->
-        kpt_slot_in s (pte_addr_at (kpt_l1_dev root) i)
-          (mk_pte (kpt_l0_dev root (bv_unsigned i - 96)) PTE_PTR))
-  /\ (forall i : mword 9, bv_unsigned i < 64 ->
-        kpt_slot_in s (pte_addr_at (kpt_l1_dram root) i)
-          (mk_pte (kpt_l0_dram root (bv_unsigned i)) PTE_PTR))
-  /\ (forall vpn : mword 27, kpt_mapped vpn ->
-        kpt_slot_in s (kpt_slot0_pa root vpn) (kpt_leaf_pte_ad adf vpn)).
+
+
 
 (* ---- preset bridges: the A/D=1 instance is the fixed-flag layer ---- *)
 
@@ -399,75 +349,14 @@ Definition kpt_mem_ad (adf : kpt_adf) (s : mstate) (root : mword 44) : Prop :=
 
 (* ---- parametric flag-byte facts (any A/D) ---- *)
 
-Lemma kpt_lflags_ad_bound (adf : kpt_adf) (vpn : mword 27) :
-  0 <= kpt_lflags_ad adf vpn < 256.
-Proof.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d; cbn; lia.
-Qed.
 
-Lemma kpt_inv_red_ad (adf : kpt_adf) (vpn : mword 27) : forall s',
-  exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
-          (Mk_PTE_Ext (mword_of_int 0))) s'
-  = Some (false, s').
-Proof.
-  intro s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d; vm_compute; reflexivity.
-Qed.
 
-Lemma kpt_nonleaf_red_ad (adf : kpt_adf) (vpn : mword 27) :
-  pte_is_non_leaf (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn) : mword 8)) = false.
-Proof.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d; vm_compute; reflexivity.
-Qed.
 
 
 (* permission checks ignore A/D: fetch needs the DRAM (X) base; loads and
    stores pass on both bases *)
-Lemma kpt_check_fetch_ad (adf : kpt_adf) (vpn : mword 27) :
-  kpt_dram_vpn vpn ->
-  forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (InstructionFetch tt) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
-          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof.
-  intros [Hlo _] mxr do_sum s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, kpt_ad_bits.
-  rewrite (proj2 (Z.leb_le 0x80000 (bv_unsigned vpn)) Hlo).
-  destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
-Qed.
 
-Lemma kpt_check_load_ad (adf : kpt_adf) (vpn : mword 27) :
-  forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Load Data) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
-          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof.
-  intros mxr do_sum s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
-Qed.
 
-Lemma kpt_check_store_ad (adf : kpt_adf) (vpn : mword 27) :
-  forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Store Data) Supervisor mxr do_sum
-          (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn)))
-          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
-  = Some (PTE_Check_Success tt, s').
-Proof.
-  intros mxr do_sum s'.
-  unfold kpt_lflags_ad, PTE_RAM_ad, PTE_DEV_ad, kpt_ad_bits.
-  destruct (Z.leb 0x80000 (bv_unsigned vpn));
-    destruct (adf vpn) as [a d]; destruct a, d, mxr, do_sum; vm_compute; reflexivity.
-Qed.
 
 (* A/D update conditions: A=1 suffices for non-writing accesses (D free);
    stores additionally need D=1. *)
@@ -489,46 +378,6 @@ Qed.
 (*     HYPOTHESES, dischargeable via [kpt_check_*_ad] / [kpt_upd_*_ad].   *)
 (* ===================================================================== *)
 
-Section KptRamTranslateAD.
-Context (adf : kpt_adf).
-Context (access : MemoryAccessType mem_payload).
-Context (root : mword 44).
-Context (menvcfg0 satp0 va : mword 64).
-Context (s : mstate).
-
-Local Notation vpn := (svpn_of va).
-Local Notation pmpaddr0 := (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0).
-
-Hypothesis Hok : kpt_ok root.
-Hypothesis Hmem : kpt_mem_ad adf s root.
-Hypothesis Hram : addr_is_ram va.
-(* access front matter *)
-Hypothesis Heff : exec (effectivePrivilege access (register_lookup mstatus s.(sregs)) Supervisor) s = Some (Supervisor, s).
-Hypothesis Hss : exec (is_shadow_stack_access access) s = Some (false, s).
-Hypothesis Hchk0 : forall (mxr do_sum : bool) s', exec (check_PTE_permission access Supervisor mxr do_sum (Mk_PTE_Flags (mword_of_int (kpt_lflags_ad adf vpn))) (Mk_PTE_Ext (mword_of_int 0)) tt) s' = Some (PTE_Check_Success tt, s').
-(* the A/D-update side condition (A=1; also D=1 for writing accesses) *)
-Hypothesis Hupd0 : update_PTE_Bits (mk_pte (kpt_leaf_ppn vpn) (kpt_lflags_ad adf vpn)) access = None.
-(* ambient config *)
-Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = Supervisor.
-Hypothesis HSXL : _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10".
-Hypothesis Hsatp : register_lookup satp s.(sregs) = satp0.
-Hypothesis Hmode : _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4).
-Hypothesis Hppn : autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root.
-Hypothesis Hasid : zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16).
-Hypothesis HmisaS : eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true.
-Hypothesis Hmenv : register_lookup menvcfg s.(sregs) = menvcfg0.
-Hypothesis HPBMTE : eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true.
-Hypothesis Hhtif : register_lookup htif_tohost_base s.(sregs) = None.
-(* PMP TOR entry 0 covers RAM *)
-Hypothesis HA : pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
-Hypothesis Hord : zopz0zKzJ_u (zeros' 64) pmpaddr0 = false.
-Hypothesis HR : eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true.
-Hypothesis Hcov : ram_base + ram_size <= uint pmpaddr0 * 4.
-Hypothesis Hpma : pma_allows_pte_read (register_lookup pma_regions s.(sregs)).
-
-
-End KptRamTranslateAD.
 
 
 (* ===================================================================== *)
@@ -567,10 +416,8 @@ End KptRamTranslateAD.
 (* ~49k-entry comprehension) -- every use goes through [kmap_M0_lookup].  *)
 (* ===================================================================== *)
 
-Inductive kperm : Set := KP_rx | KP_rw.
-
-Global Instance kperm_eq_dec : EqDecision kperm.
-Proof. solve_decision. Defined.
+(* [kperm] (KP_rx | KP_rw) itself lives in RiscvPtsto, above [riscvGS],
+   so the class can carry the kernel-mapping ghost over it. *)
 
 (* base perm bits (V|R|X = 0x0B, V|R|W = 0x07) + the A/D pair on top;
    at A/D preset these are the two real kvmmake flag bytes 0xCB / 0xC7 *)
@@ -692,6 +539,111 @@ Proof.
   change (2 ^ 12) with 4096.
   apply Z.div_lt_upper_bound; [lia |].
   unfold text_end in Hhi. lia.
+Qed.
+
+(* the identity re-concatenation for ANY statically classified vpn: every
+   static vpn (text/data/DEVICES) sits in the POSITIVE half of the va
+   space (all class ranges < 2^20 pages), so a canonical va with a static
+   vpn is exactly vpn ++ offset.  Generalizes [ram_ident_4k] beyond RAM;
+   the Bare regime honors static claims with it (a device va under Bare
+   translates identically too).
+   PROOF PLAN: from canonical (va = sign_extend of low 39 bits) and the
+   class range (bv_unsigned (svpn_of a) < 0x88000 < 2^20 ⟹ bits 38:32 of
+   a are 0 ⟹ bit 38 = 0 ⟹ sign-extend = zero-extend), va's unsigned is
+   svpn·4096 + offset; then the [zext64_concat44_12_unsigned] /
+   [zext44_27_unsigned] / [subrange64_unsigned_11_0] arithmetic exactly
+   as in [ram_ident_4k]. *)
+(* svpn_of as the top-27 extraction of the low-39-bit window, unconditional
+   (the [uint < 2^38]-free part of [svpn_of_unsigned_lo]) *)
+Lemma svpn_of_extract (a : mword 64) :
+  bv_unsigned (svpn_of a)
+  = Z.shiftr (bv_unsigned (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) 12.
+Proof.
+  unfold svpn_of. rewrite autocast_id.
+  unfold subrange_vec_dec at 1. rewrite autocast_id.
+  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.slice.
+  change (MachineWord.MachineWord.Z_idx pagesize_bits) with 12%N.
+  rewrite bv_extract_unsigned.
+  apply bv_wrap_small.
+  pose proof (bv_unsigned_in_range _ (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) as Hr.
+  destruct Hr as [Hlo Hhi].
+  match type of Hhi with (_ < ?m)%Z => assert (m = 549755813888) as EM39 by (vm_compute; reflexivity) end.
+  rewrite EM39 in Hhi.
+  rewrite Z.shiftr_div_pow2 by lia. change (2 ^ 12) with 4096.
+  split.
+  - apply Z.div_pos; lia.
+  - match goal with |- (_ < ?m)%Z => assert (m = 134217728) as EM27 by (vm_compute; reflexivity); rewrite EM27 end.
+    apply Z.div_lt_upper_bound; lia.
+Qed.
+
+(* every statically classified vpn is below 2^20 (all class ranges are) *)
+Lemma static_svpn_bound (a : mword 64) (pc : kperm) :
+  kmap_static (svpn_of a) pc -> bv_unsigned (svpn_of a) < 0x88000.
+Proof.
+  intro Hs. destruct (kmap_class_cases (svpn_of a) pc Hs) as [[Ht _] | [Hd _]].
+  - unfold kpt_text_vpn in Ht. lia.
+  - destruct Hd as [Hd | Hd]; unfold kpt_data_vpn, kpt_dev_vpn in Hd; lia.
+Qed.
+
+(* canonical + a static (hence < 2^20) vpn ⟹ va sits in the positive half:
+   [uint a < 2^38].  (svpn < 2^20 ⟹ bit 38 of the sign-extended window is 0,
+   so the sign-extension is a zero-extension.) *)
+Lemma static_canon_lo (a : mword 64) (pc : kperm) :
+  kmap_static (svpn_of a) pc ->
+  neq_vec (bits_of_virtaddr (Virtaddr a))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false ->
+  uint a < 274877906944.
+Proof.
+  intros Hstat Hcanon.
+  pose proof (static_svpn_bound a pc Hstat) as Hsv.
+  rewrite svpn_of_extract in Hsv.
+  rewrite Z.shiftr_div_pow2 in Hsv by lia. change (2 ^ 12) with 4096 in Hsv.
+  set (b := subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0) in *.
+  pose proof (bv_unsigned_in_range _ b) as [Hblo Hbhi].
+  match type of Hbhi with (_ < ?m)%Z => assert (m = 549755813888) as EMb by (vm_compute; reflexivity) end.
+  rewrite EMb in Hbhi.
+  assert (Hb38 : bv_unsigned b < 2281701376).
+  { pose proof (Z_div_mod_eq_full (bv_unsigned b) 4096) as Hdm.
+    assert (0 <= bv_unsigned b mod 4096 < 4096) by (apply Z_mod_lt; lia). lia. }
+  unfold neq_vec in Hcanon. rewrite negb_false_iff in Hcanon. unfold eq_vec in Hcanon.
+  rewrite MachineWord.MachineWord.eqb_true_iff in Hcanon. unfold get_word in Hcanon.
+  apply (f_equal bv_unsigned) in Hcanon.
+  change (bits_of_virtaddr (Virtaddr a)) with a in Hcanon.
+  rewrite uint_unsigned. rewrite Hcanon.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
+       MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned. unfold bv_signed.
+  rewrite bv_swrap_small.
+  2:{ match goal with |- (- ?h <= _ < ?h)%Z => assert (h = 274877906944) as EH by (vm_compute; reflexivity); rewrite EH end. lia. }
+  rewrite bv_wrap_small.
+  2:{ match goal with |- (0 <= _ < ?m)%Z => assert (m = 18446744073709551616) as EM64 by (vm_compute; reflexivity); rewrite EM64 end. lia. }
+  lia.
+Qed.
+
+Lemma static_ident_4k (a : mword 64) (pc : kperm) :
+  kmap_static (svpn_of a) pc ->
+  neq_vec (bits_of_virtaddr (Virtaddr a))
+     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false ->
+  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a))
+      (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub pagesize_bits 1) 0)) = a.
+Proof.
+  intros Hstat Hcanon.
+  pose proof (static_canon_lo a pc Hstat Hcanon) as Hlt.
+  apply bv_eq.
+  cbn [bits_of_virtaddr].
+  change (Z.sub pagesize_bits 1) with 11.
+  rewrite zext64_concat44_12_unsigned.
+  unfold kpt_leaf_ppn.
+  rewrite zext44_27_unsigned.
+  rewrite (svpn_of_unsigned_lo a Hlt).
+  rewrite subrange64_unsigned_11_0.
+  rewrite uint_unsigned.
+  rewrite Z.shiftr_div_pow2 by lia.
+  change (2 ^ 12) with 4096.
+  pose proof (bv_unsigned_in_range _ a) as Ha.
+  pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm.
+  lia.
 Qed.
 
 Lemma kdata_svpn_class (a : mword 64) :

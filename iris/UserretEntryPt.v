@@ -80,7 +80,7 @@ Section UserretEntryPt.
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       utlb_inv_pt uroot tfp um -∗
-      pt_frame (kpt_tree_spec kroot) -∗
+      kpt_frame kroot -∗
       pc_is (uva 0xa8) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -128,13 +128,13 @@ Section UserretEntryPt.
     destruct (exec_execute_SFENCE_VMA_S s_pc1 Lpriv1p
                 ltac:(rewrite Lms1p; exact HTVM)) as (tlbz1 & Hex1 & Hnone1).
     (* flush the invariant's TLB cell and re-seal with the empty vector *)
-    iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp1 tlbvec1 kt1)
-      "(Hsatp & %HkMode1 & %Hkasid1 & %Hkppn1 & Htlb & %Hokk1 & %Hspeck1 & %Hpmaw1 & Hkt & Hpmp)".
+    iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp1 tlbvec1 kt1 M)
+      "(Hsatp & %HkMode1 & %Hkasid1 & %Hkppn1 & Htlb & %Hokk1 & %Hspeck1 & HM & %Hpmaw1 & Hkt & Hpmp)".
     iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb") as "[Hreg Htlb]".
-    iDestruct (tlb_inv_pt_intro kroot ksatp1 tlbz1 kt1 HkMode1 Hkasid1 Hkppn1
+    iDestruct (tlb_inv_pt_intro kroot ksatp1 tlbz1 kt1 M HkMode1 Hkasid1 Hkppn1
                  (tlb_ok_pt_empty (mword_of_int 0) kt1 tlbz1
                     (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
-                 Hspeck1 Hpmaw1 with "Hsatp Htlb Hkt Hpmp") as "Hktlb".
+                 Hspeck1 Hpmaw1 with "Hsatp Htlb HM Hkt Hpmp") as "Hktlb".
     iModIntro.
     iExists (set_reg s_pc1 tlb tlbz1).
     iSplitR.
@@ -192,10 +192,12 @@ Section UserretEntryPt.
     rewrite Lva2 in Hex2.
     rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) usatp HuMode) in Hex2.
     (* dissolve the kernel invariant into the two-table window *)
-    iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp2 tlbvec2 kt2)
-      "(Hsatp & %HkMode2 & %Hkasid2 & %Hkppn2 & Htlb & %Hokk2 & %Hspeck2 & %Hpmaw2 & Hkt & Hpmp)".
+    iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp2 tlbvec2 kt2 M2)
+      "(Hsatp & %HkMode2 & %Hkasid2 & %Hkppn2 & Htlb & %Hokk2 & %Hspeck2 & HM & %Hpmaw2 & Hkt & Hpmp)".
+    iDestruct (KMap.kmap_auth_wf with "HM") as %Hwf2.
+    pose proof (KMap.kmap_wf_tramp M2 Hwf2) as Htn2.
     iMod (reg_update _ satp _ usatp with "Hreg Hsatp") as "[Hreg Hsatp]".
-    iDestruct (tlb_inv_pt2_enter uroot (kpt_tree_spec kroot) (upt_tree_spec uroot tfp um)
+    iDestruct (tlb_inv_pt2_enter uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
                  usatp tlbvec2 kt2 HuMode Huasid Huppn Hokk2 Hspeck2 Hpmaw2
                  with "Hsatp Htlb Hkt Hufr [Hpmp]") as "Hpt2".
     { iApply (pmp_config_reindex kroot uroot with "Hpmp"). }
@@ -213,8 +215,8 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc2) in "Hpc".
     iNext.
     (* ============ STEP 3: sfence.vma -- EXIT into the user invariant === *)
-    iApply (wp_instr_pt2_tramp uroot (kpt_tree_spec kroot) (upt_tree_spec uroot tfp um)
-              (kpt_pt2_tramp_spec kroot) (upt_pt2_tramp_spec uroot tfp um Hwf)
+    iApply (wp_instr_pt2_tramp uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
+              (kpt_pt2_tramp_spec_gen kroot M2 Htn2) (upt_pt2_tramp_spec uroot tfp um Hwf)
               (upt_pt2_base uroot tfp um)
               Φ (uva 0xa4) (upa 0xa4) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
@@ -264,7 +266,9 @@ Section UserretEntryPt.
     { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc3) in "Hpc".
     iNext.
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hkfr
+    iAssert (kpt_frame kroot) with "[Hkfr HM]" as "Hkfrm".
+    { iExists M2. iFrame "Hkfr HM". }
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hkfrm
                           [$Hpc $Hnpc] Hfmap").
   Qed.
 

@@ -2,7 +2,7 @@
    read-only analogue of [kernel_text] (KernelText.v).
 
    [kernel_text] resides the kernel's instruction bytes at their physical
-   addresses as persistent (`↦ₘ□`) points-to facts so that any fetch can
+   addresses as persistent code (`↦ₓ□`) points-to facts so that any fetch can
    extract a code window without borrow/return.  [kernel_data] does the same
    for the kernel's initialized global-data image (KernelData.kernel_data, the
    ELF `.data` section): a persistent per-byte resource from which a data load

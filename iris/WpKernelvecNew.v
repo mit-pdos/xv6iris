@@ -1357,8 +1357,8 @@ Section WpKernelvecNew.
     assert (Hra_l : kv_m2 m !!! Regidx (mword_of_int 1 : mword 5)
                     = regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
     { unfold kv_m2. apply upd_eq. }
-    iDestruct (tlb_inv_pt_open with "Htlbinv") as (satp0 tlbmid t0)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & %Hpmaw0 & Hpte & Hpmp)".
+    iDestruct (tlb_inv_pt_open with "Htlbinv") as (satp0 tlbmid t0 M)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & HM & %Hpmaw0 & Hpte & Hpmp)".
     iApply (kerneltrap_returns γ (DfracOwn (1/2)) (kv_m2 m) (kv_sp1 m)
               (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))
               satp0 tlbmid
@@ -1376,9 +1376,9 @@ Section WpKernelvecNew.
     assert (Hsp'' : m' !!! Regidx csp_rs1 = kv_sp1 m).
     { rewrite (Hpres _ Hsp_nc). exact Hsp_l. }
     (* ---- instrs #20..#38: epilogue (restores + sp cancel + sret) ---- *)
-    iDestruct (tlb_inv_pt_intro root_ppn satp0 tlbmid t0
+    iDestruct (tlb_inv_pt_intro root_ppn satp0 tlbmid t0 M
                  Hmode Hasid Hppn Hokmid Hspec0 Hpmaw0
-                 with "Hsatp Htlb Hpte Hpmp") as "Htlbinv".
+                 with "Hsatp Htlb HM Hpte Hpmp") as "Htlbinv".
     iApply (wp_kv_epilogue root_ppn γ m' (kv_sp1 m) mstatus0 mie_v mdv0 menvcfg0 sepc0
 
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))

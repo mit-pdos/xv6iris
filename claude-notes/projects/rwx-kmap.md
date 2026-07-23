@@ -1,15 +1,19 @@
 # Project: R/W/X-accurate kernel PT, code points-to, and non-identity mappings
 
-STATUS: IN PROGRESS (design signed off 2026-07-23).  Stages 1 (KptPt kperm
-layer + kmap_M0), 2 (KMap.v), 3a (RiscvPtsto ↦ₓ/region layer), and 4 (THE
-FLIP: mem_pointsto ⌜addr_is_kdata⌝, ↦ₓ□ image, kernel_data re-scope,
-adequacy etext split + kmap functor) are DONE and green on full builds.
-Stores to kernel text are now unprovable at the points-to level.  Next:
-stage 5 (see Staging).  All five decision points are settled.
-Flip fallout was tiny (3 files: SmodeCorePt/TrampStepPt fetch engines
-swapped mem_ram/mem_valid → code_ram/text_valid; KernelDataInv filter
-lambda needed a type annotation) because mem_ram kept its ⌜addr_is_ram⌝
-statement — the audit's key prediction held.  The
+STATUS: IN PROGRESS (design signed off 2026-07-23).  Stages 1-5 are DONE
+and green on full builds (301/301): kperm layer + kmap_M0, KMap.v, the
+↦ₓ/region layer, THE FLIP (stores to kernel text unprovable at the
+points-to level), and the full engine re-key — tlb_inv_pt carries the
+M-indexed kpt_tree_spec_gen + kmap_auth, sr_absorb is claim-keyed with
+the regime-generic sr_absorb_region policy corollary (fetch⇒text,
+load⇒ram, store/AMO⇒kdata), bare_inv holds the exact static auth and
+HONORS claims, and the userret pt2 window threads the auth via the
+kpt_frame bundle.  An S-mode fetch is now provable only through
+text/trampoline and a store only through data/devices — enforced by the
+invariant.  REMAINING: the 5-cleanup legacy deletion sweep (in flight),
+then stage 6 (kvminithart switch + kstack claims + vmem demonstrator).
+All five decision points settled; ghost home = riscvGS (decision a0);
+Bare-arm honoring via static_ident_4k (KptPt §15).  The
 claim/auth design is the SYNTHESIS: all-in-ghost STORAGE (the ghost auth
 holds static ∪ dynamic entries, giving a uniform two-clause tree spec and
 single-path absorption proofs) under the hybrid INTERFACE (`kmap_at` keeps
@@ -278,11 +282,40 @@ correspondence lemma; hand out
    M-indexed two-clause spec), kpt_tree_spec_gen_set_leaf{,_tramp} (ADUE
    write-back; premise M !! tramp_vpn = None, supplied by kmap_wf_tramp).
    REMAINING SURGERY (in order):
-   a. KptTree: import KMap, add kmapGS to the KptTreeInv section context;
-      tlb_inv_pt (KptTree ~l.389/§4) swaps ⌜kpt_tree_spec root t⌝ for
-      ∃ M, ⌜kpt_tree_spec_gen root_ppn M t⌝ ∗ kmap_auth M (signature
-      tlb_inv_pt root_ppn UNCHANGED — M existential inside);
-      tlb_inv_pt_intro gains the M/auth arguments.
+   a0. GHOST HOME DECISION (made 2026-07-23): the kmap ghost lives INSIDE
+      riscvGS (new fields `riscv_kmapGS :: ghost_mapG Σ (mword 27)
+      (mword 44 * kperm); kmap_name : gname`), NOT as the separate kmapGS
+      class — tlb_inv_pt rides inside sie_cap_gpr, so a separate class
+      would force a Context line into every sconf-tier file; riscvGS is
+      already threaded everywhere (precedent: uart_name/plic gnames; the
+      ghost is global, unlike per-hart CpuId).  Enabler: move ONLY the
+      `kperm` enum (+EqDecision) down into RiscvPtsto next to the region
+      split (it is region metadata; kperm_base/flags/allows/kmap_class
+      stay in KptPt).  KMap.v drops Class kmapGS, its section runs on
+      riscvGS.  RiscvAdequacy: RiscvGS construction mints the auth
+      (ghost_map_alloc kmap_M0 → γk) and the client interface hands out
+      `kmap_auth kmap_M0` ready-made (KMap import; kmap_wf_M0).
+   a. KptTree: import KMap; tlb_inv_pt (§4, ~l.631) swaps
+      ⌜kpt_tree_spec root t⌝ for ∃ M, ⌜kpt_tree_spec_gen root_ppn M t⌝
+      ∗ kmap_auth M (signature tlb_inv_pt root_ppn UNCHANGED — M
+      existential inside; NO new section context thanks to a0);
+      tlb_inv_pt_intro/open gain the M/auth arguments.  The re-keyed
+      main lemma `tlb_inv_pt_translateAddr_at` mirrors the TRAMP lemma's
+      explicit-pa shape: premises (4-way acc) + kperm_allows pc acc +
+      canonical-va + ⌜concat ppn pageoff = pa⌝ + iProp premise
+      kmap_at (svpn_of va) ppn pc; proof opens the invariant,
+      kmap_at_lookup → M-clause leaf = pte_set_ad (kpt_leaf_pte_of vpn
+      (ppn,pc)) a0 d0, Hchk := kperm_variant_check, Hvar :=
+      kperm_variant_{valid,leaf,no_napot,pbmt0}, output-ppn fact := a
+      kperm_variant_ppn analogue (mirror kpt_variant_ppn via
+      kperm_flags_bound + mk_pte_ppn_field), engine :=
+      ptree_translateAddr_own (leaf-word-generic, unchanged), rebuild :=
+      kpt_tree_spec_gen_set_leaf (M!!tramp=None from kmap_auth's wf).
+      M is UNCHANGED across the write-back (only the tree changes).
+      The tramp lemma keeps its shape (tramp clause survives in gen
+      spec); the §KptTranslateIrisAcc wrappers re-instantiate: fetch →
+      claims at KP_rx, load → either class, store/amo → KP_rw; the dev
+      wrappers become instances via kmap_class_rw + kmap_at_static.
    b. KptTree §5-§7: the tlb_inv_pt_translateAddr_* wrappers (~l.1122+)
       and the write-back path re-key onto the M clause: consumer holds
       kmap_at → kmap_at_lookup → maps-clause → the leaf-word-generic
@@ -290,13 +323,38 @@ correspondence lemma; hand out
       kperm_allows premise).  Loads: both classes allow → derive claim
       via region-decide (text_svpn_class/kdata_svpn_class) engine-side.
       Write-back arm uses kpt_tree_spec_gen_set_leaf (+_tramp).
-   c. SRegime: sr_absorb field re-keyed (claim + kperm_allows premise +
-      canonical-va premise as sr_absorb_dev has; output pa = concat ppn
-      pageoff — identity consumers unchanged via ram_ident_4k-style fact);
-      bare_inv gains kmap_auth kmap_M0 (needs SRegime to import KMap;
-      bare_absorb: both arms reduce to static-identity via
-      kmap_at_M0_static, then the Bare short-circuit); kpt_regime
-      re-proved single-path.  sr_absorb_dev unchanged.
+   c. SRegime (design REFINED 2026-07-23 after reading kpt_absorb):
+      - sr_absorb field re-keyed to the CLAIM form: ∀ acc va ppn pc σ,
+        s_acc_ok acc → kperm_allows pc acc → canonical-va →
+        ⌜concat ppn pageoff = pa⌝ → …reg facts… →
+        kmap_at (svpn_of va) ppn pc -∗ reg_interp -∗ gen_heap -∗ sr_inv
+        ==∗ …translate = Ok (Physaddr pa)… ∗ ⌜pmp_grant_facts σ'⌝ ∗ ….
+      - The identity/region form is NOT a second field — it is a GENERIC
+        corollary over any R : s_regime (the claim derivation is pure,
+        no resources):
+          sr_acc_region acc va := match acc with Fetch → addr_is_text va
+            | Load _ → addr_is_ram va | _ → addr_is_kdata va end.
+          sr_absorb_region R : s_acc_ok acc → sr_acc_region acc va →
+            …same conclusion as today's sr_absorb (identity pa = va)….
+        Proof: region → {text,ram(∃pc),kdata}_svpn_class →
+        kmap_at_static; ppn := kpt_leaf_ppn, pa := va via ram_ident_4k;
+        kperm_allows by refl per arm.  ALL existing identity leaves and
+        engines consume sr_absorb_region (fetch engines pass
+        addr_is_text from their ↦ₓ□ bytes via code_text; store/AMO
+        leaves pass addr_is_kdata via mem_kdata; loads pass addr_is_ram
+        unchanged).
+      - kpt_absorb (the KPT instance) becomes ~10 lines SINGLE-PATH:
+        apply tlb_inv_pt_translateAddr_at with Hchk := kperm_variant_check
+        (the 4-way + kperm_allows dispatcher); pmp facts via
+        tlb_inv_pt_grant_facts as today.
+      - bare_inv gains kmap_auth kmap_M0 (SRegime imports KMap);
+        bare_absorb: kmap_at_M0_static → static claim → pa = va needs
+        the NEW pure lemma static_ident_4k : kmap_static (svpn_of va) pc
+        → canonical va → concat (kpt_leaf_ppn (svpn_of va)) (pageoff va)
+        = va (generalizes ram_ident_4k — every static vpn is in the
+        POSITIVE half, incl. devices; put it in KptPt §15), then the
+        Bare short-circuit translate.
+      - sr_absorb_dev unchanged.
    d. IntrDefs: strans_regime dispatch re-shaped only in the absorb
       field; strans_inv/intr_frame shapes unchanged.
    e. Engines: s_regime_fetch derives KP_rx claims from the chunk's ↦ₓ□
@@ -304,8 +362,28 @@ correspondence lemma; hand out
       straddles); store/AMO leaves extract addr_is_kdata from their own
       ↦ₘ via mem_kdata → kdata_svpn_class → kmap_at_static (one line per
       store leaf); identity load call sites unchanged (engine converts).
-   f. TransPt (pt2 window): kpt_tree_spec → kpt_tree_spec_gen with the
-      SAME M across the window (auth rides in pt_frame/pt2 invariant).
+   f. TransPt (pt2 window) — DECIDED 2026-07-23 (the one 5c blocker was
+      here: UserretEntryPt's contract parks the kernel table as
+      pt_frame (kpt_tree_spec kroot)):
+      - NEW bundle in TransPt: `kpt_frame kroot := ∃ M,
+        pt_frame (kpt_tree_spec_gen kroot M) ∗ kmap_auth M` — "the kernel
+        table parked, its mapping auth riding along".  The userret
+        contract's kernel-park token (`pt_frame (kpt_tree_spec kroot)`,
+        both in wp_userret_entry_pt's continuation and any user_inv-side
+        carrier) becomes `kpt_frame kroot` — a one-token statement
+        change; callers never see M.
+      - TransPt's window machinery (tlb_inv_pt2/enter/exit) needs NO
+        change: Sp instantiates at kpt_tree_spec_gen kroot M for the M
+        obtained when opening tlb_inv_pt, and kmap_auth M is carried as
+        a plain proof-context resource ACROSS the window (user-mode
+        translation goes through utlb_inv_pt and never consults kernel
+        claims); it is packed into kpt_frame at exit.
+      - kpt_pt2_tramp_spec gets a gen analogue:
+        `kpt_pt2_tramp_spec_gen : M !! tramp_vpn = None ->
+         pt2_tramp_spec (kpt_tree_spec_gen kroot M)` via
+        kpt_tree_spec_gen_set_leaf_tramp (premise from kmap_auth's wf).
+      - Re-entry sites (whatever consumes the parked kernel frame to
+        rebuild tlb_inv_pt) open kpt_frame → M + auth → tlb_inv_pt_intro.
    The legacy kpt_tree_spec + its set-leaf lemmas + kpt_variant_* stay
    until every consumer is off them, then delete (guiding principle: no
    near-duplicate families left behind).

@@ -53,7 +53,8 @@ From iris.program_logic Require Import weakestpre adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
-Require Import KptPt.   (* kperm, for the kmap ghost functor (rwx-kmap) *)
+Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
+Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import WireInv.
 Require Import PlicPlan WpUart.
 
@@ -74,7 +75,8 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): capacity only --
      the client mints the auth with [kmap_alloc] when establishing the
      Bare translation slot *)
-  riscv_pre_kmapGS :: ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm);
+  riscv_pre_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+                        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -84,7 +86,8 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ uart_state;
      ghost_varΣ plic_state;
      uartGhostΣ;
-     ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm) ].
+     @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+       (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27) ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -218,6 +221,9 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ}
                           g.(gmem), a ↦ₓ□ b) ∗
        ([∗ map] a ↦ b ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
                           g.(gmem), a ↦ₘ b) ∗
+       (* the kernel-mapping auth, minted over the static map (rwx-kmap);
+          the client stores it in the Bare translation slot *)
+       kmap_auth kmap_M0 ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic))
        ={⊤}=∗
        ([∗ list] c ∈ cs, WP (LoopE c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
@@ -245,7 +251,8 @@ Proof.
   iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
   iEval (rewrite -Qp.half_half) in "Hp".
   iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ γu γp).
+  iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth _]".
+  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ γu γp _ γk).
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
   (* rwx-kmap init split at etext: split the raw heap fragments into the
      sub-[text_end] half (upgraded to [↦ₓ] via [Hram] and PERSISTED to
@@ -280,10 +287,12 @@ Proof.
     pose proof (Hram a b Ha) as [_ Hhi]. split; [lia | exact Hhi]. }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata HuF HpF]") as "[Hwps Hdwp]".
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HuF HpF]") as "[Hwps Hdwp]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
-    iFrame "Htext Hdata". iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
+    iFrame "Htext Hdata". iSplitL "Hkauth".
+    { iFrame "Hkauth". iPureIntro. exact kmap_wf_M0. }
+    iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -339,12 +348,16 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
-  iIntros "(Hwires & _ & _ & Huf & Hpf)".
+  iIntros "(Hwires & _ & _ & _ & Huf & Hpf)".
   (* allocate the four UART ghosts at the initial device state *)
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
   iMod (dev_inv_alloc _ γ with "[Huf Hpf Hacc Hout Htx Hdl]") as "#Hinv".
   { rewrite /dev_inv_body.
-    iExists g.(gdev).(duart), g.(gdev).(dplic). iFrame. iPureIntro. exact Hplic. }
+    iExists g.(gdev).(duart), g.(gdev).(dplic).
+    iFrame "Hacc Hout Htx Hdl".
+    iSplitL "Huf"; [iExact "Huf"|].
+    iSplitL "Hpf"; [iExact "Hpf"|].
+    iPureIntro. exact Hplic. }
   iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
           (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
     as "#Hwinv".

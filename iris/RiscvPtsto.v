@@ -62,6 +62,16 @@ Qed.
 (*    than [gen_heap]; the byte memory keeps its [gen_heap].                *)
 (* ---------------------------------------------------------------------- *)
 
+(* The two kernel permission CLASSES of the etext region split (rwx-kmap):
+   text pages are mapped R|X, data/device pages R|W.  The enum lives here,
+   above [riscvGS], so the class can carry the kernel-mapping claim ghost
+   (KMap.v) over it; the PTE flag bytes and the vpn classifier are KptPt
+   §15's. *)
+Inductive kperm : Set := KP_rx | KP_rw.
+
+Global Instance kperm_eq_dec : EqDecision kperm.
+Proof. solve_decision. Defined.
+
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_invGS :: invGS Σ;
   riscv_regGS :: ghost_mapG Σ register (sigT type_of_register);
@@ -79,6 +89,19 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_plicGS :: ghost_varG Σ plic_state;
   uart_name : gname;
   plic_name : gname;
+  (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): one global
+     vpn ↦ (ppn, class) map.  Lives here -- not as a separate class --
+     because [tlb_inv_pt] rides inside [sie_cap_gpr], and a separate
+     class would have to be threaded through every sconf-tier file;
+     like [uart_name]/[plic_name] it is global (not per-hart). *)
+  (* pinned to the SAIL key instances (Decidable_eq_mword/Countable_mword),
+     because every use site (KMap/KptPt/adequacy) imports Sail and elaborates
+     [gmap (mword 27)] with them; without pinning, this field would take
+     stdpp's bv_eq_dec/bv_countable (RiscvPtsto does not import the Sail
+     instance modules) and the ghost_mapG key-instance args would not unify. *)
+  riscv_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+                    (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
+  kmap_name : gname;
 }.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is

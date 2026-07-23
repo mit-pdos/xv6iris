@@ -462,8 +462,12 @@ Section IntrDefs.
   (* kept folded (no skolem-root open/repack at leaf level).               *)
   (* ------------------------------------------------------------------- *)
   Lemma strans_absorb :
-    forall acc va σ, s_acc_ok acc ->
-      addr_is_ram va ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ, s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
       register_lookup misa σ.(sregs) = MISA_C ->
       register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
       register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -473,26 +477,27 @@ Section IntrDefs.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
+      ⊢ KMap.kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
           ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
           ⌜ (σ'.(sregs) = σ.(sregs) \/
              exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
   Proof.
-    intros acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh [[Hb Hstv] | Hk]".
-    - iMod (bare_absorb acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-              with "Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
+    intros acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iIntros "Hat Hri Hgh [[Hb Hstv] | Hk]".
+    - iMod (bare_absorb acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+              with "Hat Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
       iFrame "Hri Hgh". iLeft. iFrame "Hb Hstv".
     - iDestruct "Hk" as (root_ppn) "Ht".
-      iMod (kpt_absorb root_ppn acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-              with "Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iMod (kpt_absorb root_ppn acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+              with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
       iFrame "Hri Hgh". iRight. iExists root_ppn. iExact "Ht".

@@ -149,7 +149,7 @@ Section UserretAllPt.
       pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 272)))) (Z.sub pagesize_bits 1) 0))) vt5 dqm -∗
       pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 280)))) (Z.sub pagesize_bits 1) 0))) vt6 dqm -∗
       pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 112)))) (Z.sub pagesize_bits 1) 0))) va0f dqm -∗
-      pt_frame (kpt_tree_spec kroot) -∗
+      TransPt.kpt_frame kroot -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.

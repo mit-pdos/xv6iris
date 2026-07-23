@@ -171,7 +171,7 @@ Section WpSconfLock.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Load Data) pa s_pc
+    iMod (sr_absorb_region strans_regime (Load Data) pa s_pc
             (or_intror (or_introl eq_refl)) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
@@ -378,7 +378,7 @@ Section WpSconfLock.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Load Data) pa s_pc
+    iMod (sr_absorb_region strans_regime (Load Data) pa s_pc
             (or_intror (or_introl eq_refl)) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
@@ -580,8 +580,12 @@ Section WpSconfLock.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Store Data) pa s_pc
-            (or_intror (or_intror (or_introl eq_refl))) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+    iAssert (⌜addr_is_kdata pa⌝)%I as %Hkdata.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hbk".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_kdata with "Hbk") as %Hrk. rewrite pa_add_0 in Hrk. iPureIntro. exact Hrk. }
+    iMod (sr_absorb_region strans_regime (Store Data) pa s_pc
+            (or_intror (or_intror (or_introl eq_refl))) Hkdata Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
@@ -781,8 +785,12 @@ Section WpSconfLock.
                  (exec_get_pmlen_amo_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Atomic (AMOSWAP, Data, Data)) a8 s_pc
-            (or_intror (or_intror (or_intror eq_refl))) Hrampa Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
+    iAssert (⌜addr_is_kdata a8⌝)%I as %Hkdata.
+    { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hbk".
+      { rewrite lookup_seq_lt; [reflexivity | lia]. }
+      iDestruct (mem_kdata with "Hbk") as %Hrk. rewrite pa_add_0 in Hrk. iPureIntro. exact Hrk. }
+    iMod (sr_absorb_region strans_regime (Atomic (AMOSWAP, Data, Data)) a8 s_pc
+            (or_intror (or_intror (or_intror eq_refl))) Hkdata Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_amo s_pc)
