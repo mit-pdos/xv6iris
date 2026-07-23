@@ -74,7 +74,7 @@ Section WpSmodeIntr.
   Lemma wp_instr_s_intr (γ : gname) (handler : mword 64) (root_ppn : mword 44)
       (m : regfile) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
-    sret_tgt pc = pc ->
+    ret_pc pc = pc ->
     intr_inv γ handler -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     intr_config γ -∗
@@ -276,8 +276,8 @@ Section WpSmodeIntr.
         iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
         iEval (rewrite /instr_bytes) in "Hbytes".
         iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
-      assert (Hpc0 : sret_tgt pc = pc)
-        by (unfold sret_tgt; exact (update_bit0_zero_of_aligned2 pc Hal2)).
+      assert (Hpc0 : ret_pc pc = pc)
+        by (unfold ret_pc; exact (update_bit0_zero_of_aligned2 pc Hal2)).
       iDestruct (intr_config_of_v2 with "Hsc Hq1 Hsepcx Hscausex Hstvalx")
         as "(Hic & Hq1 & Hmenv)".
       iApply (wp_instr_s_intr γ handler root_ppn m Φ pc is_rvc i

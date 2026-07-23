@@ -31,7 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import ExecCommon.
 Require Import WpGprMret.
 Require Import SmodeCore.
-(* sret_ms1..5 / sret_newpriv / sret_tgt -- the post-execute CSR tower this
+(* sret_ms1..5 / sret_newpriv / ret_pc -- the post-execute CSR tower this
    WP produces -- live with their bit theory in MstatusBits.v. *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -51,7 +51,7 @@ Section ExecSRET.
   Let ms4 := update_subrange_vec_dec ms3 17 17 ('b"0").
   Let ms5 := update_subrange_vec_dec ms4 23 23 (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let elpv := if lpe then _get_Mstatus_SPELP ms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
-  Let tgt := update_vec_dec (register_lookup sepc s.(sregs)) 0 ('b"0").
+  Let tgt := ret_pc (register_lookup sepc s.(sregs)).
   Let sF := set_reg (set_reg (set_reg (set_reg (set_reg
               (set_reg (set_reg (set_reg s mstatus ms1) mstatus ms2)
                        cur_privilege newpriv) mstatus ms3) mstatus ms4)

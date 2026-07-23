@@ -2,6 +2,7 @@ From Stdlib Require Import ZArith.
 From iris.program_logic Require Import lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec ExecCommon.
 Local Open Scope Z_scope.
@@ -93,7 +94,7 @@ Section ExecMRET.
   Let ms4 := update_subrange_vec_dec ms3 17 17 ('b"0").
   Let ms5 := update_subrange_vec_dec ms4 41 41 (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let elpv := if lpe then _get_Mstatus_MPELP ms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
-  Let tgt := update_vec_dec (register_lookup mepc s.(sregs)) 0 ('b"0").
+  Let tgt := ret_pc (register_lookup mepc s.(sregs)).
   Let sF := set_reg (set_reg (set_reg (set_reg (set_reg
               (set_reg (set_reg (set_reg s mstatus ms1) mstatus ms2)
                        cur_privilege newpriv) mstatus ms3) mstatus ms4)

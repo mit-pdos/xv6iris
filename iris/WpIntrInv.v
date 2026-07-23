@@ -224,7 +224,7 @@ Section WpIntrInv.
       (root_ppn : mword 44)
       (m : regfile)
       (Φ : mval -> iProp Σ) :
-    sret_tgt pc0 = pc0 ->
+    ret_pc pc0 = pc0 ->
     intr_inv γ handler -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     intr_config γ -∗

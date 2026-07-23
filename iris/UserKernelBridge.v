@@ -36,6 +36,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes WpGpr RegFile.
@@ -121,7 +122,7 @@ Section UserKernelBridge.
     senvcfg ↦ᵣ senvcfg0 -∗
     sepc ↦ᵣ sepc0 -∗
     utlb_inv_pt uroot tfp um -∗
-    pc_is (sret_tgt sepc0) -∗
+    pc_is (ret_pc sepc0) -∗
     gpr_file g -∗
     (* ---- the cells userret never touched (kernel-owned) ---- *)
     scause ↦ᵣ sc_v -∗
@@ -143,7 +144,7 @@ Section UserKernelBridge.
     iDestruct "Hpc" as "[Hpcc Hnpc]".
     unfold user_inv.
     iExists (HART_ACTIVE tt), (sret_ms5 mstatus0), sc_v, stval_v, sepc0,
-            (sret_tgt sepc0), (sret_tgt sepc0), g.
+            (ret_pc sepc0), (ret_pc sepc0), g.
     (* user_hart_ok *)
     iSplitR; [iPureIntro; exact I |].
     (* user_mstatus_ok *)

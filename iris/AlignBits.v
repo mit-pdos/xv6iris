@@ -49,7 +49,7 @@ Proof.
 Qed.
 
 (* A 2-aligned pc's bit 0 is already 0, so writing 0 there is the identity.
-   ([sret_tgt] = [update_vec_dec _ 0 'b"0"], MstatusBits.v: every
+   ([ret_pc] = [update_vec_dec _ 0 'b"0"], MstatusBits.v: every
    instruction-aligned pc is its own legal sret target -- lets the SIE=1
    engines derive their sret-target premise from [instr_bytes]' alignment
    fact instead of demanding it at every call site.) *)

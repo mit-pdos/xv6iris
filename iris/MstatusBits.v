@@ -3,7 +3,8 @@
    the per-field lemmas and the trap/SRET round trip.
 
    This file owns BOTH transforms' definitions (trap_ms here, sret_ms1..5 /
-   sret_newpriv / sret_tgt below) so that the theory and the definitions it
+   sret_newpriv below; the sret return target is [ret_pc], RiscvExtras) so
+   that the theory and the definitions it
    is about live together.  It is deliberately at the very bottom of the
    dependency graph -- no intra-iris Requires at all -- because both the
    S-mode WP tower (WpSmodeSret and up) and the user-mode trap proofs
@@ -153,7 +154,6 @@ Definition sret_newpriv (ms0 : mword 64) : Privilege :=
 Definition sret_ms3 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms2 ms0) 8 8 ('b"0").
 Definition sret_ms4 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms3 ms0) 17 17 ('b"0").
 Definition sret_ms5 (ms0 : mword 64) := update_subrange_vec_dec (sret_ms4 ms0) 23 23 (landing_pad_bits_backwards NO_LP_EXPECTED).
-Definition sret_tgt (sepc0 : mword 64) := update_vec_dec sepc0 0 ('b"0").
 
 (* --------------------------------------------------------------------- *)
 (* The SRET tower over a SYMBOLIC input.                                   *)

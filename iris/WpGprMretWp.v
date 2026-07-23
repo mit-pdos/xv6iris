@@ -2,6 +2,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvExtras.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode.
 From iris.base_logic.lib Require Import invariants.
@@ -75,7 +76,7 @@ Section ForwardMRET.
   Let ms4 := update_subrange_vec_dec ms3 17 17 ('b"0").
   Let ms5 := update_subrange_vec_dec ms4 41 41 (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let elpv := if lpe then _get_Mstatus_MPELP ms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
-  Let tgt := update_vec_dec (register_lookup mepc s_pcm.(sregs)) 0 ('b"0").
+  Let tgt := ret_pc (register_lookup mepc s_pcm.(sregs)).
 
   (* The 6 MRET execute side-conditions, stated at [s] (transferred to [s_pcm]). *)
   Hypothesis Hmu : eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true.
@@ -105,7 +106,6 @@ Section StepMRET.
     Definition cms3 := update_subrange_vec_dec cms2 12 11 (privLevel_to_bits User).
     Definition cms4 := update_subrange_vec_dec cms3 17 17 ('b"0").
     Definition cms5 := update_subrange_vec_dec cms4 41 41 (landing_pad_bits_backwards NO_LP_EXPECTED).
-    Definition ctgt := update_vec_dec mepc0 0 ('b"0").
 
 
     Ltac tmim := rewrite irrelevant_register_set; [ | vm_compute; reflexivity ].

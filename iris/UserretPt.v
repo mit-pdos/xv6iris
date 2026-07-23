@@ -612,7 +612,7 @@ Section ExecSRETU.
   Let ms4 := update_subrange_vec_dec ms3 17 17 ('b"0").
   Let ms5 := update_subrange_vec_dec ms4 23 23 (landing_pad_bits_backwards NO_LP_EXPECTED).
   Let elpv := if lpe then _get_Mstatus_SPELP ms4 else landing_pad_bits_backwards NO_LP_EXPECTED.
-  Let tgt := update_vec_dec (register_lookup sepc s.(sregs)) 0 ('b"0").
+  Let tgt := ret_pc (register_lookup sepc s.(sregs)).
   Let sF := set_reg (set_reg (set_reg (set_reg (set_reg
               (set_reg (set_reg (set_reg s mstatus ms1) mstatus ms2)
                        cur_privilege newpriv) mstatus ms3) mstatus ms4)
@@ -936,7 +936,7 @@ Section WpUaluUsretPt.
       senvcfg ↦ᵣ senvcfg0 -∗
       sepc ↦ᵣ sepc0 -∗
       utlb_inv_pt uroot tfp um -∗
-      pc_is (sret_tgt sepc0) -∗
+      pc_is (ret_pc sepc0) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1009,12 +1009,12 @@ Section WpUaluUsretPt.
                   (set_reg (set_reg (set_reg s_pc mstatus (sret_ms1 mstatus0)) mstatus (sret_ms2 mstatus0))
                            cur_privilege User) mstatus (sret_ms3 mstatus0)) mstatus (sret_ms4 mstatus0))
                   mstatus (sret_ms5 mstatus0)) elp (landing_pad_bits_backwards NO_LP_EXPECTED))
-                  nextPC (sret_tgt sepc0)).
+                  nextPC (ret_pc sepc0)).
     assert (HexecC : exec (execute (SRET tt)) s_pc = Some (RETIRE_SUCCESS, sX)).
     { rewrite HexecC0. unfold sX.
       rewrite !Lms_pc Lsepc_pc.
       unfold sret_newpriv, sret_ms2, sret_ms1 in Hsup.
-      unfold sret_ms1, sret_ms2, sret_ms3, sret_ms4, sret_ms5, sret_tgt.
+      unfold sret_ms1, sret_ms2, sret_ms3, sret_ms4, sret_ms5, ret_pc.
       rewrite Hsup. reflexivity. }
     (* mirror the physical set_regs on the ghost cells *)
     iMod (reg_update _ mstatus _ (sret_ms1 mstatus0) with "Hreg Hms") as "[Hreg Hms]".
@@ -1032,7 +1032,7 @@ Section WpUaluUsretPt.
     { repeat tmig. rewrite Lelp Help0. reflexivity. }
     iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
                  Lelp_now with "Hreg") as "Hreg".
-    iMod (reg_update _ nextPC _ (sret_tgt sepc0) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ nextPC _ (ret_pc sepc0) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists sX.
     iSplitR.
@@ -1040,7 +1040,7 @@ Section WpUaluUsretPt.
     iSplitL "Hreg Hmem".
     { unfold sX, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
-    assert (Lnpc : register_lookup nextPC sX.(sregs) = sret_tgt sepc0)
+    assert (Lnpc : register_lookup nextPC sX.(sregs) = ret_pc sepc0)
       by (unfold sX, set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc

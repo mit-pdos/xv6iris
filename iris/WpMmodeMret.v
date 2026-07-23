@@ -9,6 +9,7 @@ From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr MinstretInv InstrBytes SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
+Require Import RiscvExtras.
 Import Defs.
 Require Import WpGprMret WpGprMretWp.
 Import Defs.
@@ -24,7 +25,7 @@ Section WpMretGpr.
      [mstatus_legalized_MPP] on the csrw'd value), newpriv ≠ Machine, and the
      xLPE-off fact (lpe = false, forced by the persistent elp pinning).
      The continuation receives the RAW post-MRET cells: privilege [newpriv],
-     mstatus [cms5 ms_cur], pc at the aligned mepc target [ctgt mepc0]; pmpcfg,
+     mstatus [cms5 ms_cur], pc at the aligned mepc target [ret_pc mepc0]; pmpcfg,
      mepc and the GPR file are unchanged. *)
   Lemma wp_mret_gpr (Φ : mval -> iProp Σ) (pc : mword 64)
       (newpriv : Privilege)
@@ -53,7 +54,7 @@ Section WpMretGpr.
       mstatus ↦ᵣ cms5 ms_cur -∗
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       menvcfg ↦ᵣ menvcfg1 -∗
-      pc_is (ctgt mepc0) -∗
+      pc_is (ret_pc mepc0) -∗
       gpr_file m -∗
       mepc ↦ᵣ mepc0 -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -99,7 +100,7 @@ Section WpMretGpr.
                ('b"0")) = returnM newpriv)
       by (rewrite LmsP; exact Hnp).
     (* the MRET execute reduction, with the post-state phrased on the OWNED
-       values (cms1..cms5 / ctgt) *)
+       values (cms1..cms5 / ret_pc) *)
     (* the per-state get_xLPE fact, at whatever intermediate state the MRET
        reduction reads it: menvcfg is preserved by the preceding set_regs. *)
     assert (Hxlpe : forall sz, register_lookup menvcfg sz.(sregs) = menvcfg1 ->
@@ -119,7 +120,7 @@ Section WpMretGpr.
                   cur_privilege newpriv) mstatus (cms3 ms_cur)) mstatus (cms4 ms_cur))
                   mstatus (cms5 ms_cur))
                   elp (landing_pad_bits_backwards NO_LP_EXPECTED))
-                  nextPC (ctgt mepc0))).
+                  nextPC (ret_pc mepc0))).
     { rewrite LmsP LmepcP in HexecC0. exact HexecC0. }
     (* mirror the physical set_regs on the ghost cells *)
     iMod (reg_update _ mstatus _ (cms1 ms_cur) with "Hreg Hms") as "[Hreg Hms]".
@@ -138,14 +139,14 @@ Section WpMretGpr.
     { repeat tmig. rewrite Lelp Help0. reflexivity. }
     iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
                  Lelp_now with "Hreg") as "Hreg".
-    iMod (reg_update _ nextPC _ (ctgt mepc0) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update _ nextPC _ (ret_pc mepc0) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg
               (set_reg s_pc mstatus (cms1 ms_cur)) mstatus (cms2 ms_cur))
               cur_privilege newpriv) mstatus (cms3 ms_cur)) mstatus (cms4 ms_cur))
               mstatus (cms5 ms_cur))
               elp (landing_pad_bits_backwards NO_LP_EXPECTED))
-              nextPC (ctgt mepc0)).
+              nextPC (ret_pc mepc0)).
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact HexecC. }
     iSplitL "Hreg Hmem".
@@ -157,8 +158,8 @@ Section WpMretGpr.
                cur_privilege newpriv) mstatus (cms3 ms_cur)) mstatus (cms4 ms_cur))
                mstatus (cms5 ms_cur))
                elp (landing_pad_bits_backwards NO_LP_EXPECTED))
-               nextPC (ctgt mepc0)).(sregs)
-             = ctgt mepc0)
+               nextPC (ret_pc mepc0)).(sregs)
+             = ret_pc mepc0)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc Hmenv [$Hpc' $Hnpc] Hfile Hmepc").

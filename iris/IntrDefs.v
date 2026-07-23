@@ -226,7 +226,7 @@ Section IntrDefs.
   (*                                                                       *)
   (* [intr_handler_spec] is the handler contract.  Persistent (□), so it   *)
   (* lives freely inside the invariant.  Reading: for any interrupted pc   *)
-  (* [pc0] (instruction-aligned, so [sret_tgt pc0 = pc0]), any mstatus     *)
+  (* [pc0] (instruction-aligned, so [ret_pc pc0 = pc0]), any mstatus     *)
   (* [ms] with the SIE=1 fact set, and any register file [m]: if we are    *)
   (* AT [handler] in the trapped mstatus [trap_ms elp_v ms] with           *)
   (* sepc = pc0, [gpr_file m] and [intr_frame ... m], then the machine     *)
@@ -272,7 +272,7 @@ Section IntrDefs.
     (□ ∀ (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
          (m : regfile) (Φ : mval -> iProp Σ),
         ⌜ intr_ms_facts ms ⌝ -∗
-        ⌜ sret_tgt pc0 = pc0 ⌝ -∗
+        ⌜ ret_pc pc0 = pc0 ⌝ -∗
         ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
         hart_state ↦ᵣ HART_ACTIVE tt -∗
         cur_privilege ↦ᵣ Supervisor -∗

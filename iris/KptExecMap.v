@@ -112,7 +112,7 @@ Qed.
 (* [kpt_exec_pa] shifts a va only by page-aligned (hence even) constants, so it
    preserves 2-alignment: if the physical fetch address [kpt_exec_pa pc] is
    2-aligned then so is the virtual [pc].  (The SIE=1 interrupt arm keys [instr]
-   at [kpt_exec_pa pc] but needs [pc]'s alignment to derive [sret_tgt pc = pc].)
+   at [kpt_exec_pa pc] but needs [pc]'s alignment to derive [ret_pc pc = pc].)
    Pure arithmetic, kept out of the fragile [access_vec_dec] path so the
    [bv]/[mod] reduction stays stable. *)
 Lemma kpt_exec_pa_aligned2 (pc : mword 64) :

@@ -1357,7 +1357,7 @@ Section WpStartThm.
       by (vm_compute; reflexivity).
     assert (Hcretv : ret_pc st_ra_link = st_pc60)
       by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hctgtv : ctgt st_main = st_main)
+    assert (Hctgtv : ret_pc st_main = st_main)
       by (apply bv_eq; vm_compute; reflexivity).
     pose proof (st_s0_16 sp0) as Hs016.
 
