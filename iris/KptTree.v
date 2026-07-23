@@ -197,6 +197,139 @@ Proof.
   apply kpt_check_amo_ad.
 Qed.
 
+(* ===================================================================== *)
+(* §2c CLASS-KEYED LEAVES WITH ARBITRARY PPN (rwx-kmap).  The same        *)
+(*     dispatch facts for A/D variants of [mk_pte ppn (kperm_flags pc)],  *)
+(*     feeding [kpt_tree_spec_gen]'s uniform maps-clause: identity        *)
+(*     text/data/device leaves AND the dynamic kstack leaves are all      *)
+(*     instances (KptPt §15; claude-notes/projects/rwx-kmap.md).          *)
+(* ===================================================================== *)
+
+(* an A/D variant of a class-keyed leaf IS the leaf at the corresponding
+   A/D pair (arbitrary-ppn analogue of [pte_set_ad_kpt_leaf]) *)
+Lemma kperm_set_ad_leaf (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  pte_set_ad (mk_pte ppn (kperm_flags pc)) a d
+  = mk_pte ppn (kperm_flags_ad pc (ad_of a d)).
+Proof.
+  unfold mk_pte.
+  rewrite (pte_set_ad_zext_concat ppn (kperm_flags pc) a d (kperm_flags_bound pc)).
+  assert (Hz : (mword_of_int
+                  (Z.lor (Z.land (kperm_flags pc) 831)
+                     (Z.lor (Z.shiftl (bv_unsigned a) 6)
+                            (Z.shiftl (bv_unsigned d) 7))) : mword 10)
+               = mword_of_int (kperm_flags_ad pc (ad_of a d))).
+  { unfold kperm_flags, kperm_flags_ad, kperm_base, kpt_ad_bits, ad_of.
+    destruct pc;
+      destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+      apply bv_eq; vm_compute; reflexivity. }
+  rewrite Hz. reflexivity.
+Qed.
+
+Lemma kperm_variant_flags (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  subrange_vec_dec (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d) 7 0
+  = (mword_of_int (kperm_flags_ad pc (ad_of a d)) : mword 8).
+Proof.
+  rewrite kperm_set_ad_leaf.
+  apply mk_pte_flags. apply kperm_flags_ad_bound.
+Qed.
+
+Lemma kperm_variant_ext (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  ext_bits_of_PTE (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d)
+  = Mk_PTE_Ext (mword_of_int 0).
+Proof.
+  rewrite kperm_set_ad_leaf.
+  unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
+  rewrite mk_pte_ext; [reflexivity |].
+  pose proof (kperm_flags_ad_bound pc (ad_of a d)). lia.
+Qed.
+
+(* classification: every A/D variant of a class-keyed leaf is a valid 4K
+   leaf with clear extension bits *)
+Lemma kperm_variant_valid (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  pte_valid (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
+Proof.
+  intros s. unfold Mk_PTE_Flags.
+  rewrite kperm_variant_flags. rewrite kperm_variant_ext.
+  apply kperm_inv_red.
+Qed.
+
+Lemma kperm_variant_leaf (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  pte_leaf (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
+Proof.
+  unfold pte_leaf, Mk_PTE_Flags.
+  rewrite kperm_variant_flags.
+  apply kperm_nonleaf_red.
+Qed.
+
+Lemma kperm_variant_no_napot (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  pte_no_napot (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
+Proof.
+  unfold pte_no_napot.
+  rewrite kperm_variant_ext.
+  apply kpt_extN_red.
+Qed.
+
+Lemma kperm_variant_pbmt0 (ppn : mword 44) (pc : kperm) (a d : mword 1) :
+  pte_pbmt0 (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
+Proof.
+  unfold pte_pbmt0.
+  rewrite kperm_variant_ext.
+  vm_compute. reflexivity.
+Qed.
+
+(* permission checks, class-keyed: fetch only from RX, loads from both,
+   store/AMO only to RW.  A store check on an RX leaf is NOT provable --
+   stores to kernel text are unsound by construction. *)
+Lemma kperm_variant_check_fetch (ppn : mword 44) (a d : mword 1) (mxr do_sum : bool) :
+  pte_check_ok (InstructionFetch tt) Supervisor mxr do_sum
+    (pte_set_ad (mk_pte ppn (kperm_flags KP_rx)) a d).
+Proof.
+  intros s. unfold Mk_PTE_Flags.
+  rewrite kperm_variant_flags. rewrite kperm_variant_ext.
+  apply kperm_check_fetch.
+Qed.
+
+Lemma kperm_variant_check_load (ppn : mword 44) (pc : kperm) (a d : mword 1) (mxr do_sum : bool) :
+  pte_check_ok (Load Data) Supervisor mxr do_sum
+    (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
+Proof.
+  intros s. unfold Mk_PTE_Flags.
+  rewrite kperm_variant_flags. rewrite kperm_variant_ext.
+  apply kperm_check_load.
+Qed.
+
+Lemma kperm_variant_check_store (ppn : mword 44) (a d : mword 1) (mxr do_sum : bool) :
+  pte_check_ok (Store Data) Supervisor mxr do_sum
+    (pte_set_ad (mk_pte ppn (kperm_flags KP_rw)) a d).
+Proof.
+  intros s. unfold Mk_PTE_Flags.
+  rewrite kperm_variant_flags. rewrite kperm_variant_ext.
+  apply kperm_check_store.
+Qed.
+
+Lemma kperm_variant_check_amo (ppn : mword 44) (a d : mword 1) (mxr do_sum : bool) :
+  pte_check_ok (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
+    (pte_set_ad (mk_pte ppn (kperm_flags KP_rw)) a d).
+Proof.
+  intros s. unfold Mk_PTE_Flags.
+  rewrite kperm_variant_flags. rewrite kperm_variant_ext.
+  apply kperm_check_amo.
+Qed.
+
+(* the class-keyed dispatcher (the 4-way access disjunction is SRegime's
+   [s_acc_ok], inlined -- SRegime sits above this file) *)
+Lemma kperm_variant_check (ppn : mword 44) (pc : kperm)
+    (acc : MemoryAccessType mem_payload) (a d : mword 1) (mxr do_sum : bool) :
+  (acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
+   acc = Atomic (AMOSWAP, Data, Data)) ->
+  kperm_allows pc acc ->
+  pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
+Proof.
+  intros Hacc Hall s. unfold Mk_PTE_Flags.
+  rewrite kperm_variant_flags. rewrite kperm_variant_ext.
+  apply kperm_check; assumption.
+Qed.
+
 (* update_PTE_Bits: no write-back is needed exactly when A (and D, for
    stores) is already set in the variant *)
 
@@ -339,6 +472,115 @@ Proof.
   - intros vpn' Hm' Hnt.
     apply (ptree_set_leaf_blocks t vpn vpn' p2 p1 p0); [exact Hmaps |].
     apply (Hblk vpn' Hm' Hnt).
+Qed.
+
+(* ===================================================================== *)
+(* §3b THE GENERALIZED (M-INDEXED) MAPPING SPEC (rwx-kmap).  The region   *)
+(*     clauses collapse into ONE maps-clause over the kernel-mapping map  *)
+(*     M (KMap.v's auth): text/data/device identity leaves AND dynamic    *)
+(*     kstack leaves are all just entries of M, each mapped as an A/D     *)
+(*     variant of its class-keyed PTE.  The trampoline stays a dedicated  *)
+(*     clause (it is NOT a claim; KMap's [kmap_wf_tramp] keeps it out of  *)
+(*     M).  [kpt_tree_spec] (above) is the legacy uniform-RWX form; the   *)
+(*     tlb_inv_pt flip onto this spec is the stage-5 surgery.             *)
+(* ===================================================================== *)
+
+Definition kpt_leaf_pte_of (vpn : mword 27) (e : mword 44 * kperm) : mword 64 :=
+  mk_pte e.1 (kperm_flags e.2).
+
+Definition kpt_tree_spec_gen (root : mword 44)
+    (M : gmap (mword 27) (mword 44 * kperm)) (t : ptree) : Prop :=
+  pt_base t = root /\
+  (forall vpn e, M !! vpn = Some e ->
+     exists p2 p1 (a d : mword 1),
+       ptree_maps t vpn p2 p1 (pte_set_ad (kpt_leaf_pte_of vpn e) a d)) /\
+  (exists p2 p1 (a d : mword 1),
+     ptree_maps t tramp_vpn p2 p1 (pte_set_ad pte_tramp a d)) /\
+  (forall vpn, M !! vpn = None -> vpn <> tramp_vpn -> ptree_blocks t vpn).
+
+(* the generalized spec survives the ADUE write-back of any M-mapped
+   vpn's leaf (single-clause analogue of [kpt_tree_spec_set_leaf]; the
+   [M !! tramp_vpn = None] premise comes from [kmap_wf_tramp]) *)
+Lemma kpt_tree_spec_gen_set_leaf (root : mword 44)
+    (M : gmap (mword 27) (mword 44 * kperm)) (t : ptree)
+    (vpn : mword 27) (e : mword 44 * kperm)
+    (p2 p1 p0 : mword 64) (a d : mword 1) :
+  kpt_tree_spec_gen root M t ->
+  ptree_maps t vpn p2 p1 p0 ->
+  M !! vpn = Some e ->
+  M !! tramp_vpn = None ->
+  (exists a0 d0 : mword 1, p0 = pte_set_ad (kpt_leaf_pte_of vpn e) a0 d0) ->
+  kpt_tree_spec_gen root M (ptree_set_leaf t vpn (pte_set_ad p0 a d)).
+Proof.
+  intros (Hbase & Hmap & Htramp & Hblk) Hmaps He Htn (a0 & d0 & Hp0).
+  assert (Hnt : vpn <> tramp_vpn) by (intros ->; rewrite He in Htn; discriminate).
+  assert (Hvar : pte_set_ad p0 a d = pte_set_ad (kpt_leaf_pte_of vpn e) a d).
+  { rewrite Hp0. apply pte_set_ad_absorb. }
+  split; [| split; [| split]].
+  - rewrite <- Hbase.
+    unfold ptree_set_leaf.
+    destruct (pt_kids t (vpn_idx 2 vpn)); [| reflexivity].
+    destruct (pt_kids p (vpn_idx 1 vpn)); reflexivity.
+  - intros vpn' e' He'.
+    destruct (decide (vpn' = vpn)) as [-> | Hne].
+    + rewrite He in He'. injection He' as <-.
+      exists p2, p1, a, d.
+      rewrite <- Hvar.
+      apply (ptree_set_leaf_maps_self t vpn p2 p1 p0); [exact Hmaps | ..];
+        rewrite Hvar; unfold kpt_leaf_pte_of.
+      * apply kperm_variant_valid.
+      * apply kperm_variant_leaf.
+      * apply kperm_variant_no_napot.
+      * apply kperm_variant_pbmt0.
+    + destruct (Hmap vpn' e' He') as (q2 & q1 & a' & d' & Hm2).
+      exists q2, q1, a', d'.
+      apply (ptree_set_leaf_maps_other t vpn vpn' _ _ _ _ Hne Hm2).
+  - destruct Htramp as (q2 & q1 & a' & d' & Hm2).
+    exists q2, q1, a', d'.
+    apply (ptree_set_leaf_maps_other t vpn tramp_vpn _ _ _ _
+             (not_eq_sym Hnt) Hm2).
+  - intros vpn' Hm' Hnt'.
+    apply (ptree_set_leaf_blocks t vpn vpn' p2 p1 p0); [exact Hmaps |].
+    apply (Hblk vpn' Hm' Hnt').
+Qed.
+
+(* ... and of the trampoline leaf under the generalized spec (an S-mode
+   fetch through the trampoline mapping may set its A bit; every M-vpn is
+   ≠ tramp by the same [M !! tramp_vpn = None] premise) *)
+Lemma kpt_tree_spec_gen_set_leaf_tramp (root : mword 44)
+    (M : gmap (mword 27) (mword 44 * kperm)) (t : ptree)
+    (p2 p1 p0 : mword 64) (a d : mword 1) :
+  kpt_tree_spec_gen root M t ->
+  ptree_maps t tramp_vpn p2 p1 p0 ->
+  M !! tramp_vpn = None ->
+  (exists a0 d0 : mword 1, p0 = pte_set_ad pte_tramp a0 d0) ->
+  kpt_tree_spec_gen root M (ptree_set_leaf t tramp_vpn (pte_set_ad p0 a d)).
+Proof.
+  intros (Hbase & Hmap & Htramp & Hblk) Hmaps Htn (a0 & d0 & Hp0).
+  assert (Hvar : pte_set_ad p0 a d = pte_set_ad pte_tramp a d).
+  { rewrite Hp0. apply pte_set_ad_absorb. }
+  split; [| split; [| split]].
+  - rewrite <- Hbase.
+    unfold ptree_set_leaf.
+    destruct (pt_kids t (vpn_idx 2 tramp_vpn)); [| reflexivity].
+    destruct (pt_kids p (vpn_idx 1 tramp_vpn)); reflexivity.
+  - intros vpn' e' He'.
+    assert (Hne : vpn' <> tramp_vpn) by (intros ->; rewrite Htn in He'; discriminate).
+    destruct (Hmap vpn' e' He') as (q2 & q1 & a' & d' & Hm2).
+    exists q2, q1, a', d'.
+    apply (ptree_set_leaf_maps_other t tramp_vpn vpn' _ _ _ _
+             Hne Hm2).
+  - exists p2, p1, a, d.
+    rewrite <- Hvar.
+    apply (ptree_set_leaf_maps_self t tramp_vpn p2 p1 p0); [exact Hmaps | ..];
+      rewrite Hvar.
+    + exact (proj1 (tramp_variant a d)).
+    + exact (proj1 (proj2 (tramp_variant a d))).
+    + exact (proj1 (proj2 (proj2 (tramp_variant a d)))).
+    + exact (proj2 (proj2 (proj2 (tramp_variant a d)))).
+  - intros vpn' Hm' Hnt'.
+    apply (ptree_set_leaf_blocks t tramp_vpn vpn' p2 p1 p0); [exact Hmaps |].
+    apply (Hblk vpn' Hm' Hnt').
 Qed.
 
 (* ... and of the trampoline leaf itself (an S-mode fetch through the

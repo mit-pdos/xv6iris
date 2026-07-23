@@ -1,11 +1,20 @@
 # Project: R/W/X-accurate kernel PT, code points-to, and non-identity mappings
 
-STATUS: DESIGN CHECKPOINT — proposed and once-reviewed in outline; NOT started.
-The design below is UPDATED for the two refactors that landed after the
-original proposal (the `sie_cap_gpr` ambient bundle and the Bare-regime
-translation slot — see design/interrupts.md); several pieces got strictly
-easier because of them.  Open decision points at the bottom need sign-off
-before implementation.
+STATUS: IN PROGRESS (design signed off 2026-07-23).  Stages 1 (KptPt kperm
+layer + kmap_M0), 2 (KMap.v), 3a (RiscvPtsto ↦ₓ/region layer), and 4 (THE
+FLIP: mem_pointsto ⌜addr_is_kdata⌝, ↦ₓ□ image, kernel_data re-scope,
+adequacy etext split + kmap functor) are DONE and green on full builds.
+Stores to kernel text are now unprovable at the points-to level.  Next:
+stage 5 (see Staging).  All five decision points are settled.
+Flip fallout was tiny (3 files: SmodeCorePt/TrampStepPt fetch engines
+swapped mem_ram/mem_valid → code_ram/text_valid; KernelDataInv filter
+lambda needed a type annotation) because mem_ram kept its ⌜addr_is_ram⌝
+statement — the audit's key prediction held.  The
+claim/auth design is the SYNTHESIS: all-in-ghost STORAGE (the ghost auth
+holds static ∪ dynamic entries, giving a uniform two-clause tree spec and
+single-path absorption proofs) under the hybrid INTERFACE (`kmap_at` keeps
+the pure static arm, so static claims are freely constructible from address
+arithmetic and the base points-to files stay ghost-free).
 
 ## Goal
 
@@ -36,155 +45,274 @@ points-to lives INSIDE `instr_bytes`, and `instr`'s statement is unchanged.
   uses split perms: text perm 10 (R|X), data perm 6 (R|W) — no spec
   loosening needed in the kvm chain.
 
-## The design
+## Settled decisions (signed off 2026-07-23)
 
-### 1. Permission classes + region split (KptPt.v, iris-free)
+1. TRAPFRAME stays in the upt layer (`upt_tree_spec`'s `pte_tf`); the
+   kernel-PT ghost covers kstacks (+ future dynamic entries) only.
+2. Claim/auth = the SYNTHESIS below.  NOT the auth-∅-under-Bare hybrid
+   (the "49k-entry init is expensive" concern was a red herring —
+   `ghost_map_alloc` mints an arbitrary initial map in one update), and NOT
+   pure all-in-ghost (static claims must remain purely constructible, or
+   every identity load leaf / base points-to file has to thread a ghost
+   resource to the point of use).
+3. `kernel_data` re-scoped to ≥ etext; `mem_pointsto` gains the
+   UNCONDITIONAL `⌜addr_is_kdata⌝` conjunct (the 5332 unused sub-etext
+   bytes get dropped or exposed as `↦ₓ□`).
+4. `kperm` = two-class enum (KP_rx | KP_rw), matching the two real flag
+   bytes 0xCB / 0xC7.
+5. Kstack claims minted at the kvminithart switch; sp-migration onto
+   KSTACK vas is a separate later project.
+
+## The design (synthesis)
+
+### 1. Permission classes + region split + the static map (KptPt.v, iris-free)
 
 - `Inductive kperm := KP_rx | KP_rw.`  `kperm_flags`: 0xCB / 0xC7 (A/D-preset
-  bases; the §12 `_ad` layer generalizes verbatim, `PTE_TEXT_ad` new).
-  `kperm_allows`: fetch → KP_rx; load → either (BOTH bases grant R — this is
-  what keeps every load path's key unchanged); store/AMO → KP_rw.
+  bases; the `_ad` layer generalizes verbatim, `PTE_TEXT_ad` new).
+  `kperm_allows`: fetch → `pc = KP_rx`; load → `True` (BOTH bases grant R —
+  this is what keeps every identity load path's key unchanged); store/AMO →
+  `pc = KP_rw`.
 - `kpt_text_vpn` = [0x80000, 0x80007), `kpt_data_vpn` = [0x80007, 0x88000),
-  `kpt_dev_vpn` unchanged.  `kpt_lflags` region-keyed.  Hardcode
-  `text_end := 0x80007000` next to ram_base/ram_size in RiscvPtsto (cross-
-  check `= KernelSyms.etext` by vm_compute higher up) — keeps the base
-  memory layer off the kernel dump.
-- Check lemmas per (class, access), same vm_compute dispatch:
-  `kpt_check_fetch` gains a text-vpn premise, `kpt_check_store/amo` a
-  data/dev-vpn premise, `kpt_check_load` passes on both.  Ripples into the
-  `kpt_variant_*` corollaries (KptTree §1-§2).
+  `kpt_dev_vpn` unchanged.  Hardcode `text_end := 0x80007000` next to
+  ram_base/ram_size in RiscvPtsto (cross-check `= KernelSyms.etext` by
+  vm_compute higher up) — keeps the base memory layer off the kernel dump.
+- The decidable classifier and the static predicate:
+  `kmap_class vpn : option kperm` (text → Some KP_rx; data ∨ dev → Some
+  KP_rw; else None); `kmap_static vpn pc := kmap_class vpn = Some pc`.
+- **The static map, by comprehension — built once, characterized once,
+  NEVER normalized** (no `simpl`/`vm_compute` may touch it; same discipline
+  as the decode tables):
+  `kmap_M0 : gmap (mword 27) (mword 44 * kperm)` = `list_to_map` over the
+  three vpn ranges (`seqZ`), each vpn ↦ `(kpt_leaf_ppn vpn, class)`.
+  The ONE characterization lemma (all list_to_map/seqZ/NoDup reasoning
+  happens here and only here):
+  `kmap_M0_lookup vpn : kmap_M0 !! vpn = (λ pc, (kpt_leaf_ppn vpn, pc)) <$> kmap_class vpn`.
+- Check lemmas per (class, access), same vm_compute dispatch as today's
+  `kpt_variant_*`: `kpt_check_fetch` (0xCB variants pass fetch),
+  `kpt_check_load` (both bases), `kpt_check_store/amo` (0xC7 only).
 
-### 2. The claim facade `kmap_at` (new file KMap.v)
+### 2. The claim facade `kmap_at` + bundled auth (new file KMap.v)
 
 ```
 Class kmapGS Σ := { kmap_inG :: ghost_mapG Σ (mword 27) (mword 44 * kperm);
                     kmap_name : gname }.        (* CpuId-style gname class *)
-Definition kmap_static (vpn : mword 27) (pc : kperm) : Prop :=
-  (kpt_text_vpn vpn ∧ pc = KP_rx) ∨
-  ((kpt_data_vpn vpn ∨ kpt_dev_vpn vpn) ∧ pc = KP_rw).
+
+(* INTERFACE — pure static arm kept *)
 Definition kmap_at (vpn : mword 27) (ppn : mword 44) (pc : kperm) : iProp :=
   ⌜kmap_static vpn pc ∧ ppn = kpt_leaf_ppn vpn⌝ ∨ vpn ↪[kmap_name]□ (ppn, pc).
+
+(* STORAGE — auth holds static ∪ dynamic, wf facts bundled *)
+Definition kmap_dyn_ok (vpn : mword 27) (e : mword 44 * kperm) : Prop :=
+  kstack_vpn_range vpn ∧ addr_is_ram (bv_unsigned e.1 * 4096) ∧ e.2 = KP_rw.
+Definition kmap_auth (M : gmap (mword 27) (mword 44 * kperm)) : iProp :=
+  ghost_map_auth kmap_name 1 M ∗
+  ⌜kmap_M0 ⊆ M ∧ (∀ vpn e, M !! vpn = Some e →
+                     kmap_M0 !! vpn = Some e ∨ kmap_dyn_ok vpn e)⌝.
 ```
-Persistent, timeless, duplicable — "under the current AND ALL FUTURE kernel
-translation regimes, vpn maps to ppn with at least pc".  HYBRID (recommended
-over all-in-ghost): the static identity regions ride the pure arm (honored
-by BOTH regimes by construction — Bare is identity-everything, KPT's region
-clauses grant exactly these); the ghost map holds ONLY dynamic entries
-(kstacks; extensible).  Avoids a ~49k-entry initial gmap and keeps the
-points-to definitions ghost-free (no kmapGS in the base files).
-Monotonicity = ghost_map elems persisted, never deleted; the Bare→KPT
-switch is the single point where outstanding claims are re-honored, which
-is why text claims are RX-ONLY even though Bare would allow RWX.
+
+`kmap_at` is persistent, timeless, duplicable — "under the current AND ALL
+FUTURE kernel translation regimes, vpn maps to ppn with at least pc".
+The three working lemmas:
+
+- `kmap_at_static : kmap_static vpn pc → ⊢ kmap_at vpn (kpt_leaf_ppn vpn) pc`
+  — free construction from arithmetic, no resources, anywhere.
+- `kmap_at_lookup : kmap_auth M -∗ kmap_at vpn ppn pc -∗
+   ⌜M !! vpn = Some (ppn, pc)⌝` — THE synthesis point: static arm via
+  `kmap_M0_lookup` + `map_subseteq_spec`, ghost arm via `ghost_map_lookup`;
+  both land in the SAME conclusion, so everything downstream is single-path.
+- `kmap_insert : M !! vpn = None → kmap_dyn_ok vpn (ppn, pc) →
+   kmap_auth M ==∗ kmap_auth (<[vpn := (ppn,pc)]> M) ∗ kmap_at vpn ppn pc`
+  (returns the claim, not the raw fragment — what the switch lemma hands out).
+
+Allocation: ONE `ghost_map_alloc kmap_M0` at adequacy init (the returned 49k
+fragments are dropped — static claims use the pure arm).  Monotonicity =
+elems persisted, never deleted.  The wf conjunct gives `M !! tramp_vpn =
+None` for free (tramp is neither static nor in the kstack range).
 IMPORTANT: static claims are IDENTITY-ONLY.  The trampoline mapping is NOT
-a claim (a non-identity pure fact would be usable under Bare — unsound);
-it stays the dedicated static clause in the tree spec, consumed by the
+a claim (a non-identity pure fact would be usable under Bare — unsound); it
+stays the dedicated static clause in the tree spec, consumed by the
 ktramp/userret engines exactly as today.
 
-### 3. Where the ghost auth lives — NOW EASY (the slot exists)
+### 3. Tree spec collapses to two clauses (KptTree.v) + the slot arms
 
-`strans_inv` is already `(bare_inv ∗ stvec) ∨ (∃root, tlb_inv_pt root)`:
-- KPT arm: `tlb_inv_pt` gains `∃ M, ghost_map_auth kmap_name 1 M` and the
-  tree spec becomes `kpt_tree_spec_gen root M t`:
-    pt_base ∧ (static regions → A/D-variants of region leaves)
-    ∧ (tramp clause, unchanged) 
-    ∧ (∀ vpn↦(ppn,pc) ∈ M: dyn-range vpn ∧ RAM ppn ∧ maps A/D-variant of
-       mk_pte ppn (kperm_flags pc))
-    ∧ (∀ vpn ∉ static ∪ {tramp} ∪ dom M: blocks).
-  `dom M ⊆` the kstack va range ∪ {tramp?no} — keep constrained for future
-  fault lemmas.
-- Bare arm: `bare_inv` gains `ghost_map_auth kmap_name 1 ∅` — ghost claims
-  are REFUTABLE under Bare (lookup in ∅), static claims are identity, so
-  `bare_absorb` stays provable.  Once any kstack fragment is persisted the
-  Bare arm can never be re-established: Bare→KPT one-way, no extra ghost.
-- The kvminithart switch lemma (kvm-spec.md item 3): dissolve Bare arm,
-  build tlb_inv_pt from `pt_rep0 t kvm_map` (which will now have the split
-  perms + kstack entries), insert+persist the 64 kstack claims, hand out
-  `[∗ list] i, kmap_at (kstack_vpn i) (stk i) KP_rw` + the stvec cell.
+```
+Definition kpt_leaf_pte_of (vpn : mword 27) (e : mword 44 * kperm) : mword 64 :=
+  mk_pte e.1 (kperm_flags e.2).
+
+Definition kpt_tree_spec_gen (root : mword 44) (M : gmap _ _) (t : ptree) : Prop :=
+  pt_base t = root ∧
+  (∀ vpn e, M !! vpn = Some e → ∃ p2 p1 a d,
+     ptree_maps t vpn p2 p1 (pte_set_ad (kpt_leaf_pte_of vpn e) a d)) ∧
+  (∃ p2 p1 a d, ptree_maps t tramp_vpn p2 p1 (pte_set_ad pte_tramp a d)) ∧
+  (∀ vpn, M !! vpn = None → vpn ≠ tramp_vpn → ptree_blocks t vpn).
+```
+
+No region clauses, no separate dynamic clause — text/data/dev/kstacks are
+all just entries of M.  The tramp clause stays separate exactly as today.
+The tree spec stays pure geometry over an arbitrary M; the M-vs-M0/dyn wf
+facts live in `kmap_auth`, NOT here.  `kpt_tree_spec_set_leaf` (ADUE
+write-back) generalizes with the same proof shape, one clause instead of
+the region case split.
+
+`strans_inv` (`IntrDefs.v`) keeps its shape; the two arms change inside:
+- KPT arm: `tlb_inv_pt root_ppn` keeps its signature; inside, M is
+  existential: `∃ satp0 tlbvec t M, … ⌜kpt_tree_spec_gen root_ppn M t⌝ ∗
+  kmap_auth M ∗ ptree_own 2 1 t ∗ …`.  `intr_frame` gains the auth silently.
+- Bare arm: `bare_inv` gains `kmap_auth kmap_M0` — auth over EXACTLY the
+  static map.  Bare does not refute ghost claims, it HONORS them: a
+  fragment agreeing against auth kmap_M0 is necessarily a static identity
+  entry (kmap_M0_lookup), so `bare_absorb` translates it identically.
+  One-way Bare→KPT: a persisted kstack fragment contradicts auth kmap_M0
+  (its vpn looks up to None in kmap_M0).
 
 ### 4. Points-to layer (RiscvPtsto.v — ghost-free changes)
 
 - `addr_is_text a := ram_base ≤ a < text_end`;
   `addr_is_kdata a := text_end ≤ a < ram_base + ram_size`.
+  RiscvPtsto is the SINGLE HOME of the address-level split (`text_end`
+  0x80007000): KptExecMap's former `addr_in_text`/`addr_in_data` were
+  collapsed onto these (KptExecMap keeps vpn-granularity `etext_vpn` +
+  the `etext_vpn_text_end` cross-check; KallocInv's kalloc-page bridge is
+  now `page_in_range_addr_is_kdata`).  KptPt §15 has the vpn-class
+  conversion hooks `text_svpn_class` / `kdata_svpn_class` (address region
+  → `kmap_static` at the right class) that the engines' claim
+  constructions use.
 - CODE: `text_pointsto a dq b := pointsto a dq b ∗ ⌜addr_is_text a⌝`
   (notations `↦ₓ{dq}`/`↦ₓ□`; `code_ram` analogue of `mem_ram`).  The RX
-  claim for identity text is derivable via the static arm — not stored.
+  claim for identity text is derivable via `kmap_at_static` — not stored.
 - DATA: `mem_pointsto a dq v := pointsto a dq v ∗ ⌜addr_is_kdata a⌝`
-  (RECOMMENDED: unconditional strengthening; `mem_ram` still holds since
+  (unconditional, per settled decision 3; `mem_ram` still holds since
   kdata ⊂ ram).  Requires re-scoping `kernel_data` to ≥ etext (drop the
-  5332 unused sub-etext bytes, or expose them as `↦ₓ□`).  FALLBACK if
-  sub-etext data loads ever materialize: the dq-conditional conjunct
-  (`match dq with DfracDiscarded => True | _ => addr_is_kdata a end`) —
-  survives split/combine/persist; keeps read-only image data anywhere.
-- GENERAL (non-identity) forms for kstack/future use:
+  5332 unused sub-etext bytes, or expose them as `↦ₓ□`).
+- GENERAL (non-identity) forms for kstack/future use — these live at KMap
+  altitude (they mention `kmap_at`), NOT in RiscvPtsto:
   `vmem_pointsto va pa dq b := pointsto pa dq b ∗ ⌜addr_is_ram pa⌝ ∗
    ⌜page-offsets agree⌝ ∗ kmap_at (vpn va) (ppn pa) KP_rw` (and a vcode
   analogue).  `a ↦ₘ v ⊢ vmem_pointsto a a v`.  Only NEW proofs (kstack
-  demonstrator) use these; sp-migration onto KSTACK vas is a separate later
-  project — this project builds the machinery + a width-8 leaf demonstrator.
+  demonstrator) use these.
 - `kernel_text` and `instr_bytes`' footprint switch `↦ₘ□ → ↦ₓ□`; `instr`
   statement unchanged; `fetch_from_instr_bytes` (M-mode, no perm check)
   re-proves off `addr_is_text ⊆ addr_is_ram`; KernelText's `mk_rvc/mk_base`
-  tactic interfaces unchanged.  Adequacy init splits at etext (below →
-  persist to `↦ₓ□`; above → own `↦ₘ`).
+  tactic interfaces unchanged.  Adequacy init: `ghost_map_alloc kmap_M0` +
+  split at etext (below → persist to `↦ₓ□`; above → own `↦ₘ`).
 
 ### 5. Absorption re-keying (the only engine-tier change)
 
 The `s_regime` record's `sr_absorb` key changes from the blanket
-`addr_is_ram va` to claim + class:
+`addr_is_ram va` to claim + class, and the output pa becomes the claim's ppn:
 ```
-sr_absorb : ∀ acc va ppn pc σ, s_acc_ok acc → kperm_allows pc acc → …reg facts… →
+sr_absorb : ∀ acc va ppn pc σ, s_acc_ok acc → kperm_allows pc acc →
+  (canonical-va premise, as sr_absorb_dev already carries) → …reg facts… →
   ⊢ kmap_at (svpn_of va) ppn pc -∗ reg_interp -∗ gen_heap -∗ sr_inv ==∗
     ∃ σ', ⌜translateAddr va acc = Ok (Physaddr (ppn ++ pageoff va), …)⌝ ∗ … ∗ sr_inv
 ```
-(output pa = the claim's ppn; identity in the static arms).  Instances:
-- `kpt_absorb`: ghost arm via auth agreement + `kpt_tree_spec_gen`'s M
-  clause; static arm via the region clauses.  The O1/O2/O3 total case
-  analysis (`kpt_translateAddr_cases`) is leaf-word-generic and survives;
-  only the flag-byte dispatch becomes class-indexed.
-- `bare_absorb`: static → pa=va identity translate; ghost → refuted (∅).
+For identity claims the output pa equals va by the same
+`concat_vec (kpt_leaf_ppn (svpn_of va)) … = va` fact `sr_absorb_dev`
+already threads — identity consumers conclude exactly what they do today.
+Instances:
+- `kpt_absorb`: open tlb_inv_pt → `kmap_at_lookup` → the single maps-clause
+  → the existing O1/O2/O3 total case analysis (`kpt_translateAddr_cases`,
+  leaf-word-generic, survives) on the A/D-variant of
+  `mk_pte ppn (kperm_flags pc)`; flag-byte dispatch by `kperm_allows`.
+  ONE PATH — the static/ghost split dies at `kmap_at_lookup`.
+- `bare_absorb`: both claim arms reduce to "the entry is static identity"
+  (pure arm directly; ghost arm via auth-M0 agreement + kmap_M0_lookup),
+  then the Bare short-circuit translation.  Two one-liners.
 - `strans_regime` dispatch: unchanged shape.
 - LOADS: `kperm_allows pc (Load Data)` holds for both classes, so identity
-  load leaves keep deriving their claim from `addr_is_ram` (region-decide
-  → static arm) — NO leaf signature changes.  STORES/AMO extract
-  `addr_is_kdata` from their own (own-fraction) `↦ₘ` — one proof line per
-  store leaf.  FETCH: the fetch engine (`s_regime_fetch`) derives the RX
-  claim from the chunk's own `↦ₓ□` bytes (per-chunk for straddles).
-  `sr_absorb_dev` unchanged (dev region's flag byte was already 0xC7).
+  load leaves keep their `addr_is_ram` signatures — the ENGINE converts
+  (region-decide → `kmap_at_static`).  NO leaf signature changes.
+  STORES/AMO extract `addr_is_kdata` from their own (own-fraction) `↦ₘ` —
+  one proof line per store leaf.  FETCH: the fetch engine
+  (`s_regime_fetch`) derives the RX claim from the chunk's own `↦ₓ□` bytes
+  (per-chunk for straddles).  `sr_absorb_dev` unchanged (dev = KP_rw; its
+  flag byte was already 0xC7).
 - Soundness win: stores to text become UNPROVABLE.
 
-### 6. TRAPFRAME (open question, again)
+### 6. Switch lemma (kvminithart)
 
-In xv6, TRAPFRAME is a USER-PT mapping (kernel C code reaches the trapframe
-through the identity data mapping; only trampoline code uses the va, under
-the user table — already handled by `upt_tree_spec`'s `pte_tf`).  Proposal:
-kernel-PT ghost covers kstacks (+ future) only; TRAPFRAME stays in the upt
-layer.  If a kernel-PT trapframe deviation is wanted instead, the ghost
-handles it exactly like kstacks.  NEEDS SIGN-OFF.
+Dissolve the Bare arm → recover `kmap_auth kmap_M0` + the satp cell; fold
+`kmap_insert` over the 64 kstack entries (induction over 64, not 49k),
+persisting the fragments; build `kpt_tree_spec_gen root (kmap_M0 ∪ kstacks)
+t` from `pt_rep0 t kvm_map` via a pointwise `kvm_map` ↔ `kpt_leaf_pte_of`
+correspondence lemma; hand out
+`[∗ list] i, kmap_at (kstack_vpn i) (stk i) KP_rw` + the stvec cell.
+(This IS the "boot introduction" of kvm-spec.md item 3.)
 
-## Open decision points (carry to review)
+## Hazards
 
-1. TRAPFRAME scope (above).
-2. Hybrid claims (recommended) vs all-in-ghost (uniform but 49k-entry init).
-3. `kernel_data` re-scope to ≥ etext (recommended) vs dq-conditional
-   `mem_pointsto` conjunct.
-4. `kperm` two-class enum (recommended; matches the two real flag bytes) vs
-   {R,W,X} record.
-5. Kstack claims minted at the kvminithart switch; sp-migration deferred.
+1. **`kmap_M0` must never be normalized** — no `simpl`/`vm_compute` may
+   touch the comprehension; every use goes through `kmap_M0_lookup`.
+2. Tree-spec/tramp consistency (`M !! tramp_vpn = None`) comes from
+   `kmap_auth`'s wf conjunct — keep it there, not in the tree spec.
 
 ## Staging (each phase builds green independently)
 
-1. KptPt region split + per-class check/update lemmas + kpt_variant ripple.
-2. KMap.v (kperm, kmapGS, kmap_at, static-intro/agree/insert lemmas).
-3. RiscvPtsto: addr_is_text/kdata, ↦ₓ, mem_pointsto conjunct, vmem/vcode;
-   audit `↦ₘ` construction sites (grep `rewrite /mem_pointsto`); re-scope
-   kernel_data (KernelDataInv + dump tooling if needed).
-4. KernelText/InstrBytes/adequacy: ↦ₓ□ image + init split.
-5. KptTree/IntrDefs-strans/engines: kpt_tree_spec_gen + auth in both slot
-   arms, re-keyed absorption instances + strans_regime dispatch, fetch
-   engine; store/AMO leaf one-liners.
-6. Switch lemma + kstack claims + vmem width-8 leaf demonstrator
-   (dovetails with kvm-spec.md items 2-3, which this project's tree-spec
-   revision unblocks — the "boot introduction" there IS this switch lemma).
+1. DONE — KptPt: region split, kperm/kperm_flags/kperm_allows, kmap_class/
+   kmap_static, kmap_M0 + kmap_M0_lookup, per-class check lemmas; KptTree
+   §2c kperm_variant_* (arbitrary-ppn class-keyed variant corollaries).
+   No update-lemma work was needed: the O1/O2/O3 engine
+   (`ptree_translateAddr_cases`) is leaf-word-generic and handles the
+   A/D write-back arm internally.
+2. DONE — KMap.v (kmapGS, kmap_at, kmap_dyn_ok, kmap_auth, the three
+   working lemmas, kmap_at_M0_static, kmap_wf_tramp, kmap_alloc).
+3. DONE (3a, additive only) — RiscvPtsto: text_end/addr_is_text/
+   addr_is_kdata + ↦ₓ + bridge lemmas; KptExecMap collapsed onto them;
+   KptPt text_svpn_class/kdata_svpn_class.  The mem_pointsto CONJUNCT
+   SWAP was deliberately deferred to stage 4: it cannot land before the
+   image switch (kernel_text still mints ↦ₘ□ below etext), so the swap,
+   the ↦ₓ□ image, and the kernel_data re-scope form ONE atomic flip.
+   vmem/vcode deferred to stage 6 (their identity-intro lemma is only
+   provable after the flip; first consumer is the demonstrator).
+4. THE FLIP (atomic): mem_pointsto conjunct → addr_is_kdata;
+   kernel_text/instr_bytes footprint ↦ₘ□ → ↦ₓ□;
+   fetch_from_instr_bytes re-proof off addr_is_text ⊆ addr_is_ram;
+   kernel_data re-scope to ≥ etext (KernelDataInv filter or dump
+   re-scope); adequacy init split at etext + the one ghost_map_alloc.
+   Audit first: `↦ₘ` construction sites are RiscvAdequacy.v:241,
+   WpMmodeLeafBase.v:917, WpLock.v:85 (instance only), RiscvPtsto
+   internal; mem_ram STAYS PROVABLE (kdata ⊂ ram) so consumers of the
+   ⌜addr_is_ram⌝ conclusion are unaffected.
+5. KptTree/IntrDefs-strans/engines — IN PROGRESS.
+   DONE (green): KptTree §3b — kpt_leaf_pte_of, kpt_tree_spec_gen (uniform
+   M-indexed two-clause spec), kpt_tree_spec_gen_set_leaf{,_tramp} (ADUE
+   write-back; premise M !! tramp_vpn = None, supplied by kmap_wf_tramp).
+   REMAINING SURGERY (in order):
+   a. KptTree: import KMap, add kmapGS to the KptTreeInv section context;
+      tlb_inv_pt (KptTree ~l.389/§4) swaps ⌜kpt_tree_spec root t⌝ for
+      ∃ M, ⌜kpt_tree_spec_gen root_ppn M t⌝ ∗ kmap_auth M (signature
+      tlb_inv_pt root_ppn UNCHANGED — M existential inside);
+      tlb_inv_pt_intro gains the M/auth arguments.
+   b. KptTree §5-§7: the tlb_inv_pt_translateAddr_* wrappers (~l.1122+)
+      and the write-back path re-key onto the M clause: consumer holds
+      kmap_at → kmap_at_lookup → maps-clause → the leaf-word-generic
+      ptree_translateAddr_cases with kperm_variant_check dispatch (needs
+      kperm_allows premise).  Loads: both classes allow → derive claim
+      via region-decide (text_svpn_class/kdata_svpn_class) engine-side.
+      Write-back arm uses kpt_tree_spec_gen_set_leaf (+_tramp).
+   c. SRegime: sr_absorb field re-keyed (claim + kperm_allows premise +
+      canonical-va premise as sr_absorb_dev has; output pa = concat ppn
+      pageoff — identity consumers unchanged via ram_ident_4k-style fact);
+      bare_inv gains kmap_auth kmap_M0 (needs SRegime to import KMap;
+      bare_absorb: both arms reduce to static-identity via
+      kmap_at_M0_static, then the Bare short-circuit); kpt_regime
+      re-proved single-path.  sr_absorb_dev unchanged.
+   d. IntrDefs: strans_regime dispatch re-shaped only in the absorb
+      field; strans_inv/intr_frame shapes unchanged.
+   e. Engines: s_regime_fetch derives KP_rx claims from the chunk's ↦ₓ□
+      bytes (code_text → text_svpn_class → kmap_at_static, per-chunk for
+      straddles); store/AMO leaves extract addr_is_kdata from their own
+      ↦ₘ via mem_kdata → kdata_svpn_class → kmap_at_static (one line per
+      store leaf); identity load call sites unchanged (engine converts).
+   f. TransPt (pt2 window): kpt_tree_spec → kpt_tree_spec_gen with the
+      SAME M across the window (auth rides in pt_frame/pt2 invariant).
+   The legacy kpt_tree_spec + its set-leaf lemmas + kpt_variant_* stay
+   until every consumer is off them, then delete (guiding principle: no
+   near-duplicate families left behind).
+6. Switch lemma + kstack claims + vmem/vcode general forms (KMap
+   altitude) + width-8 leaf demonstrator (dovetails with kvm-spec.md
+   items 2-3, which this project's tree-spec revision unblocks — the
+   "boot introduction" there IS this switch lemma).
 
 ## Interactions to keep in mind
 

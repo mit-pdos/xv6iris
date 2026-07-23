@@ -33,8 +33,8 @@
        (TrampPt/TrampTlb, userret layer), and kernel stacks are dynamic.
    This file is IRIS-FREE and in the vanilla-Ltac dialect (like Pt4kWalk);
    the Iris ownership bundle for the PT bytes lives in SmodeCore. *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
+From Stdlib Require Import ZArith Bool.
+From stdpp Require Import gmap list_numbers bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -75,6 +75,17 @@ Definition vpn0_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 8 0.
 Definition kpt_dram_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x88000.
 Definition kpt_dev_vpn  (vpn : mword 27) : Prop := 0xC000 <= bv_unsigned vpn < 0x10002.
 Definition kpt_mapped (vpn : mword 27) : Prop := kpt_dram_vpn vpn \/ kpt_dev_vpn vpn.
+
+(* rwx-kmap: the DRAM range split at etext = 0x80007000 -- text pages
+   [0x80000, 0x80007), data pages [0x80007, 0x88000).  (Cross-checked
+   against KernelSyms.etext by vm_compute where the kernel dump is in
+   scope; the base memory layer stays off the dump.) *)
+Definition kpt_text_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x80007.
+Definition kpt_data_vpn (vpn : mword 27) : Prop := 0x80007 <= bv_unsigned vpn < 0x88000.
+
+Lemma kpt_dram_vpn_split (vpn : mword 27) :
+  kpt_dram_vpn vpn <-> kpt_text_vpn vpn \/ kpt_data_vpn vpn.
+Proof. unfold kpt_dram_vpn, kpt_text_vpn, kpt_data_vpn. lia. Qed.
 
 Definition kpt_lflags (vpn : mword 27) : Z :=
   if Z.leb 0x80000 (bv_unsigned vpn) then PTE_RAM else PTE_DEV.
@@ -544,3 +555,347 @@ End KptRamTranslateAD.
 
 (* per-entry discrimination: ANY-bits entries still discriminate by vpn
    tag alone, so the fetch/data chains work over [P_kpt_e]-consistent TLBs *)
+
+(* ===================================================================== *)
+(* 15. R/W/X PERMISSION CLASSES AND THE STATIC KERNEL MAP (rwx-kmap).     *)
+(* The kvmmake-faithful TWO flag bytes: kernel text is R|X (0xCB with     *)
+(* A/D preset), data and devices are R|W (0xC7).  [kmap_class]            *)
+(* classifies every statically (identity-)mapped vpn; [kmap_M0] is the    *)
+(* same classification as a gmap -- the initial kernel-mapping ghost map  *)
+(* of KMap.v (see claude-notes/projects/rwx-kmap.md).                     *)
+(* HAZARD: NEVER normalize [kmap_M0] (no simpl/vm_compute may touch the   *)
+(* ~49k-entry comprehension) -- every use goes through [kmap_M0_lookup].  *)
+(* ===================================================================== *)
+
+Inductive kperm : Set := KP_rx | KP_rw.
+
+Global Instance kperm_eq_dec : EqDecision kperm.
+Proof. solve_decision. Defined.
+
+(* base perm bits (V|R|X = 0x0B, V|R|W = 0x07) + the A/D pair on top;
+   at A/D preset these are the two real kvmmake flag bytes 0xCB / 0xC7 *)
+Definition kperm_base (pc : kperm) : Z :=
+  match pc with KP_rx => 0x0B | KP_rw => 0x07 end.
+Definition kperm_flags_ad (pc : kperm) (ad : bool * bool) : Z :=
+  kperm_base pc + kpt_ad_bits ad.
+Definition kperm_flags (pc : kperm) : Z := kperm_flags_ad pc (true, true).
+
+(* which access kinds a class admits: fetch only from text (R|X), store
+   and AMO only to R|W pages, loads from BOTH (both bases grant R -- this
+   is what keeps every identity load path's key unchanged) *)
+Definition kperm_allows (pc : kperm) (acc : MemoryAccessType mem_payload) : Prop :=
+  match acc with
+  | InstructionFetch _ => pc = KP_rx
+  | Load _ => True
+  | _ => pc = KP_rw
+  end.
+
+(* the A/D pair picked out by two flag bits (pair form of KptTree's
+   [kpt_adf_of]) *)
+Definition ad_of (a d : mword 1) : bool * bool :=
+  (eq_vec a ('b"1"), eq_vec d ('b"1")).
+
+(* ---- the classifier and the static predicate ---- *)
+
+Definition kmap_class (vpn : mword 27) : option kperm :=
+  if andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)
+  then Some KP_rx
+  else if orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
+              (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002))
+  then Some KP_rw
+  else None.
+
+Definition kmap_static (vpn : mword 27) (pc : kperm) : Prop :=
+  kmap_class vpn = Some pc.
+
+Lemma kmap_class_text (vpn : mword 27) :
+  kpt_text_vpn vpn -> kmap_class vpn = Some KP_rx.
+Proof.
+  intros [Hlo Hhi]. unfold kmap_class.
+  rewrite (proj2 (Z.leb_le _ _) Hlo), (proj2 (Z.ltb_lt _ _) Hhi).
+  reflexivity.
+Qed.
+
+Lemma kmap_class_rw (vpn : mword 27) :
+  kpt_data_vpn vpn \/ kpt_dev_vpn vpn -> kmap_class vpn = Some KP_rw.
+Proof.
+  intros Hd. unfold kmap_class.
+  unfold kpt_data_vpn, kpt_dev_vpn in Hd.
+  destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)) eqn:Ht.
+  { apply andb_prop in Ht. destruct Ht as [Ht1 Ht2].
+    apply Z.leb_le in Ht1. apply Z.ltb_lt in Ht2. lia. }
+  destruct Hd as [[Hlo Hhi] | [Hlo Hhi]];
+    rewrite (proj2 (Z.leb_le _ _) Hlo), (proj2 (Z.ltb_lt _ _) Hhi);
+    [rewrite Bool.andb_true_l, Bool.orb_true_l | rewrite Bool.andb_true_l, Bool.orb_true_r];
+    reflexivity.
+Qed.
+
+Lemma kmap_class_cases (vpn : mword 27) (pc : kperm) :
+  kmap_class vpn = Some pc ->
+  (kpt_text_vpn vpn /\ pc = KP_rx) \/
+  ((kpt_data_vpn vpn \/ kpt_dev_vpn vpn) /\ pc = KP_rw).
+Proof.
+  unfold kmap_class, kpt_text_vpn, kpt_data_vpn, kpt_dev_vpn.
+  destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007)) eqn:Ht.
+  { apply andb_prop in Ht. destruct Ht as [Ht1 Ht2].
+    apply Z.leb_le in Ht1. apply Z.ltb_lt in Ht2.
+    intros [= <-]. left. split; [lia | reflexivity]. }
+  destruct (orb (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000))
+                (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002))) eqn:Hr;
+    [| discriminate].
+  apply Bool.orb_prop in Hr.
+  intros [= <-]. right. split; [| reflexivity].
+  destruct Hr as [Hr | Hr]; apply andb_prop in Hr; destruct Hr as [Hr1 Hr2];
+    apply Z.leb_le in Hr1; apply Z.ltb_lt in Hr2; [left | right]; lia.
+Qed.
+
+Lemma kmap_static_mapped (vpn : mword 27) (pc : kperm) :
+  kmap_static vpn pc -> kpt_mapped vpn.
+Proof.
+  intros Hc. destruct (kmap_class_cases vpn pc Hc) as [[Ht _] | [Hd _]].
+  - left. apply kpt_dram_vpn_split. left. exact Ht.
+  - destruct Hd as [Hd | Hd]; [left | right; exact Hd].
+    apply kpt_dram_vpn_split. right. exact Hd.
+Qed.
+
+Lemma kpt_mapped_static (vpn : mword 27) :
+  kpt_mapped vpn -> exists pc, kmap_static vpn pc.
+Proof.
+  intros [Hd | Hd].
+  - apply kpt_dram_vpn_split in Hd. destruct Hd as [Hd | Hd].
+    + exists KP_rx. apply kmap_class_text. exact Hd.
+    + exists KP_rw. apply kmap_class_rw. left. exact Hd.
+  - exists KP_rw. apply kmap_class_rw. right. exact Hd.
+Qed.
+
+(* an owned RAM va's vpn is statically classified (text or data) *)
+Lemma ram_svpn_static (a : mword 64) :
+  addr_is_ram a -> exists pc, kmap_static (svpn_of a) pc.
+Proof.
+  intros Hram. apply kpt_mapped_static. left. exact (ram_svpn_range a Hram).
+Qed.
+
+(* address-level regions land in the matching vpn class -- the conversion
+   hooks the engines use: a fetch chunk's own [↦ₓ□] bytes give
+   [addr_is_text] hence a KP_rx claim; a store's own [↦ₘ] bytes give
+   [addr_is_kdata] hence a KP_rw claim (both via [kmap_at_static]). *)
+Lemma text_svpn_class (a : mword 64) :
+  addr_is_text a -> kmap_static (svpn_of a) KP_rx.
+Proof.
+  intros Hin. pose proof Hin as [Hlo Hhi].
+  apply kmap_class_text.
+  pose proof (ram_svpn_range a (addr_is_text_ram a Hin)) as [Hvlo _].
+  split; [exact Hvlo |].
+  rewrite (svpn_of_unsigned a (addr_is_text_ram a Hin)).
+  rewrite uint_unsigned in Hhi. rewrite uint_unsigned.
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  apply Z.div_lt_upper_bound; [lia |].
+  unfold text_end in Hhi. lia.
+Qed.
+
+Lemma kdata_svpn_class (a : mword 64) :
+  addr_is_kdata a -> kmap_static (svpn_of a) KP_rw.
+Proof.
+  intros Hin. pose proof Hin as [Hlo Hhi].
+  apply kmap_class_rw. left.
+  pose proof (ram_svpn_range a (addr_is_kdata_ram a Hin)) as [_ Hvhi].
+  split; [| exact Hvhi].
+  rewrite (svpn_of_unsigned a (addr_is_kdata_ram a Hin)).
+  rewrite uint_unsigned in Hlo. rewrite uint_unsigned.
+  rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  apply Z.div_le_lower_bound; [lia |].
+  unfold text_end in Hlo. lia.
+Qed.
+
+(* ---- flag-byte facts (mirror §12's, keyed by class) ---- *)
+
+Lemma kperm_flags_ad_bound (pc : kperm) (ad : bool * bool) :
+  0 <= kperm_flags_ad pc ad < 256.
+Proof.
+  unfold kperm_flags_ad, kperm_base, kpt_ad_bits.
+  destruct pc; destruct ad as [a d]; destruct a, d; cbn; lia.
+Qed.
+
+Lemma kperm_flags_bound (pc : kperm) : 0 <= kperm_flags pc < 1024.
+Proof.
+  pose proof (kperm_flags_ad_bound pc (true, true)). unfold kperm_flags. lia.
+Qed.
+
+Lemma kperm_inv_red (pc : kperm) (ad : bool * bool) : forall s',
+  exec (pte_is_invalid (Mk_PTE_Flags (mword_of_int (kperm_flags_ad pc ad)))
+          (Mk_PTE_Ext (mword_of_int 0))) s'
+  = Some (false, s').
+Proof.
+  intro s'. destruct pc; destruct ad as [a d]; destruct a, d; vm_compute; reflexivity.
+Qed.
+
+Lemma kperm_nonleaf_red (pc : kperm) (ad : bool * bool) :
+  pte_is_non_leaf (Mk_PTE_Flags (mword_of_int (kperm_flags_ad pc ad) : mword 8)) = false.
+Proof.
+  destruct pc; destruct ad as [a d]; destruct a, d; vm_compute; reflexivity.
+Qed.
+
+(* permission checks: fetch needs the text (X) base; loads pass on both;
+   stores and AMOs need the R|W base.  A store check against KP_rx is NOT
+   provable -- stores to kernel text are unsound by construction. *)
+Lemma kperm_check_fetch (ad : bool * bool) : forall (mxr do_sum : bool) s',
+  exec (check_PTE_permission (InstructionFetch tt) Supervisor mxr do_sum
+          (Mk_PTE_Flags (mword_of_int (kperm_flags_ad KP_rx ad)))
+          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+  = Some (PTE_Check_Success tt, s').
+Proof.
+  intros mxr do_sum s'. destruct ad as [a d]; destruct a, d, mxr, do_sum;
+    vm_compute; reflexivity.
+Qed.
+
+Lemma kperm_check_load (pc : kperm) (ad : bool * bool) : forall (mxr do_sum : bool) s',
+  exec (check_PTE_permission (Load Data) Supervisor mxr do_sum
+          (Mk_PTE_Flags (mword_of_int (kperm_flags_ad pc ad)))
+          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+  = Some (PTE_Check_Success tt, s').
+Proof.
+  intros mxr do_sum s'. destruct pc; destruct ad as [a d]; destruct a, d, mxr, do_sum;
+    vm_compute; reflexivity.
+Qed.
+
+Lemma kperm_check_store (ad : bool * bool) : forall (mxr do_sum : bool) s',
+  exec (check_PTE_permission (Store Data) Supervisor mxr do_sum
+          (Mk_PTE_Flags (mword_of_int (kperm_flags_ad KP_rw ad)))
+          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+  = Some (PTE_Check_Success tt, s').
+Proof.
+  intros mxr do_sum s'. destruct ad as [a d]; destruct a, d, mxr, do_sum;
+    vm_compute; reflexivity.
+Qed.
+
+Lemma kperm_check_amo (ad : bool * bool) : forall (mxr do_sum : bool) s',
+  exec (check_PTE_permission (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
+          (Mk_PTE_Flags (mword_of_int (kperm_flags_ad KP_rw ad)))
+          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+  = Some (PTE_Check_Success tt, s').
+Proof.
+  intros mxr do_sum s'. destruct ad as [a d]; destruct a, d, mxr, do_sum;
+    vm_compute; reflexivity.
+Qed.
+
+(* the class-keyed dispatcher: any allowed (class, access) pair passes.
+   (The 4-way access disjunction is SRegime's [s_acc_ok], inlined --
+   SRegime sits above this file.) *)
+Lemma kperm_check (pc : kperm) (acc : MemoryAccessType mem_payload) (ad : bool * bool) :
+  (acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
+   acc = Atomic (AMOSWAP, Data, Data)) ->
+  kperm_allows pc acc ->
+  forall (mxr do_sum : bool) s',
+  exec (check_PTE_permission acc Supervisor mxr do_sum
+          (Mk_PTE_Flags (mword_of_int (kperm_flags_ad pc ad)))
+          (Mk_PTE_Ext (mword_of_int 0)) tt) s'
+  = Some (PTE_Check_Success tt, s').
+Proof.
+  intros [-> | [-> | [-> | ->]]] Hall.
+  - cbn in Hall. subst pc. apply kperm_check_fetch.
+  - apply kperm_check_load.
+  - cbn in Hall. subst pc. apply kperm_check_store.
+  - cbn in Hall. subst pc. apply kperm_check_amo.
+Qed.
+
+(* ---- the static kernel map [kmap_M0] ---- *)
+
+(* one identity region as an association list: vpns [lo, lo+len) at class
+   [pc], each mapping to its own ppn *)
+Definition kmap_seq (lo len : Z) (pc : kperm) : list (mword 27 * (mword 44 * kperm)) :=
+  (fun z => ((mword_of_int z : mword 27),
+             (kpt_leaf_ppn (mword_of_int z), pc))) <$> seqZ lo len.
+
+(* text [0x80000, 0x80007) RX; data [0x80007, 0x88000) RW;
+   devices [0xC000, 0x10002) RW *)
+Definition kmap_M0 : gmap (mword 27) (mword 44 * kperm) :=
+  list_to_map (kmap_seq 0x80000 0x7 KP_rx
+               ++ kmap_seq 0x80007 0x7FF9 KP_rw
+               ++ kmap_seq 0xC000 0x4002 KP_rw).
+
+(* round-trip: a Z in [0, 2^27) survives [mword_of_int : mword 27] and back *)
+Lemma mword27_unsigned (z : Z) :
+  0 <= z < 134217728 -> bv_unsigned (mword_of_int z : mword 27) = z.
+Proof.
+  intro Hz. unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+  assert (bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728) as -> by (vm_compute; reflexivity).
+  exact Hz.
+Qed.
+
+Lemma vpn27_bound (vpn : mword 27) : 0 <= bv_unsigned vpn < 134217728.
+Proof.
+  pose proof (bv_unsigned_in_range _ vpn) as Hr.
+  assert (bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728) as Hm by (vm_compute; reflexivity).
+  rewrite Hm in Hr. exact Hr.
+Qed.
+
+Lemma mword27_of_unsigned (vpn : mword 27) : mword_of_int (bv_unsigned vpn) = vpn.
+Proof.
+  apply bv_eq. rewrite mword27_unsigned; [reflexivity | apply vpn27_bound].
+Qed.
+
+(* the key column of one region-seq is [mword_of_int] over [seqZ] *)
+Lemma kmap_seq_keys (lo len : Z) (pc : kperm) :
+  (kmap_seq lo len pc).*1 = (fun z => (mword_of_int z : mword 27)) <$> seqZ lo len.
+Proof.
+  unfold kmap_seq. rewrite <- list_fmap_compose. reflexivity.
+Qed.
+
+(* one region-seq's lookup, purely symbolic (never normalizes seqZ) *)
+Lemma kmap_seq_lookup (lo len : Z) (pc : kperm) (vpn : mword 27) :
+  0 <= lo -> lo + len <= 134217728 ->
+  (list_to_map (kmap_seq lo len pc) : gmap (mword 27) (mword 44 * kperm)) !! vpn
+  = if andb (Z.leb lo (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) (lo + len))
+    then Some (kpt_leaf_ppn vpn, pc) else None.
+Proof.
+  intros Hlo Hhi.
+  assert (Hnd : base.NoDup ((kmap_seq lo len pc).*1)).
+  { rewrite kmap_seq_keys.
+    apply (NoDup_fmap_2_strong (fun z => (mword_of_int z : mword 27)) (seqZ lo len));
+      [| apply NoDup_seqZ].
+    intros x y Hx Hy Heq. apply elem_of_seqZ in Hx, Hy.
+    assert (bv_unsigned (mword_of_int x : mword 27) = bv_unsigned (mword_of_int y : mword 27))
+      as Hbv by (rewrite Heq; reflexivity).
+    rewrite (mword27_unsigned x), (mword27_unsigned y) in Hbv; lia. }
+  destruct (andb (Z.leb lo (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) (lo + len))) eqn:Hc.
+  - apply andb_prop in Hc. destruct Hc as [Hc1 Hc2].
+    apply Z.leb_le in Hc1. apply Z.ltb_lt in Hc2.
+    apply elem_of_list_to_map; [exact Hnd|].
+    unfold kmap_seq. apply elem_of_list_fmap.
+    exists (bv_unsigned vpn). split.
+    + rewrite mword27_of_unsigned. reflexivity.
+    + apply elem_of_seqZ. lia.
+  - apply not_elem_of_list_to_map.
+    rewrite kmap_seq_keys. intro Hin. apply elem_of_list_fmap in Hin.
+    destruct Hin as [z [Hz Hzin]]. apply elem_of_seqZ in Hzin.
+    assert (bv_unsigned vpn = z) as Hbv.
+    { rewrite Hz. apply mword27_unsigned. lia. }
+    rewrite Hbv in Hc.
+    apply andb_false_iff in Hc. destruct Hc as [Hc | Hc].
+    + apply Z.leb_nle in Hc. lia.
+    + apply Z.ltb_nlt in Hc. lia.
+Qed.
+
+(* THE characterization -- the only lemma that ever looks inside kmap_M0;
+   everything downstream goes through it *)
+Lemma kmap_M0_lookup (vpn : mword 27) :
+  kmap_M0 !! vpn = (fun pc => (kpt_leaf_ppn vpn, pc)) <$> kmap_class vpn.
+Proof.
+  unfold kmap_M0.
+  rewrite list_to_map_app, list_to_map_app.
+  rewrite !lookup_union.
+  rewrite (kmap_seq_lookup 0x80000 0x7 KP_rx vpn ltac:(lia) ltac:(lia)).
+  rewrite (kmap_seq_lookup 0x80007 0x7FF9 KP_rw vpn ltac:(lia) ltac:(lia)).
+  rewrite (kmap_seq_lookup 0xC000 0x4002 KP_rw vpn ltac:(lia) ltac:(lia)).
+  change (0x80000 + 0x7) with 0x80007.
+  change (0x80007 + 0x7FF9) with 0x88000.
+  change (0xC000 + 0x4002) with 0x10002.
+  unfold kmap_class.
+  destruct (andb (Z.leb 0x80000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x80007));
+  destruct (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000));
+  destruct (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002));
+  reflexivity.
+Qed.

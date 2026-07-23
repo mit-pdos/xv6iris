@@ -72,7 +72,7 @@ Section ProofUartinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007030 "uart"%string _ eq_refl Huart
+    iPoseProof (kernel_data_string 0x80007030 "uart"%string _ eq_refl ltac:(unfold text_end; lia) Huart
                   with "Hkdata") as "#Hstr".
     (* pc-advance helper facts *)
     assert (Hspr2 : spr = pa_stk sp0 2).

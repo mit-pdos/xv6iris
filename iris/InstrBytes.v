@@ -21,7 +21,7 @@ Section InstrBytes.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₘ□]).
+  (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₓ□]).
      [pc] is always (at least) 2-aligned -- that single fact is hoisted out of
      the match (the fetch-error arms become [2-aligned ∗ False] = [False]):
        - [F_Base w]: the low 16 bits of [w] are NOT a compressed opcode, and
@@ -40,13 +40,13 @@ Section InstrBytes.
      match r with
      | F_Base w =>
          ⌜ isRVC (subrange_vec_dec w 15 0) = false ⌝ ∗
-         [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
+         [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₓ□ nth_byte w j
      | F_RVC h =>
          ⌜ isRVC h = true ⌝ ∗
          if is_aligned_vaddr (Virtaddr pc) 4
          then ∃ w : mword 32, ⌜ subrange_vec_dec w 15 0 = h ⌝ ∗
-                [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j
-         else [∗ list] j ∈ seq 0 2, (pa_add pc j) ↦ₘ□ nth_byte h j
+                [∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₓ□ nth_byte w j
+         else [∗ list] j ∈ seq 0 2, (pa_add pc j) ↦ₓ□ nth_byte h j
      | _ => False
      end)%I.
 
@@ -303,11 +303,11 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -335,16 +335,16 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hraml.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (fetch_pa (add_vec_int pc 2))⌝)%I as %Hramh.
         { iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbytes") as "Hb2".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb2") as %Hr2. rewrite Hoff fetch_pa_id.
+          iDestruct (code_ram with "Hb2") as %Hr2. rewrite Hoff fetch_pa_id.
           iPureIntro. exact Hr2. }
         iPureIntro.
         pose proof (addr_is_ram_not_in_clint _ Hraml) as Hncl; pose proof (addr_is_ram_not_in_sig _ Hraml) as Hnsl; pose proof (addr_is_ram_not_in_clint _ Hramh) as Hnch; pose proof (addr_is_ram_not_in_sig _ Hramh) as Hnsh.
@@ -383,11 +383,11 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -408,11 +408,11 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 (fetch_pa pc) 2) as (region & Hmatch0 & Hexec0 & _ & _).

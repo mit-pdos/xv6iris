@@ -163,17 +163,17 @@ Section Kalloc.
   Qed.
 
   (* THE BRIDGE LEMMA: every byte of a kalloc page lies in the kernel data
-     region [KptExecMap.addr_in_data] = [etext, PHYSTOP).  Pure arithmetic on
-     the concrete literals: [kmem_lo] (0x80023558) > [etext_vpn]*4096
+     region [RiscvPtsto.addr_is_kdata] = [etext, PHYSTOP).  Pure arithmetic on
+     the concrete literals: [kmem_lo] (0x80023558) > [text_end]
      (0x80007000), and [kmem_hi] (0x88000000) = [ram_base]+[ram_size] =
      PHYSTOP.  Page-alignment of both [p] and [kmem_hi] is what keeps
      [uint p + j] strictly below [kmem_hi] for every in-page offset [j] --
      [page_in_range] alone (without [page_aligned]) is not enough. *)
-  Lemma page_in_range_addr_in_data (p : mword 64) (j : nat) :
-    page_valid p -> (j < 4096)%nat -> addr_in_data (pa_add p j).
+  Lemma page_in_range_addr_is_kdata (p : mword 64) (j : nat) :
+    page_valid p -> (j < 4096)%nat -> addr_is_kdata (pa_add p j).
   Proof.
     intros [Hal [Hlo Hhi]] Hj.
-    assert (Hlit : etext_vpn * 4096 <= kmem_lo) by (unfold etext_vpn, kmem_lo; lia).
+    assert (Hlit : text_end <= kmem_lo) by (unfold text_end, kmem_lo; lia).
     assert (Hhilit : kmem_hi = ram_base + ram_size)
       by (unfold kmem_hi, ram_base, ram_size; lia).
     assert (Hhimod : kmem_hi mod 4096 = 0) by (unfold kmem_hi; vm_compute; reflexivity).
@@ -185,7 +185,7 @@ Section Kalloc.
       destruct Hal as [ka Hka]. destruct Hhimod as [kb Hkb]. lia. }
     assert (Hno : (uint p + Z.of_nat j < 18446744073709551616)%Z)
       by (unfold kmem_hi in Hhi; lia).
-    unfold addr_in_data. rewrite (kalloc_uint_pa_add p j Hno). lia.
+    unfold addr_is_kdata. rewrite (kalloc_uint_pa_add p j Hno). lia.
   Qed.
 
   (* the little-endian 64-bit word built from 8 bytes reproduces those bytes *)

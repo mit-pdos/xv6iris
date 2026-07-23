@@ -53,11 +53,11 @@ Section KernelText.
 
   (* The image is the dumper's PER-BYTE map [KernelInstrs.kernel_bytes] (byte
      address -> byte value), each byte resident at its physical address.  The
-     code points-to facts are DfracDiscarded (`↦ₘ□`), hence persistent and
+     code points-to facts are DfracDiscarded (`↦ₓ□`), hence persistent and
      duplicable: a fetch window can be extracted while [kernel_text] stays
      intact — no borrow/return. *)
   Definition kernel_text : iProp Σ :=
-    ([∗ map] a↦b ∈ KernelInstrs.kernel_bytes, (mword_of_int a : Arch.pa) ↦ₘ□ b)%I.
+    ([∗ map] a↦b ∈ KernelInstrs.kernel_bytes, (mword_of_int a : Arch.pa) ↦ₓ□ b)%I.
 
   Global Instance kernel_text_persistent : Persistent kernel_text.
   Proof. apply _. Qed.
@@ -83,7 +83,7 @@ Section KernelText.
     (forall j, (j < W)%nat ->
        KernelInstrs.kernel_bytes !! (A + Z.of_nat j)%Z = Some (nth_byte w j)) ->
     kernel_text -∗
-    ([∗ list] j ∈ seq 0 W, (pa_add pc j) ↦ₘ□ nth_byte w j).
+    ([∗ list] j ∈ seq 0 W, (pa_add pc j) ↦ₓ□ nth_byte w j).
   Proof.
     iIntros (-> Hbytes) "#Ht". iApply big_sepL_intro. iIntros "!>" (k j Hk).
     apply lookup_seq in Hk. destruct Hk as [-> Hlt]. simpl.
@@ -96,7 +96,7 @@ Section KernelText.
   Lemma instr_bytes_base (pc : mword 64) (w : mword 32) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
-    ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₓ□ nth_byte w j) -∗
     instr_bytes pc (F_Base w).
   Proof.
     iIntros (H2 Hn) "Hw". rewrite /instr_bytes. iEval (cbv beta iota).
@@ -123,7 +123,7 @@ Section KernelText.
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     isRVC h = true ->
     subrange_vec_dec w 15 0 = h ->
-    ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₘ□ nth_byte w j) -∗
+    ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₓ□ nth_byte w j) -∗
     instr_bytes pc (F_RVC h).
   Proof.
     iIntros (H2 Hr Hs) "#Hw". rewrite /instr_bytes. iEval (cbv beta iota).

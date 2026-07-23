@@ -57,11 +57,11 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — DESIGN CHECKPOINT (not started):
+- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — DESIGN SIGNED OFF, in progress:
   R/W/X-accurate kernel PT (text RX / data RW), the code points-to `↦ₓ`
   inside `instr`, the monotone kernel-mapping claim ghost for non-identity
-  mappings (kstacks), and the re-keyed absorption — with open decision
-  points awaiting review.
+  mappings (kstacks), and the re-keyed absorption — synthesis design
+  (all-in-ghost storage, pure-static-arm interface).
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
   mappages / walk proofs (`KvmSpec.v`).
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart

@@ -52,7 +52,7 @@ Section ProofFileinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl Hftable
+    iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl ltac:(unfold text_end, ftable_name_str; lia) Hftable
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf γ Φ m K FI
               (mword_of_int 3) (mword_of_int 30) (mword_of_int 1468) (mword_of_int 1212)

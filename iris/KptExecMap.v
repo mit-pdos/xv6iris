@@ -10,10 +10,13 @@
 
    LAYERING: this file sits BELOW InstrBytes (it imports only RiscvPtsto, for
    [ram_base]/[ram_size]) so InstrBytes can key [instr] on the virtual pc
-   without a dependency cycle.  It is the single home of the region constants
-   [etext_vpn]/[addr_in_text]/[addr_in_data] and the trampoline geometry
-   [tramp_vpn]/[tramp_ppn]: KptPt.v and TrampPt.v `Require Export` this file
-   and reuse these names (no duplication, no equality bridge).
+   without a dependency cycle.  The ADDRESS-level text/data region split
+   ([text_end]/[addr_is_text]/[addr_is_kdata]) lives in RiscvPtsto -- the
+   points-to layer records it (rwx-kmap) -- and is reused here, not
+   duplicated.  This file is the single home of the vpn-granularity
+   [etext_vpn] and the trampoline geometry [tramp_vpn]/[tramp_ppn]:
+   TrampPt.v `Require Export`s this file; KptTree.v/KMap.v Require it
+   directly (no duplication, no equality bridge).
 
    The DATA side ([kpt_data_va]) stays in KptTree.v: its kstack arm is a
    ghost-parameterised RELATION and needs the [kstackG] context.          *)
@@ -33,17 +36,13 @@ Import Defs.
 (* ===================================================================== *)
 
 (* end of kernel text, as a vpn: KernelSyms.etext = 0x80007000 (the dump
-   is authoritative; cross-checked against KernelSyms in KvmSpec.v). *)
+   is authoritative; cross-checked against KernelSyms in KvmSpec.v).  The
+   ADDRESS-level split is RiscvPtsto's [text_end]/[addr_is_text]/
+   [addr_is_kdata]; this vpn-granularity constant agrees with it: *)
 Definition etext_vpn : Z := 0x80007.
 
-(* the text/data split at the ADDRESS level (the form leaves/engines
-   discharge -- by vm_compute for the concrete kernel pcs/addresses, or from
-   [KallocInv.page_in_range] for kalloc pages, which sit above <end> and
-   hence in the data region) *)
-Definition addr_in_text (a : mword 64) : Prop :=
-  ram_base <= uint a < etext_vpn * 4096.
-Definition addr_in_data (a : mword 64) : Prop :=
-  etext_vpn * 4096 <= uint a < ram_base + ram_size.
+Lemma etext_vpn_text_end : etext_vpn * 4096 = text_end.
+Proof. vm_compute. reflexivity. Qed.
 
 (* the trampoline page's vpn and physical page number (KernelSyms.trampoline
    >> 12). *)
@@ -57,7 +56,7 @@ Definition tramp_ppn : mword 44 := mword_of_int 0x80006.
 (* the executable (fetch-legal) window: identity kernel text, plus the
    high-mapped TRAMPOLINE page (va = tramp_vpn·4096 + offset). *)
 Definition kpt_exec_mapped (va : mword 64) : Prop :=
-  addr_in_text va \/
+  addr_is_text va \/
   bv_unsigned tramp_vpn * 4096 <= uint va
     < bv_unsigned tramp_vpn * 4096 + 4096.
 
@@ -81,14 +80,14 @@ Definition kpt_exec_va (va pa : mword 64) : Prop :=
 (*  mapped-window obligation on each arm (text / trampoline).             *)
 (* ===================================================================== *)
 
-(* text arm: identity.  ([addr_in_text va] ⟹ [uint va] far below the
+(* text arm: identity.  ([addr_is_text va] ⟹ [uint va] far below the
    trampoline range, so the [Z.leb] guard is false.) *)
 Lemma kpt_exec_pa_text (va : mword 64) :
-  addr_in_text va -> kpt_exec_pa va = va.
+  addr_is_text va -> kpt_exec_pa va = va.
 Proof.
-  unfold addr_in_text, kpt_exec_pa. intros [_ Hhi].
+  unfold addr_is_text, kpt_exec_pa. intros [_ Hhi].
   assert (Ht : bv_unsigned tramp_vpn * 4096 = 274877902848) by (vm_compute; reflexivity).
-  assert (He : etext_vpn * 4096 = 2147512320) by (vm_compute; reflexivity).
+  assert (He : text_end = 2147512320) by (vm_compute; reflexivity).
   rewrite Ht. rewrite He in Hhi.
   replace (Z.leb 274877902848 (uint va)) with false.
   - reflexivity.
@@ -155,7 +154,7 @@ Qed.
 
 (* [kpt_exec_mapped] introduction, one per arm. *)
 Lemma kpt_exec_mapped_text (va : mword 64) :
-  addr_in_text va -> kpt_exec_mapped va.
+  addr_is_text va -> kpt_exec_mapped va.
 Proof. intro H. left. exact H. Qed.
 
 Lemma kpt_exec_mapped_tramp (va : mword 64) :
@@ -173,6 +172,6 @@ Definition kpt_exec_window (va : mword 64) (W : nat) : Prop :=
 (* the natural text-window introduction: a window whose every byte lies in
    the kernel text region is exec-mapped throughout. *)
 Lemma kpt_exec_window_text (va : mword 64) (W : nat) :
-  (forall j : nat, (j < W)%nat -> addr_in_text (pa_add va j)) ->
+  (forall j : nat, (j < W)%nat -> addr_is_text (pa_add va j)) ->
   kpt_exec_window va W.
 Proof. intros H j Hj. left. apply H. exact Hj. Qed.

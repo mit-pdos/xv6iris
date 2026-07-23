@@ -31,11 +31,17 @@ Section KernelDataInv.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* The initialized global-data image, each byte resident at its physical
-     address as a DfracDiscarded (`↦ₘ□`) points-to -- hence persistent and
+  (* The initialized global-data image, RE-SCOPED to the kernel-DATA region
+     (rwx-kmap): the dump also carries 5332 sub-etext bytes (inter-function
+     padding + the trampoline page's tail) that no proof consumes -- those
+     are dropped here (adequacy exposes them as [↦ₓ□] with the rest of the
+     sub-etext image).  Each remaining byte resides at its physical address
+     as a DfracDiscarded (`↦ₘ□`) points-to -- hence persistent and
      duplicable, like [kernel_text]. *)
   Definition kernel_data : iProp Σ :=
-    ([∗ map] a↦b ∈ KernelData.kernel_data, (mword_of_int a : Arch.pa) ↦ₘ□ b)%I.
+    ([∗ map] a↦b ∈ base.filter (fun p : Z * bv 8 => text_end <= p.1)
+                     KernelData.kernel_data,
+       (mword_of_int a : Arch.pa) ↦ₘ□ b)%I.
 
   Global Instance kernel_data_persistent : Persistent kernel_data.
   Proof. apply _. Qed.
@@ -45,16 +51,17 @@ Section KernelDataInv.
      word whose bytes the image holds at [A..A+W). *)
   Lemma kernel_data_window {wd : Z} (A : Z) (w : mword wd) (W : nat) (a : mword 64) :
     a = mword_of_int A ->
+    text_end <= A ->
     (forall j, (j < W)%nat ->
        KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some (nth_byte w j)) ->
     kernel_data -∗
     ([∗ list] j ∈ seq 0 W, (pa_add a j) ↦ₘ□ nth_byte w j).
   Proof.
-    iIntros (-> Hbytes) "#Hd". iApply big_sepL_intro. iIntros "!>" (k j Hk).
+    iIntros (-> HA Hbytes) "#Hd". iApply big_sepL_intro. iIntros "!>" (k j Hk).
     apply lookup_seq in Hk. destruct Hk as [-> Hlt]. simpl.
     rewrite pa_add_mword.
     iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (nth_byte w k) with "Hd").
-    apply Hbytes. exact Hlt.
+    apply map_lookup_filter_Some_2; [apply Hbytes; exact Hlt | cbn; lia].
   Qed.
 
   (* Extract a NUL-terminated STRING literal from the image: the string
@@ -65,15 +72,16 @@ Section KernelDataInv.
      never has to be threaded. *)
   Lemma kernel_data_string (A : Z) (s : string) (a : mword 64) :
     a = mword_of_int A ->
+    text_end <= A ->
     (forall j b, cstring_bytes s !! j = Some b ->
        KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some b) ->
     kernel_data -∗ a ↦ₛ□ s.
   Proof.
-    iIntros (-> Hbytes) "#Hd". rewrite /string_pointsto.
+    iIntros (-> HA Hbytes) "#Hd". rewrite /string_pointsto.
     iApply big_sepL_intro. iIntros "!>" (j b Hj).
     rewrite pa_add_mword.
     iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd").
-    by apply Hbytes.
+    apply map_lookup_filter_Some_2; [by apply Hbytes | cbn; lia].
   Qed.
 
 End KernelDataInv.

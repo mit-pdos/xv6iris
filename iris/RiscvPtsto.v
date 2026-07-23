@@ -127,6 +127,33 @@ Definition ram_size : Z := 0x8000000.        (* 134217728 = 128 MiB *)
 Definition addr_is_ram (a : Arch.pa) : Prop :=
   (ram_base <= uint a < ram_base + ram_size)%Z.
 
+(* rwx-kmap: the RAM bank split at etext.  [text_end] is hardcoded here to
+   keep the base memory layer off the kernel dump (KernelSyms.etext =
+   0x80007000 is cross-checked by vm_compute higher up: KptExecMap's
+   [etext_vpn], KvmSpec).  Kernel TEXT [ram_base, text_end) is mapped R|X
+   by the kernel page table, kernel DATA [text_end, PHYSTOP) R|W; the
+   points-to layer records the region so stores to text are unprovable
+   and fetches carry their own R|X evidence. *)
+Definition text_end : Z := 0x80007000.
+Definition addr_is_text (a : Arch.pa) : Prop :=
+  (ram_base <= uint a < text_end)%Z.
+Definition addr_is_kdata (a : Arch.pa) : Prop :=
+  (text_end <= uint a < ram_base + ram_size)%Z.
+
+Lemma addr_is_text_ram a : addr_is_text a -> addr_is_ram a.
+Proof.
+  unfold addr_is_text, addr_is_ram, text_end, ram_base, ram_size. lia.
+Qed.
+Lemma addr_is_kdata_ram a : addr_is_kdata a -> addr_is_ram a.
+Proof.
+  unfold addr_is_kdata, addr_is_ram, text_end, ram_base, ram_size. lia.
+Qed.
+Lemma addr_is_ram_split a : addr_is_ram a <-> addr_is_text a \/ addr_is_kdata a.
+Proof.
+  unfold addr_is_ram, addr_is_text, addr_is_kdata, text_end, ram_base, ram_size.
+  lia.
+Qed.
+
 (* The two legacy MMIO-disjointness predicates, kept as the interface the
    model discharges ([within_clint_false]/[within_sig_false] consume them). *)
 Definition not_in_clint (a : Arch.pa) : Prop :=
@@ -158,11 +185,15 @@ Proof.
 Qed.
 
 (* memory points-to: owns byte [a |-> v] at fraction [dq] AND records that [a]
-   is real RAM.  [dq] is a [dfrac]: [DfracOwn 1] = full (writable) ownership,
-   [DfracDiscarded] = persistent/duplicable read-only ownership (used for the
-   immutable kernel code, so [kernel_text] need not be borrowed and returned). *)
+   is a kernel-DATA byte (rwx-kmap: [addr_is_kdata], i.e. RAM at or above
+   etext -- the R|W-mapped region; the R|X kernel text below etext lives at
+   the CODE points-to [↦ₓ] instead, so a store leaf's own [↦ₘ] certifies its
+   target is writable-mapped and stores to text are unprovable).  [dq] is a
+   [dfrac]: [DfracOwn 1] = full (writable) ownership, [DfracDiscarded] =
+   persistent/duplicable read-only ownership (used for the immutable kernel
+   globals image, so [kernel_data] need not be borrowed and returned). *)
 Definition mem_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
-  (pointsto (L:=Arch.pa) (V:=bv 8) a dq v ∗ ⌜addr_is_ram a⌝)%I.
+  (pointsto (L:=Arch.pa) (V:=bv 8) a dq v ∗ ⌜addr_is_kdata a⌝)%I.
 Notation "a ↦ₘ{ dq } v" := (mem_pointsto a dq v)
   (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
 (* discarded (persistent, duplicable) read-only ownership. *)
@@ -171,6 +202,22 @@ Notation "a ↦ₘ□ v" := (mem_pointsto a DfracDiscarded v)
 (* default: full (writable) ownership. *)
 Notation "a ↦ₘ v" := (mem_pointsto a (DfracOwn 1) v)
   (at level 20, format "a  ↦ₘ  v") : bi_scope.
+
+(* CODE points-to (rwx-kmap): owns byte [a |-> v] at fraction [dq] AND records
+   that [a] is a kernel-TEXT byte.  The R|X mapping claim for an identity text
+   va is DERIVABLE (KMap's [kmap_at_static] via the text region class), not
+   stored -- this definition stays ghost-free.  [↦ₓ□] is the form the immutable
+   kernel image lives at ([kernel_text]/[instr_bytes] after the rwx flip). *)
+Definition text_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
+  (pointsto (L:=Arch.pa) (V:=bv 8) a dq v ∗ ⌜addr_is_text a⌝)%I.
+Notation "a ↦ₓ{ dq } v" := (text_pointsto a dq v)
+  (at level 20, format "a  ↦ₓ{ dq }  v") : bi_scope.
+(* discarded (persistent, duplicable) read-only code ownership. *)
+Notation "a ↦ₓ□ v" := (text_pointsto a DfracDiscarded v)
+  (at level 20, format "a  ↦ₓ□  v") : bi_scope.
+(* full ownership (pre-persist, e.g. at adequacy init). *)
+Notation "a ↦ₓ v" := (text_pointsto a (DfracOwn 1) v)
+  (at level 20, format "a  ↦ₓ  v") : bi_scope.
 
 (* ---------------------------------------------------------------------- *)
 (* word points-to: an 8-byte (doubleword) value [w] stored little-endian at a
@@ -552,8 +599,15 @@ Section Bridge.
     iIntros "Hm [Ha _]". by iDestruct (gen_heap_valid with "Hm Ha") as %?.
   Qed.
 
-  (* owning a memory byte (at ANY fraction) certifies its address is real RAM. *)
+  (* owning a memory byte (at ANY fraction) certifies its address is real RAM
+     (statement unchanged across the rwx flip: kdata ⊂ ram). *)
   Lemma mem_ram a dq b : a ↦ₘ{dq} b -∗ ⌜addr_is_ram a⌝.
+  Proof. iIntros "[_ %H]". iPureIntro. exact (addr_is_kdata_ram a H). Qed.
+
+  (* the sharpened region fact (rwx-kmap): an owned memory byte is a kernel-
+     DATA byte -- what a store/AMO leaf turns into its KP_rw mapping claim
+     (KptPt's [kdata_svpn_class] + KMap's [kmap_at_static]). *)
+  Lemma mem_kdata a dq b : a ↦ₘ{dq} b -∗ ⌜addr_is_kdata a⌝.
   Proof. by iIntros "[_ %H]". Qed.
 
   (* a discarded (read-only) memory byte is persistent — hence FREELY duplicable.
@@ -575,6 +629,35 @@ Section Bridge.
      a persistent (discarded) byte can be handed out repeatedly. *)
   Lemma mem_pointsto_dup a b : a ↦ₘ□ b -∗ a ↦ₘ□ b ∗ a ↦ₘ□ b.
   Proof. iIntros "#H". by iSplitR. Qed.
+
+  (* ---- the CODE points-to bridge (rwx-kmap; mirrors the ↦ₘ suite) ---- *)
+
+  Lemma text_valid (mm : gmap Arch.pa (bv 8)) a dq b :
+    gen_heap_interp mm -∗ a ↦ₓ{dq} b -∗ ⌜mm !! a = Some b⌝.
+  Proof.
+    iIntros "Hm [Ha _]". by iDestruct (gen_heap_valid with "Hm Ha") as %?.
+  Qed.
+
+  (* owning a code byte certifies its address is a kernel-text byte ... *)
+  Lemma code_text a dq b : a ↦ₓ{dq} b -∗ ⌜addr_is_text a⌝.
+  Proof. by iIntros "[_ %H]". Qed.
+
+  (* ... and hence real RAM (what the M-mode no-perm-check fetch path and
+     the PMP/MMIO geometry facts consume). *)
+  Lemma code_ram a dq b : a ↦ₓ{dq} b -∗ ⌜addr_is_ram a⌝.
+  Proof. iIntros "[_ %H]". iPureIntro. exact (addr_is_text_ram a H). Qed.
+
+  Global Instance text_pointsto_discarded_persistent a b :
+    Persistent (a ↦ₓ□ b).
+  Proof. rewrite /text_pointsto. apply _. Qed.
+
+  (* discard the fraction: turn any code byte into the persistent read-only
+     one (adequacy init persists the whole sub-etext image this way). *)
+  Lemma text_pointsto_persist a dq b : a ↦ₓ{dq} b ==∗ a ↦ₓ□ b.
+  Proof.
+    iIntros "[Ha %Hr]". iMod (pointsto_persist with "Ha") as "Ha".
+    iModIntro. by iFrame.
+  Qed.
 
 End Bridge.
 
@@ -628,4 +711,5 @@ End pointsto_persist.
    which destruct the raw conjunction, still typecheck.  [Typeclasses Opaque]
    (not [Opaque]) leaves [rewrite /mem_pointsto] / [unfold] working. *)
 Typeclasses Opaque mem_pointsto.
+Typeclasses Opaque text_pointsto.
 

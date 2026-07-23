@@ -53,6 +53,7 @@ From iris.program_logic Require Import weakestpre adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
+Require Import KptPt.   (* kperm, for the kmap ghost functor (rwx-kmap) *)
 Require Import WireInv.
 Require Import PlicPlan WpUart.
 
@@ -70,6 +71,10 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_plicGS :: ghost_varG Σ plic_state;
   (* the UART ghosts carried by [dev_inv_body] (WpUart.v) *)
   riscv_pre_uartGhostGS :: uartGhostG Σ;
+  (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): capacity only --
+     the client mints the auth with [kmap_alloc] when establishing the
+     Bare translation slot *)
+  riscv_pre_kmapGS :: ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm);
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -78,7 +83,8 @@ Definition riscvΣ : gFunctors :=
      gen_heapΣ Arch.pa (bv 8);
      ghost_varΣ uart_state;
      ghost_varΣ plic_state;
-     uartGhostΣ ].
+     uartGhostΣ;
+     ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm) ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -205,7 +211,13 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ}
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
             reg_pointsto_at c r (DfracOwn 1) (register_lookup r (g.(gregs) c))) ∗
-       ([∗ map] a ↦ b ∈ g.(gmem), a ↦ₘ b) ∗
+       (* rwx-kmap init split at etext: the sub-etext image (kernel text +
+          the dump's padding tail) arrives PERSISTED as [↦ₓ□]; the data
+          region arrives owned as [↦ₘ] *)
+       ([∗ map] a ↦ b ∈ filter (fun p : Arch.pa * bv 8 => uint p.1 < text_end)
+                          g.(gmem), a ↦ₓ□ b) ∗
+       ([∗ map] a ↦ b ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
+                          g.(gmem), a ↦ₘ b) ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic))
        ={⊤}=∗
        ([∗ list] c ∈ cs, WP (LoopE c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
@@ -235,17 +247,43 @@ Proof.
   iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
   set (HR := RiscvGS Σ Hinv _ f Hgen _ _ γu γp).
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
-  (* upgrade the raw heap fragments to [↦ₘ] using [Hram] *)
-  iAssert ([∗ map] a ↦ b ∈ g.(gmem), a ↦ₘ b)%I with "[Hbytes]" as "Hbytes".
-  { iApply (big_sepM_impl with "Hbytes").
-    iIntros "!>" (a b Ha) "Hb". rewrite /mem_pointsto.
-    iFrame "Hb". iPureIntro. exact (Hram a b Ha). }
+  (* rwx-kmap init split at etext: split the raw heap fragments into the
+     sub-[text_end] half (upgraded to [↦ₓ] via [Hram] and PERSISTED to
+     [↦ₓ□]) and the rest (upgraded to owned [↦ₘ]). *)
+  iEval (rewrite <- (map_filter_union_complement
+                       (fun p : Arch.pa * bv 8 => uint p.1 < text_end)
+                       g.(gmem))) in "Hbytes".
+  iDestruct (big_sepM_union with "Hbytes") as "[Htext Hdata]";
+    [apply map_disjoint_filter_complement |].
+  iAssert (|==> [∗ map] a ↦ b
+                  ∈ filter (fun p : Arch.pa * bv 8 => uint p.1 < text_end)
+                      g.(gmem),
+             a ↦ₓ□ b)%I with "[Htext]" as ">Htext".
+  { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htext").
+    iIntros "!>" (a b Ha) "Hb".
+    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hlt].
+    iApply text_pointsto_persist. rewrite /text_pointsto.
+    iFrame "Hb". iPureIntro. cbn in Hlt.
+    pose proof (Hram a b Ha) as [Hlo _]. split; [exact Hlo | exact Hlt]. }
+  iAssert ([∗ map] a ↦ b
+             ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
+                 g.(gmem),
+             a ↦ₘ b)%I with "[Hdata]" as "Hdata".
+  { assert (Hfeq : filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1) g.(gmem)
+                 = filter (fun p : Arch.pa * bv 8 => ¬ (uint p.1 < text_end)) g.(gmem)).
+    { apply (proj1 (map_filter_ext _ _ g.(gmem))). intros i x _. cbn. split; lia. }
+    rewrite Hfeq.
+    iApply (big_sepM_impl with "Hdata").
+    iIntros "!>" (a b Ha) "Hb".
+    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hge].
+    rewrite /mem_pointsto. iFrame "Hb". iPureIntro. cbn in Hge.
+    pose proof (Hram a b Ha) as [_ Hhi]. split; [lia | exact Hhi]. }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Hbytes HuF HpF]") as "[Hwps Hdwp]".
+  iMod ("Hwand" with "[Helems Htext Hdata HuF HpF]") as "[Hwps Hdwp]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
-    iFrame "Hbytes". iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
+    iFrame "Htext Hdata". iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -301,7 +339,7 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
-  iIntros "(Hwires & _ & Huf & Hpf)".
+  iIntros "(Hwires & _ & _ & Huf & Hpf)".
   (* allocate the four UART ghosts at the initial device state *)
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
   iMod (dev_inv_alloc _ γ with "[Huf Hpf Hacc Hout Htx Hdl]") as "#Hinv".

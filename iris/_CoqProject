@@ -89,6 +89,7 @@ SmodePte.v
 PtAdBits.v
 Pt4kWalk.v
 KptPt.v
+KMap.v
 PtTree.v
 UserBits.v
 SmodeCore.v
