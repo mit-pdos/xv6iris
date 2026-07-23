@@ -767,6 +767,14 @@ Definition kmap_M0 : gmap (mword 27) (mword 44 * kperm) :=
                ++ kmap_seq 0x80007 0x7FF9 KP_rw
                ++ kmap_seq 0xC000 0x4002 KP_rw).
 
+(* Keep typeclass search from unfolding the ~49k-entry comprehension: the only
+   place that ever looks inside is [kmap_M0_lookup] (via [unfold], unaffected by
+   this).  Without it, [ghost_map_alloc kmap_M0] at the two auth-mint sites
+   ([kmap_alloc] here / adequacy init) makes TC resolution materialize the whole
+   map -- ~262 s PER site.  [Typeclasses Opaque] (never [Opaque]) leaves
+   [unfold]/[vm_compute] working, so the HAZARD above still holds. *)
+Global Typeclasses Opaque kmap_M0.
+
 (* round-trip: a Z in [0, 2^27) survives [mword_of_int : mword 27] and back *)
 Lemma mword27_unsigned (z : Z) :
   0 <= z < 134217728 -> bv_unsigned (mword_of_int z : mword 27) = z.
