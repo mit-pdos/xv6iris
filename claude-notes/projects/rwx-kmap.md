@@ -1,5 +1,80 @@
 # Project: R/W/X-accurate kernel PT, code points-to, and non-identity mappings
 
+## UNIFORM-CLAIMS REVISION (2026-07-23, user-signed-off; SUPERSEDES parts
+## of the design below — read this first)
+
+The points-to layer is being REFOUNDED va-based and the claim ghost made
+fully uniform.  User decisions, ironed out over several rounds:
+
+1. `↦ₘ`/`↦ₓ` are REDEFINED VA-BASED (same notations, function specs
+   unchanged): `mem_pointsto va dq v := ∃ ppn, kmap_at (svpn_of va) ppn
+   KP_rw ∗ ⌜uint va < 2^38⌝ ∗ ⌜addr_is_kdata (pa_of ppn va)⌝ ∗
+   pointsto (pa_of ppn va) dq v` where `pa_of ppn va := zext64 (concat
+   ppn (pageoff va))`; text form at KP_rx/addr_is_text.  The claim ghost
+   carries BOTH the permission AND the va→pa mapping.  The canonicality
+   conjunct (uint va < 2^38, positive half) makes va ↔ (vpn, offset)
+   bijective.  Identity = the M0-fragment case (pa = va derivable).
+2. `kmap_at vpn ppn pc := vpn ↪[kmap_name]□ (ppn, pc)` — a BARE persisted
+   fragment, nothing else.  Uniqueness = ghost_map library agreement
+   (`kmap_at_agree`), which is what ↦ₘ fraction recombination needs.
+   NO pure static arm; NO kmap_wf; `kmap_auth M := ghost_map_auth
+   kmap_name 1 M` bare (the old ⌜kmap_M0 ⊆ M⌝ was reified monotonicity —
+   under full fragment-keying the persisted fragments themselves are the
+   monotonicity witnesses, so nothing rides the auth).  KMap.v's pure
+   layer (kmap_wf/kmap_wf_insert/kmap_wf_tramp/kmap_dyn_ok/
+   kstack_vpn_range) is DELETED; kmap_insert keeps only freshness.
+3. STATIC FRAGMENTS are minted AT INIT (adequacy): ghost_map_alloc
+   kmap_M0, fragments PERSISTED and distributed (a) inside every
+   identity ↦ₘ/↦ₓ□ the init split builds, (b) as the persistent bundle
+   `kmap_static_claims := [∗ map] vpn↦e ∈ kmap_M0, vpn ↪□ e`, which
+   rides in hw_config (already ambient+persistent everywhere); the
+   extraction lemma `kmap_static vpn pc → hw_config/bundle ⊢ kmap_at vpn
+   (kpt_leaf_ppn vpn) pc` replaces kmap_at_static.
+4. EVERYTHING is claim-keyed — the record simplifications this buys:
+   - `sr_absorb_dev` DELETED from s_regime (dev entries are ordinary
+     KP_rw M0 entries; the general sr_absorb covers them); kpt/bare
+     _absorb_dev die; the dispatch loses the arm; dev leaves re-keyed
+     onto bundle-extracted claims.
+   - `sr_absorb_region`/`sr_acc_region` DELETED (every leaf carries its
+     claim in its resource; the R/W/X policy is structural: ↦ₓ carries
+     KP_rx, ↦ₘ carries KP_rw, kperm_allows at the absorb site).
+   - KptTree's five identity/dev wrappers collapse into the one
+     claim-keyed tlb_inv_pt_translateAddr_at.
+5. TRAMPOLINE UNIFIED under the ghost map: its fragment is minted at the
+   kvminithart switch (NOT at init — under Bare it would promise a
+   translation Bare does not perform; the Bare arm's exact-M0 agreement
+   refutation is the soundness guard).  The dedicated tramp clause DIES;
+   ktramp/userret engines re-key onto the tramp fragment.  The switch
+   folds 65 inserts (64 kstacks + tramp).
+6. `kpt_tree_spec_gen` becomes the ONE-CLAUSE exact-representation form:
+   `pt_base t = root ∧ ∀ vpn, match M !! vpn with Some e => ∃ p2 p1 a d,
+   ptree_maps t vpn p2 p1 (pte_set_ad (kpt_leaf_pte_of vpn e) a d)
+   | None => ptree_blocks t vpn end`.  The blocks direction is what
+   makes the invariant characterize the table EXACTLY (and is the real
+   guard on kmap_insert: an entry can only enter M if the physical
+   table maps it, enforced at invariant re-establishment).
+7. Lemma-suite shift: mem_valid/mem_ram become PA-side statements, with
+   a static-fragment identity corollary (pa = va) for the M-mode paths
+   (M-mode has no translation and never touches tramp/kstack vas).
+
+EXECUTION STAGES (revised for green-per-stage; KvmMap item (ii) is done
+so sequencing is clear):
+  A'. ADDITIVE PREP (green): define kmap_static_claims; hw_config gains
+      the bundle conjunct; adequacy persists the init fragments and
+      hands the bundle out; nothing existing changes.
+  B'. THE ATOMIC FLIP (one phase, like stages 4+5 were): kmap_at
+      redefinition (bare fragment) + kmap_auth bare + KMap pure-layer
+      deletion + the VA-based ↦ₘ/↦ₓ redefinition + tower/leaf re-keying
+      + sr_absorb_dev/sr_absorb_region/wrapper deletions + Bare-arm
+      rework + dev-leaf re-key.  (kmap_at's redefinition breaks every
+      kmap_at_static consumer at once, and those consumers are exactly
+      the structures being deleted — so A-then-B split cannot each be
+      green; B' is deliberately atomic.)
+  C.  Tramp unification: switch-minted tramp fragment, tramp clause
+      dies (tree spec already one-clause), ktramp/userret engine
+      re-key, KvmMap revision (kvm_M + tramp entry, kvm_M_wf deleted,
+      bridge tramp arm folds into the maps arm).
+
 STATUS: IN PROGRESS (design signed off 2026-07-23).  Stages 1-5 are DONE
 and green on full builds (301/301): kperm layer + kmap_M0, KMap.v, the
 ↦ₓ/region layer, THE FLIP (stores to kernel text unprovable at the

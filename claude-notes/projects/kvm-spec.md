@@ -248,8 +248,22 @@ passes the live count, mappages' loop invariant is the additive
 consumed-form composed via avail_sub_add; a new word_pointsto_ram
 helper refutes the slot-null sub-case: an owned RAM cell address is
 nonzero, so mappages' -1 return can only be kalloc exhaustion).
-(ii) constants + kvm_map literal +
-the M-correspondence bridge lemma; (iii) proc_mapstacks/kvmmake/kvminit
+(ii) DONE 2026-07-23, 302/302 green, kvm_bridge closed under the global
+context — KvmMap.v: constants, the six-region kvm_map literal +
+kvm_stacks/kvm_map_full, kvm_M, the two master lookup characterizations,
+and the bridge pt_rep0 t (kvm_map_full pas) → kpt_tree_spec_gen root
+(kvm_M pas) t.  PROOF-ENGINEERING LANDMINES for KvmMap-scale pure-map
+work: (a) NEVER unfold a chain of pt_insert_runs with large page counts
+into one term before rewriting — peel one run at a time with the
+accumulator kept FOLDED (the kvm_m*_peel helpers; unfolded, every
+rewrite traverses the giant term and compounds to a timeout);
+(b) Typeclasses Opaque/Opaque do NOT stop kernel/rewrite conversion —
+the folding discipline is the real fix; (c) cbn unfolds
+pte_set_ad/bv_unsigned-of-literal — use cbn [fst snd]; (d) the zify hook
+breaks lia on large-literal and evar goals — explicit boolean asserts +
+Z.leb_gt/Z.ltb_ge projections.  NOTE: kvm_M_wf will be DELETED and
+kvm_M gains the tramp entry in the uniform-claims revision stage C
+(rwx-kmap.md).  (iii) proc_mapstacks/kvmmake/kvminit
 specs (KvmSpec.v) — sign-off shape below is superseded by the above;
 OPEN at (iii): kvmmap keeps panic_wp for None mode (the panic branch is
 xv6 code); decide then whether the counted cone gets a derived

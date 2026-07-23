@@ -91,6 +91,7 @@ Pt4kWalk.v
 KptPt.v
 KMap.v
 PtTree.v
+KvmMap.v
 UserBits.v
 SmodeCore.v
 PtTreeAdue.v
