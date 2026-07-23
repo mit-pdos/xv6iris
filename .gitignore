@@ -7,6 +7,8 @@ CoqMakefile.conf
 .CoqMakefile.d
 .*.aux
 *.glob
+*.v.timing
+*.v.beautified
 *.log
 .*.cache
 /xv6-riscv

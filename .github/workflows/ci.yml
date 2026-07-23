@@ -102,7 +102,44 @@ jobs:
       - name: Build Iris proofs (iris/)
         run: |
           make SWITCH="$GITHUB_WORKSPACE" iris/CoqMakefile
-          opam exec -- make -C iris -f CoqMakefile -j"$(nproc)"
+          # Profiled build: TIMED=1 prints a per-file `Foo.vo (real: T, ...)`
+          # line; TIMING=1 writes a per-sentence `<file>.v.timing` next to each
+          # .v.  Both add negligible overhead but let the next step report where
+          # the wall-clock goes.  `tee` keeps the per-file log for the profiler;
+          # the shell is `bash -eo pipefail`, so a make failure still fails here.
+          opam exec -- make -C iris -f CoqMakefile -j"$(nproc)" TIMED=1 TIMING=1 \
+            2>&1 | tee "$RUNNER_TEMP/iris-build.log"
+
+      # ---- 3b. Build profile (iris/, informational) ----
+      # Consumes the TIMED log + the .v.timing files + coqdep's .CoqMakefile.d +
+      # the .vo mtimes to report the most expensive statements and files, the
+      # longest require chain (the critical path — the build is critical-path
+      # bound, so this is the real floor), and a parallelism-over-time plot.
+      # Stdlib-only Python; `continue-on-error` so a profiler hiccup never fails
+      # an otherwise-green build.  Runs only on a successful build (no `if:`),
+      # so the timing data is complete.
+      - name: Proof build profile (iris/, informational)
+        continue-on-error: true
+        run: |
+          python3 tools/proof_profile.py \
+            --build-log "$RUNNER_TEMP/iris-build.log" \
+            --iris-dir iris --out-dir "$RUNNER_TEMP/profile" \
+            --jobs "$(nproc)" --top 30
+          cat "$RUNNER_TEMP/profile/report.md" >> "$GITHUB_STEP_SUMMARY"
+          # Tidy the workspace so the .v.timing files don't linger for later
+          # steps (checkout wipes them next run regardless, but be explicit).
+          rm -f iris/*.v.timing
+
+      - name: Upload build profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-build-profile
+          path: |
+            ${{ runner.temp }}/profile/parallelism.svg
+            ${{ runner.temp }}/profile/report-full.txt
+            ${{ runner.temp }}/profile/report.md
+          if-no-files-found: ignore
 
       # ---- 4. Dead-code report (iris/) ----
       # Informational only: find_dead.py reads the .glob files the step above
