@@ -20,6 +20,7 @@ Require Import WpMycpu.
 Require Import WpAuipc.
 Require Import ProcGeom.
 Require Import SwtchCtx.
+Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpGprCsrwCommon.
 Require Import WpIntenaBits.
@@ -143,17 +144,29 @@ Section WpSconfSched.
 
   Lemma wp_sched_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-      (m : regfile) (av : nat)
-    : wp_sched_sconf_body γ Φ γs j γl st ch m av.
+      (m : regfile) (av : nat) (eb : bool)
+    : wp_sched_sconf_body γ Φ γs j γl st ch m av eb.
   Proof.
     cbv beta delta [wp_sched_sconf_body].
     intros pcE pj ret_tgt Htp Hj Hgl Hneeds Hal Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hprocs Hheld Hcells Hown Hvc Hcont".
-    (* unpack the payloads. *)
+    iIntros "Hcg #Htext Hpc #Hprocs Hheld Hcpu Hown Hvc Hcont".
+    (* the cpu bundle [cpu_own γ 1 eb pj emp] arrives whole at level 1; unfold
+       it to the individual cells + counting token the check-chain threads. *)
     iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hlkcpu)".
-    iDestruct "Hcells" as "(Hcur & Hnoff & Hint)".
-    iDestruct "Hint" as (iv) "Hint".
+    (* a persistent copy of the level-1 handler-avail payload (needed only when
+       the saved base enable [eb] is true) for the return-path retune. *)
+    iAssert (cpu_own γ 1 eb (proc_addr j) emp ∗
+             □ (if eb then intr_handler_avail γ else emp))%I
+      with "[Hcpu]" as "(Hcpu & #Havail_eb)".
+    { destruct eb.
+      - iEval (rewrite /cpu_own /intr_count /=) in "Hcpu".
+        iDestruct "Hcpu" as "(%Hb & Hnoff & Hint & [Hq0 #Hav] & Hcur & _)".
+        iSplitR "".
+        2:{ iModIntro. iExact "Hav". }
+        rewrite /cpu_own /intr_count /=. iFrame "Hnoff Hint Hcur".
+        iSplitR; [iPureIntro; exact Hb |]. iFrame "Hq0". iExact "Hav".
+      - iFrame "Hcpu". iModIntro. done. }
     iDestruct "Hown" as (ctxvs) "[%Hctxlen Hctxcells]".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
@@ -261,18 +274,19 @@ Section WpSconfSched.
     { rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. exact Htp. }
-    iApply (Myproc.wp_myproc_sconf γ Φ A2 (av - 6)%nat 1 (mword_of_int 1) iv (proc_addr j)
+    iApply (Myproc.wp_myproc_sconf γ Φ A2 (av - 6)%nat 1 eb (proc_addr j) emp
               HtpA2
-              ltac:(split; intro HH; vm_compute in HH; discriminate)
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite HA2ra; vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc Hnoff Hint Hcur [-]").
-    iIntros (ms mp) "%Hmsf Hcg Hcnt Hpc %Hmp Hnoff Hint Hcur".
+              with "Hcg Hcpu Htext Hpc [-]").
+    iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
-    assert (Hifint : (if eq_vec (sign_extend' 64 (mword_of_int 1 : mword 32)) zero_reg
-                      then po_intena_val ms else iv) = iv) by (vm_compute; reflexivity).
-    iEval (rewrite Hifint) in "Hint".
+    (* re-unfold the (unchanged) returned bundle into the individual cells the
+       check-chain reads, and name the level-1 intena value. *)
+    iEval (rewrite /cpu_own) in "Hcpu".
+    iDestruct "Hcpu" as "(_ & Hnoff & Hint & Hcnt & Hcur & _)".
+    set (iv := intena_val eb : mword 32).
     assert (Hpc12 : update_vec_dec (add_vec (A2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SD + 0x12)) by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc12) in "Hpc".
@@ -545,7 +559,8 @@ Section WpSconfSched.
       - iSplit; [done|]. iSplitL "Hq0arm"; [ iLeft; iExact "Hq0arm" | iExact "Hq0cnt" ].
       - iDestruct (ghost_var_agree with "Hq0cnt Hq1arm") as %Hbad.
         exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate. }
-    iDestruct (intr_count_pack_S γ 0 with "Hq0cnt Hres") as "Hcnt".
+    iAssert (intr_count γ 1 eb) with "[Hq0cnt Hres]" as "Hcnt".
+    { rewrite /intr_count. iFrame "Hq0cnt". iExact "Hres". }
     set (C10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read ms2)]> C9).
     iDestruct (sie_cap_gpr_join γ C10 (av - 6)%nat with "Hhs Hsc [Hstk Htlbinv Harm] Hfile") as "Hcg".
     { rewrite /sie_cap. iFrame "Hstk Htlbinv Harm". }
@@ -839,33 +854,34 @@ Section WpSconfSched.
       apply sched_reconcile2. vm_compute. reflexivity. }
     assert (Hal_ret : eq_vec (access_vec_dec (ctx_pc (Mc !!! Regidx (mword_of_int 1 : mword 5))) 0) ('b"0") = true)
       by (rewrite Hra_Mc; vm_compute; reflexivity).
-    (* split off sie_arm + the deep stack. *)
-    iDestruct (sie_cap_gpr_split γ Mc (av - 6)%nat with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iEval (rewrite /sie_cap) in "Hcap".
-    iDestruct "Hcap" as "(Hdeepstk & Htlbinv & Harm)".
-    iAssert (swconf γ) with "[Hsc Hhs Htlbinv Harm Hcnt]" as "Hswconf".
-    { rewrite /swconf. iFrame "Hsc Hhs Htlbinv Harm Hcnt". }
-    (* build the parking-proc payload. *)
+    (* FULL-BUNDLE swtch: hand [sie_cap_gpr] and [cpu_own] whole (the swtch
+       proof internally carves the stack/off-eighth and parks them in the OLD
+       record).  Refold the check-chain cells into the level-1 [cpu_own]. *)
+    iAssert (cpu_own γ 1 eb pj emp) with "[Hnoff Hint Hcnt Hcur]" as "Hcpu".
+    { rewrite /cpu_own. iFrame "Hnoff Hint Hcnt Hcur". iPureIntro; vm_compute; reflexivity. }
+    (* build the parking-proc payload (proc-held facts only; the cpu bundle
+       now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs j γl st ch Hj Hgl Hneeds
-                  with "[Hlocked Hstate Hchan Hlkcpu] [Hcur Hnoff Hint]") as "HP".
+                  with "[Hlocked Hstate Hchan Hlkcpu]") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hlkcpu". }
-    { rewrite /cpu_cells. iFrame "Hcur Hnoff". iExists iv. iExact "Hint". }
     (* apply swtch. *)
-    iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word) Mc ctxvs
+    iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
+              Mc ctxvs (av - 6)%nat eb pj
               Hctxlen Holdc Hnewc Hal_ret
-              with "Htext Hswconf Hpc Hfile Hctxcells Hvc [HP] [-]").
+              with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP] [-]").
     { iEval (rewrite Htp_Mc). iExact "HP". }
-    iIntros (m') "%Hcallee Hswconf Hpc Hfile Hctxback Hresume".
+    iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
     (* resume: elim the SECOND disjunct (dispatched proc). *)
     iDestruct "Hresume" as (cret) "[Hvc' Hpay]".
     iDestruct (p_sched_at_proc γs j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) Hj with "Hpay")
       as "(%Htpv & %Hcret & Hpay2)".
-    iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Hcells')".
+    iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
     (* callee-image component equalities. *)
     unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
     injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
-    iDestruct "Hswconf" as "(Hsc & Hhs & Htlbinv & Harm & Hcnt)".
+    (* sie_cap_gpr [Hcg] and cpu_own [Hcpu] both came back WHOLE from the swtch
+       continuation (at [av-6] and at the same [eb], [pj]); no rebuild needed. *)
     (* sp threads unchanged from the prologue push all the way through. *)
     assert (Hcsp_Mc : Mc !!! Regidx csp_rs1 = spd).
     { rewrite /Mc upd_ne; [| vm_compute; discriminate].
@@ -891,17 +907,16 @@ Section WpSconfSched.
     assert (Hsp_m' : m' !!! Regidx csp_rs1 = spd).
     { change (Regidx csp_rs1) with (Regidx (mword_of_int 2 : mword 5)).
       rewrite Hm2. change (Regidx (mword_of_int 2 : mword 5)) with (Regidx csp_rs1). exact Hcsp_Mc. }
-    (* rebuild sie_cap_gpr for m'. *)
-    iEval (rewrite Hcsp_Mc) in "Hdeepstk".
-    iDestruct (sie_cap_gpr_join γ m' (av - 6)%nat with "Hhs Hsc [Hdeepstk Htlbinv Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap Hsp_m'. iFrame "Hdeepstk Htlbinv Harm". }
     (* pc lands on the saved return address SD+0x72. *)
     assert (Hpctgt : ctx_pc (m' !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (SD + 0x72))
       by (rewrite Hm1 Hra_Mc; vm_compute; reflexivity).
     iEval (rewrite Hpctgt) in "Hpc".
-    (* the returned cpu cells (intena existential). *)
-    iDestruct "Hcells'" as "(Hcur2 & Hnoff2 & Hint2)".
-    iDestruct "Hint2" as (iv') "Hint2".
+    (* the returned cpu bundle came back at the RESUMER's base [eb'] (the wand
+       is [∀ eb']); unfold it -- the intena-restore store + a ghost retune below
+       bring it back to this thread's own saved base [eb]. *)
+    iEval (rewrite /cpu_own) in "Hcpu".
+    iDestruct "Hcpu" as "(_ & Hnoff2 & Hint2 & Hcnt2 & Hcur2 & _)".
+    set (iv' := intena_val eb' : mword 32).
     (* ------------------------------------------------------------------ *)
     (* +0x72..+0x7a: restore c->intena := s3.                             *)
     (* ------------------------------------------------------------------ *)
@@ -980,9 +995,37 @@ Section WpSconfSched.
     iEval (rewrite Hrec_int2) in "Hint2".
     assert (Hpc7e : add_vec_int (mword_of_int (SD + 0x7a) : mword 64) 4 = mword_of_int (SD + 0x7e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc7e) in "Hpc".
-    (* rebuild cpu_cells j (intena value forgotten). *)
-    iAssert (cpu_cells j) with "[Hcur2 Hnoff2 Hint2]" as "Hcells2".
-    { rewrite /cpu_cells. iFrame "Hcur2 Hnoff2". iExists _. iExact "Hint2". }
+    (* the restored intena cell holds this thread's saved base [intena_val eb]
+       (s3 = the value read at +0x54, sign-extended then truncated back). *)
+    assert (HE3s3 : E3 !!! Regidx (mword_of_int 19 : mword 5) = sign_extend' 64 (intena_val eb)).
+    { rewrite /E3 upd_ne; [| vm_compute; discriminate].
+      rewrite /E2 upd_ne; [| vm_compute; discriminate].
+      rewrite /E1 upd_ne; [| vm_compute; discriminate].
+      rewrite /E0 upd_ne; [| vm_compute; discriminate].
+      rewrite Hm19.
+      rewrite /Mc upd_ne; [| vm_compute; discriminate].
+      rewrite /D14 upd_ne; [| vm_compute; discriminate].
+      rewrite /D13 upd_ne; [| vm_compute; discriminate].
+      rewrite /D12 upd_ne; [| vm_compute; discriminate].
+      rewrite /D11 upd_ne; [| vm_compute; discriminate].
+      rewrite /D10 upd_ne; [| vm_compute; discriminate].
+      rewrite /D9 upd_ne; [| vm_compute; discriminate].
+      rewrite /D8 upd_ne; [| vm_compute; discriminate].
+      rewrite /D7 upd_ne; [| vm_compute; discriminate].
+      rewrite /D6 upd_eq. reflexivity. }
+    assert (Hstoreval : trunc32 (E3 !!! Regidx (mword_of_int 19 : mword 5)) = intena_val eb).
+    { rewrite HE3s3. destruct eb; vm_compute; reflexivity. }
+    iEval (rewrite Hstoreval) in "Hint2".
+    (* retune the count token from the resumer's base [eb'] to this thread's own
+       saved base [eb] (retune_on when eb = true, using the entry avail copy);
+       the intena cell was just restored to [intena_val eb] by the store. *)
+    iAssert (intr_count γ 1 eb) with "[Hcnt2]" as "Hcnt2".
+    { destruct eb.
+      - iApply (intr_count_retune_on γ 0 eb' with "Havail_eb Hcnt2").
+      - iApply (intr_count_retune_off γ 0 eb' with "Hcnt2"). }
+    (* refold [cpu_own γ 1 eb pj emp]. *)
+    iAssert (cpu_own γ 1 eb pj emp) with "[Hcur2 Hnoff2 Hint2 Hcnt2]" as "Hcpu".
+    { rewrite /cpu_own. iFrame "Hnoff2 Hcnt2 Hcur2 Hint2". iPureIntro; vm_compute; reflexivity. }
     (* ------------------------------------------------------------------ *)
     (* +0x7e..+0x8a: epilogue -- restore ra/s0/s1/s2/s3, pop frame, ret.   *)
     (* ------------------------------------------------------------------ *)
@@ -1169,7 +1212,7 @@ Section WpSconfSched.
       rewrite /E2 upd_ne; [| exact H15]. rewrite /E1 upd_ne; [| exact H15].
       rewrite /E0 upd_ne; [| exact H15].
       rewrite Hmm. apply Hthread; assumption. }
-    iApply ("Hcont" $! Ef ch' with "[%] Hcg Hcnt Hpc Hheld' Hcells2 [Hctxback] [Hvc']").
+    iApply ("Hcont" $! Ef ch' with "[%] Hcg Hpc Hheld' Hcpu [Hctxback] [Hvc']").
     { (* callee_saved m Ef *)
       assert (Hf_sp : Ef !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
         by (rewrite /Ef upd_eq Hsp_E8; exact Hpopsp).

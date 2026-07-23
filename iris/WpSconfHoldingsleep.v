@@ -21,6 +21,7 @@ Require Import StackOwn CalleeSaved.
 Require Import WpIntenaBits.
 Require Import WpLock.
 Require Import WpMycpu ProcGeom.
+Require Import IntrDefs SwtchCtx CpuOwn.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpWakeup.
@@ -73,14 +74,14 @@ Section WpSconfHoldingsleep.
 
   Lemma wp_holdingsleep_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (dq : dfrac)
-    : wp_holdingsleep_sconf_body γ Φ γl γsl s R m p pidv av dq.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac)
+    : wp_holdingsleep_sconf_body γ Φ γl γsl s R m p pidv av eb C dq.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Htp Hretal Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield Hlkcpu Hnoffcell Hintex Hcur Hpidproc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield Hlkcpu Hpidproc Hcont".
     (* stack-slot address bridges (spr-relative store offset -> pa_stk sp0 k). *)
     assert (Hspr6 : spr = pa_stk sp0 6).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -95,7 +96,6 @@ Section WpSconfHoldingsleep.
     assert (Hb5 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 5).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iDestruct (is_sleeplock_lock with "Hsleeplock") as "#Hlk".
-    iDestruct "Hintex" as (iv0) "Hint".
     (* ===================== PROLOGUE ===================== *)
     iPoseProof (hsl_00 with "Htext") as "Hi00".
     assert (Hpush : add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk sp0 6) by exact Hspr6.
@@ -229,32 +229,21 @@ Section WpSconfHoldingsleep.
       rewrite /M0 upd_ne; [| vm_compute; discriminate]. reflexivity. }
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
     iApply (Acquire.wp_acquire_sconf γ Φ γl "sleep lock"%string (sl_res γsl slk R) M5
-              (zero_reg : mword 64) (mword_of_int 0 : mword 32) iv0 0%nat (av - 6)%nat
+              (zero_reg : mword 64) 0%nat eb p C (av - 6)%nat
               ltac:(rewrite HM5tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
               ltac:(rewrite HM5ra; vm_compute; reflexivity)
+              HM5tp
+              ltac:(vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hlk] [Hlkcpu] [Hnoffcell] [Hint] [-]").
+              with "Hcg Hcnt Htext Hpc [Hlk] [Hlkcpu] [-]").
     { iEval (rewrite HM5a0). iExact "Hlk". }
     { iEval (rewrite HM5a0). iExact "Hlkcpu". }
-    { iEval (rewrite HM5tp). iExact "Hnoffcell". }
-    { iEval (rewrite HM5tp). iExact "Hint". }
-    iIntros (ms A) "%Hms Hcg Hpc %HcsA Htok HR Hcpu Hnoff Hint Hcnt".
+    iIntros (ms A) "%Hms Hcg Hpc %HcsA Htok HR Hcpu Hcnt Hpay".
     assert (Hpc18 : update_vec_dec (add_vec (M5 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (HSL + 0x18))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
-    (* rewrite the returned cells into canonical (slk / cid_word) forms. *)
+    (* rewrite the returned sl_lkcpu cell into canonical (slk / cid_word) form. *)
     iEval (rewrite HM5a0 HM5tp) in "Hcpu".
-    iEval (rewrite HM5tp) in "Hnoff".
-    iEval (rewrite HM5tp) in "Hint".
-    set (ivA := if eq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) zero_reg then po_intena_val ms else iv0).
-    change (if eq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) zero_reg then po_intena_val ms else iv0) with ivA.
-    (* the noff cell now holds acquire's +1 form; rewrite to literal 1. *)
-    assert (Hns1 : autocast (T := mword) (subrange_vec_dec
-       (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 (mword_of_int 0 : mword 32))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
-       (Z.sub (Z.mul 4 8) 1) 0) = (mword_of_int 1 : mword 32))
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hns1) in "Hnoff".
     (* open sl_res with the caller's token: refute the free arm. *)
     iDestruct (sl_res_open_held γsl slk R with "HR Hsl") as "(Hsl & Hcellex)".
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
@@ -343,20 +332,14 @@ Section WpSconfHoldingsleep.
       rewrite /B18 upd_ne; [| vm_compute; discriminate].
       rewrite (callee_saved_lookup HcsA (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)). exact HM5tp. }
     (* myproc(): a0 = p, callee-saved preserved; noff cell at literal 1. *)
-    iApply (Myproc.wp_myproc_sconf γ Φ Bj (av - 6)%nat 1%nat (mword_of_int 1 : mword 32) ivA p
-              ltac:(exact HBjtp)
-              ltac:(split; intro Hc; [vm_compute in Hc; discriminate | discriminate])
+    iApply (Myproc.wp_myproc_sconf γ Φ Bj (av - 6)%nat 1%nat eb p C
+              HBjtp
               ltac:(vm_compute; reflexivity)
               ltac:(rewrite HBjra; vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hnoff] [Hint] [Hcur] [-]").
-    { iExact "Hnoff". }
-    { iExact "Hint". }
-    { iExact "Hcur". }
-    iIntros (ms2 MP) "%Hms2 Hcg Hcnt Hpc %HcsMPa Hnoff Hint Hcur".
+              with "Hcg Hcnt Htext Hpc [-]").
+    iIntros (ms2 MP) "%Hms2 Hcg Hcnt Hpc %HcsMPa".
     destruct HcsMPa as [HcsMP HMPa0].
-    set (ivB := if eq_vec (sign_extend' 64 (mword_of_int 1 : mword 32)) zero_reg then po_intena_val ms2 else ivA).
-    change (if eq_vec (sign_extend' 64 (mword_of_int 1 : mword 32)) zero_reg then po_intena_val ms2 else ivA) with ivB.
     assert (Hpc3c : update_vec_dec (add_vec (Bj !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (HSL + 0x3c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3c) in "Hpc".
@@ -498,35 +481,23 @@ Section WpSconfHoldingsleep.
     iDestruct (sl_res_close_held γsl slk R v Hvnz with "Hslk") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γ Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20
-              (mycpu_ret cid_word) (mword_of_int 1 : mword 32) ivB 0%nat (av - 6)%nat (dqi := DfracOwn 1)
+              (mycpu_ret cid_word) 0%nat eb p C (av - 6)%nat
               ltac:(rewrite HD20a0; apply wk_add_vec_0)
               ltac:(rewrite HD20tp; apply wk_eq_vec_refl)
-              ltac:(split; [intros _; reflexivity | intros _; vm_compute; reflexivity])
-              ltac:(vm_compute; reflexivity)
               ltac:(rewrite HD20ra; vm_compute; reflexivity)
+              HD20tp
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlk] [Htok] [HR2] [Hcpu] [Hnoff] [Hint] Hcnt [-]").
+              with "Hcg Htext Hpc [Hlk] [Htok] [HR2] [Hcpu] Hcnt Hpay [-]").
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR2". }
     { iEval (rewrite HD20a0). iExact "Hcpu". }
-    { iEval (rewrite HD20tp). iExact "Hnoff". }
-    { iEval (rewrite HD20tp). iExact "Hint". }
-    iIntros (MR) "Hcg Hpc %HcsMR Hcpu Hnoff Hint Hcnt".
+    iIntros (MR) "Hcg Hpc %HcsMR Hcpu Hcnt".
     assert (Hpc24 : update_vec_dec (add_vec (D20 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (HSL + 0x24))
       by (rewrite HD20ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".
-    (* rewrite the released noff cell to literal 0. *)
-    assert (Hns0 : autocast (T := mword) (subrange_vec_dec
-       (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 (mword_of_int 1 : mword 32))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
-       (Z.sub (Z.mul 4 8) 1) 0) = (mword_of_int 0 : mword 32))
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hns0) in "Hnoff".
-    (* rewrite the released cells back into the canonical sl_lk / cid_word forms. *)
+    (* rewrite the released sl_lkcpu cell back into the canonical sl_lk form. *)
     iEval (rewrite HD20a0) in "Hcpu".
-    iEval (rewrite HD20tp) in "Hnoff".
-    iEval (rewrite HD20tp) in "Hint".
     (* register-preservation facts for the epilogue and callee_saved. *)
     assert (HMRcsp : MR !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup HcsMR csp_rs1 ltac:(vm_compute; reflexivity)). exact HD20csp. }
@@ -714,7 +685,7 @@ Section WpSconfHoldingsleep.
       rewrite /M2 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence].
       rewrite /M0 upd_ne; [| congruence]. reflexivity. }
-    iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidfield Hcpu Hnoff [Hint] Hcur Hpidproc").
+    iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidfield Hcpu Hpidproc").
     { split.
       - unfold callee_saved.
         split; [exact HE2e_csp|].
@@ -732,7 +703,6 @@ Section WpSconfHoldingsleep.
         split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
         apply Hthr; vm_compute; first [reflexivity | discriminate].
       - exact HE2e_a0. }
-    { iExists _. iExact "Hint". }
   Qed.
 
 End WpSconfHoldingsleep.

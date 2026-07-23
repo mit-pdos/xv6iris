@@ -147,13 +147,13 @@ Section WpSconfAcquire.
   Lemma wp_acquire_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
-      (cpuold : mword 64) (noffv intena_old : mword 32) (n : nat) (av : nat)
-    : wp_acquire_sconf_body γ Φ γl s R m cpuold noffv intena_old n av.
+      (cpuold : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+    : wp_acquire_sconf_body γ Φ γl s R m cpuold n eb p C av.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].
-    intros pcE lk0 a_cpu cpuv a_noff a_int po_noff_a5 po_noff_store ret_tgt Hnotmine Hal0 Hav.
+    intros pcE lk0 a_cpu cpuv ret_tgt Hnotmine Hal0 Htp Hpos Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock Hcpu Hnoff Hint Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hlock Hcpu Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
     iPoseProof (aqi_02 with "Htext") as "Hi02".
     iPoseProof (aqi_04 with "Htext") as "Hi04".
@@ -266,14 +266,13 @@ Section WpSconfAcquire.
       rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       exact HcspA0. }
-    iApply (PushOff.wp_push_off_sconf γ Φ A3 (av - 4)%nat noffv intena_old cpuv n
+    iApply (PushOff.wp_push_off_sconf γ Φ A3 (av - 4)%nat n eb p C
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
-              ltac:(rewrite HtpA3; reflexivity)
+              ltac:(rewrite HtpA3; exact Htp)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hnoff] [Hint] [-]").
-    { iExact "Hnoff". }
-    { iExact "Hint". }
-    iIntros (ms mp) "%Hmsf Hcg Hpc %Hmp Hnoff Hint Hcnt".
+              ltac:(lia)
+              with "Hcg Hown Htext Hpc [-]").
+    iIntros (ms mp) "%Hmsf Hcg Hown Hpay Hpc %Hmp".
     destruct Hmp as (Hcspp & Htpp & Hs0p & Hs1p & Hs2p & Hs3p & Hs4p & Hs5p & Hs6p & Hs7p & Hs8p & Hs9p & Hs10p & Hs11p).
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc10 : update_vec_dec (add_vec (add_vec_int (mword_of_int (AQ + 0x0c) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
@@ -398,28 +397,28 @@ Section WpSconfAcquire.
               ltac:(rewrite upd_eq; vm_compute; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc Hi24 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
-    set (C := mo).
+    set (Cm := mo).
     destruct Hmo as [Hcso Hmo_a0].
     destruct Hcso as (Hcspo & Htpo & Hs0o & Hs1o & Hs2o & Hs3o & Hs4o & Hs5o & Hs6o & Hs7o & Hs8o & Hs9o & Hs10o & Hs11o).
     assert (HtpB8 : B8 !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)).
     { rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Htph. exact HtpB2. }
-    assert (Ha0C : C !!! Regidx (mword_of_int 10 : mword 5) = cpuv)
-      by (rewrite /C Hmo_a0 HtpB8; reflexivity).
+    assert (Ha0C : Cm !!! Regidx (mword_of_int 10 : mword 5) = cpuv)
+      by (rewrite /Cm Hmo_a0 HtpB8; reflexivity).
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc28 : update_vec_dec (add_vec (add_vec_int (mword_of_int (AQ + 0x24) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (AQ + 0x28) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
     (* ---- 0x28: c.sd a0,16(s1) : lk->cpu := mycpu ---- *)
-    assert (Hs1C : C !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk0).
-    { rewrite /C Hs1o /B8 upd_ne; [| vm_compute; discriminate].
+    assert (Hs1C : Cm !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk0).
+    { rewrite /Cm Hs1o /B8 upd_ne; [| vm_compute; discriminate].
       exact HB3s1. }
-    assert (Hpacpu : add_vec (C !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu).
+    assert (Hpacpu : add_vec (Cm !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu).
     { rewrite Hs1C aq_addv_zero_l. reflexivity. }
     iPoseProof (aqi_28 with "Htext") as "Hi28".
     iApply (wp_csd_s_sconf γ Φ (mword_of_int (AQ + 0x28)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) C (av - 4)%nat cpuold
+              (mword_of_int 16 : mword 12) Cm (av - 4)%nat cpuold
               with "Hcg Hpc Hi28 [Hcpu] [-]").
     { iEval (rewrite Hpacpu). iExact "Hcpu". }
     iIntros "Hcg Hpc Hcpu".
@@ -427,7 +426,7 @@ Section WpSconfAcquire.
     assert (Hpc2a : add_vec_int (mword_of_int (AQ + 0x28) : mword 64) 2 = mword_of_int (AQ + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)
-    assert (HcspC : C !!! Regidx csp_rs1 = spd) by (rewrite /C Hcspo; exact HcspB8).
+    assert (HcspC : Cm !!! Regidx csp_rs1 = spd) by (rewrite /Cm Hcspo; exact HcspB8).
     assert (HraA0 : A0 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
       by (rewrite /A0 upd_ne; [reflexivity | vm_compute; discriminate]).
     assert (Hs0A0 : A0 !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5))
@@ -439,13 +438,13 @@ Section WpSconfAcquire.
     iEval (rewrite HcspA0 Hs1A0) in "Hr8".
     iPoseProof (aqi_2a with "Htext") as "Hi2a".
     iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (AQ + 0x2a)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
-              C (av - 4)%nat (m !!! Regidx (mword_of_int 1 : mword 5))
+              Cm (av - 4)%nat (m !!! Regidx (mword_of_int 1 : mword 5))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2a [Hr24] [-]").
     { iEval (rewrite HcspC). iExact "Hr24". }
     iIntros "Hcg Hpc Hr24".
-    set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> C).
-    change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> C) with E1.
+    set (E1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> Cm).
+    change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> Cm) with E1.
     assert (Hpc2c : add_vec_int (mword_of_int (AQ + 0x2a) : mword 64) 2 = mword_of_int (AQ + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
     assert (HcspE1 : E1 !!! Regidx csp_rs1 = spd)
@@ -526,14 +525,14 @@ Section WpSconfAcquire.
     assert (Hra_final : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! ms E4 with "[%] Hcg Hpc [%] Htok HRes Hcpu Hnoff Hint Hcnt").
+    iApply ("Hcont" $! ms E4 with "[%] Hcg Hpc [%] Htok HRes Hcpu Hown Hpay").
     { exact Hmsf. }
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Htpo. exact HtpB8.
+      rewrite /Cm Htpo. exact HtpB8.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs2o.
+      rewrite /Cm Hs2o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs2h.
@@ -545,7 +544,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs3o.
+      rewrite /Cm Hs3o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs3h.
@@ -557,7 +556,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs4o.
+      rewrite /Cm Hs4o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs4h.
@@ -569,7 +568,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs5o.
+      rewrite /Cm Hs5o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs5h.
@@ -581,7 +580,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs6o.
+      rewrite /Cm Hs6o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs6h.
@@ -593,7 +592,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs7o.
+      rewrite /Cm Hs7o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs7h.
@@ -605,7 +604,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs8o.
+      rewrite /Cm Hs8o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs8h.
@@ -617,7 +616,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs9o.
+      rewrite /Cm Hs9o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs9h.
@@ -629,7 +628,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs10o.
+      rewrite /Cm Hs10o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs10h.
@@ -641,7 +640,7 @@ Section WpSconfAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /C Hs11o.
+      rewrite /Cm Hs11o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs11h.

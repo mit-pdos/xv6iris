@@ -14,6 +14,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import ProcGeom SwtchCtx CpuOwn.
 Require Import WpIntenaBits WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -22,73 +23,66 @@ Notation PO := KernelSyms.push_off.
 Notation PP := KernelSyms.pop_off.
 
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
-     unbundled mstatus0; the statement stays mstatus0-free. *)
-  let noff_a5 := sign_extend' 64 (subrange_vec_dec
-      (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0) in
-  let noff_store := (autocast (T := mword) (subrange_vec_dec noff_a5 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-  let a_noff := add_vec a0f (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-  let a_intena := add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)) in
+     unbundled mstatus0; the statement stays mstatus0-free.  The noff/intena
+     cells and the counting token ride inside [cpu_own]: the noff cell IS the
+     level [n], the intena cell records [eb] once n ≥ 1, so no cell arguments
+     and no level-mirror premises appear here. *)
   let caller_ret := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   eq_vec (access_vec_dec caller_ret 0) ('b"0") = true ->
-  mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) = a0f ->
+  (* the tp register holds THIS cpu's id (the chain-wide convention) *)
+  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* the noff increment stays in int range *)
+  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (6 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ n -∗
+  cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.push_off + 0x00) : mword 64) -∗
-  a_noff ↦₄ noff -∗
-  a_intena ↦₄ intena_old -∗
   ( ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
     sie_cap_gpr γ mfin av -∗
+    cpu_own γ (S n) eb p C -∗
+    trap_csrs_pay n eb -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
-    a_noff ↦₄ noff_store -∗
-    a_intena ↦₄ (if eq_vec (sign_extend' 64 noff) zero_reg
-                 then po_intena_val ms else intena_old) -∗
-    intr_count γ (S n) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) (dqi : dfrac) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
-  let a0v := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_noff := add_vec a0v (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-  let a_int := add_vec a0v (sign_extend' 64 (mword_of_int 124 : mword 12)) in
-  let nv1 := sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noffv) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
-  let storeval := (autocast (T := mword) (subrange_vec_dec nv1 (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
-  (* the counting token's level mirrors the noff cell: the machine
-     branch [noff-1 == 0] holds iff we are popping to level 0. *)
-  (neq_vec nv1 zero_reg = false <-> n = 0%nat) ->
-  zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false ->
+  (* both panic checks (intr_get(), noff < 1) and the noff-1 == 0 branch are
+     facts of [cpu_own]: the level is S n > 0, SIE is pinned '0' by the count
+     eighth, and the final pop's re-enable branch reads intena = [eb]. *)
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (4 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ (S n) -∗
+  cpu_own γ (S n) eb p C -∗
+  trap_csrs_pay n eb -∗
   kernel_text -∗ pc_is pcE -∗
-  a_noff ↦₄ noffv -∗
-  a_int ↦₄{ dqi } intenav -∗
   ( ∀ mf,
     sie_cap_gpr γ mf av -∗
-    intr_count γ n -∗
+    cpu_own γ n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mf ⌝ -∗
-    a_noff ↦₄ storeval -∗
-    a_int ↦₄{ dqi } intenav -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noff intena_old : mword 32) (a0f : mword 64) (n : nat),
-      wp_push_off_sconf_body γ Φ m av noff intena_old a0f n.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
+      wp_push_off_sconf_body γ Φ m av n eb p C.
   Parameter wp_pop_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat) (noffv intenav : mword 32) (n : nat) {dqi : dfrac},
-      wp_pop_off_sconf_body γ Φ m av noffv intenav n dqi.
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
+      wp_pop_off_sconf_body γ Φ m av n eb p C.
 End PUSHOFF.

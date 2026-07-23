@@ -62,26 +62,6 @@ Proof.
   rewrite HAB. apply kv_addv_zero.
 Qed.
 
-(* acquire's push_off increments the (entry-0) noff cell to 1.  LHS is
-   SpecAcquire's [po_noff_store] with [noffv := 0], written out. *)
-Lemma rsl_noff_acq0 :
-  (autocast (T := mword) (subrange_vec_dec
-     (sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 (mword_of_int 0 : mword 32))
-                 (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
-     (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = (mword_of_int 1 : mword 32).
-Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* release's pop_off decrements the (1) noff cell back to 0.  LHS is
-   SpecRelease's [storeval_noff] with [noffv := 1], written out. *)
-Lemma rsl_noff_rel1 :
-  (autocast (T := mword) (subrange_vec_dec
-     (sign_extend' 64 (subrange_vec_dec
-        (add_vec (sign_extend' 64 (mword_of_int 1 : mword 32))
-                 (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
-     (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = (mword_of_int 0 : mword 32).
-Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-
 Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (WakeupLoop : WAKEUPLOOP) : RELEASESLEEP.
 
 Section WpSconfReleasesleep.
@@ -91,8 +71,8 @@ Section WpSconfReleasesleep.
   Lemma wp_releasesleep_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat)
-    : wp_releasesleep_sconf_body γ Φ γs γl γsl s R m pd pme av.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ)
+    : wp_releasesleep_sconf_body γ Φ γs γl γsl s R m pd pme av eb C.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Htp Hretm Hav.
@@ -100,9 +80,8 @@ Section WpSconfReleasesleep.
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : eq_vec (zero_reg : mword 64) (mycpu_ret cid_word) = false)
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
-    iIntros "Hcg Hcnt #Htext Hpc #Hslp Hslk Hpid HRcaller Hcpu Hnoff Hint Hlockcells Hcur #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HRcaller Hcpu Hlockcells #Hpinv Hcont".
     iDestruct (is_sleeplock_lock with "Hslp") as "#Hlockinv".
-    iDestruct "Hint" as (iv0) "Hint".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
     iPoseProof (rsl_00 with "Htext") as "Hi00".
@@ -244,25 +223,22 @@ Section WpSconfReleasesleep.
       exact HA_s2_s2. }
     (* ===== acquire(&slk->lk): intr_count 0 -> 1, returns sl_res + locked ===== *)
     iApply (Acquire.wp_acquire_sconf γ Φ γl "sleep lock"%string (sl_res γsl slk R) Kacq
-              (zero_reg : mword 64) (mword_of_int 0 : mword 32) iv0 0%nat (av - 4)%nat
+              (zero_reg : mword 64) 0%nat eb pme C (av - 4)%nat
               ltac:(rewrite HKacqtp; exact Hcpune)
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
+              HKacqtp
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [] [Hcpu] [Hnoff] [Hint] [-]").
+              ltac:(lia)
+              with "Hcg Hown Htext Hpc [] [Hcpu] [-]").
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
     { iEval (rewrite HKacqa0). iExact "Hcpu". }
-    { iEval (rewrite HKacqtp). iExact "Hnoff". }
-    { iEval (rewrite HKacqtp). iExact "Hint". }
-    iIntros (ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hcpu2 Hnoff2 Hint2 Hcnt".
+    iIntros (ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hcpu2 Hown Hpay".
     assert (Hpc18 : update_vec_dec (add_vec (Kacq !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (RSL + 0x18)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
-    (* normalise the acquire-returned per-cpu cells (address to [cpuv]-anchored,
-       value to the literals). *)
+    (* normalise the acquire-returned lock cpu word (address to sl_lkcpu). *)
     iEval (rewrite HKacqa0) in "Hcpu2". iEval (rewrite HKacqtp) in "Hcpu2".
-    iEval (rewrite HKacqtp) in "Hnoff2". iEval (rewrite rsl_noff_acq0) in "Hnoff2".
-    iEval (rewrite HKacqtp) in "Hint2".
     (* s1 preserved by acquire (callee_saved). *)
     assert (HMacqs1 : Macq !!! Regidx (mword_of_int 9 : mword 5) = slk).
     { rewrite (callee_saved_lookup Hpins (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact HKacqs1. }
@@ -315,28 +291,21 @@ Section WpSconfReleasesleep.
       rewrite (callee_saved_lookup Hpins (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HKacqtp. }
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
-    iApply (WakeupLoop.wp_wakeup_sconf γ Φ Cwk γs (mycpu_ret cid_word) pme (mword_of_int 1 : mword 32) 1%nat (av - 4)%nat
+    iApply (WakeupLoop.wp_wakeup_sconf γ Φ Cwk γs (mycpu_ret cid_word) pme 1%nat (av - 4)%nat eb C
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
               HCwktp
               ltac:(rewrite HCwktp; reflexivity)
               ltac:(rewrite HCwktp; exact Hcpune)
-              ltac:(vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(split; [intro Hh; exfalso; vm_compute in Hh; discriminate | intro Hh; discriminate])
-              ltac:(split; [intro Hh; exfalso; vm_compute in Hh; discriminate | intro Hh; discriminate])
-              ltac:(vm_compute; reflexivity)
+              ltac:(lia)
               ltac:(rewrite HCwkra; vm_compute; reflexivity)
-              with "Hcg Hcnt Htext Hpc [Hnoff2] [Hint2] Hlockcells Hcur Hpinv [-]").
-    { iExact "Hnoff2". }
-    { iExists _. iExact "Hint2". }
-    iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hcnt Htext2 Hpc Hnoff3 Hint3 Hlockcells Hcur".
+              with "Hcg Hown Htext Hpc Hlockcells Hpinv [-]").
+    iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hown Htext2 Hpc Hlockcells".
     assert (Hpc26 : update_vec_dec (add_vec (Cwk !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (RSL + 0x26)).
     { rewrite HCwkra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc26) in "Hpc".
-    iDestruct "Hint3" as (iv3) "Hint3".
     assert (HMwks2 : Mwk !!! Regidx (mword_of_int 18 : mword 5) = sl_lk slk).
     { rewrite (callee_saved_lookup Hwkcs (mword_of_int 18 : mword 5) ltac:(vm_compute; reflexivity)).
       rewrite /Cwk upd_ne; [| vm_compute; discriminate].
@@ -387,27 +356,22 @@ Section WpSconfReleasesleep.
     iDestruct (sl_res_close_free γsl slk R with "Hslkw Hslk Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γ Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
-              (mycpu_ret cid_word) (mword_of_int 1 : mword 32) iv3 0%nat (av - 4)%nat (dqi:=DfracOwn 1)
+              (mycpu_ret cid_word) 0%nat eb pme C (av - 4)%nat
               ltac:(rewrite HKrela0; apply wk_add_vec_0)
               ltac:(rewrite HKreltp; apply wk_eq_vec_refl)
-              ltac:(split; [intro Hh; reflexivity | intro Hh; vm_compute; reflexivity])
-              ltac:(vm_compute; reflexivity)
               ltac:(rewrite HKrelra; vm_compute; reflexivity)
+              HKreltp
               ltac:(lia)
-              with "Hcg Htext Hpc [] HtokL HRsl [Hcpu2] [Hnoff3] [Hint3] Hcnt [-]").
+              with "Hcg Htext Hpc [] HtokL HRsl [Hcpu2] Hown Hpay [-]").
     { iExact "Hlockinv". }
     { iEval (rewrite HKrela0). iExact "Hcpu2". }
-    { iEval (rewrite HKreltp). iExact "Hnoff3". }
-    { iEval (rewrite HKreltp). iExact "Hint3". }
-    iIntros (Mrel) "Hcg Hpc %Hrelcs Hcpu3 Hnoff4 Hint4 Hcnt".
+    iIntros (Mrel) "Hcg Hpc %Hrelcs Hcpu3 Hown".
     assert (Hpc2c : update_vec_dec (add_vec (Krel !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (RSL + 0x2c)).
     { rewrite HKrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc2c) in "Hpc".
-    (* normalise release-returned cells for the continuation. *)
+    (* normalise release-returned lock cpu word for the continuation. *)
     iEval (rewrite HKrela0) in "Hcpu3".
-    iEval (rewrite HKreltp) in "Hnoff4". iEval (rewrite rsl_noff_rel1) in "Hnoff4".
-    iEval (rewrite HKreltp) in "Hint4".
     assert (HspMrel : Mrel !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hrelcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HKrelsp. }
     (* ===== EPILOGUE: restore ra/s0/s1/s2, pop frame, ret ===== *)
@@ -506,10 +470,8 @@ Section WpSconfReleasesleep.
     assert (Hretf : update_vec_dec (add_vec (Q34 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HQ34ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q34 with "[%] Hcg Hcnt Hpc [Hcpu3] [Hnoff4] [Hint4] Hlockcells Hcur").
+    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc [Hcpu3] Hlockcells").
     2:{ iExact "Hcpu3". }
-    2:{ iExact "Hnoff4". }
-    2:{ iExists _. iExact "Hint4". }
     (* callee_saved m Q34 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->

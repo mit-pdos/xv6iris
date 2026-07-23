@@ -143,30 +143,21 @@ statement) closed by `exact (<generic> (kpt_regime root_ppn) <explicit
 binders>)` — NEVER a Definition (an implicit `dq` would become positional and
 churn every call site).
 
-STAGE (d) — SUPERSEDED by the sie_cap_gpr refactor (design/interrupts.md):
-whole-function specs no longer name ANY translation invariant — they thread the
-bundle `sie_cap_gpr γ m n`, whose translation slot `strans_inv := ∃ root,
-tlb_inv_pt root` (IntrDefs.v) is opened at a skolem root only inside engines
-and data/device leaves.  The old plan (flip statements from `tlb_inv_pt
-root_ppn` to `sr_inv R`) is therefore dead: statements are already
-regime-OBLIVIOUS.  What remains to open the Bare boot path is localized in the
-engine tier, not the spec tier:
-
-  1. `strans_inv` grows the disjunct: `bare_inv ∨ ∃ root, tlb_inv_pt root`.
-  2. The funnel `wp_instr_s_sconf`'s '0' arm dispatches per disjunct to
-     `wp_instr_s_config_regime` at `bare_regime` / `kpt_regime root` (both
-     instances proven); the sconf DATA/device leaves' internals likewise
-     dispatch (their regime-generic `_r` underpinnings already exist).
-  3. The '1' arm (interrupts enabled) needs the kpt disjunct.  Two options:
-     (a) refute Bare at SIE=1 (xv6 never enables S-interrupts before
-     kvminithart) via a one-shot token parked in `bare_inv`; or (b) — nicer,
-     ghost-free — make `intr_frame` carry `strans_inv` instead of
-     `tlb_inv_pt root` and prove `kernelvec_handler_spec` regime-generically
-     (kernelvec under Bare is identity translation), making enabled execution
-     legal in either regime.  Decide when building it.
-  4. KvmSpec.v's `Variable R : s_regime` threading of `sr_inv R` may become
-     redundant once the slot is a disjunction (the walk/mappages/kvmmap proofs
-     are sconf-tier and reach translation through the slot) — revisit then.
+STAGE (d) — DONE, absorbed into the strans_regime/Bare work
+(design/interrupts.md): whole-function specs are regime-OBLIVIOUS (they
+thread sie_cap_gpr, whose translation slot is the Bare∨KPT disjunction
+consumed foldedly through the derived instance [strans_regime : s_regime]),
+and the funnel + every sconf leaf dispatches through it — the sconf tier
+holds at Bare, so the kvm chain (and memset, the lock/kalloc cone at
+[cpu_own γ n false p C]) is callable during early boot.  What remains of
+the old item:
+  - the '1' SIE arm still requires the KPT disjunct (intr_frame carries
+    tlb_inv_pt; Bare ∧ '1' is refuted by the Bare arm's stvec cell against
+    intr_inv's) — making intr_frame carry the slot and proving kernelvec
+    regime-generically stays a possible later cleanup, not a blocker;
+  - KvmSpec.v's Variable R : s_regime threading of [sr_inv R] is now
+    redundant at the whole-function altitude (the chain reaches translation
+    through the slot) — collapse it at the next KvmSpec touch.
 
 Gotcha: WpSmodePtUart stays kpt-specific — its DEV absorption needs kpt-shaped
 premises; a Bare device access (uartinit/printf during boot) instead needs a

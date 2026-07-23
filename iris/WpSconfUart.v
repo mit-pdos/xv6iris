@@ -6,10 +6,11 @@
    callback's own step (devN is disjoint from minstretN AND intrN, so
    the open is arm-blind), the caller does its uart ghost step through
    the accessor wand while the invariant is open, and the translate side
-   runs through the regime machinery instantiated at [kpt_regime]
-   ([sr_inv (kpt_regime root_ppn)] IS [tlb_inv_pt root_ppn]
-   definitionally, so the bundle's invariant threads straight through
-   [sr_transform]/[sr_absorb_dev]).  The store leaf carries no rd
+   runs REGIME-BLIND through the derived regime instance [strans_regime]
+   ([sr_inv strans_regime] IS the folded translation slot [strans_inv]
+   definitionally, so the bundle's invariant [Htr] threads straight
+   through [sr_transform]/[sr_absorb_dev] with no skolem-root open or
+   repack).  The store leaf carries no rd
    premises and no retarget; the load leaf takes [rd <> csp_rs1] and
    retargets the capability like every gpr-writing sconf leaf.          *)
 From Stdlib Require Import ZArith Bool Lia List.
@@ -61,7 +62,6 @@ Context `{CID : CpuId}.
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-  iDestruct "Htr" as (root_ppn) "Htlbinv".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
@@ -101,7 +101,7 @@ Context `{CID : CpuId}.
   assert (Lmenv_pc' : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S) by (rewrite Lmenv_pc; exact Hmenvval0).
   assert (LSXL_pc : _get_Mstatus_SXL (register_lookup mstatus s_pc.(sregs)) = 'b"10") by (rewrite Lms_pc; exact HSXL).
   assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs))) by (rewrite Lpma_pc; exact Hpma_all).
-  iDestruct (sr_transform (kpt_regime root_ppn) (Store Data)
+  iDestruct (sr_transform strans_regime (Store Data)
                (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                         (sign_extend' 64 imm))
@@ -110,15 +110,15 @@ Context `{CID : CpuId}.
                   ltac:(rewrite Lms_pc; exact HMPRV))
                (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                   ltac:(rewrite Lmenv_pc; exact Hpmm))
-               with "Hreg Htlbinv") as %Htea.
-  iMod (sr_absorb_dev (kpt_regime root_ppn) (Store Data) a8 s_pc
+               with "Hreg Htr") as %Htea.
+  iMod (sr_absorb_dev strans_regime (Store Data) a8 s_pc
           (or_intror eq_refl) Hdevvpn Hcanon Hident_pt
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_store s_pc)
-          Lpma_pc' with "Hreg Hmem Htlbinv")
-    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+          Lpma_pc' with "Hreg Hmem Htr")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
   assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -174,8 +174,8 @@ Context `{CID : CpuId}.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
-  { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] HS").
 Qed.
@@ -208,7 +208,6 @@ Qed.
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-  iDestruct "Htr" as (root_ppn) "Htlbinv".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
@@ -245,7 +244,7 @@ Qed.
   assert (Lmenv_pc' : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S) by (rewrite Lmenv_pc; exact Hmenvval0).
   assert (LSXL_pc : _get_Mstatus_SXL (register_lookup mstatus s_pc.(sregs)) = 'b"10") by (rewrite Lms_pc; exact HSXL).
   assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs))) by (rewrite Lpma_pc; exact Hpma_all).
-  iDestruct (sr_transform (kpt_regime root_ppn) (Store Data)
+  iDestruct (sr_transform strans_regime (Store Data)
                (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                         (sign_extend' 64 imm))
@@ -254,15 +253,15 @@ Qed.
                   ltac:(rewrite Lms_pc; exact HMPRV))
                (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                   ltac:(rewrite Lmenv_pc; exact Hpmm))
-               with "Hreg Htlbinv") as %Htea.
-  iMod (sr_absorb_dev (kpt_regime root_ppn) (Store Data) a8 s_pc
+               with "Hreg Htr") as %Htea.
+  iMod (sr_absorb_dev strans_regime (Store Data) a8 s_pc
           (or_intror eq_refl) Hdevvpn Hcanon Hident_pt
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_store s_pc)
-          Lpma_pc' with "Hreg Hmem Htlbinv")
-    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+          Lpma_pc' with "Hreg Hmem Htr")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
   assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -315,8 +314,8 @@ Qed.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
-  { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] Huf'").
 Qed.
@@ -343,7 +342,6 @@ Qed.
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-  iDestruct "Htr" as (root_ppn) "Htlbinv".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
@@ -380,7 +378,7 @@ Qed.
   assert (Lmenv_pc' : register_lookup menvcfg s_pc.(sregs) = MENVCFG_S) by (rewrite Lmenv_pc; exact Hmenvval0).
   assert (LSXL_pc : _get_Mstatus_SXL (register_lookup mstatus s_pc.(sregs)) = 'b"10") by (rewrite Lms_pc; exact HSXL).
   assert (Lpma_pc' : pma_allows_all (register_lookup pma_regions s_pc.(sregs))) by (rewrite Lpma_pc; exact Hpma_all).
-  iDestruct (sr_transform (kpt_regime root_ppn) (Load Data)
+  iDestruct (sr_transform strans_regime (Load Data)
                (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                         (sign_extend' 64 imm))
@@ -389,15 +387,15 @@ Qed.
                   ltac:(rewrite Lms_pc; exact HMPRV))
                (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                   ltac:(rewrite Lmenv_pc; exact Hpmm))
-               with "Hreg Htlbinv") as %Htea.
-  iMod (sr_absorb_dev (kpt_regime root_ppn) (Load Data) a8 s_pc
+               with "Hreg Htr") as %Htea.
+  iMod (sr_absorb_dev strans_regime (Load Data) a8 s_pc
           (or_introl eq_refl) Hdevvpn Hcanon Hident_pt
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_load s_pc)
-          Lpma_pc' with "Hreg Hmem Htlbinv")
-    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+          Lpma_pc' with "Hreg Hmem Htr")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
   assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -462,8 +460,8 @@ Qed.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htlbinv Harm]" as "Hcap".
-  { rewrite /sie_cap /strans_inv. iFrame "Hstk Harm". iExists root_ppn. iExact "Htlbinv". }
+  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_retarget γ m
                (<[Regidx rd := regval_into_reg (ldval b)]> m) n Hsp with "Hcap") as "Hcap".
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".

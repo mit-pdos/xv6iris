@@ -43,16 +43,16 @@ Section WpSconfKinit.
 
   Lemma wp_kinit_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat)
+      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ)
       (vlock : bv 32) (vname vcpu : bv 64)
-    : wp_kinit_sconf_body γ Φ m ps K ncnt vlock vname vcpu.
+    : wp_kinit_sconf_body γ Φ m ps K ncnt eb pcur C vlock vname vcpu.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
-    intros pcE ret_tgt cpuv a_noff a_int lk fl c_name c_cpu endaddr phystop s1entry
-      HK Hncnt Hmycpu Hretm Hprun.
+    intros pcE ret_tgt cpuv lk fl c_name c_cpu endaddr phystop s1entry
+      HK Hncnt Hmycpu Hretm Htp Hprun.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hqnoff Hqint Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
     assert (Hkmem : forall j b, cstring_bytes "kmem"%string !! j = Some b ->
                       KernelData.kernel_data !! (0x80007040 + Z.of_nat j)%Z = Some b).
@@ -310,20 +310,17 @@ Section WpSconfKinit.
     assert (HR12ra : R12 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KI + 0x28) : mword 64) 4)
       by (rewrite /R12; apply upd_eq).
     (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads the count *)
-    iApply (Freerange.wp_freerange_sconf γ Φ γl γk lk fl R12 ps (K - 2) ncnt
+    iApply (Freerange.wp_freerange_sconf γ Φ γl γk lk fl R12 ps (K - 2) ncnt eb pcur C
               ltac:(lia) Hncnt
               ltac:(rewrite HR12tp; exact Hmycpu)
               ltac:(rewrite HR12ra; vm_compute; reflexivity)
+              ltac:(rewrite HR12tp; exact Htp)
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun)
-              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hqnoff] [Hqint] [Hcpu] [Havail] [-]").
-    { iEval (rewrite HR12tp). iExact "Hqnoff". }
-    { iEval (rewrite HR12tp). iExact "Hqint". }
+              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hcpu] [Havail] [-]").
     { iExact "Hcpu". }
     { iExact "Havail". }
-    iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Hqnoff Hqint Hqcpu Havail".
-    iEval (rewrite HR12tp) in "Hqnoff".
-    iEval (rewrite HR12tp) in "Hqint".
+    iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Hqcpu Havail".
     assert (Hpcfr : update_vec_dec (add_vec (R12 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KI + 0x2c)).
     { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcfr) in "Hpc".
@@ -394,7 +391,7 @@ Section WpSconfKinit.
     assert (Hretf : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail Hqnoff Hqint Hqcpu").
+    iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail Hqcpu").
     (* callee_saved m E3: the two sub-calls preserve s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

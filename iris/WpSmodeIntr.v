@@ -225,7 +225,6 @@ Section WpSmodeIntr.
     iIntros "Hcg Hpc Hinstr H".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-    iDestruct "Htr" as (root_ppn) "Htlbinv".
     iDestruct "Harm" as "[Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]".
     - (* ---- quarter-'0': the dispatch-None engine, SIE=0 from ghost ---- *)
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -238,13 +237,13 @@ Section WpSmodeIntr.
       iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
       iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
       iDestruct "Hpc" as "[Hpcr Hnpc]".
-      iApply (wp_instr_s_config_tlbinv_pt root_ppn Φ pc is_rvc i
+      iApply (wp_instr_s_config_regime strans_regime Φ pc is_rvc i
                 ms mie_v mdv0 menvcfg0 (dq := DfracOwn 1)
                 HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-                with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpcr Hinstr").
-      iIntros (σ Hpceq) "Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsi".
+                with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpcr Hinstr").
+      iIntros (σ Hpceq) "Hpriv Hms Hmie Hmdl Hmenv Htr Hsi".
       iMod ("H" $! σ Hpceq
-              with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv] [Hstk Htlbinv Hq0] Hfile Hnpc Hsi")
+              with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv] [Hstk Htr Hq0] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iFrame "Hhw Hminv Hpriv".
         iSplitL "Hms Hhalf".
@@ -253,18 +252,25 @@ Section WpSmodeIntr.
         { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      { iFrame "Hstk".
-        iSplitL "Htlbinv". { iExists root_ppn. iExact "Htlbinv". }
-        iLeft. iExact "Hq0". }
+      { iFrame "Hstk". iFrame "Htr". iLeft. iExact "Hq0". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".
     - (* ---- quarter-'1': the interrupt-absorbing engine ---- *)
       (* split the exact reserved carve off for [intr_frame]; the deep
          [n] available slots ride framed through the absorbing engine *)
+      iDestruct "Hhx" as (handler) "#Hintr".
+      (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
+         inside its invariant, and the Bare slot owns the same cell. *)
+      iDestruct "Htr" as "[[Hbare Hbstv] | Hkpt]".
+      { iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
+        iApply fupd_wp.
+        iInv "Hinv_i" as (b) "(>Hq & >Hstv & Hspec)" "Hclose".
+        iDestruct "Hbstv" as (v0) "Hbstv".
+        iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
+      iDestruct "Hkpt" as (root_ppn) "Htlbinv".
       iEval (rewrite stack_own_app) in "Hstk".
       iDestruct "Hstk" as "[Hstk Hdeep]".
-      iDestruct "Hhx" as (handler) "#Hintr".
       iAssert (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝)%I as %Hal2.
       { iDestruct "Hinstr" as "[%Hnlpad Hr]".
         iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
@@ -287,7 +293,7 @@ Section WpSmodeIntr.
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
-        iSplitL "Htlbinv". { iExists root_ppn. iExact "Htlbinv". }
+        iSplitL "Htlbinv". { iRight. iExists root_ppn. iExact "Htlbinv". }
         iRight. iFrame "Hq1 Hsepcx Hscausex Hstvalx".
         iExists handler. iExact "Hintr". }
       iModIntro. iExists s_exec.

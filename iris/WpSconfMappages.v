@@ -20,6 +20,7 @@ Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
+Require Import ProcGeom SwtchCtx CpuOwn.
 Require Import VcGen.
 Require Import KallocInv.
 Require Import PtTree.
@@ -79,7 +80,8 @@ Section WpSconfMappages.
   Lemma wp_mappages_epilogue_sconf (γ : gname) (γa : gname)
       (Φ : mval -> iProp Σ)
       (mm Mf : regfile) (t tf : ptree)
-      (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat) :
+      (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
     let ppn0 := (autocast (T := mword) (subrange_vec_dec (mm !!! Regidx (mword_of_int 13)) 55 12) : mword 44) in
@@ -97,7 +99,7 @@ Section WpSconfMappages.
     pt_rep0 tf (pt_insert_run m vpn0 ppn0 perm k) ->
     ((k = npages /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
      \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1))) ->
-    sie_cap_gpr γ Mf (K - 10)%nat -∗ intr_count γ lvl -∗
+    sie_cap_gpr γ Mf (K - 10)%nat -∗ cpu_own γ lvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (MP + 0x9c)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -113,7 +115,7 @@ Section WpSconfMappages.
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (k' : nat),
-      sie_cap_gpr γ mr K -∗ intr_count γ lvl -∗
+      sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
@@ -390,6 +392,7 @@ Section WpSconfMappages.
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ)
       (rem : nat) :
     forall (k : nat) (Mk : regfile) (tk : ptree),
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -428,7 +431,8 @@ Section WpSconfMappages.
     Mk !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     pt_base tk = pt_base t ->
     pt_rep0 tk (pt_insert_run m vpn0 ppn0 perm k) ->
-    sie_cap_gpr γ Mk (K - 10)%nat -∗ intr_count γ lvl -∗
+    mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+    sie_cap_gpr γ Mk (K - 10)%nat -∗ cpu_own γ lvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (MP + 0x3e)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -444,7 +448,7 @@ Section WpSconfMappages.
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (k' : nat),
-      sie_cap_gpr γ mr K -∗ intr_count γ lvl -∗
+      sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (mm !!! Regidx (mword_of_int 4)) -∗
@@ -459,7 +463,7 @@ Section WpSconfMappages.
   Proof.
     induction rem as [| rem' IH]; intros k Mk tk va pa vpn0 ppn0 sp0 spr ret_tgt
       Hlvl HK Hkrem Hrem Hroot Hvaal Hpaal Hpermreg Hpok Hvab Hpab Hnone
-      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep;
+      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hcid;
       [lia |].
     iIntros "Hcg Hcnt #Htext Hpc
              Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -560,11 +564,12 @@ Section WpSconfMappages.
     assert (Hvpnk : svpn_of (add_vec va (mword_of_int (4096 * Z.of_nat k))) = vpn_at vpn0 k)
       by (apply svpn_of_run; lia).
     (* the walk call *)
-    iApply (Walk.wp_walk_sconf γ γa Φ W4 tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl
+    iApply (Walk.wp_walk_sconf γ γa Φ W4 tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p C
               Hlvl ltac:(lia)
               HW4a0 HW4a2
               ltac:(rewrite HW4a1; rewrite uint_unsigned; rewrite Hvak_u; lia)
               Hrep
+              ltac:(rewrite HW4tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HW4tp). iExact "Henv". }
     iIntros (mr t') "Hcg Hcnt Hpc Hptree Henv %Hkcs %Hsame %Hpay".
@@ -681,7 +686,7 @@ Section WpSconfMappages.
           (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> mr).
       assert (Hpp9c : add_vec_int (mword_of_int (MP + 0x9a) : mword 64) 2 = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp9c) in "Hpc".
-      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t t' m npages k perm K lvl HK
+      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t t' m npages k perm K lvl eb p C HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrsp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrtp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr24)
@@ -908,7 +913,7 @@ Section WpSconfMappages.
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
               = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt9c) in "Hpc".
-      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t tS m npages (S k) perm K lvl HK
+      iApply (wp_mappages_epilogue_sconf γ γa Φ mm F1 t tS m npages (S k) perm K lvl eb p C HK
                 ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
                       repeat (rewrite upd_ne; [| reg_neq]); exact Hmrsp)
                 ltac:(rewrite /F1 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
@@ -1006,7 +1011,7 @@ Section WpSconfMappages.
                     repeat (rewrite upd_ne; [| reg_neq]); exact Hmr26)
               ltac:(rewrite /M12 /M11 /M10 /M9 /M8 /M7 /M6 /M5;
                     repeat (rewrite upd_ne; [| reg_neq]); exact Hmr27)
-              HbaseS HrepS
+              HbaseS HrepS Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
                     Hptree Henv Hcont").
@@ -1017,11 +1022,12 @@ Section WpSconfMappages.
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-    : wp_mappages_sconf_body γ γa Φ mm t m npages perm lvl K.
+      (eb : bool) (p : mword 64) (C : iProp Σ)
+    : wp_mappages_sconf_body γ γa Φ mm t m npages perm lvl K eb p C.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
-      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone.
+      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hcid.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -1401,7 +1407,7 @@ Section WpSconfMappages.
       repeat (rewrite upd_ne; [| reg_neq]).
       rewrite add_vec_zero_l.
       rewrite mappages_va0. reflexivity. }
-    iApply (wp_mappages_loop_sconf γ γa Φ mm t m npages perm K lvl npages 0%nat P13 t
+    iApply (wp_mappages_loop_sconf γ γa Φ mm t m npages perm K lvl eb p C npages 0%nat P13 t
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone
@@ -1437,7 +1443,7 @@ Section WpSconfMappages.
               ltac:(peel_reg)
               ltac:(peel_reg)
               ltac:(peel_reg)
-              eq_refl Hrep
+              eq_refl Hrep Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 [S10]
                     Hptree Henv Hcont").

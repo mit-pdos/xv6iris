@@ -32,6 +32,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
+Require Import SwtchCtx CpuOwn.
 Require Import SchedCtx.
 Require Import WpWakeup.
 Require Import SleepLock.
@@ -45,7 +46,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) :=
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -55,7 +56,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ 0 -∗
+  cpu_own γ 0 eb pme C -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle, surrendered back into the lock *)
@@ -63,22 +64,16 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   sl_pid slk ↦₄ pd -∗
   R -∗
   sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-  a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-  (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   (* wakeup's resources *)
   wk_lockcells γs -∗
-  cur_proc pme -∗
   procs_inv γ Φ γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ 0 -∗
+      cpu_own γ 0 eb pme C -∗
       pc_is ret_tgt -∗
       sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-      a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-      (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
       wk_lockcells γs -∗
-      cur_proc pme -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -88,6 +83,6 @@ Module Type RELEASESLEEP.
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat),
-      wp_releasesleep_sconf_body γ Φ γs γl γsl s R m pd pme av.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ),
+      wp_releasesleep_sconf_body γ Φ γs γl γsl s R m pd pme av eb C.
 End RELEASESLEEP.

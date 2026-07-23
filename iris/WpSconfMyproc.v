@@ -27,6 +27,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpIntenaBits KernelRvcDecode WpAuipc.
 Require Import WpMycpu ProcGeom.
 Require Import WpMyprocDecode.
+Require Import CpuOwn.
 Require Import SpecPushOff.
 Require Import SpecMyproc.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -167,18 +168,13 @@ Section WpSconfMyproc.
   Context `{CID : CpuId}.
 
   Lemma wp_myproc_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av n : nat) (noffv intena_old : mword 32) (p : mword 64)
-    : wp_myproc_sconf_body γ Φ m av n noffv intena_old p.
+      (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    : wp_myproc_sconf_body γ Φ m av n eb p C.
   Proof.
     cbv beta delta [wp_myproc_sconf_body].
-    intros pcE noff1 nv1 ret_tgt Htp Hcorr Hpos Halret Hav.
+    intros pcE ret_tgt Htp Hpos Halret Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    set (a0f := mycpu_ret cid_word).
-    iIntros "Hcg Hcnt #Htext Hpc Hnoff Hint Hcur Hcont".
-    (* expose the per-CPU cells / cur_proc as raw mycpu_ret-anchored points-to *)
-    iEval (rewrite /a_cpu_noff) in "Hnoff".
-    iEval (rewrite /a_cpu_int) in "Hint".
-    iEval (rewrite /cur_proc /a_cpu_proc) in "Hcur".
+    iIntros "Hcg Hown #Htext Hpc Hcont".
     iPoseProof (mpi_00 with "Htext") as "Hi00".
     iPoseProof (mpi_02 with "Htext") as "Hi02".
     iPoseProof (mpi_04 with "Htext") as "Hi04".
@@ -275,15 +271,14 @@ Section WpSconfMyproc.
     assert (HcspA2 : A2 !!! Regidx csp_rs1 = spd).
     { rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspA0. }
-    (* the c->noff / c->intena cells are a0f-anchored: a0f = mycpu_ret cid_word *)
-    iApply (PushOff.wp_push_off_sconf γ Φ A2 (av - 4)%nat noffv intena_old a0f n
+    (* the noff/intena cells + counting token ride inside cpu_own *)
+    iApply (PushOff.wp_push_off_sconf γ Φ A2 (av - 4)%nat n eb p C
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
-              ltac:(rewrite HtpA2; reflexivity)
+              HtpA2
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hnoff] [Hint] [-]").
-    { iExact "Hnoff". }
-    { iExact "Hint". }
-    iIntros (ms MP1) "%Hmsf Hcg Hpc %Hmp1 Hnoff Hint Hcnt".
+              ltac:(lia)
+              with "Hcg Hown Htext Hpc [-]").
+    iIntros (ms MP1) "%Hmsf Hcg Hown Hpay Hpc %Hmp1".
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc0e : update_vec_dec (add_vec (add_vec_int (mword_of_int (MP + 0x0a) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (MP + 0x0e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -377,6 +372,9 @@ Section WpSconfMyproc.
     { rewrite HB6a5. change (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))) with mp_L48.
       rewrite mp_load_reconcile. rewrite HtpMP1. reflexivity. }
     (* ---- 0x1e: c.ld a5,48(a5) -- read the current-proc field ---- *)
+    (* expose c->proc from cpu_own for the read, then refold *)
+    iDestruct (cpu_own_set_proc γ (S n) eb p p C with "Hown") as "(Hcur & Hown)".
+    iEval (rewrite /a_cpu_proc) in "Hcur".
     iPoseProof (mpi_1e with "Htext") as "Hi1e".
     iApply (wp_cld_s_sconf γ Φ (mword_of_int (MP + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))
               B6 (av - 4)%nat p (dqm := DfracOwn 1)
@@ -385,6 +383,7 @@ Section WpSconfMyproc.
     { iEval (rewrite Hpa). iExact "Hcur". }
     iIntros "Hcg Hpc Hcur".
     iEval (rewrite Hpa) in "Hcur".
+    iSpecialize ("Hown" with "Hcur").
     set (B7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg p]> B6).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg p]> B6) with B7.
     assert (Hpc20 : add_vec_int (mword_of_int (MP + 0x1e) : mword 64) 2 = mword_of_int (MP + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
@@ -414,7 +413,7 @@ Section WpSconfMyproc.
     assert (Hpcpp : add_vec (mword_of_int (MP + 0x22) : mword 64) (sign_extend' 64 (mword_of_int 2093858 : mword 21))
                     = mword_of_int KernelSyms.pop_off) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcpp) in "Hpc".
-    (* tp still cid_word at pop_off entry; the noff/intena cells are a0f-anchored *)
+    (* tp still cid_word at pop_off entry *)
     assert (HtpB9 : B9 !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
     { rewrite /B9 upd_ne; [| vm_compute; discriminate].
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
@@ -425,26 +424,18 @@ Section WpSconfMyproc.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite /B2 upd_ne; [| vm_compute; discriminate].
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HtpMP1. }
-    assert (Ha0v_pp : mycpu_ret (B9 !!! Regidx (mword_of_int 4 : mword 5)) = a0f)
-      by (rewrite HtpB9; reflexivity).
     assert (HB9ra : B9 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (MP + 0x26))
       by (rewrite /B9 upd_eq; apply bv_eq; vm_compute; reflexivity).
-    iApply (PushOff.wp_pop_off_sconf γ Φ B9 (av - 4)%nat noff1
-              (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old) n (dqi := DfracOwn 1)
-              Hcorr Hpos
+    iApply (PushOff.wp_pop_off_sconf γ Φ B9 (av - 4)%nat n eb p C
               ltac:(rewrite HB9ra; vm_compute; reflexivity)
+              HtpB9
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hnoff] [Hint] [-]").
-    { rewrite Ha0v_pp. iExact "Hnoff". }
-    { rewrite Ha0v_pp. iExact "Hint". }
-    iIntros (MP2) "Hcg Hcnt Hpc %Hmp2 Hnoff Hint".
-    rewrite Ha0v_pp.
+              with "Hcg Hown Hpay Htext Hpc [-]").
+    iIntros (MP2) "Hcg Hown Hpc %Hmp2".
     iEval (rewrite HB9ra) in "Hpc".
     assert (Hpc26 : update_vec_dec (add_vec (mword_of_int (MP + 0x26) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (MP + 0x26) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
-    (* the noff cell round-trips to noffv *)
-    iEval (rewrite noff_push_pop_id) in "Hnoff".
     (* ---- 0x26: c.mv a0,s1 ---- *)
     iPoseProof (mpi_26 with "Htext") as "Hi26".
     iApply (wp_cmv_s_sconf γ Φ (mword_of_int (MP + 0x26)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
@@ -575,7 +566,7 @@ Section WpSconfMyproc.
     assert (Hra_final : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! ms E4 with "[%] Hcg Hcnt Hpc [%] Hnoff Hint Hcur").
+    iApply ("Hcont" $! ms E4 with "[%] Hcg Hown Hpc [%]").
     { exact Hmsf. }
     (* callee_saved m E4  /\  E4!!!a0 = p *)
     destruct Hmp1 as (Hsp1 & Htp1 & Hs01 & Hs11 & Hs21 & Hs31 & Hs41 & Hs51 & Hs61 & Hs71 & Hs81 & Hs91 & Hs101 & Hs111).

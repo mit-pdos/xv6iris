@@ -40,8 +40,17 @@ Require Import WpLock.
 Require Import WpMycpu.
 Require Import ProcGeom.
 Require Import SwtchCtx.
+Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+
+(* the context-slot payload while nobody is parked in it: the raw
+   14-word save area (boot; and while the scheduler itself runs).
+   (Here rather than CpuOwn.v: it names [ctx_cells], and SwtchCtx now
+   sits above CpuOwn so the ambient-bundle wand can mention [cpu_own].) *)
+Definition cpu_ctx_free `{!riscvGS Σ} `{CID : CpuId} : iProp Σ :=
+  (∃ vs : list (mword 64),
+     ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
 
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
@@ -57,14 +66,10 @@ Section SchedCtx.
   (* The two payload halves shared by both swtch directions.              *)
   (* ------------------------------------------------------------------ *)
 
-  (* this CPU's per-CPU cells as they cross a scheduler swtch: the
-     current-process resource pinned at proc j, noff = 1 (exactly one
-     push_off outstanding -- xv6's "sched locks" assertion), intena
-     existential (wk_res_sconf precedent: pop_off restores it blindly). *)
-  Definition cpu_cells (j : nat) : iProp Σ :=
-    (cur_proc (proc_addr j) ∗
-     a_cpu_noff cid_word ↦₄ (mword_of_int 1 : mword 32) ∗
-     (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv))%I.
+  (* NOTE: this CPU's [struct cpu] no longer rides in the payload -- the
+     whole [cpu_own γ 1 eb p emp] bundle crosses at the [valid_context]
+     wand interface (SwtchCtx.v), at the RESUMER's [eb]/proc; the payload
+     below carries only the chain-protocol facts and the held lock. *)
 
   (* holding proc j's spinlock, contents out: the token, the state and chan
      cells, and the lock's cpu word pinned at this CPU (set by acquire,
@@ -88,17 +93,18 @@ Section SchedCtx.
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
           ⌜cret = p_context (proc_addr j) /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
-          proc_held j γl st ch ∗ cpu_cells j)
+          proc_held j γl st ch)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p. *)
        (∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx cid_word⌝ ∗
-          proc_held j γl RUNNING ch ∗ cpu_cells j)))%I.
+          proc_held j γl RUNNING ch)))%I.
 
-  (* the scheduler-chain valid context (fixed sc / Phi / P instantiation). *)
-  Definition sched_vc (c : mword 64) : iProp Σ :=
-    valid_context (swconf γ) Φ p_sched c.
+  (* the scheduler-chain valid context (fixed γ / Phi / P instantiation);
+     [p] = the context's c->proc index (see SwtchCtx). *)
+  Definition sched_vc (c p : mword 64) : iProp Σ :=
+    valid_context γ Φ p_sched c p.
 
   (* ------------------------------------------------------------------ *)
   (* Payload intro/elim.  Discrimination is by the resumed context's own  *)
@@ -108,10 +114,10 @@ Section SchedCtx.
   (* build the parking-proc payload (what sched supplies at its swtch). *)
   Lemma p_sched_to_cpu (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> needs_ctx st = true ->
-    proc_held j γl st ch -∗ cpu_cells j -∗
+    proc_held j γl st ch -∗
     p_sched (a_cpu_ctx cid_word) (p_context (proc_addr j)) cid_word.
   Proof.
-    iIntros (Hj Hγl Hst) "Hheld Hcells".
+    iIntros (Hj Hγl Hst) "Hheld".
     iSplit; [done|]. iLeft. iSplit; [done|].
     iExists j, γl, st, ch. iFrame. done.
   Qed.
@@ -119,10 +125,10 @@ Section SchedCtx.
   (* build the dispatch payload (what the scheduler supplies at its swtch). *)
   Lemma p_sched_to_proc (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
-    proc_held j γl RUNNING ch -∗ cpu_cells j -∗
+    proc_held j γl RUNNING ch -∗
     p_sched (p_context (proc_addr j)) (a_cpu_ctx cid_word) cid_word.
   Proof.
-    iIntros (Hj Hγl) "Hheld Hcells".
+    iIntros (Hj Hγl) "Hheld".
     iSplit; [done|]. iRight.
     iExists j, γl, ch. iFrame. done.
   Qed.
@@ -134,7 +140,7 @@ Section SchedCtx.
     p_sched (p_context (proc_addr j)) cret tpv -∗
     ⌜tpv = cid_word⌝ ∗ ⌜cret = a_cpu_ctx cid_word⌝ ∗
     ∃ (γl : gname) (ch : mword 64),
-      ⌜γs !! j = Some γl⌝ ∗ proc_held j γl RUNNING ch ∗ cpu_cells j.
+      ⌜γs !! j = Some γl⌝ ∗ proc_held j γl RUNNING ch.
   Proof.
     iIntros (Hj) "[%Htp Hpay]". iSplit; [done|].
     iDestruct "Hpay" as "[[%Hc _] | Hpay]".
@@ -154,7 +160,7 @@ Section SchedCtx.
     ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
       ⌜cret = p_context (proc_addr j) /\ (j < NPROC)%nat /\
        γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
-      proc_held j γl st ch ∗ cpu_cells j.
+      proc_held j γl st ch.
   Proof.
     iIntros "[%Htp Hpay]". iSplit; [done|].
     iDestruct "Hpay" as "[[_ Hpay] | Hpay]".
@@ -171,7 +177,9 @@ Section SchedCtx.
 
   (* the valid-context obligation of a parked proc: its saved context is a
      member of the scheduler chain. *)
-  Definition proc_ctx (pa : mword 64) : iProp Σ := sched_vc (p_context pa).
+  (* a parked proc's context is indexed by its OWN proc address (it parked
+     right after the dispatcher set c->proc to it, and never wrote it). *)
+  Definition proc_ctx (pa : mword 64) : iProp Σ := sched_vc (p_context pa) pa.
 
   (* the resource protected by [p->lock].  The context slot is ▷-guarded:
      its producer (the scheduler, releasing a freshly parked proc) only ever

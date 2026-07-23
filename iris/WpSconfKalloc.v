@@ -50,15 +50,15 @@ Section WpSconfKalloc.
   Lemma wp_kalloc_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile)
-      (cpuold : mword 64) (noffv intena_old : mword 32)
-      (on : option nat) (n : nat) (K : nat)
-    : wp_kalloc_sconf_body γ Φ γl γk fl m cpuold noffv intena_old on n K.
+      (cpuold : mword 64)
+      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat)
+    : wp_kalloc_sconf_body γ Φ γl γk fl m cpuold on n eb p C K.
   Proof.
     cbv beta delta [wp_kalloc_sconf_body].
-    intros pcE ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
-      HK Hcpune Hretm Hfl Hnoff_lvl Hnoffpos Hintena0.
+    intros pcE ret_tgt cpuv a_cpu
+      HK Hcpune Hretm Htp Hfl Hnoffpos.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail Hqnoff Hqint Hqcpu Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail Hqcpu Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (kai_00 with "Htext") as "Hi00".
     iPoseProof (kai_02 with "Htext") as "Hi02".
@@ -174,16 +174,16 @@ Section WpSconfKalloc.
     assert (HmAra : mA !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x12) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
     iApply (Acquire.wp_acquire_sconf γ Φ γl "kmem"%string (kmem_res γk fl) mA
-              cpuold noffv intena_old n (K - 4)%nat
+              cpuold n eb p C (K - 4)%nat
               ltac:(rewrite HmAtp; exact Hcpune)
               ltac:(rewrite HmAra; vm_compute; reflexivity)
+              ltac:(rewrite HmAtp; exact Htp)
+              Hnoffpos
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hlock] [Hqcpu] [Hqnoff] [Hqint] [-]").
+              with "Hcg Hcnt Htext Hpc [Hlock] [Hqcpu] [-]").
     { iEval (rewrite HmAa0). iExact "Hlock". }
     { iEval (rewrite HmAa0). iExact "Hqcpu". }
-    { iEval (rewrite HmAtp). iExact "Hqnoff". }
-    { iEval (rewrite HmAtp). iExact "Hqint". }
-    iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hacpu Hanoff Haint Hcnt".
+    iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hacpu Hcnt Hpay".
     assert (Hpc16 : update_vec_dec (add_vec (mA !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x16)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc16) in "Hpc".
@@ -191,12 +191,6 @@ Section WpSconfKalloc.
     iPoseProof (kai_16 with "Htext") as "Hi16".
     iPoseProof (kai_1a with "Htext") as "Hi1a".
     iPoseProof (kai_1e with "Htext") as "Hi1e".
-    (* the noff-cancel identity (shared with kfree): release nv1 = sext noffv *)
-    assert (Hnv1eq : sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
-                     = sign_extend' 64 noffv)
-      by (exact (kfree_nv1_cancel_pure noffv)).
-    assert (Hcancel : neq_vec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)) zero_reg = false <-> n = 0%nat)
-      by (rewrite Hnv1eq; exact Hnoff_lvl).
     (* ===== +0x16 auipc s1,0x11 ; +0x1a ld s1,head ; +0x1e beqz s1 ===== *)
     (* +0x16 auipc s1,0x11 *)
     iApply (wp_auipc_s_sconf γ Φ (mword_of_int (AK + 0x16)) (mword_of_int 9 : mword 5) (mword_of_int 0x11 : mword 20)
@@ -291,29 +285,18 @@ Section WpSconfKalloc.
       { rewrite /E3 upd_ne; [| vm_compute; discriminate]. exact Ha0kmem2. }
       assert (HE3ra : E3 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x54) : mword 64) 4)
         by (rewrite /E3; apply upd_eq).
-      (* the cbeqz-taken iNext stripped [intr_count (S n)]'s inner later on the
-         handler spec; re-fold it (the spec is persistent). *)
-      iDestruct "Hcnt" as "(Htok0 & Hinvspec & HsepA & HscaA & HstvA)".
-      iDestruct "Hinvspec" as (hA) "[#HiA #HsA]".
-      iAssert (intr_count γ (S n)) with "[Htok0 HsepA HscaA HstvA]" as "Hcnt".
-      { iApply (intr_count_pack_S γ n with "Htok0").
-        iApply (intr_restore_intro γ hA with "HiA HsA HsepA HscaA HstvA"). }
       iApply (Release.wp_release_sconf γ Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
                 (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
-                po_noff_store
-                (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
-                n (K - 4)%nat (dqi:=DfracOwn 1)
+                n eb p C (K - 4)%nat
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(rewrite HE3tp; apply eq_vec_true_iff; reflexivity)
-                Hcancel Hnoffpos
                 ltac:(rewrite HE3ra; vm_compute; reflexivity)
+                ltac:(rewrite HE3tp; exact Htp)
                 ltac:(lia)
-                with "Hcg Htext Hpc [Hlock] Htok HRres [Hacpu] [Hanoff] [Haint] Hcnt [-]").
+                with "Hcg Htext Hpc [Hlock] Htok HRres [Hacpu] Hcnt Hpay [-]").
       { iExact "Hlock". }
       { iEval (rewrite HmAa0 HmAtp) in "Hacpu". iEval (rewrite HE3a0). iExact "Hacpu". }
-      { iEval (rewrite HmAtp) in "Hanoff". iEval (rewrite HE3tp). iExact "Hanoff". }
-      { iEval (rewrite HmAtp) in "Haint". iEval (rewrite HE3tp). iExact "Haint". }
-      iIntros (mr) "Hcg Hpc %Hrelpins Hcpu2 Hnoff2 Hint2 Hcnt".
+      iIntros (mr) "Hcg Hpc %Hrelpins Hcpu2 Hcnt".
       assert (Hpc58 : update_vec_dec (add_vec (E3 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x58)).
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc58) in "Hpc".
@@ -436,10 +419,8 @@ Section WpSconfKalloc.
       assert (Hretf : update_vec_dec (add_vec (P45 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
         by (rewrite HP45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iApply ("Hcont" $! P45 with "Hcg Hcnt Hpc [%] [Havail] [Hcpu2] [Hnoff2] [Hint2]").
+      iApply ("Hcont" $! P45 with "Hcg Hcnt Hpc [%] [Havail] [Hcpu2]").
       3:{ iEval (rewrite HE3a0) in "Hcpu2". iExact "Hcpu2". }
-      3:{ iEval (rewrite HE3tp) in "Hnoff2". iExact "Hnoff2". }
-      3:{ iEval (rewrite HE3tp) in "Hint2". iExists _. iExact "Hint2". }
       { (* callee_saved m P45 *)
         assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                   c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
@@ -575,20 +556,16 @@ Section WpSconfKalloc.
         repeat (rewrite upd_ne; [| vm_compute; discriminate]); exact Hs1R7. }
       iApply (Release.wp_release_sconf γ Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
                 (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
-                po_noff_store
-                (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
-                n (K - 4)%nat (dqi:=DfracOwn 1)
+                n eb p C (K - 4)%nat
                 ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(rewrite HR12tp; apply eq_vec_true_iff; reflexivity)
-                Hcancel Hnoffpos
                 ltac:(rewrite HR12ra; vm_compute; reflexivity)
+                ltac:(rewrite HR12tp; exact Htp)
                 ltac:(lia)
-                with "Hcg Htext Hpc [Hlock] Htok HRres [Hacpu] [Hanoff] [Haint] Hcnt [-]").
+                with "Hcg Htext Hpc [Hlock] Htok HRres [Hacpu] Hcnt Hpay [-]").
       { iExact "Hlock". }
       { iEval (rewrite HmAa0 HmAtp) in "Hacpu". iEval (rewrite HR12a0). iExact "Hacpu". }
-      { iEval (rewrite HmAtp) in "Hanoff". iEval (rewrite HR12tp). iExact "Hanoff". }
-      { iEval (rewrite HmAtp) in "Haint". iEval (rewrite HR12tp). iExact "Haint". }
-      iIntros (mr) "Hcg Hpc %Hrelpins Hcpu2 Hnoff2 Hint2 Hcnt".
+      iIntros (mr) "Hcg Hpc %Hrelpins Hcpu2 Hcnt".
       assert (Hpc36 : update_vec_dec (add_vec (R12 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (AK + 0x36)).
       { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc36) in "Hpc".
@@ -779,10 +756,8 @@ Section WpSconfKalloc.
       assert (Hretf : update_vec_dec (add_vec (Q45 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
         by (rewrite HQ45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iApply ("Hcont" $! Q45 with "Hcg Hcnt Hpc [%] [Hpage Havail] [Hcpu2] [Hnoff2] [Hint2]").
+      iApply ("Hcont" $! Q45 with "Hcg Hcnt Hpc [%] [Hpage Havail] [Hcpu2]").
       3:{ iEval (rewrite HR12a0) in "Hcpu2". iExact "Hcpu2". }
-      3:{ iEval (rewrite HR12tp) in "Hnoff2". iExact "Hnoff2". }
-      3:{ iEval (rewrite HR12tp) in "Hint2". iExists _. iExact "Hint2". }
       { (* callee_saved m Q45 *)
         assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                   c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->

@@ -29,6 +29,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import WpMycpu.
 Require Import ProcGeom.
+Require Import IntrDefs SwtchCtx CpuOwn.
 Require Import SchedCtx.
 Require Import WpSleepDecode.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecSleep.
@@ -129,17 +130,25 @@ Section WpSconfSleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
 
+  (* extract the opaque context-slot payload, leaving the bundle at slot
+     [emp] (what the sched call-site hands across the swtch). *)
+  Lemma cpu_own_ctx_take (γ : gname) (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) :
+    cpu_own γ n eb p D -∗ D ∗ cpu_own γ n eb p emp.
+  Proof.
+    iIntros "(%Hb & Hnoff & Hint & Hcnt & Hproc & HD)". iFrame "HD".
+    rewrite /cpu_own. iSplitR; [iPureIntro; exact Hb|]. iFrame "Hnoff Hint Hcnt Hproc".
+  Qed.
+
   Lemma wp_sleep_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-      (m : regfile) (av : nat)
-    : wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    : wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av eb C.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
     intros pcE pj chan lk0 a_cpu_k ret_tgt Htp Hj Hgl Hlka0 Hal Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hprocs #Hkislock Hklocked HRk Hkcpu Hcur Hnoff Hint Hlkcpu Hown Hvc Hcont".
-    iDestruct "Hint" as (iv0) "Hint".
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk Hkcpu Hlkcpu Hown Hvc Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
     (* ------------------------------------------------------------------ *)
@@ -276,18 +285,14 @@ Section WpSconfSleep.
     { rewrite /A4 upd_ne; [| vm_compute; discriminate]. rewrite /A3 upd_ne; [| vm_compute; discriminate].
       rewrite /A2 upd_ne; [| vm_compute; discriminate]. rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. exact Htp. }
-    iApply (Myproc.wp_myproc_sconf γ Φ A4 (av - 6)%nat 1 (mword_of_int 1) iv0 (proc_addr j)
+    iApply (Myproc.wp_myproc_sconf γ Φ A4 (av - 6)%nat 1 eb (proc_addr j) C
               HtpA4
-              ltac:(split; intro HH; vm_compute in HH; discriminate)
-              ltac:(vm_compute; reflexivity)
+              ltac:(lia)
               ltac:(rewrite HA4ra; vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc Hnoff Hint Hcur [-]").
-    iIntros (ms mp) "%Hmsf Hcg Hcnt Hpc %Hmp Hnoff Hint Hcur".
+              with "Hcg Hcpu Htext Hpc [-]").
+    iIntros (ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
     destruct Hmp as [Hcs_mp Ha0_mp].
-    assert (Hifint : (if eq_vec (sign_extend' 64 (mword_of_int 1 : mword 32)) zero_reg
-                      then po_intena_val ms else iv0) = iv0) by (vm_compute; reflexivity).
-    iEval (rewrite Hifint) in "Hint".
     assert (Hpc16 : update_vec_dec (add_vec (A4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SL + 0x16)) by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
@@ -326,20 +331,16 @@ Section WpSconfSleep.
       by (rewrite /B1 upd_eq; reflexivity).
     iPoseProof (procs_inv_lookup γ Φ γs j γl Hgl with "Hprocs") as "#Hislock".
     iApply (Acquire.wp_acquire_sconf γ Φ γl "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (zero_reg : mword 64) (mword_of_int 1) iv0 1 (av - 6)%nat
+              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (zero_reg : mword 64) 1 eb (proc_addr j) C (av - 6)%nat
               ltac:(rewrite HtpB1; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
               ltac:(rewrite HB1ra; vm_compute; reflexivity)
+              HtpB1
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hislock] [Hlkcpu] [Hnoff] [Hint] [-]").
+              ltac:(lia)
+              with "Hcg Hcpu Htext Hpc [Hislock] [Hlkcpu] [-]").
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     { iEval (rewrite Ha0_B1). iExact "Hlkcpu". }
-    { iEval (rewrite HtpB1). iExact "Hnoff". }
-    { iEval (rewrite HtpB1). iExact "Hint". }
-    iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hlkcpu Hnoff Hint Hcnt".
-    iEval (rewrite HtpB1 sl_acq_noff_two) in "Hnoff".
-    assert (Hifint2 : (if eq_vec (sign_extend' 64 (mword_of_int 1 : mword 32)) zero_reg
-                       then po_intena_val ms2 else iv0) = iv0) by (vm_compute; reflexivity).
-    iEval (rewrite HtpB1 Hifint2) in "Hint".
+    iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hlkcpu Hcpu Hpay1".
     iEval (rewrite Ha0_B1 HtpB1) in "Hlkcpu".
     assert (Hpc1c : update_vec_dec (add_vec (B1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SL + 0x1c)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
@@ -395,21 +396,16 @@ Section WpSconfSleep.
     (* a_cpu_k address: reconcile lk-derived release address to a_cpu_k. *)
     assert (Hacpu_r1 : add_vec (C1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu_k)
       by (rewrite Ha0_C1; reflexivity).
-    iApply (Release.wp_release_sconf γ Φ γk lka sk Rk C1 (mycpu_ret cid_word) (mword_of_int 2) iv0 1 (av - 6)%nat (dqi := DfracOwn 1)
+    iApply (Release.wp_release_sconf γ Φ γk lka sk Rk C1 (mycpu_ret cid_word) 1 eb (proc_addr j) C (av - 6)%nat
               Hlka_r1
               Hcpueq_r1
-              ltac:(split; intro HH; vm_compute in HH; discriminate)
-              ltac:(vm_compute; reflexivity)
               Halr_r1
+              HtpC1
               ltac:(lia)
-              with "Hcg Htext Hpc Hkislock Hklocked HRk [Hkcpu] [Hnoff] [Hint] Hcnt [-]").
+              with "Hcg Htext Hpc Hkislock Hklocked HRk [Hkcpu] Hcpu Hpay1 [-]").
     { iEval (rewrite Hacpu_r1). iExact "Hkcpu". }
-    { iEval (rewrite HtpC1). iExact "Hnoff". }
-    { iEval (rewrite HtpC1). iExact "Hint". }
-    iIntros (mrel1) "Hcg Hpc %Hcs_rel1 Hkcpu Hnoff Hint Hcnt".
+    iIntros (mrel1) "Hcg Hpc %Hcs_rel1 Hkcpu Hcpu".
     iEval (rewrite Hacpu_r1) in "Hkcpu".
-    iEval (rewrite HtpC1 sl_rel_noff_one) in "Hnoff".
-    iEval (rewrite HtpC1) in "Hint".
     assert (Hpc22 : update_vec_dec (add_vec (C1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SL + 0x22)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
@@ -492,15 +488,15 @@ Section WpSconfSleep.
       rewrite (callee_saved_lookup Hcs_rel1 (mword_of_int 4) ltac:(vm_compute; reflexivity)). exact HtpC1. }
     assert (HD1ra : D1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SL + 0x2a) : mword 64) 4)
       by (rewrite /D1 upd_eq; reflexivity).
-    iApply (Sched.wp_sched_sconf γ Φ γs j γl SLEEPING chan D1 (av - 6)%nat
+    iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
+    iApply (Sched.wp_sched_sconf γ Φ γs j γl SLEEPING chan D1 (av - 6)%nat eb
               HtpD1 Hj Hgl (needs_ctx_SLEEPING) ltac:(rewrite HD1ra; vm_compute; reflexivity) ltac:(lia)
-              with "Hcg Hcnt Htext Hpc Hprocs [Hlocked Hstate Hchan Hlkcpu] [Hcur Hnoff Hint] Hown Hvc [-]").
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hlkcpu] Hcpuemp Hown Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hlkcpu". }
-    { rewrite /cpu_cells. iFrame "Hcur Hnoff". iExists _. iExact "Hint". }
-    iIntros (msch ch') "%Hcs_sch Hcg Hcnt Hpc Hheld' Hcells' Hown' Hvc'".
+    iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Hcpuemp Hown' Hvc'".
     iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hlkcpu)".
-    iDestruct "Hcells'" as "(Hcur & Hnoff & Hint)".
-    iDestruct "Hint" as (iv1) "Hint".
+    iAssert (cpu_own γ 1 eb (proc_addr j) C) with "[Hcpuemp HC]" as "Hcpu".
+    { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
     assert (Hpc2e : update_vec_dec (add_vec (D1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SL + 0x2e)) by (rewrite HD1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
@@ -571,21 +567,16 @@ Section WpSconfSleep.
     assert (Halr_r2 : eq_vec (access_vec_dec (update_vec_dec (add_vec (E1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")) 0) ('b"0") = true)
       by (rewrite HE1ra; vm_compute; reflexivity).
     iApply (Release.wp_release_sconf γ Φ γl (proc_addr j) "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) E1 (mycpu_ret cid_word) (mword_of_int 1) iv1 0 (av - 6)%nat (dqi := DfracOwn 1)
+              (proc_lock_res γ Φ γs γl (proc_addr j)) E1 (mycpu_ret cid_word) 0 eb (proc_addr j) C (av - 6)%nat
               Hlka_r2
               Hcpueq_r2
-              ltac:(split; intros _; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
               Halr_r2
+              HtpE1
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 [Hlkcpu] [Hnoff] [Hint] Hcnt [-]").
+              with "Hcg Htext Hpc Hislock Hlocked HR2 [Hlkcpu] Hcpu Hpay0 [-]").
     { iEval (rewrite Ha0_E1). iExact "Hlkcpu". }
-    { iEval (rewrite HtpE1). iExact "Hnoff". }
-    { iEval (rewrite HtpE1). iExact "Hint". }
-    iIntros (mrel2) "Hcg Hpc %Hcs_rel2 Hlkcpu Hnoff Hint Hcnt".
+    iIntros (mrel2) "Hcg Hpc %Hcs_rel2 Hlkcpu Hcpu".
     iEval (rewrite Ha0_E1) in "Hlkcpu".
-    iEval (rewrite HtpE1 sl_rel_noff_zero) in "Hnoff".
-    iEval (rewrite HtpE1) in "Hint".
     assert (Hpc38 : update_vec_dec (add_vec (E1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SL + 0x38)) by (rewrite HE1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc38) in "Hpc".
@@ -638,18 +629,16 @@ Section WpSconfSleep.
       rewrite H0. apply kv_addv_zero. }
     assert (Hacpu_f : add_vec (F1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu_k)
       by (rewrite Ha0_F1; reflexivity).
-    iApply (Acquire.wp_acquire_sconf γ Φ γk sk Rk F1 (zero_reg : mword 64) (mword_of_int 0) iv1 0 (av - 6)%nat
+    iApply (Acquire.wp_acquire_sconf γ Φ γk sk Rk F1 (zero_reg : mword 64) 0 eb (proc_addr j) C (av - 6)%nat
               ltac:(rewrite HtpF1; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
               ltac:(rewrite HF1ra; vm_compute; reflexivity)
+              HtpF1
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hkislock] [Hkcpu] [Hnoff] [Hint] [-]").
+              ltac:(lia)
+              with "Hcg Hcpu Htext Hpc [Hkislock] [Hkcpu] [-]").
     { iEval (rewrite Hislk_f). iExact "Hkislock". }
     { iEval (rewrite Hacpu_f). iExact "Hkcpu". }
-    { iEval (rewrite HtpF1). iExact "Hnoff". }
-    { iEval (rewrite HtpF1). iExact "Hint". }
-    iIntros (ms3 macq2) "%Hmsf3 Hcg Hpc %Hcs_acq2 Hklocked HRk Hkcpu Hnoff Hint Hcnt".
-    iEval (rewrite HtpF1 sl_acq_noff_one) in "Hnoff".
-    iEval (rewrite HtpF1) in "Hint".
+    iIntros (ms3 macq2) "%Hmsf3 Hcg Hpc %Hcs_acq2 Hklocked HRk Hkcpu Hcpu Hpay0'".
     iEval (rewrite Hacpu_f HtpF1) in "Hkcpu".
     assert (Hpc3e : update_vec_dec (add_vec (F1 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = mword_of_int (SL + 0x3e)) by (rewrite HF1ra; apply bv_eq; vm_compute; reflexivity).
@@ -831,8 +820,7 @@ Section WpSconfSleep.
       rewrite /A4 upd_ne; [| exact H1]. rewrite /A3 upd_ne; [| exact H18].
       rewrite /A2 upd_ne; [| exact H19]. rewrite /A1 upd_ne; [| exact H8].
       rewrite /A0 upd_ne; [| exact Hsp]. reflexivity. }
-    iApply ("Hcont" $! Gf with "[%] Hcg Hcnt Hpc Hklocked HRk Hkcpu Hcur Hnoff [Hint] Hlkcpu Hown' Hvc'").
-    2:{ iExists (if eq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) zero_reg then po_intena_val ms3 else iv1). iExact "Hint". }
+    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc Hklocked HRk Hkcpu Hlkcpu Hown' Hvc'").
     (* callee_saved m Gf *)
     assert (Csp : Gf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite /Gf upd_eq HcspG8 Hpopsp; reflexivity).

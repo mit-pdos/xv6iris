@@ -31,6 +31,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpMycpu.
 Require Import ProcGeom.
+Require Import SwtchCtx CpuOwn.
 Require Import SchedCtx.
 Require Import SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -42,7 +43,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-    (m : regfile) (av : nat) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   (* a0 = the channel, a1 = the caller's condition lock *)
@@ -58,7 +59,12 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (22 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ 1 -∗
+  cpu_own γ 1 eb pj C -∗
+  (* sleep is NOT push/pop-order-balanced: it pops p->lock to level 0
+     BEFORE re-acquiring the condition lock, so at eb = true the interior
+     pop deposits the trap CSRs into the re-enabled arm and the
+     re-acquire extracts them back -- the pay must ride the spec. *)
+  trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γ Φ γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
@@ -67,28 +73,23 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   Rk -∗
   a_cpu_k ↦₈ mycpu_ret cid_word -∗
   (* the running-thread bundle *)
-  cur_proc pj -∗
-  a_cpu_noff cid_word ↦₄ (mword_of_int 1 : mword 32) -∗
-  (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   ( ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ 1 -∗
+      cpu_own γ 1 eb pj C -∗
+      trap_csrs_pay 0 eb -∗
       pc_is ret_tgt -∗
       (* lk reacquired, with its resource *)
       locked γk -∗
       Rk -∗
       a_cpu_k ↦₈ mycpu_ret cid_word -∗
       (* the running-thread bundle, refreshed *)
-      cur_proc pj -∗
-      a_cpu_noff cid_word ↦₄ (mword_of_int 1 : mword 32) -∗
-      (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
       p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -98,6 +99,6 @@ Module Type SLEEP.
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-      (m : regfile) (av : nat),
-      wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
+      wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av eb C.
 End SLEEP.

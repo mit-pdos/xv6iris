@@ -18,7 +18,7 @@ Require Import KernelText.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
-Require Import IntrDefs.
+Require Import ProcGeom SwtchCtx CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -42,39 +42,35 @@ Fixpoint prun (pa_end s1 : mword 64) (ps : list (mword 64)) : Prop :=
   end.
 
 Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_noff := add_vec cpuv (sign_extend' 64 (mword_of_int 120 : mword 12)) in
-  let a_int := add_vec cpuv (sign_extend' 64 (mword_of_int 124 : mword 12)) in
   let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let s1entry := add_vec (and_vec (add_vec pa_start (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (20 <= K)%nat ->
   ncnt = 0%nat ->
   eq_vec (zero_reg : mword 64) cpuv = false ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
+  (* the tp register holds THIS cpu's id (kfree cid convention) *)
+  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
   sie_cap_gpr γ m K -∗
-  intr_count γ ncnt -∗
+  cpu_own γ ncnt eb pcur C -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
-  a_noff ↦₄ (zeros' 32 : mword 32) -∗
-  (∃ iv : mword 32, a_int ↦₄ iv) -∗
   a_cpu ↦₈ (zero_reg : mword 64) -∗
   kalloc_avail γk (Some 0%nat) -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
-    intr_count γ ncnt -∗
+    cpu_own γ ncnt eb pcur C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    a_noff ↦₄ (zeros' 32 : mword 32) -∗
-    (∃ iv : mword 32, a_int ↦₄ iv) -∗
     a_cpu ↦₈ (zero_reg : mword 64) -∗
     kalloc_avail γk (Some (length ps)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -83,6 +79,6 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 Module Type FREERANGE.
   Parameter wp_freerange_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat),
-      wp_freerange_sconf_body γ Φ γl γk lk fl m ps K ncnt.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ),
+      wp_freerange_sconf_body γ Φ γl γk lk fl m ps K ncnt eb pcur C.
 End FREERANGE.

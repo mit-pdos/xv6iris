@@ -27,7 +27,7 @@ Require Import KernelText.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
-Require Import IntrDefs.
+Require Import ProcGeom SwtchCtx CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKfree.
 Require Import WpFreerangeDecode.
@@ -74,7 +74,7 @@ Section WpSconfFreerange.
      premise pm-reduces on application (an iAssert's would stay folded and fail to
      unify with the caller's iota-reduced [intr_count] hypothesis). *)
   Lemma frepi (γ : gname) (Φ : mval -> iProp Σ)
-      (m Me : regfile) (K ncnt : nat) (a_noff a_int a_cpu : mword 64)
+      (m Me : regfile) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (a_cpu : mword 64)
       (γk : gname * gname) (onf : option nat) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
@@ -85,7 +85,7 @@ Section WpSconfFreerange.
     (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 8 -> c <> mword_of_int 9 -> c <> csp_rs1 -> Me !!! Regidx c = m !!! Regidx c) ->
     kernel_text -∗
     sie_cap_gpr γ Me (K - 6) -∗
-    intr_count γ ncnt -∗
+    cpu_own γ ncnt eb pcur C -∗
     pc_is (mword_of_int (FR + 0x3e)) -∗
     (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
     (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
@@ -93,13 +93,13 @@ Section WpSconfFreerange.
     (∃ v : mword 64, (pa_stk sp0 4) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 5) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
-    a_noff ↦₄ (zeros' 32 : mword 32) -∗ (∃ iv : mword 32, a_int ↦₄ iv) -∗ a_cpu ↦₈ (zero_reg : mword 64) -∗
+    a_cpu ↦₈ (zero_reg : mword 64) -∗
     kalloc_avail γk onf -∗
     ( ∀ mr,
       sie_cap_gpr γ mr K -∗
-      intr_count γ ncnt -∗
+      cpu_own γ ncnt eb pcur C -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
-      a_noff ↦₄ (zeros' 32 : mword 32) -∗ (∃ iv : mword 32, a_int ↦₄ iv) -∗ a_cpu ↦₈ (zero_reg : mword 64) -∗
+      a_cpu ↦₈ (zero_reg : mword 64) -∗
       kalloc_avail γk onf -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -115,7 +115,7 @@ Section WpSconfFreerange.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hdeepaddr : pa_stk (pa_stk sp0 kv_frame_slots) 6 = pa_stk spr kv_frame_slots).
     { rewrite Hspr6 !pa_stk_assoc. f_equal; lia. }
-    iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 Hqnoff Hqint Hqcpu Havail Hcont".
+    iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 Hqcpu Havail Hcont".
     iPoseProof (fri_3e with "Htext") as "Hi3e".
     iPoseProof (fri_40 with "Htext") as "Hi40".
     iPoseProof (fri_42 with "Htext") as "Hi42".
@@ -205,7 +205,7 @@ Section WpSconfFreerange.
     assert (Hretf : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] Hqnoff Hqint Hqcpu Havail").
+    iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] Hqcpu Havail").
     (* callee_saved m E4 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 1 -> c <> mword_of_int 8 -> c <> mword_of_int 9 -> c <> csp_rs1 -> E4 !!! Regidx c = m !!! Regidx c).
     { intros c Hc N1 N8 N9 Nsp.
@@ -228,15 +228,15 @@ Section WpSconfFreerange.
   Lemma wp_freerange_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat)
-    : wp_freerange_sconf_body γ Φ γl γk lk fl m ps K ncnt.
+      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ)
+    : wp_freerange_sconf_body γ Φ γl γk lk fl m ps K ncnt eb pcur C.
   Proof.
     cbv beta delta [wp_freerange_sconf_body].
-    intros pcE pa_start pa_end ret_tgt cpuv a_noff a_int a_cpu s1entry
-      HK Hncnt Hmycpu Hretm Hlk Hfl Hprun.
+    intros pcE pa_start pa_end ret_tgt cpuv a_cpu s1entry
+      HK Hncnt Hmycpu Hretm Htp Hlk Hfl Hprun.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages Hqnoff Hqint Hqcpu Havail Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages Hqcpu Havail Hcont".
     assert (Hspr6 : spr = pa_stk sp0 6).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* the six frame-slot address bridges (spr-relative store offset -> pa_stk sp0 k) *)
@@ -445,14 +445,13 @@ Section WpSconfFreerange.
                 with "Hcg Hpc Hi1a [-]").
       iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt3e) in "Hpc".
-      iApply (frepi γ Φ m R8 K ncnt a_noff a_int a_cpu γk (Some 0%nat) ltac:(lia) Hretm HR8sp HR8cs
-                with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Hqnoff Hqint Hqcpu Havail Hcont").
+      iApply (frepi γ Φ m R8 K ncnt eb pcur C a_cpu γk (Some 0%nat) ltac:(lia) Hretm HR8sp HR8cs
+                with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Hqcpu Havail Hcont").
       { iExists vs20; iExact "Hslot4". }
       { iExists vs30; iExact "Hslot5". }
       { iExists vs40; iExact "Hslot6". }
     - (* ---- LOOP: at least one full page fits; enter the loop ---- *)
       destruct Hprun as (Hfits0 & Hp0eq & Hpv0 & Hprest0).
-      iDestruct "Hqint" as (iv0) "Hqint".
       (* +0x1a bltu a1,s1 : falls through into the loop setup *)
       iApply (wp_bltu_fall_s_sconf γ Φ (mword_of_int (FR + 0x1a)) (mword_of_int 36 : mword 13) (mword_of_int 9 : mword 5) (mword_of_int 11 : mword 5)
                 R8 (K - 6)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -568,10 +567,10 @@ Section WpSconfFreerange.
           /\ qs <> []
           /\ avail_inc_n on (length qs) = Some (length (p0 :: rest)) ⌝ -∗
         sie_cap_gpr γ M (K - 6) -∗
-        intr_count γ ncnt -∗
+        cpu_own γ ncnt eb pcur C -∗
         pc_is (mword_of_int (FR + 0x2a)) -∗
         ([∗ list] p ∈ qs, page_own p) -∗
-        a_noff ↦₄ (zeros' 32 : mword 32) -∗ (∃ iv : mword 32, a_int ↦₄ iv) -∗ a_cpu ↦₈ (zero_reg : mword 64) -∗
+        a_cpu ↦₈ (zero_reg : mword 64) -∗
         kalloc_avail γk on -∗
         (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
         (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
@@ -580,18 +579,18 @@ Section WpSconfFreerange.
         (pa_stk sp0 5) ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5) : mword 64) -∗
         (pa_stk sp0 6) ↦₈ (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
         ( ∀ mr, sie_cap_gpr γ mr K -∗
-          intr_count γ ncnt -∗
+          cpu_own γ ncnt eb pcur C -∗
           pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
-          a_noff ↦₄ (zeros' 32 : mword 32) -∗ (∃ iv : mword 32, a_int ↦₄ iv) -∗ a_cpu ↦₈ (zero_reg : mword 64) -∗
+          a_cpu ↦₈ (zero_reg : mword 64) -∗
           kalloc_avail γk (Some (length (p0 :: rest))) -∗
           WP (Loop : expr riscv_lang) {{ Φ }}) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-        { iIntros (M qs on) "%Hlen %Hinv Hcg Hcnt Hpc Hpages Hqnoff Hqint Hqcpu Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont".
+        { iIntros (M qs on) "%Hlen %Hinv Hcg Hcnt Hpc Hpages Hqcpu Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont".
           destruct Hinv as (_ & _ & _ & _ & _ & _ & _ & Hne & _).
           destruct qs; [contradiction | simpl in Hlen; lia]. }
-        iIntros (M qs on) "%Hlen %Hinv Hcg Hcnt Hpc Hpages Hqnoff Hqint Hqcpu Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont".
+        iIntros (M qs on) "%Hlen %Hinv Hcg Hcnt Hpc Hpages Hqcpu Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont".
         destruct Hinv as (Hms2 & Hms3 & Hms4 & Hmsp & Hmtp & Hmcs & Hprunq & Hqne & Hcount).
         destruct qs as [| pc0 rest0]; [contradiction |].
         destruct Hprunq as (Hfitsq & Hpc0eqq & Hpvq & Hprestq).
@@ -629,36 +628,17 @@ Section WpSconfFreerange.
           rewrite /M1 upd_ne; [exact Hmsp | vm_compute; discriminate]. }
         assert (HM2ra : M2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (FR + 0x2e) : mword 64) 4) by (rewrite /M2; apply upd_eq).
         (* ---- kfree(p) ---- *)
-        iDestruct "Hqint" as (ivl) "Hqint".
-        iApply (Kfree.wp_kfree_sconf γ Φ γl γk lk fl M2 zero_reg (zeros' 32) ivl on ncnt (K - 6)
+        iApply (Kfree.wp_kfree_sconf γ Φ γl γk lk fl M2 zero_reg on ncnt eb pcur C (K - 6)
                   ltac:(lia)
                   ltac:(rewrite HM2tp; exact Hmycpu)
                   ltac:(rewrite HM2ra; vm_compute; reflexivity)
+                  ltac:(rewrite HM2tp; exact Htp)
                   Hlk Hfl
-                  ltac:(split; intros _; [exact Hncnt | vm_compute; reflexivity])
-                  ltac:(vm_compute; reflexivity)
-                  ltac:(vm_compute; reflexivity)
-                  with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail [Hqnoff] [Hqint] [Hqcpu] [-]").
+                  ltac:(lia)
+                  with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail [Hqcpu] [-]").
         { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HM2a0; exact Hpvq | rewrite HM2a0; iExact "Hpage"]. }
-        { iEval (rewrite HM2tp). iExact "Hqnoff". }
-        { iEval (rewrite HM2tp). iExact "Hqint". }
         { iExact "Hqcpu". }
-        iIntros (mkf) "Hcg Hcnt Hpc %Hkfcs Havail Hqcpu Hqnoff Hqint".
-        iEval (rewrite HM2tp) in "Hqnoff".
-        iEval (rewrite HM2tp) in "Hqint".
-        (* kfree returned the noff cell at the release value; it is [zeros' 32]. *)
-        (* kfree returned the noff cell at the release value; at noffv = [zeros' 32]
-           it is [zeros' 32].  Compute the ISOLATED (closed) value -- vm_compute on
-           the hypothesis itself would diverge on the symbolic per-cpu address. *)
-        assert (Hnr : (autocast (T := mword) (subrange_vec_dec
-            (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 (autocast (T := mword) (subrange_vec_dec
-                (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 (zeros' 32))
-                    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
-                (Z.sub (Z.mul 4 8) 1) 0) : mword 32))
-                (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
-            (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = (zeros' 32 : mword 32))
-          by (apply bv_eq; vm_compute; reflexivity).
-        iEval (rewrite Hnr) in "Hqnoff".
+        iIntros (mkf) "Hcg Hcnt Hpc %Hkfcs Havail Hqcpu".
         assert (Hkfret : update_vec_dec (add_vec (M2 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (FR + 0x32)).
         { rewrite HM2ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hkfret) in "Hpc".
@@ -779,9 +759,9 @@ Section WpSconfFreerange.
           (* the token after the last free is [avail_inc on] = [Some (length ps)] *)
           simpl in Hcount.
           iEval (rewrite Hcount) in "Havail".
-          iApply (frepi γ Φ m N3 K ncnt a_noff a_int a_cpu γk (Some (length (p0 :: rest))) ltac:(lia)
+          iApply (frepi γ Φ m N3 K ncnt eb pcur C a_cpu γk (Some (length (p0 :: rest))) ltac:(lia)
                     Hretm HN3sp HN3cs
-                    with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Hqnoff Hqint Hqcpu Havail Hcont").
+                    with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Hqcpu Havail Hcont").
           { iExists _; iExact "Hc4". }
           { iExists _; iExact "Hc5". }
           { iExists _; iExact "Hc6". }
@@ -796,7 +776,7 @@ Section WpSconfFreerange.
                     with "Hcg Hpc Hi34 [-]").
           iNext. iIntros "Hcg Hpc".
           iEval (rewrite Htgt2a) in "Hpc".
-          iApply ("IHf" $! M3 (q0 :: rest0') (avail_inc on) with "[] [] Hcg Hcnt Hpc Hpages Hqnoff Hqint Hqcpu Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont").
+          iApply ("IHf" $! M3 (q0 :: rest0') (avail_inc on) with "[] [] Hcg Hcnt Hpc Hpages Hqcpu Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont").
           { iPureIntro. simpl in Hlen |- *. lia. }
           { iPureIntro. rewrite HM3s2 HM3s3 HM3s4 HM3sp HM3tp HM3s1.
             split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
@@ -804,7 +784,7 @@ Section WpSconfFreerange.
             split; [exact Hprestq|]. split; [discriminate|].
             rewrite avail_inc_n_comm; exact Hcount. } }
       (* apply the loop at the entry (fuel = length of the page list) *)
-      iApply ("Hloop" $! (length (p0 :: rest)) R11 (p0 :: rest) (Some 0%nat) with "[] [] Hcg Hcnt Hpc Hpages Hqnoff [Hqint] Hqcpu Havail Hra Hs0 Hs1 Hslot4 Hslot5 Hslot6 Hcont").
+      iApply ("Hloop" $! (length (p0 :: rest)) R11 (p0 :: rest) (Some 0%nat) with "[] [] Hcg Hcnt Hpc Hpages Hqcpu Havail Hra Hs0 Hs1 Hslot4 Hslot5 Hslot6 Hcont").
       { iPureIntro. lia. }
       { iPureIntro. rewrite HR11s2 HR11s3 HR11s4 HR11sp HR11tp HR11s1.
         split; [reflexivity|]. split; [reflexivity|]. split; [reflexivity|].
@@ -812,7 +792,6 @@ Section WpSconfFreerange.
         split; [simpl; split; [exact Hfits0 | split; [exact Hp0eq | split; [exact Hpv0 | exact Hprest0]]]|].
         split; [discriminate|].
         rewrite avail_inc_n_Some0; reflexivity. }
-      { iExists iv0; iExact "Hqint". }
   Qed.
 
 End WpSconfFreerange.

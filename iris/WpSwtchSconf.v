@@ -6,12 +6,16 @@
 
    - CONFIG: the caller hands the [swconf] bundle; the proof unbundles
      [sconf γ] into the raw CSR resources and runs the plain (non-sp-
-     tracking) engine [wp_vc_block_s_den_r (kpt_regime root_ppn)] -- swtch
+     tracking) engine [wp_vc_block_s_den_r strans_regime] -- swtch
      loads sp from memory, which the sp-tracking sconf VCgen cannot model.
-     The SIE=0 pin comes from [intr_count 1]'s ghost eighth agreeing with
-     [sconf]'s tied half; MPRV/SXL/MXR from [sconf_ms_facts]; menvcfg is
-     pinned MENVCFG_S by the bundle.  [sie_arm]/[intr_count]/[hart_state]/
-     [tlb_inv_pt] ride through untouched and are re-bundled at both exits.
+     The translation slot rides FOLDED through the regime-blind engines
+     (no skolem root is ever opened), so swtch is provable at either regime.
+     The SIE=0 pin comes from [swconf]'s interrupts-off eighth [intr_off_tok]
+     agreeing with [sconf]'s tied half (the crossing is always interrupts-off;
+     the counting token itself rides in the chain payload); MPRV/SXL/MXR from
+     [sconf_ms_facts]; menvcfg is pinned MENVCFG_S by the bundle.  The eighth /
+     [hart_state] / [strans_inv] ride through untouched and are re-bundled at
+     both exits.
 
    - ▷ TARGET: the [valid_context newc] premise is ▷-guarded.  At entry,
      [fupd_wp] + [later_exist_except_0] + timelessness strip the two pure
@@ -40,6 +44,8 @@ Require Import SmodeCore.
 Require Import VcGen VcGenS.
 Require Import IntrDefs.
 Require Import WpSmodePtCtl.
+Require Import StackOwn.
+Require Import CpuOwn.
 Require Import SwtchCtx.
 Require Import WpSwtchVc.
 Require Import SpecSwtch.
@@ -52,20 +58,32 @@ Section WpSwtchSconf.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
+  Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
+    Timeless (stack_own sp n).
+  Proof.
+    rewrite /stack_own. apply bi.exist_timeless. intros ws.
+    apply bi.sep_timeless; [ apply _ | ].
+    apply big_sepL_timeless. intros ? ?.
+    rewrite /word_pointsto /mem_pointsto. apply _.
+  Qed.
+
   Lemma wp_swtch_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
-      (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64)) :
-    wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs.
+      (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
+      (av : nat) (eb : bool) (p : mword 64) :
+    wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hal_old)
-      "#Ht Hswconf Hpc Hfile Holdcells Hvalidnew HP Hwold".
-    (* ---- unbundle swconf / sconf into the raw CSR resources ---- *)
-    iEval (rewrite /swconf) in "Hswconf".
-    iDestruct "Hswconf" as "(Hsc & Hhs & Htr & Hsiearm & Hintr)".
-    (* open the translation slot at its skolem root; instantiate the regime
-       engines at that root and refold [strans_inv] when handing [swconf] back *)
-    iDestruct "Htr" as (root_ppn) "Htlbinv".
+      "#Ht Hcg Hcpuown Hpc Holdcells Hvalidnew HP Hwold".
+    (* The record no longer parks [eb] or an avail copy: its resume wand is
+       [∀ m eb'], so the resumer supplies cpu_own at ITS OWN [eb']; the
+       same-eb contract is realized one level up (sched's intena epilogue). *)
+    (* ---- unbundle sie_cap_gpr into hart_state / sconf / sie_cap / gpr_file;
+       sie_cap into stack + strans_inv + arm ---- *)
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+    iEval (rewrite /sie_cap) in "Hcap".
+    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -73,21 +91,30 @@ Section WpSwtchSconf.
     iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvx" as (menvcfg0)
       "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    (* ---- SIE = 0 from the intr_count-1 eighth agreeing with sconf's tied half ---- *)
-    iDestruct (intr_count_pos_off γ 0 with "Hintr") as "[Hq0 Hrestore]".
+    (* ---- refute sie_arm '1' against cpu_own's level-1 count eighth; keep the
+       off-eighth [Hq0] for the SIE=0 pin, refold cpu_own ---- *)
+    iEval (rewrite /cpu_own) in "Hcpuown".
+    iDestruct "Hcpuown" as "(%Hcpb & Hcnoff & Hcint & Hccnt & Hcproc & _)".
+    iDestruct (intr_count_pos_off γ 0 with "Hccnt") as "[Hq0cnt Hres]".
+    iAssert (intr_off_tok γ ∗ intr_count γ 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
+    { iDestruct "Hsiearm" as "[Hq0arm | (Hq1arm & _)]".
+      - iFrame "Hq0arm". rewrite /intr_count. iFrame "Hq0cnt Hres".
+      - iDestruct (ghost_var_agree with "Hq0cnt Hq1arm") as %Hbad.
+        exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate. }
+    iAssert (cpu_own γ 1 eb p emp) with "[Hcnoff Hcint Hccnt Hcproc]" as "Hcpuown".
+    { rewrite /cpu_own. iFrame "Hcnoff Hcint Hccnt Hcproc". iPureIntro; exact Hcpb. }
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).
-    (* re-pack [intr_count 1] NOW (folded): a folded [intr_count] has no leading
-       ▷, so it rides through the c.ret's [iNext] untouched -- whereas the raw
-       [intr_restore] carries an internal ▷ that [iNext] would strip. *)
-    iDestruct (intr_count_pack_S γ 0 with "Hq0 Hrestore") as "Hintr".
-    (* ---- strip the ▷ off the target VC: keep the resume wand ▷'d ---- *)
+    (* ---- strip the ▷ off the target VC record.  [valid_context γ Φ P newc p]
+       is indexed by the caller's OWN [p]; its existentials are just (vs, av),
+       and its resume wand demands cpu_own at that SAME index p -- so the
+       cpu_own we already hold fits with no retune, no equation. ---- *)
     iApply fupd_wp.
-    iEval (rewrite (valid_context_unfold (swconf γ) Φ P newc)
-                   /valid_context_pre bi.later_exist) in "Hvalidnew".
-    iDestruct "Hvalidnew" as (new_vs) "Hvalidnew".
-    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & Hnewwand)".
+    iEval (rewrite (valid_context_unfold γ Φ P newc p)
+                   /valid_context_pre !bi.later_exist) in "Hvalidnew".
+    iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
+    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
     iModIntro.
     (* ---- the symbolic environment: 0..31 = m0; 32..45 = new's saved; 46..59 = old's ---- *)
     iDestruct (VcGenS.gpr_file_dom with "Hfile") as "[%Hdom Hfile]".
@@ -113,13 +140,13 @@ Section WpSwtchSconf.
       apply (list14_nth new_vs (mword_of_int 0) Hlen_new). }
     iDestruct (swtch_code with "Ht") as "Hcode".
     iEval (rewrite -Hden) in "Hfile".
-    (* ---- run the 28-instruction straight-line block (plain kpt_regime engine) ---- *)
-    iApply (wp_vc_block_s_den root_ppn swtch_prog Φ
+    (* ---- run the 28-instruction straight-line block (regime-blind engine) ---- *)
+    iApply (wp_vc_block_s_den_r strans_regime swtch_prog Φ
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
-              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hcode [Holdcells Hnewcells] []").
     { rewrite /vheap_own /swtch_heap0 big_sepL_app.
       rewrite (seg_cells_ctx rho 10 oldc 0 _ Hrho10).
@@ -128,7 +155,7 @@ Section WpSwtchSconf.
       rewrite -/(ctx_cells oldc old_vs) -/(ctx_cells newc new_vs).
       iFrame "Holdcells Hnewcells". }
     { rewrite /vheap4_own. cbn [vheap4]. done. }
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hheap _".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile Hheap _".
     (* ---- split the post-block heap into old's (now current callee regs) and new's ---- *)
     iEval (rewrite /vheap_own /swtch_heap1 big_sepL_app
                    (seg_cells_ctx rho 10 oldc 0 ctx_regs_nat Hrho10)
@@ -139,11 +166,15 @@ Section WpSwtchSconf.
     { unfold callee_img, ctx_regs, ctx_regs_nat, rho; cbn. reflexivity. }
     iEval (rewrite Hmapcallee Hmapnew) in "Hheap".
     iDestruct "Hheap" as "[Holdpart Hnewpart]".
-    (* ---- build [valid_context P oldc] from old's restored cells + the caller cont ---- *)
-    iAssert (valid_context (swconf γ) Φ P oldc)
-      with "[Holdpart Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold (swconf γ) Φ P oldc) /valid_context_pre.
-      iExists (callee_img m0).
+    (* ---- build the OLD context's record: (callee_img m0, av, p), the caller's
+       stack (keyed by saved sp), and the caller continuation as the resume
+       wand.  Pack p := the spec's [p] param; the caller continuation [Hwold]
+       is already [∀ m eb', … cpu_own γ 1 eb' p emp …], matching the record's
+       [∀ m eb'] wand at that same p. ---- *)
+    iAssert (valid_context γ Φ P oldc p)
+      with "[Holdpart Hstk Hwold]" as "Hvoldc".
+    { rewrite (valid_context_unfold γ Φ P oldc p) /valid_context_pre.
+      iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.
@@ -153,7 +184,12 @@ Section WpSwtchSconf.
           by (unfold callee_img, ctx_regs; cbn; reflexivity).
         rewrite Hn0. exact Hal_old. }
       rewrite -/(ctx_cells oldc (callee_img m0)).
-      iFrame "Holdpart". iExact "Hwold". }
+      iFrame "Holdpart".
+      iSplitL "Hstk".
+      { assert (Hn1 : nth 1 (callee_img m0) (mword_of_int 0) = m0 !!! Regidx csp_rs1)
+          by (unfold callee_img, ctx_regs, csp_rs1; cbn; reflexivity).
+        rewrite Hn1. iExact "Hstk". }
+      iExact "Hwold". }
     (* ---- the trailing c.ret returns to new's saved return address ---- *)
     assert (Hm1 : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5)
                 = nth 0 new_vs (mword_of_int 0)).
@@ -176,20 +212,24 @@ Section WpSwtchSconf.
       repeat f_equal;
         (erewrite vregs_den_lookup by (vm_compute; reflexivity);
          apply sval_den_SX0). }
+    (* the resumed file's sp (= new's saved sp = nth 1 new_vs) keys its stack. *)
+    assert (Hcsp_t : vregs_den rho swtch_regs1 !!! Regidx csp_rs1
+                     = nth 1 new_vs (mword_of_int 0)).
+    { rewrite <- Hcallee_new. unfold callee_img, ctx_regs, csp_rs1. cbn. reflexivity. }
     iDestruct (swi_ret with "Ht") as "Hret".
-    iApply (wp_cret_s_zca_r_later (kpt_regime root_ppn) Φ
+    iApply (wp_cret_s_zca_r_later strans_regime Φ
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
               ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe Hlow
-              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hret
-                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hsiearm Hintr]").
-    (* ---- the ▷ continuation: iNext strips it AND the resume wand's later ---- *)
+                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hq0 Hcpuown Hstk_t]").
+    (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
     iNext.
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile".
-    (* ---- rebuild sconf, then swconf, and hand control to new's saved WP ---- *)
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
+    (* ---- rebuild sconf ---- *)
     iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv]" as "Hsc".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
       iSplitL "Hms Hhalf".
@@ -197,19 +237,15 @@ Section WpSwtchSconf.
       iSplitL "Hmie Hmdl".
       { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    (* the c.ret's [iNext] stripped [intr_count]'s internal ▷ (on the handler
-       spec); re-introduce it via [intr_restore_intro] and re-pack. *)
-    iDestruct "Hintr" as "(Hq0 & (%h & #Hinv_h & #Hspec_h) & Hsepc & Hscause & Hstval)".
-    iDestruct (intr_restore_intro γ h
-                 with "Hinv_h Hspec_h Hsepc Hscause Hstval") as "Hrestore".
-    iDestruct (intr_count_pack_S γ 0 with "Hq0 Hrestore") as "Hintr".
-    iAssert (swconf γ)
-      with "[Hsc Hhs Htlbinv Hsiearm Hintr]" as "Hswconf".
-    { rewrite /swconf. iFrame "Hsc Hhs Hsiearm Hintr".
-      (* refold [strans_inv] at the skolem root the entry destructured *)
-      iExists root_ppn. iExact "Htlbinv". }
-    iApply ("Hnewwand" $! (vregs_den rho swtch_regs1)
-              with "[] Hswconf Hpc Hfile Hnewpart [Hvoldc HP]").
+    (* ---- the target record's resume wand is [∀ m eb'] and demands cpu_own at
+       the record's INDEX p (= our own p); supply our bundle at our own [eb]
+       (eb' := eb) -- no retune, no equation. ---- *)
+    iAssert (sie_cap γ (vregs_den rho swtch_regs1) av_t) with "[Hstk_t Htr Hq0]" as "Hcap_t".
+    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iLeft. iExact "Hq0". }
+    iDestruct (sie_cap_gpr_join γ (vregs_den rho swtch_regs1) av_t
+                 with "Hhs Hsc Hcap_t Hfile") as "Hcg_t".
+    iApply ("Hnewwand" $! (vregs_den rho swtch_regs1) eb
+              with "[] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hcallee_new. }
     iExists oldc. iSplitL "Hvoldc".
     { iNext. iExact "Hvoldc". }

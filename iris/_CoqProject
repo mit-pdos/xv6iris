@@ -212,6 +212,8 @@ TrampPt.v
 VcGen.v
 VcGenS.v
 SwtchCtx.v
+CpuOwn.v
+WpPushOffBridges.v
 WpSwtchVc.v
 SpecSwtch.v
 WpSwtchSconf.v

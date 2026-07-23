@@ -30,6 +30,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
+Require Import SwtchCtx CpuOwn.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -40,7 +41,7 @@ Notation HSL := KernelSyms.holdingsleep.
 Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (dq : dfrac) :=
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -50,30 +51,24 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (16 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ 0 -∗
+  cpu_own γ 0 eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle (returned untouched) *)
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pidv -∗
   sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-  a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-  (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
-  (* the current process and its pid, agreeing with the lock's pid field *)
-  cur_proc p -∗
+  (* the caller's own pid, agreeing with the lock's pid field *)
   p_pid p ↦₄{dq} pidv -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ 0 -∗
+      cpu_own γ 0 eb p C -∗
       pc_is ret_tgt -∗
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
       sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-      a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-      (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
-      cur_proc p -∗
       p_pid p ↦₄{dq} pidv -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -83,6 +78,6 @@ Module Type HOLDINGSLEEP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) {dq : dfrac},
-      wp_holdingsleep_sconf_body γ Φ γl γsl s R m p pidv av dq.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac},
+      wp_holdingsleep_sconf_body γ Φ γl γsl s R m p pidv av eb C dq.
 End HOLDINGSLEEP.

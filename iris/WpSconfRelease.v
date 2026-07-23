@@ -54,14 +54,14 @@ Section WpSconfRelease.
   Lemma wp_release_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
-      (cpuold : mword 64) (noffv intenav : mword 32) (n : nat) (av : nat) {dqi : dfrac}
-    : wp_release_sconf_body γ Φ γl lka s R m cpuold noffv intenav n av dqi.
+      (cpuold : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+    : wp_release_sconf_body γ Φ γl lka s R m cpuold n eb p C av.
   Proof.
     cbv beta delta [wp_release_sconf_body].
-    intros pcE lk0 a_cpu cpuv a_noff a_int nv1 storeval_noff ret_tgt
-           Hlka Hmine Hcoup Hnoffpos Hal0 Hav.
+    intros pcE lk0 a_cpu cpuv ret_tgt
+           Hlka Hmine Hal0 Htp Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hcpu Hnoff Hint Hcnt Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hcpu Hown Hpay Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
     iPoseProof (rli_02 with "Htext") as "Hi02".
     iPoseProof (rli_04 with "Htext") as "Hi04".
@@ -255,16 +255,12 @@ Section WpSconfRelease.
     assert (HcspM1 : M1 !!! Regidx csp_rs1 = spr).
     { rewrite /M1 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspR3. }
-    iApply (PushOff.wp_pop_off_sconf γ Φ M1 (av - 4)%nat noffv intenav n (dqi := dqi)
-              Hcoup Hnoffpos
+    iApply (PushOff.wp_pop_off_sconf γ Φ M1 (av - 4)%nat n eb p C
               ltac:(rewrite upd_eq; vm_compute; reflexivity)
+              ltac:(rewrite HtpM1; exact Htp)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hnoff] [Hint] [-]").
-    { iEval (rewrite HtpM1). iExact "Hnoff". }
-    { iEval (rewrite HtpM1). iExact "Hint". }
-    iIntros (mf) "Hcg Hcnt Hpc %Hmf Hnoff Hint".
-    iEval (rewrite HtpM1) in "Hnoff".
-    iEval (rewrite HtpM1) in "Hint".
+              with "Hcg Hown Hpay Htext Hpc [-]").
+    iIntros (mf) "Hcg Hown Hpc %Hmf".
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc22 : update_vec_dec (add_vec (add_vec_int (mword_of_int (RL + 0x1e) : mword 64) 4) (sign_extend' 64 (zeros' 12))) 0 ('b"0")
                     = (mword_of_int (RL + 0x22) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -371,7 +367,7 @@ Section WpSconfRelease.
     assert (Hra_final : update_vec_dec (add_vec (E4 !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! E4 with "Hcg Hpc [%] Hcpu Hnoff Hint Hcnt").
+    iApply ("Hcont" $! E4 with "Hcg Hpc [%] Hcpu Hown").
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).

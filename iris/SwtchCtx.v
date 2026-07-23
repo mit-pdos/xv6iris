@@ -17,7 +17,10 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile WpGpr.
 Require Import SmodeCore.
+Require Import StackOwn.
 Require Import IntrDefs.
+Require Import ProcGeom.
+Require Import CpuOwn.
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -39,6 +42,7 @@ Definition ctx_pc (ra : mword 64) : mword 64 :=
 
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
   (* ================================================================== *)
@@ -92,36 +96,60 @@ Section SwtchCtx.
   (* context field again to ever swtch OUT again (it is what the next          *)
   (* park saves into).                                                        *)
   (* -------------------------------------------------------------------- *)
+  (* THE FULL-BUNDLE INTERFACE: a parked coroutine's record stores, beside
+     its saved registers, ITS OWN free stack ([kv_frame_slots + av] slots
+     below the saved sp -- sp is callee-saved and pinned by [callee_img],
+     so on resume the stack re-attaches to the fresh file).  [p] is an
+     INDEX of the context, not a record existential: the protocol pre-sets
+     c->proc before every dispatch (the scheduler's c->proc = p store; a
+     parking proc never touches it), every wrapper user KNOWS its
+     context's p (proc j's context is indexed by proc_addr j; the parked
+     scheduler's by the proc it was dispatching), and both directions of
+     a crossing happen at the same c->proc value -- so the hand-off's
+     resumer-record carries the SAME index and the swtch spec ties the
+     caller's [cpu_own] p to the target's index directly.  The base-enable index is [∀ eb'] -- the RESUMER's:
+     swtch itself performs NO stores to struct cpu, so at this altitude
+     the intena cell physically still holds the resumer's state; the
+     same-eb contract lives one level up (SpecSched), realized by sched's
+     own epilogue intena store + ghost retune.  Level 1 = xv6's
+     noff==1-at-swtch invariant; slot [emp]: the in-flight context cells
+     ride separately.  The stack-free crossing remainder ([swconf] below)
+     is internal to the swtch proof; no [sc] parameter remains. *)
   Definition valid_context_pre
-      (sc : iProp Σ) (Phi : mval -> iProp Σ)
+      (γ : gname) (Phi : mval -> iProp Σ)
       (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
-      (rec : mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ := fun c =>
-    (∃ vs : list (mword 64),
+      (rec : mword 64 -d> mword 64 -d> iPropO Σ)
+      : mword 64 -d> mword 64 -d> iPropO Σ := fun c p =>
+    (∃ (vs : list (mword 64)) (av : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ctx_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
-      (∀ (m : regfile),
-         ⌜callee_img m = vs⌝ -∗ sc -∗
-         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗ gpr_file m -∗
+      stack_own (nth 1 vs (mword_of_int 0)) (kv_frame_slots + av) ∗
+      (∀ (m : regfile) (eb' : bool),
+         ⌜callee_img m = vs⌝ -∗
+         sie_cap_gpr γ m av -∗
+         cpu_own γ 1 eb' p emp -∗
+         pc_is (ctx_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
          (∃ cret : mword 64,
-            ▷ rec cret ∗ P c cret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
+            ▷ rec cret p ∗ P c cret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
          WP (Loop : expr riscv_lang) {{ Phi }}))%I.
 
-  Global Instance valid_context_pre_contractive sc Phi
+  Global Instance valid_context_pre_contractive γ Phi
       (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) :
-    Contractive (valid_context_pre sc Phi P).
+    Contractive (valid_context_pre γ Phi P).
   Proof. solve_contractive. Qed.
 
-  Definition valid_context (sc : iProp Σ) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) : mword 64 -d> iPropO Σ :=
-    fixpoint (valid_context_pre sc Phi P).
+  Definition valid_context (γ : gname) (Phi : mval -> iProp Σ)
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      : mword 64 -d> mword 64 -d> iPropO Σ :=
+    fixpoint (valid_context_pre γ Phi P).
 
-  Lemma valid_context_unfold (sc : iProp Σ) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) (c : mword 64) :
-    valid_context sc Phi P c ⊣⊢
-      valid_context_pre sc Phi P (valid_context sc Phi P) c.
-  Proof. apply (fixpoint_unfold (valid_context_pre sc Phi P) c). Qed.
+  Lemma valid_context_unfold (γ : gname) (Phi : mval -> iProp Σ)
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) (c p : mword 64) :
+    valid_context γ Phi P c p ⊣⊢
+      valid_context_pre γ Phi P (valid_context γ Phi P) c p.
+  Proof. apply (fixpoint_unfold (valid_context_pre γ Phi P) c p). Qed.
 
 End SwtchCtx.
 
@@ -139,10 +167,23 @@ Section Swconf.
   (* noff == 1 at every scheduler swtch (exactly one push_off              *)
   (* outstanding on both sides).                                           *)
   (* ------------------------------------------------------------------ *)
+  (* The counting token does NOT ride here: it crosses inside the chain
+     payload's [cpu_own] (SchedCtx.cpu_cells), whose context-slot argument
+     is [emp] at the crossing -- the suspender's slot content is exactly
+     the target-context resource it feeds to the swtch, and the resumed
+     party re-fills the slot from its own swtch's returned cells.
+
+     The SIE arm crosses as the BARE '0' EIGHTH [intr_off_tok γ], not the
+     [sie_arm] disjunction: a scheduler swtch always runs interrupts-off
+     (noff >= 1 on both sides), and the swtch proof needs the SIE=0 pin
+     for its block engine -- the '1' arm would be unrefutable here since
+     the conflicting count eighth rides opaquely inside the payload.  The
+     suspender refutes its arm's '1' branch against the level-1 count
+     eighth before packing; the resumed party rebuilds [sie_arm] via
+     [iLeft]. *)
   Definition swconf (γ : gname) : iProp Σ :=
     (sconf γ ∗
      hart_state ↦ᵣ HART_ACTIVE tt ∗
      strans_inv ∗
-     sie_arm γ ∗
-     intr_count γ 1)%I.
+     intr_off_tok γ)%I.
 End Swconf.

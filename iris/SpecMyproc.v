@@ -23,6 +23,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import SwtchCtx CpuOwn.
 Require Import WpIntenaBits.
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -32,44 +33,26 @@ Notation MP := KernelSyms.myproc.
 
 Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
-    (m : regfile) (av n : nat) (noffv intena_old : mword 32) (p : mword 64) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.myproc in
-  (* the noff cell value after push_off's increment (its own storeval form);
-     the pop_off restores it to exactly [noffv] (noff_push_pop_id). *)
-  let noff1 : mword 32 :=
-    (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec
-       (add_vec (sign_extend' 64 noffv)
-                (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
-       (Z.sub (Z.mul 4 8) 1) 0) : mword 32) in
-  let nv1 := sign_extend' 64 (subrange_vec_dec
-     (add_vec (sign_extend' 64 noff1)
-              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0) in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
                    (sign_extend' 64 (zeros' 12))) 0 ('b"0") in
   (* the hart id is the ambient CpuId *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  (* pop_off's level/cell correlation and positivity, at the incremented cell *)
-  (neq_vec nv1 zero_reg = false <-> n = 0%nat) ->
-  zopz0zKzJ_s zero_reg (sign_extend' 64 noff1) = false ->
+  (* push_off's transient noff increment stays in int range *)
+  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (10 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ n -∗
+  cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  a_cpu_noff cid_word ↦₄ noffv -∗
-  a_cpu_int cid_word ↦₄ intena_old -∗
-  cur_proc p -∗
   ( ∀ (ms : mword 64) (mf : regfile),
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ n -∗
+      cpu_own γ n eb p C -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = p ⌝ -∗
-      a_cpu_noff cid_word ↦₄ noffv -∗
-      a_cpu_int cid_word ↦₄ (if eq_vec (sign_extend' 64 noffv) zero_reg
-                             then po_intena_val ms else intena_old) -∗
-      cur_proc p -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -77,6 +60,6 @@ Module Type MYPROC.
   Parameter wp_myproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av n : nat) (noffv intena_old : mword 32) (p : mword 64),
-      wp_myproc_sconf_body γ Φ m av n noffv intena_old p.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
+      wp_myproc_sconf_body γ Φ m av n eb p C.
 End MYPROC.

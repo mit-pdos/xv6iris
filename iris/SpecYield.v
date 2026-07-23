@@ -24,6 +24,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
+Require Import SwtchCtx CpuOwn.
 Require Import SchedCtx.
 Require Import SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -34,7 +35,7 @@ Notation YD := KernelSyms.yield.
 Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.yield in
   let pj := proc_addr j in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -45,26 +46,20 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (20 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ 0 -∗
+  cpu_own γ 0 eb pj C -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γ Φ γs -∗
-  cur_proc pj -∗
-  a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-  (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   ( ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ 0 -∗
+      cpu_own γ 0 eb pj C -∗
       pc_is ret_tgt -∗
-      cur_proc pj -∗
-      a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-      (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
       p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -73,6 +68,6 @@ Module Type YIELD.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat),
-      wp_yield_sconf_body γ Φ γs j γl m av.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
+      wp_yield_sconf_body γ Φ γs j γl m av eb C.
 End YIELD.

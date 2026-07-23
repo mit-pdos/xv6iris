@@ -12,28 +12,34 @@
      - the SIE-AGNOSTIC v2 bundle (the smode_config successor):
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
        (SIE unpinned, ghost half tied to the live bit, menvcfg bundled),
-       and the kernel-code capability [sie_cap γ root m avail] -- it owns
-       the [kv_frame_slots + avail] free-stack slots below sp ([avail]
-       of them available to kernel code, the rest reserved for a
-       potential interrupt frame; sp moves trade against [avail] via
-       [sie_cap_push]/[sie_cap_pop]) plus the SIE arm: '0' is the bare
-       quarter token, '1' carries the quarter + the interrupt invariant
-       + the trap-scratch CSRs, i.e. exactly the extra obligations of
-       running with interrupts enabled;
+       the kernel-code capability [sie_cap γ m avail] -- the
+       [kv_frame_slots + avail] free-stack slots below sp (sp moves trade
+       against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
+       SLOT [strans_inv] (Bare-with-stvec ∨ ∃root kernel-PT, consumed
+       foldedly via the derived regime [strans_regime]), and the SIE arm
+       ('0' = the bare eighth; '1' adds the interrupt invariant + trap
+       CSRs); the ambient bundle [sie_cap_gpr] = hart_state ∗ sconf ∗
+       sie_cap ∗ gpr_file;
+     - the push/pop counting token [intr_count γ n eb] (§6b: eb = the
+       saved base-enable state; eb=true payload is the persistent
+       [intr_handler_avail]; the trap CSRs ride [trap_csrs_pay] on
+       unbalanced specs only);
      - the conversions [intr_config_of_v2] / [v2_of_intr_config] the
        agnostic engines use to enter/exit the absorbing step engine.   *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var invariants.
+From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
+Require Import SmodePte KptPt.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
+Require Import SRegime.
 Require Import MstatusBits WpIntrCore.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
    namespace doesn't shadow anything here. *)
@@ -408,18 +414,156 @@ Section IntrDefs.
       (∃ v : mword 64, stval ↦ᵣ v)))%I.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
-     S-mode translation invariant, its root hidden.  Clients thread the
-     capability and never name the kernel root; a step engine or data leaf
-     opens the slot, works at the skolem root, and repacks it.  This is the
-     single place the eventual Bare boot regime will join as a disjunct
-     ([bare_inv ∨ ...], SRegime.v), making the whole capability tier -- and
-     every whole-function spec over it -- regime-oblivious. *)
+     S-mode translation invariant, regime and root hidden.  Clients thread
+     the capability and never name either; engines and data/device leaves
+     consume the slot FOLDED through the derived regime instance
+     [strans_regime] below.
+       - BARE (boot): satp Mode = Bare, plus ownership of STVEC -- no trap
+         handler is installed yet.  The stvec cell is what refutes
+         "interrupts enabled while Bare": the SIE arm's '1' branch carries
+         [intr_inv], whose invariant owns [stvec ↦ᵣ handler], and two full
+         cells conflict ([reg_pointsto_conflict]).  Installing the handler
+         (trapinithart) is only possible after this arm is dissolved.
+       - KPT: the kernel table installed at some root.  Says NOTHING about
+         stvec: between kvminithart (Bare→Sv39) and trapinithart the cell
+         rides client-side (Sv39, no handler, SIE=0 -- a legal state).
+     The Bare→KPT move happens once, at kvminithart: dissolve the left arm
+     (it owns the satp cell the switch writes), build [tlb_inv_pt], hand the
+     stvec cell out to the boot code. *)
   Definition strans_inv : iProp Σ :=
-    (∃ root_ppn : mword 44, tlb_inv_pt root_ppn)%I.
+    ((bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
+     ∨ (∃ root_ppn : mword 44, tlb_inv_pt root_ppn))%I.
 
   Lemma strans_inv_intro (root_ppn : mword 44) :
     tlb_inv_pt root_ppn -∗ strans_inv.
-  Proof. iIntros "H". iExists root_ppn. iExact "H". Qed.
+  Proof. iIntros "H". iRight. iExists root_ppn. iExact "H". Qed.
+
+  Lemma strans_inv_intro_bare (v : mword 64) :
+    bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
+  Proof. iIntros "Hb Hstv". iLeft. iFrame "Hb". iExists v. iExact "Hstv". Qed.
+
+  (* two FULL cells of the same register cannot coexist -- the Bare∧SIE='1'
+     refutation's engine (the dq-generic second cell lets a borrowed
+     invariant copy conflict with the slot's full cell). *)
+  Lemma reg_pointsto_conflict (r : register) (dq : dfrac)
+      (v1 v2 : type_of_register r) :
+    r ↦ᵣ v1 -∗ r ↦ᵣ{ dq } v2 -∗ ⌜ False ⌝.
+  Proof.
+    rewrite /reg_pointsto. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_ne with "H1 H2") as %Hne.
+    iPureIntro. exact (Hne eq_refl).
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* [strans_regime] -- the slot packaged as a DERIVED [s_regime]: each    *)
+  (* field destructs the disjunct and delegates to the proven              *)
+  (* [bare_regime] / [kpt_regime root] fields, so every engine and leaf    *)
+  (* built on the R-generic machinery serves BOTH regimes with the slot    *)
+  (* kept folded (no skolem-root open/repack at leaf level).               *)
+  (* ------------------------------------------------------------------- *)
+  Lemma strans_absorb :
+    forall acc va σ, s_acc_ok acc ->
+      addr_is_ram va ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
+  Proof.
+    intros acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iIntros "Hri Hgh [[Hb Hstv] | Hk]".
+    - iMod (bare_absorb acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+              with "Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
+      iModIntro. iExists σ'.
+      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+      iFrame "Hri Hgh". iLeft. iFrame "Hb Hstv".
+    - iDestruct "Hk" as (root_ppn) "Ht".
+      iMod (kpt_absorb root_ppn acc va σ Hacc Hram Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+              with "Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iModIntro. iExists σ'.
+      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+      iFrame "Hri Hgh". iRight. iExists root_ppn. iExact "Ht".
+  Qed.
+
+  Lemma strans_transform :
+    forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
+      s_acc_ok acc ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
+      ⊢ reg_interp σ.(sregs) -∗ strans_inv -∗
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝.
+  Proof.
+    intros acc ea σ Hacc Hcp HSXL Heff Hpml.
+    iIntros "Hri [[Hb _] | Hk]".
+    - iApply (bare_transform acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Hb").
+    - iDestruct "Hk" as (root_ppn) "Ht".
+      iApply (kpt_transform root_ppn acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Ht").
+  Qed.
+
+  Lemma strans_absorb_dev :
+    forall acc va σ, (acc = Load Data \/ acc = Store Data) ->
+      kpt_dev_vpn (svpn_of va) ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
+  Proof.
+    intros acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    iIntros "Hri Hgh [[Hb Hstv] | Hk]".
+    - iMod (bare_absorb_dev acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+              with "Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
+      iModIntro. iExists σ'.
+      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+      iFrame "Hri Hgh". iLeft. iFrame "Hb Hstv".
+    - iDestruct "Hk" as (root_ppn) "Ht".
+      iMod (kpt_absorb_dev root_ppn acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+              with "Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iModIntro. iExists σ'.
+      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+      iFrame "Hri Hgh". iRight. iExists root_ppn. iExact "Ht".
+  Qed.
+
+  Definition strans_regime : s_regime :=
+    SRegime strans_inv strans_absorb strans_transform strans_absorb_dev.
+
+  (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
+     leaf/engine call sites use without unfolding the record. *)
+  Lemma strans_regime_inv : sr_inv strans_regime ⊣⊢ strans_inv.
+  Proof. reflexivity. Qed.
 
   Definition sie_cap (γ : gname) (m : regfile) (avail : nat) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
@@ -445,6 +589,28 @@ Section IntrDefs.
      of the step engines threads only the hart_state-LESS residue
      ([sconf] + [sie_cap] + [gpr_file]) -- the engine holds hart_state
      across the step and hands it back to the final continuation. *)
+  (* BOOT ENTRY: the capability at the Bare regime, from raw boot
+     resources -- the free-stack carve, satp still Bare + PMP, the
+     UNWRITTEN stvec cell (no trap handler installed), and the SIE
+     ghost's kernel-code eighth at '0'.  Nothing here requires the
+     kernel page table, an interrupt handler, or the trap CSRs: this is
+     what makes the whole sconf-tier (memset, the lock/kalloc cone via
+     [cpu_own γ 0 false p C], ...) callable during early boot. *)
+  Lemma sie_cap_intro_bare (γ : gname) (m : regfile) (avail : nat)
+      (v : mword 64) :
+    stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) -∗
+    bare_inv -∗
+    stvec ↦ᵣ v -∗
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
+    sie_cap γ m avail.
+  Proof.
+    iIntros "Hstk Hb Hstv Htok".
+    iFrame "Hstk".
+    iSplitL "Hb Hstv".
+    { iApply (strans_inv_intro_bare with "Hb Hstv"). }
+    iLeft. iExact "Htok".
+  Qed.
+
   Definition sie_cap_gpr (γ : gname)
       (m : regfile) (avail : nat) : iProp Σ :=
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
@@ -579,82 +745,137 @@ Section IntrDefs.
   Qed.
 
   (* =================================================================== *)
-  (* §6b THE PUSH/POP COUNTING TOKEN.  [intr_count γ root n] is the      *)
+  (* §6b THE PUSH/POP COUNTING TOKEN.  [intr_count γ n eb] is the       *)
   (* per-cpu interrupt-disable bookkeeping token push_off/pop_off manage *)
-  (* (n mirrors the noff nesting depth).  It carries the COMPLEMENTARY   *)
-  (* EIGHTH of the SIE ghost at EVERY level -- the other half of the     *)
-  (* capability's eighth at either arm -- so arm knowledge is pure ghost *)
-  (* agreement wherever the token travels: n > 0 implies interrupts are  *)
-  (* disabled ('0'-eighth), and at n = 0 the eighth records the current  *)
-  (* arm.  Every level >= 1 (and the n = 0 disabled state) also carries  *)
-  (* the RESTORE payload (the invariant copy + later'd handler spec +    *)
-  (* the trap CSRs) -- the enable flip is sound whenever csrsi actually  *)
-  (* executes, so no intena correlation is needed in the token itself.   *)
+  (* (n mirrors the noff nesting depth; [eb] is xv6's saved intena --    *)
+  (* the BASE enable state recorded at the 0→1 push).  It carries the    *)
+  (* COMPLEMENTARY EIGHTH of the SIE ghost at every level -- the other   *)
+  (* half of the capability's eighth at either arm -- so arm knowledge   *)
+  (* is pure ghost agreement wherever the token travels: n > 0 implies   *)
+  (* interrupts are disabled ('0'-eighth), and at n = 0 the eighth       *)
+  (* mirrors the LIVE bit, which is [eb] itself.  The RESTORE payload    *)
+  (* (invariant copy + later'd handler spec + the trap CSRs) is carried  *)
+  (* ONLY at n ≥ 1 with eb = true -- exactly what the final pop's        *)
+  (* re-enable flip consumes.  At eb = false the token is JUST the       *)
+  (* eighth: push_off/pop_off from an interrupts-disabled base state are *)
+  (* no-ops on SIE and need no handler, no stvec, no trap CSRs -- the    *)
+  (* early-boot discipline ([intr_count γ 0 false] = [intr_off_tok γ]).  *)
   (* =================================================================== *)
-  Definition intr_restore (γ : gname) : iProp Σ :=
-    ((∃ handler : mword 64,
+  Definition sie_bit (eb : bool) : mword 1 := if eb then 'b"1" else 'b"0".
+
+  (* the persistent half of the old restore payload: an interrupt handler
+     is installed and its contract is available.  Persistent (intr_inv and
+     the □ handler spec both are), hence duplicable -- a crossing retune
+     (sched's intena restore) can drop or re-duplicate it freely. *)
+  Definition intr_handler_avail (γ : gname) : iProp Σ :=
+    (∃ handler : mword 64,
         intr_inv γ handler ∗
-        ▷ intr_handler_spec handler) ∗
-     (∃ v : mword 64, sepc ↦ᵣ v) ∗
+        ▷ intr_handler_spec handler)%I.
+
+  Global Instance intr_handler_avail_persistent γ :
+    Persistent (intr_handler_avail γ).
+  Proof. rewrite /intr_handler_avail. apply _. Qed.
+
+  (* the LINEAR half: the trap-scratch CSRs.  They live in the SIE arm's
+     '1' branch while interrupts are enabled, and are threaded EXPLICITLY
+     at SIE=0 -- they ride on the UNBALANCED specs only (bare push_off /
+     pop_off, acquire's post / release's pre, the flip leaves), via
+     [trap_csrs_pay]: owed exactly at a level-0 boundary with an enabled
+     base.  Push/pop-balanced functions never mention them. *)
+  Definition trap_csrs : iProp Σ :=
+    ((∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v))%I.
 
-  Definition intr_count (γ : gname) (n : nat) : iProp Σ :=
+  Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
+    (match n with
+     | O => if eb then trap_csrs else emp
+     | S _ => emp
+     end)%I.
+
+  Definition intr_restore (γ : gname) : iProp Σ :=
+    (intr_handler_avail γ ∗ trap_csrs)%I.
+
+  Definition intr_count (γ : gname) (n : nat) (eb : bool) : iProp Σ :=
     match n with
-    | O => (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1)
-            ∨ (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ))%I
-    | S _ => (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ)%I
+    | O => ghost_var γ (1/4/2)%Qp (sie_bit eb)
+    | S _ => (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
+              (if eb then intr_handler_avail γ else emp))%I
     end.
 
-  (* enter the push/pop discipline at level 0 from raw SIE-token
-     ownership (the boot path: interrupts start disabled, the boot holds
-     the spare eighth + the trap CSRs + the freshly allocated invariant) *)
-  Lemma intr_count_init (γ : gname) :
-    intr_off_tok γ -∗ intr_restore γ -∗ intr_count γ 0.
-  Proof. iIntros "Htok Hres". iRight. iFrame "Htok Hres". Qed.
+  (* crossing retunes (the sched intena restore): the payload is
+     persistent-or-empty, so both directions are loss-free. *)
+  Lemma intr_count_retune_off (γ : gname) (n : nat) (eb : bool) :
+    intr_count γ (S n) eb -∗ intr_count γ (S n) false.
+  Proof. iIntros "[Htok _]". iFrame. Qed.
+
+  Lemma intr_count_retune_on (γ : gname) (n : nat) (eb : bool) :
+    intr_handler_avail γ -∗
+    intr_count γ (S n) eb -∗ intr_count γ (S n) true.
+  Proof. iIntros "#Ha [Htok _]". iFrame "Htok Ha". Qed.
+
+  (* enter the boot discipline: base state OFF, nothing but the eighth *)
+  Lemma intr_count_init_off (γ : gname) :
+    intr_off_tok γ -∗ intr_count γ 0 false.
+  Proof. iIntros "H". iExact "H". Qed.
 
   (* n > 0 implies interrupts disabled: any fraction of '0' pins the arm *)
-  Lemma intr_count_pos_off (γ : gname) (n : nat) :
-    intr_count γ (S n) -∗ ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ.
+  Lemma intr_count_pos_off (γ : gname) (n : nat) (eb : bool) :
+    intr_count γ (S n) eb -∗
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ (if eb then intr_handler_avail γ else emp).
   Proof. iIntros "[Htok Hres]". iFrame. Qed.
 
-  (* at the '0' arm (cap-eighth-'0'), [intr_count n] yields the count
-     eighth-'0' + the restore payload -- the n=0 '1'-branch is refuted
-     by ghost agreement with the cap. *)
-  Lemma intr_count_get_off (γ : gname) (n : nat) :
+  (* the '0'-arm PUSH (csrci with interrupts already off): the level just
+     increments -- at n = 0 ghost agreement with the capability's '0'
+     eighth pins eb = false, so the payload owed at level 1 is [emp]. *)
+  Lemma intr_count_push_off (γ : gname) (n : nat) (eb : bool) :
     ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
-    intr_count γ n -∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_restore γ.
+    intr_count γ n eb -∗
+    ⌜ n = 0%nat -> eb = false ⌝ ∗
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_count γ (S n) eb.
   Proof.
     iIntros "Hcap Hcnt". destruct n.
-    - iDestruct "Hcnt" as "[Hc1 | [Hc0 Hres]]".
-      + iDestruct (ghost_var_agree with "Hcap Hc1") as %Hbad.
-        exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
-      + iFrame.
-    - iDestruct "Hcnt" as "[Hc0 Hres]". iFrame.
+    - iDestruct (ghost_var_agree with "Hcap Hcnt") as %Hb.
+      destruct eb.
+      + exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
+        vm_compute in Hb. discriminate.
+      + iSplitR; [done |]. iFrame "Hcap". iFrame "Hcnt".
+    - iDestruct "Hcnt" as "[Htok Hres]".
+      iSplitR; [iPureIntro; discriminate |]. iFrame.
   Qed.
 
-  (* at the '1' arm (cap-eighth-'1'), [intr_count n] forces n=0 and
-     yields the count eighth-'1' -- the S-case and the n=0 '0'-branch
-     both carry a '0' eighth, refuted by agreement. *)
-  Lemma intr_count_get_on (γ : gname) (n : nat) :
+  (* the '0'-arm POP at eb = false (never re-enables): level decrement *)
+  Lemma intr_count_pop_off (γ : gname) (n : nat) :
+    intr_count γ (S n) false -∗ intr_count γ n false.
+  Proof.
+    iIntros "[Htok _]". destruct n; [iExact "Htok" | iFrame; done].
+  Qed.
+
+  (* an interior POP (n+1 ≥ 2 → n+1 ≥ 1): payload carried through *)
+  Lemma intr_count_dec (γ : gname) (n : nat) (eb : bool) :
+    intr_count γ (S (S n)) eb -∗ intr_count γ (S n) eb.
+  Proof. iIntros "[Htok Hres]". iFrame. Qed.
+
+  (* at the '1' arm (cap-eighth-'1'), [intr_count n eb] forces n = 0 and
+     eb = true, and yields the two '1' eighths -- the S-case and the
+     n = 0 eb = false case both carry a '0' eighth, refuted by agreement. *)
+  Lemma intr_count_get_on (γ : gname) (n : nat) (eb : bool) :
     ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) -∗
-    intr_count γ n -∗
-    ⌜ n = 0%nat ⌝ ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1)
-                  ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1).
+    intr_count γ n eb -∗
+    ⌜ n = 0%nat /\ eb = true ⌝ ∗
+    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
+    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1).
   Proof.
     iIntros "Hcap Hcnt". destruct n.
-    - iDestruct "Hcnt" as "[Hc1 | [Hc0 _]]".
+    - destruct eb.
       + iFrame. done.
-      + iDestruct (ghost_var_agree with "Hcap Hc0") as %Hbad.
+      + iDestruct (ghost_var_agree with "Hcap Hcnt") as %Hbad.
         exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
     - iDestruct "Hcnt" as "[Hc0 _]".
       iDestruct (ghost_var_agree with "Hcap Hc0") as %Hbad.
       exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
   Qed.
 
-  (* pack a count eighth-'0' + restore back into [intr_count (S n)]. *)
   (* rebuild [intr_restore] from its pieces, re-introducing the later on
      the persistent handler spec (needed after a branch's [iNext] strips
      it). *)
@@ -670,10 +891,17 @@ Section IntrDefs.
     iExists h. iFrame "Hi". iNext. iExact "Hs".
   Qed.
 
-  Lemma intr_count_pack_S (γ : gname) (n : nat) :
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_restore γ -∗
-    intr_count γ (S n).
-  Proof. iIntros "Hc0 Hres". iFrame. Qed.
+  (* pack a count eighth-'0' + the persistent avail into level S n *)
+  Lemma intr_count_pack_S_on (γ : gname) (n : nat) :
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_handler_avail γ -∗
+    intr_count γ (S n) true.
+  Proof. iIntros "Hc0 #Ha". iFrame "Hc0 Ha". Qed.
+
+  (* ... and the disabled-base level S n needs only the eighth *)
+  Lemma intr_count_pack_S_off (γ : gname) (n : nat) :
+    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
+    intr_count γ (S n) false.
+  Proof. iIntros "Hc0". iFrame. Qed.
 
   (* =================================================================== *)
   (* §7 The v2 <-> interrupts-enabled conversions: the agnostic engines'  *)

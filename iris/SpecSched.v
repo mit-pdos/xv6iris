@@ -28,6 +28,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import SwtchCtx.
+Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -44,7 +45,7 @@ Definition own_ctx `{!riscvGS Σ} (pa : mword 64) : iProp Σ :=
 Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-    (m : regfile) (av : nat) :=
+    (m : regfile) (av : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
   let pj := proc_addr j in
   let ret_tgt := update_vec_dec (add_vec (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -56,22 +57,26 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (16 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ 1 -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γ Φ γs -∗
   proc_held j γl st ch -∗
-  cpu_cells j -∗
+  (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:
+     the parked-scheduler slot content is the ▷ sched_vc premise below.
+     sched PRESERVES [eb] across the park -- its intena save/restore is
+     exactly the eb retune back to the caller's own state (the eb=true
+     retune re-duplicates [intr_handler_avail] from this bundle's own
+     entry payload). *)
+  cpu_own γ 1 eb pj emp -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   ( ∀ (mf : regfile) (ch' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ 1 -∗
       pc_is ret_tgt -∗
       proc_held j γl RUNNING ch' -∗
-      cpu_cells j -∗
+      cpu_own γ 1 eb pj emp -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -80,6 +85,6 @@ Module Type SCHED.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-      (m : regfile) (av : nat),
-      wp_sched_sconf_body γ Φ γs j γl st ch m av.
+      (m : regfile) (av : nat) (eb : bool),
+      wp_sched_sconf_body γ Φ γs j γl st ch m av eb.
 End SCHED.

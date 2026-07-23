@@ -36,8 +36,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-(* [kfree_nv1_cancel_pure] moved to WpKalloc.v -- shared with kalloc's own
-   acquire/release-shaped noff counter, next to [kalloc_sp_cancel]. *)
 
 Module KfreeProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELEASE) : KFREE.
 
@@ -50,15 +48,15 @@ Section WpSconfKfree.
   Lemma wp_kfree_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (cpuold : mword 64) (noffv intena_old : mword 32)
-      (on : option nat) (n : nat) (K : nat)
-    : wp_kfree_sconf_body γ Φ γl γk lk fl m cpuold noffv intena_old on n K.
+      (cpuold : mword 64)
+      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat)
+    : wp_kfree_sconf_body γ Φ γl γk lk fl m cpuold on n eb pcur C K.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
-    intros pcE p ret_tgt cpuv a_noff a_int a_cpu po_noff_a5 po_noff_store noff_ret
-      HK Hcpune Hretm Hlk Hfl Hnoff_lvl Hnoffpos Hintena0.
+    intros pcE p ret_tgt cpuv a_cpu
+      HK Hcpune Hretm Htp Hlk Hfl Hnoffpos.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail Hqnoff Hqint Hqcpu Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail Hqcpu Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     (* the caller-supplied page precondition: validity + full ownership *)
     iDestruct "Hpre" as "[%Hpv Hpown]".
@@ -492,16 +490,16 @@ Section WpSconfKfree.
       rewrite /R5 upd_ne; [| vm_compute; discriminate].
       rewrite Hp10. apply add_vec_zero_l. }
     iApply (Acquire.wp_acquire_sconf γ Φ γl "kmem"%string (kmem_res γk fl) Kacq
-              cpuold noffv intena_old n (K - 4)%nat
+              cpuold n eb pcur C (K - 4)%nat
               ltac:(rewrite HKacqtp; exact Hcpune)
               ltac:(rewrite HKacqra; vm_compute; reflexivity)
+              ltac:(rewrite HKacqtp; exact Htp)
+              Hnoffpos
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hkmem] [Hqcpu] [Hqnoff] [Hqint] [-]").
+              with "Hcg Hcnt Htext Hpc [Hkmem] [Hqcpu] [-]").
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hqcpu". }
-    { iEval (rewrite HKacqtp). iExact "Hqnoff". }
-    { iEval (rewrite HKacqtp). iExact "Hqint". }
-    iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hacpu Hanoff Haint Hcnt".
+    iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hacpu Hcnt Hpay".
     assert (Hpc44 : update_vec_dec (add_vec (Kacq !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x44)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
@@ -601,30 +599,18 @@ Section WpSconfKfree.
       rewrite /Rae upd_eq. rewrite HRlds2. apply add_vec_zero_l. }
     assert (HRrelra : Rrel !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KF + 0x50) : mword 64) 4)
       by (rewrite /Rrel; apply upd_eq).
-    (* the acquire (+1) / release (-1) noff cancellation makes release's nv1
-       equal to [sign_extend' 64 noffv], so its coupling premise IS Hnoff_lvl. *)
-    assert (Hnv1eq : sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
-                     = sign_extend' 64 noffv).
-    { exact (kfree_nv1_cancel_pure noffv). }
-    assert (kfree_nv1_cancel : neq_vec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 po_noff_store) (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)) zero_reg = false <-> n = 0%nat).
-    { rewrite Hnv1eq. exact Hnoff_lvl. }
     iApply (Release.wp_release_sconf γ Φ γl lk "kmem"%string (kmem_res γk fl) Rrel
               (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
-              po_noff_store
-              (if eq_vec (sign_extend' 64 noffv) zero_reg then po_intena_val ms else intena_old)
-              n (K - 4)%nat (dqi:=DfracOwn 1)
+              n eb pcur C (K - 4)%nat
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HRreltp; apply eq_vec_true_iff; reflexivity)
-              kfree_nv1_cancel
-              Hnoffpos
               ltac:(rewrite HRrelra; vm_compute; reflexivity)
+              ltac:(rewrite HRreltp; exact Htp)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hkmem] Htok HRres [Hacpu] [Hanoff] [Haint] Hcnt [-]").
+              with "Hcg Htext Hpc [Hkmem] Htok HRres [Hacpu] Hcnt Hpay [-]").
     { iExact "Hkmem". }
     { iEval (rewrite HKacqa0 -Hlk HKacqtp) in "Hacpu". iEval (rewrite HRrela0 -Hlk). iExact "Hacpu". }
-    { iEval (rewrite HKacqtp) in "Hanoff". iEval (rewrite HRreltp). iExact "Hanoff". }
-    { iEval (rewrite HKacqtp) in "Haint". iEval (rewrite HRreltp). iExact "Haint". }
-    iIntros (mrel) "Hcg Hpc %Hrelpins Hcpu2 Hnoff2 Hint2 Hcnt".
+    iIntros (mrel) "Hcg Hpc %Hrelpins Hcpu2 Hcnt".
     assert (Hpc54 : update_vec_dec (add_vec (Rrel !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = mword_of_int (KF + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
@@ -732,13 +718,9 @@ Section WpSconfKfree.
     assert (Hretf : update_vec_dec (add_vec (Q5c !!! Regidx (mword_of_int 1 : mword 5)) (sign_extend' 64 (zeros' 12))) 0 ('b"0") = ret_tgt)
       by (rewrite HQ5cra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] Havail [Hcpu2] [Hnoff2] [Hint2]").
+    iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] Havail [Hcpu2]").
     2:{ (* a_cpu ↦₈ zero_reg -- release cleared lk->cpu *)
         iEval (rewrite HRrela0 -Hlk) in "Hcpu2". iExact "Hcpu2". }
-    2:{ (* a_noff ↦₄ noff_ret -- release's pop_off restored noff *)
-        iEval (rewrite HRreltp) in "Hnoff2". iExact "Hnoff2". }
-    2:{ (* a_int ↦₄ (existential scratch) *)
-        iEval (rewrite HRreltp) in "Hint2". iExists _. iExact "Hint2". }
     { (* callee_saved m Q5c *)
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                 c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->

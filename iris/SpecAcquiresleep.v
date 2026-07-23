@@ -31,6 +31,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
+Require Import SwtchCtx CpuOwn.
 Require Import SchedCtx.
 Require Import SpecSched.
 Require Import SleepLock.
@@ -44,7 +45,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pidv : mword 32) (av : nat) (dq : dfrac) :=
+    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pj := proc_addr j in
@@ -56,37 +57,31 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   eq_vec (access_vec_dec ret_tgt 0) ('b"0") = true ->
   (26 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  intr_count γ 0 -∗
+  cpu_own γ 0 eb pj C -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-  a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-  (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
-  (* the current process and its pid (read-only fraction) *)
-  cur_proc pj -∗
+  (* the caller's own pid (read-only fraction) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
   p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
   procs_inv γ Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr γ mf av -∗
-      intr_count γ 0 -∗
+      cpu_own γ 0 eb pj C -∗
       pc_is ret_tgt -∗
       (* the lock is now HELD: token + pid field + protected resource *)
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
       R -∗
       sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-      a_cpu_noff cid_word ↦₄ (mword_of_int 0 : mword 32) -∗
-      (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
-      cur_proc pj -∗
       p_pid pj ↦₄{dq} pidv -∗
       p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) -∗
+      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -96,6 +91,6 @@ Module Type ACQUIRESLEEP.
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pidv : mword 32) (av : nat) {dq : dfrac},
-      wp_acquiresleep_sconf_body γ Φ γs j γl γsl s R m pidv av dq.
+      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac},
+      wp_acquiresleep_sconf_body γ Φ γs j γl γsl s R m pidv av eb C dq.
 End ACQUIRESLEEP.

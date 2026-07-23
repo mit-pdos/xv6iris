@@ -85,6 +85,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes KernelText WpGpr WpMmodeLeafBase RegFile.
 Require Import PtTree PtBuild.
 Require Import IntrDefs.
+Require Import ProcGeom SwtchCtx CpuOwn.
 Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
@@ -118,16 +119,12 @@ Section KvmSpecs.
      unknown, kalloc may fail), so every kalloc call threads [on := None] and
      the bundle trivially re-establishes. *)
   Definition kalloc_env (γ : gname) (tp : mword 64) : iProp Σ :=
-    (∃ (γk : gname * gname) (qint : mword 32) (qcpu : mword 64),
+    (∃ (γk : gname * gname) (qcpu : mword 64),
       ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
       ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk None ∗
-      add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 120 : mword 12))
-        ↦₄ (zeros' 32 : mword 32) ∗
-      add_vec (mycpu_ret tp) (sign_extend' 64 (mword_of_int 124 : mword 12))
-        ↦₄ qint ∗
       add_vec (mword_of_int KernelSyms.kmem : mword 64)
         (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈ qcpu)%I.
 
@@ -146,6 +143,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition walk_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
+       (eb : bool) (p : mword 64) (C : iProp Σ)
        (mm : regfile) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
@@ -162,6 +160,7 @@ Section KvmSpecs.
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+      cpu_own γ 0 eb p C -∗
       ( ∀ (mr : regfile) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
@@ -169,6 +168,7 @@ Section KvmSpecs.
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+        cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜ptree_same_rep0 t t'⌝ -∗
         ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0)   (* alloc failed *)
@@ -188,6 +188,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition mappages_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
+       (eb : bool) (p : mword 64) (C : iProp Σ)
        (mm : regfile) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
@@ -213,6 +214,7 @@ Section KvmSpecs.
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+      cpu_own γ 0 eb p C -∗
       ( ∀ (mr : regfile) (t' : ptree) (k : nat),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
@@ -220,6 +222,7 @@ Section KvmSpecs.
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+        cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
         ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
@@ -246,6 +249,7 @@ Section KvmSpecs.
   (* ------------------------------------------------------------------- *)
   Definition kvmmap_spec : iProp Σ :=
     (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
+       (eb : bool) (p : mword 64) (C : iProp Σ)
        (mm : regfile) (t : ptree)
        (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat),
       let va := mm !!! Regidx (mword_of_int 11) in
@@ -272,6 +276,7 @@ Section KvmSpecs.
       gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
       ptree_own 2 (DfracOwn 1) t -∗
       kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+      cpu_own γ 0 eb p C -∗
       ( ∀ (mr : regfile) (t' : ptree),
         smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
         sr_inv R -∗
@@ -279,6 +284,7 @@ Section KvmSpecs.
         gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         kalloc_env γ (mm !!! Regidx (mword_of_int 4)) -∗
+        cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
         ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm npages)⌝ -∗

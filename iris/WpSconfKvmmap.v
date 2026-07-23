@@ -44,11 +44,12 @@ Section WpSconfKvmmap.
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-    : wp_kvmmap_sconf_body γ γa Φ mm t m npages perm lvl K.
+      (eb : bool) (p : mword 64) (C : iProp Σ)
+    : wp_kvmmap_sconf_body γ γa Φ mm t m npages perm lvl K eb p C.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
-      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone.
+      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hcid.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -193,7 +194,7 @@ Section WpSconfKvmmap.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       reflexivity. }
     (* the call *)
-    iApply (Mappages.wp_mappages_sconf γ γa Φ P6 t m npages perm lvl (K - 2)%nat
+    iApply (Mappages.wp_mappages_sconf γ γa Φ P6 t m npages perm lvl (K - 2)%nat eb p C
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)
@@ -203,6 +204,7 @@ Section WpSconfKvmmap.
               ltac:(rewrite HP6a3; exact Hpab)
               Hrep
               ltac:(rewrite HP6a1; exact Hnone)
+              ltac:(rewrite HP6tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HP6tp). iExact "Henv". }
     iIntros (mr t' k) "Hcg Hcnt Hpc Hptree Henv %Hkcs %Hbase' %Hrep' %Hpay".
