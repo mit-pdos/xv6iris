@@ -265,6 +265,101 @@ Z.leb_gt/Z.ltb_ge projections.  NOTE: kvm_M_wf will be DELETED and
 kvm_M gains the tramp entry in the uniform-claims revision stage C
 (rwx-kmap.md).  (iii) proc_mapstacks/kvmmake/kvminit
 specs (KvmSpec.v) — sign-off shape below is superseded by the above;
+=====================================================================
+SESSION CHECKPOINT 2026-07-24 (usage-credit pause) — RESUME HERE
+=====================================================================
+Working tree should be CLEAN at or after commit 099294f except this
+notes commit; verify `git status` first (an interrupted session may
+have left ProofProcMapstacks.v/LinkProcMapstacks.v WIP — none existed
+at checkpoint time).
+
+LEDGER (all on main, each full-build green at its commit):
+  a0cd4d4  counted kalloc tier (item i)
+  9630265  KvmMap + kvm_bridge (item ii)
+  2af5603 / 705131e / 27ed01f / 713627a  uniform-claims A'/B'/pte8/C
+           (rwx-kmap.md — that project's model is COMPLETE)
+  1897bca  sharp pt_missing bound + ptree_offpath_eq walk export;
+           kvmmap's counted arm refutes its panic branch
+  06e0e80  the three cone specs (superseded surface — see 099294f)
+  099294f  decode catalogs (WpProcMapstacksInstr 62 / WpKvmmakeInstr
+           64+11, all frames/stride CONFIRMED) + specs restructured to
+           SpecProcMapstacks/SpecKvmmake/SpecKvminit.v (_body + Module
+           Type, sie_cap_gpr interface; KvmSpec's dead legacy trio and
+           Variable R deleted)
+
+NEXT WORK, IN ORDER:
+(v).0  THE pt_present_mono SPEC SURGERY (decided 2026-07-24; option B
+   of the proc_mapstacks agent's analysis — chosen over per-vpn
+   offpath threading per the one-general-abstraction principle):
+   - PtBuild: `pt_present_mono t t' : Prop` — every present L1/L0 node
+     of t is present in t' (kid-level, both levels).  Reflexive,
+     TRANSITIVE (composes across mappages' pages and proc_mapstacks'
+     64 calls), implied by pt_graft1/pt_graft2/pt_upd_kid-descend and
+     preserved by ptree_set_leaf; yields
+     `pt_missing t' v np <= pt_missing t v np` for ALL v, np
+     (subsumes the verified-in-isolation helper pt_missing_offpath_mono
+     whose statement is in the 2026-07-24 proc_mapstacks agent report:
+     offpath_eq + the two present-facts => per-vpn missing mono; that
+     helper's proof splits pt_missing_1_eq into l0/l1_absent components
+     and uses offpath_l{0,1}_flip — reuse the technique).
+   - Export `⌜pt_present_mono t t'⌝` from walk/mappages/kvmmap posts
+     (SpecWalk/SpecMappages/SpecKvmmap bodies + Module Types +
+     Proof*/Link*; sealed functors so no caller re-verifies), AND
+     forward mappages' existing ⌜g <= pt_missing t vpn0 npages⌝
+     through kvmmap's continuation (ProofKvmmap has %Hmiss in scope at
+     ~l.210 — just thread it).
+(v).1  ProofProcMapstacks.v + LinkProcMapstacks.v per the BLUEPRINT in
+   the same agent report (recorded here in essentials):
+   - three-part house pattern a la ProofMappages: Qed-sealed epilogue
+     (10-slot restore +0x80..+0x96, both exits funnel), fuel-inducted
+     loop on remaining proc count, prologue +0x00..+0x52 (frame +
+     &proc/TRAMPOLINE/magic-constant materialization).
+   - loop invariant: s1 = &proc + i*0x168 register column (+s8/s2/s3),
+     pt_base preserved, pt_rep0 tk (kvm_stacks pas i m), kalloc_env at
+     avail_sub on (i + g_so_far), budget
+     (i + g_so_far) + Σ_{j>=i} pt_missing tk (kstack_vpn j) 1
+       <= 64 + kstacks_missing t
+     (telescopes via pt_present_mono + the per-call sharp bound),
+     pas extension (fun j => if j <? i then pas_so_far j else new_pa),
+     accumulated [∗ list] page_own.
+   - per iteration: kalloc (counted null-arm REFUTED: avail_zero at a
+     positive counter; idiom at ProofWalk.v:813-885), arg setup,
+     SpecKvmmake... (no: SpecKvmmap) wp_kvmmap_sconf counted arm from
+     the budget, step s1, recurse.
+   - catalog anchors: kalloc jal pmsi_52, kvmmap jal pmsi_74,
+     null-panic beqz pmsi_58, stride addi pmsi_78, loop bne pmsi_7c.
+   - KSTACK index-recovery arithmetic (the magic-reciprocal multiply
+     s2 = 0x..4fa4fa4f chain, pmsdec_5a..6e) needs bridge lemmas
+     (analogues of mappages_pte_compute/mappages_s2_val).
+   - kvm_pas_ok from kalloc's page_valid; page addresses
+     zext(concat (pas i) 0^12).
+(v).2  ProofKvmmake + Link: root kalloc + memset (SpecMemset*) + the
+   six kvmmap calls chained DEFINITIONALLY through KvmMap.kvm_m1..
+   kvm_map (each post's pt_insert_run IS the next pre's pt_rep0) +
+   the proc_mapstacks call; pin ⌜pt_nodes t = 102⌝ by computing the
+   witness; budget K_kvmmake = 166 telescoped across the calls.
+   Catalog: WpKvmmakeInstr kmkdec_*/kmki_*.
+(v).3  ProofKvminit + Link: kvmmake call + the sd into
+   kernel_pagetable @ 0x8000a238 (identity ↦₈ cell; kidec_*/kii_*).
+THEN: rwx-kmap STAGE 6 (see rwx-kmap.md staging C→6): the kvminithart
+   switch — dissolve the Bare arm (recover kmap_auth kmap_M0 + satp),
+   build tlb_inv_pt from kvminit's post via KvmMap.kvm_bridge
+   (pt_rep0 t (kvm_map_full pas) -> kpt_tree_spec_gen root (kvm_M pas))
+   + tlb_ok_pt_empty after the sfence, fold 65 kmap_inserts (64
+   kstacks via kvm_M_stacks order + tramp), hand out the kstack claims
+   + tramp claim + stvec cell; then the ↦ᵥ-style kstack demonstrator.
+
+STANDING AGENT-BRIEF RULES (repeat in every subagent prompt): read
+durable-notes.md Build+gotchas first; opam switch eval; foreground
+builds, generous timeouts; NEVER any git command; never pkill -f coqc;
+no make clean-proofs; never normalize kmap_M0/kmap_static_claims/
+kvm literals/kernel image maps; statements frozen unless the brief
+authorizes; STOP-AND-REPORT design-level issues; no admits in
+deliverables; templates named per task.  Orchestration: Fable states
+specs/designs, Opus subagents prove; checkpoint-commit green stage
+boundaries to main (rebase over the user's concurrent commits; commit
+from the repo ROOT — cwd often sits in iris/).
+
 OFF-PATH FRAME DECISION (2026-07-24): pt_missing + all telescope/flip
 lemmas are DONE and green (PtBuild §10-§12), but ptree_same_rep0 is
 node-presence-blind (a present all-zero L0 vs an absent one agree on

@@ -57,7 +57,7 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — DESIGN SIGNED OFF, in progress:
+- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — uniform-claims model COMPLETE (2026-07-24); only stage 6 (the boot switch) remains, blocked on kvm-spec:
   R/W/X-accurate kernel PT (text RX / data RW), the code points-to `↦ₓ`
   inside `instr`, the monotone kernel-mapping claim ghost for non-identity
   mappings (kstacks), and the re-keyed absorption — synthesis design
