@@ -1,4 +1,4 @@
-(* WpBinitDecode.v *)
+(* WpBinitDecode.v -- instruction decode facts for binit() *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -16,4 +16,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-Lemma bidb_45848493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s -> exec (ext_decode (mword_of_int 0x45848493 : mword 32)) s = Some (ITYPE (mword_of_int 1112 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s). Proof. decode_bridge_ms. Qed.
+(* Compressed 16-bit decodes *)
+Lemma test_7179 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exists i, exec (ext_decode_compressed (mword_of_int 0x7179 : mword 16)) s = Some (i, s).
+Proof. intros H. rvc_oneshot s H. eexists. reflexivity. Qed.

@@ -27,7 +27,6 @@ Section ProofBinit.
   Context `{CID : CpuId}.
 
   Definition bcache_name_str : Z := 0x80007390.
-  Definition buffer_name_str : Z := 0x80007398.
 
   Lemma wp_binit_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
@@ -46,15 +45,29 @@ Section ProofBinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string bcache_name_str "bcache"%string name_bcache eq_refl ltac:(unfold text_end, bcache_name_str; lia) Hbcache
                   with "Hkdata") as "#Hstr_bcache".
-    iAssert (pc_is ret_tgt) with "[Hpc]" as "Hret".
+
+    set (m_il := <[Regidx (mword_of_int 10 : mword 5) := lk]>
+                 (<[Regidx (mword_of_int 11 : mword 5) := name_bcache]>
+                  (<[Regidx (mword_of_int 1 : mword 5) := m !!! Regidx (mword_of_int 1 : mword 5)]> m))).
+    assert (Hbl10 : m_il !!! Regidx (mword_of_int 10 : mword 5) = lk) by (rewrite /m_il upd_eq; reflexivity).
+    assert (Hbl11 : m_il !!! Regidx (mword_of_int 11 : mword 5) = name_bcache) by (rewrite /m_il upd_ne; [rewrite upd_eq; reflexivity | vm_compute; discriminate]).
+    assert (Hbl1 : m_il !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
+      by (rewrite /m_il upd_ne; [rewrite upd_ne; [rewrite upd_eq; reflexivity | vm_compute; discriminate] | vm_compute; discriminate]).
+
+    iAssert (sie_cap_gpr γ m_il K ∗ pc_is (mword_of_int KernelSyms.initlock))%I with "[Hcg Hpc]" as "[Hcg_il Hpc_il]".
     { admit. }
-    iAssert (lk ↦₄ (mword_of_int 0 : mword 32))%I with "[Hlock]" as "Hlk_zero".
-    { admit. }
-    iAssert (lock_name lk "bcache"%string) with "[Hname]" as "#Hlk_name".
-    { admit. }
-    iAssert (c_cpu ↦₈ (zero_reg : mword 64))%I with "[Hcpu]" as "Hcpu_zero".
-    { admit. }
-    iApply ("Hcont" $! m with "Hcg Hret [//] Hlk_zero Hlk_name Hcpu_zero").
+
+    iApply (Initlock.wp_initlock_sconf γ Φ m_il vlock vname vcpu "bcache"%string K ltac:(lia)
+              with "Hcg_il Htext Hpc_il Hstr_bcache [Hlock] [Hname] [Hcpu]").
+    { iEval (rewrite Hbl10). iExact "Hlock". }
+    { iEval (rewrite Hbl10). iExact "Hname". }
+    { iEval (rewrite Hbl10). iExact "Hcpu". }
+    iIntros (mr) "Hcg Hret %Hcs Hlk_zero #Hlk_name Hcpu_zero".
+    iEval (rewrite Hbl10) in "Hlk_zero".
+    iEval (rewrite Hbl10) in "Hlk_name".
+    iEval (rewrite Hbl10) in "Hcpu_zero".
+    iEval (rewrite Hbl1) in "Hret".
+    iApply ("Hcont" $! mr with "Hcg Hret [//] Hlk_zero Hlk_name Hcpu_zero").
   Admitted.
 
 End ProofBinit.

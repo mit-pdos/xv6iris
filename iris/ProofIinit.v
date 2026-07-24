@@ -45,15 +45,29 @@ Section ProofIinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia) Hitable
                   with "Hkdata") as "#Hstr_itable".
-    iAssert (pc_is ret_tgt) with "[Hpc]" as "Hret".
+
+    set (m_il := <[Regidx (mword_of_int 10 : mword 5) := lk]>
+                 (<[Regidx (mword_of_int 11 : mword 5) := name_itable]>
+                  (<[Regidx (mword_of_int 1 : mword 5) := m !!! Regidx (mword_of_int 1 : mword 5)]> m))).
+    assert (Hil10 : m_il !!! Regidx (mword_of_int 10 : mword 5) = lk) by (rewrite /m_il upd_eq; reflexivity).
+    assert (Hil11 : m_il !!! Regidx (mword_of_int 11 : mword 5) = name_itable) by (rewrite /m_il upd_ne; [rewrite upd_eq; reflexivity | vm_compute; discriminate]).
+    assert (Hil1 : m_il !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
+      by (rewrite /m_il upd_ne; [rewrite upd_ne; [rewrite upd_eq; reflexivity | vm_compute; discriminate] | vm_compute; discriminate]).
+
+    iAssert (sie_cap_gpr γ m_il K ∗ pc_is (mword_of_int KernelSyms.initlock))%I with "[Hcg Hpc]" as "[Hcg_il Hpc_il]".
     { admit. }
-    iAssert (lk ↦₄ (mword_of_int 0 : mword 32))%I with "[Hlock]" as "Hlk_zero".
-    { admit. }
-    iAssert (lock_name lk "itable"%string) with "[Hname]" as "#Hlk_name".
-    { admit. }
-    iAssert (c_cpu ↦₈ (zero_reg : mword 64))%I with "[Hcpu]" as "Hcpu_zero".
-    { admit. }
-    iApply ("Hcont" $! m with "Hcg Hret [//] Hlk_zero Hlk_name Hcpu_zero").
+
+    iApply (Initlock.wp_initlock_sconf γ Φ m_il vlock vname vcpu "itable"%string K ltac:(lia)
+              with "Hcg_il Htext Hpc_il Hstr_itable [Hlock] [Hname] [Hcpu]").
+    { iEval (rewrite Hil10). iExact "Hlock". }
+    { iEval (rewrite Hil10). iExact "Hname". }
+    { iEval (rewrite Hil10). iExact "Hcpu". }
+    iIntros (mr) "Hcg Hret %Hcs Hlk_zero #Hlk_name Hcpu_zero".
+    iEval (rewrite Hil10) in "Hlk_zero".
+    iEval (rewrite Hil10) in "Hlk_name".
+    iEval (rewrite Hil10) in "Hcpu_zero".
+    iEval (rewrite Hil1) in "Hret".
+    iApply ("Hcont" $! mr with "Hcg Hret [//] Hlk_zero Hlk_name Hcpu_zero").
   Admitted.
 
 End ProofIinit.
