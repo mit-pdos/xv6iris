@@ -27,7 +27,8 @@ Notation KVMI := KernelSyms.kvminit.
 (* kvminit(): kvmmake() then store its result into the global
    [kernel_pagetable] cell (an identity 8-byte word at
    KernelSyms.kernel_pagetable = 0x8000a238; pre = arbitrary [kpt0], post = the
-   root page's byte address).  COUNTED-ONLY like kvmmake (boot-only), so
+   root page's byte address).  COUNTED-ONLY like kvmmake (boot-only, STRICT
+   budget premise ⌜166 < nb⌝ -- see SpecKvmmake's spare-page note), so
    unconditional success, NO panic_wp.  This is THE deliverable: the verified
    construction whose post feeds the stage-6 boot switch (kvm_bridge).
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
@@ -36,7 +37,7 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (50 <= K)%nat ->
-  (exists nb, on = Some nb /\ (K_kvmmake <= nb)%nat) ->
+  (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
   (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
      this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->

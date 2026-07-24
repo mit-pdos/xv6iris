@@ -300,11 +300,11 @@ Proof.
 Qed.
 
 (* kstack vpns: unsigned value, injectivity *)
-Local Lemma kstack_vpn_uns (i : nat) :
+Lemma kstack_vpn_uns (i : nat) :
   (i < 64)%nat -> bv_unsigned (kstack_vpn i) = 0x3FFFFFF - 2 * (Z.of_nat i + 1).
 Proof. intro. unfold kstack_vpn. rewrite mword27_unsigned; [reflexivity | lia]. Qed.
 
-Local Lemma kstack_vpn_inj (i j : nat) :
+Lemma kstack_vpn_inj (i j : nat) :
   (i < 64)%nat -> (j < 64)%nat -> i <> j -> kstack_vpn i <> kstack_vpn j.
 Proof.
   intros Hi Hj Hne Heq. apply (f_equal bv_unsigned) in Heq.
@@ -312,7 +312,7 @@ Proof.
 Qed.
 
 (* the kstacks-fixpoint lookup: hit at each kstack vpn, miss elsewhere *)
-Local Lemma kvm_stacks_hit (pas : nat -> mword 44) (k : nat)
+Lemma kvm_stacks_hit (pas : nat -> mword 44) (k : nat)
     (m : gmap (mword 27) (mword 64)) :
   forall i : nat, (i < k)%nat -> (k <= 64)%nat ->
   kvm_stacks pas k m !! kstack_vpn i = Some (mk_pte (pas i) (Z.lor 6 1)).
@@ -325,7 +325,7 @@ Proof.
     apply IH; lia.
 Qed.
 
-Local Lemma kvm_stacks_miss (pas : nat -> mword 44) (k : nat)
+Lemma kvm_stacks_miss (pas : nat -> mword 44) (k : nat)
     (m : gmap (mword 27) (mword 64)) (vpn : mword 27) :
   (forall i : nat, (i < k)%nat -> vpn <> kstack_vpn i) ->
   kvm_stacks pas k m !! vpn = m !! vpn.
@@ -335,6 +335,21 @@ Proof.
   - cbn [kvm_stacks]. rewrite one_run_lookup.
     rewrite decide_False; [| apply Hne; lia].
     apply IH. intros i Hi. apply Hne. lia.
+Qed.
+
+(* pas-extension congruence: [kvm_stacks] over the first [k] stacks depends
+   only on [pas]'s values below [k], so a pas that agrees with [pas'] there
+   builds the same map.  proc_mapstacks' loop uses this to swap the running
+   [pas] accumulator for the final one. *)
+Lemma kvm_stacks_ext (pas pas' : nat -> mword 44) (k : nat)
+    (m : gmap (mword 27) (mword 64)) :
+  (forall j : nat, (j < k)%nat -> pas j = pas' j) ->
+  kvm_stacks pas k m = kvm_stacks pas' k m.
+Proof.
+  induction k as [|k' IH]; intros Hag.
+  - reflexivity.
+  - cbn [kvm_stacks]. rewrite (IH ltac:(intros j Hj; apply Hag; lia)).
+    rewrite (Hag k' ltac:(lia)). reflexivity.
 Qed.
 
 Lemma kstack_index_spec (vpn : mword 27) (i : nat) :

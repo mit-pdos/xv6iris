@@ -28,10 +28,15 @@ Notation KVMMK := KernelSyms.kvmmake.
    (UART/VIRTIO/PLIC RW, text RX, data RW, trampoline RX) then proc_mapstacks.
    Returns (a0) the root page's byte address.  The result table represents
    [kvm_map_full pas] and has exactly 102 table nodes.  COUNTED-ONLY (premise
-   ⌜on = Some nb ∧ 166 <= nb⌝): kvmmake is boot-only (kvminit its sole caller),
+   ⌜on = Some nb ∧ 166 < nb⌝): kvmmake is boot-only (kvminit its sole caller),
    so it needs no None mode -- a deviation from the chain's dual-mode specs,
    justified by the absence of any non-boot caller.  With the budget premise no
-   kalloc can fail, so NO panic_wp anywhere.
+   kalloc can fail, so NO panic_wp anywhere.  The premise is STRICT while the
+   post's [avail_sub on K_kvmmake] is the true consumption: the chain's
+   counted-arm convention (kvmmap's [missing < nb], proc_mapstacks'
+   [64 + kstacks_missing < nb]) demands one spare page beyond consumption --
+   a [Some 0] remainder would leave the innermost failure arm's [avail_zero]
+   unrefutable.
    stack_own bound 48 = own 4-slot frame + proc_mapstacks' 44 (PROVISIONAL,
    pending the decode pass). *)
 Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
@@ -39,7 +44,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (48 <= K)%nat ->
-  (exists nb, on = Some nb /\ (K_kvmmake <= nb)%nat) ->
+  (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
   (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
      this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
