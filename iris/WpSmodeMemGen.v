@@ -129,7 +129,7 @@ Variable a : mword 64.
 Variable v : mword (8*width).
 Variable region : PMA_Region.
 Variable s s' : mstate.
-Let pa := zero_extend' 64 (add_vec_int a (0 * width)).
+Variable pa : mword 64.
 Let data2 : mword (8*1*width) :=
   update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width) (autocast (T := mword) v).
 Hypothesis Halign : is_aligned_vaddr (Virtaddr a) width = true.
@@ -205,7 +205,7 @@ Variable s s' : mstate.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
-Let pa := zero_extend' 64 (add_vec_int a8 (0 * width)).
+Variable pa : mword 64.
 Let data2 : mword (8*1*width) :=
   update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width) (autocast (T := mword) v).
 Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Load Data)) s
@@ -247,7 +247,7 @@ Proof.
   cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
   rewrite execR_liftR.
-  rewrite (exec_vmem_read_addr_w_S_walk_pt a8 v region s s' Halign Hcp' Hmprv' Htr HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes).
+  rewrite (exec_vmem_read_addr_w_S_walk_pt a8 v region s s' pa Halign Hcp' Hmprv' Htr HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes).
   reflexivity.
 Qed.
 End RWgwSwalkPt.
@@ -263,7 +263,7 @@ Let offset := sign_extend' 64 imm.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
-Let pa := zero_extend' 64 (add_vec_int a8 (0 * width)).
+Variable pa : mword 64.
 Let data2 : mword (8*1*width) :=
   update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width) (autocast (T := mword) v).
 Hypothesis Hrd : uint rd <> 0.
@@ -303,7 +303,7 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/I/base_insts.sail:289.28-289.29" : M (true = true)) s = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (exec_bind_Some _ _ _ _ _ Hass).
   rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_read_w_gpr_S_walk_pt rs1 offset v region s s' Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes)).
+    (exec_vmem_read_w_gpr_S_walk_pt rs1 offset v region s s' pa Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes)).
   cbn match.
   assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) s'
                = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -412,7 +412,7 @@ Variable a : mword 64.
 Variable dat : mword (8*width).
 Variable region : PMA_Region.
 Variable s s' : mstate.
-Let pa := zero_extend' 64 (add_vec_int a (0 * width)).
+Variable pa : mword 64.
 Let wv : mword (8*width) := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*width-1) (8*0*width)).
 Hypothesis Halign : is_aligned_vaddr (Virtaddr a) width = true.
 Hypothesis Hcp : register_lookup cur_privilege s'.(sregs) = Supervisor.
@@ -455,7 +455,7 @@ Variable s s' : mstate.
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
-Let pa := zero_extend' 64 (add_vec_int a8 (0 * width)).
+Variable pa : mword 64.
 Let wv : mword (8*width) := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*width-1) (8*0*width)).
 Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Store Data)) s
                   = Some (Virtaddr ea, s).
@@ -496,7 +496,7 @@ Proof.
   cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Virtaddr a8) s)).
   rewrite execR_liftR.
-  rewrite (exec_vmem_write_addr_w_S_walk_pt a8 dat region s s' Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev).
+  rewrite (exec_vmem_write_addr_w_S_walk_pt a8 dat region s s' pa Halign Hcp' Hmprv' Htr HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev).
   reflexivity.
 Qed.
 End VWgwSwalkPt.
@@ -515,7 +515,7 @@ Let vrs2 : mword (8*width) := autocast (T := mword)
 Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset.
 Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
-Let pa := zero_extend' 64 (add_vec_int a8 (0 * width)).
+Variable pa : mword 64.
 Let wv : mword (8*width) := autocast (T := mword) (subrange_vec_dec vrs2 (8*(0+1)*width-1) (8*0*width)).
 Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Store Data)) s
                   = Some (Virtaddr ea, s).
@@ -554,7 +554,7 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
   cbn match.
   rewrite (exec_bind_Some _ _ _ _ _
-    (exec_vmem_write_w_gpr_S_walk_pt rs1 offset vrs2 region s s' Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
+    (exec_vmem_write_w_gpr_S_walk_pt rs1 offset vrs2 region s s' pa Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
   cbn match. rewrite (exec_returnM _ _). reflexivity.
 Qed.
 End ExecStoreGwSwalkPt.

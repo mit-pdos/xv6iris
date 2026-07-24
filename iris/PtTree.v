@@ -133,6 +133,19 @@ Definition pt_ents (t : ptree) : mword 9 -> mword 64 :=
 Definition pt_kids (t : ptree) : mword 9 -> option ptree :=
   match t with PtNode _ _ k => k end.
 
+(* The identity vpn of a node page at ppn [b]: all 512 slots
+   ([u_pte_addr b idx], idx*8 < 4096) sit in the SAME page, so share this
+   vpn.  [node_kdata b]: that page lies wholly in kernel DATA memory. *)
+Definition pt_page_vpn (b : mword 44) : mword 27 :=
+  svpn_of (u_pte_addr b (mword_of_int 0)).
+
+(* the node page at ppn [b] lies wholly in kernel DATA memory.  Implies VA
+   canonicality of every slot ([b*4096+4096 <= ram_base+ram_size < 2^38]) --
+   both pure facts [mem_pointsto] needs for the [↦ₚ₈ -> ↦₈] slot reconstruction. *)
+Definition node_kdata (b : mword 44) : Prop :=
+  (text_end <= bv_unsigned b * 4096)%Z /\
+  (bv_unsigned b * 4096 + 4096 <= ram_base + ram_size)%Z.
+
 (* the 9-bit walk index a level-[lvl] node decodes from [vpn] (Sv39:
    levels 2,1,0 top-down) *)
 Definition vpn_idx (lvl : nat) (vpn : mword 27) : mword 9 :=
@@ -567,10 +580,24 @@ Qed.
 Section PtTreeIris.
   Context `{!riscvGS Σ}.
 
-  (* one node's page: all 512 slots, whatever words the description says *)
+  (* PERSISTENT per-node identity claim (uniform-claims PHYSICAL TIER): the
+     node page's vpn maps to its own ppn at KP_rw in the kernel map, and the
+     page is kdata.  Carried inside [pt_page_own] so a software walk can turn a
+     physical slot [↦ₚ₈] into a VA-tier [↦₈] (reconstruct [mem_pointsto]) with
+     NOTHING but the tree itself -- [kmap_at] supplies the mapping, [node_kdata]
+     the [addr_is_kdata] + canonicality conjuncts [mem_pointsto] carries. *)
+  Definition pt_node_claim (b : mword 44) : iProp Σ :=
+    (⌜node_kdata b⌝ ∗ kmap_at (pt_page_vpn b) b KP_rw)%I.
+
+  Global Instance pt_node_claim_persistent b : Persistent (pt_node_claim b).
+  Proof. rewrite /pt_node_claim. apply _. Qed.
+
+  (* one node's page: the identity claim, plus all 512 slots (whatever words
+     the description says). *)
   Definition pt_page_own (dq : dfrac) (t : ptree) : iProp Σ :=
-    ([∗ list] i ∈ seqZ 0 512,
-       u_pte_addr (pt_base t) (mword_of_int i) ↦₈{dq} pt_ents t (mword_of_int i))%I.
+    (pt_node_claim (pt_base t) ∗
+     [∗ list] i ∈ seqZ 0 512,
+       u_pte_addr (pt_base t) (mword_of_int i) ↦ₚ₈{dq} pt_ents t (mword_of_int i))%I.
 
   Fixpoint ptree_own (lvl : nat) (dq : dfrac) (t : ptree) {struct lvl} : iProp Σ :=
     (pt_page_own dq t ∗
@@ -599,9 +626,9 @@ Section PtTreeIris.
   (* ---- single-node slot accessor (update form) ---------------------- *)
   Lemma pt_page_own_acc (dq : dfrac) (t : ptree) (i : mword 9) :
     pt_page_own dq t ⊢
-      u_pte_addr (pt_base t) i ↦₈{dq} pt_ents t i ∗
+      u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
       (∀ w' : mword 64,
-         u_pte_addr (pt_base t) i ↦₈{dq} w' -∗
+         u_pte_addr (pt_base t) i ↦ₚ₈{dq} w' -∗
          pt_page_own dq (pt_upd_ent t i w')).
   Proof.
     pose proof (bv_unsigned_in_range _ i) as Hir.
@@ -611,15 +638,18 @@ Section PtTreeIris.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hpg".
-    iEval (rewrite /pt_page_own (big_sepL_delete _ _ _ _ Hlk)) in "Hpg".
+    iEval (rewrite /pt_page_own) in "Hpg".
+    iDestruct "Hpg" as "[#Hcl Hpg]".
+    iEval (rewrite (big_sepL_delete _ _ _ _ Hlk)) in "Hpg".
     iDestruct "Hpg" as "[Hslot Hrest]".
     iEval (rewrite pt_mword9_id) in "Hslot".
     iFrame "Hslot".
     iIntros (w') "Hslot".
     rewrite /pt_page_own.
+    iSplitR; [rewrite pt_upd_ent_base; iExact "Hcl" |].
     rewrite (big_sepL_delete
                (fun _ j => (u_pte_addr (pt_base (pt_upd_ent t i w')) (mword_of_int j)
-                            ↦₈{dq} pt_ents (pt_upd_ent t i w') (mword_of_int j))%I)
+                            ↦ₚ₈{dq} pt_ents (pt_upd_ent t i w') (mword_of_int j))%I)
                _ _ _ Hlk).
     iSplitL "Hslot".
     { rewrite pt_mword9_id pt_upd_ent_base pt_upd_ent_same. iExact "Hslot". }
@@ -639,8 +669,8 @@ Section PtTreeIris.
   (* read-only form: restore the SAME description *)
   Lemma pt_page_own_acc_ro (dq : dfrac) (t : ptree) (i : mword 9) :
     pt_page_own dq t ⊢
-      u_pte_addr (pt_base t) i ↦₈{dq} pt_ents t i ∗
-      (u_pte_addr (pt_base t) i ↦₈{dq} pt_ents t i -∗ pt_page_own dq t).
+      u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
+      (u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i -∗ pt_page_own dq t).
   Proof.
     pose proof (bv_unsigned_in_range _ i) as Hir.
     assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
@@ -650,10 +680,12 @@ Section PtTreeIris.
     { apply lookup_seqZ. split; lia. }
     iIntros "Hpg".
     iEval (rewrite /pt_page_own) in "Hpg".
+    iDestruct "Hpg" as "[#Hcl Hpg]".
     iDestruct (big_sepL_lookup_acc _ _ _ _ Hlk with "Hpg") as "[Hslot Hrest]".
     iEval (rewrite pt_mword9_id) in "Hslot".
     iFrame "Hslot".
     iIntros "Hslot".
+    rewrite /pt_page_own. iFrame "Hcl".
     iApply "Hrest". iEval (rewrite pt_mword9_id). iExact "Hslot".
   Qed.
 
@@ -727,12 +759,12 @@ Section PtTreeIris.
       (p2 p1 p0 : mword 64) :
     ptree_maps t vpn p2 p1 p0 ->
     ptree_own 2 dq t ⊢
-      pt_addr2 t vpn ↦₈{dq} p2 ∗
-      pt_addr1 p2 vpn ↦₈{dq} p1 ∗
-      pt_addr0 p1 vpn ↦₈{dq} p0 ∗
-      (pt_addr2 t vpn ↦₈{dq} p2 -∗
-       pt_addr1 p2 vpn ↦₈{dq} p1 -∗
-       pt_addr0 p1 vpn ↦₈{dq} p0 -∗
+      pt_addr2 t vpn ↦ₚ₈{dq} p2 ∗
+      pt_addr1 p2 vpn ↦ₚ₈{dq} p1 ∗
+      pt_addr0 p1 vpn ↦ₚ₈{dq} p0 ∗
+      (pt_addr2 t vpn ↦ₚ₈{dq} p2 -∗
+       pt_addr1 p2 vpn ↦ₚ₈{dq} p1 -∗
+       pt_addr0 p1 vpn ↦ₚ₈{dq} p0 -∗
        ptree_own 2 dq t).
   Proof.
     intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
@@ -764,13 +796,13 @@ Section PtTreeIris.
       (p2 p1 p0 : mword 64) :
     ptree_maps t vpn p2 p1 p0 ->
     ptree_own 2 dq t ⊢
-      pt_addr2 t vpn ↦₈{dq} p2 ∗
-      pt_addr1 p2 vpn ↦₈{dq} p1 ∗
-      pt_addr0 p1 vpn ↦₈{dq} p0 ∗
+      pt_addr2 t vpn ↦ₚ₈{dq} p2 ∗
+      pt_addr1 p2 vpn ↦ₚ₈{dq} p1 ∗
+      pt_addr0 p1 vpn ↦ₚ₈{dq} p0 ∗
       (∀ w' : mword 64,
-         pt_addr2 t vpn ↦₈{dq} p2 -∗
-         pt_addr1 p2 vpn ↦₈{dq} p1 -∗
-         pt_addr0 p1 vpn ↦₈{dq} w' -∗
+         pt_addr2 t vpn ↦ₚ₈{dq} p2 -∗
+         pt_addr1 p2 vpn ↦ₚ₈{dq} p1 -∗
+         pt_addr0 p1 vpn ↦ₚ₈{dq} w' -∗
          ptree_own 2 dq (ptree_set_leaf t vpn w')).
   Proof.
     intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
@@ -807,25 +839,25 @@ Section PtTreeIris.
   (* ---- pure per-slot memory facts, extracted from ownership --------- *)
 
   Lemma slot_mem_of_own (sg : mstate) (a : Arch.pa) (dq : dfrac) (w : mword 64) :
-    gen_heap_interp sg.(mem) -∗ a ↦₈{dq} w -∗ ⌜pt_slot_mem sg a w⌝.
+    gen_heap_interp sg.(mem) -∗ a ↦ₚ₈{dq} w -∗ ⌜pt_slot_mem sg a w⌝.
   Proof.
     iIntros "Hm Hw".
-    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (phys_word_pointsto_bytes with "Hw") as "Hb".
     iAssert (⌜forall j : nat, (N.of_nat j < 8)%N ->
                sg.(mem) !! pa_add a j = Some (nth_byte w j)⌝)%I as %Hbytes.
     { iIntros (j Hj).
       iDestruct (big_sepL_lookup _ _ j j with "Hb") as "Hbj";
         [rewrite lookup_seq_lt; [reflexivity | lia]|].
-      iApply (mem_valid with "Hm Hbj"). }
+      iApply (phys_valid with "Hm Hbj"). }
     iAssert (⌜addr_is_ram (pa_add a 0)⌝)%I as %Hr0.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0";
         [rewrite lookup_seq_lt; [reflexivity | lia]|].
-      iApply (mem_ram with "Hb0"). }
+      iApply (phys_ram with "Hb0"). }
     iAssert (⌜addr_is_ram (pa_add a 7)⌝)%I as %Hr7.
     { iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hb") as "Hb7";
         [rewrite lookup_seq_lt; [reflexivity | lia]|].
-      iApply (mem_ram with "Hb7"). }
+      iApply (phys_ram with "Hb7"). }
     iPureIntro.
     split; [exact Hbytes|].
     split; [exact (addr_is_ram_pa0 a Hr0)|].

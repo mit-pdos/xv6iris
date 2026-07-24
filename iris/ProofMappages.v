@@ -23,7 +23,8 @@ Require Import IntrDefs.
 Require Import ProcGeom SwtchCtx CpuOwn.
 Require Import VcGen.
 Require Import KallocInv.
-Require Import PtTree.
+Require Import CommonWalk PtTree.
+Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys *)
 Require Import PtBuild KvmSpec.
 Require Import WpMappagesInstr UserBits.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -73,20 +74,10 @@ Section ProofMappages.
     rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
   Qed.
 
-  (* an owned word cell sits in RAM ([ram_base = 0x80000000]); pure conclusion,
-     so [iDestruct ... as %H] keeps the cell.  Used to rule out a NULL (=0) walk
-     result on the level0 (success) arm -- addr 0 is not RAM, so the return
-     address of a genuine slot is nonzero and the -1 return can only come from
-     kalloc exhaustion (the avail_zero witness). *)
-  Lemma word_pointsto_ram (a : mword 64) (dq : dfrac) (w : mword 64) :
-    word_pointsto a dq w ⊢ ⌜addr_is_ram a⌝.
-  Proof.
-    iIntros "Hw". iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
-    iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbs") as "Hb0".
-    { rewrite lookup_seq_lt; [reflexivity | lia]. }
-    iDestruct (mem_ram with "Hb0") as %Hram0.
-    iPureIntro. exact (addr_is_ram_pa0 a Hram0).
-  Qed.
+  (* the L0 slot's RAM-ness (used to rule out a NULL (=0) walk result on the
+     level0 success arm -- addr 0 is not RAM) now comes straight off the
+     PHYSICAL slot cell via [phys_word_pointsto_ram] (uniform-claims: the slot
+     is owned at the physical tier before the VA-tier conversion). *)
 
 
   (* ================================================================= *)
@@ -715,8 +706,14 @@ Section ProofMappages.
                       Hptree Henv Hcont").
     }
     (* ---- walk returned the L0 slot: store the leaf ---- *)
-    iDestruct (ptree_own_level0_upd (DfracOwn 1) t' (vpn_at vpn0 k) p2 p1 w0 Hl0 with "Hptree") as "[Hcell Hupd]".
-    iDestruct (word_pointsto_ram with "Hcell") as %Hslotram.
+    iDestruct (ptree_own_level0_upd (DfracOwn 1) t' (vpn_at vpn0 k) p2 p1 w0 Hl0 with "Hptree") as "[#Hcl0 [Hcell Hupd]]".
+    iDestruct (phys_word_pointsto_ram with "Hcell") as %Hslotram.
+    (* the L0 slot is owned PHYSICALLY ([↦ₚ₈]); the remap-check load and the
+       leaf store go THROUGH translation, so convert to the VA tier ([↦₈]) via
+       the node's own claim (uniform-claims PHYSICAL TIER), and convert back
+       before handing the rewritten cell to the ownership-restore wand. *)
+    iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 (vpn_at vpn0 k)) (DfracOwn 1) w0
+                 with "Hcl0 Hcell") as "Hcell".
     assert (Ha0nz : mr !!! Regidx (mword_of_int 10 : mword 5) <> mword_of_int 0).
     { rewrite Ha0v. intro Heq. rewrite Heq in Hslotram.
       unfold addr_is_ram in Hslotram. destruct Hslotram as [Hlo _].
@@ -876,6 +873,8 @@ Section ProofMappages.
     { iEval (rewrite Hea0 HM11a0 Ha0v). iExact "Hcell". }
     iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hea0 HM11a0 Ha0v HPTE) in "Hcell".
+    iDestruct (pt_slot_mem_to_phys (u_next_base p1) (vpn_idx 0 (vpn_at vpn0 k)) (DfracOwn 1)
+                 (mappages_pte ppn0 perm k) with "Hcl0 Hcell") as "Hcell".
     iDestruct ("Hupd" $! (mappages_pte ppn0 perm k) with "Hcell") as "Hptree".
     assert (Hpp62 : add_vec_int (mword_of_int (MP + 0x60) : mword 64) 2 = mword_of_int (MP + 0x62)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp62) in "Hpc".

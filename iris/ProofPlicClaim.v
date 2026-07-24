@@ -289,7 +289,6 @@ Section ProofPlicClaim.
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_vpn   _ (ph_sclaim_geom _ Hhart)))
-              ltac:(rewrite HN4a5; exact (ph_geom_ident _ (ph_sclaim_geom _ Hhart)))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rewrite HN4a5; intros pq Hpq;
                     destruct (plic_claim pq (Z.to_nat (bv_unsigned (m0 !!! Regidx tp_idx)))) as [cv cp] eqn:Hc;

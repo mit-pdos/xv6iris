@@ -77,18 +77,18 @@ Section UserFetchPtWord.
               nth_byte iw j = [b0; b1; b2; b3] !!! j).
     { intros j Hj. apply nth_byte_assemble4; [reflexivity | exact Hj]. }
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hb0 with "Hbytes") as "[Hb0' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb0'") as %Hp0.
-    iDestruct (mem_ram with "Hb0'") as %Hram0.
+    iDestruct (phys_valid with "Hmem Hb0'") as %Hp0.
+    iDestruct (phys_ram with "Hb0'") as %Hram0.
     iDestruct ("Hrest" with "Hb0'") as "Hbytes".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hb1 with "Hbytes") as "[Hb1' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb1'") as %Hp1.
+    iDestruct (phys_valid with "Hmem Hb1'") as %Hp1.
     iDestruct ("Hrest" with "Hb1'") as "Hbytes".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hb2 with "Hbytes") as "[Hb2' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb2'") as %Hp2.
+    iDestruct (phys_valid with "Hmem Hb2'") as %Hp2.
     iDestruct ("Hrest" with "Hb2'") as "Hbytes".
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hb3 with "Hbytes") as "[Hb3' Hrest]".
-    iDestruct (mem_valid with "Hmem Hb3'") as %Hp3.
-    iDestruct (mem_ram with "Hb3'") as %Hram3.
+    iDestruct (phys_valid with "Hmem Hb3'") as %Hp3.
+    iDestruct (phys_ram with "Hb3'") as %Hram3.
     iDestruct ("Hrest" with "Hb3'") as "Hbytes".
     iPureIntro.
     exists iw.

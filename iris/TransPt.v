@@ -608,7 +608,7 @@ Section Pt2TranslateIris.
         by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
       iDestruct (ptree_own_path_upd (DfracOwn 1) tc vpn pc2 pc1 p0c Hmaps_c with "Htc")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (word_pointsto_write σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hs0")
+      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hs0")
         as "[Hgh Hs0]".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htc".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
@@ -649,7 +649,7 @@ Section Pt2TranslateIris.
         by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
       iDestruct (ptree_own_path_upd (DfracOwn 1) tp vpn pp2 pp1 p0p Hmaps_p with "Htp")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (word_pointsto_write σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hs0")
+      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hs0")
         as "[Hgh Hs0]".
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htp".
       set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)

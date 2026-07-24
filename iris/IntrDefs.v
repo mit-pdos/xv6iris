@@ -477,7 +477,7 @@ Section IntrDefs.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ KMap.kmap_at (svpn_of va) ppn pc -∗
+      ⊢ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -521,49 +521,8 @@ Section IntrDefs.
       iApply (kpt_transform root_ppn acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Ht").
   Qed.
 
-  Lemma strans_absorb_dev :
-    forall acc va σ, (acc = Load Data \/ acc = Store Data) ->
-      kpt_dev_vpn (svpn_of va) ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
-  Proof.
-    intros acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh [[Hb Hstv] | Hk]".
-    - iMod (bare_absorb_dev acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-              with "Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
-      iModIntro. iExists σ'.
-      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iLeft. iFrame "Hb Hstv".
-    - iDestruct "Hk" as (root_ppn) "Ht".
-      iMod (kpt_absorb_dev root_ppn acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-              with "Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
-      iModIntro. iExists σ'.
-      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iRight. iExists root_ppn. iExact "Ht".
-  Qed.
-
   Definition strans_regime : s_regime :=
-    SRegime strans_inv strans_absorb strans_transform strans_absorb_dev.
+    SRegime strans_inv strans_absorb strans_transform.
 
   (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
      leaf/engine call sites use without unfolding the record. *)
@@ -648,6 +607,26 @@ Section IntrDefs.
     gpr_file m -∗
     sie_cap_gpr γ m avail.
   Proof. iIntros "Hhs Hsc Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
+
+  (* [hw_config] is persistent and rides at the head of [sconf]; a
+     whole-function proof threading [sie_cap_gpr] can pull it out (keeping the
+     bundle intact) whenever it needs the ambient static-claims bundle for a
+     ghost conversion between instructions (e.g. the walk's kalloc-page ->
+     PT-node ↦ₘ→↦ₚ disassembly, which needs [kmap_static_claims]). *)
+  Lemma sie_cap_gpr_dup_hw_config γ m avail :
+    sie_cap_gpr γ m avail -∗ hw_config ∗ sie_cap_gpr γ m avail.
+  Proof.
+    iIntros "Hcg".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
+    iEval (rewrite /sconf) in "Hsc". iDestruct "Hsc" as "(#Hhw & Hrest)".
+    iAssert (sconf γ) with "[Hrest]" as "Hsc".
+    { rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"]. }
+    iSplitR; [iExact "Hhw"|].
+    rewrite /sie_cap_gpr.
+    iSplitL "Hhs"; [iExact "Hhs"|].
+    iSplitL "Hsc"; [iExact "Hsc"|].
+    iSplitL "Hsie"; [iExact "Hsie" | iExact "Hgpr"].
+  Qed.
 
   (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof
      threading [sie_cap_gpr] can read the map's x0 slot and keep the bundle. *)

@@ -15,6 +15,7 @@ Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
+Require Import KptPt KMap.
 Local Open Scope Z_scope.
 
 Section InstrBytes.
@@ -270,6 +271,11 @@ Section InstrBytes.
     pmp_allows_all pmpcfg0 ->
     pma_allows_all pmar0 ->
     eq_vec (_get_Misa_C misa0) ('b"1") = true ->
+    (* M-mode fetch reads PHYSICAL memory: the VA-based [↦ₓ] window is
+       disassembled to the physical tier via the static bundle.  The caller
+       has a concrete [pc] (kernel text), so the per-byte static premise is
+       dischargeable by [vm_compute] and the bundle rides in [hw_config]. *)
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
     mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Machine -∗
@@ -277,10 +283,11 @@ Section InstrBytes.
     pma_regions ↦ᵣ{ dqa } pmar0 -∗
     htif_tohost_base ↦ᵣ{ dqh } None -∗
     misa ↦ᵣ{ dqm } misa0 -∗
+    kmap_static_claims -∗
     instr_bytes pc r -∗
     ⌜ exec (fetch tt) σ = Some (r, σ) ⌝.
   Proof.
-    iIntros (Hpmp0 Hpma0 HmisaC) "[Hreg [Hmem Hdev]] Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes".
+    iIntros (Hpmp0 Hpma0 HmisaC Hstat) "[Hreg [Hmem Hdev]] Hpc Hpriv Hpmpc Hpma Hhtif Hmisa #Hbundle Hbytes".
     iDestruct (reg_valid    with "Hreg Hpc")   as %Lpc.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid_dq with "Hreg Hpmpc") as %Lpmpc.
@@ -303,11 +310,13 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hbj".
+          iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
+          iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -335,16 +344,19 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hbj".
+          iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hraml.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
+          iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (fetch_pa (add_vec_int pc 2))⌝)%I as %Hramh.
         { iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbytes") as "Hb2".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb2") as %Hr2. rewrite Hoff fetch_pa_id.
+          iDestruct (text_ident_phys _ _ _ (Hstat 2%nat ltac:(lia)) with "Hbundle Hb2") as "Hb2".
+          iDestruct (phys_ram with "Hb2") as %Hr2. rewrite Hoff fetch_pa_id.
           iPureIntro. exact Hr2. }
         iPureIntro.
         pose proof (addr_is_ram_not_in_clint _ Hraml) as Hncl; pose proof (addr_is_ram_not_in_sig _ Hraml) as Hnsl; pose proof (addr_is_ram_not_in_clint _ Hramh) as Hnch; pose proof (addr_is_ram_not_in_sig _ Hramh) as Hnsh.
@@ -383,11 +395,13 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hbj".
+          iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
+          iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 (fetch_pa pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -408,11 +422,13 @@ Section InstrBytes.
         { iIntros (j Hj). rewrite fetch_pa_id.
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hbj".
+          iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
         iAssert (⌜addr_is_ram (fetch_pa pc)⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
+          iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Hpma0 (fetch_pa pc) 2) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -559,6 +575,7 @@ Section InstrBytes.
     eq_vec (_get_Misa_A misa0) ('b"1") = true ->
     misa0 = MISA_C ->
     mseccfg0 = mword_of_int 0 ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
     mstate_interp σ -∗
     PC ↦ᵣ pc -∗
     cur_privilege ↦ᵣ{ dqp } Machine -∗
@@ -567,6 +584,7 @@ Section InstrBytes.
     htif_tohost_base ↦ᵣ{ dqh } None -∗
     misa ↦ᵣ{ dqm } misa0 -∗
     mseccfg ↦ᵣ{ dqs } mseccfg0 -∗
+    kmap_static_claims -∗
     instr pc is_rvc i -∗
     ⌜ if is_rvc
       then ∃ (h : half) (i0 : instruction),
@@ -579,7 +597,7 @@ Section InstrBytes.
              exec (decode_fetch (F_Base w)) σ = Some (i, σ) /\
              is_lpad_instruction i = false ⌝.
   Proof.
-    iIntros (Hpmp Hpma HmisaC HmisaA Hmisaval Hmseccfgval) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hinstr".
+    iIntros (Hpmp Hpma HmisaC HmisaA Hmisaval Hmseccfgval Hstat) "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg #Hbundle Hinstr".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iDestruct (state_interp_reg_dq σ cur_privilege dqp Machine
@@ -589,8 +607,8 @@ Section InstrBytes.
     iDestruct (state_interp_reg_dq σ mseccfg dqs mseccfg0
                  with "Hsi Hmseccfg") as %Lmseccfg.
     iDestruct (fetch_from_instr_bytes σ pc r pmpcfg0 pmar0 misa0
-                 Hpmp Hpma HmisaC
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbytes") as %Hfetch.
+                 Hpmp Hpma HmisaC Hstat
+                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hbundle Hbytes") as %Hfetch.
     iDestruct ("Hdec" $! σ with "Hsi") as %Hdec0.
     specialize (Hdec0 ltac:(rewrite Lpriv; reflexivity) ltac:(rewrite Lmisa; exact HmisaC)
                       ltac:(rewrite Lmisa; exact HmisaA)
@@ -819,6 +837,7 @@ Section InstrBytes.
   Lemma wp_instr Φ (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
     mmode_config dq -∗
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     PC ↦ᵣ pc -∗
@@ -837,7 +856,7 @@ Section InstrBytes.
           ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp) "Hmm Hpmpc Hpc Hinstr H".
+    iIntros (Hpmp Hstat) "Hmm Hpmpc Hpc Hinstr H".
     iDestruct "Hmm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
     iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -847,8 +866,8 @@ Section InstrBytes.
     iApply (wp_exec_step_decode_execute_inv Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
-                 Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hinstr") as %Hlift.
+                 Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0 Hstat
+                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hkmapb Hinstr") as %Hlift.
     iDestruct (dispatchInterrupt_none_from_regs σ misa0 mstatus0 HmisaS HmIE
                  with "Hsi Hmisa Hmstatus") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -925,6 +944,7 @@ Section InstrBytes.
       (pmpcfg0 : type_of_register pmpcfg_n) (ms0 : mword 64) :
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -949,7 +969,7 @@ Section InstrBytes.
           ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp HmIE) "#Hhw #Hinv Hhs Hpriv Hmstatus Hpmpc Hpc Hinstr H".
+    iIntros (Hpmp HmIE Hstat) "#Hhw #Hinv Hhs Hpriv Hmstatus Hpmpc Hpc Hinstr H".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -957,8 +977,8 @@ Section InstrBytes.
     iApply (wp_exec_step_decode_execute_inv Φ with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
-                 Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0
-                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hinstr") as %Hlift.
+                 Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0 Hstat
+                 with "Hsi Hpc Hpriv Hpmpc Hpma Hhtif Hmisa Hmseccfg Hkmapb Hinstr") as %Hlift.
     iDestruct (dispatchInterrupt_none_from_regs σ misa0 ms0 HmisaS HmIE
                  with "Hsi Hmisa Hmstatus") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".

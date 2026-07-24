@@ -654,17 +654,17 @@ Section PtWriteIris.
 
   (* update an owned 8-byte slot to a new word, in step with the model's
      [write_bytes] memory update *)
-  Lemma word_pointsto_write (mm : _) (a : Arch.pa)
+  Lemma phys_word_pointsto_write (mm : _) (a : Arch.pa)
       (vold vnew : mword 64) :
-    gen_heap_interp (hG := riscv_memGS) mm -∗ a ↦₈ vold ==∗
-    gen_heap_interp (hG := riscv_memGS) (write_bytes mm a 8 vnew) ∗ a ↦₈ vnew.
+    gen_heap_interp (hG := riscv_memGS) mm -∗ a ↦ₚ₈ vold ==∗
+    gen_heap_interp (hG := riscv_memGS) (write_bytes mm a 8 vnew) ∗ a ↦ₚ₈ vnew.
   Proof.
     iIntros "Hm Hw".
-    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (phys_word_pointsto_bytes with "Hw") as "Hb".
     iMod (upd_window_8 mm a vnew vold with "Hm Hb") as "[Hm Hb]".
     iModIntro. iFrame "Hm".
-    iApply word_pointsto_intro; [exact Hal |].
+    iApply phys_word_pointsto_intro; [exact Hal |].
     iExact "Hb".
   Qed.
 

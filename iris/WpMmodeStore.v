@@ -38,21 +38,22 @@ Section WpStoreGpr.
        even in M-mode), so unlocked-ness alone does not suffice.  The fetch
        side uses [pmp_all_off_allows_all]. *)
     pmp_all_off pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ea ↦₈ vold -∗
+    ea ↦ₚ₈ vold -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
-      ea ↦₈ (m !!! Regidx rs2) -∗
+      ea ↦ₚ₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros offset ea Hpmp.
+    intros offset ea Hpmp Hstat.
     iIntros "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -65,7 +66,7 @@ Section WpStoreGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite & _).
     iApply (wp_instr Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
- (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+ (pmp_all_off_allows_all _ Hpmp) Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -87,7 +88,7 @@ Section WpStoreGpr.
     iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
     (* base register at the execute state, uniform over rs1 (x0 -> zero_reg). *)
     assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
@@ -158,8 +159,8 @@ Section WpStoreGpr.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iAssert (ea ↦₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
-    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iAssert (ea ↦ₚ₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
+    { rewrite /phys_word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfile Hbw").
   Qed.
 End WpStoreGpr.
@@ -176,6 +177,7 @@ Section MmodeStoreTor.
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
@@ -183,17 +185,17 @@ Section MmodeStoreTor.
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ea ↦₈ vold -∗
+    ea ↦ₚ₈ vold -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
-      ea ↦₈ (m !!! Regidx rs2) -∗
+      ea ↦ₚ₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros offset ea Hpmp Htor.
+    intros offset ea Hpmp Hstat Htor.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] Hfile Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -206,7 +208,7 @@ Section MmodeStoreTor.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite & _).
     iApply (wp_instr Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
-              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -227,7 +229,7 @@ Section MmodeStoreTor.
     iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
     assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
@@ -301,8 +303,8 @@ Section MmodeStoreTor.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iAssert (ea ↦₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
-    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iAssert (ea ↦ₚ₈ (m !!! Regidx rs2))%I with "[Hbytes]" as "Hbw".
+    { rewrite /phys_word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
     iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] Hfile Hbw").
   Qed.
 
@@ -315,24 +317,25 @@ Section MmodeStoreTor.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx csp_rs1, 8)) -∗
-    ea ↦₈ vold -∗
+    ea ↦ₚ₈ vold -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
-      ea ↦₈ (m !!! Regidx rs2) -∗
+      ea ↦ₚ₈ (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea Hpmp Htor.
+    intros imm ea Hpmp Hstat Htor.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
     iApply (wp_store_gpr_tor Φ pc true csp_rs1 rs2 imm m vold
-              pmpcfg0 pmpaddrs q Hpmp Htor
+              pmpcfg0 pmpaddrs q Hpmp Hstat Htor
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
   Qed.
 

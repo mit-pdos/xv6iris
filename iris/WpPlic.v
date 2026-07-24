@@ -7,7 +7,7 @@
    handled through the RAW [plic_frag] half (the caller owns [plic_frag p] and
    gets back [plic_frag p'] in the continuation) instead of through a
    [dev_inv] invariant + uart-style accessor.  The translate side still runs
-   REGIME-BLIND through [sr_transform]/[sr_absorb_dev] at the derived regime
+   REGIME-BLIND through [sr_transform]/[sr_absorb] (claim from the static bundle) at the derived regime
    instance [strans_regime] (the folded translation slot [Htr] threads
    straight through, no skolem-root open or repack), absorbing the
    device walk for ANY device vpn ([kpt_dev_vpn]).                          *)
@@ -21,7 +21,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import DevModel RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import WpLoad WpGpr InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
-Require Import KptPt.
+Require Import KptPt KMap.
 Require Import SmodeCore WpSmodeGpr.
 Require Import SmodeCorePt SRegime.
 Require Import PlicPlan WpUart.
@@ -71,7 +71,6 @@ Lemma wp_sw_plic_s_sconf (γ : gname)
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8)) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
   plic_write p (uint a8 - plic_base)%Z storeword = Some p' ->
   sie_cap_gpr γ m n -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
@@ -82,7 +81,7 @@ Lemma wp_sw_plic_s_sconf (γ : gname)
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hident Hpw.
+  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hpw.
   iIntros "Hcg Hpc Hinstr Hp Hcont".
   iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
@@ -135,14 +134,20 @@ Proof.
                (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                   ltac:(rewrite Lmenv_pc; exact Hpmm))
                with "Hreg Htr") as %Htea.
-  iMod (sr_absorb_dev strans_regime (Store Data) a8 s_pc
-          (or_intror eq_refl) Hdevvpn Hcanon Hident
+  assert (Hdevstatic : kmap_static (svpn_of a8) KP_rw)
+    by (apply kmap_class_rw; right; exact Hdevvpn).
+  iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
+  pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iMod (sr_absorb strans_regime (Store Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
+          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc
+          (or_intror (or_intror (or_introl eq_refl))) eq_refl Hcanon ltac:(reflexivity)
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_store s_pc)
-          Lpma_pc' with "Hreg Hmem Htr")
+          Lpma_pc' with "Hclaim Hreg Hmem Htr")
     as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+  rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
   assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -221,7 +226,6 @@ Lemma wp_sw_plic_dev_s_sconf (γ : gname) (γd : uart_names)
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8)) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
   sie_cap_gpr γ m n -∗
@@ -232,7 +236,7 @@ Lemma wp_sw_plic_dev_s_sconf (γ : gname) (γd : uart_names)
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hident Hwrite.
+  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
@@ -288,14 +292,20 @@ Proof.
                (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                   ltac:(rewrite Lmenv_pc; exact Hpmm))
                with "Hreg Htr") as %Htea.
-  iMod (sr_absorb_dev strans_regime (Store Data) a8 s_pc
-          (or_intror eq_refl) Hdevvpn Hcanon Hident
+  assert (Hdevstatic : kmap_static (svpn_of a8) KP_rw)
+    by (apply kmap_class_rw; right; exact Hdevvpn).
+  iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
+  pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iMod (sr_absorb strans_regime (Store Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
+          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc
+          (or_intror (or_intror (or_introl eq_refl))) eq_refl Hcanon ltac:(reflexivity)
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_store s_pc)
-          Lpma_pc' with "Hreg Hmem Htr")
+          Lpma_pc' with "Hclaim Hreg Hmem Htr")
     as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+  rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
   assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -376,7 +386,6 @@ Lemma wp_lw_plic_dev_s_sconf (γ : gname) (γd : uart_names)
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a8)) (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub pagesize_bits 1) 0)) = a8 ->
   uint rd <> 0 ->
   rd <> csp_rs1 ->
   (forall p, plic_ok p ->
@@ -391,7 +400,7 @@ Lemma wp_lw_plic_dev_s_sconf (γ : gname) (γd : uart_names)
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hident Hrd Hrdsp Hread.
+  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrd Hrdsp Hread.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
@@ -444,14 +453,20 @@ Proof.
                (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                   ltac:(rewrite Lmenv_pc; exact Hpmm))
                with "Hreg Htr") as %Htea.
-  iMod (sr_absorb_dev strans_regime (Load Data) a8 s_pc
-          (or_introl eq_refl) Hdevvpn Hcanon Hident
+  assert (Hdevstatic : kmap_static (svpn_of a8) KP_rw)
+    by (apply kmap_class_rw; right; exact Hdevvpn).
+  iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
+  pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iMod (sr_absorb strans_regime (Load Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
+          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc
+          (or_intror (or_introl eq_refl)) I Hcanon ltac:(reflexivity)
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_load s_pc)
-          Lpma_pc' with "Hreg Hmem Htr")
+          Lpma_pc' with "Hclaim Hreg Hmem Htr")
     as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+  rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
   assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)

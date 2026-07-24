@@ -70,7 +70,6 @@ Section WpSconfUartAccess.
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
     - iIntros (u b u') "%Hread Hg Hown".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
@@ -111,7 +110,6 @@ Section WpSconfUartAccess.
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
               ltac:(unfold uart_size; lia)
               ltac:(rewrite Haddr; vm_compute; reflexivity)
-              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").

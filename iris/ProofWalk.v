@@ -19,9 +19,11 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv.
+Require Import KMap.   (* mem_page_to_phys: kalloc-page ↦ₘ → ↦ₚ for the PT node *)
 Require Import WpLock.
 Require Import VcGen.
 Require Import CommonWalk PtTree.
+Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node_claim_from_static *)
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
@@ -958,8 +960,30 @@ Section ProofWalk.
     (* the zero page as a description node *)
     assert (Hcb : nth_byte (autocast (T := mword) (subrange_vec_dec (mword_of_int 0 : mword 64) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = (mword_of_int 0 : mword 8))
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hcb HN4a0 -Hpb) in "Hbytes".
-    iDestruct (zero_page_to_node clvl (DfracOwn 1) bppn with "Hbytes") as "Hchild".
+    iEval (rewrite Hcb HN4a0) in "Hbytes".
+    (* the kalloc page is ↦ₘ (VA tier); [ptree_own] is PHYSICAL tier, so
+       disassemble the identity kdata page to ↦ₚ before grafting it as a node.
+       The static-claims bundle comes off the persistent [hw_config] head of
+       the threaded [sie_cap_gpr]. *)
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
+    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+    iDestruct (mem_page_to_phys (mr !!! Regidx (mword_of_int 10 : mword 5)) (DfracOwn 1) (mword_of_int 0 : mword 8)
+                 ltac:(intros j Hj; apply kdata_svpn_class;
+                       apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
+                 with "Hkmapb Hbytes") as "Hbytes".
+    iEval (rewrite -Hpb) in "Hbytes".
+    (* the freshly-allocated PT page's identity claim (uniform-claims PHYSICAL
+       TIER): it is a kdata page, so [pt_node_claim bppn] comes off the static
+       bundle -- what [zero_page_to_node] now needs to build the node. *)
+    assert (Hnkd : node_kdata bppn).
+    { assert (Hbppn4k : bv_unsigned bppn * 4096 = uint (mr !!! Regidx (mword_of_int 10 : mword 5))).
+      { rewrite uint_unsigned. rewrite <- Hpb. rewrite page_base_unsigned. reflexivity. }
+      unfold node_kdata, text_end, ram_base, ram_size. rewrite Hbppn4k.
+      pose proof Hal as Hald. apply Z.mod_divide in Hald; [| lia]. destruct Hald as [ka Hka].
+      lia. }
+    iDestruct (pt_node_claim_from_static bppn Hnkd with "Hkmapb") as "#Hbclaim".
+    iDestruct (zero_page_to_node clvl (DfracOwn 1) bppn with "Hbclaim Hbytes") as "Hchild".
     (* +0x86 srli a5,s1,12 *)
     assert (Hmfs1 : mfin !!! Regidx (mword_of_int 9 : mword 5)
                     = add_vec zero_reg (mr !!! Regidx (mword_of_int 10 : mword 5))).
@@ -1156,7 +1180,13 @@ Section ProofWalk.
     iPoseProof (wi_3e with "Htext") as "Hi3e".
     iPoseProof (wi_40 with "Htext") as "Hi40".
     iPoseProof (wi_42 with "Htext") as "Hi42".
+    (* the slot cell is owned PHYSICALLY ([↦ₚ₈]); the S-mode load reads it
+       THROUGH translation, so convert to the VA-tier [↦₈] via the node's own
+       claim (uniform-claims), and convert back for the read-only wand. *)
+    iDestruct (ptree_own_node_claim L' (DfracOwn 1) cur with "Hown") as "[#Hcurcl Hown]".
     iDestruct (ptree_own_cell_ro L' (DfracOwn 1) cur (vpn_idx (S L') vpn) with "Hown") as "[Hslot Hcl]".
+    iDestruct (pt_slot_phys_to_mem (pt_base cur) (vpn_idx (S L') vpn) (DfracOwn 1)
+                 (pt_ents cur (vpn_idx (S L') vpn)) with "Hcurcl Hslot") as "Hslot".
     iApply (wp_walk_probe_sconf γ Φ Mf (K - 8)%nat va (mword_of_int (12 + 9 * Z.of_nat (S L')))
               (u_pte_addr (pt_base cur) (vpn_idx (S L') vpn)) (pt_ents cur (vpn_idx (S L') vpn))
               (dqm:=DfracOwn 1)
@@ -1164,6 +1194,8 @@ Section ProofWalk.
               ltac:(rewrite Hs1; exact (walk_slot_addr_lvl (S L') (pt_base cur) va ltac:(lia) Hva))
               with "Hcg Htext Hpc Hslot [-]").
     iIntros "Hcg Hpc Hslot".
+    iDestruct (pt_slot_mem_to_phys (pt_base cur) (vpn_idx (S L') vpn) (DfracOwn 1)
+                 (pt_ents cur (vpn_idx (S L') vpn)) with "Hcurcl Hslot") as "Hslot".
     iDestruct ("Hcl" with "Hslot") as "Hown".
     set (pte := pt_ents cur (vpn_idx (S L') vpn)).
     set (M4 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (u_pte_addr (pt_base cur) (vpn_idx (S L') vpn))]> Mf).
@@ -1336,11 +1368,31 @@ Section ProofWalk.
       assert (Htgt72 : add_vec (mword_of_int (WK + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (WK + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt72) in "Hpc".
       iCombine "Hrestore Hcont" as "HF".
+      (* the graft accessor delivers VA-tier ([↦₈]) cells: the walk stores the
+         pointer PTE THROUGH translation, so wrap [ptree_own_graft]'s physical
+         cells with the node's own claim (uniform-claims PHYSICAL TIER). *)
+      assert (Hgraft8 : ptree_own (S L') (DfracOwn 1) cur ⊢
+         u_pte_addr (pt_base cur) (vpn_idx (S L') vpn) ↦₈{DfracOwn 1} pte ∗
+         (∀ b : mword 44,
+            u_pte_addr (pt_base cur) (vpn_idx (S L') vpn) ↦₈{DfracOwn 1} pt_ptr_pte b -∗
+            ptree_own L' (DfracOwn 1) (pt_empty_node b) -∗
+            ptree_own (S L') (DfracOwn 1) (pt_graft cur (vpn_idx (S L') vpn) b))).
+      { iIntros "Hown0".
+        iDestruct (ptree_own_node_claim L' (DfracOwn 1) cur with "Hown0") as "[#Hcl0 Hown0]".
+        iDestruct (ptree_own_graft L' (DfracOwn 1) cur (vpn_idx (S L') vpn) Hkids with "Hown0")
+          as "[Hcell Hgw]".
+        iDestruct (pt_slot_phys_to_mem (pt_base cur) (vpn_idx (S L') vpn) (DfracOwn 1) pte
+                     with "Hcl0 Hcell") as "Hcell".
+        iSplitL "Hcell"; [iExact "Hcell" |].
+        iIntros (b) "Hcell Hchild".
+        iDestruct (pt_slot_mem_to_phys (pt_base cur) (vpn_idx (S L') vpn) (DfracOwn 1) (pt_ptr_pte b)
+                     with "Hcl0 Hcell") as "Hcell".
+        iApply ("Hgw" $! b with "Hcell Hchild"). }
       iApply (wp_walk_alloc_sconf γ γa Φ mm M6 cur
                 (fun b => pt_graft cur (vpn_idx (S L') vpn) b) (S L') L'
                 (u_pte_addr (pt_base cur) (vpn_idx (S L') vpn)) pte K lvl eb p C _ on g Hlvl HK
                 HspM6 HM6s18 HM6s6 HM6x4 HM6x23 HM6x24 HM6x25 HM6x26 HM6x27
-                (ptree_own_graft L' (DfracOwn 1) cur (vpn_idx (S L') vpn) Hkids)
+                Hgraft8
                 Hcid
                 with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF").
       + (* ---- Hok: kalloc succeeded; continue the loop with the grafted subtree ---- *)

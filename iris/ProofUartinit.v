@@ -183,7 +183,6 @@ Section ProofUartinit.
               ltac:(rewrite HR3a5; vm_compute; reflexivity)
               ltac:(rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi0c Huf [-]").
     iIntros "Hcg Hpc Huf".
     assert (Hpp10 : add_vec_int (mword_of_int (UI + 0x0c) : mword 64) 4 = mword_of_int (UI + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -220,7 +219,6 @@ Section ProofUartinit.
               R5 (K - 2)%nat u1 u2
               ltac:(unfold uart_size; lia) Hw2
               ltac:(rewrite HR5a4; vm_compute; reflexivity)
-              ltac:(rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi18 Huf [-]").
@@ -274,7 +272,6 @@ Section ProofUartinit.
               ltac:(rewrite HR7a2; vm_compute; reflexivity)
               ltac:(rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi22 Huf [-]").
     iIntros "Hcg Hpc Huf".
     assert (Hpp26 : add_vec_int (mword_of_int (UI + 0x22) : mword 64) 4 = mword_of_int (UI + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
@@ -288,7 +285,6 @@ Section ProofUartinit.
               R7 (K - 2)%nat u3 u4
               ltac:(unfold uart_size; lia) Hw4
               ltac:(rewrite HR7a5; vm_compute; reflexivity)
-              ltac:(rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi26 Huf [-]").
@@ -305,7 +301,6 @@ Section ProofUartinit.
               R7 (K - 2)%nat u4 u5
               ltac:(unfold uart_size; lia) Hw5
               ltac:(rewrite HR7a4; vm_compute; reflexivity)
-              ltac:(rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi2a Huf [-]").
@@ -352,7 +347,6 @@ Section ProofUartinit.
               ltac:(rewrite HR9a4; vm_compute; reflexivity)
               ltac:(rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi32 Huf [-]").
     iIntros "Hcg Hpc Huf".
     assert (Hpp36 : add_vec_int (mword_of_int (UI + 0x32) : mword 64) 4 = mword_of_int (UI + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
@@ -367,7 +361,6 @@ Section ProofUartinit.
               R9 (K - 2)%nat u6 u7
               ltac:(unfold uart_size; lia) Hw7
               ltac:(rewrite HR9a5; vm_compute; reflexivity)
-              ltac:(rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi36 Huf [-]").

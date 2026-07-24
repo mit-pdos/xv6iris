@@ -33,6 +33,7 @@ Section WpMretGpr.
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     eq_vec (_get_Mstatus_MIE ms_cur) ('b"1") = false ->
     privLevel_bits_forwards (_get_Mstatus_MPP (cms2 ms_cur), ('b"0"))
       = returnM newpriv ->
@@ -60,11 +61,11 @@ Section WpMretGpr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp HmIE Hnp Hsup Hlpe0)
+    iIntros (Hpmp Hstat HmIE Hnp Hsup Hlpe0)
       "#Hhw #Hinv Hhs Hpriv Hms Hpmpc Hmenv [Hpc Hnpc] Hfile Hmepc Hinstr Hcont".
     assert (Hnpm : generic_neq newpriv Machine = true)
       by (rewrite Hsup; vm_compute; reflexivity).
-    iApply (wp_instr_config Φ pc false (MRET tt) pmpcfg0 ms_cur Hpmp HmIE
+    iApply (wp_instr_config Φ pc false (MRET tt) pmpcfg0 ms_cur Hpmp HmIE Hstat
               with "Hhw Hinv Hhs Hpriv Hms Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".

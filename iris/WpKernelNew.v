@@ -68,10 +68,10 @@ Section WpKernelNew.
     mcounteren ↦ᵣ mcounteren0 -∗
     stimecmp ↦ᵣ stimecmp0 -∗
     (* the per-CPU stack0 pointer word _entry loads *)
-    entry_ld_ea ↦₈{ dq } v_stack0 -∗
+    entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
     (* start()'s 4-slot frame (own ra/s0 + child timerinit's ra/s0) as the
-       bottom four slots of [stack_own sp0 n] (any depth n >= 4). *)
-    stack_own sp0 n -∗
+       bottom four slots of [stack_own_phys sp0 n] (any depth n >= 4). *)
+    stack_own_phys sp0 n -∗
     kernel_text -∗
     ( ∀ (tv : mword 64) (ms0 : mword 64)
         (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
@@ -94,8 +94,8 @@ Section WpKernelNew.
       menvcfg ↦ᵣ menvcfg_legalized (st_menv_adue menvcfg0) (ti_menv1 (st_menv_adue menvcfg0)) -∗
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0) -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline tv) -∗
-      entry_ld_ea ↦₈{ dq } v_stack0 -∗
-      stack_own sp0 n -∗
+      entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
+      stack_own_phys sp0 n -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.

@@ -148,7 +148,7 @@ Section UserPtInv.
      a flat pa-set dedups pages shared by several vpns. *)
   Definition udata_own (data : gset Arch.pa) : iProp Σ :=
     (∃ dm : gmap Arch.pa (bv 8),
-       ⌜dom dm = data⌝ ∗ [∗ map] a ↦ b ∈ dm, a ↦ₘ b)%I.
+       ⌜dom dm = data⌝ ∗ [∗ map] a ↦ b ∈ dm, a ↦ₚ b)%I.
 
   (* THE USER-EXECUTION PT BUNDLE: the tree invariant + the data pages +
      the pure coverage and access-classification facts. *)

@@ -250,9 +250,8 @@ Qed.
    [svpn] the S-mode WPs abstract over; defining it as the extraction lets the
    [Hvpn_def] premise ([autocast (subrange (subrange a 38 0) 38 12) = svpn])
    hold by [reflexivity], and pins its value via [svpn_of_unsigned]. *)
-Definition svpn_of (a : mword 64) : mword 27 :=
-  autocast (T := mword) (subrange_vec_dec
-     (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits).
+(* [svpn_of] itself now lives in RiscvPtsto (the VA-based points-to is
+   built on it); its arithmetic lemmas stay here with their helpers. *)
 
 Lemma svpn_of_unsigned (a : mword 64) :
   addr_is_ram a ->

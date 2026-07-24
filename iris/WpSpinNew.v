@@ -151,8 +151,16 @@ Qed.
     iIntros "Hmm Hpmpc Hpc Hfile".
     iPoseProof (spin_instr with "Htext") as "Hinstr".
     iDestruct "Hpc" as "[Hpc Hnpc]".
+    (* the fetch window at the concrete [pc_spin] is kernel text: discharge
+       [wp_instr]'s per-byte static premise by [instr_window_static] +
+       [vm_compute] on the text range (M-mode fetch, guard-permitted). *)
+    assert (Hspin_static : forall j, (j < 4)%nat ->
+              KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc_spin j)) KP_rx).
+    { apply KptPt.instr_window_static. intros j Hj. unfold addr_is_text.
+      destruct j as [|[|[|[|k]]]]; try lia;
+        (split; [vm_compute; discriminate | vm_compute; reflexivity]). }
     (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
-    iApply (wp_instr Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 Hpmp
+    iApply (wp_instr Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 Hpmp Hspin_static
               with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

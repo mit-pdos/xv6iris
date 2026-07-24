@@ -38,8 +38,13 @@ Definition upa (off : Z) : mword 64 := mword_of_int (KernelSyms.trampoline + off
 Section Pte8.
   Context `{!riscvGS Σ}.
 
+  (* uniform-claims PHYSICAL TIER: the trampoline accesses the trapframe at the
+     USER-PT translate OUTPUT [tfpa] (a physical address, same shape as the
+     hardware page-walker's PT slots), so the owned trapframe bytes live at the
+     physical tier [↦ₚ].  Kernel-side S-mode views convert via the claim
+     bridges where needed. *)
   Definition pte8 (a v : mword 64) (dq : dfrac) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{ dq } nth_byte v j)%I.
+    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₚ{ dq } nth_byte v j)%I.
 
 End Pte8.
 

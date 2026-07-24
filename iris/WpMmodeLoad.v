@@ -34,22 +34,23 @@ Section WpLdGpr.
        even in M-mode), so unlocked-ness alone does not suffice.  The fetch
        side uses [pmp_all_off_allows_all]. *)
     pmp_all_off pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    word_pointsto ea dq v -∗
+    phys_word_pointsto ea dq v -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      word_pointsto ea dq v -∗
+      phys_word_pointsto ea dq v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros offset ea Hpmp Hrd.
+    intros offset ea Hpmp Hstat Hrd.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbw Hcont".
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -62,7 +63,7 @@ Section WpLdGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
- (pmp_all_off_allows_all _ Hpmp) with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+ (pmp_all_off_allows_all _ Hpmp) Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -80,11 +81,11 @@ Section WpLdGpr.
     { iIntros (j Hj). assert (Hj' : (j < 8)%nat) by lia.
       iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
-      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+      iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
     iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
@@ -173,8 +174,8 @@ Section WpLdGpr.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iAssert (word_pointsto ea dq v) with "[Hbytes]" as "Hbw".
-    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iAssert (phys_word_pointsto ea dq v) with "[Hbytes]" as "Hbw".
+    { rewrite /phys_word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
     { iPureIntro. intro r. rewrite rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Hdom. }
@@ -195,6 +196,7 @@ Section MmodeLoadTor.
     let offset := sign_extend' 64 imm in
     let ea := add_vec (m !!! Regidx rs1) offset in
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
@@ -203,17 +205,17 @@ Section MmodeLoadTor.
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    ea ↦₈{ dq } v -∗
+    ea ↦ₚ₈{ dq } v -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ea ↦₈{ dq } v -∗
+      ea ↦ₚ₈{ dq } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros offset ea Hpmp Htor Hrd.
+    intros offset ea Hpmp Hstat Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -226,7 +228,7 @@ Section MmodeLoadTor.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (Hpma_all ea 8) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
-              Hpmp with "Hmm_wp Hpmpc_wp Hpc Hinstr").
+              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     iDestruct (reg_valid_dq with "Hreg Hpriv_k")   as %Lpriv.
@@ -245,11 +247,11 @@ Section MmodeLoadTor.
     { iIntros (j Hj). assert (Hj' : (j < 8)%nat) by lia.
       iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
-      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+      iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
     iAssert (⌜addr_is_ram ea⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+      iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
       iPureIntro. exact Hr0. }
     iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
@@ -343,8 +345,8 @@ Section MmodeLoadTor.
     { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iAssert (ea ↦₈{ dq } v)%I with "[Hbytes]" as "Hbw".
-    { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
+    iAssert (ea ↦ₚ₈{ dq } v)%I with "[Hbytes]" as "Hbw".
+    { rewrite /phys_word_pointsto. iFrame "Hbytes". iPureIntro. exact Halign. }
     iApply ("Hcont" with "Hmm'' Hpmpc'' Hpaddr [$Hpc' $Hnpc] [Hfmap] Hbw").
     iSplitR.
     { iPureIntro. intro r. rewrite rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Hdom. }
@@ -359,25 +361,26 @@ Section MmodeLoadTor.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let ea := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) in
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     pmp_tor0_grants pmpcfg0 pmpaddrs ea 8 ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc true (LOAD (imm, Regidx csp_rs1, Regidx rd, false, 8)) -∗
-    ea ↦₈{ dq } v -∗
+    ea ↦ₚ₈{ dq } v -∗
     ( mmode_config (DfracOwn q) -∗ pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ea ↦₈{ dq } v -∗
+      ea ↦ₚ₈{ dq } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros imm ea Hpmp Htor Hrd.
+    intros imm ea Hpmp Hstat Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
     iApply (wp_ld_gpr_tor Φ pc true csp_rs1 rd imm m v
-              pmpcfg0 pmpaddrs q Hpmp Htor Hrd
+              pmpcfg0 pmpaddrs q Hpmp Hstat Htor Hrd
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
   Qed.
 

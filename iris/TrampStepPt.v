@@ -12,6 +12,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
+Require Import KMap.
 Require Import KptExecMap.
 Require Import SmodeCore SmodeCorePt KptTree UptTree PtFetchGen.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -72,8 +73,15 @@ Section TrampFetchPt.
     is_aligned_paddr (Physaddr pa) 2 = true ->
     is_aligned_paddr (Physaddr (add_vec_int pa 2)) 2 = true ->
     (is_aligned_vaddr (Virtaddr pc) 4 = true -> is_aligned_paddr (Physaddr pa) 4 = true) ->
+    (* PHYSICAL-storage premise (NOT about the fetched va): the trampoline
+       page IS kernel text (ppn 0x80006 < etext), so each byte's PHYSICAL
+       location [pa_add pa j] is a text vpn.  Dischargeable by [vm_compute]
+       at the concrete-[pa] call sites; the va's non-identity translation
+       stays entirely inside [Habs]. *)
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pa j)) KP_rx) ->
     mstate_interp σ -∗
     INV -∗
+    kmap_static_claims -∗
     instr_bytes pa r ==∗
     ∃ σf : mstate,
       ⌜ exec (fetch tt) σ = Some (r, σf) ⌝ ∗
@@ -85,8 +93,8 @@ Section TrampFetchPt.
   Proof.
     intros Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2
-           Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al.
-    iIntros "[Hreg [Hmem Hdev]] Hinv Hbytes".
+           Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al Hstat.
+    iIntros "[Hreg [Hmem Hdev]] Hinv #Hbundle Hbytes".
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Lmisa; vm_compute; reflexivity).
     iEval (rewrite /instr_bytes) in "Hbytes".
@@ -100,12 +108,14 @@ Section TrampFetchPt.
         iAssert (⌜addr_is_ram pa⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hp0".
+          iDestruct (phys_ram with "Hp0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hram3.
         { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb3") as %Hr3. iPureIntro.
+          iDestruct (text_ident_phys _ _ _ (Hstat 3%nat ltac:(lia)) with "Hbundle Hb3") as "Hp3".
+          iDestruct (phys_ram with "Hp3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
         iMod (Habs pc pa σ Hcanon Hvpn Hident Lmisa Lmenv Lhtif Lpriv LSXL Lpma
                 with "Hreg Hmem Hinv")
@@ -116,7 +126,8 @@ Section TrampFetchPt.
         { iIntros (j Hj).
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hpj".
+          iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Lpma pa 4) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -156,22 +167,26 @@ Section TrampFetchPt.
         iAssert (⌜addr_is_ram pa⌝)%I as %Hraml.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hp0".
+          iDestruct (phys_ram with "Hp0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (pa_add pa 1)⌝)%I as %Hraml1.
         { iDestruct (big_sepL_lookup _ _ 1%nat 1%nat with "Hbytes") as "Hb1".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb1") as %Hr1. iPureIntro.
+          iDestruct (text_ident_phys _ _ _ (Hstat 1%nat ltac:(lia)) with "Hbundle Hb1") as "Hp1".
+          iDestruct (phys_ram with "Hp1") as %Hr1. iPureIntro.
           unfold pa_add in Hr1 |- *. change (Z.of_nat 1) with 1 in Hr1 |- *. exact Hr1. }
         iAssert (⌜addr_is_ram (add_vec_int pa 2)⌝)%I as %Hramh.
         { iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbytes") as "Hb2".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb2") as %Hr2. iPureIntro.
+          iDestruct (text_ident_phys _ _ _ (Hstat 2%nat ltac:(lia)) with "Hbundle Hb2") as "Hp2".
+          iDestruct (phys_ram with "Hp2") as %Hr2. iPureIntro.
           unfold pa_add in Hr2. change (Z.of_nat 2) with 2 in Hr2. exact Hr2. }
         iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hram3.
         { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb3") as %Hr3. iPureIntro.
+          iDestruct (text_ident_phys _ _ _ (Hstat 3%nat ltac:(lia)) with "Hbundle Hb3") as "Hp3".
+          iDestruct (phys_ram with "Hp3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
         assert (Hramh1 : addr_is_ram (pa_add (add_vec_int pa 2) 1)).
         { rewrite (Haddr 1%nat ltac:(lia)). change (2 + 1)%nat with 3%nat. exact Hram3. }
@@ -208,7 +223,8 @@ Section TrampFetchPt.
         { iIntros (j Hj). rewrite nth_byte_subrange_lo; [| exact Hj].
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hpj".
+          iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         (* --- high chunk: s1 -> s2 --- *)
         iMod (Habs (add_vec_int pc 2) (add_vec_int pa 2) s1 Hcanon2 Hvpn2 Hident2
                 L1misa L1menv L1htif L1priv L1SXL L1pma
@@ -226,7 +242,8 @@ Section TrampFetchPt.
           rewrite (Haddr j Hj).
           iDestruct (big_sepL_lookup _ _ (2 + j)%nat (2 + j)%nat with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat (2 + j)%nat ltac:(lia)) with "Hbundle Hbj") as "Hpj".
+          iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         (* the s1/s2 PMP facts for the two instruction reads *)
         assert (Hfetch : exec (fetch tt) σ = Some (F_Base w, s2)).
         { apply (exec_fetch_F_Base_2_S_gen_pa pc pa w σ s1 s2 regl regh
@@ -279,12 +296,14 @@ Section TrampFetchPt.
         iAssert (⌜addr_is_ram pa⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hp0".
+          iDestruct (phys_ram with "Hp0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (pa_add pa 3)⌝)%I as %Hram3.
         { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb3") as %Hr3. iPureIntro.
+          iDestruct (text_ident_phys _ _ _ (Hstat 3%nat ltac:(lia)) with "Hbundle Hb3") as "Hp3".
+          iDestruct (phys_ram with "Hp3") as %Hr3. iPureIntro.
           unfold pa_add in Hr3 |- *. change (Z.of_nat 3) with 3 in Hr3 |- *. exact Hr3. }
         iMod (Habs pc pa σ Hcanon Hvpn Hident Lmisa Lmenv Lhtif Lpriv LSXL Lpma
                 with "Hreg Hmem Hinv")
@@ -295,7 +314,8 @@ Section TrampFetchPt.
         { iIntros (j Hj).
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hpj".
+          iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Lpma pa 4) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -333,12 +353,14 @@ Section TrampFetchPt.
         iAssert (⌜addr_is_ram pa⌝)%I as %Hram.
         { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
+          iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hp0".
+          iDestruct (phys_ram with "Hp0") as %Hr0. rewrite pa_add_0 in Hr0.
           iPureIntro. exact Hr0. }
         iAssert (⌜addr_is_ram (pa_add pa 1)⌝)%I as %Hram1.
         { iDestruct (big_sepL_lookup _ _ 1%nat 1%nat with "Hbytes") as "Hb1".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (code_ram with "Hb1") as %Hr1. iPureIntro.
+          iDestruct (text_ident_phys _ _ _ (Hstat 1%nat ltac:(lia)) with "Hbundle Hb1") as "Hp1".
+          iDestruct (phys_ram with "Hp1") as %Hr1. iPureIntro.
           unfold pa_add in Hr1 |- *. change (Z.of_nat 1) with 1 in Hr1 |- *. exact Hr1. }
         iMod (Habs pc pa σ Hcanon Hvpn Hident Lmisa Lmenv Lhtif Lpriv LSXL Lpma
                 with "Hreg Hmem Hinv")
@@ -349,7 +371,8 @@ Section TrampFetchPt.
         { iIntros (j Hj).
           iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
           { rewrite lookup_seq_lt; [reflexivity | lia]. }
-          iDestruct (text_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+          iDestruct (text_ident_phys _ _ _ (Hstat j ltac:(lia)) with "Hbundle Hbj") as "Hpj".
+          iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
         destruct (Lpma pa 2) as (region & Hmatch0 & Hexec0 & _ & _).
@@ -478,7 +501,8 @@ Section TrampFetchPt.
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
             Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2
             Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
-            with "[$Hreg $Hmem] Htlbinv Hbytes")
+            (tramp_window_static pc pa Hident Hident2 Hpa2al)
+            with "[$Hreg $Hmem] Htlbinv Hkmapb Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -571,7 +595,7 @@ Section TrampFetchInst.
             Lpma with "Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
     iDestruct "Hinv" as (satp1 tlbvec1 t1 M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Htrampnone & %Hpmawimpl & Ht & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
       "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc0") as %Lc.
@@ -586,7 +610,7 @@ Section TrampFetchInst.
     iSplit; [iPureIntro; rewrite La; exact Hcov |].
     iFrame "Hri Hgh".
     iApply (tlb_inv_pt_intro root_ppn satp1 tlbvec1 t1 M
-              Hmode Hasid Hppn Htlbok Hspec Hpmawimpl with "Hsatp Htlb HM Ht").
+              Hmode Hasid Hppn Htlbok Hspec Htrampnone Hpmawimpl with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
               HA Hord Hpmarimpl HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.

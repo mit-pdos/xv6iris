@@ -31,7 +31,7 @@ Section ExecAmoGS4walkPt.
   Let ea := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (zeros' 64).
   Let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0).
-  Let pa := a8.
+  Variable pa : mword 64.
   Let storeval : mword 32 :=
     sign_extend' (Z.mul 8 (__id 4)) (trunc (Z.mul (__id 4) 8) vrs2).
   Hypothesis Hrd : uint rd <> 0.

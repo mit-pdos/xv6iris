@@ -692,28 +692,6 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (*    and that map is wf (so the stage-6 switch can install it).          *)
 (* ===================================================================== *)
 
-Lemma kvm_M_wf (pas : nat -> mword 44) :
-  kvm_pas_ok pas -> kmap_wf (kvm_M pas).
-Proof.
-  intros Hpas. split.
-  - (* kmap_M0 ⊆ kvm_M pas *)
-    apply map_subseteq_spec. intros vpn e Hm0.
-    rewrite kmap_M0_lookup in Hm0. rewrite kvm_M_lookup.
-    destruct (kmap_class vpn) as [pc|] eqn:Hc; cbn in Hm0; [| discriminate].
-    injection Hm0 as <-. reflexivity.
-  - (* every entry is static or a legal dynamic (kstack) one *)
-    intros vpn e He. rewrite kvm_M_lookup in He.
-    destruct (kmap_class vpn) as [pc|] eqn:Hc.
-    + left. rewrite kmap_M0_lookup, Hc. cbn. exact He.
-    + destruct (kstack_index vpn) as [i|] eqn:Hks; [| discriminate].
-      injection He as <-. right.
-      apply kstack_index_spec in Hks. destruct Hks as [Hi ->].
-      pose proof (Hpas i Hi) as [Hlo Hhi].
-      unfold kmap_dyn_ok, kstack_vpn_range, kstack_vpn_lo. cbn [fst snd].
-      rewrite (kstack_vpn_uns i Hi).
-      split; [lia | split; [exact Hlo | split; [exact Hhi | reflexivity]]].
-Qed.
-
 (* the full-map word at an M-entry IS the zero-A/D variant of the class leaf *)
 Local Lemma kvm_full_of_M (pas : nat -> mword 44) (vpn : mword 27) (e : mword 44 * kperm) :
   kvm_M pas !! vpn = Some e ->

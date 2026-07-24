@@ -370,7 +370,6 @@ Section ProofPlicinithart.
               ltac:(rewrite HN5a5; exact (ph_geom_align _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_canon _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_vpn   _ (ph_senable_geom _ Hhart)))
-              ltac:(rewrite HN5a5; exact (ph_geom_ident _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5sw HN5a5; intros pq Hpq;
                     eexists; split;
                     [ exact (ph_senable_write _ pq _ Hhart)
@@ -431,7 +430,6 @@ Section ProofPlicinithart.
               ltac:(rewrite HN8a5; exact (ph_geom_align _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_canon _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_vpn   _ (ph_sthresh_geom _ Hhart)))
-              ltac:(rewrite HN8a5; exact (ph_geom_ident _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8sw HN8a5; intros pq Hpq;
                     eexists; split;
                     [ exact (ph_sthresh_write _ pq _ Hhart)

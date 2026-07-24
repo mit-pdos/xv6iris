@@ -908,36 +908,27 @@ Section MemUpdate.
   Context `{CID : CpuId}.
   Context {dqc : dfrac}.
 
-  (* single-byte update (no [mem_update] exists in RiscvPtsto). *)
-  Lemma mem_update (mm : _) (a : Arch.pa) (v v' : bv 8) :
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ a ↦ₘ v ==∗ gen_heap_interp (hG:=riscv_memGS) (<[a := v']> mm) ∗ a ↦ₘ v'.
-  Proof.
-    (* [mem_pointsto] is [Typeclasses Opaque] (sealed in RiscvPtsto); unfold it
-       here so the raw [pointsto ∗ ⌜addr_is_ram⌝] conjunction can be destructed. *)
-    rewrite /mem_pointsto. iIntros "Hm [Ha %Hram]".
-    iMod (gen_heap_update with "Hm Ha") as "[Hm Ha]".
-    iModIntro. iFrame "Hm Ha". iPureIntro. exact Hram.
-  Qed.
-
-  (* window update over an arbitrary index list (write_bytes is a foldr). *)
+  (* window update over an arbitrary index list (write_bytes is a foldr).
+     PHYSICAL tier: M-mode writes untranslated memory ([↦ₚ]); the single-byte
+     step is RiscvPtsto's [phys_update]. *)
   Lemma upd_window (mm : _) (pa : Arch.pa) (vnew vold : bv 64)
       (l : list nat) :
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ ([∗ list] j ∈ l, (pa_add pa j) ↦ₘ nth_byte vold j) ==∗
+    gen_heap_interp (hG:=riscv_memGS) mm -∗ ([∗ list] j ∈ l, (pa_add pa j) ↦ₚ nth_byte vold j) ==∗
     gen_heap_interp (hG:=riscv_memGS) (foldr (fun j acc => <[pa_add pa j := nth_byte vnew j]> acc) mm l)
-      ∗ ([∗ list] j ∈ l, (pa_add pa j) ↦ₘ nth_byte vnew j).
+      ∗ ([∗ list] j ∈ l, (pa_add pa j) ↦ₚ nth_byte vnew j).
   Proof.
     iInduction l as [|x xs IH] "IH"; simpl.
     - iIntros "Hm _". iModIntro. iFrame.
     - iIntros "Hm [Ha Hrest]".
       iMod ("IH" with "Hm Hrest") as "[Hm Hrest]".
-      iMod (mem_update _ (pa_add pa x) (nth_byte vold x) (nth_byte vnew x) with "Hm Ha") as "[Hm Ha]".
+      iMod (phys_update _ (pa_add pa x) (nth_byte vold x) (nth_byte vnew x) with "Hm Ha") as "[Hm Ha]".
       iModIntro. iFrame "Ha Hrest Hm".
   Qed.
 
   Lemma upd_window_8 (mm : _) (pa : Arch.pa) (vnew vold : bv 64) :
-    gen_heap_interp (hG:=riscv_memGS) mm -∗ ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vold j) ==∗
+    gen_heap_interp (hG:=riscv_memGS) mm -∗ ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₚ nth_byte vold j) ==∗
     gen_heap_interp (hG:=riscv_memGS) (write_bytes mm pa 8 vnew)
-      ∗ ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₘ nth_byte vnew j).
+      ∗ ([∗ list] j ∈ seq 0 8, (pa_add pa j) ↦ₚ nth_byte vnew j).
   Proof. unfold write_bytes. change (N.to_nat 8) with 8%nat. apply upd_window. Qed.
 End MemUpdate.
 

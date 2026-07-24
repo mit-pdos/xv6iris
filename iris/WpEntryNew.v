@@ -58,6 +58,13 @@ Lemma decode_ld s :
   exec (ext_decode w_ld) s = Some (LOAD (imm_ld, Regidx i_ld, Regidx i_ld, false, 8), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; unfold imm_ld, i_ld; decode_any s Hpriv ]. Qed.
 
+(* discharge [wp_instr]'s per-byte static premise at a concrete boot pc:
+   M-mode fetch is untranslated, so the identity/static window is guard-permitted. *)
+Ltac boot_static :=
+  apply KptPt.instr_window_static; intros jj Hjj; unfold addr_is_text;
+  destruct jj as [|[|[|[|]]]]; try lia;
+  (split; [vm_compute; discriminate | vm_compute; reflexivity]).
+
 Section WpEntryNew.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -232,7 +239,7 @@ Section WpEntryNew.
     gpr_file m -∗
     mhartid ↦ᵣ mhartid_in -∗
     (* the stack0 pointer word sitting at the load effective address *)
-    entry_ld_ea ↦₈{ dq } v_stack0 -∗
+    entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
     (* the kernel text image: the eight decoded [instr] facts are derived from
        it inside the proof via the [entry_instr_*] constructors ([kernel_text]
        is persistent, so one copy feeds all eight) *)
@@ -242,7 +249,7 @@ Section WpEntryNew.
       pc_is pc_start -∗
       gpr_file (m_jal m v_stack0 mhartid_in) -∗
       mhartid ↦ᵣ mhartid_in -∗
-      entry_ld_ea ↦₈{ dq } v_stack0 -∗
+      entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -269,7 +276,7 @@ Section WpEntryNew.
     assert (Hrd7 : uint i_jal <> 0) by (vm_compute; discriminate).
 
     (* ---- 1. AUIPC @ pc_e0: sp := entry_sp1 ---- *)
-    iApply (wp_auipc_gpr Φ pc_e0 i_auipc imm_auipc m pmpcfg0 1%Qp HpmpU Hrd0
+    iApply (wp_auipc_gpr Φ pc_e0 i_auipc imm_auipc m pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd0
               with "Hmm Hpmpc Hpc Hfile Hi0").
     iEval (rewrite pc_e0_e1).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -286,7 +293,7 @@ Section WpEntryNew.
       rewrite reg_ld_auipc.
       rewrite upd_eq. reflexivity. }
     iApply (wp_ld_gpr Φ pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
-              (dq := dq) Hpmp Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
+              (dq := dq) Hpmp ltac:(boot_static) Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
     { rewrite Hea. iExact "Hbytes". }
     iEval (rewrite pc_e1_e2).
     iIntros "Hmm Hpmpc Hpc Hfile Hbytes".
@@ -296,7 +303,7 @@ Section WpEntryNew.
 
     (* ---- 3. C.LUI @ pc_e2: a0 := 0x1000 ---- *)
     iApply (wp_lui_gpr Φ pc_e2 true (regidx_bits rd_clui) (sign_extend' 20 imm_clui)
-              (m_ld m v_stack0) pmpcfg0 1%Qp HpmpU Hrd2
+              (m_ld m v_stack0) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd2
               with "Hmm Hpmpc Hpc Hfile Hi2").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e2_e3).
@@ -307,7 +314,7 @@ Section WpEntryNew.
 
     (* ---- 4. CSRRS @ pc_e3 (2-aligned): a1 := mhartid ---- *)
     iApply (wp_csrr_mhartid_gpr Φ pc_e3 i_rd_csrr mhartid_in
-              (m_clui m v_stack0) pmpcfg0 1%Qp HpmpU Hrd3
+              (m_clui m v_stack0) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd3
               with "Hmm Hpmpc Hpc Hfile Hmh Hi3").
     iEval (rewrite pc_e3_e4).
     iIntros "Hmm Hpmpc Hpc Hfile Hmh".
@@ -317,7 +324,7 @@ Section WpEntryNew.
     (* ---- 5. C.ADDI @ pc_e4: a1 := a1 + 1 ---- *)
     iApply (wp_addi_gpr Φ pc_e4 true (regidx_bits rsd_caddi) (regidx_bits rsd_caddi)
               (sign_extend' 12 imm_caddi)
-              (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU Hrd4
+              (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd4
               with "Hmm Hpmpc Hpc Hfile Hi4").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e4_e5).
@@ -331,7 +338,7 @@ Section WpEntryNew.
 
     (* ---- 6. MUL @ pc_e5: a0 := a0 * a1 ---- *)
     iApply (wp_mul_gpr Φ pc_e5 i_mul_rs2 i_mul_rs1 i_mul_rd
-              (m_caddi m v_stack0 mhartid_in) pmpcfg0 HpmpU Hrd5
+              (m_caddi m v_stack0 mhartid_in) pmpcfg0 HpmpU ltac:(boot_static) Hrd5
               with "Hmm Hpmpc Hpc Hfile Hi5").
     iEval (rewrite pc_e5_e6).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -347,7 +354,7 @@ Section WpEntryNew.
     (* ---- 7. C.ADD @ pc_e6: sp := sp + a0 ---- *)
     iApply (wp_add_gpr Φ pc_e6 true (regidx_bits rs2_cadd) (regidx_bits rsd_cadd)
               (regidx_bits rsd_cadd)
-              (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU Hrd6
+              (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd6
               with "Hmm Hpmpc Hpc Hfile Hi6").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e6_e7).
@@ -361,7 +368,7 @@ Section WpEntryNew.
 
     (* ---- 8. JAL @ pc_e7 (2-aligned): ra := pc+4; PC := start ---- *)
     iApply (wp_jal_gpr Φ pc_e7 i_jal imm_jal
-              (m_cadd m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU Hrd7 jal_aligned
+              (m_cadd m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd7 jal_aligned
               with "Hmm Hpmpc Hpc Hfile Hi7").
     iEval (rewrite pc_e7_start).
     iIntros "Hmm Hpmpc Hpc Hfile".

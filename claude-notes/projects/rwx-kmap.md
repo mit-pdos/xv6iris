@@ -57,6 +57,18 @@ fully uniform.  User decisions, ironed out over several rounds:
    a static-fragment identity corollary (pa = va) for the M-mode paths
    (M-mode has no translation and never touches tramp/kstack vas).
 
+PARKED CLEANUP (user-deferred 2026-07-24, revisit after the project):
+the heap-domain invariant — add ⌜∀ a ∈ dom mem, addr_is_ram a⌝ to
+mstate_interp (true, currently unreified: the heap is born RAM-only and
+bus routing keeps it so).  Once in, the RAM content of the points-to
+region conjuncts is derivable at any interp-holding site
+(gen_heap_valid + domain), enabling: ↦ₚ → bare pointsto, and ↦ₘ's
+⌜addr_is_kdata pa⌝ slimmed or dropped (the kdata-vs-ram sharpening is
+NOT load-bearing — the no-writable-text guarantee rests on the concrete
+table; kdata just keeps it visible in the resource type).  Cost: the
+domain obligation in every step-preservation proof + re-plumbing tower
+derivations from resource-destruct to interp-lookup.
+
 EXECUTION STAGES (revised for green-per-stage; KvmMap item (ii) is done
 so sequencing is clear):
   A'. ADDITIVE PREP (green): define kmap_static_claims; hw_config gains
@@ -70,6 +82,66 @@ so sequencing is clear):
       kmap_at_static consumer at once, and those consumers are exactly
       the structures being deleted — so A-then-B split cannot each be
       green; B' is deliberately atomic.)
+      PHYSICAL TIER (adopted 2026-07-23, mid-B′): three consumers access
+      memory UNTRANSLATED and cannot use the VA-based facts — ptree_own
+      (the hardware walker reads PT slots physically at abstract
+      addresses; no static classification derivable for an abstract
+      root), M-mode generic access, M-mode fetch.  Resolution: a
+      physical points-to `pa ↦ₚ{dq} b := pointsto pa dq b ∗
+      ⌜addr_is_ram pa⌝` (+ word form for PT slots) for untranslated
+      ownership, with IDENTITY ASSEMBLY/DISASSEMBLY lemmas at the
+      boundaries: static-bundle claim + pa ↦ₚ v ⇄ pa ↦ₘ v via
+      kmap_at_agree + pa_of_id.  Physical actors (walker/ptree_own,
+      M-mode leaves+fetch — M-mode whole-function specs shift to ↦ₚ —
+      and adequacy's raw image) own ↦ₚ; translated actors (all S-mode)
+      own ↦ₘ/↦ₓ/↦₈; conversions at kalloc→PT pages
+      (zero_page_to_node), the walk's S-mode slot stores, and the
+      M-mode→S-mode boot handoff.
+      B′ PROGRESS (2026-07-23): 300/302 — foundation/spine/M-mode/
+      adequacy/user-PT DONE (38+13 files).  Approved shape decisions:
+      stack_own_phys (StackOwn.v — the ↦ₚ₈ mirror threaded through the
+      M-mode boot chain wp_entry→wp_timerinit→wp_start→wp_kernel, in
+      lieu of a kmap_static-of-sp0 precondition cascade); the word-level
+      accessors live in KptPt (pa_of_pa_add/svpn_of_pa_add under
+      canonical + non-straddling premises + instr_window_static).
+      REMAINING: the four S-mode fetch drivers exec_fetch_*_S_gen
+      (SmodeCore.v ~658/673) are stated with IDENTITY translation
+      (translate = Physaddr va, bytes at va+j) — the last hidden-identity
+      site; generalize them to an arbitrary translated pa (bytes at
+      pa+j), then re-key SmodeCorePt/UserFetchPt on the ↦ₓ□ bytes' own
+      claims (per-word collapse via kmap_at_agree) and fan out to the
+      S-mode towers/leaves still referencing the deleted
+      sr_absorb_region/_dev (WpSmodePt{Mem,Leaves,Btype,Ctl},
+      WpSconf{Mem,Lock,Btype,Csr,Ctl}, WpPlic, ProofUart, TrampStepPt,
+      UserretPt/EntryPt, WpSmodeIntr).  Two stale sr_absorb_region
+      header comments in SRegime.v to clean.
+      LATE-B′ DESIGN ADDITIONS (approved 2026-07-24):
+      - pt_node_claim (PtTree): every PT node's pt_page_own carries
+        ⌜node_kdata b⌝ ∗ kmap_at (pt_page_vpn b) b KP_rw — the node's own
+        identity claim rides in the tree ownership, so the S-mode walk
+        code converts slot words ↦ₚ₈ ⇄ ↦₈ locally (phys_to_mem_claim /
+        mem_to_phys_claim) with NO bundle threading through
+        PtBuild/PtTree.  node_kdata also gives canonicality (kdata ⊂
+        [0,2^38)).  Established at node creation: kalloc pages via
+        mem_page_to_phys + the bundle at the caller (zero_page_to_node
+        gains a pt_node_claim premise).
+      - tramp_window_static (KptPt): derives the trampoline instruction
+        window's physical-storage KP_rx facts from the engine's own
+        geometry premises (Hident/Hident2 + 2-alignment) — no caller
+        cascade for the M-mode-pattern tramp fetch.
+      - Trapframe pte8 → ↦ₚ (UserretPt/EntryPt/AllPt): the trampoline
+        accesses the trapframe at the USER-PT translate OUTPUT (physical
+        tfpa) — same shape as PT slots; kernel-side S-mode views convert
+        via the claim bridges when needed.
+      LAYERING RESOLUTION (decided): ↦ₘ/↦ₓ mentioning kmap_at does NOT
+      force moving them up — the fragment-only kmap_at needs ONLY
+      riscvGS's kmap_name + kperm + the ghost_map ↪-notation, all
+      available in RiscvPtsto.  So `kmap_at` (and `pa_of ppn va :=
+      zext64 (concat ppn (pageoff va))`) move DOWN into RiscvPtsto next
+      to riscvGS; ↦ₘ/↦ₓ redefine IN PLACE; KMap keeps everything that
+      needs kmap_M0 (auth, bundle, lookup/insert/characterizations).
+      KMap re-exports nothing; kmap_at's KMap definition is DELETED in
+      favor of the RiscvPtsto one (single definition, no alias).
   C.  Tramp unification: switch-minted tramp fragment, tramp clause
       dies (tree spec already one-clause), ktramp/userret engine
       re-key, KvmMap revision (kvm_M + tramp entry, kvm_M_wf deleted,

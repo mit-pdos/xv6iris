@@ -6,11 +6,12 @@
    [sr_absorb] is the TrampStepPt-Habs shape, access-generic over the
    four access classes, keyed on a kernel-mapping CLAIM [kmap_at (svpn_of
    va) ppn pc] + the class [pc] it must admit ([kperm_allows]), with the
-   output pa = ppn ++ pageoff (rwx-kmap).  Identity consumers use the
-   derived region-keyed corollary [sr_absorb_region] (fetch => text,
-   load => ram, store/amo => kdata; the static claim is pure).  The PMP
-   grant facts at the output state are exposed for the subsequent memory
-   access.  Instances:
+   output pa = ppn ++ pageoff (rwx-kmap).  Every consumer presents the
+   claim carried in its OWN resource (the fetch window's [↦ₓ□] bytes, a
+   datum's [↦ₘ], a device vpn's static bundle claim), so there is no
+   identity/region assumption at this altitude.  The PMP grant facts at
+   the output state are exposed for the subsequent memory access.
+   Instances:
      - [kpt_regime root_ppn]: sr_inv := tlb_inv_pt root_ppn; the fields
        are the existing absorption wrappers + the ktramp-style PMP
        peel-and-reseal.
@@ -172,9 +173,9 @@ Section SRegimeDef.
     sr_inv : iProp Σ;
     (* THE re-keyed absorption (rwx-kmap): keyed on a kernel-mapping CLAIM
        [kmap_at (svpn_of va) ppn pc] + the access class it must admit,
-       with the output pa = ppn ++ pageoff.  Identity consumers use the
-       derived [sr_absorb_region] below (the claim derivation for the
-       static regions is pure, so it is regime-GENERIC). *)
+       with the output pa = ppn ++ pageoff.  The claim is supplied by the
+       consumer's OWN resource (fetch [↦ₓ□] window / datum [↦ₘ] / device
+       static bundle), so no identity or region premise rides here. *)
     sr_absorb : forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
         (ppn : mword 44) (pc : kperm) (σ : mstate),
       s_acc_ok acc ->
@@ -210,100 +211,8 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
       ⊢ reg_interp σ.(sregs) -∗ sr_inv -∗
-        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝;
-    sr_absorb_dev : forall (acc : MemoryAccessType mem_payload) (va : mword 64) (σ : mstate),
-      (acc = Load Data \/ acc = Store Data) ->
-      kpt_dev_vpn (svpn_of va) ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ==∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝
   }.
-
-  (* ------------------------------------------------------------------- *)
-  (* The REGION-keyed identity form every existing leaf/engine consumes:  *)
-  (* fetches only from TEXT, loads from anywhere in RAM (both classes     *)
-  (* grant R), stores/AMOs only to DATA.  Regime-GENERIC: the static      *)
-  (* claim is pure ([kmap_at_static]), so this is one corollary over any  *)
-  (* [R : s_regime], not a second record field.                           *)
-  (* ------------------------------------------------------------------- *)
-
-  Definition sr_acc_region (acc : MemoryAccessType mem_payload) (va : mword 64) : Prop :=
-    match acc with
-    | InstructionFetch _ => addr_is_text va
-    | Load _ => addr_is_ram va
-    | _ => addr_is_kdata va
-    end.
-
-  Lemma sr_acc_region_ram (acc : MemoryAccessType mem_payload) (va : mword 64) :
-    sr_acc_region acc va -> addr_is_ram va.
-  Proof.
-    destruct acc; cbn;
-      auto using addr_is_text_ram, addr_is_kdata_ram.
-  Qed.
-
-  Lemma sr_absorb_region (R : s_regime) :
-    forall (acc : MemoryAccessType mem_payload) (va : mword 64) (σ : mstate),
-      s_acc_ok acc ->
-      sr_acc_region acc va ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ R.(sr_inv) ==∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ R.(sr_inv).
-  Proof.
-    intros acc va σ Hacc Hreg Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    pose proof (sr_acc_region_ram acc va Hreg) as Hram.
-    iIntros "Hri Hgh Hinv".
-    (* the class: fetch ⇒ KP_rx from text, store/amo ⇒ KP_rw from kdata,
-       load ⇒ whichever class the region decides *)
-    assert (Hcls : exists pc, kmap_static (svpn_of va) pc /\ kperm_allows pc acc).
-    { destruct Hacc as [-> | [-> | [-> | ->]]]; cbn in Hreg.
-      - exists KP_rx. split; [exact (text_svpn_class va Hreg) | reflexivity].
-      - destruct (ram_svpn_static va Hreg) as (pc & Hc). exists pc.
-        split; [exact Hc | exact I].
-      - exists KP_rw. split; [exact (kdata_svpn_class va Hreg) | reflexivity].
-      - exists KP_rw. split; [exact (kdata_svpn_class va Hreg) | reflexivity]. }
-    destruct Hcls as (pc & Hcls & Hallow).
-    iApply (R.(sr_absorb) acc va va (kpt_leaf_ppn (svpn_of va)) pc σ
-              Hacc Hallow
-              (RiscvExtras.ram_canonical va Hram)
-              (ram_ident_4k va Hram)
-              Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-              with "[] Hri Hgh Hinv").
-    iApply (kmap_at_static _ _ Hcls).
-  Qed.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
   Lemma pmp_config_grant_facts (r : mword 44) (σ : mstate) :
@@ -322,7 +231,7 @@ Section SRegimeDef.
   Proof.
     iIntros "Hri Hinv".
     iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M)
-      "(Hsatp & _ & _ & _ & Htlb & _ & _ & _ & _ & Ht & Hpmp)".
+      "(Hsatp & _ & _ & _ & Htlb & _ & _ & _ & _ & _ & Ht & Hpmp)".
     iApply (pmp_config_grant_facts with "Hri Hpmp").
   Qed.
 
@@ -399,55 +308,8 @@ Section SRegimeDef.
              (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode)).
   Qed.
 
-  Lemma kpt_absorb_dev (root_ppn : mword 44) :
-    forall acc va σ, (acc = Load Data \/ acc = Store Data) ->
-      kpt_dev_vpn (svpn_of va) ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
-  Proof.
-    intros acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh Hinv".
-    iAssert (|==> ∃ σ' : mstate,
-      ⌜ exec (translateAddr (Virtaddr va) acc) σ
-        = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-      ⌜ (σ'.(sregs) = σ.(sregs) \/
-         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn)%I
-      with "[Hri Hgh Hinv]" as ">H".
-    { destruct Hacc as [-> | ->].
-      - iApply (tlb_inv_pt_translateAddr_load_dev root_ppn va σ Hdev Hcanon Hident
-                  Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv").
-      - iApply (tlb_inv_pt_translateAddr_store_dev root_ppn va σ Hdev Hcanon Hident
-                  Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall with "Hri Hgh Hinv"). }
-    iDestruct "H" as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
-    iDestruct (tlb_inv_pt_grant_facts root_ppn σ' with "Hri Hinv") as %Hpmp.
-    iModIntro. iExists σ'. iFrame "Hri Hgh Hinv". iPureIntro. tauto.
-  Qed.
-
   Definition kpt_regime (root_ppn : mword 44) : s_regime :=
-    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn)
-            (kpt_absorb_dev root_ppn).
+    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn).
 
   (* ------------------------------------------------------------------- *)
   (* The BARE instance (boot: satp Mode = Bare, translation = identity).   *)
@@ -533,50 +395,7 @@ Section SRegimeDef.
              (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode)).
   Qed.
 
-  Lemma bare_absorb_dev :
-    forall acc va σ, (acc = Load Data \/ acc = Store Data) ->
-      kpt_dev_vpn (svpn_of va) ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of va))
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = va ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ==∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr va, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
-  Proof.
-    intros acc va σ Hacc Hdev Hcanon Hident Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp & HM)".
-    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
-    iDestruct (pmp_config_grant_facts (mword_of_int 0) σ with "Hri Hpmp") as %Hpmp.
-    iModIntro. iExists σ.
-    iSplit.
-    { iPureIntro.
-      exact (exec_translateAddr_bare acc va σ Heff Hss Hcp
-               (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode)). }
-    iSplit; [iPureIntro; reflexivity |].
-    iSplit; [iPureIntro; left; reflexivity |].
-    iSplit; [iPureIntro; exact Hpmp |].
-    iFrame "Hri Hgh".
-    iExists satp0. iFrame "Hsatp Hpmp HM". iPureIntro. exact Hmode.
-  Qed.
-
   Definition bare_regime : s_regime :=
-    SRegime bare_inv bare_absorb bare_transform bare_absorb_dev.
+    SRegime bare_inv bare_absorb bare_transform.
 
 End SRegimeDef.

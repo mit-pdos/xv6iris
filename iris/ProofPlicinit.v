@@ -307,7 +307,6 @@ Section ProofPlicinit.
               ltac:(rewrite Ha4; vm_compute; reflexivity)
               ltac:(rewrite Ha4; vm_compute; reflexivity)
               ltac:(rewrite Ha4; unfold kpt_dev_vpn; zrange_vm)
-              ltac:(rewrite Ha4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Ha4; rewrite Hsw; apply plic_write_prio; vm_compute; reflexivity)
               with "Hcg Hpc Hi0e Hp").
     iIntros "Hcg Hpc Hp".
@@ -321,7 +320,6 @@ Section ProofPlicinit.
               ltac:(rewrite Ha4; vm_compute; reflexivity)
               ltac:(rewrite Ha4; vm_compute; reflexivity)
               ltac:(rewrite Ha4; unfold kpt_dev_vpn; zrange_vm)
-              ltac:(rewrite Ha4; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Ha4; rewrite Hsw2; apply plic_write_prio; vm_compute; reflexivity)
               with "Hcg Hpc Hi10 Hp").
     iIntros "Hcg Hpc Hp".

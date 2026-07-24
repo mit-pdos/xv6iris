@@ -44,6 +44,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
 Require Import Pt4kWalk.
+Require Import KptExecMap.   (* tramp_ppn, for the trampoline-window text lemma *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -661,6 +662,30 @@ Proof.
   unfold text_end in Hlo. lia.
 Qed.
 
+(* the pa a claim maps a canonical va to, when the claim is the IDENTITY
+   (static) leaf ppn, is the va itself: [pa_of (kpt_leaf_ppn (svpn_of a)) a =
+   a].  This is the arithmetic core of [static_ident_4k] keyed purely on
+   canonicality (no [kmap_static] needed for the arithmetic).  The M-mode
+   identity recovery + every static consumer of a resource's claim uses it
+   (after pinning the claim's ppn to [kpt_leaf_ppn] via [kmap_at_agree]
+   against the static bundle). *)
+Lemma pa_of_id (a : mword 64) :
+  uint a < 274877906944 ->
+  pa_of (kpt_leaf_ppn (svpn_of a)) a = a.
+Proof.
+  intro Hlt. unfold pa_of. apply bv_eq.
+  rewrite zext64_concat44_12_unsigned.
+  unfold kpt_leaf_ppn. rewrite zext44_27_unsigned.
+  rewrite (svpn_of_unsigned_lo a Hlt).
+  rewrite subrange64_unsigned_11_0.
+  rewrite uint_unsigned.
+  rewrite Z.shiftr_div_pow2 by lia.
+  change (2 ^ 12) with 4096.
+  pose proof (bv_unsigned_in_range _ a) as Ha.
+  pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm.
+  lia.
+Qed.
+
 (* ---- flag-byte facts (mirror §12's, keyed by class) ---- *)
 
 Lemma kperm_flags_ad_bound (pc : kperm) (ad : bool * bool) :
@@ -858,4 +883,163 @@ Proof.
   destruct (andb (Z.leb 0x80007 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x88000));
   destruct (andb (Z.leb 0xC000 (bv_unsigned vpn)) (Z.ltb (bv_unsigned vpn) 0x10002));
   reflexivity.
+Qed.
+
+(* the per-byte static classification for a 4-byte instruction window, from
+   the window's text-range fact -- what an M-mode leaf threads into
+   [wp_instr]/[wp_instr_config], and what a concrete boot pc discharges by
+   [vm_compute] on [addr_is_text].  M-mode fetch is UNTRANSLATED, so this
+   identity/static premise is guard-permitted. *)
+Lemma instr_window_static (pc : mword 64) :
+  (forall j, (j < 4)%nat -> addr_is_text (pa_add pc j)) ->
+  (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx).
+Proof. intros H j Hj. apply text_svpn_class, H, Hj. Qed.
+
+(* The trampoline page PHYSICALLY is kernel text (ppn 0x80006 < etext), so the
+   4-byte fetch window at the physical [pa] is entirely text -- and hence the
+   per-byte [kmap_static … KP_rx] facts the physical-window fetch needs are
+   DERIVABLE from the trampoline geometry: the two concat facts pin [pa]/[pa+2]
+   onto the tramp page, and 2-alignment of [pa] rules out a straddle of the last
+   window byte.  Guard-compliant: entirely about the PHYSICAL storage address
+   [pa], never the translated va.  (Lives here, off the heavy WP files, so the
+   plain [lia]s are not broken by the [bitvector.tactics] zify hook.) *)
+Lemma tramp_window_static (pc pa : mword 64) :
+  zero_extend' 64 (concat_vec tramp_ppn
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+  zero_extend' 64 (concat_vec tramp_ppn
+     (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+  is_aligned_paddr (Physaddr pa) 2 = true ->
+  forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pa j)) KP_rx.
+Proof.
+  intros Hid Hid2 Hal.
+  apply instr_window_static.
+  change (Z.sub pagesize_bits 1) with 11 in Hid, Hid2.
+  pose proof (subrange64_unsigned_11_0 (bits_of_virtaddr (Virtaddr pc))) as Ho1.
+  pose proof (subrange64_unsigned_11_0 (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))) as Ho2.
+  change (2 ^ 12) with 4096 in Ho1, Ho2.
+  set (o1 := subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) 11 0) in *.
+  set (o2 := subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) 11 0) in *.
+  pose proof (Z.mod_pos_bound (bv_unsigned (bits_of_virtaddr (Virtaddr pc))) 4096 ltac:(lia)) as Ho1b.
+  pose proof (Z.mod_pos_bound (bv_unsigned (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))) 4096 ltac:(lia)) as Ho2b.
+  rewrite <- Ho1 in Ho1b. rewrite <- Ho2 in Ho2b.
+  assert (Htp : bv_unsigned tramp_ppn = 524294) by (vm_compute; reflexivity).
+  assert (Hpa : bv_unsigned pa = 2147508224 + bv_unsigned o1).
+  { rewrite <- Hid. rewrite zext64_concat44_12_unsigned. rewrite Htp.
+    change (524294 * 4096) with 2147508224. reflexivity. }
+  assert (Hpa2 : bv_unsigned (add_vec_int pa 2) = 2147508224 + bv_unsigned o2).
+  { rewrite <- Hid2. rewrite zext64_concat44_12_unsigned. rewrite Htp.
+    change (524294 * 4096) with 2147508224. reflexivity. }
+  assert (Hnw : bv_unsigned (add_vec_int pa 2) = bv_unsigned pa + 2).
+  { apply pt_add_vec_int_small; [lia | rewrite Hpa; lia]. }
+  assert (Hle : bv_unsigned o1 <= 4093) by lia.
+  unfold is_aligned_paddr in Hal. apply Z.eqb_eq in Hal.
+  rewrite uint_unsigned in Hal.
+  pose proof (bv_unsigned_in_range _ pa) as [Hpalo _].
+  rewrite Z.rem_mod_nonneg in Hal; [| exact Hpalo | lia].
+  rewrite Hpa in Hal.
+  apply Z.mod_divide in Hal; [| lia]. destruct Hal as [q Hq].
+  assert (Hle2 : bv_unsigned o1 <= 4092) by lia.
+  intros j Hj.
+  unfold addr_is_text.
+  pose proof (Nat2Z.is_nonneg j).
+  assert (Hj3 : Z.of_nat j <= 3) by lia.
+  assert (Hpaj : uint (pa_add pa j) = 2147508224 + bv_unsigned o1 + Z.of_nat j).
+  { unfold pa_add. rewrite uint_unsigned.
+    rewrite pt_add_vec_int_small; [| lia | rewrite Hpa; lia]. rewrite Hpa. lia. }
+  rewrite Hpaj. unfold ram_base, text_end. lia.
+Qed.
+
+(* ===================================================================== *)
+(* WORD-LEVEL ACCESSOR ARITHMETIC (uniform-claims item 1).                *)
+(*                                                                        *)
+(* A per-byte offset [j] inside a word/instruction window that does not   *)
+(* cross a page boundary (its page offset plus [j] stays under 4096)      *)
+(* leaves the page -- hence the svpn -- unchanged, and commutes with      *)
+(* [pa_of].  These serve BOTH the ↦₈-word towers (8-byte, [j < 8]) and    *)
+(* the 4-byte instruction/word windows ([j < 4]); the S-mode engines use  *)
+(* them to work at [pa_of ppn va] throughout (guard-compliant, arbitrary  *)
+(* ppn).  Canonicality ([uint a < 2^38]) makes va <-> (vpn,offset)        *)
+(* bijective and bounds the arithmetic away from the 2^64 wrap.           *)
+(* ===================================================================== *)
+
+(* the low-12 page offset of a within-page shifted address is the base
+   offset plus [j] (no carry out of bit 11). *)
+Lemma subrange_11_0_pa_add (a : mword 64) (j : nat) :
+  (uint a < 274877906944)%Z ->
+  (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z ->
+  bv_unsigned (subrange_vec_dec (pa_add a j) 11 0)
+  = bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j.
+Proof.
+  intros Hcan Hoff. rewrite subrange64_unsigned_11_0 in Hoff |- *.
+  change (2 ^ 12) with 4096 in Hoff |- *.
+  rewrite uint_unsigned in Hcan.
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)) as Hm.
+  pose proof (Nat2Z.is_nonneg j) as Hjnn.
+  unfold pa_add.
+  rewrite (pt_add_vec_int_small a (Z.of_nat j) ltac:(lia) ltac:(lia)).
+  rewrite Zplus_mod. rewrite (Zmod_small (Z.of_nat j) 4096) by lia.
+  rewrite Zmod_small; [reflexivity | lia].
+Qed.
+
+(* within a non-straddling window [pa_of] commutes with the byte offset *)
+Lemma pa_of_pa_add (ppn : mword 44) (a : mword 64) (j : nat) :
+  (uint a < 274877906944)%Z ->
+  (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z ->
+  pa_of ppn (pa_add a j) = pa_add (pa_of ppn a) j.
+Proof.
+  intros Hcan Hoff. apply bv_eq.
+  pose proof (bv_unsigned_in_range _ ppn) as Hppn.
+  assert (Hppnm : bv_modulus (MachineWord.MachineWord.Z_idx 44) = 17592186044416)
+    by (vm_compute; reflexivity).
+  rewrite Hppnm in Hppn.
+  rewrite subrange64_unsigned_11_0 in Hoff. change (2 ^ 12) with 4096 in Hoff.
+  rewrite uint_unsigned in Hcan.
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)) as Hoa.
+  pose proof (Nat2Z.is_nonneg j) as Hjnn.
+  unfold pa_of, pa_add.
+  (* RHS: no 2^64 wrap since ppn*4096 + offset + j is small *)
+  rewrite (pt_add_vec_int_small (zero_extend' 64 (concat_vec ppn (subrange_vec_dec a 11 0)))
+             (Z.of_nat j) ltac:(lia)).
+  2:{ rewrite zext64_concat44_12_unsigned. rewrite subrange64_unsigned_11_0.
+      change (2 ^ 12) with 4096. lia. }
+  rewrite !zext64_concat44_12_unsigned.
+  rewrite !subrange64_unsigned_11_0. change (2 ^ 12) with 4096.
+  rewrite (pt_add_vec_int_small a (Z.of_nat j) ltac:(lia) ltac:(lia)).
+  rewrite Zplus_mod. rewrite (Zmod_small (Z.of_nat j) 4096) by lia.
+  rewrite (Zmod_small (bv_unsigned a mod 4096 + Z.of_nat j) 4096) by lia.
+  lia.
+Qed.
+
+(* the svpn is unchanged across a non-straddling window *)
+Lemma svpn_of_pa_add (a : mword 64) (j : nat) :
+  (uint a < 274877906944)%Z ->
+  (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z ->
+  svpn_of (pa_add a j) = svpn_of a.
+Proof.
+  intros Hcan Hoff.
+  pose proof Hoff as Hoff'. rewrite subrange64_unsigned_11_0 in Hoff'.
+  change (2 ^ 12) with 4096 in Hoff'.
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)) as Hoa.
+  pose proof (Nat2Z.is_nonneg j) as Hjnn.
+  rewrite uint_unsigned in Hcan.
+  (* [pa_add a j] is in the same page, hence still canonical *)
+  assert (Hcanj : (uint (pa_add a j) < 274877906944)%Z).
+  { unfold pa_add. rewrite uint_unsigned.
+    rewrite (pt_add_vec_int_small a (Z.of_nat j) ltac:(lia) ltac:(lia)).
+    pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm. lia. }
+  apply bv_eq.
+  rewrite (svpn_of_unsigned_lo (pa_add a j) Hcanj).
+  rewrite (svpn_of_unsigned_lo a ltac:(rewrite uint_unsigned; lia)).
+  unfold pa_add. rewrite !uint_unsigned.
+  rewrite (pt_add_vec_int_small a (Z.of_nat j) ltac:(lia) ltac:(lia)).
+  rewrite !Z.shiftr_div_pow2 by lia. change (2 ^ 12) with 4096.
+  (* (A + j) / 4096 = A / 4096 since (A mod 4096) + j < 4096 *)
+  pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm.
+  replace (bv_unsigned a + Z.of_nat j)
+    with (bv_unsigned a / 4096 * 4096 + (bv_unsigned a mod 4096 + Z.of_nat j))
+    by lia.
+  rewrite (Z.div_add_l (bv_unsigned a / 4096) 4096 (bv_unsigned a mod 4096 + Z.of_nat j)
+             ltac:(lia)).
+  rewrite (Z.div_small (bv_unsigned a mod 4096 + Z.of_nat j) 4096 ltac:(lia)).
+  rewrite Z.add_0_r. reflexivity.
 Qed.

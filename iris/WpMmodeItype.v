@@ -30,6 +30,7 @@ Section WpAddiGpr.
       (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
@@ -43,9 +44,9 @@ Section WpAddiGpr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] Hgf Hinstr Hcont".
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hgf Hinstr Hcont".
     iApply (wp_instr Φ pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) pmpcfg0
-              Hpmp with "Hmm Hpmpc Hpc Hinstr").
+              Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     (* tick nextPC first, so we read rs1 against the execute state *)
@@ -105,6 +106,7 @@ Section WpLogicITypeGpr.
       (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
+    (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
     uint rd <> 0 ->
     mmode_config (DfracOwn q) -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
@@ -118,9 +120,9 @@ Section WpLogicITypeGpr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hpmp Hrd) "Hmm Hpmpc [Hpc Hnpc] Hgf Hinstr Hcont".
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hgf Hinstr Hcont".
     iApply (wp_instr Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) pmpcfg0
-              Hpmp with "Hmm Hpmpc Hpc Hinstr").
+              Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".

@@ -246,4 +246,99 @@ Section stack_own.
     - rewrite -(pa_stk_assoc sp 1 1). by iApply stack_own_1_intro.
   Qed.
 
+
+  (* ===== PHYSICAL-tier stack ownership (M-mode boot owns ↦ₚ, uniform-
+     claims): the [↦ₚ₈] mirror of [stack_own], same lemma suite. ===== *)
+  Definition stack_own_phys (sp : Arch.pa) (n : nat) : iProp Σ :=
+    (∃ ws : list (bv 64), ⌜length ws = n⌝ ∗
+       [∗ list] i ↦ w ∈ ws, phys_word_pointsto (pa_stk sp (S i)) (DfracOwn 1) w)%I.
+
+  Lemma stack_own_phys_0 (sp : Arch.pa) : stack_own_phys sp 0 ⊣⊢ emp.
+  Proof.
+    rewrite /stack_own_phys. iSplit.
+    - iIntros "H". done.
+    - iIntros "_". iExists []. by iSplit.
+  Qed.
+
+  Lemma stack_own_phys_app (sp : Arch.pa) (n1 n2 : nat) :
+    stack_own_phys sp (n1 + n2) ⊣⊢ stack_own_phys sp n1 ∗ stack_own_phys (pa_stk sp n1) n2.
+  Proof.
+    rewrite /stack_own_phys. iSplit.
+    - iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
+      rewrite -(take_drop n1 ws) big_sepL_app.
+      iDestruct "H" as "[H1 H2]".
+      assert (Hle : (n1 ≤ length ws)%nat) by lia.
+      iSplitL "H1".
+      + iExists (take n1 ws). iFrame "H1". iPureIntro.
+        rewrite length_take. lia.
+      + iExists (drop n1 ws). iSplitR.
+        { iPureIntro. rewrite length_drop. lia. }
+        rewrite length_take_le; [| exact Hle].
+        iApply (big_sepL_proper with "H2").
+        intros i w _. by rewrite pa_stk_shift.
+    - iIntros "[H1 H2]".
+      iDestruct "H1" as (ws1) "[%Hlen1 H1]".
+      iDestruct "H2" as (ws2) "[%Hlen2 H2]".
+      iExists (app ws1 ws2). iSplitR.
+      { iPureIntro. rewrite length_app. lia. }
+      rewrite big_sepL_app. iFrame "H1".
+      rewrite Hlen1.
+      iApply (big_sepL_proper with "H2").
+      intros i w _. by rewrite pa_stk_shift.
+  Qed.
+
+  Lemma stack_own_phys_split (sp : Arch.pa) (a n : nat) :
+    (a ≤ n)%nat ->
+    stack_own_phys sp n ⊣⊢ stack_own_phys sp a ∗ stack_own_phys (pa_stk sp a) (n - a).
+  Proof.
+    intro Hle. replace n with (a + (n - a))%nat at 1 by lia.
+    apply stack_own_phys_app.
+  Qed.
+
+  Lemma stack_own_phys_1 (sp : Arch.pa) :
+    stack_own_phys sp 1 ⊣⊢ ∃ w : bv 64, phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w.
+  Proof.
+    rewrite /stack_own_phys. iSplit.
+    - iIntros "H". iDestruct "H" as (ws) "[%Hlen H]".
+      destruct ws as [| w [| ??]]; simpl in Hlen; try lia.
+      iExists w. iDestruct "H" as "[$ _]".
+    - iIntros "H". iDestruct "H" as (w) "H".
+      iExists [w]. iSplitR; [done|]. simpl. iFrame.
+  Qed.
+
+  Lemma stack_own_phys_1_intro (sp : Arch.pa) (w : bv 64) :
+    phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w ⊢ stack_own_phys sp 1.
+  Proof. rewrite stack_own_phys_1. iIntros "H". by iExists w. Qed.
+
+  Lemma stack_own_phys_split_1 (sp : Arch.pa) (a n : nat) :
+    (a ≤ n)%nat ->
+    stack_own_phys sp n ⊢ stack_own_phys sp a ∗ stack_own_phys (pa_stk sp a) (n - a).
+  Proof. intro Hle. by rewrite (stack_own_phys_split sp a n Hle). Qed.
+
+  Lemma stack_own_phys_split_2 (sp : Arch.pa) (a n : nat) :
+    (a ≤ n)%nat ->
+    stack_own_phys sp a ∗ stack_own_phys (pa_stk sp a) (n - a) ⊢ stack_own_phys sp n.
+  Proof. intro Hle. by rewrite (stack_own_phys_split sp a n Hle). Qed.
+
+  Lemma stack_own_phys_2_elim (sp : Arch.pa) :
+    stack_own_phys sp 2 ⊢ ∃ w1 w2 : bv 64,
+      phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 ∗
+      phys_word_pointsto (pa_stk sp 2) (DfracOwn 1) w2.
+  Proof.
+    rewrite (stack_own_phys_app sp 1 1) stack_own_phys_1.
+    iIntros "[H1 H2]". iDestruct "H1" as (w1) "H1".
+    rewrite stack_own_phys_1 (pa_stk_assoc sp 1 1).
+    iDestruct "H2" as (w2) "H2". iExists w1, w2. iFrame.
+  Qed.
+
+  Lemma stack_own_phys_2_intro (sp : Arch.pa) (w1 w2 : bv 64) :
+    phys_word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 -∗
+    phys_word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 -∗
+    stack_own_phys sp 2.
+  Proof.
+    iIntros "H1 H2". rewrite (stack_own_phys_app sp 1 1). iSplitL "H1".
+    - by iApply stack_own_phys_1_intro.
+    - rewrite -(pa_stk_assoc sp 1 1). by iApply stack_own_phys_1_intro.
+  Qed.
+
 End stack_own.

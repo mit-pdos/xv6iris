@@ -227,7 +227,7 @@ Section UserMemPtGhost.
         { rewrite Hdom. apply Hin. apply elem_of_cons. left. reflexivity. }
         apply elem_of_dom in Hmem. destruct Hmem as [b Hb].
         iDestruct (big_sepM_insert_acc _ _ _ _ Hb with "Hbytes") as "[Hab Hrest]".
-        iMod (mem_update _ (pa_add pa x) b (nth_byte v x) with "Hm Hab") as "[Hm Hab]".
+        iMod (phys_update _ (pa_add pa x) b (nth_byte v x) with "Hm Hab") as "[Hm Hab]".
         iDestruct ("Hrest" $! (nth_byte v x) with "Hab") as "Hbytes".
         iModIntro.
         cbn [foldr]. iFrame "Hm".
@@ -460,8 +460,8 @@ Section UserMemPtGeneric.
                σ'.(mem) !! a = Some b /\ addr_is_ram a⌝)%I as %Hmm.
     { iIntros (a b Hab).
       iDestruct (big_sepM_lookup_acc _ _ _ _ Hab with "Hbytes") as "[Hab Hrest]".
-      iDestruct (mem_valid with "Hmem Hab") as %Hv.
-      iDestruct (mem_ram with "Hab") as %Hr.
+      iDestruct (phys_valid with "Hmem Hab") as %Hv.
+      iDestruct (phys_ram with "Hab") as %Hr.
       iPureIntro. exact (conj Hv Hr). }
     iPureIntro.
     exists dv.

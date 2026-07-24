@@ -407,11 +407,11 @@ Section WpUldPt.
     iAssert (⌜addr_is_ram tfpa⌝)%I as %Hrampa.
     { iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "Hb0".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
+      iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0. iPureIntro. exact Hr0. }
     iAssert (⌜addr_is_ram (pa_add tfpa 7)⌝)%I as %Hrampa7.
     { iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbytes") as "Hb7".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
-      iDestruct (mem_ram with "Hb7") as %Hr. iPureIntro. exact Hr. }
+      iDestruct (phys_ram with "Hb7") as %Hr. iPureIntro. exact Hr. }
     assert (Hlo : (ram_base <= uint tfpa)%Z) by (destruct Hrampa as [Hl _]; exact Hl).
     assert (Hfit : (uint tfpa + 8 <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint tfpa + Z.of_nat 7 < 18446744073709551616)%Z).
@@ -486,7 +486,7 @@ Section WpUldPt.
     { iIntros (j Hj). assert (Hj' : (j < 8)%nat) by lia.
       iDestruct (big_sepL_lookup _ _ j j with "Hbytes") as "Hbj".
       { rewrite lookup_seq_lt; [reflexivity | exact Hj']. }
-      iDestruct (mem_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
+      iDestruct (phys_valid with "Hmem Hbj") as %Hmj. iPureIntro. exact Hmj. }
     pose proof (within_clint_false tfpa 8 s_tr (addr_is_ram_not_in_clint _ Hrampa) ltac:(lia)) as Hwc.
     pose proof (within_sig_false tfpa 8 s_tr (addr_is_ram_not_in_sig _ Hrampa) ltac:(lia)) as Hws.
     pose proof (within_htif_false tfpa 8 s_tr Lhtif_tr) as Hwh.

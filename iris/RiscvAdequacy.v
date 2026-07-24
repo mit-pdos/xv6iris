@@ -262,7 +262,8 @@ Proof.
   { rewrite /kmap_static_claims. iApply big_sepM_bupd.
     iApply (big_sepM_mono with "Hkfrags").
     iIntros (vpn e Hlk) "Hfrag".
-    by iMod (ghost_map_elem_persist with "Hfrag") as "$". }
+    iMod (ghost_map_elem_persist with "Hfrag") as "Hf".
+    iModIntro. rewrite /kmap_at. destruct e as [ppn pc]. iExact "Hf". }
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
   (* rwx-kmap init split at etext: split the raw heap fragments into the
      sub-[text_end] half (upgraded to [↦ₓ] via [Hram] and PERSISTED to
@@ -278,10 +279,17 @@ Proof.
              a ↦ₓ□ b)%I with "[Htext]" as ">Htext".
   { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htext").
     iIntros "!>" (a b Ha) "Hb".
-    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hlt].
-    iApply text_pointsto_persist. rewrite /text_pointsto.
-    iFrame "Hb". iPureIntro. cbn in Hlt.
-    pose proof (Hram a b Ha) as [Hlo _]. split; [exact Hlo | exact Hlt]. }
+    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hlt]. cbn in Hlt.
+    pose proof (Hram a b Ha) as [Hlo _].
+    assert (Htext : addr_is_text a) by (split; [exact Hlo | exact Hlt]).
+    assert (Hcanon : (uint a < 274877906944)%Z)
+      by (unfold addr_is_text, text_end in Htext; lia).
+    (* identity assembly: raw ↦ₚ + the static claim (off the bundle) -> ↦ₓ,
+       then persist to the immutable image ↦ₓ□ (uniform-claims PHYSICAL TIER). *)
+    iApply text_pointsto_persist.
+    iApply (phys_ident_text a (DfracOwn 1) b (text_svpn_class a Htext) Htext Hcanon
+              with "Hkbundle [Hb]").
+    rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_text_ram a Htext). }
   iAssert ([∗ map] a ↦ b
              ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
                  g.(gmem),
@@ -292,16 +300,22 @@ Proof.
     rewrite Hfeq.
     iApply (big_sepM_impl with "Hdata").
     iIntros "!>" (a b Ha) "Hb".
-    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hge].
-    rewrite /mem_pointsto. iFrame "Hb". iPureIntro. cbn in Hge.
-    pose proof (Hram a b Ha) as [_ Hhi]. split; [lia | exact Hhi]. }
+    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hge]. cbn in Hge.
+    pose proof (Hram a b Ha) as [_ Hhi].
+    assert (Hkd : addr_is_kdata a) by (split; [lia | exact Hhi]).
+    assert (Hcanon : (uint a < 274877906944)%Z)
+      by (unfold addr_is_kdata, ram_base, ram_size, text_end in Hkd; lia).
+    (* identity assembly: raw ↦ₚ + the static claim -> owned ↦ₘ image. *)
+    iApply (phys_ident_mem a (DfracOwn 1) b (kdata_svpn_class a Hkd) Hkd Hcanon
+              with "Hkbundle [Hb]").
+    rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
   iMod ("Hwand" with "[Helems Htext Hdata Hkauth HuF HpF]") as "[Hwps Hdwp]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
     iFrame "Htext Hdata". iSplitL "Hkauth".
-    { iFrame "Hkauth". iPureIntro. exact kmap_wf_M0. }
+    { iExact "Hkauth". }
     iSplitR; [iExact "Hkbundle" |].
     iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
   iModIntro.

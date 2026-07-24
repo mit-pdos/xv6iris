@@ -1,35 +1,28 @@
-(* KMap.v -- the monotone kernel-mapping claim ghost (rwx-kmap project).
+(* KMap.v -- the kernel-mapping ghost AUTH + static bundle (rwx-kmap /
+   uniform-claims).
 
-   [kmap_at vpn ppn pc] is a persistent, timeless CLAIM: "under the
-   current and all future kernel translation regimes, virtual page [vpn]
-   maps to physical page [ppn] with (at least) permission class [pc]".
+   The persistent CLAIM [kmap_at vpn ppn pc] itself now lives in
+   RiscvPtsto (it needs only [riscv_kmapGS] + the ghost_map ↪-notation): a
+   BARE persisted fragment [vpn ↪[kmap_name]□ (ppn, pc)], "under the current
+   and all future kernel translation regimes, vpn maps to ppn at class pc".
+   Uniqueness is ghost-map library agreement ([kmap_at_agree]).
 
-   INTERFACE: the static identity regions (kernel text / data / devices,
-   classified by KptPt §15's [kmap_class]) ride a PURE arm -- a static
-   claim is constructible from address arithmetic alone ([kmap_at_static]),
-   no resources, anywhere -- while dynamically minted mappings (the
-   per-proc kernel stacks) are persisted [ghost_map] fragments.
+   This file keeps everything that needs [kmap_M0] (KptPt): the AUTH
+   ([kmap_auth M] = bare [ghost_map_auth]), the lookup/insert working
+   lemmas, and the persistent STATIC-CLAIMS bundle [kmap_static_claims]
+   (every identity mapping's fragment, minted+persisted at adequacy init and
+   carried in [hw_config]) with its extraction lemma [kmap_static_claims_at].
 
-   STORAGE: the authoritative map ([kmap_auth M]) holds static AND
-   dynamic entries -- [M] always extends [kmap_M0] ([kmap_wf]) -- so the
-   generalized tree spec above ([kpt_tree_spec_gen], KptTree) is a
-   uniform two-clause form over [M], and every absorption proof is
-   single-path through [kmap_at_lookup]: both claim arms land in the
-   same [M !! vpn = Some (ppn, pc)] conclusion.
+   Under full fragment-keying the persisted fragments themselves are the
+   monotonicity witnesses, so nothing rides the auth: the old
+   [kmap_M0 ⊆ M] / [kmap_wf] reification is GONE, and the auth is bare.
 
    The auth lives in the translation slot's two arms (IntrDefs
-   [strans_inv]): the Bare arm holds [kmap_auth kmap_M0] EXACTLY, so
-   every claim honored under Bare is a static identity entry
-   ([kmap_at_M0_static]); the KPT arm holds [kmap_auth M] for the
-   existential [M] of [tlb_inv_pt].  Monotonicity: fragments are
-   persisted and entries are never deleted.  Bare->KPT is ONE-WAY: once
-   a kstack fragment is persisted, [kmap_auth kmap_M0] can never be
-   re-established (the fragment's vpn looks up to [None] in [kmap_M0]).
-
-   The TRAMPOLINE mapping is deliberately NOT a claim (a non-identity
-   pure fact would be usable under Bare -- unsound); it stays the
-   dedicated clause in the tree spec, and [kmap_wf_tramp] keeps it out
-   of [M].  See claude-notes/projects/rwx-kmap.md. *)
+   [strans_inv]): the Bare arm holds [kmap_auth kmap_M0] EXACTLY, so every
+   claim honored under Bare is a static identity entry (a fragment agreeing
+   against auth-[kmap_M0] looks up in [kmap_M0], [kmap_M0_lookup]); the KPT
+   arm holds [kmap_auth M] for the existential [M] of [tlb_inv_pt].
+   See claude-notes/projects/rwx-kmap.md. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -42,78 +35,10 @@ Require Import KptExecMap.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
-(* §1 Pure layer: the dynamic-entry window and the auth well-formedness.  *)
+(* Allocation (adequacy init): ONE [ghost_map_alloc] mints the auth over  *)
+(* the whole static map; the returned static fragments are PERSISTED and  *)
+(* distributed (into the identity ↦ₘ/↦ₓ□ and the bundle below).           *)
 (* ===================================================================== *)
-
-(* the per-proc kernel-stack vpn window, just below the trampoline:
-   KSTACK(p) = TRAMPOLINE - (p+1)*2*PGSIZE for p in [0, NPROC=64), i.e.
-   the stack vpns are {tramp_vpn - 2(p+1)} (odd offsets are the guard
-   slots).  The wf invariant only needs a WINDOW disjoint from the
-   static regions and excluding [tramp_vpn] itself; the kvminithart
-   switch lemma inserts exactly the 64 stack vpns. *)
-Definition kstack_vpn_lo : Z := 0x3FFFFFF - 128.
-Definition kstack_vpn_range (vpn : mword 27) : Prop :=
-  kstack_vpn_lo <= bv_unsigned vpn < 0x3FFFFFF.
-
-(* a legal dynamic entry: a kstack vpn mapped to a whole RAM page at
-   class RW *)
-Definition kmap_dyn_ok (vpn : mword 27) (e : mword 44 * kperm) : Prop :=
-  kstack_vpn_range vpn /\
-  ram_base <= bv_unsigned e.1 * 4096 /\
-  (bv_unsigned e.1 + 1) * 4096 <= ram_base + ram_size /\
-  e.2 = KP_rw.
-
-(* the auth's well-formedness: M extends the static map, and every entry
-   is a static entry or a legal dynamic one *)
-Definition kmap_wf (M : gmap (mword 27) (mword 44 * kperm)) : Prop :=
-  kmap_M0 ⊆ M /\
-  (forall vpn e, M !! vpn = Some e -> kmap_M0 !! vpn = Some e \/ kmap_dyn_ok vpn e).
-
-Lemma kmap_wf_M0 : kmap_wf kmap_M0.
-Proof. split; [reflexivity | intros vpn e He; left; exact He]. Qed.
-
-Lemma kmap_wf_insert (M : gmap (mword 27) (mword 44 * kperm))
-    (vpn : mword 27) (e : mword 44 * kperm) :
-  kmap_wf M -> M !! vpn = None -> kmap_dyn_ok vpn e ->
-  kmap_wf (<[vpn := e]> M).
-Proof.
-  intros [Hsub Hent] Hfresh Hdyn. split.
-  - transitivity M; [exact Hsub | apply insert_subseteq; exact Hfresh].
-  - intros v e' Hl. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite lookup_insert in Hl. injection Hl as <-. right. exact Hdyn.
-    + rewrite lookup_insert_ne in Hl; [| exact (not_eq_sym Hne)]. exact (Hent _ _ Hl).
-Qed.
-
-(* a wf map never carries the trampoline vpn (its static class is None
-   and the dynamic window sits strictly below it) -- so the tree spec's
-   dedicated tramp clause never collides with the maps-clause *)
-Lemma kmap_wf_tramp (M : gmap (mword 27) (mword 44 * kperm)) :
-  kmap_wf M -> M !! tramp_vpn = None.
-Proof.
-  intros [_ Hent].
-  destruct (M !! tramp_vpn) as [e|] eqn:HM; [| reflexivity].
-  exfalso.
-  assert (Ht : bv_unsigned tramp_vpn = 0x3FFFFFF) by (vm_compute; reflexivity).
-  destruct (Hent _ _ HM) as [H0 | Hd].
-  - rewrite kmap_M0_lookup in H0.
-    unfold kmap_class in H0. rewrite Ht in H0. vm_compute in H0. discriminate.
-  - destruct Hd as [[_ Hhi] _]. lia.
-Qed.
-
-(* ===================================================================== *)
-(* §2 The ghost: [kmap_at] claims over an explicitly-named auth.          *)
-(* ===================================================================== *)
-
-(* The ghost lives in [riscvGS] itself ([riscv_kmapGS] + [kmap_name] --
-   rwx-kmap decision a0): [tlb_inv_pt] rides inside [sie_cap_gpr], so a
-   separate class would have to be threaded through every sconf-tier
-   file; like the device gnames it is global, not per-hart.  Adequacy
-   mints the auth at init ([kmap_alloc]) and passes the gname into the
-   [RiscvGS] constructor. *)
-
-(* allocation (adequacy init): ONE update mints the auth over the whole
-   ~49k-entry static map -- the returned static fragments are dropped,
-   static claims use the pure arm instead *)
 Lemma kmap_alloc `{!ghost_mapG Σ (mword 27) (mword 44 * kperm)} :
   ⊢ |==> ∃ γ : gname, ghost_map_auth γ 1 kmap_M0.
 Proof.
@@ -124,99 +49,69 @@ Qed.
 Section KMap.
   Context `{!riscvGS Σ}.
 
-  (* THE claim.  Static arm: identity-only by construction (the ppn is
-     pinned to [kpt_leaf_ppn vpn]).  Ghost arm: a persisted fragment. *)
-  Definition kmap_at (vpn : mword 27) (ppn : mword 44) (pc : kperm) : iProp Σ :=
-    (⌜kmap_static vpn pc /\ ppn = kpt_leaf_ppn vpn⌝
-     ∨ vpn ↪[kmap_name]□ (ppn, pc))%I.
-
-  Global Instance kmap_at_persistent vpn ppn pc : Persistent (kmap_at vpn ppn pc).
-  Proof. apply _. Qed.
-  Global Instance kmap_at_timeless vpn ppn pc : Timeless (kmap_at vpn ppn pc).
-  Proof. apply _. Qed.
-
-  (* the auth, with the wf facts bundled *)
+  (* ===================================================================== *)
+  (* The bare auth.                                                         *)
+  (* ===================================================================== *)
   Definition kmap_auth (M : gmap (mword 27) (mword 44 * kperm)) : iProp Σ :=
-    (ghost_map_auth kmap_name 1 M ∗ ⌜kmap_wf M⌝)%I.
+    ghost_map_auth kmap_name 1 M.
 
   Global Instance kmap_auth_timeless M : Timeless (kmap_auth M).
   Proof. apply _. Qed.
 
-  Lemma kmap_auth_intro (M : gmap (mword 27) (mword 44 * kperm)) :
-    kmap_wf M -> ghost_map_auth kmap_name 1 M -∗ kmap_auth M.
-  Proof. iIntros (Hwf) "Hauth". iFrame "Hauth". iPureIntro. exact Hwf. Qed.
+  (* ---- the two working lemmas ---- *)
 
-  (* pure-conclusion extraction (an [iDestruct … as %] of this keeps the
-     auth in the spatial context) *)
-  Lemma kmap_auth_wf (M : gmap (mword 27) (mword 44 * kperm)) :
-    kmap_auth M -∗ ⌜kmap_wf M⌝.
-  Proof. iIntros "[_ %Hwf]". iPureIntro. exact Hwf. Qed.
-
-  (* ---- the three working lemmas ---- *)
-
-  (* free construction: any statically classified vpn's identity claim,
-     from pure arithmetic alone *)
-  Lemma kmap_at_static (vpn : mword 27) (pc : kperm) :
-    kmap_static vpn pc -> ⊢ kmap_at vpn (kpt_leaf_ppn vpn) pc.
-  Proof. intros Hs. iLeft. iPureIntro. split; [exact Hs | reflexivity]. Qed.
-
-  (* THE synthesis point: both claim arms land in the SAME lookup fact,
-     so everything downstream (the tree spec's uniform maps-clause) is
-     single-path *)
+  (* a claim agrees with the auth: its vpn is mapped as claimed *)
   Lemma kmap_at_lookup (M : gmap (mword 27) (mword 44 * kperm))
       (vpn : mword 27) (ppn : mword 44) (pc : kperm) :
     kmap_auth M -∗ kmap_at vpn ppn pc -∗ ⌜M !! vpn = Some (ppn, pc)⌝.
   Proof.
-    iIntros "[Hauth %Hwf] [%Hstat | Hfrag]".
-    - destruct Hstat as [Hs ->]. iPureIntro.
-      eapply lookup_weaken; [| exact (proj1 Hwf)].
-      rewrite kmap_M0_lookup. unfold kmap_static in Hs. rewrite Hs. reflexivity.
-    - iDestruct (ghost_map_lookup with "Hauth Hfrag") as %Hl.
-      iPureIntro. exact Hl.
+    rewrite /kmap_auth /kmap_at.
+    iIntros "Hauth Hfrag".
+    iDestruct (ghost_map_lookup with "Hauth Hfrag") as %Hl.
+    iPureIntro. exact Hl.
   Qed.
 
-  (* dynamic minting (the kvminithart switch inserts the 64 kstack
-     entries, one [kmap_insert] each, persisting the fragments) *)
+  (* dynamic minting (the kvminithart switch inserts the kstack entries,
+     one [kmap_insert] each, persisting the fragments as claims) *)
   Lemma kmap_insert (M : gmap (mword 27) (mword 44 * kperm))
       (vpn : mword 27) (ppn : mword 44) (pc : kperm) :
-    M !! vpn = None -> kmap_dyn_ok vpn (ppn, pc) ->
+    M !! vpn = None ->
     kmap_auth M ==∗ kmap_auth (<[vpn := (ppn, pc)]> M) ∗ kmap_at vpn ppn pc.
   Proof.
-    iIntros (Hfresh Hdyn) "[Hauth %Hwf]".
+    rewrite /kmap_auth /kmap_at.
+    iIntros (Hfresh) "Hauth".
     iMod (ghost_map_insert_persist vpn (ppn, pc) Hfresh with "Hauth")
       as "[Hauth #Hfrag]".
-    iModIntro. iSplitL "Hauth".
-    - iFrame "Hauth". iPureIntro. apply kmap_wf_insert; assumption.
-    - iRight. iExact "Hfrag".
+    iModIntro. iFrame "Hauth". iExact "Hfrag".
   Qed.
 
-  (* ---- the persistent STATIC-CLAIMS bundle (uniform-claims stage A') --
-     every identity mapping's fragment, minted and persisted at adequacy
-     init and carried in [hw_config]; the extraction lemma below replaces
-     pure static-claim construction once [kmap_at] becomes fragment-only
-     (stage B').  Never normalized: extraction is by [big_sepM_lookup] +
-     [kmap_M0_lookup]. ---- *)
+  (* ===================================================================== *)
+  (* The persistent STATIC-CLAIMS bundle (uniform-claims stage A'):         *)
+  (* every identity mapping's fragment, minted and persisted at adequacy    *)
+  (* init and carried in [hw_config].  Never normalized: extraction is by   *)
+  (* [big_sepM_lookup] + [kmap_M0_lookup].                                  *)
+  (* ===================================================================== *)
 
   Definition kmap_static_claims : iProp Σ :=
-    ([∗ map] vpn ↦ e ∈ kmap_M0, vpn ↪[kmap_name]□ e)%I.
+    ([∗ map] vpn ↦ e ∈ kmap_M0, kmap_at vpn e.1 e.2)%I.
 
   Global Instance kmap_static_claims_persistent : Persistent kmap_static_claims.
   Proof. apply _. Qed.
 
+  (* extraction: any statically classified vpn's identity claim, off the
+     bundle (replaces the old pure-arm [kmap_at_static]) *)
   Lemma kmap_static_claims_at (vpn : mword 27) (pc : kperm) :
     kmap_static vpn pc ->
     kmap_static_claims -∗ kmap_at vpn (kpt_leaf_ppn vpn) pc.
   Proof.
-    iIntros (Hs) "#Hb". iRight.
+    iIntros (Hs) "#Hb".
     iApply (big_sepM_lookup _ _ vpn (kpt_leaf_ppn vpn, pc) with "Hb").
     rewrite kmap_M0_lookup. unfold kmap_static in Hs. rewrite Hs. reflexivity.
   Qed.
 
-  (* ---- derived facts ---- *)
-
-  (* the Bare-arm honoring fact: against the EXACT static auth, every
-     claim -- either arm -- is a static identity claim.  (This is also
-     the one-way Bare->KPT argument: a persisted kstack fragment's vpn
+  (* the Bare-arm honoring fact: against the EXACT static auth, a claim's
+     vpn is statically classified and its ppn is the identity leaf ppn.
+     (Also the one-way Bare->KPT guard: a persisted kstack fragment's vpn
      has [kmap_class = None], contradicting the conclusion.) *)
   Lemma kmap_at_M0_static (vpn : mword 27) (ppn : mword 44) (pc : kperm) :
     kmap_auth kmap_M0 -∗ kmap_at vpn ppn pc -∗
@@ -228,6 +123,86 @@ Section KMap.
     destruct (kmap_class vpn) as [pc'|] eqn:Hc; [| discriminate].
     cbn in Hl. injection Hl as <- <-.
     split; [exact Hc | reflexivity].
+  Qed.
+
+  (* ===================================================================== *)
+  (* Tier bridge (uniform-claims PHYSICAL TIER): a static (identity) kernel *)
+  (* va converts between the VA-based ↦ₘ/↦ₓ and the PHYSICAL ↦ₚ tiers.  The *)
+  (* static claim comes off the bundle ([kmap_static_claims_at]); the ppn   *)
+  (* is pinned to [kpt_leaf_ppn] ([kmap_at_agree], via [mem_pointsto_pin]), *)
+  (* and [pa_of_id] gives [pa_of (kpt_leaf_ppn (svpn_of pa)) pa = pa].      *)
+  (* ===================================================================== *)
+
+  (* disassembly ↦ₘ → ↦ₚ: the byte a static kdata va owns IS the physical
+     byte at [pa] *)
+  Lemma mem_ident_phys (pa : mword 64) dq b :
+    kmap_static (svpn_of pa) KP_rw ->
+    kmap_static_claims -∗ pa ↦ₘ{dq} b -∗ pa ↦ₚ{dq} b.
+  Proof.
+    iIntros (Hs) "#Hb H".
+    iDestruct (kmap_static_claims_at (svpn_of pa) KP_rw Hs with "Hb") as "#Hk0".
+    iDestruct (mem_pointsto_pin pa dq b (kpt_leaf_ppn (svpn_of pa)) with "Hk0 H")
+      as "(%Hc & %Hd & Hp & _)".
+    rewrite (pa_of_id pa Hc) in Hd.
+    iEval (rewrite (pa_of_id pa Hc)) in "Hp".
+    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact (addr_is_kdata_ram _ Hd).
+  Qed.
+
+  (* assembly ↦ₚ → ↦ₘ: a physical byte at a static kdata va re-forms ↦ₘ *)
+  Lemma phys_ident_mem (pa : mword 64) dq b :
+    kmap_static (svpn_of pa) KP_rw ->
+    addr_is_kdata pa -> (uint pa < 274877906944)%Z ->
+    kmap_static_claims -∗ pa ↦ₚ{dq} b -∗ pa ↦ₘ{dq} b.
+  Proof.
+    iIntros (Hs Hkd Hc) "#Hb H".
+    iDestruct (kmap_static_claims_at (svpn_of pa) KP_rw Hs with "Hb") as "#Hk0".
+    iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
+    rewrite /mem_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
+    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro. split; [exact Hc | exact Hkd].
+  Qed.
+
+  (* text tier: ↦ₓ ⇄ ↦ₚ at KP_rx / addr_is_text *)
+  Lemma text_ident_phys (pa : mword 64) dq b :
+    kmap_static (svpn_of pa) KP_rx ->
+    kmap_static_claims -∗ pa ↦ₓ{dq} b -∗ pa ↦ₚ{dq} b.
+  Proof.
+    iIntros (Hs) "#Hb H".
+    iDestruct (kmap_static_claims_at (svpn_of pa) KP_rx Hs with "Hb") as "#Hk0".
+    iDestruct (text_pointsto_pin pa dq b (kpt_leaf_ppn (svpn_of pa)) with "Hk0 H")
+      as "(%Hc & %Hd & Hp & _)".
+    rewrite (pa_of_id pa Hc) in Hd.
+    iEval (rewrite (pa_of_id pa Hc)) in "Hp".
+    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact (addr_is_text_ram _ Hd).
+  Qed.
+
+  (* PAGE disassembly ↦ₘ → ↦ₚ over a 4096-byte page (the kalloc-page ->
+     PT-node boundary in the walk): each byte of an identity kdata page
+     converts pointwise via [mem_ident_phys].  The per-byte static premise is
+     supplied by [page_in_range_addr_is_kdata] + [kdata_svpn_class] at the
+     call site (the page is [page_valid]). *)
+  Lemma mem_page_to_phys (p : mword 64) dq (b : bv 8) :
+    (forall j, (j < 4096)%nat -> kmap_static (svpn_of (pa_add p j)) KP_rw) ->
+    kmap_static_claims -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ{dq} b) -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₚ{dq} b).
+  Proof.
+    iIntros (Hstat) "#Hb Hbytes".
+    iApply (big_sepL_impl with "Hbytes").
+    iIntros "!>" (k x Hk) "H".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    iApply (mem_ident_phys (pa_add p (0 + k)%nat) dq b (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
+  Qed.
+
+  Lemma phys_ident_text (pa : mword 64) dq b :
+    kmap_static (svpn_of pa) KP_rx ->
+    addr_is_text pa -> (uint pa < 274877906944)%Z ->
+    kmap_static_claims -∗ pa ↦ₚ{dq} b -∗ pa ↦ₓ{dq} b.
+  Proof.
+    iIntros (Hs Htx Hc) "#Hb H".
+    iDestruct (kmap_static_claims_at (svpn_of pa) KP_rx Hs with "Hb") as "#Hk0".
+    iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
+    rewrite /text_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
+    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro. split; [exact Hc | exact Htx].
   Qed.
 
 End KMap.
