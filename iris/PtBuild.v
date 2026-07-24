@@ -2779,3 +2779,764 @@ Proof.
   apply pt_nodes_lvl_upd_ent.
 Qed.
 
+(* ===================================================================== *)
+(* §10 pt_missing: the SHARP upper bound on the table pages a run's walks *)
+(*    would graft.  A run [vpn0, vpn0+npages) touches a CONTIGUOUS range   *)
+(*    of l0-groups (18-bit index [vpn>>9]) and l1-groups (9-bit index      *)
+(*    [vpn>>18]).  Each DISTINCT touched l0-group whose L0 node is absent   *)
+(*    costs one L0 table; each distinct touched l1-group whose root kid is  *)
+(*    absent costs one L1 table.  Counting per GROUP (not per page) both    *)
+(*    DEDUPS the grafts (sharp -- 2*npages is uselessly loose) and stays    *)
+(*    computable on kvm-scale runs (#groups ~ npages/512, not #pages).      *)
+(*    The telescope [pt_missing_tel_gen] matches how [wp_mappages]'s loop   *)
+(*    consumes it: growing then missing-of-the-tail <= missing-of-the-whole *)
+(*    (with equality, hence sharp).                                         *)
+(* ===================================================================== *)
+
+(* [q] an l0-group index (0 <= q < 2^18): L1 index [q/512], L0 index [q mod 512].
+   [1] iff the group's L0 node is absent in [t] (walk would graft it). *)
+Definition l0_absent (t : ptree) (q : Z) : nat :=
+  match pt_kids t (mword_of_int (q / 512) : mword 9) with
+  | None => 1%nat
+  | Some c1 => match pt_kids c1 (mword_of_int (q mod 512) : mword 9) with
+               | None => 1%nat | Some _ => 0%nat end
+  end.
+
+(* [r] an l1-group index (0 <= r < 512): [1] iff the root kid at [r] is absent. *)
+Definition l1_absent (t : ptree) (r : Z) : nat :=
+  match pt_kids t (mword_of_int r : mword 9) with None => 1%nat | Some _ => 0%nat end.
+
+Definition l0count (t : ptree) (lo hi : Z) : nat :=
+  sum_list_with (l0_absent t) (seqZ lo (hi - lo + 1)).
+Definition l1count (t : ptree) (lo hi : Z) : nat :=
+  sum_list_with (l1_absent t) (seqZ lo (hi - lo + 1)).
+
+Definition pt_missing (t : ptree) (vpn0 : mword 27) (npages : nat) : nat :=
+  match npages with
+  | O => 0%nat
+  | S _ =>
+      let lo := bv_unsigned vpn0 in
+      let hi := (lo + Z.of_nat npages - 1)%Z in
+      (l0count t (lo / 512) (hi / 512) + l1count t (lo / 262144) (hi / 262144))%nat
+  end.
+
+(* ------ generic sum-over-interval facts ------------------------------- *)
+
+Lemma sum_seqZ_cons (f : Z -> nat) (lo hi : Z) :
+  (lo <= hi)%Z ->
+  sum_list_with f (seqZ lo (hi - lo + 1))
+  = (f lo + sum_list_with f (seqZ (lo + 1) (hi - (lo + 1) + 1)))%nat.
+Proof.
+  intros H.
+  rewrite (seqZ_cons lo (hi - lo + 1) ltac:(lia)). cbn [sum_list_with].
+  replace (Z.succ lo) with (lo + 1)%Z by lia.
+  replace (Z.pred (hi - lo + 1)) with (hi - (lo + 1) + 1)%Z by lia.
+  reflexivity.
+Qed.
+
+(* Front point [lo] flips to [0] in [f']; [f'] agrees with [f] above [lo].
+   Whether the tail sum starts at [lo] or [lo+1], [f lo] fits under the whole. *)
+Lemma countA_le (f f' : Z -> nat) (lo hi lo' : Z) :
+  (lo <= hi)%Z -> (lo' = lo \/ lo' = lo + 1)%Z ->
+  f' lo = 0%nat ->
+  (forall z, (lo + 1 <= z <= hi)%Z -> f' z = f z) ->
+  (f lo + sum_list_with f' (seqZ lo' (hi - lo' + 1))
+   <= sum_list_with f (seqZ lo (hi - lo + 1)))%nat.
+Proof.
+  intros Hle Hlo' Hf'0 Hagree.
+  rewrite (sum_seqZ_cons f lo hi Hle).
+  assert (Htail : sum_list_with f' (seqZ (lo + 1) (hi - (lo + 1) + 1))
+                  = sum_list_with f (seqZ (lo + 1) (hi - (lo + 1) + 1))).
+  { apply sum_list_with_ext'. intros z Hz. apply elem_of_seqZ in Hz. apply Hagree. lia. }
+  destruct Hlo' as [-> | ->].
+  - rewrite (sum_seqZ_cons f' lo hi Hle). rewrite Hf'0. rewrite Htail. lia.
+  - rewrite Htail. lia.
+Qed.
+
+Lemma div_succ_between (a d : Z) :
+  (0 < d)%Z -> ((a + 1) / d = a / d \/ (a + 1) / d = a / d + 1)%Z.
+Proof.
+  intros Hd.
+  pose proof (Z.div_le_mono a (a + 1) d Hd ltac:(lia)) as Hlo.
+  assert (Hhi : ((a + 1) / d <= a / d + 1)%Z).
+  { pose proof (Z.div_le_mono (a + 1) (a + 1 * d) d Hd ltac:(lia)) as H.
+    rewrite (Z.div_add a 1 d ltac:(lia)) in H. lia. }
+  lia.
+Qed.
+
+Lemma l0count_single (t : ptree) (a : Z) : l0count t a a = l0_absent t a.
+Proof.
+  unfold l0count. replace (a - a + 1)%Z with 1%Z by lia.
+  rewrite (seqZ_cons a 1 ltac:(lia)). rewrite (seqZ_nil (Z.succ a) (Z.pred 1) ltac:(lia)). cbn [sum_list_with]. lia.
+Qed.
+
+Lemma l1count_single (t : ptree) (a : Z) : l1count t a a = l1_absent t a.
+Proof.
+  unfold l1count. replace (a - a + 1)%Z with 1%Z by lia.
+  rewrite (seqZ_cons a 1 ltac:(lia)). rewrite (seqZ_nil (Z.succ a) (Z.pred 1) ltac:(lia)). cbn [sum_list_with]. lia.
+Qed.
+
+(* ------ vpn walk-index <-> group-index arithmetic --------------------- *)
+
+Lemma vpn_range (vpn : mword 27) : (0 <= bv_unsigned vpn < 134217728)%Z.
+Proof.
+  pose proof (bv_unsigned_in_range 27 vpn) as [Hlo Hhi].
+  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728)
+    by (vm_compute; reflexivity).
+  rewrite Hm in Hhi. split; [exact Hlo | exact Hhi].
+Qed.
+
+Lemma vpn_idx2_div (vpn : mword 27) :
+  bv_unsigned (vpn_idx 2 vpn) = (bv_unsigned vpn / 262144)%Z.
+Proof.
+  pose proof (vpn_range vpn) as [Hlo Hhi].
+  cbn [vpn_idx]. rewrite pt_sub27_26_18.
+  rewrite (Z.shiftr_div_pow2 _ 18 ltac:(lia)). change (2 ^ 18)%Z with 262144%Z. change (2 ^ 9)%Z with 512%Z.
+  rewrite Z.mod_small; [reflexivity |].
+  split; [ apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia ].
+Qed.
+
+Lemma vpn_idx1_mod (vpn : mword 27) :
+  bv_unsigned (vpn_idx 1 vpn) = ((bv_unsigned vpn / 512) mod 512)%Z.
+Proof.
+  cbn [vpn_idx]. rewrite pt_sub27_17_9.
+  rewrite (Z.shiftr_div_pow2 _ 9 ltac:(lia)). change (2 ^ 9)%Z with 512%Z. reflexivity.
+Qed.
+
+(* the l1-group index of [vpn] is [bv/262144]; the l0-group index is [bv/512] *)
+Lemma group_i2 (vpn : mword 27) :
+  (mword_of_int (bv_unsigned vpn / 262144) : mword 9) = vpn_idx 2 vpn.
+Proof. rewrite <- vpn_idx2_div. apply pt_mword9_id. Qed.
+
+Lemma group_i2_of_q0 (vpn : mword 27) :
+  (mword_of_int ((bv_unsigned vpn / 512) / 512) : mword 9) = vpn_idx 2 vpn.
+Proof.
+  rewrite (Z.div_div (bv_unsigned vpn) 512 512 ltac:(lia) ltac:(lia)).
+  change (512 * 512)%Z with 262144%Z. apply group_i2.
+Qed.
+
+Lemma group_i1_of_q0 (vpn : mword 27) :
+  (mword_of_int ((bv_unsigned vpn / 512) mod 512) : mword 9) = vpn_idx 1 vpn.
+Proof. rewrite <- vpn_idx1_mod. apply pt_mword9_id. Qed.
+
+(* ------ pt_missing is a function of [bv_unsigned vpn0] ----------------- *)
+
+Lemma pt_missing_bv_eq (t : ptree) (v v' : mword 27) (np : nat) :
+  bv_unsigned v = bv_unsigned v' -> pt_missing t v np = pt_missing t v' np.
+Proof.
+  intros Hbv. destruct np as [| n]; [reflexivity |]. unfold pt_missing. rewrite Hbv. reflexivity.
+Qed.
+
+Lemma pt_missing_0 (t : ptree) (v : mword 27) : pt_missing t v 0 = 0%nat.
+Proof. reflexivity. Qed.
+
+(* ------ set_leaf preserves absent-ness (only ENTS change) ------------- *)
+
+Lemma l0_absent_set_leaf (t : ptree) (vpn : mword 27) (w : mword 64) (q : Z) :
+  l0_absent (ptree_set_leaf t vpn w) q = l0_absent t q.
+Proof.
+  unfold l0_absent, ptree_set_leaf.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:H1; [| reflexivity].
+  destruct (pt_kids c1 (vpn_idx 1 vpn)) as [c0|] eqn:H0; [| reflexivity].
+  destruct (decide (mword_of_int (q / 512) = vpn_idx 2 vpn)) as [E2 | N2].
+  - rewrite E2. rewrite pt_upd_kid_same. rewrite H1.
+    destruct (decide (mword_of_int (q mod 512) = vpn_idx 1 vpn)) as [E1 | N1].
+    + rewrite E1. rewrite pt_upd_kid_same. rewrite H0. reflexivity.
+    + rewrite (pt_upd_kid_other _ _ _ _ N1). reflexivity.
+  - rewrite (pt_upd_kid_other _ _ _ _ N2). reflexivity.
+Qed.
+
+Lemma l1_absent_set_leaf (t : ptree) (vpn : mword 27) (w : mword 64) (r : Z) :
+  l1_absent (ptree_set_leaf t vpn w) r = l1_absent t r.
+Proof.
+  unfold l1_absent, ptree_set_leaf.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:H1; [| reflexivity].
+  destruct (pt_kids c1 (vpn_idx 1 vpn)) as [c0|] eqn:H0; [| reflexivity].
+  destruct (decide (mword_of_int r = vpn_idx 2 vpn)) as [E2 | N2].
+  - rewrite E2. rewrite pt_upd_kid_same. rewrite H1. reflexivity.
+  - rewrite (pt_upd_kid_other _ _ _ _ N2). reflexivity.
+Qed.
+
+Lemma pt_missing_set_leaf (t : ptree) (vpn : mword 27) (w : mword 64) (v0 : mword 27) (np : nat) :
+  pt_missing (ptree_set_leaf t vpn w) v0 np = pt_missing t v0 np.
+Proof.
+  destruct np as [| n]; [reflexivity |]. unfold pt_missing, l0count, l1count.
+  f_equal; apply sum_list_with_ext'; intros x _;
+    [ apply l0_absent_set_leaf | apply l1_absent_set_leaf ].
+Qed.
+
+(* ===================================================================== *)
+(* §11 The TELESCOPE: growing the tree along [vpn]'s path (as walk does)   *)
+(*    then taking the missing count of the [n]-page TAIL is bounded by the *)
+(*    missing count of the whole [S n]-page run.  Stated generically over  *)
+(*    the four "flip" facts a graft along [vpn]'s path induces, so each     *)
+(*    walk arm supplies the flips its concrete graft satisfies.            *)
+(* ===================================================================== *)
+
+Lemma pt_missing_tel_gen (t t' : ptree) (vpn : mword 27) (n : nat) :
+  (bv_unsigned vpn + Z.of_nat n + 1 <= 134217728)%Z ->
+  l0_absent t' (bv_unsigned vpn / 512) = 0%nat ->
+  (forall q, (0 <= q < 262144)%Z -> q <> (bv_unsigned vpn / 512)%Z ->
+             l0_absent t' q = l0_absent t q) ->
+  l1_absent t' (bv_unsigned vpn / 262144) = 0%nat ->
+  (forall r, (0 <= r < 512)%Z -> r <> (bv_unsigned vpn / 262144)%Z ->
+             l1_absent t' r = l1_absent t r) ->
+  ((l0_absent t (bv_unsigned vpn / 512) + l1_absent t (bv_unsigned vpn / 262144))
+     + pt_missing t' (add_vec_int vpn 1) n <= pt_missing t vpn (S n))%nat.
+Proof.
+  intros Hnw Hl0z Hl0o Hl1z Hl1o.
+  pose proof (vpn_range vpn) as [Hvlo Hvhi].
+  set (lo := bv_unsigned vpn) in *.
+  set (q0 := (lo / 512)%Z). set (r0 := (lo / 262144)%Z).
+  (* pt_missing t vpn (S n) : hi = lo + n *)
+  assert (HSn : Z.of_nat (S n) = (Z.of_nat n + 1)%Z) by lia.
+  assert (Hmt : pt_missing t vpn (S n)
+                = (l0count t q0 ((lo + Z.of_nat n) / 512)
+                   + l1count t r0 ((lo + Z.of_nat n) / 262144))%nat).
+  { unfold pt_missing. rewrite HSn. fold lo. unfold q0, r0.
+    replace (lo + (Z.of_nat n + 1) - 1)%Z with (lo + Z.of_nat n)%Z by lia. reflexivity. }
+  rewrite Hmt.
+  (* bounds *)
+  assert (Hq0pos : (0 <= q0)%Z) by (unfold q0; apply Z.div_pos; lia).
+  assert (Hr0pos : (0 <= r0)%Z) by (unfold r0; apply Z.div_pos; lia).
+  assert (Hq0hi : (q0 <= (lo + Z.of_nat n) / 512)%Z)
+    by (unfold q0; apply Z.div_le_mono; lia).
+  assert (Hr0hi : (r0 <= (lo + Z.of_nat n) / 262144)%Z)
+    by (unfold r0; apply Z.div_le_mono; lia).
+  assert (Hhi512 : ((lo + Z.of_nat n) / 512 < 262144)%Z)
+    by (apply Z.div_lt_upper_bound; lia).
+  assert (Hhi262 : ((lo + Z.of_nat n) / 262144 < 512)%Z)
+    by (apply Z.div_lt_upper_bound; lia).
+  (* the l0 inequality *)
+  assert (HL0 : (l0_absent t q0 + l0count t' ((lo + 1) / 512) ((lo + Z.of_nat n) / 512)
+                 <= l0count t q0 ((lo + Z.of_nat n) / 512))%nat).
+  { unfold l0count.
+    apply (countA_le (l0_absent t) (l0_absent t') q0 ((lo + Z.of_nat n) / 512) ((lo + 1) / 512)).
+    - exact Hq0hi.
+    - unfold q0. apply div_succ_between; lia.
+    - exact Hl0z.
+    - intros z Hz. apply Hl0o; [ lia | lia ]. }
+  (* the l1 inequality *)
+  assert (HL1 : (l1_absent t r0 + l1count t' ((lo + 1) / 262144) ((lo + Z.of_nat n) / 262144)
+                 <= l1count t r0 ((lo + Z.of_nat n) / 262144))%nat).
+  { unfold l1count.
+    apply (countA_le (l1_absent t) (l1_absent t') r0 ((lo + Z.of_nat n) / 262144) ((lo + 1) / 262144)).
+    - exact Hr0hi.
+    - unfold r0. apply div_succ_between; lia.
+    - exact Hl1z.
+    - intros z Hz. apply Hl1o; [ lia | lia ]. }
+  (* pt_missing t' (add_vec_int vpn 1) n *)
+  destruct n as [| n'].
+  - (* single page: tail empty *)
+    change (pt_missing t' (add_vec_int vpn 1) 0) with 0%nat.
+    replace (lo + Z.of_nat 0)%Z with lo by lia.
+    replace (lo / 512)%Z with q0 by reflexivity.
+    replace (lo / 262144)%Z with r0 by reflexivity.
+    rewrite (l0count_single t q0). rewrite (l1count_single t r0). lia.
+  - (* n = S n' >= 1: no wrap, tail run starts at lo+1 *)
+    assert (Hbv1 : bv_unsigned (add_vec_int vpn 1) = (lo + 1)%Z).
+    { rewrite (pb_add_vec_int27_wrap vpn 1 ltac:(lia)). unfold lo.
+      rewrite bv_wrap_small; [ reflexivity |].
+      unfold bv_modulus. change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 27))%Z with 134217728%Z. lia. }
+    assert (Hmt' : pt_missing t' (add_vec_int vpn 1) (S n')
+                   = (l0count t' ((lo + 1) / 512) ((lo + Z.of_nat (S n')) / 512)
+                      + l1count t' ((lo + 1) / 262144) ((lo + Z.of_nat (S n')) / 262144))%nat).
+    { unfold pt_missing. rewrite Hbv1.
+      replace (lo + 1 + Z.of_nat (S n') - 1)%Z with (lo + Z.of_nat (S n'))%Z by lia. reflexivity. }
+    rewrite Hmt'. lia.
+Qed.
+
+(* ===================================================================== *)
+(* §12 Per-arm flip facts: the grafts walk performs along [vpn]'s path.   *)
+(*    graft2 adds an empty L1 node (flips the L1 group present, leaves     *)
+(*    every L0 group's absent-ness unchanged); graft1 adds an L0 node      *)
+(*    (flips [vpn]'s own L0 group present, leaves others unchanged).       *)
+(* ===================================================================== *)
+
+(* --- q/512 = i2, q mod 512 = i1 comparison bridges (0 <= q < 2^18) --- *)
+Lemma q_i2_iff (vpn : mword 27) (q : Z) :
+  (0 <= q < 262144)%Z ->
+  (mword_of_int (q / 512) : mword 9) = vpn_idx 2 vpn <-> (q / 512 = bv_unsigned vpn / 262144)%Z.
+Proof.
+  intros Hq. split.
+  - intros E. apply (f_equal bv_unsigned) in E.
+    rewrite (pt_mword9_unsigned (q / 512) ltac:(split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia])) in E.
+    rewrite vpn_idx2_div in E. exact E.
+  - intros E. rewrite E. apply group_i2.
+Qed.
+
+Lemma q_i1_iff (vpn : mword 27) (q : Z) :
+  (0 <= q < 262144)%Z ->
+  (mword_of_int (q mod 512) : mword 9) = vpn_idx 1 vpn <-> (q mod 512 = (bv_unsigned vpn / 512) mod 512)%Z.
+Proof.
+  intros Hq. split.
+  - intros E. apply (f_equal bv_unsigned) in E.
+    rewrite (pt_mword9_unsigned (q mod 512) ltac:(pose proof (Z.mod_pos_bound q 512 ltac:(lia)); lia)) in E.
+    rewrite vpn_idx1_mod in E. exact E.
+  - intros E. rewrite E. apply group_i1_of_q0.
+Qed.
+
+(* graft2: given the root kid at [vpn]'s L1 slot is absent. *)
+Lemma l0_absent_graft2 (t : ptree) (vpn : mword 27) (b : mword 44) (q : Z) :
+  pt_kids t (vpn_idx 2 vpn) = None ->
+  l0_absent (pt_graft2 t vpn b) q = l0_absent t q.
+Proof.
+  intros Hnone. unfold l0_absent.
+  destruct (decide (mword_of_int (q / 512) = vpn_idx 2 vpn)) as [E2 | N2].
+  - rewrite E2. rewrite pt_graft2_kid. rewrite Hnone. reflexivity.
+  - rewrite (pt_graft2_kids_other t vpn b _ N2). reflexivity.
+Qed.
+
+Lemma l1_absent_graft2_z (t : ptree) (vpn : mword 27) (b : mword 44) :
+  l1_absent (pt_graft2 t vpn b) (bv_unsigned vpn / 262144) = 0%nat.
+Proof.
+  unfold l1_absent. rewrite group_i2. rewrite pt_graft2_kid. reflexivity.
+Qed.
+
+Lemma l1_absent_graft2_o (t : ptree) (vpn : mword 27) (b : mword 44) (r : Z) :
+  (0 <= r < 512)%Z -> r <> (bv_unsigned vpn / 262144)%Z ->
+  l1_absent (pt_graft2 t vpn b) r = l1_absent t r.
+Proof.
+  intros Hr Hne. unfold l1_absent.
+  assert (N2 : (mword_of_int r : mword 9) <> vpn_idx 2 vpn).
+  { intro E. apply (f_equal bv_unsigned) in E.
+    rewrite (pt_mword9_unsigned r ltac:(lia)) in E. rewrite vpn_idx2_div in E. lia. }
+  rewrite (pt_graft2_kids_other t vpn b _ N2). reflexivity.
+Qed.
+
+(* graft1: given the root kid [c1] present and its L0 slot at [vpn] absent. *)
+Lemma l0_absent_graft1_z (t c1 : ptree) (vpn : mword 27) (b : mword 44) :
+  pt_kids t (vpn_idx 2 vpn) = Some c1 ->
+  l0_absent (pt_graft1 t vpn b) (bv_unsigned vpn / 512) = 0%nat.
+Proof.
+  intros Hk2. unfold l0_absent.
+  rewrite group_i2_of_q0. rewrite (pt_graft1_kid_at t c1 vpn b Hk2).
+  rewrite group_i1_of_q0. rewrite pt_graft1_kid_kid. reflexivity.
+Qed.
+
+Lemma l0_absent_graft1_o (t c1 : ptree) (vpn : mword 27) (b : mword 44) (q : Z) :
+  pt_kids t (vpn_idx 2 vpn) = Some c1 ->
+  (0 <= q < 262144)%Z -> q <> (bv_unsigned vpn / 512)%Z ->
+  l0_absent (pt_graft1 t vpn b) q = l0_absent t q.
+Proof.
+  intros Hk2 Hq Hne. unfold l0_absent.
+  destruct (decide (mword_of_int (q / 512) = vpn_idx 2 vpn)) as [E2 | N2].
+  - (* same L1 group as [vpn]: must differ in the L0 index, else q = q0 *)
+    assert (Hq2 : (q / 512 = bv_unsigned vpn / 262144)%Z) by (apply (q_i2_iff vpn q Hq); exact E2).
+    assert (N1 : (mword_of_int (q mod 512) : mword 9) <> vpn_idx 1 vpn).
+    { intro E1. apply (q_i1_iff vpn q Hq) in E1. apply Hne.
+      pose proof (Z.div_div (bv_unsigned vpn) 512 512 ltac:(lia) ltac:(lia)) as Hdd.
+      change (512 * 512)%Z with 262144%Z in Hdd.
+      rewrite <- Hdd in Hq2.
+      pose proof (Z.div_mod q 512 ltac:(lia)) as Dq.
+      pose proof (Z.div_mod (bv_unsigned vpn / 512) 512 ltac:(lia)) as Dv.
+      lia. }
+    rewrite E2. rewrite (pt_graft1_kid_at t c1 vpn b Hk2). rewrite Hk2.
+    rewrite (pt_graft1_kid_kids_other c1 vpn b _ N1). reflexivity.
+  - rewrite (pt_graft1_kids_other t vpn b _ N2). reflexivity.
+Qed.
+
+Lemma l1_absent_graft1 (t : ptree) (vpn : mword 27) (b : mword 44) (r : Z) :
+  l1_absent (pt_graft1 t vpn b) r = l1_absent t r.
+Proof.
+  unfold l1_absent, pt_graft1.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:Hk2; [| reflexivity].
+  destruct (decide (mword_of_int r = vpn_idx 2 vpn)) as [E | N].
+  - rewrite E. rewrite pt_upd_kid_same. rewrite Hk2. reflexivity.
+  - rewrite (pt_upd_kid_other _ _ _ _ N). reflexivity.
+Qed.
+
+(* ------ the three walk-arm telescope corollaries ---------------------- *)
+
+(* arm g=0: both nodes present -- the run's tail is a sub-run (no graft) *)
+Lemma pt_missing_tel_present (t : ptree) (vpn : mword 27) (c1 c0 : ptree) (n : nat) :
+  (bv_unsigned vpn + Z.of_nat n + 1 <= 134217728)%Z ->
+  pt_kids t (vpn_idx 2 vpn) = Some c1 ->
+  pt_kids c1 (vpn_idx 1 vpn) = Some c0 ->
+  (0 + pt_missing t (add_vec_int vpn 1) n <= pt_missing t vpn (S n))%nat.
+Proof.
+  intros Hnw Hk2 Hk1.
+  assert (Hl0z : l0_absent t (bv_unsigned vpn / 512) = 0%nat).
+  { unfold l0_absent. rewrite group_i2_of_q0. rewrite Hk2.
+    rewrite group_i1_of_q0. rewrite Hk1. reflexivity. }
+  assert (Hl1z : l1_absent t (bv_unsigned vpn / 262144) = 0%nat).
+  { unfold l1_absent. rewrite group_i2. rewrite Hk2. reflexivity. }
+  pose proof (pt_missing_tel_gen t t vpn n Hnw Hl0z (fun q _ _ => eq_refl) Hl1z (fun r _ _ => eq_refl)) as H.
+  rewrite Hl0z Hl1z in H. change (0 + 0)%nat with 0%nat in H. exact H.
+Qed.
+
+(* arm g=1: root kid present, L0 node absent -- graft1 *)
+Lemma pt_missing_tel_graft1 (t c1 : ptree) (vpn : mword 27) (b : mword 44) (n : nat) :
+  (bv_unsigned vpn + Z.of_nat n + 1 <= 134217728)%Z ->
+  pt_kids t (vpn_idx 2 vpn) = Some c1 ->
+  pt_kids c1 (vpn_idx 1 vpn) = None ->
+  (1 + pt_missing (pt_graft1 t vpn b) (add_vec_int vpn 1) n <= pt_missing t vpn (S n))%nat.
+Proof.
+  intros Hnw Hk2 Hk1.
+  assert (Hl0t : l0_absent t (bv_unsigned vpn / 512) = 1%nat).
+  { unfold l0_absent. rewrite group_i2_of_q0. rewrite Hk2. rewrite group_i1_of_q0. rewrite Hk1. reflexivity. }
+  assert (Hl1t : l1_absent t (bv_unsigned vpn / 262144) = 0%nat).
+  { unfold l1_absent. rewrite group_i2. rewrite Hk2. reflexivity. }
+  pose proof (pt_missing_tel_gen t (pt_graft1 t vpn b) vpn n Hnw
+                (l0_absent_graft1_z t c1 vpn b Hk2)
+                (fun q Hq Hne => l0_absent_graft1_o t c1 vpn b q Hk2 Hq Hne)
+                ltac:(rewrite l1_absent_graft1; exact Hl1t)
+                (fun r _ _ => l1_absent_graft1 t vpn b r)) as H.
+  rewrite Hl0t Hl1t in H. change (1 + 0)%nat with 1%nat in H. exact H.
+Qed.
+
+(* arm g=2: root kid absent -- graft2 (empty L1) then graft1 (L0) *)
+Lemma pt_missing_tel_graft2 (t : ptree) (vpn : mword 27) (b1 b0 : mword 44) (n : nat) :
+  (bv_unsigned vpn + Z.of_nat n + 1 <= 134217728)%Z ->
+  pt_kids t (vpn_idx 2 vpn) = None ->
+  (2 + pt_missing (pt_graft1 (pt_graft2 t vpn b1) vpn b0) (add_vec_int vpn 1) n
+     <= pt_missing t vpn (S n))%nat.
+Proof.
+  intros Hnw Hnone.
+  set (t2 := pt_graft2 t vpn b1).
+  set (t' := pt_graft1 t2 vpn b0).
+  assert (Hk2' : pt_kids t2 (vpn_idx 2 vpn) = Some (pt_empty_node b1)) by apply pt_graft2_kid.
+  (* coefficients in [t]: both nodes absent *)
+  assert (Hl0t : l0_absent t (bv_unsigned vpn / 512) = 1%nat).
+  { unfold l0_absent. rewrite group_i2_of_q0. rewrite Hnone. reflexivity. }
+  assert (Hl1t : l1_absent t (bv_unsigned vpn / 262144) = 1%nat).
+  { unfold l1_absent. rewrite group_i2. rewrite Hnone. reflexivity. }
+  (* the four combined flips of t' = graft1 (graft2 t) relative to t *)
+  assert (F0z : l0_absent t' (bv_unsigned vpn / 512) = 0%nat)
+    by exact (l0_absent_graft1_z t2 (pt_empty_node b1) vpn b0 Hk2').
+  assert (F0o : forall q, (0 <= q < 262144)%Z -> q <> (bv_unsigned vpn / 512)%Z ->
+                          l0_absent t' q = l0_absent t q).
+  { intros q Hq Hne. unfold t'.
+    rewrite (l0_absent_graft1_o t2 (pt_empty_node b1) vpn b0 q Hk2' Hq Hne).
+    exact (l0_absent_graft2 t vpn b1 q Hnone). }
+  assert (F1z : l1_absent t' (bv_unsigned vpn / 262144) = 0%nat).
+  { unfold t'. rewrite l1_absent_graft1. exact (l1_absent_graft2_z t vpn b1). }
+  assert (F1o : forall r, (0 <= r < 512)%Z -> r <> (bv_unsigned vpn / 262144)%Z ->
+                          l1_absent t' r = l1_absent t r).
+  { intros r Hr Hne. unfold t'. rewrite l1_absent_graft1.
+    exact (l1_absent_graft2_o t vpn b1 r Hr Hne). }
+  pose proof (pt_missing_tel_gen t t' vpn n Hnw F0z F0o F1z F1o) as H.
+  rewrite Hl0t Hl1t in H. unfold t' in H. change (1 + 1)%nat with 2%nat in H. exact H.
+Qed.
+
+(* ===================================================================== *)
+(* §13 ptree_offpath_eq: the KID-level off-path agreement walk exports so  *)
+(*    mappages can discharge the telescope's flip hypotheses.  walk edits  *)
+(*    only vpn's path, so the l2 kids off [vpn_idx 2] are preserved, and    *)
+(*    within vpn's l1 kid the kids off [vpn_idx 1] are preserved (a freshly *)
+(*    grafted l1 kid has all-None other slots).  The DERIVATION lemmas turn *)
+(*    this + walk's present-facts into [pt_missing_tel_gen]'s two off-path  *)
+(*    flip hypotheses.                                                      *)
+(* ===================================================================== *)
+
+Definition ptree_offpath_eq (vpn : mword 27) (t t' : ptree) : Prop :=
+  (forall j, j <> vpn_idx 2 vpn -> pt_kids t' j = pt_kids t j) /\
+  (forall c c', pt_kids t (vpn_idx 2 vpn) = Some c ->
+                pt_kids t' (vpn_idx 2 vpn) = Some c' ->
+                forall j, j <> vpn_idx 1 vpn -> pt_kids c' j = pt_kids c j) /\
+  (forall c', pt_kids t (vpn_idx 2 vpn) = None ->
+              pt_kids t' (vpn_idx 2 vpn) = Some c' ->
+              forall j, j <> vpn_idx 1 vpn -> pt_kids c' j = None).
+
+Lemma ptree_offpath_eq_refl (vpn : mword 27) (t : ptree) : ptree_offpath_eq vpn t t.
+Proof.
+  split; [intros; reflexivity | split].
+  - intros c c' Hc Hc' j _. rewrite Hc' in Hc. injection Hc as ->. reflexivity.
+  - intros c' Hnone Hsome. rewrite Hnone in Hsome. discriminate.
+Qed.
+
+(* ------ the LEVEL-GENERIC threading predicate --------------------------
+   walk descends levels 2,1,0; [ptree_offpath_eq] only constrains the l2
+   kids (level 2) and vpn's l1 kid's kids (level 1).  The zipper's restore,
+   built up as walk descends, plugs a rebuilt level-[L] subtree back in.
+   The hypothesis it needs of that subtree is level-dependent: at level 2 it
+   is the full [ptree_offpath_eq]; at level 1 the single-level kid agreement
+   off [vpn_idx 1]; at level 0 there is nothing to constrain (True). *)
+Definition ptree_offpath_eq_lvl (L : nat) (vpn : mword 27) (cur curf : ptree) : Prop :=
+  match L with
+  | O => True
+  | S O => forall j, j <> vpn_idx 1 vpn -> pt_kids curf j = pt_kids cur j
+  | S (S _) => ptree_offpath_eq vpn cur curf
+  end.
+
+Lemma ptree_offpath_eq_lvl_refl (L : nat) (vpn : mword 27) (cur : ptree) :
+  ptree_offpath_eq_lvl L vpn cur cur.
+Proof.
+  destruct L as [| [| l]]; cbn.
+  - exact I.
+  - intros; reflexivity.
+  - apply ptree_offpath_eq_refl.
+Qed.
+
+Lemma ptree_offpath_eq_lvl_2 (vpn : mword 27) (cur curf : ptree) :
+  ptree_offpath_eq_lvl 2 vpn cur curf = ptree_offpath_eq vpn cur curf.
+Proof. reflexivity. Qed.
+
+(* the zipper's descend wrap: plugging [curf] under [vpn_idx (S l)]'s (present)
+   kid slot preserves off-path agreement one level up. *)
+Lemma ptree_offpath_eq_lvl_upd_kid (l : nat) (vpn : mword 27) (cur curf c : ptree) :
+  (S l <= 2)%nat ->
+  pt_kids cur (vpn_idx (S l) vpn) = Some c ->
+  ptree_offpath_eq_lvl l vpn c curf ->
+  ptree_offpath_eq_lvl (S l) vpn cur (pt_upd_kid cur (vpn_idx (S l) vpn) (Some curf)).
+Proof.
+  intros HL Hk Hoff. destruct l as [| [| l]]; [| | exfalso; lia].
+  - (* S l = 1 *)
+    cbn. intros j Hj. apply (pt_upd_kid_other cur (vpn_idx 1 vpn) (Some curf) j Hj).
+  - (* S l = 2 *)
+    cbn in Hoff |- *. split; [| split].
+    + intros j Hj. apply (pt_upd_kid_other cur (vpn_idx 2 vpn) (Some curf) j Hj).
+    + intros c0 c' Hc0 Hc'. rewrite pt_upd_kid_same in Hc'. injection Hc' as <-.
+      rewrite Hk in Hc0. injection Hc0 as <-. exact Hoff.
+    + intros c' Hnone. rewrite Hk in Hnone. discriminate.
+Qed.
+
+(* the zipper's graft wrap: grafting a fresh empty page under [vpn_idx (S l)]'s
+   (absent) slot then descending preserves off-path agreement. *)
+Lemma ptree_offpath_eq_lvl_graft (l : nat) (vpn : mword 27) (cur curf : ptree) (b : mword 44) :
+  (S l <= 2)%nat ->
+  pt_kids cur (vpn_idx (S l) vpn) = None ->
+  ptree_offpath_eq_lvl l vpn (pt_empty_node b) curf ->
+  ptree_offpath_eq_lvl (S l) vpn cur
+    (pt_upd_kid (pt_graft cur (vpn_idx (S l) vpn) b) (vpn_idx (S l) vpn) (Some curf)).
+Proof.
+  intros HL Hk Hoff. destruct l as [| [| l]]; [| | exfalso; lia].
+  - (* S l = 1 *)
+    intros j Hj.
+    rewrite (pt_upd_kid_other (pt_graft cur (vpn_idx 1 vpn) b) (vpn_idx 1 vpn) (Some curf) j Hj).
+    apply (pt_graft_kids_other cur (vpn_idx 1 vpn) j b Hj).
+  - (* S l = 2 *)
+    unfold ptree_offpath_eq_lvl in Hoff. split; [| split].
+    + intros j Hj. rewrite (pt_upd_kid_other (pt_graft cur (vpn_idx 2 vpn) b) (vpn_idx 2 vpn) (Some curf) j Hj).
+      apply (pt_graft_kids_other cur (vpn_idx 2 vpn) j b Hj).
+    + intros c0 c' Hc0. rewrite Hk in Hc0. discriminate.
+    + intros c' _ Hc'. rewrite pt_upd_kid_same in Hc'. injection Hc' as <-.
+      intros j Hj. rewrite (Hoff j Hj). reflexivity.
+Qed.
+
+(* ------ derivation: offpath + present-facts => the tel_gen flips -------- *)
+
+Lemma offpath_l1_flip (vpn : mword 27) (t t' : ptree) :
+  ptree_offpath_eq vpn t t' ->
+  forall r, (0 <= r < 512)%Z -> r <> (bv_unsigned vpn / 262144)%Z ->
+    l1_absent t' r = l1_absent t r.
+Proof.
+  intros (Hi & _ & _) r Hr Hne. unfold l1_absent.
+  assert (N2 : (mword_of_int r : mword 9) <> vpn_idx 2 vpn).
+  { intro E. apply (f_equal bv_unsigned) in E.
+    rewrite (pt_mword9_unsigned r ltac:(lia)) in E. rewrite vpn_idx2_div in E. lia. }
+  rewrite (Hi (mword_of_int r) N2). reflexivity.
+Qed.
+
+Lemma offpath_l0_flip (vpn : mword 27) (t t' : ptree) :
+  ptree_offpath_eq vpn t t' ->
+  l0_absent t' (bv_unsigned vpn / 512) = 0%nat ->
+  forall q, (0 <= q < 262144)%Z -> q <> (bv_unsigned vpn / 512)%Z ->
+    l0_absent t' q = l0_absent t q.
+Proof.
+  intros (Hi & Hii & Hiii) Hz q Hq Hne.
+  (* the present-fact gives t' a full l1 kid at [vpn_idx 2 vpn] *)
+  assert (Hpres : exists c1', pt_kids t' (vpn_idx 2 vpn) = Some c1').
+  { revert Hz. unfold l0_absent. rewrite group_i2_of_q0.
+    destruct (pt_kids t' (vpn_idx 2 vpn)) as [c1'|] eqn:Ht'; [| discriminate].
+    intros _. exists c1'. reflexivity. }
+  destruct Hpres as [c1' Ht'2].
+  unfold l0_absent.
+  destruct (decide (mword_of_int (q / 512) = vpn_idx 2 vpn)) as [E2 | N2].
+  - (* same l1 group as vpn: l0 index differs from vpn's *)
+    assert (Hq2 : (q / 512 = bv_unsigned vpn / 262144)%Z) by (apply (q_i2_iff vpn q Hq); exact E2).
+    assert (N1 : (mword_of_int (q mod 512) : mword 9) <> vpn_idx 1 vpn).
+    { intro E1. apply (q_i1_iff vpn q Hq) in E1. apply Hne.
+      pose proof (Z.div_div (bv_unsigned vpn) 512 512 ltac:(lia) ltac:(lia)) as Hdd.
+      change (512 * 512)%Z with 262144%Z in Hdd.
+      rewrite <- Hdd in Hq2.
+      pose proof (Z.div_mod q 512 ltac:(lia)) as Dq.
+      pose proof (Z.div_mod (bv_unsigned vpn / 512) 512 ltac:(lia)) as Dv.
+      lia. }
+    rewrite E2. rewrite Ht'2.
+    destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:Ht2.
+    + rewrite (Hii c1 c1' eq_refl Ht'2 (mword_of_int (q mod 512)) N1). reflexivity.
+    + rewrite (Hiii c1' eq_refl Ht'2 (mword_of_int (q mod 512)) N1). reflexivity.
+  - rewrite (Hi (mword_of_int (q / 512)) N2). reflexivity.
+Qed.
+
+(* ------ extract the present-facts from walk's [ptree_level0] output ----- *)
+
+Lemma ptree_level0_l1_absent (t : ptree) (vpn : mword 27) (p2 p1 w0 : mword 64) :
+  ptree_level0 t vpn p2 p1 w0 -> l1_absent t (bv_unsigned vpn / 262144) = 0%nat.
+Proof.
+  intros (c1 & c0 & Hk2 & _). unfold l1_absent. rewrite group_i2. rewrite Hk2. reflexivity.
+Qed.
+
+Lemma ptree_level0_l0_absent (t : ptree) (vpn : mword 27) (p2 p1 w0 : mword 64) :
+  ptree_level0 t vpn p2 p1 w0 -> l0_absent t (bv_unsigned vpn / 512) = 0%nat.
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & _). unfold l0_absent.
+  rewrite group_i2_of_q0. rewrite Hk2. rewrite group_i1_of_q0. rewrite Hk1. reflexivity.
+Qed.
+
+(* ------ pt_missing at one page = the two absent counts along vpn -------- *)
+
+Lemma pt_missing_1_eq (t : ptree) (vpn : mword 27) :
+  pt_missing t vpn 1
+  = (l0_absent t (bv_unsigned vpn / 512) + l1_absent t (bv_unsigned vpn / 262144))%nat.
+Proof.
+  unfold pt_missing.
+  replace (bv_unsigned vpn + Z.of_nat 1 - 1)%Z with (bv_unsigned vpn) by lia.
+  rewrite l0count_single l1count_single. reflexivity.
+Qed.
+
+(* ------ the COMBINED telescope lemma mappages calls each iteration ------
+   offpath agreement + walk's present-facts telescope the tail's missing
+   count under the whole run's, with the head accounted as [pt_missing t vpn 1]
+   (= the tables the single-page walk grafts). *)
+Lemma pt_missing_tel_offpath (t t' : ptree) (vpn : mword 27) (n : nat) :
+  (bv_unsigned vpn + Z.of_nat n + 1 <= 134217728)%Z ->
+  ptree_offpath_eq vpn t t' ->
+  l0_absent t' (bv_unsigned vpn / 512) = 0%nat ->
+  l1_absent t' (bv_unsigned vpn / 262144) = 0%nat ->
+  (pt_missing t vpn 1 + pt_missing t' (add_vec_int vpn 1) n <= pt_missing t vpn (S n))%nat.
+Proof.
+  intros Hnw Hoff Hl0z Hl1z.
+  pose proof (offpath_l0_flip vpn t t' Hoff Hl0z) as Hl0o.
+  pose proof (offpath_l1_flip vpn t t' Hoff) as Hl1o.
+  pose proof (pt_missing_tel_gen t t' vpn n Hnw Hl0z Hl0o Hl1z Hl1o) as H.
+  rewrite <- pt_missing_1_eq in H. exact H.
+Qed.
+
+(* ------ pt_missing monotone in the page count (failure-arm bound) ------- *)
+
+Lemma l0count_ge_first (t : ptree) (a b : Z) :
+  (a <= b)%Z -> (l0_absent t a <= l0count t a b)%nat.
+Proof. intros H. unfold l0count. rewrite (sum_seqZ_cons (l0_absent t) a b H). lia. Qed.
+
+Lemma l1count_ge_first (t : ptree) (a b : Z) :
+  (a <= b)%Z -> (l1_absent t a <= l1count t a b)%nat.
+Proof. intros H. unfold l1count. rewrite (sum_seqZ_cons (l1_absent t) a b H). lia. Qed.
+
+Lemma pt_missing_1_le (t : ptree) (v : mword 27) (n : nat) :
+  (pt_missing t v 1 <= pt_missing t v (S n))%nat.
+Proof.
+  rewrite pt_missing_1_eq.
+  pose proof (vpn_range v) as [Hlo Hhi].
+  unfold pt_missing.
+  set (lo := bv_unsigned v) in *.
+  assert (Hle : (lo <= lo + Z.of_nat (S n) - 1)%Z) by lia.
+  pose proof (Z.div_le_mono lo (lo + Z.of_nat (S n) - 1) 512 ltac:(lia) Hle) as H512.
+  pose proof (Z.div_le_mono lo (lo + Z.of_nat (S n) - 1) 262144 ltac:(lia) Hle) as H262.
+  pose proof (l0count_ge_first t (lo / 512) ((lo + Z.of_nat (S n) - 1) / 512) H512) as A.
+  pose proof (l1count_ge_first t (lo / 262144) ((lo + Z.of_nat (S n) - 1) / 262144) H262) as B.
+  lia.
+Qed.
+
+(* ===================================================================== *)
+(* §14 grafts_lvl: the number of table pages walk grafts descending from a  *)
+(*    level-[L] node along [vpn].  Threaded through the walk loop as the     *)
+(*    invariant [g + grafts_lvl L cur vpn = pt_missing t vpn 1], it bounds   *)
+(*    walk's node growth [g] by the sharp per-page missing count.           *)
+(* ===================================================================== *)
+
+Fixpoint grafts_lvl (L : nat) (cur : ptree) (vpn : mword 27) : nat :=
+  match L with
+  | O => O
+  | S l => match pt_kids cur (vpn_idx (S l) vpn) with
+           | Some c => grafts_lvl l c vpn
+           | None => S l
+           end
+  end.
+
+Lemma grafts_lvl_empty (L : nat) (b : mword 44) (vpn : mword 27) :
+  grafts_lvl L (pt_empty_node b) vpn = L.
+Proof. destruct L; reflexivity. Qed.
+
+Lemma grafts_lvl_descend (l : nat) (cur c : ptree) (vpn : mword 27) :
+  pt_kids cur (vpn_idx (S l) vpn) = Some c ->
+  grafts_lvl (S l) cur vpn = grafts_lvl l c vpn.
+Proof. intros H. cbn [grafts_lvl]. rewrite H. reflexivity. Qed.
+
+Lemma grafts_lvl_none (l : nat) (cur : ptree) (vpn : mword 27) :
+  pt_kids cur (vpn_idx (S l) vpn) = None -> grafts_lvl (S l) cur vpn = S l.
+Proof. intros H. cbn [grafts_lvl]. rewrite H. reflexivity. Qed.
+
+Lemma grafts_lvl_2_missing (t : ptree) (vpn : mword 27) :
+  grafts_lvl 2 t vpn = pt_missing t vpn 1.
+Proof.
+  rewrite pt_missing_1_eq. cbn [grafts_lvl].
+  unfold l0_absent, l1_absent.
+  rewrite group_i2 group_i2_of_q0 group_i1_of_q0.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:Hk2.
+  - cbn [grafts_lvl]. destruct (pt_kids c1 (vpn_idx 1 vpn)) as [c0|] eqn:Hk1; reflexivity.
+  - reflexivity.
+Qed.
+
+(* ------ run-index no-wrap bounds (mappages' telescope side conditions) -- *)
+
+(* [bv_unsigned _ >= 0] confuses the bv zify hook here, so the range side
+   conditions are discharged with explicit monotonicity, not [lia]. *)
+Lemma vpn_at_unsigned (vpn0 : mword 27) (k : nat) :
+  (bv_unsigned vpn0 + Z.of_nat k < 134217728)%Z ->
+  bv_unsigned (vpn_at vpn0 k) = (bv_unsigned vpn0 + Z.of_nat k)%Z.
+Proof.
+  intros H. pose proof (bv_unsigned_in_range 27 vpn0) as [Hlo _].
+  pose proof (Nat2Z.is_nonneg k) as Hk0.
+  assert (Hkb : (0 <= Z.of_nat k < 134217728)%Z).
+  { split; [ exact Hk0 |].
+    apply (Z.le_lt_trans (Z.of_nat k) (bv_unsigned vpn0 + Z.of_nat k) 134217728); [| exact H].
+    rewrite <- (Z.add_0_l (Z.of_nat k)) at 1. apply Z.add_le_mono_r. exact Hlo. }
+  unfold vpn_at. rewrite (pb_add_vec_int27_wrap vpn0 (Z.of_nat k) Hkb).
+  assert (HM : bv_modulus 27 = 134217728) by (vm_compute; reflexivity).
+  apply bv_wrap_small. rewrite HM.
+  split; [| exact H].
+  rewrite <- (Z.add_0_l 0). apply Z.add_le_mono; [exact Hlo | exact Hk0].
+Qed.
+
+Lemma vpn_at_step_bv (vpn0 : mword 27) (k : nat) :
+  (bv_unsigned vpn0 + Z.of_nat (S k) < 134217728)%Z ->
+  bv_unsigned (vpn_at vpn0 (S k)) = bv_unsigned (add_vec_int (vpn_at vpn0 k) 1).
+Proof.
+  intros H. pose proof (bv_unsigned_in_range 27 vpn0) as [Hlo _].
+  pose proof (Nat2Z.is_nonneg k) as Hk0.
+  assert (Hk1 : (bv_unsigned vpn0 + Z.of_nat k < 134217728)%Z).
+  { rewrite Nat2Z.inj_succ in H. lia. }
+  rewrite (vpn_at_unsigned vpn0 (S k) H).
+  rewrite (pb_add_vec_int27_wrap (vpn_at vpn0 k) 1 ltac:(lia)).
+  rewrite (vpn_at_unsigned vpn0 k Hk1).
+  assert (HM : bv_modulus 27 = 134217728) by (vm_compute; reflexivity).
+  assert (Hrange : (0 <= bv_unsigned vpn0 + Z.of_nat k + 1 < bv_modulus 27)%Z).
+  { rewrite HM. split.
+    - apply Z.add_nonneg_nonneg; [ apply Z.add_nonneg_nonneg; [exact Hlo | exact Hk0] | apply Z.le_0_1 ].
+    - rewrite Nat2Z.inj_succ in H. lia. }
+  rewrite (bv_wrap_small 27 (bv_unsigned vpn0 + Z.of_nat k + 1)%Z Hrange).
+  rewrite Nat2Z.inj_succ. lia.
+Qed.
+
+Lemma vpn_at_0_bv (vpn0 : mword 27) : bv_unsigned (vpn_at vpn0 0) = bv_unsigned vpn0.
+Proof.
+  pose proof (bv_unsigned_in_range 27 vpn0) as [_ Hhi].
+  assert (HM : bv_modulus 27 = 134217728) by (vm_compute; reflexivity).
+  rewrite HM in Hhi.
+  rewrite (vpn_at_unsigned vpn0 0
+             ltac:(change (Z.of_nat 0) with 0%Z; rewrite Z.add_0_r; exact Hhi)).
+  change (Z.of_nat 0) with 0%Z. rewrite Z.add_0_r. reflexivity.
+Qed.
+
+Lemma svpn_run_bound (va : mword 64) (npages : nat) :
+  (1 <= npages)%nat ->
+  (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z ->
+  (bv_unsigned (svpn_of va) + Z.of_nat npages <= 134217728)%Z.
+Proof.
+  intros Hnp Hb.
+  pose proof (bv_unsigned_in_range 64 va) as [Hlo _].
+  pose proof (Nat2Z.is_nonneg npages) as Hnn.
+  assert (Hnp1 : (1 <= Z.of_nat npages)%Z) by lia.
+  assert (Hvalt : uint va < 274877906944).
+  { rewrite uint_unsigned. assert (4096 <= Z.of_nat npages * 4096)%Z by lia. lia. }
+  rewrite (svpn_of_unsigned_lo va Hvalt). rewrite uint_unsigned.
+  rewrite (Z.shiftr_div_pow2 (bv_unsigned va) 12 ltac:(lia)).
+  change (2 ^ 12)%Z with 4096%Z.
+  assert (Hup : (bv_unsigned va <= 4096 * (67108864 - Z.of_nat npages))%Z) by lia.
+  assert (H1 : (bv_unsigned va / 4096 <= 67108864 - Z.of_nat npages)%Z)
+    by (apply Z.div_le_upper_bound; [lia | exact Hup]).
+  lia.
+Qed.
+

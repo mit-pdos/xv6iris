@@ -265,11 +265,73 @@ Z.leb_gt/Z.ltb_ge projections.  NOTE: kvm_M_wf will be DELETED and
 kvm_M gains the tramp entry in the uniform-claims revision stage C
 (rwx-kmap.md).  (iii) proc_mapstacks/kvmmake/kvminit
 specs (KvmSpec.v) — sign-off shape below is superseded by the above;
-OPEN at (iii): kvmmap keeps panic_wp for None mode (the panic branch is
-xv6 code); decide then whether the counted cone gets a derived
-kvmmap-without-panic_wp form (budget refutes the -1 arm, branch proven
-unreachable) so kvminit's spec is panic_wp-free; (iv) decode catalogs;
-(v) whole-function proofs.
+OFF-PATH FRAME DECISION (2026-07-24): pt_missing + all telescope/flip
+lemmas are DONE and green (PtBuild §10-§12), but ptree_same_rep0 is
+node-presence-blind (a present all-zero L0 vs an absent one agree on
+rep0 yet differ in pt_missing), so mappages' loop cannot track the
+sharp bound through walk's current frame.  DECIDED: option (a) —
+same_rep0 STAYS (map-level frame, consumers untouched); walk's post
+ADDITIONALLY exports the structural off-path agreement
+`ptree_offpath_eq vpn t t'` (kid-level: l2 kids agree off vpn_idx 2;
+within vpn's l1 kid, kids agree off vpn_idx 1; a freshly grafted l1 kid
+has all-None other slots), threaded through wp_walk_loop_sconf's
+Hrestore continuation.  The predicate delivers exactly the telescope's
+four hypotheses; consumed per-iteration inside mappages' step (no
+cross-iteration transitivity needed — the loop invariant is the
+pt_missing INEQUALITY).
+
+ITEM (iii) DESIGN (2026-07-24 — the specs; RESOLVES the panic question):
+
+The 2·npages growth bound is USELESS for refuting the panic branch
+mid-chain (2·32761 exceeds the whole budget).  TRUE panic-freedom needs
+the SHARP bound:
+- NEW pure function `pt_missing t vpn0 npages : nat` (PtBuild): the
+  number of table pages the run's walks would ALLOCATE — absent-l1s +
+  absent-l0s along [vpn0, vpn0+npages).  Well-defined on 0-form trees.
+- walk/mappages posts gain `⌜g ≤ pt_missing t vpn0 npages⌝` (walk: its
+  one-page instance; mappages: the invariant telescopes
+  g_so_far + pt_missing(tk, rest) ≤ pt_missing(t0, all)).
+- kvmmap_spec's counted arm REFUTES the -1/panic branch internally:
+  hypothesis becomes `match on with None => panic_wp | Some n =>
+  ⌜pt_missing t vpn0 npages < n⌝ end` — with the sharp bound, the -1
+  arm's avail_zero(avail_sub (Some n) g) + g ≤ missing < n is a
+  contradiction, the branch is DEAD, and no panic_wp is needed.  None
+  mode is verbatim today's spec.
+
+THE THREE SPECS (KvmSpec.v):
+- proc_mapstacks_spec: pre = a0 = kpgtbl, ptree_own t + ⌜pt_rep0 t m⌝ +
+  ⌜∀ i<64, m !! kstack_vpn i = None⌝ + kalloc_env γ on tp + counted arm
+  ⌜Some n => 64 + pt_missing-of-the-64-runs < n⌝ (each kstack run is 1
+  page; missing ≤ 1 l0 shared + ...; concrete at kvm_map: compute).
+  Post: ∃ pas, ⌜kvm_pas_ok-shaped facts⌝ ∗ ptree_own t' ∗
+  ⌜pt_rep0 t' (kvm_stacks pas 64 m)⌝ ∗ ⌜pt_base t' = pt_base t⌝ ∗
+  ∃ g, ⌜pt_nodes t' = pt_nodes t + g⌝ ∗
+  kalloc_env γ (avail_sub on (64 + g)) tp ∗ the 64 pages' ownership
+  ([∗ list] page_own-form at pas i) ∗ callee_saved/stack_own etc. per
+  the house whole-function shape.  pas as a FUNCTION nat→mword 44.
+- kvmmake_spec: pre = kalloc_env γ on tp + counted ⌜Some n =>
+  K_kvmmake ≤ n⌝ with K_kvmmake = 166 (102 tables incl. root + 64
+  stacks; PIN by computing pt_nodes of the witness = 102 in the proof).
+  NO panic_wp anywhere (root kalloc: budget > 0; six kvmmap calls: the
+  sharp-bound arms; mapstacks: its counted arm).  Post: a0 = root
+  (fresh page, page-aligned), ∃ pas t, ptree_own 2 1 t ∗
+  ⌜pt_rep0 t (kvm_map_full pas)⌝ ∗ ⌜pt_base t = root-ppn⌝ ∗
+  ⌜pt_nodes t = 102⌝ ∗ kalloc_env γ (avail_sub on 166) tp ∗ stack pages'
+  ownership ∗ house post shape.  The six kvmmap posts chain
+  DEFINITIONALLY through kvm_m1..kvm_map (KvmMap's literals).
+- kvminit_spec: kvmmake + sd into the kernel_pagetable global cell
+  (KernelSyms; identity ↦₈).  Post: kernel_pagetable ↦₈ root ∗
+  everything from kvmmake's post minus a0.  UNCONDITIONAL success —
+  no failure arm, no panic_wp, budget premise K_kvminit = 166 ≤ n.
+  This is THE deliverable: the verified construction of the table the
+  stage-6 switch installs (its post feeds kvm_bridge directly).
+
+(iv) decode catalogs (WpProcMapstacksInstr ~90, WpKvmmakeInstr ~44 —
+2-ORIG (d) guidance stands: reuse KernelRvcDecode templates, JAL
+residues mod 2^21, probe ASTs before committing); (v) whole-function
+proofs (order: pt_missing machinery → proc_mapstacks → kvmmake →
+kvminit), each through a sealed epilogue + the Spec/sealed-functor/Link
+shape so the coverage report sees them.
 
 ### 2-ORIG. wp_kvmmake / wp_proc_mapstacks / wp_kvminit (original checkpoint)
 

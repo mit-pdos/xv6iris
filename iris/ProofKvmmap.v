@@ -57,7 +57,7 @@ Section ProofKvmmap.
     assert (Hsp1 : W1 !!! Regidx csp_rs1 = pa_stk (mm !!! Regidx csp_rs1) 2).
     { rewrite /W1 upd_eq. unfold regval_into_reg, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
-    iIntros "#Hpanic Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
+    iIntros "Hbudget Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { unfold spr, pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -207,7 +207,7 @@ Section ProofKvmmap.
               ltac:(rewrite HP6tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HP6tp). iExact "Henv". }
-    iIntros (mr t' k g) "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpay".
+    iIntros (mr t' k g) "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hmiss %Hpay".
     iEval (rewrite HP6tp) in "Henv".
     (* pc back at +0x12; the frame cells recovered *)
     assert (HP6link : P6 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KM + 0x0e) : mword 64) 4).
@@ -222,14 +222,25 @@ Section ProofKvmmap.
     assert (Hmrtp : mr !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite (callee_saved_lookup Hkcs (mword_of_int 4) ltac:(vm_compute; reflexivity)).
       exact HP6tp. }
-    rewrite HP6a1 in Hrep'. rewrite HP6a3 in Hrep'.
+    rewrite HP6a1 in Hrep'. rewrite HP6a3 in Hrep'. rewrite HP6a1 in Hmiss.
     iPoseProof (ki_12 with "Htext") as "Hi12'".
     iPoseProof (ki_14 with "Htext") as "Hi14'".
     iPoseProof (ki_16 with "Htext") as "Hi16'".
     iPoseProof (ki_18 with "Htext") as "Hi18'".
     iPoseProof (ki_1a with "Htext") as "Hi1a'".
-    destruct Hpay as [(Hkn & Ha0z) | (Hklt & Ha0m1 & _)].
-    2:{ (* ---- mappages FAILED (a0 = -1): bnez TAKEN -> panic ---- *)
+    destruct Hpay as [(Hkn & Ha0z) | (Hklt & Ha0m1 & Havz)].
+    2:{ (* ---- mappages FAILED (a0 = -1) ---- *)
+      (* Under a counted budget [Some nb] the sharp bound [g <= pt_missing <
+         nb] refutes the [avail_zero] witness (no page was left, yet the
+         counter says zero) -- the branch is DEAD.  Under [None] the panic
+         contract [Hbudget] discharges it verbatim. *)
+      destruct on as [nb |].
+      { (* Some nb: the counted-budget arm is dead *)
+        iDestruct "Hbudget" as %Hbud.
+        change vpn0 with (svpn_of va) in Hbud.
+        rewrite avail_sub_Some in Havz. cbn in Havz.
+        exfalso. lia. }
+      (* None: panic *)
       iApply (wp_cbnez_taken_s_sconf γ Φ (mword_of_int (KM + 0x12)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
                 mr (K - 2)%nat
                 ltac:(vm_compute; reflexivity)
@@ -268,7 +279,7 @@ Section ProofKvmmap.
       iIntros "Hcg Hpc".
       assert (Hpcpn : add_vec (mword_of_int (KM + 0x24) : mword 64) (sign_extend' 64 (mword_of_int 2094876 : mword 21)) = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpcpn) in "Hpc".
-      iApply ("Hpanic" $! Φ γ _ _ with "Htext Hpc Hcg").
+      iApply ("Hbudget" $! Φ γ _ _ with "Htext Hpc Hcg").
     }
     (* ---- mappages SUCCEEDED (k = npages, a0 = 0): bnez FALLS, epilogue ---- *)
     subst k.

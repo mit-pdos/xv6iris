@@ -3,7 +3,19 @@
 ## UNIFORM-CLAIMS REVISION (2026-07-23, user-signed-off; SUPERSEDES parts
 ## of the design below — read this first)
 
-The points-to layer is being REFOUNDED va-based and the claim ghost made
+STATUS: COMPLETE 2026-07-24 (A′ 2af5603, B′ 705131e, pte8 cleanup
+27ed01f, C 713627a; all 302/302 green).  The kernel mapping model is
+one mechanism end-to-end: one ghost map with bare-fragment claims and
+library uniqueness, VA-based ↦ₘ/↦ₓ carrying claim+mapping, the physical
+tier ↦ₚ for untranslated actors, one claim-keyed absorption interface,
+the one-clause exact-representation tree spec, and the trampoline as an
+ordinary mapping.  REMAINING for the wider rwx-kmap project: stage 6
+(the kvminithart switch minting the 65 fragments + establishing
+tlb_inv_pt from the kvm_bridge) — now blocked only on the kvm-spec
+project delivering kvmmake/kvminit (items iii-v there).  The PARKED
+heap-domain-invariant cleanup stands.
+
+The points-to layer was REFOUNDED va-based and the claim ghost made
 fully uniform.  User decisions, ironed out over several rounds:
 
 1. `↦ₘ`/`↦ₓ` are REDEFINED VA-BASED (same notations, function specs

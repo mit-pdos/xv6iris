@@ -172,6 +172,8 @@ Section KvmSpecs.
         cpu_own γ 0 eb p C -∗
         ⌜callee_saved mm mr⌝ -∗
         ⌜ptree_same_rep0 t t'⌝ -∗
+        ⌜ptree_offpath_eq vpn t t'⌝ -∗
+        ⌜(g <= pt_missing t vpn 1)%nat⌝ -∗
         ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0   (* alloc failed *)
              /\ avail_zero (avail_sub on g))
           \/ (exists p2 p1 w0,
@@ -229,6 +231,7 @@ Section KvmSpecs.
         ⌜callee_saved mm mr⌝ -∗
         ⌜pt_base t' = pt_base t⌝ -∗
         ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
+        ⌜(g <= pt_missing t vpn0 npages)%nat⌝ -∗
         ⌜ (k = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
           \/ ((k < npages)%nat /\
               mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
@@ -273,7 +276,10 @@ Section KvmSpecs.
       ⌜(uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z⌝ -∗
       ⌜pt_rep0 t m⌝ -∗
       ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
-      panic_wp -∗
+      (match on with
+       | None => panic_wp
+       | Some nb => ⌜(pt_missing t vpn0 npages < nb)%nat⌝
+       end) -∗
       smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
       sr_inv R -∗ kernel_text -∗
       pc_is (mword_of_int KernelSyms.kvmmap) -∗

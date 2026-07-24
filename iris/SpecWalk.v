@@ -57,6 +57,8 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
     kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ptree_same_rep0 t t'⌝ -∗
+    ⌜ptree_offpath_eq vpn t t'⌝ -∗
+    ⌜(g <= pt_missing t vpn 1)%nat⌝ -∗
     ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
          /\ avail_zero (avail_sub on g))
       \/ (exists p2 p1 w0,

@@ -49,7 +49,10 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
      this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  panic_wp -∗
+  match on with
+  | None => panic_wp
+  | Some nb => ⌜(pt_missing t vpn0 npages < nb)%nat⌝
+  end -∗
   sie_cap_gpr γ mm K -∗
   cpu_own γ lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗

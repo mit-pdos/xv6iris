@@ -104,6 +104,7 @@ Section ProofMappages.
     pt_base tf = pt_base t ->
     pt_rep0 tf (pt_insert_run m vpn0 ppn0 perm k) ->
     pt_nodes tf = (pt_nodes t + q)%nat ->
+    (q <= pt_missing t vpn0 npages)%nat ->
     ((k = npages /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
      \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1)
          /\ avail_zero (avail_sub on q))) ->
@@ -131,6 +132,7 @@ Section ProofMappages.
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
+      ⌜(g <= pt_missing t vpn0 npages)%nat⌝ -∗
       ⌜ (k' = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
         \/ ((k' < npages)%nat /\
             mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
@@ -138,7 +140,7 @@ Section ProofMappages.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va vpn0 ppn0 sp0 spr ret_tgt HK Hsp Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hpay.
+    intros va vpn0 ppn0 sp0 spr ret_tgt HK Hsp Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hmiss Hpay.
     iIntros "Hcg Hcnt #Htext Hpc
              Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
              Hptree Henv Hcont".
@@ -350,7 +352,7 @@ Section ProofMappages.
     { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
       repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
-    iApply ("Hcont" $! E10 tf k q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%]").
+    iApply ("Hcont" $! E10 tf k q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%]").
     { exact Hnodes. }
     { (* callee_saved mm E10 *)
       unfold callee_saved.
@@ -389,6 +391,7 @@ Section ProofMappages.
     }
     { exact Hbase. }
     { exact Hrep. }
+    { exact Hmiss. }
     { rewrite HE10a0. exact Hpay. }
   Qed.
   (* NB: with g := q the payload/env forms coincide with the epilogue's;
@@ -441,6 +444,7 @@ Section ProofMappages.
     pt_base tk = pt_base t ->
     pt_rep0 tk (pt_insert_run m vpn0 ppn0 perm k) ->
     pt_nodes tk = (pt_nodes t + consumed)%nat ->
+    (consumed + pt_missing tk (vpn_at vpn0 k) (npages - k) <= pt_missing t vpn0 npages)%nat ->
     mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
     sie_cap_gpr γ Mk (K - 10)%nat -∗ cpu_own γ lvl eb p C -∗
     kernel_text -∗
@@ -466,6 +470,7 @@ Section ProofMappages.
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
+      ⌜(g <= pt_missing t vpn0 npages)%nat⌝ -∗
       ⌜ (k' = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
         \/ ((k' < npages)%nat /\
             mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
@@ -475,7 +480,7 @@ Section ProofMappages.
   Proof.
     induction rem as [| rem' IH]; intros k Mk tk consumed va pa vpn0 ppn0 sp0 spr ret_tgt
       Hlvl HK Hkrem Hrem Hroot Hvaal Hpaal Hpermreg Hpok Hvab Hpab Hnone
-      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hcid;
+      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Htp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hinv Hcid;
       [lia |].
     iIntros "Hcg Hcnt #Htext Hpc
              Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -584,7 +589,7 @@ Section ProofMappages.
               ltac:(rewrite HW4tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HW4tp). iExact "Henv". }
-    iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hg Henv %Hkcs %Hsame %Hpay".
+    iIntros (mr t' g) "Hcg Hcnt Hpc Hptree %Hg Henv %Hkcs %Hsame %Hoffw %Hmissw %Hpay".
     iEval (rewrite HW4tp) in "Henv".
     iEval (rewrite <- (avail_sub_add on consumed g)) in "Henv".
     assert (Ht'nodes : pt_nodes t' = (pt_nodes t + (consumed + g))%nat) by lia.
@@ -663,7 +668,15 @@ Section ProofMappages.
     { destruct Hsame as (Hb & _). rewrite Hb. exact Hbase. }
     assert (Hrep' : pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k))
       by (exact (pt_rep0_same tk t' _ Hsame Hrep)).
-    rewrite HW4a1 in Hpay. rewrite Hvpnk in Hpay.
+    rewrite HW4a1 in Hpay Hoffw Hmissw. rewrite Hvpnk in Hpay Hoffw Hmissw.
+    (* the sharp per-page bound: this walk grew [g <= pt_missing tk vk 1], and
+       [pt_missing] is monotone in the page count, so the total node growth
+       [consumed + g] stays under the whole run's missing count.  Discharges
+       the epilogue's bound on BOTH exit arms. *)
+    assert (Hmiss : (consumed + g <= pt_missing t vpn0 npages)%nat).
+    { assert (Hnpk : (npages - k = S (npages - k - 1))%nat) by lia.
+      pose proof (pt_missing_1_le tk (vpn_at vpn0 k) (npages - k - 1)) as Hmono.
+      rewrite <- Hnpk in Hmono. lia. }
     (* the walk returns either NULL (a0=0, kalloc exhausted => avail_zero) or
        the L0 slot address; the latter is an OWNED RAM cell, hence nonzero. *)
     destruct Hpay as [(Ha0z & Havz) | (p2 & p1 & w0 & Hl0 & Ha0v)].
@@ -697,7 +710,7 @@ Section ProofMappages.
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr25)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr26)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr27)
-                Hbase' Hrep' Ht'nodes
+                Hbase' Hrep' Ht'nodes Hmiss
                 ltac:(right; split; [lia |]; split;
                       [ rewrite /F1 upd_eq; apply bv_eq; vm_compute; reflexivity
                       | rewrite (avail_sub_add on consumed g); exact Havz ])
@@ -948,7 +961,7 @@ Section ProofMappages.
                 (eq_trans Hf25 Hmr25)
                 (eq_trans Hf26 Hmr26)
                 (eq_trans Hf27 Hmr27)
-                HbaseS HrepS HnodesS
+                HbaseS HrepS HnodesS Hmiss
                 ltac:(left; split; [lia |];
                       rewrite /F1 upd_eq;
                       apply bv_eq; vm_compute; reflexivity)
@@ -1022,6 +1035,36 @@ Section ProofMappages.
     assert (Hag25 : M12 !!! Regidx (mword_of_int 25 : mword 5) = mr !!! Regidx (mword_of_int 25 : mword 5)) by peel_reg.
     assert (Hag26 : M12 !!! Regidx (mword_of_int 26 : mword 5) = mr !!! Regidx (mword_of_int 26 : mword 5)) by peel_reg.
     assert (Hag27 : M12 !!! Regidx (mword_of_int 27 : mword 5) = mr !!! Regidx (mword_of_int 27 : mword 5)) by peel_reg.
+    (* re-establish the sharp missing-count invariant for the next iteration:
+       the head page's walk grew [g <= pt_missing tk vk 1]; the telescope
+       (from walk's off-path agreement + present-facts) bounds the tail's
+       missing count under the head's, and [pt_missing_set_leaf] shows the leaf
+       store leaves the count unchanged. *)
+    assert (HinvS : ((consumed + g) + pt_missing tS (vpn_at vpn0 (S k)) (npages - S k)
+                     <= pt_missing t vpn0 npages)%nat).
+    { assert (Hvpn0np : (bv_unsigned vpn0 + Z.of_nat npages <= 134217728)%Z).
+      { apply (svpn_run_bound va npages); [lia | exact Hvab]. }
+      assert (Hbk1 : (bv_unsigned vpn0 + Z.of_nat k < 134217728)%Z) by lia.
+      assert (HbkSk : (bv_unsigned vpn0 + Z.of_nat (S k) < 134217728)%Z)
+        by (rewrite Nat2Z.inj_succ; lia).
+      assert (Hshift : pt_missing tS (vpn_at vpn0 (S k)) (npages - S k)
+                       = pt_missing t' (add_vec_int (vpn_at vpn0 k) 1) (npages - S k)).
+      { rewrite /tS pt_missing_set_leaf.
+        apply pt_missing_bv_eq. exact (vpn_at_step_bv vpn0 k HbkSk). }
+      rewrite Hshift.
+      assert (Hnn : (npages - S k = npages - k - 1)%nat) by lia.
+      rewrite Hnn.
+      assert (Hbound : (bv_unsigned (vpn_at vpn0 k) + Z.of_nat (npages - k - 1) + 1 <= 134217728)%Z).
+      { rewrite (vpn_at_unsigned vpn0 k Hbk1).
+        replace (Z.of_nat (npages - k - 1)) with (Z.of_nat npages - Z.of_nat k - 1)%Z by lia.
+        lia. }
+      pose proof (pt_missing_tel_offpath tk t' (vpn_at vpn0 k) (npages - k - 1)%nat
+                    Hbound Hoffw
+                    (ptree_level0_l0_absent t' (vpn_at vpn0 k) p2 p1 w0 Hl0)
+                    (ptree_level0_l1_absent t' (vpn_at vpn0 k) p2 p1 w0 Hl0)) as Htel.
+      assert (HSn : (S (npages - k - 1) = npages - k)%nat) by lia.
+      rewrite HSn in Htel.
+      lia. }
     iApply (IH (S k) M12 tS (consumed + g)%nat
               Hlvl HK ltac:(lia) ltac:(lia) Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
@@ -1039,7 +1082,7 @@ Section ProofMappages.
               (eq_trans Hag25 Hmr25)
               (eq_trans Hag26 Hmr26)
               (eq_trans Hag27 Hmr27)
-              HbaseS HrepS HnodesS Hcid
+              HbaseS HrepS HnodesS HinvS Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
                     Hptree Henv Hcont").
@@ -1441,6 +1484,10 @@ Section ProofMappages.
     assert (HPsp : P13 !!! Regidx csp_rs1 = W1 !!! Regidx csp_rs1)
       by (rewrite /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2;
           repeat (rewrite upd_ne; [| reg_neq]); reflexivity).
+    assert (Hinv0 : (0 + pt_missing t (vpn_at vpn0 0) (npages - 0) <= pt_missing t vpn0 npages)%nat).
+    { rewrite Nat.add_0_l. rewrite Nat.sub_0_r.
+      rewrite (pt_missing_bv_eq t (vpn_at vpn0 0) vpn0 npages (vpn_at_0_bv vpn0)).
+      apply Nat.le_refl. }
     iApply (wp_mappages_loop_sconf γ γa Φ mm t m npages perm K lvl eb p C on npages 0%nat P13 t 0%nat
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
@@ -1475,7 +1522,9 @@ Section ProofMappages.
               ltac:(peel_reg)
               ltac:(peel_reg)
               ltac:(peel_reg)
-              eq_refl Hrep ltac:(lia) Hcid
+              eq_refl Hrep ltac:(lia)
+              Hinv0
+              Hcid
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 [S10]
                     Hptree Henv Hcont").
