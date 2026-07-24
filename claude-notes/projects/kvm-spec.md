@@ -339,6 +339,27 @@ NEXT WORK, IN ORDER:
    the proc_mapstacks call; pin ⌜pt_nodes t = 102⌝ by computing the
    witness; budget K_kvmmake = 166 telescoped across the calls.
    Catalog: WpKvmmakeInstr kmkdec_*/kmki_*.
+   OFF-BY-ONE FIX REQUIRED FIRST (found 2026-07-24 during the budget
+   telescope check; apply at the next green boundary): the strict-<
+   counted-arm convention makes every failure-arm refutation demand
+   ONE SPARE page beyond true consumption (kvmmap with missing=0 and
+   remaining=Some 0 has an unrefutable avail_zero failure arm).  True
+   consumption is exactly 166, and at the proc_mapstacks call
+   (consumed<=102, kstacks_missing t6 = 0 via the tramp entry's
+   pt_rep0 presence) the premise 64+0 < nb-102 forces nb >= 167.  So
+   SpecKvmmake/SpecKvminit keep K_kvmmake = 166 (the post's
+   avail_sub on 166 is the true consumption) but the PREMISE tightens
+   to STRICT: (K_kvmmake < nb)%nat — uniform with kvmmap's
+   missing < nb and proc_mapstacks' 64+kstacks_missing < nb.
+   PROOF-SIDE BUDGET LEDGER (per-call missing upper bounds, each
+   needing the presence facts from pt_rep0 t_j m_j at the ALREADY
+   MAPPED vpns): uart<=2, virtio<=0 (shares group 128 + l1 0 with
+   uart), plic<=32 (l1 0 present), text<=2, data<=63 (group 1024 +
+   l1 2 present from text), tramp<=2; sum 101, +root = 102, +64
+   stacks = 166.  Needs a small pt_missing upper-bound kit:
+   pt_rep0 + m!!vpn=Some w => l0_absent/l1_absent = 0 at vpn's
+   groups, and l0count/l1count interval bounds (<= length, minus one
+   per provably-present group).
 (v).3  ProofKvminit + Link: kvmmake call + the sd into
    kernel_pagetable @ 0x8000a238 (identity ↦₈ cell; kidec_*/kii_*).
 THEN: rwx-kmap STAGE 6 (see rwx-kmap.md staging C→6): the kvminithart
