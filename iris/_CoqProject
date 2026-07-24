@@ -78,6 +78,8 @@ PtBuild.v
 KvmSpec.v
 WpWalkInstr.v
 WpMappagesInstr.v
+WpProcMapstacksInstr.v
+WpKvmmakeInstr.v
 WpKvmmap.v
 InstrBytes.v
 KernelText.v
@@ -185,6 +187,9 @@ LinkMappages.v
 SpecKvmmap.v
 ProofKvmmap.v
 LinkKvmmap.v
+SpecProcMapstacks.v
+SpecKvmmake.v
+SpecKvminit.v
 SpecWakeupParts.v
 ProofWakeupParts.v
 LinkWakeupParts.v

@@ -35,7 +35,7 @@
      +0x3e C 865a      mv    a2,s6          <- LOOP HEAD
      +0x40 C 85a6      mv    a1,s1
      +0x42 C 8552      mv    a0,s4
-     +0x44 B ee9ff0ef  jal   walk           (walk_spec_holds)
+     +0x44 B ee9ff0ef  jal   walk           (SpecWalk.wp_walk_sconf)
      +0x48 C c929      beqz  a0,+0x52       (-> +0xca: ret -1 exit)
      +0x4a C 611c      ld    a5,0(a0)       (the REMAP-CHECK read)
      +0x4c C 8b85      andi  a5,a5,1

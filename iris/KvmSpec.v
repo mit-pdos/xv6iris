@@ -11,15 +11,18 @@
       kvmmake edits the future kernel table while satp is BARE (kvminit
       runs before kvminithart; start() wrote satp=0), and the user-table
       callers (uvmalloc &c.) edit a USER table while satp holds the KERNEL
-      table.  So every spec here separates
+      table.  So every spec separates
         - the EDITED table: [ptree_own 2 1 t] + pure facts about [t], and
-        - the AMBIENT TRANSLATION REGIME [R : s_regime] (SRegime.v), the
-          abstract invariant governing instruction fetch and data access:
-          [bare_regime] during boot, [kpt_regime kroot] for the
-          user-table callers.
-      The S-mode leaf layer is regime-generic (the [_r] leaves), so the
-      instruction proofs run ONCE over the abstract [R] and both
-      instantiations come free.
+        - the AMBIENT TRANSLATION REGIME, which the whole-function specs no
+          longer name: they thread the SIE-agnostic [sie_cap_gpr] bundle
+          (IntrDefs.v), whose [strans_inv] slot carries the Bare∨KPT regime
+          disjunction consumed foldedly through the derived [strans_regime :
+          s_regime].  So the boot (Bare) and user-table (kpt) callers share
+          one spec with no [s_regime] parameter -- the old [Variable R] /
+          [sr_inv R] threading is gone.  The per-function spec STATEMENTS live
+          in the Spec<F>.v files (SpecWalk / SpecMappages / SpecKvmmap /
+          SpecProcMapstacks / SpecKvmmake / SpecKvminit); this file keeps only
+          the shared vocabulary ([kalloc_env], [panic_wp], [K_kvmmake]).
 
    2. THE MAP VIEW.  A table under construction is described by a finite
       map [m : gmap (mword 27) (mword 64)] (vpn -> leaf word), through
@@ -87,24 +90,25 @@ Require Import PtTree PtBuild.
 Require Import KvmMap.
 Require Import IntrDefs.
 Require Import ProcGeom SwtchCtx CpuOwn.
-Require Import SmodeCore SRegime StackOwn CalleeSaved KallocInv WpLock WpMycpu.
+Require Import SmodeCore StackOwn CalleeSaved KallocInv WpLock WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* §2 The spec statements.  [R : s_regime] is the ambient S-mode          *)
-(*    translation regime (see the header); every spec threads [sr_inv R]  *)
-(*    opaquely.  The                                                      *)
-(*    statements are definitions so the file compiles proof-free; the     *)
-(*    instruction-level lemmas will conclude these exact iProps.          *)
+(* §2 Shared spec vocabulary.  The per-function spec STATEMENTS now live  *)
+(*    in the per-function Spec<F>.v files in the modern sconf shape        *)
+(*    (thread [sie_cap_gpr], whose translation slot [strans_inv] carries   *)
+(*    the Bare∨KPT regime disjunction -- no [s_regime] parameter and no    *)
+(*    [sr_inv R] threading at the whole-function altitude).  What remains   *)
+(*    here is the vocabulary every one of those Spec files shares:          *)
+(*    [kalloc_env] (kalloc's ambient resources) and [panic_wp].            *)
 (* ===================================================================== *)
 
 Section KvmSpecs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
-  Variable R : s_regime.
 
   (* kalloc's ambient resources, bundled so callers can invoke kalloc
      REPEATEDLY: the kmem lock, and THIS cpu's push_off/pop_off cells in
@@ -130,117 +134,6 @@ Section KvmSpecs.
         (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈ qcpu)%I.
 
   (* ------------------------------------------------------------------- *)
-  (* walk(pagetable=a0, va=a1, alloc=a2=1).                                *)
-  (* Pre: the edited tree (root page-aligned base in a0), va below MAXVA.  *)
-  (* Post (ret in a0):                                                     *)
-  (*   ret <> 0 : the tree grew intermediate nodes only (same represented  *)
-  (*     map); vpn's pointer path now reaches L0; ret = the L0 slot        *)
-  (*     address; the slot's current word is exposed (the caller's remap   *)
-  (*     check reads it: if [ptree_blocks0 t vpn] held, w0 is ZERO).       *)
-  (*   ret = 0 : kalloc failed; the tree may still have grown (same        *)
-  (*     represented map).                                                 *)
-  (* alloc=0 (walkaddr's mode) is a separate, simpler spec when the user-  *)
-  (*   side work needs it: no kalloc_env, t' = t.                          *)
-  (* ------------------------------------------------------------------- *)
-  Definition walk_spec : iProp Σ :=
-    (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (eb : bool) (p : mword 64) (C : iProp Σ)
-       (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (n : nat) (on : option nat),
-      let va := mm !!! Regidx (mword_of_int 11) in
-      let vpn := svpn_of va in
-      ⌜(22 <= n)%nat⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 10)
-         = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 12) = mword_of_int 1⌝ -∗
-      ⌜(uint va < 2 ^ 38)%Z⌝ -∗          (* below MAXVA: no panic arm *)
-      ⌜pt_rep0 t m⌝ -∗   (* the xv6 table shape: V=1 slots really descend *)
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      sr_inv R -∗ kernel_text -∗
-      pc_is (mword_of_int KernelSyms.walk) -∗
-      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-      ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
-      cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree) (g : nat),
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        sr_inv R -∗
-        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-        ptree_own 2 (DfracOwn 1) t' -∗
-        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-        kalloc_env γ (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
-        cpu_own γ 0 eb p C -∗
-        ⌜callee_saved mm mr⌝ -∗
-        ⌜ptree_same_rep0 t t'⌝ -∗
-        ⌜ptree_offpath_eq vpn t t'⌝ -∗
-        ⌜(g <= pt_missing t vpn 1)%nat⌝ -∗
-        ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0   (* alloc failed *)
-             /\ avail_zero (avail_sub on g))
-          \/ (exists p2 p1 w0,
-               ptree_level0 t' vpn p2 p1 w0 /\
-               mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I.
-
-  (* ------------------------------------------------------------------- *)
-  (* mappages(pagetable=a0, va=a1, size=a2, pa=a3, perm=a4).               *)
-  (* Pre: page-aligned va/pa, size = npages * 4096 with 1 <= npages, the   *)
-  (* whole va run below MAXVA (the aligned+bounded premises make the three *)
-  (* panic arms unreachable), and NO REMAP: every target vpn unmapped in   *)
-  (* [m].  Post: ret=0 and the tree represents m + the WHOLE run, or       *)
-  (* ret=-1 and it represents m + a PROPER PREFIX (walk's kalloc failed).  *)
-  (* ------------------------------------------------------------------- *)
-  Definition mappages_spec : iProp Σ :=
-    (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (eb : bool) (p : mword 64) (C : iProp Σ)
-       (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat) (on : option nat),
-      let va := mm !!! Regidx (mword_of_int 11) in
-      let pa := mm !!! Regidx (mword_of_int 13) in
-      let vpn0 := svpn_of va in
-      let ppn0 := (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44) in
-      ⌜(32 <= n)%nat⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 10)
-         = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
-      ⌜subrange_vec_dec va 11 0 = (zeros' 12 : mword 12)⌝ -∗
-      ⌜subrange_vec_dec pa 11 0 = (zeros' 12 : mword 12)⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 12) = mword_of_int (Z.of_nat npages * 4096)⌝ -∗
-      ⌜(1 <= npages)%nat⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 14) = mword_of_int perm⌝ -∗
-      ⌜mappages_perm_ok perm⌝ -∗
-      ⌜(uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z⌝ -∗
-      ⌜(uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z⌝ -∗
-      ⌜pt_rep0 t m⌝ -∗
-      ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      sr_inv R -∗ kernel_text -∗
-      pc_is (mword_of_int KernelSyms.mappages) -∗
-      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-      ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
-      cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree) (k : nat) (g : nat),
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        sr_inv R -∗
-        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-        ptree_own 2 (DfracOwn 1) t' -∗
-        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-        kalloc_env γ (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
-        cpu_own γ 0 eb p C -∗
-        ⌜callee_saved mm mr⌝ -∗
-        ⌜pt_base t' = pt_base t⌝ -∗
-        ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
-        ⌜(g <= pt_missing t vpn0 npages)%nat⌝ -∗
-        ⌜ (k = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
-          \/ ((k < npages)%nat /\
-              mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
-              avail_zero (avail_sub on g)) ⌝ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I.
-
-  (* ------------------------------------------------------------------- *)
   (* The panic contract: panic never returns, so a safety WP holds with    *)
   (* any postcondition.  (Eventually a lemma -- uartputc + a Löb spin      *)
   (* loop; an axiom in the interim -- as myproc once was, now proven.)      *)
@@ -250,58 +143,6 @@ Section KvmSpecs.
     (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (m : regfile) (avail : nat),
        kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr γ m avail -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
-
-  (* ------------------------------------------------------------------- *)
-  (* kvmmap(kpgtbl=a0, va=a1, pa=a2, sz=a3, perm=a4): mappages with the    *)
-  (* failure arm absorbed by panic.  Post: the FULL run is mapped.         *)
-  (* ------------------------------------------------------------------- *)
-  Definition kvmmap_spec : iProp Σ :=
-    (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (eb : bool) (p : mword 64) (C : iProp Σ)
-       (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (n : nat) (on : option nat),
-      let va := mm !!! Regidx (mword_of_int 11) in
-      let pa := mm !!! Regidx (mword_of_int 12) in
-      let vpn0 := svpn_of va in
-      let ppn0 := (autocast (T := mword) (subrange_vec_dec pa 55 12) : mword 44) in
-      ⌜(34 <= n)%nat⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 10)
-         = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
-      ⌜subrange_vec_dec va 11 0 = (zeros' 12 : mword 12)⌝ -∗
-      ⌜subrange_vec_dec pa 11 0 = (zeros' 12 : mword 12)⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 13) = mword_of_int (Z.of_nat npages * 4096)⌝ -∗
-      ⌜(1 <= npages)%nat⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 14) = mword_of_int perm⌝ -∗
-      ⌜mappages_perm_ok perm⌝ -∗
-      ⌜(uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z⌝ -∗
-      ⌜(uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z⌝ -∗
-      ⌜pt_rep0 t m⌝ -∗
-      ⌜forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None⌝ -∗
-      (match on with
-       | None => panic_wp
-       | Some nb => ⌜(pt_missing t vpn0 npages < nb)%nat⌝
-       end) -∗
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      sr_inv R -∗ kernel_text -∗
-      pc_is (mword_of_int KernelSyms.kvmmap) -∗
-      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-      ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
-      cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree) (g : nat),
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        sr_inv R -∗
-        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-        ptree_own 2 (DfracOwn 1) t' -∗
-        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-        kalloc_env γ (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
-        cpu_own γ 0 eb p C -∗
-        ⌜callee_saved mm mr⌝ -∗
-        ⌜pt_base t' = pt_base t⌝ -∗
-        ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm npages)⌝ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* ------------------------------------------------------------------- *)
   (* kvmmake() / kvminit().  kvmmake returns (a0) the root of a fresh      *)
@@ -326,149 +167,9 @@ Section KvmSpecs.
   (* [pt_rep t kvm_map] at kvminithart.                                    *)
   (* ------------------------------------------------------------------- *)
 
-  (* ------------------------------------------------------------------- *)
-  (* proc_mapstacks(kpgtbl=a0): kalloc a page for each of the 64 process   *)
-  (* kernel stacks and kvmmap it at KSTACK(i) (RW, one page).  The stack   *)
-  (* pas are kalloc-chosen -- existential (as a FUNCTION [nat -> mword 44]) *)
-  (* in the post -- and the represented map gains the 64 kstack entries    *)
-  (* [kvm_stacks pas 64 m].                                                *)
-  (* COUNTED-ONLY (premise ⌜on = Some nb ∧ 64 + kstacks_missing t < nb⌝):  *)
-  (* proc_mapstacks is boot-only (kvmmake its sole caller), and its        *)
-  (* failure path is panic("kvminit") on a kalloc-null, so a None mode is  *)
-  (* meaningless here -- a deviation from the chain's dual-mode specs,      *)
-  (* justified by the absence of any non-boot caller.  The budget          *)
-  (* exceeds 64 (the leaf pages) plus [kstacks_missing t] (the naive-sum   *)
-  (* UPPER BOUND on the tables the 64 walks graft -- see KvmMap; the proof *)
-  (* telescopes it), so every kalloc-null / kvmmap-fail branch is DEAD and *)
-  (* the success-only post is honest -- NO panic_wp.                       *)
-  (* stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL).   *)
-  (* ------------------------------------------------------------------- *)
-  Definition proc_mapstacks_spec : iProp Σ :=
-    (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (eb : bool) (p : mword 64) (C : iProp Σ)
-       (mm : regfile) (t : ptree)
-       (m : gmap (mword 27) (mword 64)) (n : nat) (on : option nat),
-      ⌜(44 <= n)%nat⌝ -∗
-      ⌜mm !!! Regidx (mword_of_int 10)
-         = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
-      ⌜pt_rep0 t m⌝ -∗
-      ⌜forall i : nat, (i < 64)%nat -> m !! kstack_vpn i = None⌝ -∗
-      ⌜exists nb, on = Some nb /\ (64 + kstacks_missing t < nb)%nat⌝ -∗
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      sr_inv R -∗ kernel_text -∗
-      pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
-      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-      ptree_own 2 (DfracOwn 1) t -∗
-      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
-      cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        sr_inv R -∗
-        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-        ptree_own 2 (DfracOwn 1) t' -∗
-        ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-        kalloc_env γ (avail_sub on (64 + g)) (mm !!! Regidx (mword_of_int 4)) -∗
-        cpu_own γ 0 eb p C -∗
-        ⌜callee_saved mm mr⌝ -∗
-        ⌜pt_base t' = pt_base t⌝ -∗
-        ⌜kvm_pas_ok pas⌝ -∗
-        ⌜pt_rep0 t' (kvm_stacks pas 64 m)⌝ -∗
-        ⌜(g <= kstacks_missing t)%nat⌝ -∗
-        ([∗ list] i ∈ seq 0 64,
-           page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I.
-
   (* Total kalloc consumption of kvmmake: 102 table pages (the root L2 +
      3 L1 group tables + 98 L0 tables -- see kvm-spec.md's node accounting,
      pinned to [pt_nodes = 102] in the proof) + 64 kstack leaf pages. *)
   Definition K_kvmmake : nat := 166.
-
-  (* ------------------------------------------------------------------- *)
-  (* kvmmake(): kalloc a fresh root page, memset it, run the six kvmmap    *)
-  (* regions (UART/VIRTIO/PLIC RW, text RX, data RW, trampoline RX) then   *)
-  (* proc_mapstacks.  Returns (a0) the root page's byte address.  The      *)
-  (* result table represents [kvm_map_full pas] and has exactly 102 table  *)
-  (* nodes.  COUNTED-ONLY (premise ⌜on = Some nb ∧ 166 <= nb⌝): kvmmake is *)
-  (* boot-only (kvminit its sole caller), so it needs no None mode -- a    *)
-  (* deviation from the chain's dual-mode specs, justified by the absence  *)
-  (* of any non-boot caller.  With the budget premise no kalloc can fail,  *)
-  (* so NO panic_wp anywhere.                                              *)
-  (* stack_own bound 48 = own 4-slot frame + proc_mapstacks' 44            *)
-  (* (PROVISIONAL, pending the decode pass).                               *)
-  (* ------------------------------------------------------------------- *)
-  Definition kvmmake_spec : iProp Σ :=
-    (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (eb : bool) (p : mword 64) (C : iProp Σ)
-       (mm : regfile) (n : nat) (on : option nat),
-      ⌜(48 <= n)%nat⌝ -∗
-      ⌜exists nb, on = Some nb /\ (K_kvmmake <= nb)%nat⌝ -∗
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      sr_inv R -∗ kernel_text -∗
-      pc_is (mword_of_int KernelSyms.kvmmake) -∗
-      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
-      cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        sr_inv R -∗
-        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-        ptree_own 2 (DfracOwn 1) t -∗
-        ⌜mr !!! Regidx (mword_of_int 10)
-           = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
-        ⌜pt_rep0 t (kvm_map_full pas)⌝ -∗
-        ⌜pt_nodes t = 102%nat⌝ -∗
-        kalloc_env γ (avail_sub on K_kvmmake) (mm !!! Regidx (mword_of_int 4)) -∗
-        cpu_own γ 0 eb p C -∗
-        ⌜callee_saved mm mr⌝ -∗
-        ⌜kvm_pas_ok pas⌝ -∗
-        ([∗ list] i ∈ seq 0 64,
-           page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I.
-
-  (* ------------------------------------------------------------------- *)
-  (* kvminit(): kvmmake() then store its result into the global           *)
-  (* [kernel_pagetable] cell (an identity 8-byte word at                  *)
-  (* KernelSyms.kernel_pagetable = 0x8000a238; pre = arbitrary [kpt0],     *)
-  (* post = the root page's byte address).  COUNTED-ONLY like kvmmake      *)
-  (* (boot-only), so unconditional success, NO panic_wp.  This is THE      *)
-  (* deliverable: the verified construction whose post feeds the           *)
-  (* stage-6 boot switch (kvm_bridge).                                     *)
-  (* stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL).   *)
-  (* ------------------------------------------------------------------- *)
-  Definition kvminit_spec : iProp Σ :=
-    (∀ (Φ : mval -> iProp Σ) (γ : gname) (γc : gname) (bsie : mword 1)
-       (eb : bool) (p : mword 64) (C : iProp Σ)
-       (mm : regfile) (n : nat) (on : option nat) (kpt0 : mword 64),
-      ⌜(50 <= n)%nat⌝ -∗
-      ⌜exists nb, on = Some nb /\ (K_kvmmake <= nb)%nat⌝ -∗
-      smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-      sr_inv R -∗ kernel_text -∗
-      pc_is (mword_of_int KernelSyms.kvminit) -∗
-      gpr_file mm -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-      (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0 -∗
-      kalloc_env γ on (mm !!! Regidx (mword_of_int 4)) -∗
-      cpu_own γ 0 eb p C -∗
-      ( ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
-        smode_config γc (DfracOwn 1) -∗ ghost_var γc (1/2) bsie -∗
-        sr_inv R -∗
-        pc_is (update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0")) -∗
-        gpr_file mr -∗ stack_own (mm !!! Regidx csp_rs1) n -∗
-        ptree_own 2 (DfracOwn 1) t -∗
-        (mword_of_int KernelSyms.kernel_pagetable : mword 64)
-          ↦₈ zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) -∗
-        ⌜pt_rep0 t (kvm_map_full pas)⌝ -∗
-        ⌜pt_nodes t = 102%nat⌝ -∗
-        kalloc_env γ (avail_sub on K_kvmmake) (mm !!! Regidx (mword_of_int 4)) -∗
-        cpu_own γ 0 eb p C -∗
-        ⌜callee_saved mm mr⌝ -∗
-        ⌜kvm_pas_ok pas⌝ -∗
-        ([∗ list] i ∈ seq 0 64,
-           page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
 End KvmSpecs.

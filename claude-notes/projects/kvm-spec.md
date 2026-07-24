@@ -401,7 +401,8 @@ comments):
 
 **(d) Decode catalogs** (mechanical, ~90 + ~44 instrs; reuse KernelRvcDecode's
 shared frame templates mdec_ccc..cf0 as WpKvmmap did): WpProcMapstacksInstr.v
-(frame 0x715d = 80-byte = 11 slots, KSTACK arith auipc/lui/addi/mul-by-stride/
+(frame 0x715d = 80-byte = 10 slots [the old "11" here was wrong -- decode
+pass confirmed 10 saved regs ra,s0..s8], KSTACK arith auipc/lui/addi/mul-by-stride/
 sub, kalloc+kvmmap jals, the p<&proc[64] bne loop) and WpKvmmakeInstr.v
 (kalloc+memset+6*{auipc/lui/addi arg setup + kvmmap jal} + proc_mapstacks jal).
 Generate programmatically as in WpMappagesInstr; JAL residues = (target - pc) mod
