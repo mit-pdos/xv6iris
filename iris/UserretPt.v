@@ -345,7 +345,7 @@ Section WpUldPt.
     pc_is va -∗
     gpr_file m -∗
     instr pa is_rvc (LOAD (imm, Regidx (mword_of_int 10), Regidx rd, false, 8)) -∗
-    pte8 tfpa v dqm -∗
+    tfpa ↦ₚ₈{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -355,7 +355,7 @@ Section WpUldPt.
       utlb_inv_pt uroot tfp um -∗
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      pte8 tfpa v dqm -∗
+      tfpa ↦ₚ₈{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -363,7 +363,7 @@ Section WpUldPt.
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
       Heva Hcanond Hvpnd Halignd Hmod8.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb
-             [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
+             [Hpc Hnpc] [%Hdom Hfmap] Hinstr [%Hbal Hbytes] Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -535,6 +535,7 @@ Section WpUldPt.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
+    iDestruct (phys_word_pointsto_intro tfpa dqm v Hpalign8 with "Hbytes") as "Hbytes".
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Hutlb
                           [$Hpc' $Hnpc] [Hfmap] Hbytes").
     iSplitR.

@@ -1,8 +1,9 @@
 (* UserretDefs.v -- shared userret definitions: the va/pa windows, the
-   owned-PTE-word bundle [pte8], the 38-instruction catalog (words, ASTs,
-   decode facts, [kernel_text]-backed [instr] constructors), and the pure
-   execute reductions for the page-table-switch instructions (the
-   SFENCE.VMA flush and the S-mode csrw satp chain). *)
+   38-instruction catalog (words, ASTs, decode facts, [kernel_text]-backed
+   [instr] constructors), and the pure execute reductions for the
+   page-table-switch instructions (the SFENCE.VMA flush and the S-mode csrw
+   satp chain).  The owned trapframe word is the canonical physical word form
+   [_ ↦ₚ₈ _] ([phys_word_pointsto], RiscvPtsto). *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -30,23 +31,6 @@ Import Defs.
 
 Definition uva (off : Z) : mword 64 := mword_of_int (TRAMPOLINE + off).
 Definition upa (off : Z) : mword 64 := mword_of_int (KernelSyms.trampoline + off).
-
-(* ===================================================================== *)
-(* 2. 8 owned bytes holding a PTE word.                                   *)
-(* ===================================================================== *)
-
-Section Pte8.
-  Context `{!riscvGS Σ}.
-
-  (* uniform-claims PHYSICAL TIER: the trampoline accesses the trapframe at the
-     USER-PT translate OUTPUT [tfpa] (a physical address, same shape as the
-     hardware page-walker's PT slots), so the owned trapframe bytes live at the
-     physical tier [↦ₚ].  Kernel-side S-mode views convert via the claim
-     bridges where needed. *)
-  Definition pte8 (a v : mword 64) (dq : dfrac) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₚ{ dq } nth_byte v j)%I.
-
-End Pte8.
 
 (* ===================================================================== *)
 (* 8. flush_TLB None None clears every slot; the SFENCE.VMA x0,x0         *)

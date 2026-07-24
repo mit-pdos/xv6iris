@@ -75,37 +75,37 @@ Section UserretAllPt.
     pt_frame (upt_tree_spec uroot tfp um) -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 40)))) (Z.sub pagesize_bits 1) 0))) vra dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 48)))) (Z.sub pagesize_bits 1) 0))) vsp dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 56)))) (Z.sub pagesize_bits 1) 0))) vgp dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 64)))) (Z.sub pagesize_bits 1) 0))) vtp dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 72)))) (Z.sub pagesize_bits 1) 0))) vt0 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 80)))) (Z.sub pagesize_bits 1) 0))) vt1 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 88)))) (Z.sub pagesize_bits 1) 0))) vt2 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 96)))) (Z.sub pagesize_bits 1) 0))) vs0 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 104)))) (Z.sub pagesize_bits 1) 0))) vs1 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 120)))) (Z.sub pagesize_bits 1) 0))) va1 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 128)))) (Z.sub pagesize_bits 1) 0))) va2 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 136)))) (Z.sub pagesize_bits 1) 0))) va3 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 144)))) (Z.sub pagesize_bits 1) 0))) va4 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 152)))) (Z.sub pagesize_bits 1) 0))) va5 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 160)))) (Z.sub pagesize_bits 1) 0))) va6 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 168)))) (Z.sub pagesize_bits 1) 0))) va7 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 176)))) (Z.sub pagesize_bits 1) 0))) vs2 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 184)))) (Z.sub pagesize_bits 1) 0))) vs3 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 192)))) (Z.sub pagesize_bits 1) 0))) vs4 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 200)))) (Z.sub pagesize_bits 1) 0))) vs5 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 208)))) (Z.sub pagesize_bits 1) 0))) vs6 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 216)))) (Z.sub pagesize_bits 1) 0))) vs7 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 224)))) (Z.sub pagesize_bits 1) 0))) vs8 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 232)))) (Z.sub pagesize_bits 1) 0))) vs9 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 240)))) (Z.sub pagesize_bits 1) 0))) vs10 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 248)))) (Z.sub pagesize_bits 1) 0))) vs11 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 256)))) (Z.sub pagesize_bits 1) 0))) vt3 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 264)))) (Z.sub pagesize_bits 1) 0))) vt4 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 272)))) (Z.sub pagesize_bits 1) 0))) vt5 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 280)))) (Z.sub pagesize_bits 1) 0))) vt6 dqm -∗
-    pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 112)))) (Z.sub pagesize_bits 1) 0))) va0f dqm -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 40)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vra -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 48)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vsp -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 56)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vgp -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 64)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vtp -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 72)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt0 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 80)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt1 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 88)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt2 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 96)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs0 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 104)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs1 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 120)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va1 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 128)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va2 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 136)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va3 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 144)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va4 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 152)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va5 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 160)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va6 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 168)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va7 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 176)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs2 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 184)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs3 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 192)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs4 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 200)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs5 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 208)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs6 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 216)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs7 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 224)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs8 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 232)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs9 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 240)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs10 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 248)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs11 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 256)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt3 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 264)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt4 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 272)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt5 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 280)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt6 -∗
+    (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 112)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va0f -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ User -∗
       mstatus ↦ᵣ sret_ms5 mstatus0 -∗
@@ -118,37 +118,37 @@ Section UserretAllPt.
       pc_is (ret_pc sepc0) -∗
       gpr_file
         (<[Regidx (mword_of_int 10) := regval_into_reg va0f]> (<[Regidx (mword_of_int 31) := regval_into_reg vt6]> (<[Regidx (mword_of_int 30) := regval_into_reg vt5]> (<[Regidx (mword_of_int 29) := regval_into_reg vt4]> (<[Regidx (mword_of_int 28) := regval_into_reg vt3]> (<[Regidx (mword_of_int 27) := regval_into_reg vs11]> (<[Regidx (mword_of_int 26) := regval_into_reg vs10]> (<[Regidx (mword_of_int 25) := regval_into_reg vs9]> (<[Regidx (mword_of_int 24) := regval_into_reg vs8]> (<[Regidx (mword_of_int 23) := regval_into_reg vs7]> (<[Regidx (mword_of_int 22) := regval_into_reg vs6]> (<[Regidx (mword_of_int 21) := regval_into_reg vs5]> (<[Regidx (mword_of_int 20) := regval_into_reg vs4]> (<[Regidx (mword_of_int 19) := regval_into_reg vs3]> (<[Regidx (mword_of_int 18) := regval_into_reg vs2]> (<[Regidx (mword_of_int 17) := regval_into_reg va7]> (<[Regidx (mword_of_int 16) := regval_into_reg va6]> (<[Regidx (mword_of_int 15) := regval_into_reg va5]> (<[Regidx (mword_of_int 14) := regval_into_reg va4]> (<[Regidx (mword_of_int 13) := regval_into_reg va3]> (<[Regidx (mword_of_int 12) := regval_into_reg va2]> (<[Regidx (mword_of_int 11) := regval_into_reg va1]> (<[Regidx (mword_of_int 9) := regval_into_reg vs1]> (<[Regidx (mword_of_int 8) := regval_into_reg vs0]> (<[Regidx (mword_of_int 7) := regval_into_reg vt2]> (<[Regidx (mword_of_int 6) := regval_into_reg vt1]> (<[Regidx (mword_of_int 5) := regval_into_reg vt0]> (<[Regidx (mword_of_int 4) := regval_into_reg vtp]> (<[Regidx (mword_of_int 3) := regval_into_reg vgp]> (<[Regidx (mword_of_int 2) := regval_into_reg vsp]> (<[Regidx (mword_of_int 1) := regval_into_reg vra]> (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> m)))))))))))))))))))))))))))))))) -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 40)))) (Z.sub pagesize_bits 1) 0))) vra dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 48)))) (Z.sub pagesize_bits 1) 0))) vsp dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 56)))) (Z.sub pagesize_bits 1) 0))) vgp dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 64)))) (Z.sub pagesize_bits 1) 0))) vtp dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 72)))) (Z.sub pagesize_bits 1) 0))) vt0 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 80)))) (Z.sub pagesize_bits 1) 0))) vt1 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 88)))) (Z.sub pagesize_bits 1) 0))) vt2 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 96)))) (Z.sub pagesize_bits 1) 0))) vs0 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 104)))) (Z.sub pagesize_bits 1) 0))) vs1 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 120)))) (Z.sub pagesize_bits 1) 0))) va1 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 128)))) (Z.sub pagesize_bits 1) 0))) va2 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 136)))) (Z.sub pagesize_bits 1) 0))) va3 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 144)))) (Z.sub pagesize_bits 1) 0))) va4 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 152)))) (Z.sub pagesize_bits 1) 0))) va5 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 160)))) (Z.sub pagesize_bits 1) 0))) va6 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 168)))) (Z.sub pagesize_bits 1) 0))) va7 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 176)))) (Z.sub pagesize_bits 1) 0))) vs2 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 184)))) (Z.sub pagesize_bits 1) 0))) vs3 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 192)))) (Z.sub pagesize_bits 1) 0))) vs4 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 200)))) (Z.sub pagesize_bits 1) 0))) vs5 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 208)))) (Z.sub pagesize_bits 1) 0))) vs6 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 216)))) (Z.sub pagesize_bits 1) 0))) vs7 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 224)))) (Z.sub pagesize_bits 1) 0))) vs8 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 232)))) (Z.sub pagesize_bits 1) 0))) vs9 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 240)))) (Z.sub pagesize_bits 1) 0))) vs10 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 248)))) (Z.sub pagesize_bits 1) 0))) vs11 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 256)))) (Z.sub pagesize_bits 1) 0))) vt3 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 264)))) (Z.sub pagesize_bits 1) 0))) vt4 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 272)))) (Z.sub pagesize_bits 1) 0))) vt5 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 280)))) (Z.sub pagesize_bits 1) 0))) vt6 dqm -∗
-      pte8 (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 112)))) (Z.sub pagesize_bits 1) 0))) va0f dqm -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 40)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vra -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 48)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vsp -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 56)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vgp -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 64)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vtp -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 72)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt0 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 80)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt1 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 88)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt2 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 96)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs0 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 104)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs1 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 120)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va1 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 128)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va2 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 136)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va3 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 144)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va4 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 152)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va5 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 160)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va6 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 168)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va7 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 176)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs2 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 184)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs3 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 192)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs4 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 200)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs5 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 208)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs6 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 216)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs7 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 224)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs8 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 232)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs9 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 240)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs10 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 248)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vs11 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 256)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt3 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 264)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt4 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 272)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt5 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 280)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } vt6 -∗
+      (zero_extend' 64 (concat_vec tfp (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + 112)))) (Z.sub pagesize_bits 1) 0))) ↦ₚ₈{ dqm } va0f -∗
       TransPt.kpt_frame kroot -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
