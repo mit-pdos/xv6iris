@@ -135,15 +135,15 @@ Definition pt_kids (t : ptree) : mword 9 -> option ptree :=
 
 (* The identity vpn of a node page at ppn [b]: all 512 slots
    ([u_pte_addr b idx], idx*8 < 4096) sit in the SAME page, so share this
-   vpn.  [node_kdata b]: that page lies wholly in kernel DATA memory. *)
+   vpn.  [node_kdata b]: that page lies wholly in RAM memory. *)
 Definition pt_page_vpn (b : mword 44) : mword 27 :=
   svpn_of (u_pte_addr b (mword_of_int 0)).
 
-(* the node page at ppn [b] lies wholly in kernel DATA memory.  Implies VA
+(* the node page at ppn [b] lies wholly in RAM memory.  Implies VA
    canonicality of every slot ([b*4096+4096 <= ram_base+ram_size < 2^38]) --
    both pure facts [mem_pointsto] needs for the [↦ₚ₈ -> ↦₈] slot reconstruction. *)
 Definition node_kdata (b : mword 44) : Prop :=
-  (text_end <= bv_unsigned b * 4096)%Z /\
+  (ram_base <= bv_unsigned b * 4096)%Z /\
   (bv_unsigned b * 4096 + 4096 <= ram_base + ram_size)%Z.
 
 (* the 9-bit walk index a level-[lvl] node decodes from [vpn] (Sv39:

@@ -437,12 +437,12 @@ Section PtSlotBridge.
   Qed.
 
   (* the per-byte discharge for a slot [u_pte_addr b idx], byte offset
-     [j < 8]: [pa_of]-identity, kdata, canonicality and svpn-constancy,
+     [j < 8]: [pa_of]-identity, ram, canonicality and svpn-constancy,
      all from the node's [node_kdata b]. *)
   Lemma u_pte_slot_facts (b : mword 44) (idx : mword 9) (j : nat) :
     node_kdata b -> (j < 8)%nat ->
     pa_of b (pa_add (u_pte_addr b idx) j) = pa_add (u_pte_addr b idx) j /\
-    addr_is_kdata (pa_add (u_pte_addr b idx) j) /\
+    addr_is_ram (pa_add (u_pte_addr b idx) j) /\
     (uint (pa_add (u_pte_addr b idx) j) < 274877906944)%Z /\
     svpn_of (pa_add (u_pte_addr b idx) j) = pt_page_vpn b.
   Proof.
@@ -452,7 +452,7 @@ Section PtSlotBridge.
     pose proof (bv_unsigned_in_range _ idx) as Hidxr.
     assert (Hidxm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512) by (vm_compute; reflexivity).
     rewrite Hidxm in Hidxr.
-    unfold node_kdata in *. unfold text_end, ram_base, ram_size in Hklo, Hkhi.
+    unfold node_kdata in *. unfold ram_base, ram_size in Hklo, Hkhi.
     (* the shifted address is in the SAME page: unsigned is b*4096 + idx*8 + j *)
     assert (Hpaj : bv_unsigned (pa_add (u_pte_addr b idx) j)
                    = bv_unsigned b * 4096 + bv_unsigned idx * 8 + Z.of_nat j).
@@ -460,8 +460,8 @@ Section PtSlotBridge.
       - rewrite Ha. reflexivity.
       - lia.
       - rewrite Ha. lia. }
-    assert (Hkda : addr_is_kdata (pa_add (u_pte_addr b idx) j)).
-    { unfold addr_is_kdata, text_end, ram_base, ram_size.
+    assert (Hram : addr_is_ram (pa_add (u_pte_addr b idx) j)).
+    { unfold addr_is_ram, ram_base, ram_size.
       rewrite uint_unsigned Hpaj. lia. }
     assert (Hcanpa : (uint (pa_add (u_pte_addr b idx) j) < 274877906944)%Z).
     { rewrite uint_unsigned Hpaj. lia. }
@@ -471,7 +471,7 @@ Section PtSlotBridge.
       replace (bv_unsigned (mword_of_int 0 : mword 9)) with 0 by (vm_compute; reflexivity). lia. }
     assert (Hcana0 : (uint (u_pte_addr b (mword_of_int 0)) < 274877906944)%Z).
     { rewrite uint_unsigned Ha0. lia. }
-    split; [| split; [exact Hkda | split; [exact Hcanpa |]]].
+    split; [| split; [exact Hram | split; [exact Hcanpa |]]].
     - (* pa_of b (pa_add a j) = pa_add a j *)
       apply bv_eq. unfold pa_of. rewrite zext64_concat44_12_unsigned.
       rewrite subrange64_unsigned_11_0. change (2 ^ 12) with 4096.
@@ -501,11 +501,11 @@ Section PtSlotBridge.
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
     apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
-    destruct (u_pte_slot_facts b idx (0 + k)%nat Hkd ltac:(lia)) as (Hid & Hkda & Hcan & Hsvpn).
+    destruct (u_pte_slot_facts b idx (0 + k)%nat Hkd ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (u_pte_addr b idx) (0 + k))) b KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
     iApply (phys_to_mem_claim (pa_add (u_pte_addr b idx) (0 + k)) b dq (nth_byte w (0 + k))
-              Hid (addr_is_kdata_ram _ Hkda) Hcan with "Hk' Hp").
+              Hid Hram Hcan with "Hk' Hp").
   Qed.
 
   (* the reverse ↦₈ → ↦ₚ₈ (walk restores the physical slot after its load /
@@ -535,11 +535,12 @@ Section PtSlotBridge.
      (ProofWalk) supplies for the just-allocated PT node. *)
   Lemma pt_node_claim_from_static (b : mword 44) :
     node_kdata b ->
+    (text_end <= bv_unsigned b * 4096)%Z ->
     kmap_static_claims -∗ pt_node_claim b.
   Proof.
-    intros Hkd. iIntros "#Hb".
-    pose proof Hkd as Hkd'. destruct Hkd' as [Hlo Hhi].
-    unfold text_end, ram_base, ram_size in Hlo, Hhi.
+    intros Hkd Hkda. iIntros "#Hb".
+    pose proof Hkd as [Hlo Hhi].
+    unfold text_end, ram_base, ram_size in Hlo, Hhi, Hkda.
     assert (Ha0 : bv_unsigned (u_pte_addr b (mword_of_int 0)) = bv_unsigned b * 4096).
     { rewrite (pte_addr_at_unsigned b (mword_of_int 0)).
       replace (bv_unsigned (mword_of_int 0 : mword 9)) with 0 by (vm_compute; reflexivity). lia. }
