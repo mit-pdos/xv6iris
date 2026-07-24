@@ -254,6 +254,7 @@ End RWgwSwalkPt.
 
 (* ---- execute LOAD retire, generic width ---- *)
 Section ExecLoadGwSwalkPt.
+Variable is_unsigned : bool.
 Variable rs1 rd : mword 5.
 Variable imm : mword 12.
 Variable v : mword (8*width).
@@ -291,12 +292,12 @@ Hypothesis Hdev : dev_addr pa = false.
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < Z.to_N width)%N -> s'.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
 Lemma exec_execute_LOAD_w_gpr_S_walk_pt :
-  exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, width))) s
+  exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, width))) s
     = Some (RETIRE_SUCCESS,
-            set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value false data2))).
+            set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (extend_value is_unsigned data2))).
 Proof.
-  change (execute (LOAD (imm, Regidx rs1, Regidx rd, false, width)))
-    with (execute_LOAD imm (Regidx rs1) (Regidx rd) false width).
+  change (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, width)))
+    with (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned width).
   unfold execute_LOAD.
   replace (width <=? xlen_bytes) with true
     by (change xlen_bytes with 8; symmetry; apply Z.leb_le; exact Hw8).
@@ -305,10 +306,10 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _
     (exec_vmem_read_w_gpr_S_walk_pt rs1 offset v region s s' pa Htea Halign Htr Hcp' Hmprv' HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes)).
   cbn match.
-  assert (Hw : exec (wX_bits (Regidx rd) (extend_value false data2)) s'
+  assert (Hw : exec (wX_bits (Regidx rd) (extend_value is_unsigned data2)) s'
                = Some (tt, set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
-                              (regval_into_reg (extend_value false data2)))).
-  { rewrite (exec_wX_bits_gpr rd (extend_value false data2) s').
+                              (regval_into_reg (extend_value is_unsigned data2)))).
+  { rewrite (exec_wX_bits_gpr rd (extend_value is_unsigned data2) s').
     rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
   rewrite (exec_bind0_Some _ _ _ _ _ Hw).
   apply exec_returnM.
@@ -560,4 +561,3 @@ Qed.
 End ExecStoreGwSwalkPt.
 
 End SmodeMemGenStore.
-

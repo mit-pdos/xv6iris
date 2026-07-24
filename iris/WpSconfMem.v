@@ -303,7 +303,7 @@ Section WpSconfMem.
                               (regval_into_reg lv))).
     { rewrite <- Hlv.
       pose proof (ram_pmp_match_w (pa_of ppn pa) (vec_access_dec (register_lookup pmpaddr_n s_tr.(sregs)) 0) width Hw0 Huintw Hlo Hfit Hcov) as Hrange_ld.
-      apply (exec_execute_LOAD_w_gpr_S_walk_pt width Hw8 Hread_plain rs1 rd imm v region_ld s_pc s_tr (pa_of ppn pa) Hrd
+      apply (exec_execute_LOAD_w_gpr_S_walk_pt width Hw8 Hread_plain false rs1 rd imm v region_ld s_pc s_tr (pa_of ppn pa) Hrd
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign)
                ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mulw; exact Htr_pc)
