@@ -444,12 +444,17 @@ Section ProofPMS.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Ltac peel_reg :=
+  (* peel ONE update layer at a time (unfold-then-peel on the whole set-chain
+     is O(depth^2): see claude-notes/optimization.md). [peel_reg_step] leaves
+     whatever residual goal the peel bottoms out at, for a caller-supplied
+     closing tactic; [peel_reg] is the reflexivity-closed special case. *)
+  Ltac peel_reg_step :=
     repeat first
       [ rewrite upd_eq
       | rewrite upd_ne; [| reg_neq]
-      | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ];
-    reflexivity.
+      | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
+
+  Ltac peel_reg := peel_reg_step; reflexivity.
 
   (* ================================================================= *)
   (* THE SEALED EPILOGUE (+0x80..+0x96): restore the 10-slot frame and  *)
@@ -713,8 +718,7 @@ Section ProofPMS.
       split.
       { rewrite /E11 upd_eq. rewrite HspE10. unfold spr. apply pms_sp_cancel. }
       split.
-      { rewrite /E11 /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite upd_ne; [| reg_neq]). exact Htp. }
+      { peel_reg_step. exact Htp. }
       split. { peel_reg. }
       split. { peel_reg. }
       split. { peel_reg. }
@@ -725,13 +729,10 @@ Section ProofPMS.
       split. { peel_reg. }
       split. { peel_reg. }
       split.
-      { rewrite /E11 /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite upd_ne; [| reg_neq]). exact Hx25. }
+      { peel_reg_step. exact Hx25. }
       split.
-      { rewrite /E11 /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite upd_ne; [| reg_neq]). exact Hx26. }
-      { rewrite /E11 /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
-        repeat (rewrite upd_ne; [| reg_neq]). exact Hx27. }
+      { peel_reg_step. exact Hx26. }
+      { peel_reg_step. exact Hx27. }
     }
     { exact Hbase. }
     { exact Hpasok. }
@@ -996,7 +997,7 @@ Section ProofPMS.
     iEval (rewrite Hp60) in "Hpc".
     (* +0x60 mul a1,a1,s2 => i *)
     assert (HW4s2 : W4 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5).
-    { rewrite /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_18. }
+    { peel_reg_step. exact Hmr0_18. }
     iApply (wp_mul_s_sconf γ Φ (mword_of_int (PM + 0x60)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 18 : mword 5)
               (mword_of_int (Z.of_nat i))
               W4 (K - 10)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1061,7 +1062,7 @@ Section ProofPMS.
     iEval (rewrite Hp6e) in "Hpc".
     (* +0x6e sub a1,s3,a1 => VA = va_i i *)
     assert (HW10s3 : W10 !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000).
-    { rewrite /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_19. }
+    { peel_reg_step. exact Hmr0_19. }
     assert (HW10a1 : W10 !!! Regidx (mword_of_int 11 : mword 5) = mword_of_int (8192 * (Z.of_nat i + 1))).
     { rewrite /W10 /W9. repeat (rewrite upd_ne; [| reg_neq]). exact HW8a1. }
     iApply (wp_sub_s_sconf γ Φ (mword_of_int (PM + 0x6e)) (mword_of_int 11 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 11 : mword 5)
@@ -1093,7 +1094,7 @@ Section ProofPMS.
     set (ppn0 := (autocast (T := mword) (subrange_vec_dec page 55 12) : mword 44)).
     assert (HWka0 : Wk !!! Regidx (mword_of_int 10 : mword 5) = zero_extend' 64 (concat_vec (pt_base tk) (zeros' 12 : mword 12))).
     { rewrite /Wk. rewrite upd_ne; [| reg_neq]. rewrite /W12 upd_eq. rewrite add_vec_zero_l.
-      rewrite /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]).
+      peel_reg_step.
       rewrite Hmr0_20. rewrite Hroot. rewrite Hbase. reflexivity. }
     assert (HWka1 : Wk !!! Regidx (mword_of_int 11 : mword 5) = VA).
     { rewrite /Wk /W12. repeat (rewrite upd_ne; [| reg_neq]). rewrite /W11 upd_eq. reflexivity. }
@@ -1103,15 +1104,15 @@ Section ProofPMS.
       rewrite /W2 upd_eq. rewrite add_vec_zero_l. reflexivity. }
     assert (HWka3 : Wk !!! Regidx (mword_of_int 13 : mword 5) = mword_of_int (Z.of_nat 1 * 4096)).
     { rewrite /Wk /W12 /W11. repeat (rewrite upd_ne; [| reg_neq]). rewrite /W10 upd_eq. rewrite add_vec_zero_l.
-      rewrite /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). rewrite Hmr0_22.
+      peel_reg_step. rewrite Hmr0_22.
       apply bv_eq; vm_compute; reflexivity. }
     assert (HWka4 : Wk !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 6).
     { rewrite /Wk /W12 /W11 /W10. repeat (rewrite upd_ne; [| reg_neq]). rewrite /W9 upd_eq. rewrite add_vec_zero_l.
-      rewrite /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_23. }
+      peel_reg_step. exact Hmr0_23. }
     assert (HWktp : Wk !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
-    { rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0tp. }
+    { peel_reg_step. exact Hmr0tp. }
     assert (HWksp : Wk !!! Regidx csp_rs1 = spr).
-    { rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0sp. }
+    { peel_reg_step. exact Hmr0sp. }
     (* page validity facts feeding the kvmmap premises *)
     pose proof Hpv as Hpv'. destruct Hpv' as [Hpal [Hplo Hphi]].
     unfold page_aligned, PGSIZE in Hpal. unfold page_in_range, kmem_lo, kmem_hi in Hplo, Hphi.
@@ -1173,7 +1174,7 @@ Section ProofPMS.
     (* recover callee-saved through kvmmap *)
     assert (Hmr1_9 : mr1 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x80012778 + 360 * Z.of_nat i)).
     { rewrite (callee_saved_lookup Hkcs1 (mword_of_int 9) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]).
+      peel_reg_step.
       exact Hmr0_9. }
     assert (Hmr1sp : mr1 !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hkcs1 csp_rs1 ltac:(vm_compute; reflexivity)). exact HWksp. }
@@ -1183,34 +1184,34 @@ Section ProofPMS.
       by (intros r Hr; symmetry; apply (callee_saved_lookup Hkcs1 r Hr)).
     assert (Hmr1_24 : mr1 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x80012778).
     { rewrite <- (HWkcs (mword_of_int 24) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_24. }
+      peel_reg_step. exact Hmr0_24. }
     assert (Hmr1_18 : mr1 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5).
     { rewrite <- (HWkcs (mword_of_int 18) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_18. }
+      peel_reg_step. exact Hmr0_18. }
     assert (Hmr1_19 : mr1 !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000).
     { rewrite <- (HWkcs (mword_of_int 19) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_19. }
+      peel_reg_step. exact Hmr0_19. }
     assert (Hmr1_21 : mr1 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x80018178).
     { rewrite <- (HWkcs (mword_of_int 21) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_21. }
+      peel_reg_step. exact Hmr0_21. }
     assert (Hmr1_22 : mr1 !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 4096).
     { rewrite <- (HWkcs (mword_of_int 22) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_22. }
+      peel_reg_step. exact Hmr0_22. }
     assert (Hmr1_23 : mr1 !!! Regidx (mword_of_int 23 : mword 5) = mword_of_int 6).
     { rewrite <- (HWkcs (mword_of_int 23) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_23. }
+      peel_reg_step. exact Hmr0_23. }
     assert (Hmr1_20 : mr1 !!! Regidx (mword_of_int 20 : mword 5) = mm !!! Regidx (mword_of_int 10)).
     { rewrite <- (HWkcs (mword_of_int 20) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_20. }
+      peel_reg_step. exact Hmr0_20. }
     assert (Hmr1_25 : mr1 !!! Regidx (mword_of_int 25 : mword 5) = mm !!! Regidx (mword_of_int 25)).
     { rewrite <- (HWkcs (mword_of_int 25) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_25. }
+      peel_reg_step. exact Hmr0_25. }
     assert (Hmr1_26 : mr1 !!! Regidx (mword_of_int 26 : mword 5) = mm !!! Regidx (mword_of_int 26)).
     { rewrite <- (HWkcs (mword_of_int 26) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_26. }
+      peel_reg_step. exact Hmr0_26. }
     assert (Hmr1_27 : mr1 !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27)).
     { rewrite <- (HWkcs (mword_of_int 27) ltac:(vm_compute; reflexivity)).
-      rewrite /Wk /W12 /W11 /W10 /W9 /W8 /W7 /W6 /W5 /W4 /W3 /W2. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0_27. }
+      peel_reg_step. exact Hmr0_27. }
     (* accumulate the page_own for the new slot i *)
     iAssert ([∗ list] j ∈ seq 0 (S i),
                page_own (zero_extend' 64 (concat_vec (pas' j) (zeros' 12 : mword 12))))%I
@@ -1649,34 +1650,34 @@ Section ProofPMS.
     iEval (rewrite Hp52) in "Hpc".
     (* ---- loop-entry register facts (all concrete) ---- *)
     assert (HE_sp : P21 !!! Regidx csp_rs1 = spr).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]).
+    { peel_reg_step.
       rewrite -HspW1 /W1 upd_eq. reflexivity. }
     assert (HE_s1 : P21 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x80012778 + 360 * Z.of_nat 0)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s8 : P21 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x80012778).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s2 : P21 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s3 : P21 !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s5 : P21 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x80018178).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s6 : P21 !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 4096).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s7 : P21 !!! Regidx (mword_of_int 23 : mword 5) = mword_of_int 6).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply bv_eq; vm_compute; reflexivity. }
+    { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s4 : P21 !!! Regidx (mword_of_int 20 : mword 5) = mm !!! Regidx (mword_of_int 10)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). apply add_vec_zero_l. }
+    { peel_reg_step. apply add_vec_zero_l. }
     assert (HE_tp : P21 !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). reflexivity. }
+    { peel_reg_step. reflexivity. }
     assert (HE_x25 : P21 !!! Regidx (mword_of_int 25 : mword 5) = mm !!! Regidx (mword_of_int 25)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). reflexivity. }
+    { peel_reg_step. reflexivity. }
     assert (HE_x26 : P21 !!! Regidx (mword_of_int 26 : mword 5) = mm !!! Regidx (mword_of_int 26)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). reflexivity. }
+    { peel_reg_step. reflexivity. }
     assert (HE_x27 : P21 !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). reflexivity. }
+    { peel_reg_step. reflexivity. }
     assert (HE_a0 : P21 !!! Regidx (mword_of_int 10 : mword 5) = mm !!! Regidx (mword_of_int 10)).
-    { rewrite /P21 /P20 /P19 /P18 /P17 /P16 /P15 /P14 /P13 /P12 /P11 /P10 /P9 /P8 /P7 /P6 /P5 /P4 /P3 /P2 /W1. repeat (first [ rewrite upd_eq | rewrite upd_ne; [| reg_neq] ]). reflexivity. }
+    { peel_reg_step. reflexivity. }
     (* enter the loop at i = 0 *)
     iApply (wp_proc_mapstacks_loop_sconf γ γa Φ mm t m K lvl eb p C nb 64 0%nat P21 t 0%nat (fun _ => (mword_of_int 0 : mword 44))
               Hlvl HK ltac:(lia) ltac:(lia) Hnbig Hroot Hres Hcid
