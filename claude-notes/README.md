@@ -57,23 +57,23 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — uniform-claims model COMPLETE (2026-07-24); only stage 6 (the boot switch) remains, blocked on kvm-spec:
+- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — uniform-claims model and RAM-bounds cleanup complete (2026-07-24); stage 6 (boot switch) remains:
   R/W/X-accurate kernel PT (text RX / data RW), the code points-to `↦ₓ`
   inside `instr`, the monotone kernel-mapping claim ghost for non-identity
-  mappings (kstacks), and the re-keyed absorption — synthesis design
-  (all-in-ghost storage, pure-static-arm interface).
+  mappings, and `mem_pointsto`/`node_kdata` generalization to `addr_is_ram`.
 - **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
   mappages / walk proofs (`KvmSpec.v`).
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
-- **[`yield-sched.md`](projects/yield-sched.md)** — yield/sched/myproc specs and
-  proofs: the sconf-tier swtch port, the global scheduler-chain predicate
-  `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
+
 ### `completed/` — finished projects, archived for reference
 
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`yield-sched.md`](completed/yield-sched.md)** — yield/sched/myproc specs and
+  proofs (S1–S9 complete): the sconf-tier swtch port, the global scheduler-chain predicate
+  `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
 - **[`sleeplock.md`](completed/sleeplock.md)** — the sleeplock subsystem, all
   four functions proven (initsleeplock / acquiresleep / releasesleep /
   holdingsleep): the `is_sleeplock`/`sl_res` lock abstraction over the inner

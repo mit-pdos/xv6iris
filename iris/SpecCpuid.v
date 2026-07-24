@@ -25,7 +25,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
+Require Import ProcGeom PlicHart IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -36,6 +36,14 @@ Notation CPUID := KernelSyms.cpuid.
 (* the [int]-truncated hart id returned by cpuid: sign-extend tp's low 32. *)
 Definition cpuid_ret (tp : mword 64) : mword 64 :=
   sign_extend' 64 (subrange_vec_dec tp 31 0 : mword 32).
+
+Lemma cpuid_ret_cid `{CID : CpuId} : cpuid_ret cid_word = cid_word.
+Proof.
+  destruct tp_ok_cid as [_ H].
+  rewrite uint_unsigned in H.
+  change 8 with (Z.of_nat dev_ncpu) in H.
+  exact (sext32_id_hart cid_word H).
+Qed.
 
 Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=

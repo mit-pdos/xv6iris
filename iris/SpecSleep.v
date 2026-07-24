@@ -31,7 +31,8 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpMycpu.
 Require Import ProcGeom.
-Require Import SwtchCtx CpuOwn.
+Require Export SwtchCtx.
+Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

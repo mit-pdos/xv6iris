@@ -54,6 +54,12 @@ Section SwtchCtx.
   Definition ctx_cells (c : mword 64) (vs : list (mword 64)) : iProp Σ :=
     ctx_cells_at c 0 vs.
 
+  (* 14-slot context-field ownership, contents existential: what a RUNNING
+     party holds of its own context field between switches (the resume wand
+     hands it back; the next park saves into it). *)
+  Definition own_ctx (pa : mword 64) : iProp Σ :=
+    (∃ vs : list (mword 64), ⌜length vs = 14%nat⌝ ∗ ctx_cells pa vs)%I.
+
   Local Instance ctx_cells_at_timeless c off vs : Timeless (ctx_cells_at c off vs).
   Proof.
     revert off; induction vs as [|v vs IH]; intros off; simpl.

@@ -20,7 +20,7 @@ fully uniform.  User decisions, ironed out over several rounds:
 
 1. `↦ₘ`/`↦ₓ` are REDEFINED VA-BASED (same notations, function specs
    unchanged): `mem_pointsto va dq v := ∃ ppn, kmap_at (svpn_of va) ppn
-   KP_rw ∗ ⌜uint va < 2^38⌝ ∗ ⌜addr_is_kdata (pa_of ppn va)⌝ ∗
+   KP_rw ∗ ⌜uint va < 2^38⌝ ∗ ⌜addr_is_ram (pa_of ppn va)⌝ ∗
    pointsto (pa_of ppn va) dq v` where `pa_of ppn va := zext64 (concat
    ppn (pageoff va))`; text form at KP_rx/addr_is_text.  The claim ghost
    carries BOTH the permission AND the va→pa mapping.  The canonicality

@@ -27,20 +27,13 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import SwtchCtx.
+Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 Notation SD := KernelSyms.sched.
-
-(* 14-slot context-field ownership, contents existential: what a RUNNING
-   party holds of its own context field between switches (the resume wand
-   hands it back; the next park saves into it).
-   TEMPORARY HOME: belongs in SwtchCtx.v; move at the next SwtchCtx touch. *)
-Definition own_ctx `{!riscvGS Σ} (pa : mword 64) : iProp Σ :=
-  (∃ vs : list (mword 64), ⌜length vs = 14%nat⌝ ∗ ctx_cells pa vs)%I.
 
 Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
