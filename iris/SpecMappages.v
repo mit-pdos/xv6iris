@@ -63,6 +63,7 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     ⌜callee_saved mm mr⌝ -∗
     ⌜pt_base t' = pt_base t⌝ -∗
     ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗
+    ⌜pt_present_mono t t'⌝ -∗
     ⌜(g <= pt_missing t vpn0 npages)%nat⌝ -∗
     ⌜ (k = npages /\ mr !!! Regidx (mword_of_int 10) = mword_of_int 0)
       \/ ((k < npages)%nat /\

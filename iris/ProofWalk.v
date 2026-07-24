@@ -105,6 +105,7 @@ Section ProofWalk.
     Mf !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     ptree_same_rep0 t tf ->
     ptree_offpath_eq vpn t tf ->
+    pt_present_mono t tf ->
     pt_nodes tf = (pt_nodes t + q)%nat ->
     (q <= pt_missing t vpn 1)%nat ->
     (((Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
@@ -133,6 +134,7 @@ Section ProofWalk.
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
       ⌜ptree_offpath_eq vpn t t'⌝ -∗
+      ⌜pt_present_mono t t'⌝ -∗
       ⌜(g <= pt_missing t vpn 1)%nat⌝ -∗
       ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
            /\ avail_zero (avail_sub on g))
@@ -142,7 +144,7 @@ Section ProofWalk.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va vpn sp0 spr ret_tgt HK Hsp Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hoff Hnodes Hmiss Hpay.
+    intros va vpn sp0 spr ret_tgt HK Hsp Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hoff Hpres Hnodes Hmiss Hpay.
     iIntros "Hcg Hcnt #Htext Hpc
              Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
              Hptree Henv Hcont".
@@ -331,7 +333,7 @@ Section ProofWalk.
               with "Hcg Hpc Hi64 [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iApply ("Hcont" $! E9 tf q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%]").
+    iApply ("Hcont" $! E9 tf q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%] [%]").
     { exact Hnodes. }
     { (* callee_saved mm E9 *)
       unfold callee_saved.
@@ -363,6 +365,7 @@ Section ProofWalk.
          first [ exact Hx23 | exact Hx24 | exact Hx25 | exact Hx26 | exact Hx27 ]). }
     { exact Hsame. }
     { exact Hoff. }
+    { exact Hpres. }
     { exact Hmiss. }
     { assert (HE9a0 : E9 !!! Regidx (mword_of_int 10 : mword 5)
                       = Mf !!! Regidx (mword_of_int 10 : mword 5)).
@@ -395,6 +398,7 @@ Section ProofWalk.
     Mf !!! Regidx (mword_of_int 27 : mword 5) = mm !!! Regidx (mword_of_int 27) ->
     ptree_same_rep0 t tf ->
     ptree_offpath_eq vpn t tf ->
+    pt_present_mono t tf ->
     pt_nodes tf = (pt_nodes t + q)%nat ->
     (q <= pt_missing t vpn 1)%nat ->
     (exists p2 p1 w0, ptree_level0 tf vpn p2 p1 w0
@@ -421,6 +425,7 @@ Section ProofWalk.
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
       ⌜ptree_offpath_eq vpn t t'⌝ -∗
+      ⌜pt_present_mono t t'⌝ -∗
       ⌜(g <= pt_missing t vpn 1)%nat⌝ -∗
       ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
            /\ avail_zero (avail_sub on g))
@@ -430,7 +435,7 @@ Section ProofWalk.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros va vpn sp0 spr ret_tgt HK Hva' Hsp Hs3 Hs1 Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hoff Hnodes Hmiss Hlvl.
+    intros va vpn sp0 spr ret_tgt HK Hva' Hsp Hs3 Hs1 Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hoff Hpres Hnodes Hmiss Hlvl.
     iIntros "Hcg Hcnt #Htext Hpc
              Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
              Hptree Henv Hcont".
@@ -523,7 +528,7 @@ Section ProofWalk.
               ltac:(rewrite /T4 /T3 /T2 /T1;
                     repeat (rewrite upd_ne; [| reg_neq]);
                     exact Hx27)
-              Hsame Hoff Hnodes Hmiss
+              Hsame Hoff Hpres Hnodes Hmiss
               ltac:(destruct Hlvl as (p2 & p1 & w0 & Hl0 & Heq);
                     right; exists p2, p1, w0; split;
                     [exact Hl0 | rewrite HT4a0 Heq; reflexivity])
@@ -1166,13 +1171,15 @@ Section ProofWalk.
        ⌜ptree_same_rep0_lvl L cur curf⌝ -∗
        ⌜pt_nodes_lvl L curf = (pt_nodes_lvl L cur + d)%nat⌝ -∗
        ⌜ptree_offpath_eq_lvl L vpn cur curf⌝ -∗
+       ⌜pt_present_mono_lvl L cur curf⌝ -∗
        (∃ tf : ptree,
           ptree_own 2 (DfracOwn 1) tf ∗
           ⌜ptree_same_rep0 t tf⌝ ∗
           ⌜pt_nodes tf = (pt_nodes t + g + d)%nat⌝ ∗
           ⌜forall leaf : ptree,
              ptree_leaf_lvl L curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝ ∗
-          ⌜ptree_offpath_eq vpn t tf⌝)) -∗
+          ⌜ptree_offpath_eq vpn t tf⌝ ∗
+          ⌜pt_present_mono t tf⌝)) -∗
     kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
@@ -1183,6 +1190,7 @@ Section ProofWalk.
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
       ⌜ptree_offpath_eq vpn t t'⌝ -∗
+      ⌜pt_present_mono t t'⌝ -∗
       ⌜(g <= pt_missing t vpn 1)%nat⌝ -∗
       ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
            /\ avail_zero (avail_sub on g))
@@ -1273,19 +1281,22 @@ Section ProofWalk.
       iAssert (∀ (curf : ptree) (d : nat), ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' c curf⌝ -∗
                  ⌜pt_nodes_lvl L' curf = (pt_nodes_lvl L' c + d)%nat⌝ -∗
                  ⌜ptree_offpath_eq_lvl L' vpn c curf⌝ -∗
+                 ⌜pt_present_mono_lvl L' c curf⌝ -∗
                  (∃ tf : ptree, ptree_own 2 (DfracOwn 1) tf ∗ ⌜ptree_same_rep0 t tf⌝ ∗
                     ⌜pt_nodes tf = (pt_nodes t + g + d)%nat⌝ ∗
                     ⌜forall leaf, ptree_leaf_lvl L' curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝ ∗
-                    ⌜ptree_offpath_eq vpn t tf⌝))%I
+                    ⌜ptree_offpath_eq vpn t tf⌝ ∗
+                    ⌜pt_present_mono t tf⌝))%I
         with "[Hframe Hrestore]" as "Hrestore'".
-      { iIntros (curf d) "Hownf %Hsr %Hd %Hoffc".
+      { iIntros (curf d) "Hownf %Hsr %Hd %Hoffc %Hpresc".
         iDestruct ("Hframe" $! curf with "Hownf") as "Hup".
-        iDestruct ("Hrestore" $! (pt_upd_kid cur (vpn_idx (S L') vpn) (Some curf)) d with "Hup [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff)".
+        iDestruct ("Hrestore" $! (pt_upd_kid cur (vpn_idx (S L') vpn) (Some curf)) d with "Hup [%] [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff & %Hpres)".
         { exact (ptree_same_rep0_lvl_upd_kid L' cur (vpn_idx (S L') vpn) c curf Hkids Hsr). }
         { pose proof (pt_nodes_lvl_kids_upd L' cur (vpn_idx (S L') vpn) (Some curf)) as Hm.
           rewrite Hkids in Hm. cbn [pt_kid_nodes] in Hm. lia. }
         { exact (ptree_offpath_eq_lvl_upd_kid L' vpn cur curf c ltac:(lia) Hkids Hoffc). }
-        iExists tf. iFrame "Htf". iSplit; [done|]. iSplit; [iPureIntro; exact Hnd|]. iSplit; [| iPureIntro; exact Hoff]. iPureIntro. intros leaf Hlf.
+        { exact (pt_present_mono_lvl_upd_kid L' vpn cur curf c ltac:(lia) Hkids Hpresc). }
+        iExists tf. iFrame "Htf". iSplit; [done|]. iSplit; [iPureIntro; exact Hnd|]. iSplit; [| iSplit; [iPureIntro; exact Hoff | iPureIntro; exact Hpres]]. iPureIntro. intros leaf Hlf.
         apply Hleaf.
         assert (Hbcf : u_next_base pte = pt_base curf).
         { destruct Hsr as (Hbc & _ & _). rewrite Hu. symmetry. exact Hbc. }
@@ -1333,17 +1344,18 @@ Section ProofWalk.
         iIntros "Hcg Hpc".
         assert (Hpp46 : add_vec_int (mword_of_int (WK + 0x42) : mword 64) 4 = mword_of_int (WK + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp46) in "Hpc".
-        iDestruct ("Hrestore'" $! c 0%nat with "Hownc [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff)".
+        iDestruct ("Hrestore'" $! c 0%nat with "Hownc [%] [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff & %Hpres)".
         { apply ptree_same_rep0_lvl_refl. }
         { lia. }
         { apply ptree_offpath_eq_lvl_refl. }
+        { apply pt_present_mono_lvl_refl. }
         assert (Hmiss : (g <= pt_missing t vpn 1)%nat).
         { pose proof Hgrafts as HG. rewrite (grafts_lvl_descend 0 cur c vpn Hkids) in HG.
           cbn [grafts_lvl] in HG. lia. }
         assert (Hl2 : ptree_leaf_lvl 2 tf vpn c) by (apply Hleaf; reflexivity).
         destruct (ptree_leaf_lvl_2 tf vpn c Hl2) as (p2 & p1 & Hl0tf & Hunb).
         iApply (wp_walk_tail_sconf γ γa Φ mm M9 t tf (pt_base c) K lvl eb p C on g HK Hva
-                  HspM9 HM9s3 HM9s1 HM9x4 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hsame Hoff ltac:(lia) Hmiss
+                  HspM9 HM9s3 HM9s1 HM9x4 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hsame Hoff Hpres ltac:(lia) Hmiss
                   ltac:(exists p2, p1, (pt_ents c (vpn_idx 0 vpn)); split;
                         [exact Hl0tf | unfold pt_addr0; rewrite Hunb; reflexivity])
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
@@ -1431,14 +1443,16 @@ Section ProofWalk.
         iAssert (∀ (curf : ptree) (d : nat), ptree_own L' (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl L' (pt_empty_node b) curf⌝ -∗
                    ⌜pt_nodes_lvl L' curf = (pt_nodes_lvl L' (pt_empty_node b) + d)%nat⌝ -∗
                    ⌜ptree_offpath_eq_lvl L' vpn (pt_empty_node b) curf⌝ -∗
+                   ⌜pt_present_mono_lvl L' (pt_empty_node b) curf⌝ -∗
                    (∃ tf : ptree, ptree_own 2 (DfracOwn 1) tf ∗ ⌜ptree_same_rep0 t tf⌝ ∗
                       ⌜pt_nodes tf = (pt_nodes t + S g + d)%nat⌝ ∗
                       ⌜forall leaf, ptree_leaf_lvl L' curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝ ∗
-                      ⌜ptree_offpath_eq vpn t tf⌝))%I
+                      ⌜ptree_offpath_eq vpn t tf⌝ ∗
+                      ⌜pt_present_mono t tf⌝))%I
           with "[Hframe Hrestore]" as "Hrestore'".
-        { iIntros (curf d) "Hownf %Hsr %Hd %Hoffc".
+        { iIntros (curf d) "Hownf %Hsr %Hd %Hoffc %Hpresc".
           iDestruct ("Hframe" $! curf with "Hownf") as "Hup".
-          iDestruct ("Hrestore" $! (pt_upd_kid (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (Some curf)) (1 + d)%nat with "Hup [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff)".
+          iDestruct ("Hrestore" $! (pt_upd_kid (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (Some curf)) (1 + d)%nat with "Hup [%] [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff & %Hpres)".
           { eapply ptree_same_rep0_lvl_trans.
             - exact (ptree_same_rep0_lvl_graft L' cur (vpn_idx (S L') vpn) b Hkids Hez).
             - exact (ptree_same_rep0_lvl_upd_kid L' (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn) (pt_empty_node b) curf (pt_graft_kid cur (vpn_idx (S L') vpn) b) Hsr). }
@@ -1446,7 +1460,8 @@ Section ProofWalk.
             rewrite (pt_graft_kid cur (vpn_idx (S L') vpn) b) in Hm. cbn [pt_kid_nodes] in Hm.
             rewrite (pt_nodes_lvl_graft L' cur (vpn_idx (S L') vpn) b Hkids) in Hm. lia. }
           { exact (ptree_offpath_eq_lvl_graft L' vpn cur curf b ltac:(lia) Hkids Hoffc). }
-          iExists tf. iFrame "Htf". iSplit; [done|]. iSplit; [iPureIntro; lia|]. iSplit; [| iPureIntro; exact Hoff]. iPureIntro. intros leaf Hlf.
+          { exact (pt_present_mono_lvl_graft L' vpn cur curf b ltac:(lia) Hkids Hpresc). }
+          iExists tf. iFrame "Htf". iSplit; [done|]. iSplit; [iPureIntro; lia|]. iSplit; [| iSplit; [iPureIntro; exact Hoff | iPureIntro; exact Hpres]]. iPureIntro. intros leaf Hlf.
           apply Hleaf.
           assert (Hbcf : u_next_base (pt_ents (pt_graft cur (vpn_idx (S L') vpn) b) (vpn_idx (S L') vpn)) = pt_base curf).
           { rewrite pt_graft_ent pt_ptr_pte_base. destruct Hsr as (Hbc & _ & _). rewrite Hbc pt_empty_node_base. reflexivity. }
@@ -1510,16 +1525,17 @@ Section ProofWalk.
           iIntros "Hcg Hpc".
           assert (Hpp46 : add_vec_int (mword_of_int (WK + 0x42) : mword 64) 4 = mword_of_int (WK + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp46) in "Hpc".
-          iDestruct ("Hrestore'" $! (pt_empty_node b) 0%nat with "Hownc [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff)".
+          iDestruct ("Hrestore'" $! (pt_empty_node b) 0%nat with "Hownc [%] [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff & %Hpres)".
           { apply ptree_same_rep0_lvl_refl. }
           { lia. }
           { apply ptree_offpath_eq_lvl_refl. }
+          { apply pt_present_mono_lvl_refl. }
           assert (Hmiss : (S g <= pt_missing t vpn 1)%nat).
           { pose proof Hgrafts as HG. rewrite (grafts_lvl_none 0 cur vpn Hkids) in HG. lia. }
           assert (Hl2 : ptree_leaf_lvl 2 tf vpn (pt_empty_node b)) by (apply Hleaf; reflexivity).
           destruct (ptree_leaf_lvl_2 tf vpn (pt_empty_node b) Hl2) as (p2 & p1 & Hl0tf & Hunb).
           iApply (wp_walk_tail_sconf γ γa Φ mm Rb t tf (pt_base (pt_empty_node b)) K lvl eb p C on (S g) HK Hva
-                    HspRb HRbs3 HRbs1 HRbx4 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27 Hsame Hoff ltac:(lia) Hmiss
+                    HspRb HRbs3 HRbs1 HRbx4 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27 Hsame Hoff Hpres ltac:(lia) Hmiss
                     ltac:(exists p2, p1, (pt_ents (pt_empty_node b) (vpn_idx 0 vpn)); split;
                           [exact Hl0tf | unfold pt_addr0; rewrite Hunb; reflexivity])
                     with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
@@ -1542,10 +1558,11 @@ Section ProofWalk.
       + (* ---- Hfail: kalloc returned 0; return 0 through the tail's epilogue ---- *)
         iIntros (Mo) "%Hcs %Ha0 %Havz Hcg Hcnt Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hown Henv HF".
         iDestruct "HF" as "[Hrestore Hcont]".
-        iDestruct ("Hrestore" $! cur 0%nat with "Hown [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff)".
+        iDestruct ("Hrestore" $! cur 0%nat with "Hown [%] [%] [%] [%]") as (tf) "(Htf & %Hsame & %Hnd & %Hleaf & %Hoff & %Hpres)".
         { apply ptree_same_rep0_lvl_refl. }
         { lia. }
         { apply ptree_offpath_eq_lvl_refl. }
+        { apply pt_present_mono_lvl_refl. }
         assert (Hmiss : (g <= pt_missing t vpn 1)%nat).
         { pose proof Hgrafts as HG. rewrite (grafts_lvl_none L' cur vpn Hkids) in HG. lia. }
         iApply (wp_walk_epilogue_sconf γ γa Φ mm Mo t tf K lvl eb p C on g HK
@@ -1556,7 +1573,7 @@ Section ProofWalk.
                   ltac:(rewrite (Hcs (mword_of_int 25) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x25)
                   ltac:(rewrite (Hcs (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x26)
                   ltac:(rewrite (Hcs (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HM6x27)
-                  Hsame Hoff ltac:(lia) Hmiss
+                  Hsame Hoff Hpres ltac:(lia) Hmiss
                   ltac:(left; split; [exact Ha0 | exact Havz])
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
   Qed.
@@ -1868,16 +1885,19 @@ Section ProofWalk.
     iAssert (∀ (curf : ptree) (d : nat), ptree_own 2 (DfracOwn 1) curf -∗ ⌜ptree_same_rep0_lvl 2 t curf⌝ -∗
                ⌜pt_nodes_lvl 2 curf = (pt_nodes_lvl 2 t + d)%nat⌝ -∗
                ⌜ptree_offpath_eq_lvl 2 vpn t curf⌝ -∗
+               ⌜pt_present_mono_lvl 2 t curf⌝ -∗
                (∃ tf : ptree, ptree_own 2 (DfracOwn 1) tf ∗ ⌜ptree_same_rep0 t tf⌝ ∗
                   ⌜pt_nodes tf = (pt_nodes t + 0 + d)%nat⌝ ∗
                   ⌜forall leaf, ptree_leaf_lvl 2 curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝ ∗
-                  ⌜ptree_offpath_eq vpn t tf⌝))%I
+                  ⌜ptree_offpath_eq vpn t tf⌝ ∗
+                  ⌜pt_present_mono t tf⌝))%I
       as "Hrestore".
-    { iIntros (curf d) "Hown %Hsr %Hd %Hoffc". iExists curf. iFrame "Hown". iPureIntro. split; [|split; [|split]].
+    { iIntros (curf d) "Hown %Hsr %Hd %Hoffc %Hpresc". iExists curf. iFrame "Hown". iPureIntro. split; [|split; [|split; [|split]]].
       - apply ptree_same_rep0_lvl_2. exact Hsr.
       - unfold pt_nodes. lia.
       - intros leaf Hlf. exact Hlf.
-      - exact Hoffc. }
+      - exact Hoffc.
+      - exact Hpresc. }
     destruct (m !! vpn) as [wv|] eqn:Hmv.
     - destruct (proj1 Hrep vpn wv Hmv) as (p2 & p1 & Hmaps).
       iApply (wp_walk_loop_sconf γ γa Φ mm W9 t t 2 wv K lvl eb p C on 0%nat Hlvl HK Hva' ltac:(lia)

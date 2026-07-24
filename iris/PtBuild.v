@@ -3430,6 +3430,186 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* §13b pt_present_mono: kid-level node-presence monotonicity walk exports *)
+(*    alongside ptree_offpath_eq.  [t' has (at least) every node t has]:    *)
+(*    for each root kid of [t] there is a root kid of [t'] at the same slot *)
+(*    whose kids cover [t]'s (L1 nodes are root kids; L0 nodes their kids). *)
+(*    Threaded through walk (level-generically, mirroring                   *)
+(*    ptree_offpath_eq_lvl) and used to push the [pt_missing] bound down a   *)
+(*    monotonically-growing tree.                                           *)
+(* ===================================================================== *)
+
+Definition pt_present_mono (t t' : ptree) : Prop :=
+  forall (i : mword 9) (c1 : ptree),
+    pt_kids t i = Some c1 ->
+    exists c1', pt_kids t' i = Some c1' /\
+      forall (j : mword 9) (c0 : ptree),
+        pt_kids c1 j = Some c0 -> exists c0', pt_kids c1' j = Some c0'.
+
+Lemma pt_present_mono_refl (t : ptree) : pt_present_mono t t.
+Proof.
+  intros i c1 Hi. exists c1. split; [exact Hi |].
+  intros j c0 Hj. exists c0. exact Hj.
+Qed.
+
+Lemma pt_present_mono_trans (t t' t'' : ptree) :
+  pt_present_mono t t' -> pt_present_mono t' t'' -> pt_present_mono t t''.
+Proof.
+  intros H1 H2 i c1 Hi.
+  destruct (H1 i c1 Hi) as (c1' & Hi' & Hkid1).
+  destruct (H2 i c1' Hi') as (c1'' & Hi'' & Hkid2).
+  exists c1''. split; [exact Hi'' |].
+  intros j c0 Hj.
+  destruct (Hkid1 j c0 Hj) as (c0' & Hj').
+  destruct (Hkid2 j c0' Hj') as (c0'' & Hj'').
+  exists c0''. exact Hj''.
+Qed.
+
+Lemma pt_present_mono_set_leaf (t : ptree) (vpn : mword 27) (w : mword 64) :
+  pt_present_mono t (ptree_set_leaf t vpn w).
+Proof.
+  unfold ptree_set_leaf.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1|] eqn:H1; [| apply pt_present_mono_refl].
+  destruct (pt_kids c1 (vpn_idx 1 vpn)) as [c0|] eqn:H0; [| apply pt_present_mono_refl].
+  intros i ci Hi.
+  destruct (decide (i = vpn_idx 2 vpn)) as [E2 | N2].
+  - subst i. rewrite Hi in H1. injection H1 as <-.
+    exists (pt_upd_kid ci (vpn_idx 1 vpn)
+              (Some (pt_upd_ent c0 (vpn_idx 0 vpn) w))).
+    split; [ rewrite pt_upd_kid_same; reflexivity |].
+    intros j cj Hj.
+    destruct (decide (j = vpn_idx 1 vpn)) as [E1 | N1].
+    + subst j. rewrite pt_upd_kid_same. eexists. reflexivity.
+    + rewrite (pt_upd_kid_other _ _ _ _ N1). exists cj. exact Hj.
+  - rewrite (pt_upd_kid_other _ _ _ _ N2). exists ci. split; [exact Hi |].
+    intros j cj Hj. exists cj. exact Hj.
+Qed.
+
+(* ------ the LEVEL-GENERIC threading predicate (mirrors                    *)
+(*        ptree_offpath_eq_lvl): at level 2 the full [pt_present_mono], at   *)
+(*        level 1 the single-level present-kid clause, at level 0 nothing.   *)
+Definition pt_present_mono_lvl (L : nat) (cur curf : ptree) : Prop :=
+  match L with
+  | O => True
+  | S O => forall (j : mword 9) (c0 : ptree),
+             pt_kids cur j = Some c0 -> exists c0', pt_kids curf j = Some c0'
+  | S (S _) => pt_present_mono cur curf
+  end.
+
+Lemma pt_present_mono_lvl_refl (L : nat) (cur : ptree) :
+  pt_present_mono_lvl L cur cur.
+Proof.
+  destruct L as [| [| l]]; cbn.
+  - exact I.
+  - intros j c0 Hj. exists c0. exact Hj.
+  - apply pt_present_mono_refl.
+Qed.
+
+Lemma pt_present_mono_lvl_upd_kid (l : nat) (vpn : mword 27) (cur curf c : ptree) :
+  (S l <= 2)%nat ->
+  pt_kids cur (vpn_idx (S l) vpn) = Some c ->
+  pt_present_mono_lvl l c curf ->
+  pt_present_mono_lvl (S l) cur (pt_upd_kid cur (vpn_idx (S l) vpn) (Some curf)).
+Proof.
+  intros HL Hk Hpm. destruct l as [| [| l]]; [| | exfalso; lia].
+  - (* S l = 1 *)
+    cbn [pt_present_mono_lvl]. intros j c0 Hj.
+    destruct (decide (j = vpn_idx 1 vpn)) as [E1 | N1].
+    + subst j. rewrite pt_upd_kid_same. eexists. reflexivity.
+    + rewrite (pt_upd_kid_other _ _ _ _ N1). exists c0. exact Hj.
+  - (* S l = 2 *)
+    cbn [pt_present_mono_lvl] in Hpm |- *. unfold pt_present_mono.
+    intros i ci Hi.
+    destruct (decide (i = vpn_idx 2 vpn)) as [E2 | N2].
+    + subst i. rewrite Hi in Hk. injection Hk as <-.
+      exists curf. split; [ rewrite pt_upd_kid_same; reflexivity |]. exact Hpm.
+    + rewrite (pt_upd_kid_other _ _ _ _ N2). exists ci. split; [exact Hi |].
+      intros j c0 Hj. exists c0. exact Hj.
+Qed.
+
+Lemma pt_present_mono_lvl_graft (l : nat) (vpn : mword 27) (cur curf : ptree) (b : mword 44) :
+  (S l <= 2)%nat ->
+  pt_kids cur (vpn_idx (S l) vpn) = None ->
+  pt_present_mono_lvl l (pt_empty_node b) curf ->
+  pt_present_mono_lvl (S l) cur
+    (pt_upd_kid (pt_graft cur (vpn_idx (S l) vpn) b) (vpn_idx (S l) vpn) (Some curf)).
+Proof.
+  intros HL Hk Hpm. destruct l as [| [| l]]; [| | exfalso; lia].
+  - (* S l = 1: the on-path slot of [cur] is absent (Hk), so nothing on-path
+       needs preserving; every present kid is off-path and grafted through. *)
+    cbn [pt_present_mono_lvl]. intros j c0 Hj.
+    destruct (decide (j = vpn_idx 1 vpn)) as [E1 | N1].
+    + subst j. rewrite Hk in Hj. discriminate.
+    + rewrite (pt_upd_kid_other _ _ _ _ N1).
+      rewrite (pt_graft_kids_other cur (vpn_idx 1 vpn) j b N1).
+      exists c0. exact Hj.
+  - (* S l = 2 *)
+    cbn [pt_present_mono_lvl] in Hpm |- *. unfold pt_present_mono.
+    intros i ci Hi.
+    destruct (decide (i = vpn_idx 2 vpn)) as [E2 | N2].
+    + subst i. rewrite Hk in Hi. discriminate.
+    + rewrite (pt_upd_kid_other _ _ _ _ N2).
+      rewrite (pt_graft_kids_other cur (vpn_idx 2 vpn) i b N2).
+      exists ci. split; [exact Hi |].
+      intros j c0 Hj. exists c0. exact Hj.
+Qed.
+
+(* ------ absence-counter monotonicity ---------------------------------- *)
+
+Lemma l1_absent_present_mono (t t' : ptree) :
+  pt_present_mono t t' -> forall r, (l1_absent t' r <= l1_absent t r)%nat.
+Proof.
+  intros Hpm r. unfold l1_absent.
+  destruct (pt_kids t (mword_of_int r : mword 9)) as [c|] eqn:Ht.
+  - destruct (Hpm (mword_of_int r) c Ht) as (c' & Ht' & _).
+    rewrite Ht'. lia.
+  - destruct (pt_kids t' (mword_of_int r : mword 9)); lia.
+Qed.
+
+Lemma l0_absent_present_mono (t t' : ptree) :
+  pt_present_mono t t' -> forall q, (l0_absent t' q <= l0_absent t q)%nat.
+Proof.
+  intros Hpm q. unfold l0_absent.
+  destruct (pt_kids t (mword_of_int (q / 512) : mword 9)) as [c1|] eqn:Ht1.
+  - destruct (Hpm (mword_of_int (q / 512)) c1 Ht1) as (c1' & Ht1' & Hkid).
+    rewrite Ht1'.
+    destruct (pt_kids c1 (mword_of_int (q mod 512) : mword 9)) as [c0|] eqn:Ht0.
+    + destruct (Hkid (mword_of_int (q mod 512)) c0 Ht0) as (c0' & Ht0').
+      rewrite Ht0'. lia.
+    + destruct (pt_kids c1' (mword_of_int (q mod 512) : mword 9)); lia.
+  - destruct (pt_kids t' (mword_of_int (q / 512) : mword 9)) as [c1'|].
+    + destruct (pt_kids c1' (mword_of_int (q mod 512) : mword 9)); lia.
+    + lia.
+Qed.
+
+(* ------ pointwise-bounded sum (no [_le] variant exists in §10/stdpp) ---- *)
+
+Lemma sum_list_with_le {A} (f f' : A -> nat) (l : list A) :
+  (forall x, x ∈ l -> (f' x <= f x)%nat) ->
+  (sum_list_with f' l <= sum_list_with f l)%nat.
+Proof.
+  induction l as [| a l IH]; cbn; intros Hle.
+  - lia.
+  - assert (f' a <= f a)%nat by (apply Hle, elem_of_list_here).
+    assert (sum_list_with f' l <= sum_list_with f l)%nat as IHl
+      by (apply IH; intros x Hx; apply Hle, elem_of_list_further, Hx).
+    lia.
+Qed.
+
+(* ------ the payoff: [pt_missing] is antitone in the growing tree -------- *)
+
+Lemma pt_missing_present_mono (t t' : ptree) :
+  pt_present_mono t t' -> forall v np, (pt_missing t' v np <= pt_missing t v np)%nat.
+Proof.
+  intros Hpm v np. destruct np as [| n].
+  { rewrite (pt_missing_0 t' v) (pt_missing_0 t v). lia. }
+  unfold pt_missing, l0count, l1count.
+  apply Nat.add_le_mono.
+  - apply sum_list_with_le. intros x _. apply l0_absent_present_mono, Hpm.
+  - apply sum_list_with_le. intros x _. apply l1_absent_present_mono, Hpm.
+Qed.
+
+(* ===================================================================== *)
 (* §14 grafts_lvl: the number of table pages walk grafts descending from a  *)
 (*    level-[L] node along [vpn].  Threaded through the walk loop as the     *)
 (*    invariant [g + grafts_lvl L cur vpn = pt_missing t vpn 1], it bounds   *)

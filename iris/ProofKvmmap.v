@@ -207,7 +207,7 @@ Section ProofKvmmap.
               ltac:(rewrite HP6tp; exact Hcid)
               with "Hcg Hcnt Htext Hpc Hptree [Henv] [-]").
     { iEval (rewrite HP6tp). iExact "Henv". }
-    iIntros (mr t' k g) "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hmiss %Hpay".
+    iIntros (mr t' k g) "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpresent %Hmiss %Hpay".
     iEval (rewrite HP6tp) in "Henv".
     (* pc back at +0x12; the frame cells recovered *)
     assert (HP6link : P6 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KM + 0x0e) : mword 64) 4).
@@ -363,7 +363,7 @@ Section ProofKvmmap.
               with "Hcg Hpc Hi1a' [-]").
     iIntros "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
-    iApply ("Hcont" $! E3 t' g with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%]").
+    iApply ("Hcont" $! E3 t' g with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%]").
     { exact Hnodes. }
     { (* callee_saved mm E3 *)
       pose proof (fun c Hc => callee_saved_lookup Hkcs c Hc) as Hcs.
@@ -396,6 +396,8 @@ Section ProofKvmmap.
     }
     { exact Hbase'. }
     { exact Hrep'. }
+    { exact Hpresent. }
+    { exact Hmiss. }
   Qed.
 
 End ProofKvmmap.
