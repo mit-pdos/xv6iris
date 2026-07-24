@@ -30,6 +30,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - push_off returns intr_count counting token, which is needed to call pop_off to ensure no panic
 - use fable to state specs, opus to prove them
 - kernel ptsto: PA own + VA map fact via kmap_at (code RX, data RW), monotonic for Bare-to-Sv39
+- page tables need to track kmap_at for intermediate PT pages, to reconstruct data ptsto
+- MMIO just needs mapping fact, no memory points-to (because it's not memory)
 
 Big things that still need to be done/explored:
 
