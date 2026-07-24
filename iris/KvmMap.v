@@ -391,17 +391,17 @@ Qed.
    trampoline and the kstacks.  The word is always the A/D-CLEAR
    [perm|V] form. *)
 (* ---- region base unsigned values / bounds (never normalize the maps) ---- *)
-Local Lemma uart_vpn_uns   : bv_unsigned uart_vpn   = 0x10000.
+Lemma uart_vpn_uns   : bv_unsigned uart_vpn   = 0x10000.
 Proof. unfold uart_vpn.   apply mword27_unsigned. lia. Qed.
-Local Lemma virtio_vpn_uns : bv_unsigned virtio_vpn = 0x10001.
+Lemma virtio_vpn_uns : bv_unsigned virtio_vpn = 0x10001.
 Proof. unfold virtio_vpn. apply mword27_unsigned. lia. Qed.
-Local Lemma plic_vpn_uns   : bv_unsigned plic_vpn   = 0xC000.
+Lemma plic_vpn_uns   : bv_unsigned plic_vpn   = 0xC000.
 Proof. unfold plic_vpn.   apply mword27_unsigned. lia. Qed.
-Local Lemma text_vpn_uns   : bv_unsigned text_vpn0  = 0x80000.
+Lemma text_vpn_uns   : bv_unsigned text_vpn0  = 0x80000.
 Proof. unfold text_vpn0.  apply mword27_unsigned. lia. Qed.
-Local Lemma data_vpn_uns   : bv_unsigned data_vpn0  = 0x80007.
+Lemma data_vpn_uns   : bv_unsigned data_vpn0  = 0x80007.
 Proof. unfold data_vpn0.  apply mword27_unsigned. lia. Qed.
-Local Lemma tramp_vpn_uns  : bv_unsigned tramp_vpn  = 0x3FFFFFF.
+Lemma tramp_vpn_uns  : bv_unsigned tramp_vpn  = 0x3FFFFFF.
 Proof. unfold tramp_vpn.   apply mword27_unsigned. lia. Qed.
 
 Local Lemma data_end : bv_unsigned data_vpn0 + Z.of_nat data_npages = 0x88000.
@@ -490,7 +490,7 @@ Proof. rewrite uart_vpn_uns. reflexivity. Qed.
    once builds a giant nested [pt_insert_run] term (with the 16384/32761 page
    counts) that makes every rewrite's traversal ~seconds.  Each peel's own
    [id_run_lookup] rewrite is then instant (the term stays small). *)
-Local Lemma kvm_m5_peel (vpn : mword 27) :
+Lemma kvm_m5_peel (vpn : mword 27) :
   kvm_m5 !! vpn = if (0x80007 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x88000)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m4 !! vpn.
 Proof.
@@ -498,7 +498,7 @@ Proof.
   rewrite (id_run_lookup kvm_m4 data_vpn0 6 data_npages vpn data_ok), data_end, data_vpn_uns.
   reflexivity.
 Qed.
-Local Lemma kvm_m4_peel (vpn : mword 27) :
+Lemma kvm_m4_peel (vpn : mword 27) :
   kvm_m4 !! vpn = if (0x80000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x80007)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 10 1)) else kvm_m3 !! vpn.
 Proof.
@@ -506,7 +506,7 @@ Proof.
   rewrite (id_run_lookup kvm_m3 text_vpn0 10 text_npages vpn text_ok), text_end, text_vpn_uns.
   reflexivity.
 Qed.
-Local Lemma kvm_m3_peel (vpn : mword 27) :
+Lemma kvm_m3_peel (vpn : mword 27) :
   kvm_m3 !! vpn = if (0xC000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10000)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m2 !! vpn.
 Proof.
@@ -514,7 +514,7 @@ Proof.
   rewrite (id_run_lookup kvm_m2 plic_vpn 6 plic_npages vpn plic_ok), plic_end, plic_vpn_uns.
   reflexivity.
 Qed.
-Local Lemma kvm_m2_peel (vpn : mword 27) :
+Lemma kvm_m2_peel (vpn : mword 27) :
   kvm_m2 !! vpn = if (0x10001 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10002)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else kvm_m1 !! vpn.
 Proof.
@@ -523,7 +523,7 @@ Proof.
     virtio_end, virtio_vpn_uns.
   reflexivity.
 Qed.
-Local Lemma kvm_m1_peel (vpn : mword 27) :
+Lemma kvm_m1_peel (vpn : mword 27) :
   kvm_m1 !! vpn = if (0x10000 <=? bv_unsigned vpn) && (bv_unsigned vpn <? 0x10001)
     then Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor 6 1)) else None.
 Proof.
@@ -533,7 +533,7 @@ Proof.
   reflexivity.
 Qed.
 
-Local Lemma kvm_m5_lookup (vpn : mword 27) :
+Lemma kvm_m5_lookup (vpn : mword 27) :
   kvm_m5 !! vpn = match kmap_class vpn with
     | Some pc => Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor (kperm_vperm pc) 1))
     | None => None end.
@@ -593,7 +593,7 @@ Proof.
     rewrite Cd, Ct, Cp, Cvi, Cu. reflexivity.
 Qed.
 
-Local Lemma kvm_map_lookup (vpn : mword 27) :
+Lemma kvm_map_lookup (vpn : mword 27) :
   kvm_map !! vpn = match kmap_class vpn with
     | Some pc => Some (mk_pte (kpt_leaf_ppn vpn) (Z.lor (kperm_vperm pc) 1))
     | None => if decide (vpn = tramp_vpn)
@@ -607,7 +607,7 @@ Proof.
 Qed.
 
 (* kstack vpns are disjoint from the static class ranges and from tramp *)
-Local Lemma kstack_not_class (vpn : mword 27) (i : nat) :
+Lemma kstack_not_class (vpn : mword 27) (i : nat) :
   (i < 64)%nat -> vpn = kstack_vpn i -> kmap_class vpn = None.
 Proof.
   intros Hi ->. unfold kmap_class. rewrite (kstack_vpn_uns i Hi).
@@ -619,7 +619,7 @@ Proof.
   rewrite !andb_false_r. reflexivity.
 Qed.
 
-Local Lemma kstack_not_tramp (i : nat) :
+Lemma kstack_not_tramp (i : nat) :
   (i < 64)%nat -> kstack_vpn i <> tramp_vpn.
 Proof.
   intros Hi Heq. apply (f_equal bv_unsigned) in Heq.
