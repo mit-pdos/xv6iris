@@ -304,6 +304,22 @@ Qed.
 (* the trampoline vpn sits at the top of the VA space, far above every
    kernel-mapped (DRAM / device) vpn *)
 
+(* stage-C bridge: the trampoline's real table word [PTE_TRAMP = 0x4B] is
+   the KP_rx class leaf modulo the A/D bits -- both mask to 0x0B under
+   [pte_set_ad] -- so an ordinary M entry [tramp_vpn ↦ (tramp_ppn, KP_rx)]
+   produces EXACTLY the [pte_tramp] variants the pt2 window machinery
+   ([pt2_tramp_spec], TransPt) still expresses through [pte_tramp]. *)
+Lemma kperm_rx_tramp_variant (a d : mword 1) :
+  pte_set_ad (mk_pte tramp_ppn (kperm_flags KP_rx)) a d = pte_set_ad pte_tramp a d.
+Proof.
+  unfold pte_tramp, mk_pte.
+  rewrite (pte_set_ad_zext_concat tramp_ppn (kperm_flags KP_rx) a d (kperm_flags_bound KP_rx)).
+  rewrite (pte_set_ad_zext_concat tramp_ppn PTE_TRAMP a d ltac:(unfold PTE_TRAMP; lia)).
+  assert (Hl : Z.land (kperm_flags KP_rx) 831 = Z.land PTE_TRAMP 831)
+    by (vm_compute; reflexivity).
+  rewrite Hl. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (* §3 The layout-free kernel mapping spec.                                *)
 (* ===================================================================== *)
@@ -313,31 +329,41 @@ Qed.
 
 (* ===================================================================== *)
 (* §3b THE GENERALIZED (M-INDEXED) MAPPING SPEC (rwx-kmap).  The region   *)
-(*     clauses collapse into ONE maps-clause over the kernel-mapping map  *)
-(*     M (KMap.v's auth): text/data/device identity leaves AND dynamic    *)
-(*     kstack leaves are all just entries of M, each mapped as an A/D     *)
-(*     variant of its class-keyed PTE.  The trampoline stays a dedicated  *)
-(*     clause (it is NOT a claim; KMap's [kmap_wf_tramp] keeps it out of  *)
-(*     M).  [kpt_tree_spec] (above) is the legacy uniform-RWX form; the   *)
-(*     tlb_inv_pt flip onto this spec is the stage-5 surgery.             *)
+(*     clauses collapse into ONE per-vpn match over the kernel-mapping    *)
+(*     map M (KMap.v's auth): text/data/device identity leaves, dynamic   *)
+(*     kstack leaves AND the trampoline are all just entries of M, each   *)
+(*     mapped as an A/D variant of its class-keyed PTE; every vpn outside *)
+(*     M BLOCKS (stage C: the dedicated trampoline clause is gone).       *)
 (* ===================================================================== *)
 
 Definition kpt_leaf_pte_of (vpn : mword 27) (e : mword 44 * kperm) : mword 64 :=
   mk_pte e.1 (kperm_flags e.2).
 
+(* THE final one-clause form (uniform-claims stage C): for every vpn,
+   the tree agrees with M -- an M entry is mapped as an A/D variant of
+   its class-keyed PTE, everything else BLOCKS.  The blocks direction is
+   what makes the invariant characterize the table EXACTLY (and is the
+   real guard on kmap_insert: an entry can only enter M because
+   re-establishing the invariant forces the physical table to map it).
+   The TRAMPOLINE is an ordinary M entry (tramp_vpn ↦ (tramp_ppn, KP_rx),
+   minted at the boot switch): pte_set_ad (mk_pte tramp_ppn 0xCB) 1 0 IS
+   the real table's 0x4B trampoline word, so the old dedicated clause
+   and the pte_tramp/tramp_variant family are subsumed by the
+   kperm_variant_* lemmas at KP_rx. *)
 Definition kpt_tree_spec_gen (root : mword 44)
     (M : gmap (mword 27) (mword 44 * kperm)) (t : ptree) : Prop :=
   pt_base t = root /\
-  (forall vpn e, M !! vpn = Some e ->
-     exists p2 p1 (a d : mword 1),
-       ptree_maps t vpn p2 p1 (pte_set_ad (kpt_leaf_pte_of vpn e) a d)) /\
-  (exists p2 p1 (a d : mword 1),
-     ptree_maps t tramp_vpn p2 p1 (pte_set_ad pte_tramp a d)) /\
-  (forall vpn, M !! vpn = None -> vpn <> tramp_vpn -> ptree_blocks t vpn).
+  (forall vpn,
+     match M !! vpn with
+     | Some e =>
+         exists p2 p1 (a d : mword 1),
+           ptree_maps t vpn p2 p1 (pte_set_ad (kpt_leaf_pte_of vpn e) a d)
+     | None => ptree_blocks t vpn
+     end).
 
 (* the generalized spec survives the ADUE write-back of any M-mapped
-   vpn's leaf (single-clause analogue of [kpt_tree_spec_set_leaf]; the
-   [M !! tramp_vpn = None] premise comes from [kmap_wf_tramp]) *)
+   vpn's leaf -- ONE lemma for every entry, the trampoline included
+   (stage C: no tramp premise, no tramp case) *)
 Lemma kpt_tree_spec_gen_set_leaf (root : mword 44)
     (M : gmap (mword 27) (mword 44 * kperm)) (t : ptree)
     (vpn : mword 27) (e : mword 44 * kperm)
@@ -345,22 +371,20 @@ Lemma kpt_tree_spec_gen_set_leaf (root : mword 44)
   kpt_tree_spec_gen root M t ->
   ptree_maps t vpn p2 p1 p0 ->
   M !! vpn = Some e ->
-  M !! tramp_vpn = None ->
   (exists a0 d0 : mword 1, p0 = pte_set_ad (kpt_leaf_pte_of vpn e) a0 d0) ->
   kpt_tree_spec_gen root M (ptree_set_leaf t vpn (pte_set_ad p0 a d)).
 Proof.
-  intros (Hbase & Hmap & Htramp & Hblk) Hmaps He Htn (a0 & d0 & Hp0).
-  assert (Hnt : vpn <> tramp_vpn) by (intros ->; rewrite He in Htn; discriminate).
+  intros (Hbase & Hall) Hmaps He (a0 & d0 & Hp0).
   assert (Hvar : pte_set_ad p0 a d = pte_set_ad (kpt_leaf_pte_of vpn e) a d).
   { rewrite Hp0. apply pte_set_ad_absorb. }
-  split; [| split; [| split]].
+  split.
   - rewrite <- Hbase.
     unfold ptree_set_leaf.
     destruct (pt_kids t (vpn_idx 2 vpn)); [| reflexivity].
     destruct (pt_kids p (vpn_idx 1 vpn)); reflexivity.
-  - intros vpn' e' He'.
+  - intros vpn'.
     destruct (decide (vpn' = vpn)) as [-> | Hne].
-    + rewrite He in He'. injection He' as <-.
+    + rewrite He.
       exists p2, p1, a, d.
       rewrite <- Hvar.
       apply (ptree_set_leaf_maps_self t vpn p2 p1 p0); [exact Hmaps | ..];
@@ -369,59 +393,14 @@ Proof.
       * apply kperm_variant_leaf.
       * apply kperm_variant_no_napot.
       * apply kperm_variant_pbmt0.
-    + destruct (Hmap vpn' e' He') as (q2 & q1 & a' & d' & Hm2).
-      exists q2, q1, a', d'.
-      apply (ptree_set_leaf_maps_other t vpn vpn' _ _ _ _ Hne Hm2).
-  - destruct Htramp as (q2 & q1 & a' & d' & Hm2).
-    exists q2, q1, a', d'.
-    apply (ptree_set_leaf_maps_other t vpn tramp_vpn _ _ _ _
-             (not_eq_sym Hnt) Hm2).
-  - intros vpn' Hm' Hnt'.
-    apply (ptree_set_leaf_blocks t vpn vpn' p2 p1 p0); [exact Hmaps |].
-    apply (Hblk vpn' Hm' Hnt').
+    + specialize (Hall vpn').
+      destruct (M !! vpn') as [e' |] eqn:He'.
+      * destruct Hall as (q2 & q1 & a' & d' & Hm2).
+        exists q2, q1, a', d'.
+        apply (ptree_set_leaf_maps_other t vpn vpn' _ _ _ _ Hne Hm2).
+      * apply (ptree_set_leaf_blocks t vpn vpn' p2 p1 p0); [exact Hmaps |].
+        exact Hall.
 Qed.
-
-(* ... and of the trampoline leaf under the generalized spec (an S-mode
-   fetch through the trampoline mapping may set its A bit; every M-vpn is
-   ≠ tramp by the same [M !! tramp_vpn = None] premise) *)
-Lemma kpt_tree_spec_gen_set_leaf_tramp (root : mword 44)
-    (M : gmap (mword 27) (mword 44 * kperm)) (t : ptree)
-    (p2 p1 p0 : mword 64) (a d : mword 1) :
-  kpt_tree_spec_gen root M t ->
-  ptree_maps t tramp_vpn p2 p1 p0 ->
-  M !! tramp_vpn = None ->
-  (exists a0 d0 : mword 1, p0 = pte_set_ad pte_tramp a0 d0) ->
-  kpt_tree_spec_gen root M (ptree_set_leaf t tramp_vpn (pte_set_ad p0 a d)).
-Proof.
-  intros (Hbase & Hmap & Htramp & Hblk) Hmaps Htn (a0 & d0 & Hp0).
-  assert (Hvar : pte_set_ad p0 a d = pte_set_ad pte_tramp a d).
-  { rewrite Hp0. apply pte_set_ad_absorb. }
-  split; [| split; [| split]].
-  - rewrite <- Hbase.
-    unfold ptree_set_leaf.
-    destruct (pt_kids t (vpn_idx 2 tramp_vpn)); [| reflexivity].
-    destruct (pt_kids p (vpn_idx 1 tramp_vpn)); reflexivity.
-  - intros vpn' e' He'.
-    assert (Hne : vpn' <> tramp_vpn) by (intros ->; rewrite Htn in He'; discriminate).
-    destruct (Hmap vpn' e' He') as (q2 & q1 & a' & d' & Hm2).
-    exists q2, q1, a', d'.
-    apply (ptree_set_leaf_maps_other t tramp_vpn vpn' _ _ _ _
-             Hne Hm2).
-  - exists p2, p1, a, d.
-    rewrite <- Hvar.
-    apply (ptree_set_leaf_maps_self t tramp_vpn p2 p1 p0); [exact Hmaps | ..];
-      rewrite Hvar.
-    + exact (proj1 (tramp_variant a d)).
-    + exact (proj1 (proj2 (tramp_variant a d))).
-    + exact (proj1 (proj2 (proj2 (tramp_variant a d)))).
-    + exact (proj2 (proj2 (proj2 (tramp_variant a d)))).
-  - intros vpn' Hm' Hnt'.
-    apply (ptree_set_leaf_blocks t tramp_vpn vpn' p2 p1 p0); [exact Hmaps |].
-    apply (Hblk vpn' Hm' Hnt').
-Qed.
-
-(* ... and of the trampoline leaf itself (an S-mode fetch through the
-   trampoline mapping may set its A bit) *)
 
 (* ===================================================================== *)
 (* §3d PT-SLOT TIER BRIDGE (uniform-claims PHYSICAL TIER, item 1).         *)
@@ -606,11 +585,6 @@ Section KptTreeInv.
        tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
        ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
        kmap_auth M ∗
-       (* TEMPORARY (uniform-claims stage B'): the set-leaf lemmas need
-          [M !! tramp_vpn = None] and the old [kmap_wf_tramp] is gone (the
-          auth is bare).  Threaded explicitly here; it dies in stage C when
-          the dedicated tramp clause is unified away under the ghost map. *)
-       ⌜ M !! tramp_vpn = None ⌝ ∗
        ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
        ptree_own 2 (DfracOwn 1) t ∗
        pmp_config root_ppn)%I.
@@ -623,14 +597,13 @@ Section KptTreeInv.
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_ok_pt (mword_of_int 0) t tlbvec ->
     kpt_tree_spec_gen root_ppn M t ->
-    M !! tramp_vpn = None ->
     (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kmap_auth M -∗
     ptree_own 2 (DfracOwn 1) t -∗
     pmp_config root_ppn -∗
     tlb_inv_pt root_ppn.
   Proof.
-    intros Hmode Hasid Hppn Hok Hspec Htramp Hpmaw. iIntros "Hsatp Htlb HM Ht Hpmp".
+    intros Hmode Hasid Hppn Hok Hspec Hpmaw. iIntros "Hsatp Htlb HM Ht Hpmp".
     iExists satp0, tlbvec, t, M. iFrame "Hsatp Htlb HM Ht Hpmp". iPureIntro. tauto.
   Qed.
 
@@ -645,7 +618,6 @@ Section KptTreeInv.
       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
       ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
       kmap_auth M ∗
-      ⌜ M !! tramp_vpn = None ⌝ ∗
       ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
       ptree_own 2 (DfracOwn 1) t ∗
       pmp_config root_ppn.
@@ -1180,7 +1152,7 @@ Section KptTranslateIris.
     intros Hchk Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     iIntros "Hat Hri Hgh Hinv".
     iDestruct "Hinv" as (satp0 tlbvec t M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Htramp & %Hpmawimpl & Ht & Hpmp)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
     pose proof (Hpmawimpl _ Hall) as Hpmaw.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
@@ -1190,8 +1162,9 @@ Section KptTranslateIris.
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     set (vpn := svpn_of va) in *.
-    pose proof Hspec as (Hbase & Hmapspec & Htrampspec & Hblkspec).
-    destruct (Hmapspec vpn (ppn, pc) HMlk) as (p2 & p1 & a0 & d0 & Hmaps).
+    pose proof Hspec as (Hbase & Hmapspec).
+    pose proof (Hmapspec vpn) as Hmapv. rewrite HMlk in Hmapv.
+    destruct Hmapv as (p2 & p1 & a0 & d0 & Hmaps).
     assert (Hlf : kpt_leaf_pte_of vpn (ppn, pc) = mk_pte ppn (kperm_flags pc))
       by reflexivity.
     rewrite Hlf in Hmaps.
@@ -1247,127 +1220,20 @@ Section KptTranslateIris.
       rewrite <- (pte_set_ad_absorb (mk_pte ppn (kperm_flags pc)) a0 d0 a1 d1).
       apply (kpt_tree_spec_gen_set_leaf root_ppn M t vpn (ppn, pc) p2 p1
                (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) a1 d1
-               Hspec Hmaps HMlk Htramp).
+               Hspec Hmaps HMlk).
       exists a0, d0. rewrite Hlf. reflexivity. }
     iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t' M
-              Hmode Hasid Hppn Htlbok' Hspec' Htramp Hpmawimpl with "Hsatp Htlb HM Ht").
-    iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
-              HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa").
-  Qed.
-
-  (* the same absorption through the kernel table's TRAMPOLINE mapping:
-     translation of a trampoline-page va lands on the kernel-text trampoline
-     page (NOT the identity), with the same three absorbed outcomes. *)
-  Lemma tlb_inv_pt_translateAddr_tramp (root_ppn : mword 44) (va pa : mword 64) (σ : mstate) :
-    (forall (a d : mword 1) (mxr do_sum : bool),
-       pte_check_ok acc Supervisor mxr do_sum (pte_set_ad pte_tramp a d)) ->
-    svpn_of va = tramp_vpn ->
-    neq_vec (bits_of_virtaddr (Virtaddr va))
-       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-    zero_extend' 64 (concat_vec tramp_ppn
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = Supervisor ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-      = Some (Supervisor, σ) ->
-    exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
-    ∃ σ' : mstate,
-      ⌜ exec (translateAddr (Virtaddr va) acc) σ
-        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-      ⌜ (σ'.(sregs) = σ.(sregs) \/
-         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
-  Proof.
-    intros Hchk Hvpn Hcanon Hid Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0 tlbvec t M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Htramp & %Hpmawimpl & Ht & Hpmp)".
-    pose proof (Hpmawimpl _ Hall) as Hpmaw.
-    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
-    iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
-    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
-    iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
-    iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
-    pose proof Hspec as (Hbase & Hmapspec & Htrampspec & Hblkspec).
-    destruct Htrampspec as (p2 & p1 & a0 & d0 & Hmaps0).
-    assert (Hmaps : ptree_maps t (svpn_of va) p2 p1 (pte_set_ad pte_tramp a0 d0))
-      by (rewrite Hvpn; exact Hmaps0).
-    assert (HA' : pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
-      by (rewrite Hpcv; exact HA).
-    assert (Hord' : zopz0zKzJ_u (zeros' 64)
-      (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false)
-      by (rewrite Hpav; exact Hord).
-    assert (HR' : eq_vec (_get_Pmpcfg_ent_R
-      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
-      by (rewrite Hpcv; exact HR).
-    assert (HW' : eq_vec (_get_Pmpcfg_ent_W
-      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
-      by (rewrite Hpcv; exact HW).
-    assert (Hcov' : (ram_base + ram_size
-      <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
-      by (rewrite Hpav; exact Hcov).
-    pose proof (Hpmarimpl _ Hall) as Hpmar.
-    assert (Hout : zero_extend' 64 (concat_vec
-        ((autocast (T := mword) ((autocast (T := mword)
-            (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
-    { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
-      rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
-      by exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode).
-    iMod (ptree_translateAddr_own acc Supervisor root_ppn t pte_tramp va pa satp0
-            tlbvec p2 p1 a0 d0 σ
-            Hchk tramp_variant Hcanon Hout Hbase Hmaps Htlbok
-            Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
-            HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
-            with "Hri Hgh Htlb Ht")
-      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
-    iModIntro. iExists σ'.
-    iSplit; [iPureIntro; exact Htrans |].
-    iSplit; [iPureIntro; exact Hmdev |].
-    iSplit; [iPureIntro; exact Hsregs |].
-    iFrame "Hri Hgh".
-    assert (Hspec' : kpt_tree_spec_gen root_ppn M t').
-    { destruct Htsh as [-> | (a1 & d1 & ->)]; [exact Hspec |].
-      rewrite Hvpn.
-      rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
-      exact (kpt_tree_spec_gen_set_leaf_tramp root_ppn M t p2 p1
-               (pte_set_ad pte_tramp a0 d0) a1 d1
-               Hspec Hmaps0 Htramp
-               (ex_intro _ a0 (ex_intro _ d0 eq_refl))). }
-    iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t' M
-              Hmode Hasid Hppn Htlbok' Hspec' Htramp Hpmawimpl with "Hsatp Htlb HM Ht").
+              Hmode Hasid Hppn Htlbok' Hspec' Hpmawimpl with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
               HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa").
   Qed.
 
 End KptTranslateIris.
 
-(* the three access instantiations: the dispatch hypothesis is exactly
-   KptPt §12's per-A/D-case machinery via the [kpt_variant_*] bridges *)
-Section KptTranslateIrisAcc.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-
-  (* The former identity/dev instantiations of
-     [tlb_inv_pt_translateAddr_at] are GONE (uniform-claims stage B'):
-     every consumer now presents the CLAIM carried by its own resource
-     (↦ₘ/↦ₓ or the static bundle) directly to [tlb_inv_pt_translateAddr_at]
-     / the regime's [sr_absorb], with the output pa = [pa_of ppn va].  Only
-     the dedicated TRAMPOLINE instantiation survives (its mapping is not a
-     claim). *)
-
-  Definition tlb_inv_pt_translateAddr_tramp_fetch :=
-    fun root_ppn va pa σ =>
-      tlb_inv_pt_translateAddr_tramp (InstructionFetch tt) root_ppn va pa σ
-        (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum).
-
-End KptTranslateIrisAcc.
+(* Stage C: the dedicated trampoline translation lemmas
+   ([tlb_inv_pt_translateAddr_tramp] and its [_fetch] wrapper) are GONE.
+   The trampoline is an ordinary M entry [tramp_vpn ↦ (tramp_ppn, KP_rx)],
+   so a trampoline-page fetch goes through the general
+   [tlb_inv_pt_translateAddr_at] at [ppn := tramp_ppn], [pc := KP_rx],
+   fed the claim [kmap_at tramp_vpn tramp_ppn KP_rx] (threaded up from the
+   post-switch caller): see [ktramp_fetch_habs] in TrampStepPt. *)

@@ -121,8 +121,10 @@ Fixpoint kvm_M_stacks (pas : nat -> mword 44) (k : nat)
   | S k' => <[kstack_vpn k' := (pas k', KP_rw)]> (kvm_M_stacks pas k' M)
   end.
 
+(* stage C: the TRAMPOLINE is an ordinary entry of the target map --
+   its fragment is minted at the switch together with the kstacks *)
 Definition kvm_M (pas : nat -> mword 44) : gmap (mword 27) (mword 44 * kperm) :=
-  kvm_M_stacks pas 64 kmap_M0.
+  kvm_M_stacks pas 64 (<[tramp_vpn := (tramp_ppn, KP_rx)]> kmap_M0).
 
 (* legal stack pas: whole RAM pages (what kalloc returns) *)
 Definition kvm_pas_ok (pas : nat -> mword 44) : Prop :=
@@ -651,23 +653,30 @@ Lemma kvm_M_lookup (pas : nat -> mword 44) (vpn : mword 27) :
   kvm_M pas !! vpn =
     match kmap_class vpn with
     | Some pc => Some (kpt_leaf_ppn vpn, pc)
-    | None => match kstack_index vpn with
-              | Some i => Some (pas i, KP_rw)
-              | None => None
-              end
+    | None =>
+        if decide (vpn = tramp_vpn)
+        then Some (tramp_ppn, KP_rx)
+        else match kstack_index vpn with
+             | Some i => Some (pas i, KP_rw)
+             | None => None
+             end
     end.
 Proof.
   unfold kvm_M.
   destruct (kstack_index vpn) as [i|] eqn:Hks.
   - apply kstack_index_spec in Hks. destruct Hks as [Hi Hvpn].
     rewrite (kstack_not_class vpn i Hi Hvpn).
-    rewrite Hvpn, (kvm_M_stacks_hit pas 64 kmap_M0 i Hi ltac:(lia)).
-    reflexivity.
+    rewrite Hvpn, (kvm_M_stacks_hit pas 64 _ i Hi ltac:(lia)).
+    rewrite decide_False; [reflexivity | apply kstack_not_tramp; exact Hi].
   - rewrite kvm_M_stacks_miss.
     2:{ intros i Hi Heq. rewrite Heq in Hks.
         rewrite (proj2 (kstack_index_spec _ i) (conj Hi eq_refl)) in Hks. discriminate. }
-    rewrite kmap_M0_lookup.
-    destruct (kmap_class vpn) as [pc|]; reflexivity.
+    destruct (decide (vpn = tramp_vpn)) as [->|Hnt].
+    + rewrite lookup_insert, kmap_class_tramp_None.
+      destruct (decide (tramp_vpn = tramp_vpn)) as [_|Hne]; [reflexivity | congruence].
+    + rewrite lookup_insert_ne; [| exact (not_eq_sym Hnt)].
+      rewrite kmap_M0_lookup.
+      destruct (kmap_class vpn) as [pc|]; reflexivity.
 Qed.
 
 (* the A/D bridge: the map's word IS the zero-A/D variant of the
@@ -701,27 +710,24 @@ Proof.
   destruct (kmap_class vpn) as [pc|] eqn:Hc.
   - intro H. injection H as <-. unfold kpt_leaf_pte_of. cbn [fst snd].
     f_equal. apply kvm_word_variant.
-  - destruct (kstack_index vpn) as [i|] eqn:Hks; intro H; [| discriminate].
-    injection H as <-.
-    apply kstack_index_spec in Hks. destruct Hks as [Hi Hvpn].
-    rewrite decide_False; [| rewrite Hvpn; apply kstack_not_tramp; exact Hi].
-    unfold kpt_leaf_pte_of. cbn [fst snd]. f_equal. exact (kvm_word_variant (pas i) KP_rw).
-Qed.
-
-Local Lemma kvm_full_tramp (pas : nat -> mword 44) :
-  kvm_map_full pas !! tramp_vpn = Some (pte_set_ad pte_tramp ('b"0") ('b"0")).
-Proof.
-  rewrite kvm_map_full_lookup, kmap_class_tramp_None, kvm_word_tramp.
-  destruct (decide (tramp_vpn = tramp_vpn)) as [_|Hne]; [reflexivity | congruence].
+  - destruct (decide (vpn = tramp_vpn)) as [->|Hnt].
+    + (* the trampoline is now an ordinary M entry [(tramp_ppn, KP_rx)]:
+         its full-map word [0x4B] IS the '0/'0 KP_rx variant *)
+      intro H. injection H as <-. unfold kpt_leaf_pte_of. cbn [fst snd].
+      rewrite kperm_rx_tramp_variant. rewrite kvm_word_tramp. reflexivity.
+    + destruct (kstack_index vpn) as [i|] eqn:Hks; intro H; [| discriminate].
+      injection H as <-.
+      unfold kpt_leaf_pte_of. cbn [fst snd]. f_equal. exact (kvm_word_variant (pas i) KP_rw).
 Qed.
 
 Local Lemma kvm_full_none (pas : nat -> mword 44) (vpn : mword 27) :
-  kvm_M pas !! vpn = None -> vpn <> tramp_vpn -> kvm_map_full pas !! vpn = None.
+  kvm_M pas !! vpn = None -> kvm_map_full pas !! vpn = None.
 Proof.
-  intros Hnone Hnt. rewrite kvm_map_full_lookup. rewrite kvm_M_lookup in Hnone.
+  intros Hnone. rewrite kvm_map_full_lookup. rewrite kvm_M_lookup in Hnone.
   destruct (kmap_class vpn) as [pc|] eqn:Hc; [discriminate|].
+  destruct (decide (vpn = tramp_vpn)) as [->|Hnt]; [discriminate|].
   destruct (kstack_index vpn) as [i|] eqn:Hks; [discriminate|].
-  rewrite decide_False; [reflexivity | exact Hnt].
+  reflexivity.
 Qed.
 
 Lemma kvm_bridge (pas : nat -> mword 44) (t : ptree) (root : mword 44) :
@@ -731,15 +737,13 @@ Lemma kvm_bridge (pas : nat -> mword 44) (t : ptree) (root : mword 44) :
   kpt_tree_spec_gen root (kvm_M pas) t.
 Proof.
   intros Hpas Hbase (Hmap & Hblk).
-  split; [exact Hbase |]. split; [| split].
-  - (* maps-clause: each M-entry maps as the '0/'0 A/D variant of its leaf *)
-    intros vpn e He.
-    destruct (Hmap vpn _ (kvm_full_of_M pas vpn e He)) as (p2 & p1 & Hm).
+  split; [exact Hbase |].
+  intros vpn.
+  destruct (kvm_M pas !! vpn) as [e|] eqn:HM.
+  - (* every M entry (text/data/dev/kstack AND the trampoline) maps as the
+       '0/'0 A/D variant of its class leaf *)
+    destruct (Hmap vpn _ (kvm_full_of_M pas vpn e HM)) as (p2 & p1 & Hm).
     exists p2, p1, ('b"0"), ('b"0"). exact Hm.
-  - (* tramp-clause *)
-    destruct (Hmap tramp_vpn _ (kvm_full_tramp pas)) as (p2 & p1 & Hm).
-    exists p2, p1, ('b"0"), ('b"0"). exact Hm.
-  - (* blocks-clause: the two masters agree on None off the trampoline *)
-    intros vpn Hn Hnt.
-    apply ptree_blocks0_blocks. apply Hblk. exact (kvm_full_none pas vpn Hn Hnt).
+  - (* off M the two masters agree on None *)
+    apply ptree_blocks0_blocks. apply Hblk. apply kvm_full_none. exact HM.
 Qed.

@@ -19,6 +19,7 @@ Require Import WpGpr WpMmodeShiftiop.
 Require Import WpMmodeLeafBase.
 Require Import KernelText MstatusBits.
 Require Import PtTree.
+Require Import KMap KptExecMap.
 Require Import TrampPt KptTree UptTree UserretDefs UserretPt UserretEntryPt.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
@@ -71,6 +72,8 @@ Section UserretAllPt.
     menvcfg ↦ᵣ menvcfg0 -∗
     senvcfg ↦ᵣ senvcfg0 -∗
     sepc ↦ᵣ sepc0 -∗
+    (* stage C: the trampoline claim, threaded to the entry switch *)
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
     tlb_inv_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
     pc_is (uva 0x9c) -∗
@@ -156,7 +159,7 @@ Section UserretAllPt.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hpmm HPBMTE Hmenvval0 Hsenvval0 Hwf HTSR Hsup
       Ha0 HuMode Huasid Huppn.
     iIntros "#Hkt #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
-             Hktlb Hufr Hpc Hfile
+             #Hclaim Hktlb Hufr Hpc Hfile
              Htf_vra
              Htf_vsp
              Htf_vgp
@@ -232,7 +235,7 @@ Section UserretAllPt.
     iApply (wp_userret_entry_pt kroot uroot tfp um Φ m usatp
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ha0 HuMode Huasid Huppn
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hufr
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hktlb Hufr
                     Hpc Hfile Hi_sfence1 Hi_csrw Hi_sfence2").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hkfr Hpc Hfile".
     (* ---- lui @ 0xa8 ---- *)

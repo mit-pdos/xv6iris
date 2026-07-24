@@ -142,10 +142,45 @@ so sequencing is clear):
       needs kmap_M0 (auth, bundle, lookup/insert/characterizations).
       KMap re-exports nothing; kmap_at's KMap definition is DELETED in
       favor of the RiscvPtsto one (single definition, no alias).
-  C.  Tramp unification: switch-minted tramp fragment, tramp clause
-      dies (tree spec already one-clause), ktramp/userret engine
-      re-key, KvmMap revision (kvm_M + tramp entry, kvm_M_wf deleted,
-      bridge tramp arm folds into the maps arm).
+  B′: DONE 2026-07-24, committed 705131e, 302/302 green, guard clean
+      tree-wide (no identity/static/region premise about a translated
+      va on any S-mode statement).
+  C.  DONE 2026-07-24, 302/302 green, no new admits/axioms.  The tramp
+      mapping is now an ordinary M entry `tramp_vpn ↦ (tramp_ppn, KP_rx)`
+      (fragment minted at the future kvminithart switch; the ktramp/
+      userret engines take `kmap_at tramp_vpn tramp_ppn KP_rx` as a
+      resource premise threaded up to the whole-function specs).  What
+      landed:
+      - kpt_tree_spec_gen is the final ONE-CLAUSE per-vpn match (anchor);
+        kpt_tree_spec_gen_set_leaf reproved one-clause, no tramp premise;
+        kpt_tree_spec_gen_set_leaf_tramp DELETED.
+      - tlb_inv_pt dropped the temporary ⌜M !! tramp_vpn = None⌝ conjunct
+        (def + intro + open + every threaded destructure: SRegime grant-
+        facts, WpKernelvecNew, UserretEntryPt windows, ktramp_fetch_habs).
+      - tlb_inv_pt_translateAddr_tramp + its _fetch wrapper DELETED; tramp
+        translation goes through the general _at at (ppn:=tramp_ppn,
+        pc:=KP_rx) with kperm_variant_check_fetch.  Bridge lemma
+        `kperm_rx_tramp_variant` (KptTree): pte_set_ad (mk_pte tramp_ppn
+        0xCB) a d = pte_set_ad pte_tramp a d (both mask to 0x0B) — carries
+        the KP_rx class leaf onto pte_tramp for the still-pte_tramp-shaped
+        pt2 window machinery.
+      - kpt_pt2_tramp_spec_gen premise flipped ⌜=None⌝ → ⌜=Some (tramp_ppn,
+        KP_rx)⌝ (supplied by kmap_at_lookup vs the window auth in
+        wp_userret_entry_pt).
+      - KvmMap: kvm_M seeds the tramp insert (anchor); kvm_M_lookup grew
+        the tramp arm; kvm_full_of_M folds tramp into the maps arm via
+        kvm_word_tramp + kperm_rx_tramp_variant; kvm_full_tramp DELETED,
+        kvm_full_none lost its vpn≠tramp premise (derivable); kvm_bridge
+        reproved one-clause.  kvm_pas_ok unchanged.
+      - pte_tramp / tramp_variant* family KEPT: still referenced by the
+        pt2 window (pt2_tramp_spec / pt2_tramp_fetch_habs) and the user-PT
+        side (UptTree / UserPtTree — a different table, untouched).
+      WHOLE-FUNCTION SPECS that gained the persistent
+      `kmap_at tramp_vpn tramp_ppn KP_rx` hypothesis (terminal — userret
+      is not yet linked into a caller): wp_userret_pt (UserretAllPt),
+      wp_userret_entry_pt (UserretEntryPt).  The kernel trampoline engine
+      wp_instr_ktramp_pt folds the claim into its INV (claim ∗ tlb_inv_pt),
+      since Habs's shape is fixed and the claim is persistent.
 
 STATUS: IN PROGRESS (design signed off 2026-07-23).  Stages 1-5 are DONE
 and green on full builds (301/301): kperm layer + kmap_M0, KMap.v, the

@@ -788,20 +788,34 @@ End Pt2TrampInst.
    trampoline clause and survive the trampoline A/D write-back ---------- *)
 
 
-(* the M-indexed analogue (rwx-kmap §5f): the generalized spec survives the
-   trampoline A/D write-back; its [M !! tramp_vpn = None] premise is supplied
-   from [kmap_auth]'s wf conjunct at the use site. *)
+(* the M-indexed analogue (rwx-kmap §5f, stage C): the trampoline is now an
+   ordinary M entry [(tramp_ppn, KP_rx)], so the generalized spec's own
+   maps-clause at [tramp_vpn] gives the [pt2_tramp_spec] premises -- the
+   class-KP_rx leaf [mk_pte tramp_ppn 0xCB] is [pte_tramp] modulo A/D
+   ([kperm_rx_tramp_variant]).  Its [M !! tramp_vpn = Some (tramp_ppn, KP_rx)]
+   premise is supplied by [kmap_at_lookup] against the window's auth from the
+   caller's trampoline claim. *)
 Lemma kpt_pt2_tramp_spec_gen (kroot : mword 44)
     (M : gmap (mword 27) (mword 44 * kperm)) :
-  M !! tramp_vpn = None -> pt2_tramp_spec (kpt_tree_spec_gen kroot M).
+  M !! tramp_vpn = Some (tramp_ppn, KP_rx) ->
+  pt2_tramp_spec (kpt_tree_spec_gen kroot M).
 Proof.
-  intro Htn. split.
-  - intros t Hspec. exact (proj1 (proj2 (proj2 Hspec))).
+  intro Htr. split.
+  - intros t (Hbase & Hall). pose proof (Hall tramp_vpn) as Hm. rewrite Htr in Hm.
+    destruct Hm as (p2 & p1 & a0 & d0 & Hmaps).
+    exists p2, p1, a0, d0.
+    rewrite <- kperm_rx_tramp_variant. exact Hmaps.
   - intros t a1 d1 Hspec.
-    destruct (proj1 (proj2 (proj2 Hspec))) as (p2 & p1 & a0 & d0 & Hmaps).
-    rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
-    exact (kpt_tree_spec_gen_set_leaf_tramp kroot M t p2 p1 _ a1 d1 Hspec Hmaps Htn
-             (ex_intro _ a0 (ex_intro _ d0 eq_refl))).
+    pose proof Hspec as (Hbase & Hall). pose proof (Hall tramp_vpn) as Hm.
+    rewrite Htr in Hm. destruct Hm as (p2 & p1 & a0 & d0 & Hmaps).
+    assert (Heq : pte_set_ad pte_tramp a1 d1
+                = pte_set_ad (kpt_leaf_pte_of tramp_vpn (tramp_ppn, KP_rx)) a1 d1).
+    { unfold kpt_leaf_pte_of; cbn [fst snd]. symmetry. apply kperm_rx_tramp_variant. }
+    rewrite Heq.
+    rewrite <- (pte_set_ad_absorb (kpt_leaf_pte_of tramp_vpn (tramp_ppn, KP_rx)) a0 d0 a1 d1).
+    apply (kpt_tree_spec_gen_set_leaf kroot M t tramp_vpn (tramp_ppn, KP_rx)
+             p2 p1 _ a1 d1 Hspec Hmaps Htr).
+    exists a0, d0. reflexivity.
 Qed.
 
 (* the parked kernel table + its mapping auth, threaded across the pt2

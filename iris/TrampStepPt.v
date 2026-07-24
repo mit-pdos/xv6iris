@@ -557,8 +557,12 @@ Section TrampFetchInst.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* the KERNEL instance: [tlb_inv_pt kroot] absorbs the trampoline fetch
-     (the kernel table maps the trampoline too). *)
+  (* the KERNEL instance (stage C): the trampoline is an ordinary M entry
+     [tramp_vpn ↦ (tramp_ppn, KP_rx)], so the fetch is absorbed by the
+     GENERAL [tlb_inv_pt_translateAddr_at] fed the trampoline claim
+     [kmap_at tramp_vpn tramp_ppn KP_rx].  The claim is persistent and rides
+     inside [INV] (it is threaded up from the post-switch caller, which holds
+     it after the kvminithart switch mints it). *)
   Lemma ktramp_fetch_habs (root_ppn : mword 44) :
     forall (va pa : mword 64) (σ : mstate),
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -572,7 +576,8 @@ Section TrampFetchInst.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt root_ppn) ==∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -584,18 +589,22 @@ Section TrampFetchInst.
       ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ⌝ ∗
       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ⌝ ∗
       ⌜ (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt root_ppn).
   Proof.
     intros va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
-    iIntros "Hri Hgh Hinv".
-    iMod (tlb_inv_pt_translateAddr_tramp_fetch root_ppn va pa σ
-            Hvpn Hcanon Hid Lmisa Lmenv Lhtif Lpriv LSXL
+    iIntros "Hri Hgh [#Hclaim Hinv]".
+    iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hclaimva".
+    { rewrite Hvpn. iApply "Hclaim". }
+    iMod (tlb_inv_pt_translateAddr_at (InstructionFetch tt) root_ppn va pa tramp_ppn KP_rx σ
+            (fun a d mxr do_sum => kperm_variant_check_fetch tramp_ppn a d mxr do_sum)
+            Hcanon Hid Lmisa Lmenv Lhtif Lpriv LSXL
             (exec_effectivePrivilege_fetch _ _ σ)
             (exec_is_shadow_stack_fetch σ)
-            Lpma with "Hri Hgh Hinv")
+            Lpma with "Hclaimva Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
     iDestruct "Hinv" as (satp1 tlbvec1 t1 M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Htrampnone & %Hpmawimpl & Ht & Hpmp)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
       "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc0") as %Lc.
@@ -608,9 +617,9 @@ Section TrampFetchInst.
     iSplit; [iPureIntro; rewrite La; exact Hord |].
     iSplit; [iPureIntro; rewrite Lc; exact HX |].
     iSplit; [iPureIntro; rewrite La; exact Hcov |].
-    iFrame "Hri Hgh".
+    iFrame "Hri Hgh Hclaim".
     iApply (tlb_inv_pt_intro root_ppn satp1 tlbvec1 t1 M
-              Hmode Hasid Hppn Htlbok Hspec Htrampnone Hpmawimpl with "Hsatp Htlb HM Ht").
+              Hmode Hasid Hppn Htlbok Hspec Hpmawimpl with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
               HA Hord Hpmarimpl HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.
@@ -678,7 +687,8 @@ Section TrampFetchInst.
      step (userret's first two instructions) and the USER-phase step (the
      rest of userret / uservec). *)
   Definition wp_instr_ktramp_pt (root_ppn : mword 44) :=
-    wp_instr_tramp_pt (tlb_inv_pt root_ppn) (ktramp_fetch_habs root_ppn).
+    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt root_ppn)
+      (ktramp_fetch_habs root_ppn).
   Definition wp_instr_u_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :=
     wp_instr_tramp_pt (utlb_inv_pt uroot tfp um) (utramp_fetch_habs uroot tfp um).
 

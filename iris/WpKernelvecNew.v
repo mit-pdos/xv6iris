@@ -1358,7 +1358,7 @@ Section WpKernelvecNew.
                     = regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
     { unfold kv_m2. apply upd_eq. }
     iDestruct (tlb_inv_pt_open with "Htlbinv") as (satp0 tlbmid t0 M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & HM & %Htramp & %Hpmaw0 & Hpte & Hpmp)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & HM & %Hpmaw0 & Hpte & Hpmp)".
     iApply (kerneltrap_returns γ (DfracOwn (1/2)) (kv_m2 m) (kv_sp1 m)
               (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))
               satp0 tlbmid
@@ -1377,7 +1377,7 @@ Section WpKernelvecNew.
     { rewrite (Hpres _ Hsp_nc). exact Hsp_l. }
     (* ---- instrs #20..#38: epilogue (restores + sp cancel + sret) ---- *)
     iDestruct (tlb_inv_pt_intro root_ppn satp0 tlbmid t0 M
-                 Hmode Hasid Hppn Hokmid Hspec0 Htramp Hpmaw0
+                 Hmode Hasid Hppn Hokmid Hspec0 Hpmaw0
                  with "Hsatp Htlb HM Hpte Hpmp") as "Htlbinv".
     iApply (wp_kv_epilogue root_ppn γ m' (kv_sp1 m) mstatus0 mie_v mdv0 menvcfg0 sepc0
 
