@@ -316,9 +316,11 @@ ProofHoldingsleep.v
 LinkHoldingsleep.v
 ProofAcquiresleep.v
 LinkAcquiresleep.v
+WpBinitDecode.v
 SpecBinit.v
 ProofBinit.v
 LinkBinit.v
+WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
 LinkIinit.v
