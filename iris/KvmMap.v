@@ -132,6 +132,22 @@ Definition kvm_pas_ok (pas : nat -> mword 44) : Prop :=
     ram_base <= bv_unsigned (pas i) * 4096 /\
     (bv_unsigned (pas i) + 1) * 4096 <= ram_base + ram_size.
 
+(* The naive per-run table-page cost of proc_mapstacks' 64 one-page kstack
+   runs, summed against the SAME (starting) tree [t].  This is an UPPER
+   BOUND on the true telescoped cost: proc_mapstacks walks the 64 kstack
+   vpns in sequence, each walk grafting at most the tables the previous
+   grafts left absent, so successive runs' missing-counts only DECREASE
+   relative to what [pt_missing t (kstack_vpn i) 1] reports against the
+   original [t].  The whole-function proof pass telescopes this
+   (the kstack vpns all live under the same top L1 group just below the
+   trampoline, so after the first run's grafts the shared l1 node is
+   present and later runs miss at most their own l0 slot); the naive sum
+   here is what the caller's budget premise is stated against, and the
+   proof discharges [true_cost <= kstacks_missing t] as an obligation --
+   NO admit is introduced by using the naive sum. *)
+Definition kstacks_missing (t : ptree) : nat :=
+  sum_list_with (fun i => pt_missing t (kstack_vpn i) 1) (seq 0 64).
+
 (* ===================================================================== *)
 (* §4 Characterizations -- the ONLY lemmas that look inside the literals  *)
 (*    (never normalize them: kvm_map has ~49k entries).                   *)
