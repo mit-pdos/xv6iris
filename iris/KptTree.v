@@ -505,7 +505,7 @@ Section PtSlotBridge.
     iAssert (kmap_at (svpn_of (pa_add (u_pte_addr b idx) (0 + k))) b KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
     iApply (phys_to_mem_claim (pa_add (u_pte_addr b idx) (0 + k)) b dq (nth_byte w (0 + k))
-              Hid Hkda Hcan with "Hk' Hp").
+              Hid (addr_is_kdata_ram _ Hkda) Hcan with "Hk' Hp").
   Qed.
 
   (* the reverse ↦₈ → ↦ₚ₈ (walk restores the physical slot after its load /

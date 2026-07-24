@@ -191,13 +191,13 @@ Section SmodeCorePt.
          σ'.(mem) !! pa_add (pa_of ppn b) j = Some (g (lo + j)%nat))
      /\ addr_is_ram (pa_of ppn b)
      /\ addr_is_ram (pa_add (pa_of ppn b) (len - 1))
-     /\ addr_is_kdata (pa_of ppn b)⌝.
+     /\ addr_is_ram (pa_of ppn b)⌝.
   Proof.
     intros Hlon Hlen Hbase Hoff Hcan.
     iIntros "Hmem #Hk Hbytes".
     iAssert (⌜forall j : nat, (j < len)%nat ->
                σ'.(mem) !! pa_add (pa_of ppn b) j = Some (g (lo + j)%nat)
-               /\ addr_is_kdata (pa_add (pa_of ppn b) j)⌝)%I as %Hall.
+               /\ addr_is_ram (pa_add (pa_of ppn b) j)⌝)%I as %Hall.
     { iIntros (j Hj).
       assert (Hoffj : (bv_unsigned (subrange_vec_dec b 11 0) + Z.of_nat j < 4096)%Z).
       { eapply Z.lt_le_trans; [| exact Hoff].
@@ -213,13 +213,13 @@ Section SmodeCorePt.
       rewrite (pa_of_pa_add ppn b j Hcan Hoffj) in Hkd.
       iPureIntro. split; [exact Hlk | exact Hkd]. }
     iPureIntro.
-    assert (Hkd0 : addr_is_kdata (pa_of ppn b)).
+    assert (Hram0 : addr_is_ram (pa_of ppn b)).
     { pose proof (proj2 (Hall 0%nat Hlen)) as H0. rewrite pa_add_0 in H0. exact H0. }
     split; [| split; [| split]].
     - intros j HjN. exact (proj1 (Hall j (nat_lt_of_N j len HjN))).
-    - exact (addr_is_kdata_ram _ Hkd0).
-    - apply addr_is_kdata_ram. exact (proj2 (Hall (len - 1)%nat ltac:(lia))).
-    - exact Hkd0.
+    - exact Hram0.
+    - exact (proj2 (Hall (len - 1)%nat ltac:(lia))).
+    - exact Hram0.
   Qed.
 
   (* =================================================================== *)

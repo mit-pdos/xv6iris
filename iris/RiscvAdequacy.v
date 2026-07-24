@@ -306,7 +306,7 @@ Proof.
     assert (Hcanon : (uint a < 274877906944)%Z)
       by (unfold addr_is_kdata, ram_base, ram_size, text_end in Hkd; lia).
     (* identity assembly: raw ↦ₚ + the static claim -> owned ↦ₘ image. *)
-    iApply (phys_ident_mem a (DfracOwn 1) b (kdata_svpn_class a Hkd) Hkd Hcanon
+    iApply (phys_ident_mem a (DfracOwn 1) b (kdata_svpn_class a Hkd) (addr_is_kdata_ram a Hkd) Hcanon
               with "Hkbundle [Hb]").
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)

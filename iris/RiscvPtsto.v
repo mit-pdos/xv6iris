@@ -276,7 +276,7 @@ Definition mem_pointsto `{!riscvGS Σ} (va : Arch.pa) (dq : dfrac) (v : bv 8) : 
   (∃ ppn : mword 44,
      kmap_at (svpn_of va) ppn KP_rw ∗
      ⌜(uint va < 274877906944)%Z⌝ ∗          (* 2^38: canonical, positive half *)
-     ⌜addr_is_kdata (pa_of ppn va)⌝ ∗
+     ⌜addr_is_ram (pa_of ppn va)⌝ ∗
      pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v)%I.
 Notation "a ↦ₘ{ dq } v" := (mem_pointsto a dq v)
   (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
@@ -741,7 +741,7 @@ Section Bridge.
     a ↦ₘ{dq} b -∗ ∃ ppn : mword 44,
       kmap_at (svpn_of a) ppn KP_rw ∗
       ⌜(uint a < 274877906944)%Z⌝ ∗
-      ⌜addr_is_kdata (pa_of ppn a)⌝ ∗
+      ⌜addr_is_ram (pa_of ppn a)⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b -∗ a ↦ₘ{dq} b).
   Proof.
@@ -758,12 +758,12 @@ Section Bridge.
     iPureIntro; exact Hc.
   Qed.
 
-  (* PA-SIDE region fact: the byte's PHYSICAL address is kernel DATA (the
+  (* PA-SIDE region fact: the byte's PHYSICAL address is in RAM (the
      claim ppn identifies the page).  Identity consumers recover the va-side
      fact via [pa_of_id] (KptPt). *)
-  Lemma mem_kdata a dq b :
+  Lemma mem_ram a dq b :
     a ↦ₘ{dq} b -∗ ∃ ppn : mword 44,
-      kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_kdata (pa_of ppn a)⌝.
+      kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_ram (pa_of ppn a)⌝.
   Proof.
     rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _)".
     iExists ppn. iFrame "Hk". iPureIntro; exact Hd.
@@ -772,7 +772,7 @@ Section Bridge.
   (* reading a memory byte agrees with the byte heap AT ITS PHYSICAL address. *)
   Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a dq b :
     gen_heap_interp (hG:=riscv_memGS) mm -∗ a ↦ₘ{dq} b -∗ ∃ ppn : mword 44,
-      kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_kdata (pa_of ppn a)⌝ ∗
+      kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_ram (pa_of ppn a)⌝ ∗
       ⌜mm !! (pa_of ppn a) = Some b⌝.
   Proof.
     rewrite /mem_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & Hp)".
@@ -924,7 +924,7 @@ Section Bridge.
      this.  Only [kmap_at_agree] is needed here, so it stays in RiscvPtsto. *)
   Lemma mem_pointsto_pin (pa : mword 64) dq b (ppn0 : mword 44) :
     kmap_at (svpn_of pa) ppn0 KP_rw -∗ pa ↦ₘ{dq} b -∗
-      ⌜(uint pa < 274877906944)%Z⌝ ∗ ⌜addr_is_kdata (pa_of ppn0 pa)⌝ ∗
+      ⌜(uint pa < 274877906944)%Z⌝ ∗ ⌜addr_is_ram (pa_of ppn0 pa)⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b -∗ pa ↦ₘ{dq} b).
   Proof.
@@ -941,7 +941,7 @@ Section Bridge.
      S-mode load, carrying NOTHING but the node's own claim
      ([pt_node_claim] = this [kmap_at] + [node_kdata]). *)
   Lemma phys_to_mem_claim (pa : mword 64) (ppn : mword 44) dq b :
-    pa_of ppn pa = pa -> addr_is_kdata pa -> (uint pa < 274877906944)%Z ->
+    pa_of ppn pa = pa -> addr_is_ram pa -> (uint pa < 274877906944)%Z ->
     kmap_at (svpn_of pa) ppn KP_rw -∗ pa ↦ₚ{dq} b -∗ pa ↦ₘ{dq} b.
   Proof.
     intros Hid Hkd Hcan. iIntros "#Hk [Hp _]".
@@ -956,7 +956,7 @@ Section Bridge.
     intros Hid. iIntros "#Hk H".
     iDestruct (mem_pointsto_pin pa dq b ppn with "Hk H") as "(%Hc & %Hd & Hp & _)".
     rewrite Hid in Hd. iEval (rewrite Hid) in "Hp".
-    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact (addr_is_kdata_ram _ Hd).
+    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hd.
   Qed.
 
   Lemma text_pointsto_pin (pa : mword 64) dq b (ppn0 : mword 44) :

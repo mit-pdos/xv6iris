@@ -841,9 +841,8 @@ Section WpSconfMem.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     (* the byte's OWN claim + canonicality + region (refold to keep) *)
-    iDestruct (mem_pointsto_acc with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hram0 & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hbyte".
-    pose proof (addr_is_kdata_ram _ Hkd0) as Hram0.
     destruct (Hpma_all (pa_of ppn pa) 1) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.

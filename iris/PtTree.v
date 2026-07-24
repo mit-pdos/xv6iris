@@ -585,7 +585,7 @@ Section PtTreeIris.
      page is kdata.  Carried inside [pt_page_own] so a software walk can turn a
      physical slot [↦ₚ₈] into a VA-tier [↦₈] (reconstruct [mem_pointsto]) with
      NOTHING but the tree itself -- [kmap_at] supplies the mapping, [node_kdata]
-     the [addr_is_kdata] + canonicality conjuncts [mem_pointsto] carries. *)
+     the [addr_is_ram] + canonicality conjuncts [mem_pointsto] carries. *)
   Definition pt_node_claim (b : mword 44) : iProp Σ :=
     (⌜node_kdata b⌝ ∗ kmap_at (pt_page_vpn b) b KP_rw)%I.
 

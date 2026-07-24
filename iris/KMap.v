@@ -145,20 +145,20 @@ Section KMap.
       as "(%Hc & %Hd & Hp & _)".
     rewrite (pa_of_id pa Hc) in Hd.
     iEval (rewrite (pa_of_id pa Hc)) in "Hp".
-    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact (addr_is_kdata_ram _ Hd).
+    rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hd.
   Qed.
 
   (* assembly ↦ₚ → ↦ₘ: a physical byte at a static kdata va re-forms ↦ₘ *)
   Lemma phys_ident_mem (pa : mword 64) dq b :
     kmap_static (svpn_of pa) KP_rw ->
-    addr_is_kdata pa -> (uint pa < 274877906944)%Z ->
+    addr_is_ram pa -> (uint pa < 274877906944)%Z ->
     kmap_static_claims -∗ pa ↦ₚ{dq} b -∗ pa ↦ₘ{dq} b.
   Proof.
-    iIntros (Hs Hkd Hc) "#Hb H".
+    iIntros (Hs Hram Hc) "#Hb H".
     iDestruct (kmap_static_claims_at (svpn_of pa) KP_rw Hs with "Hb") as "#Hk0".
     iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
     rewrite /mem_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
-    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro. split; [exact Hc | exact Hkd].
+    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro. split; [exact Hc | exact Hram].
   Qed.
 
   (* text tier: ↦ₓ ⇄ ↦ₚ at KP_rx / addr_is_text *)
