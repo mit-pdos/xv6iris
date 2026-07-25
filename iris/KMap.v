@@ -31,7 +31,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import KptPt.
-Require Import KptExecMap.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

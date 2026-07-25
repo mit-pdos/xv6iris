@@ -18,7 +18,7 @@ Require Import KernelText KernelDataInv.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
+Require Import ProcGeom CpuOwn.
 Require Import SpecFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

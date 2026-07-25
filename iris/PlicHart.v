@@ -21,7 +21,6 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
-Require Import RiscvExtras.
 Require Import DevModel.
 Require Import KptPt.
 Require Import DevModel.

@@ -18,10 +18,8 @@ Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
-Require Import WpIntenaBits.
 Require Import WpLock.
 Require Import WpMycpu ProcGeom.
-Require Import IntrDefs SwtchCtx CpuOwn.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpWakeup.

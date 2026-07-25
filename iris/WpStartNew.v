@@ -80,7 +80,6 @@ Require Import WpMmodeAddiw.
 Require Import WpMmodeItype.
 Require Import WpMmodeRtype.
 Require Import WpMmodeStore.
-Require Import WpMmodeJalr.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMretWp.
 Require Import WpMmodeLeafBase.

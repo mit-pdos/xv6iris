@@ -8,7 +8,6 @@ Require Import WpIntenaBits.
 Require Import WpGprCsrwCommon.
 (* helper bridges for ProofPushOff -- pure bit-vector facts *)
 Require Import CpuOwn.
-Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.

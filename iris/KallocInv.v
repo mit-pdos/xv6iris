@@ -58,7 +58,7 @@ From iris.base_logic.lib Require Import own ghost_var.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvPtsto WpLock KptExecMap.
+Require Import RiscvModelBytes RiscvPtsto WpLock.
 Local Open Scope Z_scope.
 Import Defs.
 

@@ -23,8 +23,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import SwtchCtx CpuOwn.
-Require Import WpIntenaBits.
+Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

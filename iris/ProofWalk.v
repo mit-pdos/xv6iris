@@ -27,11 +27,11 @@ Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
+Require Import ProcGeom CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMemset.
 Require Import SpecKalloc.
-Require Import WpWalkInstr UserBits.
+Require Import WpWalkInstr.
 Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

@@ -19,7 +19,7 @@ Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpMycpu WpLock.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
+Require Import ProcGeom CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 

@@ -33,11 +33,12 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpIntenaBits KernelRvcDecode.
+Require Import KernelRvcDecode.
 Require Import WpSmodeIntr.
 Require Import WpMycpu ProcGeom.
 Require Import CpuOwn.
-Require Import SchedCtx SpecSched.
+Require Import SchedCtx.
+Require Import SwtchCtx.
 Require Import WpLock.
 Require Import SleepLock.
 Require Import WpSleeplockDecode.

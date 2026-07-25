@@ -15,11 +15,10 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile WpGpr.
+Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import IntrDefs.
-Require Import ProcGeom.
 Require Import CpuOwn.
 Local Open Scope Z_scope.
 

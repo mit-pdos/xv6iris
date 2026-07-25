@@ -22,7 +22,7 @@ Require Import WpLock.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
+Require Import ProcGeom CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.

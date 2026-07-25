@@ -16,7 +16,7 @@ Require Import WpLock.
 Require Import RegFile.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
+Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.

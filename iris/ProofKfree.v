@@ -28,9 +28,8 @@ Require Import WpMycpu WpLock.
 Require Import VcGen.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpIntenaBits.
 Require Import SpecMemsetPage SpecAcquire SpecRelease.
-Require Import WpKalloc WpKfree.
+Require Import WpKfree.
 Require Import SpecKfree.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

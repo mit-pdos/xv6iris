@@ -15,10 +15,10 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec Ris
 Require Import WpLoad.
 Require Import RegFile.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte KptPt.
+Require Import SmodePte.
 Require Import SmodeCore WpSmodeGpr.
-Require Import KptTree SmodeCorePt WpSmodePtMem WpSmodePtLock WpAmo.
-Require Import KptPt UserBits.
+Require Import SmodeCorePt WpSmodePtMem WpSmodePtLock WpAmo.
+Require Import UserBits.
 Require Import WpLock.
 Require Import SRegime.
 Require Import IntrDefs WpSmodeIntr.

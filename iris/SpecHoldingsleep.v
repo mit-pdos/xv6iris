@@ -30,7 +30,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import SwtchCtx CpuOwn.
+Require Import CpuOwn.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

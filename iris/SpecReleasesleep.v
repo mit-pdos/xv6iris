@@ -32,7 +32,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import SwtchCtx CpuOwn.
+Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpWakeup.
 Require Import SleepLock.

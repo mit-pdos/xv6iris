@@ -23,7 +23,6 @@ Require Import CalleeSaved StackOwn.
 Require Import KallocInv.
 Require Import PtTree.
 Require Import Riscv.riscv_extras.
-Require Import UserBits.
 Require Import WpKvmmap.
 Require Import SpecMappages.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.

@@ -19,7 +19,7 @@ Require Import WpGpr WpMmodeShiftiop.
 Require Import WpMmodeLeafBase.
 Require Import KernelText MstatusBits.
 Require Import PtTree.
-Require Import KMap KptExecMap.
+Require Import KptExecMap.
 Require Import TrampPt KptTree UptTree UserretDefs UserretPt UserretEntryPt.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.

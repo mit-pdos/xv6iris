@@ -23,7 +23,6 @@ Require Import SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpGprCsrwCommon.
-Require Import WpIntenaBits.
 Require WpGprCsrwC.
 Require Import WpSchedDecode.
 Require Import SpecMyproc SpecHolding SpecSwtch SpecSched.

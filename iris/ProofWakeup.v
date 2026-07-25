@@ -29,11 +29,11 @@ Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import RiscvExtras.
-Require Import IntrDefs WpIntenaBits.
+Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import SpecAcquire SpecRelease.
-Require Import WpWakeup SpecWakeupParts WpKalloc.
+Require Import WpWakeup SpecWakeupParts.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcGeom SpecMyproc.

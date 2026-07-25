@@ -34,7 +34,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
-Require Import SmodePte KptPt.
+Require Import KptPt.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.

@@ -20,11 +20,10 @@ From stdpp Require Import gmap list_numbers bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
+Require Import RiscvPtsto.
 Require Import Pt4kWalk.
 Require Import KptPt.
 Require Import KptExecMap.
-Require Import KMap.
 Require Import PtAdBits.
 Require Import PtTree.
 Require Import PtBuild.

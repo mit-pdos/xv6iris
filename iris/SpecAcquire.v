@@ -15,8 +15,8 @@ From Stdlib Require Import FunctionalExtensionality.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
-Require Import WpLock WpIntenaBits.
+Require Import ProcGeom CpuOwn.
+Require Import WpLock.
 Require Import WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

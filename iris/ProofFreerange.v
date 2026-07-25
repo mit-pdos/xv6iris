@@ -27,7 +27,7 @@ Require Import KernelText.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
-Require Import ProcGeom SwtchCtx CpuOwn.
+Require Import CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKfree.
 Require Import WpFreerangeDecode.

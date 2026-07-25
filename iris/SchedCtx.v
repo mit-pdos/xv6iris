@@ -40,7 +40,6 @@ Require Import WpLock.
 Require Import WpMycpu.
 Require Import ProcGeom.
 Require Import SwtchCtx.
-Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

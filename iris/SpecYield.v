@@ -27,7 +27,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SpecSched.
+Require Import SwtchCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

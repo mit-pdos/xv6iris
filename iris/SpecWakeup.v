@@ -19,7 +19,7 @@ Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import SwtchCtx CpuOwn.
+Require Import CpuOwn.
 Require Import WpWakeup.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
