@@ -32,7 +32,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelRvcDecode.
+Require Import KernelRvcDecode KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -86,12 +86,8 @@ Lemma bidb_8d058593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 2256 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* auipc a0,0x15 / addi a0,a0,1736 -- a0 := &bcache *)
-Lemma bidb_00015517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00015517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
+(* a0 := &bcache: the auipc half is the shared [bdec_00015517] (sys_uptime
+   materializes &tickslock with the same word); the addi is binit's own. *)
 Lemma bidb_6c850513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x6c850513 : mword 32)) s
   = Some (ITYPE (mword_of_int 1736 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
@@ -262,7 +258,7 @@ Section WpBinitDecode.
 
   Lemma bii_18 : kernel_text -∗ instr (mword_of_int (BI + 0x18) : mword 64) false (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (BI + 0x18)%Z (mword_of_int 0x00015517 : mword 32)
-    (mword_of_int (BI + 0x18) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) bidb_00015517. Qed.
+    (mword_of_int (BI + 0x18) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00015517. Qed.
 
   Lemma bii_1c : kernel_text -∗ instr (mword_of_int (BI + 0x1c) : mword 64) false (ITYPE (mword_of_int 1736 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (BI + 0x1c)%Z (mword_of_int 0x6c850513 : mword 32)

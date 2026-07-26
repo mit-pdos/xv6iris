@@ -44,3 +44,10 @@ Lemma bdec_0c2017b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0c2017b7 : mword 32)) s
   = Some (UTYPE (mword_of_int 0xc201 : mword 20, Regidx (mword_of_int 15), LUI), s).
 Proof. decode_bridge_ms. Qed.
+
+(* auipc a0,0x15 -- binit +0x18 (&bcache), sys_uptime +0x0a and +0x20
+   (&tickslock, materialized once per acquire/release call) *)
+Lemma bdec_00015517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00015517 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x15 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
+Proof. decode_bridge_ms. Qed.

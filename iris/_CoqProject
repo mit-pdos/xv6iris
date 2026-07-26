@@ -338,3 +338,8 @@ WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
 LinkIinit.v
+TicksInv.v
+WpSysUptimeDecode.v
+SpecSysUptime.v
+ProofSysUptime.v
+LinkSysUptime.v

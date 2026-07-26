@@ -96,6 +96,7 @@ binit, splicing the element into a list). The reusable pieces:
 
 - `lockG Σ = exclR unitO`; `locked γ := own γ (Excl ())`; `lock_inv γ lk R := ∃ v, lock_word lk v ∗ (⌜v=0⌝ ∗ locked γ ∗ R ∨ ⌜v≠0⌝)`; `is_lock γ lk s R := lock_name lk s ∗ inv lockN (lock_inv γ lk R)` (`lockN` disjoint from `minstretN`). Core: `newlock`, `locked_exclusive`.
 - **A lock carries its NAME.** `lock_name lk s := ∃ p, lock_name_field lk ↦₈□ p ∗ p ↦ₛ□ s` — `lk->name` (8 B @ +8) points at the C string `s` (`↦ₛ□`, RiscvPtsto.v). Both halves are DfracDiscarded, so `lock_name` is persistent and rides inside the persistent `is_lock` at no ownership cost: no proof threads the name field, and the kmem/proc locks are `is_lock … "kmem"` / `… "proc"` by construction (`is_kmem`, `procs_inv`). initlock takes the string as a duplicable precondition (`name ↦ₛ□ s`), stores the pointer, then DISCARDS the field's fraction (`word_pointsto_persist`) and returns `lock_name lk s`; the caller seals it with the freshly allocated invariant via `is_lock_intro`. Leaves that open the invariant project it out first (`is_lock_inv`), so nothing below the lock layer sees the name. Leaves in `WpSmodePtLock.v` (`wp_amoswap_lockinv_pt`, `wp_clw_lockinv_pt{,_locked}` — the `_locked` twin refutes the free branch via `locked_exclusive`, `wp_sw_zero_lockinv_pt`, `wp_sd_zero_s_pt`); higher levels in `WpHoldingInv.v`/`WpAcquireLock.v`/`WpRelease.v`.
+- **The tickslock (`TicksInv.v`)** — the pattern for a lock over a plain global: `is_tickslock γl := is_lock γl a_tickslock "time" ticks_res` with `ticks_res := ∃ t : mword 32, a_ticks ↦₄ t`, i.e. the counter cell at an ARBITRARY value. That is deliberately the weakest useful invariant: it is all sys_uptime needs (it returns whatever it read) and all clockintr can maintain without a ghost tick history. `tickslock_cpu` is `&tickslock->cpu` spelled in acquire/release's `a_cpu` form (`add_vec lk (sign_extend' 64 16)`) so a caller's cell unifies with their specs without rewriting; `new_tickslock` is the ghost step from trapinit's postcondition (`lock_name lk "time"` + the zeroed word + the counter cell) to the sealed lock, mirroring `new_sleeplock`. A client that must relate ticks to something else (sleep/wakeup on the tick channel) strengthens `ticks_res` — the interface does not change and every lock user keeps compiling.
 - **Invariant-opening leaf technique** (reusable): inside the σ-callback (mask `E ∖ ↑minstretN`) do `iMod (inv_acc (E ∖ ↑minstretN) lockN with "Hlock") as "[Hbody Hclose]"; [solve_ndisj|]`, strip the timeless window `iDestruct … as (w) "[>Hbytes Hbr]"`, use/update bytes for the exec witness, RE-CLOSE before the final `iModIntro`, and hand the `▷`-ed payload to the continuation (the engine's `▷ WP` strips it). pop_off preconditions (constrain callers): SIE=0, `noff>0` signed, `intena=0`.
 
 
@@ -107,4 +108,20 @@ binit, splicing the element into a list). The reusable pieces:
 - `struct bcache` (bio.c, `BcacheInv.v`): lock@0 (24 B spinlock), `buf[NBUF]`@24, `head` immediately past the array — so the head sentinel is at `bcache+24+1112*NBUF` and IS the loop's end pointer, i.e. `bnode NBUF`. NBUF=30, sizeof(struct buf)=1112; inside a buf: sleeplock@16, refcnt@64, prev@72, next@80, data@88. `bcache`@0x80018190. gcc keeps `bcache+0x8000` in a register and reaches head.prev/head.next at +688/+696 off it (`hbase_prev`/`hbase_next` bridge those spellings to `bprev bhead`/`bnext bhead`). `BcacheInv.v` also holds the circular-LRU predicate (`bcache_lru`/`bseg`/`blink_raw`) and `blist`, the order binit leaves the list in — reverse address order, MRU first, which is what bget's scan expects.
 - `struct itable` (fs.c, `SpecIinit.v`): lock@0 (24 B), `inode[NINODE]`@24. NINODE=50, sizeof(struct inode)=136, sleeplock@16 inside an inode — so `&itable.inode[i].lock` is `itable+40+136*i`. `itable`@0x80020870.
 - **Data addresses come from the tracked `KernelInstrs.v`/`KernelSyms.v`, never from `xv6-riscv/kernel/kernel.asm`.** That tree is gitignored and drifts: at the time binit/iinit were proved its text sat 14 bytes below the tracked image, so every auipc/addi/jal/branch immediate in the asm was wrong while the data symbols happened to match — the most confusing possible failure mode. Read the immediates out of the `MkKInstr` table (its comments carry the disassembly).
+- the tick counter: `ticks`@0x8000a248 (4 B), `tickslock`@0x80018178 (the 24 B spinlock trapinit initializes with the name `"time"`); both named in TicksInv.v as `a_ticks` / `a_tickslock`.
+
+
+## Syscall return values: the `(uint)` cast
+
+A syscall whose C return type is `uint`/`int` ends in `slli a0,rs,0x20; srli
+a0,a0,0x20` — the 32→64 ZERO-extension of the 32-bit value in `rs`. So the
+spec's returned a0 is `zero_extend' 64 t` where `t : mword 32` is what the body
+loaded: `lw` yields `sign_extend' 64 t` and the cast is exactly what undoes the
+sign extension (sys_uptime is the worked example). The general pure fact is
+`su_uint_cast` in ProofSysUptime.v — `shiftr (shiftl x 32) 32 = zero_extend' 64
+(trunc32 x)`, plus `su_uint_cast_sext` at `x = sign_extend' 64 t`;
+`WpMemsetArray.slli32_srli32` is the same round trip specialized to a value
+already below 2^32 (memset's `(unsigned int)n` count), where it is the identity.
+Both are deliberate proof-local copies to avoid a heavy Require edge — **a third
+user should move them to `RiscvExtras.v`** rather than clone again.
 
