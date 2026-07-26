@@ -200,6 +200,7 @@ SpecKvminit.v
 ProofKvminit.v
 LinkKvminit.v
 WpKvminithart.v
+SpecKvminithart.v
 SpecWakeupParts.v
 ProofWakeupParts.v
 LinkWakeupParts.v

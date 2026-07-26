@@ -396,8 +396,11 @@ kvm literals/kernel image maps; statements frozen unless the brief
 authorizes; STOP-AND-REPORT design-level issues; no admits in
 deliverables; templates named per task.  Orchestration: Fable states
 specs/designs, Opus subagents prove; checkpoint-commit green stage
-boundaries to main (rebase over the user's concurrent commits; commit
-from the repo ROOT — cwd often sits in iris/).
+boundaries to main AND PUSH TO origin/main before continuing (user
+directive 2026-07-26) — fetch + rebase over the user's concurrent
+commits, rebuild the affected cone honestly (touch the content-changed
+files so make recompiles them and their dependents), verify green,
+then push; commit from the repo ROOT — cwd often sits in iris/.
 
 OFF-PATH FRAME DECISION (2026-07-24): pt_missing + all telescope/flip
 lemmas are DONE and green (PtBuild §10-§12), but ptree_same_rep0 is

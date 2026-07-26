@@ -141,6 +141,10 @@ Lemma trap_ms_SXL (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_SXL (trap_ms elp_v ms) = _get_Mstatus_SXL ms.
 Proof. unfold trap_ms, _get_Mstatus_SXL; cbn zeta; mw_prep; tb2. Qed.
 
+Lemma trap_ms_TVM (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_TVM (trap_ms elp_v ms) = _get_Mstatus_TVM ms.
+Proof. unfold trap_ms, _get_Mstatus_TVM; cbn zeta; mw_prep; tb1. Qed.
+
 (* --------------------------------------------------------------------- *)
 (* The SRET post-execute CSR tower, as functions of the initial mstatus /  *)
 (* sepc (names as in the archived WpKvSret.v).  WpSmodeSret.v proves the   *)
@@ -192,6 +196,13 @@ Lemma sret_ms5_SXL (x : mword 64) :
 Proof.
   unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_SXL.
   mw_prep; tb2.
+Qed.
+
+Lemma sret_ms5_TVM (x : mword 64) :
+  _get_Mstatus_TVM (sret_ms5 x) = _get_Mstatus_TVM x.
+Proof.
+  unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_TVM.
+  mw_prep; tb1.
 Qed.
 
 (* SPP over the two SRET pre-updates (bits 1 and 5): untouched.           *)
@@ -252,6 +263,11 @@ Lemma roundtrip_TSR_false (elp_v : mword 1) (ms : mword 64) :
   eq_vec (_get_Mstatus_TSR ms) ('b"1") = false ->
   eq_vec (_get_Mstatus_TSR (sret_ms5 (trap_ms elp_v ms))) ('b"1") = false.
 Proof. intros H. rewrite sret_ms5_TSR. rewrite trap_ms_TSR. exact H. Qed.
+
+Lemma roundtrip_TVM_false (elp_v : mword 1) (ms : mword 64) :
+  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false ->
+  eq_vec (_get_Mstatus_TVM (sret_ms5 (trap_ms elp_v ms))) ('b"1") = false.
+Proof. intros H. rewrite sret_ms5_TVM. rewrite trap_ms_TVM. exact H. Qed.
 
 Lemma trap_ms_SXL_eq (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_SXL ms = ('b"10" : mword 2) ->

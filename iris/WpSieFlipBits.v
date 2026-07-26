@@ -168,6 +168,40 @@ Proof. qu_disj. Qed.
 Local Lemma qTSR_uTSR (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_TSR w x) = x.
 Proof. qu_same. Qed.
 
+(* row TVM (rwx-kmap: sconf_ms_facts gains the TVM=0 conjunct) *)
+Local Lemma qTVM_uSD (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SD w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uSIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uMIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uSPIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SPIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uMPIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uSPP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SPP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uMPP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uVS (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_VS w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uFS (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_FS w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uXS (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_XS w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uMPRV (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPRV w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uSUM (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SUM w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uMXR (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MXR w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uSPELP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SPELP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uUXL (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_UXL w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Local Lemma qTVM_uTVM (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_TVM w x) = x.
+Proof. qu_same. Qed.
+
 (* row XS *)
 Local Lemma qXS_uSD (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_SD w x) = _get_Mstatus_XS w.
 Proof. qu_disj. Qed.
@@ -330,6 +364,13 @@ Proof. unfold mstatus_legalized. cbn zeta.
           qTSR_uMPP qTSR_uVS qTSR_uFS qTSR_uXS qTSR_uMPRV qTSR_uSUM qTSR_uMXR
           qTSR_uTVM qTSR_uTW qTSR_uTSR. reflexivity. Qed.
 
+Local Lemma mstatus_legalized_TVM' (o v : mword 64) :
+  _get_Mstatus_TVM (mstatus_legalized o v) = _get_Mstatus_TVM v.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qTVM_uSD qTVM_uSIE qTVM_uMIE qTVM_uSPIE qTVM_uMPIE qTVM_uSPP
+          qTVM_uMPP qTVM_uVS qTVM_uFS qTVM_uXS qTVM_uMPRV qTVM_uSUM qTVM_uMXR
+          qTVM_uTVM. reflexivity. Qed.
+
 Local Lemma mstatus_legalized_XS' (o v : mword 64) :
   _get_Mstatus_XS (mstatus_legalized o v) = extStatus_map_forwards Off.
 Proof. unfold mstatus_legalized. cbn zeta.
@@ -393,6 +434,11 @@ Local Lemma lift_TSR (m s : mword 64) :
 Proof. unfold lift_sstatus. cbn zeta.
   rewrite qTSR_uSIE qTSR_uSPIE qTSR_uSPP qTSR_uVS qTSR_uFS qTSR_uXS qTSR_uSUM qTSR_uMXR qTSR_uSPELP qTSR_uUXL qTSR_uSD. reflexivity. Qed.
 
+
+Local Lemma lift_TVM (m s : mword 64) :
+  _get_Mstatus_TVM (lift_sstatus m s) = _get_Mstatus_TVM m.
+Proof. unfold lift_sstatus. cbn zeta.
+  rewrite qTVM_uSIE qTVM_uSPIE qTVM_uSPP qTVM_uVS qTVM_uFS qTVM_uXS qTVM_uSUM qTVM_uMXR qTVM_uSPELP qTVM_uUXL qTVM_uSD. reflexivity. Qed.
 
 Local Lemma lift_FS (m s : mword 64) :
   _get_Mstatus_FS (lift_sstatus m s) = _get_Sstatus_FS s.
@@ -593,7 +639,7 @@ Section Assembly.
     _get_Mstatus_SIE (legalize_sstatus_val ms W) = b /\
     sconf_ms_facts (legalize_sstatus_val ms W).
   Proof.
-    intros (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP)
+    intros (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM)
            HbW HmxrW HfsW HvsW HxsW.
     unfold legalize_sstatus_val.
     rewrite zext64_id.
@@ -605,6 +651,7 @@ Section Assembly.
     rewrite mstatus_legalized_SXL'.
     rewrite mstatus_legalized_MXR' lift_MXR HmxrW.
     rewrite mstatus_legalized_TSR' lift_TSR.
+    rewrite mstatus_legalized_TVM' lift_TVM.
     rewrite mstatus_legalized_XS'.
     rewrite mstatus_legalized_FS' lift_FS HfsW HFS.
     rewrite mstatus_legalized_VS' lift_VS HvsW HVS.

@@ -93,7 +93,7 @@ Section WpKernelvecSpec.
     iModIntro.
     iIntros (root_ppn elp_v ms pc0 mie_v mdv0 m Φ)
       "%Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hpc Hfile HF Hcont".
-    pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+    pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
       by (vm_compute; reflexivity).
     assert (Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM MENVCFG_S) = PMM_Disabled)

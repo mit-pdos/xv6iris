@@ -68,12 +68,13 @@ Definition intr_ms_facts (ms : mword 64) : Prop :=
   _get_Mstatus_FS ms = extStatus_map_forwards Off /\
   _get_Mstatus_VS ms = extStatus_map_forwards Off /\
   _get_Mstatus_SD ms = 'b"0" /\
-  WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true.
+  WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true /\
+  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false.
 
 Lemma intr_ms_facts_roundtrip (elp_v : mword 1) (ms : mword 64) :
   intr_ms_facts ms -> intr_ms_facts (sret_ms5 (trap_ms elp_v ms)).
 Proof.
-  intros (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10).
+  intros (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11).
   split; [exact (roundtrip_SIE_true elp_v ms H1) |].
   split; [exact (roundtrip_MPRV_false elp_v ms) |].
   split; [exact (roundtrip_SXL_eq elp_v ms H3) |].
@@ -83,7 +84,8 @@ Proof.
   split; [rewrite roundtrip_FS; exact H7 |].
   split; [rewrite roundtrip_VS; exact H8 |].
   split; [rewrite roundtrip_SD; exact H9 |].
-  rewrite roundtrip_MPP; exact H10.
+  split; [rewrite roundtrip_MPP; exact H10 |].
+  exact (roundtrip_TVM_false elp_v ms H11).
 Qed.
 
 (* the SIE-AGNOSTIC common fact set: [intr_ms_facts] minus the SIE pin.
@@ -99,7 +101,8 @@ Definition sconf_ms_facts (ms : mword 64) : Prop :=
   _get_Mstatus_FS ms = extStatus_map_forwards Off /\
   _get_Mstatus_VS ms = extStatus_map_forwards Off /\
   _get_Mstatus_SD ms = 'b"0" /\
-  WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true.
+  WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true /\
+  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false.
 
 Lemma intr_ms_facts_iff (ms : mword 64) :
   intr_ms_facts ms

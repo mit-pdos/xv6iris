@@ -113,7 +113,7 @@ Section WpSmodeIntr.
     iDestruct "Hcfg" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepcx & Hscausex & Hstvalx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
     pose proof Hmsf as Hmsf'.
-    destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+    destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -230,7 +230,7 @@ Section WpSmodeIntr.
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
       iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
       pose proof Hmsf as Hmsf'.
-      destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+      destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
       assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
         by (rewrite Hb0; vm_compute; reflexivity).

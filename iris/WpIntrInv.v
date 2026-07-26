@@ -258,7 +258,7 @@ Section WpIntrInv.
     iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
     iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     pose proof Hmsf as Hmsf'.
-    destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP).
+    destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
