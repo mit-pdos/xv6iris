@@ -230,6 +230,29 @@ Definition set_hi (a : Arch.pa) (w : bv 32) : Arch.pa :=
   Z_to_bv 64 (Z.lor (Z.land (bv_unsigned a) 0xffffffff)
                     (Z.shiftl (bv_unsigned w) 32)).
 
+(* The driver programs each 64-bit queue address as two 32-bit halves, so the
+   configuration it ends up with is only recognisable as "the page I kalloc'd"
+   modulo reassembling them.  [set_lo_hi_id] is that reassembly, and it is what
+   lets a driver spec name the queue addresses directly instead of leaking the
+   half-splitting into its postcondition. *)
+Definition lo32 (a : Arch.pa) : bv 32 := bv_extract 0 32 a.
+Definition hi32 (a : Arch.pa) : bv 32 := bv_extract 32 32 a.
+
+Lemma lor_split32 (x : Z) :
+  0 <= x -> Z.lor (x `mod` 4294967296) (Z.shiftl (Z.shiftr x 32) 32) = x.
+Proof.
+  intro Hx. apply Z.bits_inj_iff'. intros i Hi.
+  rewrite Z.lor_spec, Z.shiftl_spec by lia.
+  change 4294967296 with (2 ^ 32).
+  destruct (decide (i < 32)) as [Hlt|Hge].
+  - rewrite Z.mod_pow2_bits_low by lia.
+    rewrite (Z.testbit_neg_r (Z.shiftr x 32) (i - 32)) by lia.
+    apply orb_false_r.
+  - rewrite Z.mod_pow2_bits_high by lia.
+    rewrite orb_false_l, Z.shiftr_spec by lia.
+    f_equal. lia.
+Qed.
+
 (* A device RESET (status <- 0) drops the whole configuration and all queue
    progress; the disk image, of course, survives. *)
 Definition virtio_cfg0 : virtio_cfg :=
@@ -401,6 +424,47 @@ Proof.
   - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
     intro He; injection He as <-; reflexivity.
   - intro He; injection He as <-; reflexivity.
+Qed.
+
+Lemma mod_shiftr_id (x : Z) :
+  0 <= x -> x < 18446744073709551616 ->
+  (x ≫ 32) `mod` 4294967296 = x ≫ 32.
+Proof.
+  intros H0 H1. apply Z.mod_small.
+  rewrite Z.shiftr_div_pow2 by (intro Hc; discriminate).
+  change (2 ^ 32) with 4294967296. split.
+  - apply Z.div_pos; [exact H0 | reflexivity].
+  - apply Z.div_lt_upper_bound; [reflexivity|].
+    change (4294967296 * 4294967296) with 18446744073709551616. exact H1.
+Qed.
+
+(* Writing an address low half then high half reassembles the address. *)
+Lemma set_lo_hi_id (a : Arch.pa) : set_hi (set_lo zero64 (lo32 a)) (hi32 a) = a.
+Proof.
+  pose proof (bv_unsigned_in_range 64 a) as [Halo Hahi].
+  unfold bv_modulus in Hahi. change (Z.of_N 64) with 64 in Hahi.
+  change (2 ^ 64) with 18446744073709551616 in Hahi.
+  apply bv_eq. unfold set_hi, set_lo, lo32, hi32, zero64.
+  rewrite !Z_to_bv_unsigned, !bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (Z.of_N 0) with 0. change (Z.of_N 32) with 32.
+  change (Z.of_N 64) with 64.
+  change (2 ^ 32) with 4294967296. change (2 ^ 64) with 18446744073709551616.
+  rewrite Z.shiftr_0_r.
+  assert (Hz : Z.shiftl (Z.shiftr (0 `mod` 18446744073709551616) 32) 32 = 0)
+    by reflexivity.
+  rewrite Hz, Z.lor_0_r.
+  (* the low half survives the 64-bit wrap and the 32-bit mask *)
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4294967296 ltac:(lia)) as [Hl1 Hl2].
+  rewrite (Z.mod_small (bv_unsigned a `mod` 4294967296) 18446744073709551616)
+    by lia.
+  change 4294967295 with (Z.ones 32).
+  rewrite Z.land_ones by lia. change (2 ^ 32) with 4294967296.
+  rewrite (Z.mod_small (bv_unsigned a `mod` 4294967296) 4294967296) by lia.
+  (* the high half needs no mask either *)
+  rewrite (mod_shiftr_id (bv_unsigned a) Halo Hahi).
+  rewrite (lor_split32 (bv_unsigned a) Halo).
+  apply Z.mod_small. split; [exact Halo | exact Hahi].
 Qed.
 
 (* Record eta, so a fact stated over the split state applies to a state that
@@ -1062,6 +1126,25 @@ Definition virtio_init_post (v : virtio_state) (dl dh al ah ul uh : bv 32)
                          (set_hi (set_lo zero64 al) ah)
                          (set_hi (set_lo zero64 ul) uh))
               zero32 zero16 zero16 (v_disk v).
+
+(* The same configuration with the queue addresses named DIRECTLY.  The driver
+   programs each as two 32-bit halves, and [set_lo_hi_id] reassembles them, so a
+   driver spec can say "the queue is at the page I allocated" instead of leaking
+   the half-splitting into its postcondition. *)
+Definition virtio_init_cfg (pd pav pu : Arch.pa) : virtio_cfg :=
+  VirtioCfg (Z_to_bv 32 15) (Z_to_bv 32 0) (Z_to_bv 32 0) (Z_to_bv 32 8) true
+            pd pav pu.
+
+Lemma virtio_init_post_cfg (v : virtio_state) (pd pav pu : Arch.pa) :
+  virtio_init_post v (lo32 pd) (hi32 pd) (lo32 pav) (hi32 pav) (lo32 pu) (hi32 pu)
+  = VirtioState (virtio_init_cfg pd pav pu) zero32 zero16 zero16 (v_disk v).
+Proof.
+  unfold virtio_init_post, virtio_init_cfg. by rewrite !set_lo_hi_id.
+Qed.
+
+Lemma virtio_init_cfg_live (pd pav pu : Arch.pa) :
+  virtio_live (virtio_init_cfg pd pav pu) = true.
+Proof. reflexivity. Qed.
 
 (* No write in the sequence is refused, and the state it reaches is exactly
    the one above -- whatever the device was doing before. *)

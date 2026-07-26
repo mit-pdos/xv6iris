@@ -167,7 +167,57 @@ One thing the model is deliberately silent about: the request HEADER
 the buffer either way — but a future disk-CONTENTS spec will need the header
 pinned to predict which sector is touched.
 
-## Remaining work (the driver side), in dependency order
+## `virtio_disk_init` (in progress)
+
+The SPECIFICATION is written and compiling: `SpecVirtioDiskInit.v`. Design
+points worth knowing before touching it:
+
+- It owns the **raw `virtio_frag`**, not `dev_inv` — like `wp_uartinit_sconf`,
+  and for the same reason squared: it *resets* the device, which no invariant
+  could tolerate.
+- **Every one of the six panic paths is refuted, so the spec needs no
+  `panic_wp`.** The four identification reads are constants of the model
+  (`virtio_ident_reads`), `QUEUE_NUM_MAX` is 8 (`virtio_queue_num_max_read`,
+  which needs `vc_qsel = 0` — the driver writes `QUEUE_SEL` first), the
+  FEATURES_OK re-read sticks (`virtio_status_readback`), `QUEUE_READY` reads
+  clear after the reset (`virtio_reset_not_ready`), and kalloc cannot fail
+  because the caller supplies three pages. That is a real payoff of modelling
+  the device concretely rather than axiomatising it.
+- The postcondition names the queue addresses **directly** (`virtio_init_cfg pd
+  pav pu`) rather than as the low/high halves the driver actually writes;
+  `set_lo_hi_id` (VirtioModel) is the reassembly that makes that legitimate.
+- The postcondition is deliberately **not** the DMA lease. It hands back the raw
+  frag at a live configuration plus the three zeroed pages as VA-based `↦ₘ`;
+  turning those into `virtio_lease` needs the VA→PA identity bridge
+  (`mem_ident_phys`, KMap.v, with `ram_ident_4k` for the static claim) and
+  belongs in a separate lemma, at the caller. Keeping it out of this spec keeps
+  the function's contract about the function.
+- `kalloc_env` (KvmSpec.v) bundles kalloc's whole environment (the kmem lock,
+  `kalloc_avail`, the mycpu scratch cell); use it rather than threading the
+  pieces, as `wp_kvmmake_sconf` does.
+- `K_virtio_disk_init = 18`: this function's 4-slot frame plus kalloc's 14.
+
+Still to do, in order:
+
+1. **The width-4 S-mode virtio MMIO leaves** over the raw `virtio_frag`: a
+   store and — new, the PLIC never needed one — a raw-frag *load*. The shape to
+   follow is `wp_sw_plic_s_sconf` (WpPlic.v): same S-mode translation/PMP tower,
+   with the window predicate and the device half swapped. Prefer generalizing
+   that lemma into an accessor form (device premise `dev_write d a 4 sw = Some
+   d'` + a ghost-step wand) over cloning it a third time; the `_kpt` UART leaves
+   already use that shape.
+2. **A lease-construction lemma in WpVirtio**: three zeroed pages + a live
+   `virtio_init_cfg` ⟹ `virtio_lease`, with `S = ∅`, `ai = 0`, `ctl` = the
+   descriptor and available pages. With `S = ∅` the only clause with content is
+   the `ai` pinning, which the zeroed available page discharges.
+3. **`ProofVirtioDiskInit.v`**: ~100 instructions, straight-line apart from the
+   six refuted branches, three `kalloc` calls and three `memset` calls. Use the
+   general `wp_memset_sconf` (not `wp_memset_page_sconf`) — the page-shaped one
+   returns a contents-AGNOSTIC `page_own`, and the spec needs to know the pages
+   are zero.
+4. `LinkVirtioDiskInit.v`.
+
+## Remaining work (the rest of the driver), in dependency order
 
 1. **S-mode width-4 virtio MMIO leaves.** The virtio registers are all 32-bit,
    so this is the PLIC's shape, not the UART's byte shape: reuse the width-4

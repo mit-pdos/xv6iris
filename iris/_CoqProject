@@ -291,6 +291,7 @@ ProofFileinit.v
 LinkFileinit.v
 WpUartinitDecode.v
 SpecUartinit.v
+SpecVirtioDiskInit.v
 ProofUartinit.v
 LinkUartinit.v
 SpecCpuid.v
