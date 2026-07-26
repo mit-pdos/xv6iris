@@ -615,10 +615,27 @@ correspondence lemma; hand out
    + spec 47c622b, the pma fix + ProofKvminithart/Link 5a46a50).
    wp_kvminithart is sealed and linked; its post hands out the KPT
    receipt, the stvec cell, and the 65 persistent mapping claims.
-   REMAINING of stage 6: the vmem/vcode general points-to forms +
-   the ↦ᵥ-style kstack width-8 leaf demonstrator; then the parked
-   cleanups (heap-domain invariant; intr_frame slot-carry; KvmSpec's
-   redundant Variable R note in kvm-spec.md stage (d)).
+   STAGE 6 FULLY CLOSED (2026-07-26, capstone pushed e2c30c0):
+   page_own_kstack (WpKvminithart.v) SUBSUMES the old
+   vmem/vcode-forms + demonstrator item (user: "not just a
+   demonstrator but the complete result we need from the page
+   table") -- page_own of a kvminit stack page at its identity
+   address becomes page_own (kstack_va i), the first non-identity
+   ↦ₘ; the general introduction is phys_to_mem_map (RiscvPtsto,
+   phys_to_mem_claim now its identity restatement); kvm_pas_ok
+   strengthened to node_kdata pointwise; kstack_va + per-byte facts
+   in KvmMap.  Proof-route note: no kdata bound needed -- the
+   identity byte's own KP_rw claim + ram_svpn_static +
+   kmap_at_agree pin class AND ppn (pa_of_id), so RAM bounds
+   suffice.  The lemma carries the forward pointer: proc_lock_res/
+   procs_inv (WpWakeup) will gain a per-proc page_own (kstack_va i)
+   conjunct; sp-migration consumes that.
+   THIS PROJECT'S WORKLIST IS NOW EXHAUSTED except the PARKED
+   cleanups (heap-domain invariant; intr_frame slot-carry; KvmSpec
+   Variable-R collapse note in kvm-spec.md stage (d)) -- move this
+   file + kvm-spec.md to completed/ at the next tidy-up, lifting
+   the durable recipes (WRAPPER RECIPE, the zify/lia and map-fold
+   landmines) into durable-notes.md if not already there.
 
    TWO ABSTRACTION FIXES surfaced by 6c (both decided; the switch is
    the first proof forced to MINT the ambient invariants rather than
