@@ -111,6 +111,15 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   kmap_name : gname;
+  (* the S-mode translation-slot arm bit ('b"0" = Bare, 'b"1" = kernel PT
+     installed): a global ghost name (like [kmap_name]) tracking which arm
+     of [strans_inv] the capability's translation slot is in.  A client
+     half held outside the slot is a "still-Bare receipt" pinning the arm;
+     the kvminithart switch flips it with both halves.  The [ghost_varG Σ
+     (mword 1)] functor instance comes from [sieG] at the use sites (NOT a
+     field here -- a second [ghost_varG Σ (mword 1)] instance would make
+     typeclass resolution ambiguous between two functor slots). *)
+  strans_name : gname;
 }.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is

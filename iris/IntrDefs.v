@@ -429,18 +429,56 @@ Section IntrDefs.
          rides client-side (Sv39, no handler, SIE=0 -- a legal state).
      The Bare→KPT move happens once, at kvminithart: dissolve the left arm
      (it owns the satp cell the switch writes), build [tlb_inv_pt], hand the
-     stvec cell out to the boot code. *)
+     stvec cell out to the boot code.
+     GHOST-TRACKED ARM: each arm carries half of a [ghost_var strans_name]
+     bit ('b"0" = Bare, 'b"1" = kernel PT installed); the bit is the arm
+     INDICATOR.  A client that holds the matching half pins the arm
+     (agreement -- the "still-Bare receipt"), and the kvminithart switch
+     flips it with both halves.  In practice the flip is one-way: the boot
+     receipt is the only outside half ever minted, so the arm only ever
+     moves Bare→KPT. *)
+  Definition strans_bit (b : mword 1) : iProp Σ :=
+    ghost_var strans_name (1/2)%Qp b.
+
   Definition strans_inv : iProp Σ :=
-    ((bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
-     ∨ (∃ root_ppn : mword 44, tlb_inv_pt root_ppn))%I.
+    ((strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
+     ∨ (strans_bit ('b"1") ∗ ∃ root_ppn : mword 44, tlb_inv_pt root_ppn))%I.
 
   Lemma strans_inv_intro (root_ppn : mword 44) :
-    tlb_inv_pt root_ppn -∗ strans_inv.
-  Proof. iIntros "H". iRight. iExists root_ppn. iExact "H". Qed.
+    strans_bit ('b"1") -∗ tlb_inv_pt root_ppn -∗ strans_inv.
+  Proof. iIntros "Hbit H". iRight. iFrame "Hbit". iExists root_ppn. iExact "H". Qed.
 
   Lemma strans_inv_intro_bare (v : mword 64) :
-    bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
-  Proof. iIntros "Hb Hstv". iLeft. iFrame "Hb". iExists v. iExact "Hstv". Qed.
+    strans_bit ('b"0") -∗ bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
+  Proof. iIntros "Hbit Hb Hstv". iLeft. iFrame "Hbit Hb". iExists v. iExact "Hstv". Qed.
+
+  Lemma strans_bit_agree b b' : strans_bit b -∗ strans_bit b' -∗ ⌜b = b'⌝.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ghost_var_agree with "H1 H2") as %He. done.
+  Qed.
+
+  (* the receipt pins the arm at Bare and opens it, returning BOTH halves
+     (the client's + the arm's) so the switch can flip the bit. *)
+  Lemma strans_inv_acc_bare :
+    strans_bit ('b"0") -∗ strans_inv -∗
+    strans_bit ('b"0") ∗ strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v).
+  Proof.
+    iIntros "Hrcpt [(Hbit & Hb & Hstv) | (Hbit & _)]".
+    - iFrame "Hrcpt Hbit Hb Hstv".
+    - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
+      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
+      vm_compute in Hbad. discriminate.
+  Qed.
+
+  (* both halves -> flip to '1', split back into two halves. *)
+  Lemma strans_bit_flip :
+    strans_bit ('b"0") -∗ strans_bit ('b"0") ==∗ strans_bit ('b"1") ∗ strans_bit ('b"1").
+  Proof.
+    iIntros "H1 H2".
+    iMod (ghost_var_update_halves ('b"1" : mword 1) with "H1 H2") as "[H1 H2]".
+    iModIntro. iFrame.
+  Qed.
 
   (* two FULL cells of the same register cannot coexist -- the Bare∧SIE='1'
      refutation's engine (the dq-generic second cell lets a borrowed
@@ -489,18 +527,18 @@ Section IntrDefs.
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
   Proof.
     intros acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
-    iIntros "Hat Hri Hgh [[Hb Hstv] | Hk]".
+    iIntros "Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
     - iMod (bare_absorb acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
               with "Hat Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iLeft. iFrame "Hb Hstv".
+      iFrame "Hri Hgh". iLeft. iFrame "Hbit Hb Hstv".
     - iDestruct "Hk" as (root_ppn) "Ht".
       iMod (kpt_absorb root_ppn acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
               with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
-      iFrame "Hri Hgh". iRight. iExists root_ppn. iExact "Ht".
+      iFrame "Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
   Qed.
 
   Lemma strans_transform :
@@ -515,7 +553,7 @@ Section IntrDefs.
         ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝.
   Proof.
     intros acc ea σ Hacc Hcp HSXL Heff Hpml.
-    iIntros "Hri [[Hb _] | Hk]".
+    iIntros "Hri [(_ & Hb & _) | (_ & Hk)]".
     - iApply (bare_transform acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Hb").
     - iDestruct "Hk" as (root_ppn) "Ht".
       iApply (kpt_transform root_ppn acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Ht").
@@ -555,23 +593,26 @@ Section IntrDefs.
      across the step and hands it back to the final continuation. *)
   (* BOOT ENTRY: the capability at the Bare regime, from raw boot
      resources -- the free-stack carve, satp still Bare + PMP, the
-     UNWRITTEN stvec cell (no trap handler installed), and the SIE
-     ghost's kernel-code eighth at '0'.  Nothing here requires the
+     UNWRITTEN stvec cell (no trap handler installed), the translation
+     slot's Bare arm-bit half [strans_bit ('b"0")] (its twin is kept boot
+     side as the still-Bare receipt), and the SIE ghost's kernel-code
+     eighth at '0'.  Nothing here requires the
      kernel page table, an interrupt handler, or the trap CSRs: this is
      what makes the whole sconf-tier (memset, the lock/kalloc cone via
      [cpu_own γ 0 false p C], ...) callable during early boot. *)
   Lemma sie_cap_intro_bare (γ : gname) (m : regfile) (avail : nat)
       (v : mword 64) :
     stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) -∗
+    strans_bit ('b"0") -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
     ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
     sie_cap γ m avail.
   Proof.
-    iIntros "Hstk Hb Hstv Htok".
+    iIntros "Hstk Hbit Hb Hstv Htok".
     iFrame "Hstk".
-    iSplitL "Hb Hstv".
-    { iApply (strans_inv_intro_bare with "Hb Hstv"). }
+    iSplitL "Hbit Hb Hstv".
+    { iApply (strans_inv_intro_bare with "Hbit Hb Hstv"). }
     iLeft. iExact "Htok".
   Qed.
 

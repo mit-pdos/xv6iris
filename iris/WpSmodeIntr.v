@@ -262,7 +262,7 @@ Section WpSmodeIntr.
       iDestruct "Hhx" as (handler) "#Hintr".
       (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
          inside its invariant, and the Bare slot owns the same cell. *)
-      iDestruct "Htr" as "[[Hbare Hbstv] | Hkpt]".
+      iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
       { iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
         iApply fupd_wp.
         iInv "Hinv_i" as (b) "(>Hq & >Hstv & Hspec)" "Hclose".
@@ -289,11 +289,11 @@ Section WpSmodeIntr.
       iDestruct (v2_of_intr_config with "Hic Hmenv")
         as "(Hsc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hstk Hdeep Htlbinv] Hfile Hnpc Hsi")
+              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
-        iSplitL "Htlbinv". { iRight. iExists root_ppn. iExact "Htlbinv". }
+        iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
         iRight. iFrame "Hq1 Hsepcx Hscausex Hstvalx".
         iExists handler. iExact "Hintr". }
       iModIntro. iExists s_exec.

@@ -55,6 +55,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
 Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
+Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans arm bit *)
 Require Import WireInv.
 Require Import PlicPlan WpVirtio WpUart.
 
@@ -209,7 +210,7 @@ Definition cpu_pool (cs : list CPU) : list (expr riscv_lang) :=
 (* 5. The adequacy theorem.                                                *)
 (* ---------------------------------------------------------------------- *)
 
-Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ}
+Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
     (cs : list CPU) (g : gstate) (D : CPU -> gset register)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) :
   (forall HR : riscvGS Σ,
@@ -229,6 +230,12 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ}
        (* ... and the persisted static-claims bundle (uniform-claims):
           the client threads it into hw_config *)
        kmap_static_claims ∗
+       (* BOTH halves of the S-mode translation-slot arm bit, minted at Bare
+          ('b"0"): the boot introduction folds one into the Bare translation
+          slot via [sie_cap_intro_bare] and keeps the other as the still-Bare
+          receipt (which the kvminithart switch spends to flip the arm). *)
+       ghost_var strans_name (1/2)%Qp strans_bit_bare ∗
+       ghost_var strans_name (1/2)%Qp strans_bit_bare ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio))
        ={⊤}=∗
@@ -261,7 +268,12 @@ Proof.
   iEval (rewrite -Qp.half_half) in "Hv".
   iDestruct (ghost_var_split with "Hv") as "[HvA HvF]".
   iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk).
+  (* the S-mode translation-slot arm bit, minted at Bare ('b"0"); both
+     halves are handed to the boot client below *)
+  iMod (ghost_var_alloc strans_bit_bare) as (γs) "Hs".
+  iEval (rewrite -Qp.half_half) in "Hs".
+  iDestruct (ghost_var_split with "Hs") as "[HsA HsB]".
+  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk γs).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
@@ -317,12 +329,14 @@ Proof.
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HuF HpF HvF]") as "[Hwps Hdwp]".
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HsA HsB HuF HpF HvF]") as "[Hwps Hdwp]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
     iFrame "Htext Hdata". iSplitL "Hkauth".
     { iExact "Hkauth". }
     iSplitR; [iExact "Hkbundle" |].
+    iSplitL "HsA"; [iExact "HsA" |].
+    iSplitL "HsB"; [iExact "HsB" |].
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }
   iModIntro.
@@ -364,7 +378,7 @@ Qed.
 (*    same way, with a richer [D].                                          *)
 (* ---------------------------------------------------------------------- *)
 
-Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ} (g : gstate)
+Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* [dev_inv] freezes DLAB, so the initial UART must already have it clear
        -- i.e. the invariant is allocated after the divisor latch is set. *)
@@ -390,7 +404,7 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & Huf & Hpf & Hvf)".
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
   (* allocate the four UART ghosts at the initial device state *)
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
   iMod (dev_inv_alloc _ γ with "[Huf Hpf Hvf Hacc Hout Htx Hdl]") as "#Hinv".

@@ -922,6 +922,16 @@ Qed.
 (* ghost tracking of the [mstatus.SIE] bit: [smode_config] holds one half tied
    to the actual flag; functions that observe/save SIE (push_off/pop_off via
    acquire/release) own the other half.  Mirrors [lockG] in WpLock.v. *)
+(* the S-mode translation-slot arm-bit VALUES ([strans_inv], IntrDefs.v):
+   'b"0" = Bare (boot), 'b"1" = kernel PT installed.  Named here (a file
+   that has the ['b"..."] notation) so RiscvAdequacy -- which mints the bit
+   and hands out both halves but must NOT [Import SailStdpp.Values] (that
+   leaks instances breaking its Iris proofs) -- can name the Bare value.
+   Transparent, so they convert to the raw literals at the IntrDefs use
+   sites. *)
+Definition strans_bit_bare : mword 1 := 'b"0".
+Definition strans_bit_kpt : mword 1 := 'b"1".
+
 Class sieG (Σ : gFunctors) := SieG { sie_inG :: ghost_varG Σ (mword 1) }.
 Definition sieΣ : gFunctors := #[ ghost_varΣ (mword 1) ].
 Global Instance subG_sieΣ {Σ} : subG sieΣ Σ -> sieG Σ.

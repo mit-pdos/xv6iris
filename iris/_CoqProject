@@ -82,6 +82,7 @@ WpWalkInstr.v
 WpMappagesInstr.v
 WpProcMapstacksInstr.v
 WpKvmmakeInstr.v
+WpKvminithartInstr.v
 WpKvmmap.v
 InstrBytes.v
 KernelText.v
