@@ -122,72 +122,92 @@ Section WpVirtio.
 
   (* -- the lease itself -- *)
 
-  (* [ctl] is the CONTROL part of the lease (the descriptor table and the
-     available ring: the bytes the device reads to decide WHERE to write).
-     Pinning its contents is what makes the footprint a function of the
-     configuration; [virtio_dma_ok]'s second conjunct is what keeps it
-     pinned. *)
+  (* [ctl] is the CONTROL region of the lease: bytes the invariant owns and the
+     device only ever READS -- the descriptor table and the available ring.
+     [S] is the set of available-ring positions the device may still reach, and
+     [ai] the published index.  The pure conjunct is POSITIVE: it asserts that
+     every reachable entry really is a well-formed request writing only inside
+     the lease, rather than merely constraining the writes of a step that
+     happens.  That is what makes a misconfigured queue unverifiable instead of
+     vacuously fine -- see VirtioModel section 7. *)
   Definition virtio_lease (v : virtio_state) : iProp Σ :=
-    (∃ ctl dma : gmap Arch.pa (bv 8),
+    (∃ (ctl dma : gmap Arch.pa (bv 8)) (S : gset (bv 16)) (ai : bv 16),
        dma_own dma ∗ ⌜ctl ⊆ dma⌝ ∗
-       ⌜virtio_dma_ok (v_cfg v) ctl (dom dma)⌝)%I.
+       ⌜virtio_queue_ok (v_cfg v) ctl (dom dma) S ai (v_seen v)⌝)%I.
 
   Global Instance virtio_lease_timeless v : Timeless (virtio_lease v).
   Proof. rewrite /virtio_lease. apply _. Qed.
 
-  (* The lease depends on the CONFIGURATION only: it rides through any change
-     to the dynamic half of the device state.  A driver's INTERRUPT_ACK and
-     QUEUE_NOTIFY writes qualify ([virtio_write_cfg_stable]), as does every
-     autonomous step ([virtio_req_step_cfg]). *)
-  Lemma virtio_lease_cfg (v v' : virtio_state) :
-    v_cfg v' = v_cfg v -> virtio_lease v -∗ virtio_lease v'.
-  Proof. intro Hc. rewrite /virtio_lease Hc. iIntros "$". Qed.
+  (* The lease depends on the queue CONFIGURATION and on how far the device has
+     got, and on nothing else: it rides through any other change to the device
+     state.  A driver's INTERRUPT_ACK and QUEUE_NOTIFY writes qualify
+     ([virtio_write_cfg_stable] + [virtio_write_seen]). *)
+  Lemma virtio_lease_stable (v v' : virtio_state) :
+    v_cfg v' = v_cfg v -> v_seen v' = v_seen v ->
+    virtio_lease v -∗ virtio_lease v'.
+  Proof. intros Hc Hs. rewrite /virtio_lease Hc Hs. iIntros "$". Qed.
 
-  (* Before the driver has made the queue live, the device cannot DMA at all,
-     so the EMPTY lease is already good.  This is what the power-on device
-     state (and hence whole-system adequacy) allocates. *)
+  (* Before the driver has made the queue live, the device cannot look at the
+     ring at all, so the EMPTY lease is already good.  This is what the
+     power-on device state (and hence whole-system adequacy) allocates. *)
   Lemma virtio_lease_init (v : virtio_state) :
     virtio_live (v_cfg v) = false -> ⊢ virtio_lease v.
   Proof.
     intro Hlive. rewrite /virtio_lease.
-    iExists ∅, ∅. rewrite /dma_own big_sepM_empty.
+    iExists ∅, ∅, ∅, zero16. rewrite /dma_own big_sepM_empty.
     iSplit; [done|]. iSplit; [iPureIntro; apply map_empty_subseteq|].
-    iPureIntro. by apply virtio_dma_ok_not_live.
+    iPureIntro. by apply virtio_queue_ok_not_live.
   Qed.
 
-  (* THE device-thread rule.  A DMA step is justified entirely from the lease:
-     the write set lands inside it (so the byte memory can be updated), and it
-     misses the control region (so the SAME lease is good for the next
-     request).  Nothing about the queue's contents is re-proved here -- that
-     obligation was discharged once, by the driver, when it took the lease. *)
+  (* DEVICE-THREAD RULE 1.  The lease REFUTES the write-anything step: the
+     queue the driver published is well formed, so the device is never in the
+     position of owing an answer this model does not have.  Without this the
+     wild step of [DevStepDiskWild] would make [wp_dev_loop] unprovable -- which
+     is precisely the pressure that turns queue well-formedness into a driver
+     obligation. *)
+  Lemma virtio_lease_not_stalled (m : gmap Arch.pa (bv 8)) (v : virtio_state)
+      (mv : vmem) :
+    mem_view m mv ->
+    gen_heap_interp m -∗ virtio_lease v -∗ ⌜virtio_stalled v mv = false⌝.
+  Proof.
+    iIntros (Hview) "Hm Hl".
+    iDestruct "Hl" as (ctl dma S ai) "(Hd & %Hctl & %Hok)".
+    iDestruct (dma_agree with "Hm Hd") as %Hsub.
+    iPureIntro.
+    apply (virtio_queue_not_stalled v ctl (dom dma) S ai mv Hok).
+    apply (mem_view_subseteq ctl m mv); [| exact Hview].
+    etransitivity; [exact Hctl|exact Hsub].
+  Qed.
+
+  (* DEVICE-THREAD RULE 2.  A real DMA step is justified entirely from the
+     lease: the write set lands inside it (so the byte memory can be updated)
+     and misses the control region (so the same control bytes are still pinned
+     for the next request).  Nothing about the queue's contents is re-proved
+     here -- that was discharged once, by the driver, when it took the lease. *)
   Lemma virtio_lease_step (v : virtio_state) (m : gmap Arch.pa (bv 8))
-      (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-    virtio_req_step v m = Some (v', w) ->
+      (mv : vmem) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+    mem_view m mv ->
+    virtio_req_step v mv = Some (v', w) ->
     gen_heap_interp m -∗ virtio_lease v ==∗
       gen_heap_interp (w ∪ m) ∗ virtio_lease v'.
   Proof.
-    iIntros (Hstep) "Hm Hl".
-    iDestruct "Hl" as (ctl dma) "(Hd & %Hctl & %Hok)".
+    iIntros (Hview Hstep) "Hm Hl".
+    iDestruct "Hl" as (ctl dma S ai) "(Hd & %Hctl & %Hok)".
     iDestruct (dma_agree with "Hm Hd") as %Hsub.
-    (* the control bytes are in the real memory, which is what [virtio_dma_ok]
-       needs before it will speak about a step taken at [m] *)
     assert (Hctlm : ctl ⊆ m) by (etransitivity; [exact Hctl|exact Hsub]).
-    assert (Hsplit : virtio_req_step
-                       (VirtioState (v_cfg v) (v_isr v) (v_seen v)
-                                    (v_used_idx v) (v_disk v)) m = Some (v', w)).
-    { rewrite <- virtio_state_eta. exact Hstep. }
-    destruct (Hok (v_isr v) (v_seen v) (v_used_idx v) (v_disk v) m v' w
-                  Hctlm Hsplit) as [Hdw Hdisj].
+    assert (Hvctl : mem_view ctl mv)
+      by (apply (mem_view_subseteq ctl m mv Hctlm Hview)).
+    destruct (virtio_queue_ok_step v ctl (dom dma) S ai mv v' w Hok Hvctl Hstep)
+      as (Hdw & Hdisj & Hok').
     iMod (dma_update w m dma Hdw with "Hm Hd") as "[Hm Hd]".
     iModIntro. iFrame "Hm".
-    iExists ctl, (w ∪ dma).
+    iExists ctl, (w ∪ dma), S, ai.
     iFrame "Hd". iSplit.
-    { iPureIntro. exact (virtio_dma_ctl_union ctl w dma Hdisj Hctl). }
+    { iPureIntro. exact (virtio_ctl_union ctl w dma Hdisj Hctl). }
     iPureIntro.
     assert (Hde : dom (w ∪ dma) = dom dma).
     { rewrite dom_union_L. set_solver. }
-    rewrite Hde.
-    exact (virtio_dma_ok_step v ctl (dom dma) m v' w Hok Hstep).
+    rewrite Hde. exact Hok'.
   Qed.
 
 End WpVirtio.

@@ -653,7 +653,7 @@ Section DevLoop.
     iNext. iIntros (d' m' gr' Hstep).
     iMod "Hmask" as "_".
     destruct Hstep as [b u' Htx0 | b u' Hrx | i p' Hirq Hlatch
-                      | vnew w Hdisk | c].
+                      | mv vnew w Hview Hdisk | mv w Hview Hstall | c].
     - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the
          tail of [u_out], so the accepted trace is UNCHANGED. *)
       rewrite Hu in Htx0.
@@ -706,15 +706,27 @@ Section DevLoop.
          control region (VirtioModel.virtio_dma_ok). *)
       rewrite Hv in Hdisk.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iMod (virtio_lease_step vs m vnew w Hdisk with "Hmem Hlease")
+      iMod (virtio_lease_step vs m mv vnew w Hview Hdisk with "Hmem Hlease")
         as "[Hmem' Hlease']".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
       iMod ("Hclose" with "[Hu Hp Hv' Hg Hlease']") as "_".
       { iNext. iExists u, p, vnew. iFrame.
         iSplitR; [iPureIntro; exact Hpok |].
-        iPureIntro. exact (virtio_req_step_isr_ok vs m vnew w Hvok Hdisk). }
+        iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
       iModIntro. iFrame "Hgr Hmem' Hdev'". iApply "IH".
+    - (* The queue the driver published is MALFORMED, so the device may write
+         anything anywhere.  This case is REFUTED, not handled: the lease's
+         positive well-formedness obligation says the device is never in that
+         position.  If the obligation were the old conditional one -- "if a
+         step happens its writes are bounded" -- there would be nothing to
+         refute it with, and a driver that misconfigured the queue would be
+         verifiable.  Needing this refutation is exactly the pressure that
+         makes well-formedness a driver obligation. *)
+      rewrite Hv in Hstall.
+      iDestruct (virtio_lease_not_stalled m vs mv Hview with "Hmem Hlease")
+        as %Hns.
+      exfalso. congruence.
     - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
       iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
       iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";

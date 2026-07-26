@@ -133,6 +133,18 @@ Definition vq_idx_off : Z := 2.           (* the idx field of either ring *)
 (* a disk sector *)
 Definition virtio_sector_size : Z := 512.
 
+(* the status bytes a block request can complete with (spec 5.2.6) *)
+Definition virtio_blk_s_ok : Z := 0.
+Definition virtio_blk_s_unsupp : Z := 2.
+
+(* The queue sizes this device accepts: the powers of two up to
+   [virtio_queue_num_max].  A QUEUE_NUM write of anything else is REFUSED
+   (see [virtio_write]) rather than silently accepted -- the ring geometry
+   below divides by this number, and a device that let the driver pick an
+   illegal one would be modelling hardware that does not exist. *)
+Definition vq_size_ok (n : Z) : bool :=
+  (n =? 1) || (n =? 2) || (n =? 4) || (n =? 8).
+
 (* ---------------------------------------------------------------------- *)
 (* 1. The device state.                                                    *)
 (* ---------------------------------------------------------------------- *)
@@ -173,7 +185,7 @@ Definition virtio_driver_ok (c : virtio_cfg) : bool :=
   Z.testbit (bv_unsigned (vc_status c)) 2.
 
 Definition virtio_live (c : virtio_cfg) : bool :=
-  vc_ready c && virtio_driver_ok c.
+  vc_ready c && virtio_driver_ok c && vq_size_ok (bv_unsigned (vc_qnum c)).
 
 (* the device's (level) interrupt output: asserted while the interrupt-status
    register is nonzero, i.e. until the driver acknowledges. *)
@@ -198,9 +210,14 @@ Definition virtio_read (v : virtio_state) (off : Z) : option (bv 32) :=
   else if off =? vio_off_device_id then Some (Z_to_bv 32 virtio_blk_device_id)
   else if off =? vio_off_vendor_id then Some (Z_to_bv 32 virtio_vendor_id)
   else if off =? vio_off_device_features then Some (Z_to_bv 32 virtio_device_features)
-  else if off =? vio_off_queue_num_max then Some (Z_to_bv 32 virtio_queue_num_max)
+  (* the two per-queue registers report on the SELECTED queue, and queue 0 is
+     the only one this device has: any other selection reads as absent. *)
+  else if off =? vio_off_queue_num_max then
+    Some (Z_to_bv 32 (if bv_unsigned (vc_qsel c) =? 0 then virtio_queue_num_max
+                      else 0))
   else if off =? vio_off_queue_ready then
-    Some (Z_to_bv 32 (if vc_ready c then 1 else 0))
+    Some (Z_to_bv 32 (if (bv_unsigned (vc_qsel c) =? 0) && vc_ready c then 1
+                      else 0))
   else if off =? vio_off_interrupt_status then Some (v_isr v)
   else if off =? vio_off_status then Some (vc_status c)
   else None.
@@ -235,41 +252,59 @@ Definition virtio_write (v : virtio_state) (off : Z) (w : bv 32)
   else if off =? vio_off_queue_sel then
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) w (vc_qnum c)
                                 (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)))
+  (* -- the per-queue registers.  All of them address the SELECTED queue, and
+        queue 0 is the only one that exists, so a write with any other
+        selection is REFUSED: the machine is stuck, and a driver proof has to
+        show it selected queue 0 first.  Same for an illegal queue size and a
+        notification naming a queue that does not exist.  Refusing at the
+        write is what keeps the queue geometry legal by construction, instead
+        of leaving the device to cope with a configuration no real one
+        would accept. -- *)
   else if off =? vio_off_queue_num then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
+    if negb (vq_size_ok (bv_unsigned w)) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) w
                                 (vc_ready c) (vc_desc c) (vc_avail c) (vc_used c)))
   else if off =? vio_off_queue_ready then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (negb (bv_unsigned w =? 0))
                                 (vc_desc c) (vc_avail c) (vc_used c)))
   else if off =? vio_off_queue_notify then
-    (* a hint only: this device polls the available ring itself *)
-    Some v
+    (* a hint only: this device polls the available ring itself.  The value is
+       the queue number, so only 0 is meaningful. *)
+    if negb (bv_unsigned w =? 0) then None else Some v
   else if off =? vio_off_interrupt_ack then
     Some (VirtioState c (Z_to_bv 32 (Z.land (bv_unsigned (v_isr v))
                                             (Z.lnot (bv_unsigned w))))
                       (v_seen v) (v_used_idx v) (v_disk v))
   else if off =? vio_off_queue_desc_low then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (set_lo (vc_desc c) w)
                                 (vc_avail c) (vc_used c)))
   else if off =? vio_off_queue_desc_high then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (set_hi (vc_desc c) w)
                                 (vc_avail c) (vc_used c)))
   else if off =? vio_off_driver_desc_low then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c)
                                 (set_lo (vc_avail c) w) (vc_used c)))
   else if off =? vio_off_driver_desc_high then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c)
                                 (set_hi (vc_avail c) w) (vc_used c)))
   else if off =? vio_off_device_desc_low then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c) (vc_avail c)
                                 (set_lo (vc_used c) w)))
   else if off =? vio_off_device_desc_high then
+    if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
                                 (vc_ready c) (vc_desc c) (vc_avail c)
                                 (set_hi (vc_used c) w)))
@@ -290,14 +325,25 @@ Definition vio_readable (off : Z) : bool :=
   || (off =? vio_off_queue_ready) || (off =? vio_off_interrupt_status)
   || (off =? vio_off_status).
 
-Definition vio_writable (off : Z) : bool :=
+(* A write is accepted when the register exists AND the driver has put the
+   device in a state where the write means something: the per-queue registers
+   need queue 0 selected, QUEUE_NUM needs a legal size, QUEUE_NOTIFY needs an
+   existing queue number.  Anything else is stuck -- deliberately, so that a
+   driver proof has to establish these rather than have the device paper over
+   them (see the header). *)
+Definition vio_write_ok (c : virtio_cfg) (off : Z) (w : bv 32) : bool :=
   (off =? vio_off_status) || (off =? vio_off_driver_features)
-  || (off =? vio_off_queue_sel) || (off =? vio_off_queue_num)
-  || (off =? vio_off_queue_ready) || (off =? vio_off_queue_notify)
-  || (off =? vio_off_interrupt_ack)
-  || (off =? vio_off_queue_desc_low) || (off =? vio_off_queue_desc_high)
-  || (off =? vio_off_driver_desc_low) || (off =? vio_off_driver_desc_high)
-  || (off =? vio_off_device_desc_low) || (off =? vio_off_device_desc_high).
+  || (off =? vio_off_queue_sel) || (off =? vio_off_interrupt_ack)
+  || ((off =? vio_off_queue_notify) && (bv_unsigned w =? 0))
+  || ((off =? vio_off_queue_num) && (bv_unsigned (vc_qsel c) =? 0)
+      && vq_size_ok (bv_unsigned w))
+  || ((off =? vio_off_queue_ready) && (bv_unsigned (vc_qsel c) =? 0))
+  || ((off =? vio_off_queue_desc_low) && (bv_unsigned (vc_qsel c) =? 0))
+  || ((off =? vio_off_queue_desc_high) && (bv_unsigned (vc_qsel c) =? 0))
+  || ((off =? vio_off_driver_desc_low) && (bv_unsigned (vc_qsel c) =? 0))
+  || ((off =? vio_off_driver_desc_high) && (bv_unsigned (vc_qsel c) =? 0))
+  || ((off =? vio_off_device_desc_low) && (bv_unsigned (vc_qsel c) =? 0))
+  || ((off =? vio_off_device_desc_high) && (bv_unsigned (vc_qsel c) =? 0)).
 
 Lemma virtio_read_total (v : virtio_state) (off : Z) :
   vio_readable off = true -> exists w, virtio_read v off = Some w.
@@ -309,11 +355,17 @@ Proof.
 Qed.
 
 Lemma virtio_write_total (v : virtio_state) (off : Z) (w : bv 32) :
-  vio_writable off = true -> exists v', virtio_write v off w = Some v'.
+  vio_write_ok (v_cfg v) off w = true -> exists v', virtio_write v off w = Some v'.
 Proof.
-  unfold vio_writable. intro H.
+  unfold vio_write_ok. intro H.
   repeat (apply orb_prop in H as [H|H]);
-    apply Z.eqb_eq in H; subst off; unfold virtio_write; cbv zeta;
+    repeat (apply andb_prop in H as [H ?]);
+    apply Z.eqb_eq in H; subst off;
+    unfold virtio_write; cbv zeta;
+    repeat (match goal with
+            | Hx : (_ =? _) = true |- _ => rewrite Hx; clear Hx
+            | Hx : vq_size_ok _ = true |- _ => rewrite Hx; clear Hx
+            end);
     destruct (bv_unsigned w =? 0); eexists; reflexivity.
 Qed.
 
@@ -325,6 +377,19 @@ Qed.
 Definition vio_cfg_stable (off : Z) : bool :=
   (off =? vio_off_queue_notify) || (off =? vio_off_interrupt_ack).
 
+Lemma virtio_write_seen (v : virtio_state) (off : Z) (w : bv 32)
+    (v' : virtio_state) :
+  vio_cfg_stable off = true ->
+  virtio_write v off w = Some v' -> v_seen v' = v_seen v.
+Proof.
+  unfold vio_cfg_stable. intro H.
+  apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
+    unfold virtio_write; cbv zeta.
+  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
+    intro He; injection He as <-; reflexivity.
+  - intro He; injection He as <-; reflexivity.
+Qed.
+
 Lemma virtio_write_cfg_stable (v : virtio_state) (off : Z) (w : bv 32)
     (v' : virtio_state) :
   vio_cfg_stable off = true ->
@@ -332,8 +397,10 @@ Lemma virtio_write_cfg_stable (v : virtio_state) (off : Z) (w : bv 32)
 Proof.
   unfold vio_cfg_stable. intro H.
   apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
-    unfold virtio_write; cbv zeta;
+    unfold virtio_write; cbv zeta.
+  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
     intro He; injection He as <-; reflexivity.
+  - intro He; injection He as <-; reflexivity.
 Qed.
 
 (* Record eta, so a fact stated over the split state applies to a state that
@@ -349,7 +416,9 @@ Proof.
   unfold virtio_write. cbv zeta.
   destruct (off =? vio_off_status).
   { destruct (bv_unsigned w =? 0); intro H; injection H as <-; reflexivity. }
-  repeat (destruct (off =? _); [ intro H; injection H as <-; reflexivity |]).
+  repeat (destruct (off =? _);
+          [ repeat (destruct (negb _); [discriminate|]);
+            intro H; injection H as <-; reflexivity |]).
   discriminate.
 Qed.
 
@@ -412,12 +481,104 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 4. Reading a request out of the virtqueue.                              *)
-(*                                                                         *)
-(*    xv6's disk transfers always use the legacy three-descriptor chain of  *)
-(*    spec §5.2: a device-readable 16-byte header (type/reserved/sector), a *)
-(*    data descriptor whose direction follows the request type, and a       *)
-(*    device-writable one-byte status.  This is what the device parses.     *)
+(* 4. The memory VIEW: what the device sees when it masters the bus.       *)
+(*                                                                        *)
+(*    A DMA read of an address the byte map does not cover does not fail   *)
+(*    and does not read zero -- it reads WHATEVER IS THERE, which this     *)
+(*    model does not know.  So the device does not read a [gmap] at all;   *)
+(*    it reads a TOTAL view [vmem], and the only thing tying the view to   *)
+(*    the machine is [mem_view]: it agrees with the byte map wherever that *)
+(*    map is defined, and is unconstrained everywhere else.  RiscvLang's   *)
+(*    [DevStepDisk] quantifies the view EXISTENTIALLY, so a step off the   *)
+(*    end of what the driver owns is genuine nondeterminism rather than a  *)
+(*    silently-missing transition.                                        *)
+(*                                                                        *)
+(*    Two consequences worth spelling out, because they are the point:     *)
+(*     - every device read is total, so no MMIO-independent read can ever  *)
+(*       stall the device (the old model stalled on five of them, and each *)
+(*       stall silently excused a driver that had pointed the queue at     *)
+(*       memory it did not own);                                          *)
+(*     - a claim about what the device reads is exactly a claim about      *)
+(*       memory the claimant OWNS: [view_word_read] turns a successful     *)
+(*       partial read of an owned sub-map into an equation about the view. *)
+(* ---------------------------------------------------------------------- *)
+
+Definition vmem := Arch.pa -> bv 8.
+
+Definition mem_view (m : gmap Arch.pa (bv 8)) (mv : vmem) : Prop :=
+  forall (a : Arch.pa) (b : bv 8), m !! a = Some b -> mv a = b.
+
+(* the view of a sub-map is the view of the whole map *)
+Lemma mem_view_subseteq (m1 m2 : gmap Arch.pa (bv 8)) (mv : vmem) :
+  m1 ⊆ m2 -> mem_view m2 mv -> mem_view m1 mv.
+Proof.
+  intros Hsub Hv a b Ha. apply Hv. exact (lookup_weaken _ _ _ _ Ha Hsub).
+Qed.
+
+(* [n] bytes at [a], as the device sees them *)
+Definition view_bytes (mv : vmem) (a : Arch.pa) (n : nat) : list (bv 8) :=
+  (fun j : nat => mv (pa_add a j)) <$> seq 0 n.
+
+(* an [n]-byte little-endian field, as the device sees it *)
+Definition view_word (mv : vmem) (a : Arch.pa) (n : N) : bv (8 * n) :=
+  Z_to_bv (8 * n) (assemble_bytes (view_bytes mv a (N.to_nat n))).
+
+Lemma view_bytes_length (mv : vmem) (a : Arch.pa) (n : nat) :
+  length (view_bytes mv a n) = n.
+Proof. unfold view_bytes. rewrite length_fmap, length_seq. reflexivity. Qed.
+
+(* THE transfer lemma: what the view says about bytes the claimant owns is
+   exactly what those bytes are.  Everything the device invariant knows about
+   the device's reads comes through here. *)
+Lemma view_bytes_read (m : gmap Arch.pa (bv 8)) (mv : vmem) (a : Arch.pa)
+    (n : nat) (bs : list (bv 8)) :
+  mem_view m mv -> read_byte_list m a n = Some bs -> view_bytes mv a n = bs.
+Proof.
+  intros Hv Hr. unfold read_byte_list in Hr. apply mapM_Some_1 in Hr.
+  pose proof (Forall2_length Hr) as Hlen. rewrite length_seq in Hlen.
+  apply list_eq. intro i. unfold view_bytes. rewrite list_lookup_fmap.
+  destruct (decide (i < n)%nat) as [Hi|Hi].
+  - assert (Hseq : seq 0 n !! i = Some i).
+    { rewrite (lookup_seq_lt 0 n i Hi). reflexivity. }
+    rewrite Hseq. cbn [fmap option_fmap option_map].
+    destruct (Forall2_lookup_l _ _ _ i i Hr Hseq) as (b & Hbs & Hmm).
+    rewrite Hbs. f_equal. exact (Hv _ _ Hmm).
+  - rewrite (lookup_seq_ge 0 n i) by lia. cbn [fmap option_fmap option_map].
+    symmetry. apply lookup_ge_None_2. lia.
+Qed.
+
+Lemma view_word_read (m : gmap Arch.pa (bv 8)) (mv : vmem) (a : Arch.pa)
+    (n : N) (w : bv (8 * n)) :
+  mem_view m mv -> read_bytes m a n = Some w -> view_word mv a n = w.
+Proof.
+  intros Hv. unfold read_bytes, view_word.
+  destruct (mapM (fun j : nat => m !! pa_add a j) (seq 0 (N.to_nat n)))
+    as [bs|] eqn:Hm; [|discriminate].
+  intro H. injection H as <-.
+  rewrite (view_bytes_read m mv a (N.to_nat n) bs Hv Hm). reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 5. Reading a request out of the virtqueue.                              *)
+(*                                                                        *)
+(*    xv6's disk transfers always use the legacy three-descriptor chain of *)
+(*    spec 5.2: a device-readable 16-byte header (type/reserved/sector), a *)
+(*    data descriptor, and a device-writable one-byte status.  That is the *)
+(*    ONLY chain shape this device serves, and it is the only thing that   *)
+(*    can still stop it: [chain_at] returns [None] exactly when the shape  *)
+(*    is wrong, and RiscvLang turns that into a step that may write        *)
+(*    ANYTHING ANYWHERE ([DevStepDiskWild]) rather than into silence.      *)
+(*                                                                        *)
+(*    Deliberately NOT conditions here (each would be a stall that excused *)
+(*    a driver, and reality does something rather than nothing):           *)
+(*     - the descriptors' WRITE flags.  The transfer direction follows the *)
+(*       request TYPE, and a device-writable data buffer is written        *)
+(*       whatever the flag says.  Strictly more permissive than a device   *)
+(*       that checks, so a driver proof cannot lean on the flag.          *)
+(*     - the status descriptor's length.  One byte is written at its       *)
+(*       address regardless.                                              *)
+(*     - an unrecognised request type.  A real device completes the        *)
+(*       request with status UNSUPP, and so does this one (section 6).      *)
 (* ---------------------------------------------------------------------- *)
 
 (* one descriptor, decoded *)
@@ -431,75 +592,70 @@ Record vq_desc := VqDesc {
 Definition vd_has (d : vq_desc) (flag : Z) : bool :=
   Z.land (bv_unsigned (vd_flags d)) flag =? flag.
 
-Definition read_desc (mm : gmap Arch.pa (bv 8)) (dtab : Arch.pa) (i : Z)
-  : option vq_desc :=
-  let base := pa_off dtab (vq_desc_size * i) in
-  match rd64 mm base, rd32 mm (pa_off base 8),
-        rd16 mm (pa_off base 12), rd16 mm (pa_off base 14) with
-  | Some a, Some l, Some f, Some nx => Some (VqDesc a l f nx)
-  | _, _, _, _ => None
-  end.
+Definition desc_at (c : virtio_cfg) (mv : vmem) (i : Z) : vq_desc :=
+  let base := pa_off (vc_desc c) (vq_desc_size * i) in
+  VqDesc (view_word mv base 8) (view_word mv (pa_off base 8) 4)
+         (view_word mv (pa_off base 12) 2) (view_word mv (pa_off base 14) 2).
 
 (* the available ring: [flags:2 idx:2 ring[qnum]:2each] *)
-Definition read_avail_idx (mm : gmap Arch.pa (bv 8)) (av : Arch.pa) : option (bv 16) :=
-  rd16 mm (pa_off av vq_idx_off).
-Definition read_avail_ring (mm : gmap Arch.pa (bv 8)) (av : Arch.pa)
-    (qnum : Z) (i : bv 16) : option (bv 16) :=
-  if qnum <=? 0 then None
-  else rd16 mm (pa_off av (vq_avail_ring_off + 2 * (bv_unsigned i mod qnum))).
+Definition avail_idx_at (c : virtio_cfg) (mv : vmem) : bv 16 :=
+  view_word mv (pa_off (vc_avail c) vq_idx_off) 2.
+Definition avail_ring_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : bv 16 :=
+  view_word mv (pa_off (vc_avail c)
+                  (vq_avail_ring_off
+                   + 2 * (bv_unsigned i mod bv_unsigned (vc_qnum c)))) 2.
+
+(* The chain at available-ring position [i]: exactly three descriptors, each
+   named by an in-range index.  This is the whole well-formedness condition. *)
+Definition chain_at (c : virtio_cfg) (mv : vmem) (i : bv 16)
+  : option (bv 16 * vq_desc * vq_desc * vq_desc) :=
+  let qnum := bv_unsigned (vc_qnum c) in
+  let h := avail_ring_at c mv i in
+  if negb (bv_unsigned h <? qnum) then None else
+  let d0 := desc_at c mv (bv_unsigned h) in
+  if negb (vd_has d0 vring_desc_f_next) then None else
+  if negb (bv_unsigned (vd_next d0) <? qnum) then None else
+  let d1 := desc_at c mv (bv_unsigned (vd_next d0)) in
+  if negb (vd_has d1 vring_desc_f_next) then None else
+  if negb (bv_unsigned (vd_next d1) <? qnum) then None else
+  let d2 := desc_at c mv (bv_unsigned (vd_next d1)) in
+  (* exactly three: the status descriptor ends the chain *)
+  if vd_has d2 vring_desc_f_next then None else
+  Some (h, d0, d1, d2).
+
+Definition virtio_chain_ok (c : virtio_cfg) (mv : vmem) (i : bv 16) : bool :=
+  match chain_at c mv i with Some _ => true | None => false end.
 
 (* the decoded request: what the chain says to do, and where to report it *)
 Record vio_req := VioReq {
   vr_head   : bv 16;    (* head descriptor index -- goes in the used ring *)
-  vr_type   : bv 32;    (* VIRTIO_BLK_T_IN / _OUT *)
+  vr_type   : bv 32;    (* VIRTIO_BLK_T_IN / _OUT, or anything else *)
   vr_sector : bv 64;
   vr_buf    : Arch.pa;  (* data buffer *)
   vr_len    : bv 32;    (* data length *)
   vr_status : Arch.pa;  (* the one-byte status the device must write *)
 }.
 
-Definition read_req (mm : gmap Arch.pa (bv 8)) (c : virtio_cfg) (i : bv 16)
-  : option vio_req :=
-  let qnum := bv_unsigned (vc_qnum c) in
-  match read_avail_ring mm (vc_avail c) qnum i with
+Definition req_at (c : virtio_cfg) (mv : vmem) (i : bv 16) : option vio_req :=
+  match chain_at c mv i with
   | None => None
-  | Some h =>
-    if negb (bv_unsigned h <? qnum) then None else
-    match read_desc mm (vc_desc c) (bv_unsigned h) with
-    | None => None
-    | Some d0 =>
-      if negb (vd_has d0 vring_desc_f_next) then None else
-      if vd_has d0 vring_desc_f_write then None else
-      if negb (bv_unsigned (vd_next d0) <? qnum) then None else
-      match read_desc mm (vc_desc c) (bv_unsigned (vd_next d0)) with
-      | None => None
-      | Some d1 =>
-        if negb (vd_has d1 vring_desc_f_next) then None else
-        if negb (bv_unsigned (vd_next d1) <? qnum) then None else
-        match read_desc mm (vc_desc c) (bv_unsigned (vd_next d1)) with
-        | None => None
-        | Some d2 =>
-          if negb (vd_has d2 vring_desc_f_write) then None else
-          if negb (bv_unsigned (vd_len d2) =? 1) then None else
-          (* the header: type:4 reserved:4 sector:8 *)
-          match rd32 mm (vd_addr d0), rd64 mm (pa_off (vd_addr d0) 8) with
-          | Some ty, Some sec =>
-            (* the data descriptor's direction must match the request type *)
-            let wr := vd_has d1 vring_desc_f_write in
-            if (bv_unsigned ty =? virtio_blk_t_in) && wr then
-              Some (VioReq h ty sec (vd_addr d1) (vd_len d1) (vd_addr d2))
-            else if (bv_unsigned ty =? virtio_blk_t_out) && negb wr then
-              Some (VioReq h ty sec (vd_addr d1) (vd_len d1) (vd_addr d2))
-            else None
-          | _, _ => None
-          end
-        end
-      end
-    end
+  | Some (h, d0, d1, d2) =>
+      (* the header: type:4 reserved:4 sector:8 *)
+      Some (VioReq h (view_word mv (vd_addr d0) 4)
+                     (view_word mv (pa_off (vd_addr d0) 8) 8)
+                     (vd_addr d1) (vd_len d1) (vd_addr d2))
   end.
 
+Lemma req_at_chain (c : virtio_cfg) (mv : vmem) (i : bv 16) :
+  virtio_chain_ok c mv i = true -> exists r, req_at c mv i = Some r.
+Proof.
+  unfold virtio_chain_ok, req_at.
+  destruct (chain_at c mv i) as [[[[h d0] d1] d2]|]; [|discriminate].
+  intros _. by eexists.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
-(* 5. The autonomous request step: the device's own execution context.     *)
+(* 6. The autonomous request step: the device's own execution context.     *)
 (* ---------------------------------------------------------------------- *)
 
 (* Completing a request writes, in one transition: the transferred data (for
@@ -517,15 +673,17 @@ Definition virtio_used_writes (c : virtio_cfg) (ui : bv 16) (r : vio_req)
 
 Definition byte_zero : bv 8 := Z_to_bv 8 0.
 
-(* Completing ONE parsed request: the data transfer in whichever direction the
-   request asked for, the success status byte, and the used-ring report.  The
-   dynamic half of the device state advances; the configuration does not. *)
-Definition virtio_complete (v : virtio_state) (mm : gmap Arch.pa (bv 8))
-    (r : vio_req) : option (virtio_state * gmap Arch.pa (bv 8)) :=
+(* Completing ONE parsed request.  TOTAL: there is no request the device
+   refuses to answer.  An unrecognised type is reported back with status
+   UNSUPP and no data transfer, exactly as a real block device does. *)
+Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
+  : virtio_state * gmap Arch.pa (bv 8) :=
   let n := Z.to_nat (bv_unsigned (vr_len r)) in
   let doff := bv_unsigned (vr_sector r) * virtio_sector_size in
-  (* status byte 0 = success; this device never fails a transfer *)
-  let ws := <[ vr_status r := byte_zero ]>
+  let st := if (bv_unsigned (vr_type r) =? virtio_blk_t_in)
+               || (bv_unsigned (vr_type r) =? virtio_blk_t_out)
+            then virtio_blk_s_ok else virtio_blk_s_unsupp in
+  let ws := <[ vr_status r := Z_to_bv 8 st ]>
               (virtio_used_writes (v_cfg v) (v_used_idx v) r) in
   let vd := fun dk => VirtioState (v_cfg v)
                         (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
@@ -533,82 +691,108 @@ Definition virtio_complete (v : virtio_state) (mm : gmap Arch.pa (bv 8))
                         (bv_add (v_used_idx v) (Z_to_bv 16 1)) dk in
   if bv_unsigned (vr_type r) =? virtio_blk_t_in then
     (* read the disk: the device WRITES the driver's buffer *)
-    Some (vd (v_disk v),
-          write_byte_list ws (vr_buf r) (disk_read (v_disk v) doff n))
-  else
+    (vd (v_disk v), write_byte_list ws (vr_buf r) (disk_read (v_disk v) doff n))
+  else if bv_unsigned (vr_type r) =? virtio_blk_t_out then
     (* write the disk: the device READS the driver's buffer *)
-    match read_byte_list mm (vr_buf r) n with
-    | None => None
-    | Some bs => Some (vd (disk_write (v_disk v) doff bs), ws)
-    end.
+    (vd (disk_write (v_disk v) doff (view_bytes mv (vr_buf r) n)), ws)
+  else
+    (* unsupported: the status byte and the used-ring report, nothing else *)
+    (vd (v_disk v), ws).
 
-Definition virtio_req_step (v : virtio_state) (mm : gmap Arch.pa (bv 8))
+(* the device has work to do: the queue is live and the driver has published
+   an entry the device has not taken yet *)
+Definition virtio_pending (v : virtio_state) (mv : vmem) : bool :=
+  virtio_live (v_cfg v)
+  && negb (bv_unsigned (avail_idx_at (v_cfg v) mv) =? bv_unsigned (v_seen v)).
+
+Definition virtio_req_step (v : virtio_state) (mv : vmem)
   : option (virtio_state * gmap Arch.pa (bv 8)) :=
-  if negb (virtio_live (v_cfg v)) then None else
-  match read_avail_idx mm (vc_avail (v_cfg v)) with
-  | None => None
-  | Some ai =>
-    (* nothing published since the last entry the device took *)
-    if bv_unsigned ai =? bv_unsigned (v_seen v) then None else
-    match read_req mm (v_cfg v) (v_seen v) with
-    | None => None
-    | Some r => virtio_complete v mm r
-    end
-  end.
+  if negb (virtio_pending v mv) then None
+  else match req_at (v_cfg v) mv (v_seen v) with
+       | None => None
+       | Some r => Some (virtio_complete v mv r)
+       end.
 
-(* Peel [virtio_req_step] down to its completion, once: every fact below is a
-   fact about [virtio_complete]. *)
-Lemma virtio_req_step_complete (v : virtio_state) (mm : gmap Arch.pa (bv 8))
-    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_req_step v mm = Some (v', w) ->
-  exists r, read_req mm (v_cfg v) (v_seen v) = Some r /\
-            virtio_complete v mm r = Some (v', w).
+(* THE hole this model must not have.  [virtio_stalled] is "the device owes
+   an answer and this model does not have one": it has work to do, and the
+   step above produced nothing.  By construction that happens for exactly one
+   reason -- the published chain is malformed ([virtio_stalled_chain]) -- and
+   RiscvLang gives that case a step that may write anything anywhere, so a
+   driver must PROVE it does not happen rather than benefit from it. *)
+Definition virtio_stalled (v : virtio_state) (mv : vmem) : bool :=
+  virtio_pending v mv && negb (virtio_chain_ok (v_cfg v) mv (v_seen v)).
+
+Lemma virtio_stalled_step (v : virtio_state) (mv : vmem) :
+  virtio_stalled v mv = true ->
+  virtio_pending v mv = true /\ virtio_req_step v mv = None.
 Proof.
-  unfold virtio_req_step.
-  destruct (negb (virtio_live (v_cfg v))); [discriminate|].
-  destruct (read_avail_idx mm (vc_avail (v_cfg v))) as [ai|]; [|discriminate].
-  destruct (bv_unsigned ai =? bv_unsigned (v_seen v)); [discriminate|].
-  destruct (read_req mm (v_cfg v) (v_seen v)) as [r|] eqn:Hr; [|discriminate].
-  intro H. exists r. split; [reflexivity|exact H].
+  unfold virtio_stalled, virtio_req_step, virtio_chain_ok, req_at.
+  intro H. apply andb_prop in H as [Hp Hc]. rewrite Hp. cbn [negb].
+  destruct (chain_at (v_cfg v) mv (v_seen v)) as [[[[h d0] d1] d2]|];
+    [ discriminate | ].
+  split; reflexivity.
 Qed.
+
+Lemma virtio_not_stalled_step (v : virtio_state) (mv : vmem) :
+  virtio_pending v mv = true -> virtio_stalled v mv = false ->
+  exists v' w, virtio_req_step v mv = Some (v', w).
+Proof.
+  intros Hp Hs. unfold virtio_stalled in Hs. rewrite Hp in Hs. cbn [andb] in Hs.
+  apply negb_false_iff in Hs.
+  destruct (req_at_chain _ _ _ Hs) as [r Hr].
+  unfold virtio_req_step. rewrite Hp. cbn [negb]. rewrite Hr.
+  destruct (virtio_complete v mv r) as [v' w]. exists v', w. reflexivity.
+Qed.
+
+(* -- what a step does and does not touch -- *)
 
 (* THE structural fact about an autonomous step, and the reason [virtio_cfg]
-   is a separate record: the device never writes its own configuration.
-   Everything the DMA footprint of the NEXT request depends on is therefore
-   untouched by this one -- see [virtio_dma_ok_step] below. *)
-Lemma virtio_complete_cfg (v : virtio_state) (mm : gmap Arch.pa (bv 8))
-    (r : vio_req) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_complete v mm r = Some (v', w) -> v_cfg v' = v_cfg v.
+   is a separate record: the device never writes its own configuration. *)
+Lemma virtio_req_step_cfg (v : virtio_state) (mv : vmem)
+    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  virtio_req_step v mv = Some (v', w) -> v_cfg v' = v_cfg v.
 Proof.
+  unfold virtio_req_step.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
   unfold virtio_complete. cbv zeta.
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in).
-  - intro H. injection H as H1 H2. by subst v'.
-  - destruct (read_byte_list mm (vr_buf r) (Z.to_nat (bv_unsigned (vr_len r))))
-      as [bs|]; [|discriminate].
-    intro H. injection H as H1 H2. by subst v'.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
+    [ intro H; injection H as H1 H2; by subst v' | ].
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out);
+    intro H; injection H as H1 H2; by subst v'.
 Qed.
 
-Lemma virtio_req_step_cfg (v : virtio_state) (mm : gmap Arch.pa (bv 8))
+(* the device takes the entries in order, one per step *)
+Lemma virtio_req_step_seen (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_req_step v mm = Some (v', w) -> v_cfg v' = v_cfg v.
+  virtio_req_step v mv = Some (v', w) ->
+  v_seen v' = bv_add (v_seen v) (Z_to_bv 16 1).
 Proof.
-  intro H. destruct (virtio_req_step_complete _ _ _ _ H) as (r & _ & Hc).
-  exact (virtio_complete_cfg _ _ _ _ _ Hc).
+  unfold virtio_req_step.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  unfold virtio_complete. cbv zeta.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
+    [ intro H; injection H as H1 H2; by subst v' | ].
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out);
+    intro H; injection H as H1 H2; by subst v'.
 Qed.
 
 (* The used-buffer bit of the interrupt-status register goes UP on completion,
    and only the driver's INTERRUPT_ACK can bring it down again. *)
-Lemma virtio_complete_isr (v : virtio_state) (mm : gmap Arch.pa (bv 8))
-    (r : vio_req) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_complete v mm r = Some (v', w) ->
+Lemma virtio_req_step_isr (v : virtio_state) (mv : vmem)
+    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  virtio_req_step v mv = Some (v', w) ->
   v_isr v' = bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer).
 Proof.
+  unfold virtio_req_step.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
   unfold virtio_complete. cbv zeta.
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in).
-  - intro H. injection H as H1 H2. by subst v'.
-  - destruct (read_byte_list mm (vr_buf r) (Z.to_nat (bv_unsigned (vr_len r))))
-      as [bs|]; [|discriminate].
-    intro H. injection H as H1 H2. by subst v'.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
+    [ intro H; injection H as H1 H2; by subst v' | ].
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out);
+    intro H; injection H as H1 H2; by subst v'.
 Qed.
 
 Lemma bv_or_bit0_irq (x : bv 32) :
@@ -625,62 +809,158 @@ Proof.
 Qed.
 
 (* A step always raises the interrupt line. *)
-Lemma virtio_req_step_irq (v : virtio_state) (mm : gmap Arch.pa (bv 8))
+Lemma virtio_req_step_irq (v : virtio_state) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_req_step v mm = Some (v', w) -> virtio_irq v' = true.
+  virtio_req_step v mv = Some (v', w) -> virtio_irq v' = true.
 Proof.
-  intro H. destruct (virtio_req_step_complete _ _ _ _ H) as (r & _ & Hc).
-  unfold virtio_irq. rewrite (virtio_complete_isr _ _ _ _ _ Hc).
+  intro H. unfold virtio_irq. rewrite (virtio_req_step_isr _ _ _ _ H).
   by rewrite bv_or_bit0_irq.
 Qed.
 
+Lemma virtio_req_step_not_live (v : virtio_state) (mv : vmem) :
+  virtio_live (v_cfg v) = false -> virtio_req_step v mv = None.
+Proof.
+  intro H. unfold virtio_req_step, virtio_pending. by rewrite H.
+Qed.
+
+Lemma virtio_not_live_not_stalled (v : virtio_state) (mv : vmem) :
+  virtio_live (v_cfg v) = false -> virtio_stalled v mv = false.
+Proof.
+  intro H. unfold virtio_stalled, virtio_pending. by rewrite H.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
-(* 6. The DMA-footprint obligation.                                        *)
-(*                                                                         *)
-(*    A device that writes into the harts' memory can only be given an      *)
-(*    Iris rule if the device thread OWNS the bytes it writes.  What it     *)
-(*    owns is a LEASE -- a set [D] of addresses whose points-to the device  *)
-(*    invariant holds (WpVirtio.v) -- and this predicate is the obligation  *)
-(*    that the lease is big enough:                                        *)
-(*                                                                         *)
-(*      whatever the rest of memory says, a device step from this           *)
-(*      CONFIGURATION writes only inside [D], and never over [ctl].         *)
-(*                                                                         *)
-(*    [ctl] is the CONTROL part of the lease -- the descriptor table and    *)
-(*    the available ring, the bytes the device reads to decide WHERE to     *)
-(*    write.  Pinning their contents is what makes the footprint a          *)
-(*    function of the configuration at all; the second conjunct is what     *)
-(*    keeps them pinned, since it says a request never writes over them.    *)
-(*                                                                         *)
-(*    Note what is NOT quantified: the configuration.  A device step        *)
-(*    preserves it ([virtio_req_step_cfg]), so the obligation survives      *)
-(*    every autonomous step by construction ([virtio_dma_ok_step]).  Only   *)
-(*    the DRIVER, by an MMIO write, can invalidate it -- which is exactly   *)
-(*    where the lease should have to be re-established.                     *)
+(* 7. The queue obligation: what a driver owes the device.                 *)
+(*                                                                        *)
+(*    The device thread has to justify two things at the Iris level, and   *)
+(*    neither is a property of the device: that it never takes the         *)
+(*    write-anything step, and that when it does take a real step the      *)
+(*    bytes it writes are ones it owns.  Both are consequences of ONE      *)
+(*    positive obligation on the driver, and the word POSITIVE is the      *)
+(*    whole point: an earlier version stated it as an implication -- if a   *)
+(*    step happens then its writes are inside the lease -- which a driver   *)
+(*    could satisfy vacuously by arranging for the device to stall.         *)
+(*                                                                        *)
+(*    [ctl] is the CONTROL region: bytes the claimant OWNS and the device  *)
+(*    only ever READS -- the descriptor table and the available ring.      *)
+(*    Pinning their contents is what makes the queue's shape and footprint *)
+(*    predictable at all; the [## dom ctl] conjunct is what keeps them     *)
+(*    pinned across the device's own writes.                               *)
+(*                                                                        *)
+(*    [S] is the set of available-ring positions the device may still      *)
+(*    reach.  It is closed under advancing by one UNTIL the position       *)
+(*    reaches the published index [ai], which is exactly the reachable set *)
+(*    without any 16-bit window arithmetic -- and, importantly, NOT all of  *)
+(*    [bv 16]: a driver cannot maintain well-formedness of ring slots it   *)
+(*    has not published, since xv6 leaves the stale entries of completed   *)
+(*    requests lying in the ring.                                          *)
 (* ---------------------------------------------------------------------- *)
 
-Definition virtio_dma_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
-    (D : gset Arch.pa) : Prop :=
-  forall (isr : bv 32) (sn ui : bv 16) (dk : Z -> bv 8)
-         (mm : gmap Arch.pa (bv 8)) (v' : virtio_state) (w : gmap Arch.pa (bv 8)),
-    ctl ⊆ mm ->
-    virtio_req_step (VirtioState c isr sn ui dk) mm = Some (v', w) ->
-    dom w ⊆ D /\ dom w ## dom ctl.
+(* the request published at position [i] is well formed, and writes only
+   inside the lease [D] and never over the control region *)
+Definition virtio_slot_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (i : bv 16) : Prop :=
+  forall mv : vmem, mem_view ctl mv ->
+    virtio_chain_ok c mv i = true
+    /\ forall (isr : bv 32) (ui : bv 16) (dk : Z -> bv 8)
+              (v' : virtio_state) (w : gmap Arch.pa (bv 8)),
+         virtio_req_step (VirtioState c isr i ui dk) mv = Some (v', w) ->
+         dom w ⊆ D /\ dom w ## dom ctl.
 
-(* The obligation is preserved by an autonomous step, at the lease the step
-   itself leaves behind ([w ∪ ctl] is [ctl] again, since a step never writes
-   over the control region).  This is the whole payoff of §1's split. *)
-Lemma virtio_dma_ok_step (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
-    (D : gset Arch.pa) (mm : gmap Arch.pa (bv 8))
+Definition virtio_queue_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (S : gset (bv 16)) (ai sn : bv 16) : Prop :=
+  virtio_live c = true ->
+    (* the published index is itself pinned: the device and the claimant agree
+       on how far the driver has got *)
+    read_bytes ctl (pa_off (vc_avail c) vq_idx_off) 2 = Some ai
+    /\ (sn = ai \/ sn ∈ S)
+    /\ forall i, i ∈ S ->
+         virtio_slot_ok c ctl D i
+         /\ (bv_add i (Z_to_bv 16 1) = ai \/ bv_add i (Z_to_bv 16 1) ∈ S).
+
+(* Before the driver has made the queue live it owes nothing -- the device
+   cannot even look at the ring.  This is what the power-on state (and hence
+   whole-system adequacy) needs. *)
+Lemma virtio_queue_ok_not_live (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (S : gset (bv 16)) (ai sn : bv 16) :
+  virtio_live c = false -> virtio_queue_ok c ctl D S ai sn.
+Proof. intros Hlive Hl. rewrite Hlive in Hl. discriminate. Qed.
+
+(* the pinned published index is the one the device reads *)
+Lemma avail_idx_pinned (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
+    (mv : vmem) (ai : bv 16) :
+  mem_view ctl mv ->
+  read_bytes ctl (pa_off (vc_avail c) vq_idx_off) 2 = Some ai ->
+  avail_idx_at c mv = ai.
+Proof.
+  intros Hv Hr. unfold avail_idx_at. exact (view_word_read _ _ _ 2 ai Hv Hr).
+Qed.
+
+(* PAYOFF 1: the obligation rules out the write-anything step. *)
+Lemma virtio_queue_not_stalled (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (S : gset (bv 16)) (ai : bv 16) (mv : vmem) :
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) ->
+  mem_view ctl mv ->
+  virtio_stalled v mv = false.
+Proof.
+  intros Hok Hv.
+  destruct (virtio_live (v_cfg v)) eqn:Hlive;
+    [| exact (virtio_not_live_not_stalled v mv Hlive) ].
+  destruct (Hok Hlive) as (Hai & Hpos & HS).
+  unfold virtio_stalled, virtio_pending. rewrite Hlive. cbn [andb].
+  destruct (bv_unsigned (avail_idx_at (v_cfg v) mv) =? bv_unsigned (v_seen v))
+    eqn:Heq; [reflexivity|].
+  cbn [negb andb].
+  assert (Hin : v_seen v ∈ S).
+  { destruct Hpos as [Hpos|Hpos]; [|exact Hpos].
+    exfalso. rewrite (avail_idx_pinned _ _ _ _ Hv Hai), <- Hpos in Heq.
+    by rewrite Z.eqb_refl in Heq. }
+  destruct (HS _ Hin) as [Hslot _].
+  rewrite (proj1 (Hslot mv Hv)). reflexivity.
+Qed.
+
+(* PAYOFF 2: a real step writes inside the lease, misses the control region,
+   and leaves the obligation standing at the position it advanced to. *)
+Lemma virtio_queue_ok_step (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (S : gset (bv 16)) (ai : bv 16) (mv : vmem)
     (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_dma_ok (v_cfg v) ctl D ->
-  virtio_req_step v mm = Some (v', w) ->
-  virtio_dma_ok (v_cfg v') ctl D.
-Proof. intros Hok Hstep. by rewrite (virtio_req_step_cfg _ _ _ _ Hstep). Qed.
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) ->
+  mem_view ctl mv ->
+  virtio_req_step v mv = Some (v', w) ->
+  dom w ⊆ D /\ dom w ## dom ctl
+  /\ virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v').
+Proof.
+  intros Hok Hv Hstep.
+  (* the step happened, so the queue is live and an entry is published *)
+  assert (Hp : virtio_pending v mv = true).
+  { unfold virtio_req_step in Hstep.
+    destruct (virtio_pending v mv) eqn:Hp; [reflexivity|]. by cbn in Hstep. }
+  assert (Hlive : virtio_live (v_cfg v) = true).
+  { unfold virtio_pending in Hp. by apply andb_prop in Hp as [? _]. }
+  destruct (Hok Hlive) as (Hai & Hpos & HS).
+  assert (Hin : v_seen v ∈ S).
+  { destruct Hpos as [Hpos|Hpos]; [|exact Hpos].
+    exfalso. unfold virtio_pending in Hp. apply andb_prop in Hp as [_ Hne].
+    apply negb_true_iff, Z.eqb_neq in Hne.
+    rewrite (avail_idx_pinned _ _ _ _ Hv Hai), <- Hpos in Hne. exact (Hne eq_refl). }
+  destruct (HS _ Hin) as [Hslot Hnext].
+  (* re-index the step at the split state, so the slot obligation applies *)
+  assert (Hsplit : virtio_req_step
+                     (VirtioState (v_cfg v) (v_isr v) (v_seen v)
+                                  (v_used_idx v) (v_disk v)) mv = Some (v', w)).
+  { rewrite <- virtio_state_eta. exact Hstep. }
+  destruct (proj2 (Hslot mv Hv) (v_isr v) (v_used_idx v) (v_disk v) v' w Hsplit)
+    as [Hdw Hdisj].
+  split; [exact Hdw|]. split; [exact Hdisj|].
+  rewrite (virtio_req_step_cfg _ _ _ _ Hstep),
+          (virtio_req_step_seen _ _ _ _ Hstep).
+  intros _. split; [exact Hai|]. split; [|exact HS].
+  destruct Hnext as [Hnext|Hnext]; [left|right]; exact Hnext.
+Qed.
 
 (* [ctl] stays inside the memory the step produced -- the fact that makes the
    lease re-usable at the next step. *)
-Lemma virtio_dma_ctl_union (ctl w mm : gmap Arch.pa (bv 8)) :
+Lemma virtio_ctl_union (ctl w mm : gmap Arch.pa (bv 8)) :
   dom w ## dom ctl -> ctl ⊆ mm -> ctl ⊆ w ∪ mm.
 Proof.
   intros Hdisj Hsub. apply map_subseteq_spec. intros a b Ha.
@@ -691,27 +971,8 @@ Proof.
   exact (lookup_weaken _ _ _ _ Ha Hsub).
 Qed.
 
-(* Before the driver has made the queue ready the device cannot step at all,
-   so the empty lease already satisfies the obligation.  This is what the
-   power-on device state (and hence the whole-system adequacy statement)
-   needs. *)
-Lemma virtio_req_step_not_live (v : virtio_state) (mm : gmap Arch.pa (bv 8)) :
-  virtio_live (v_cfg v) = false -> virtio_req_step v mm = None.
-Proof.
-  intro H. unfold virtio_req_step. by rewrite H.
-Qed.
-
-Lemma virtio_dma_ok_not_live (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
-    (D : gset Arch.pa) :
-  virtio_live c = false -> virtio_dma_ok c ctl D.
-Proof.
-  intros Hlive isr sn ui dk mm v' w _ Hstep.
-  rewrite (virtio_req_step_not_live (VirtioState c isr sn ui dk) mm Hlive) in Hstep.
-  discriminate.
-Qed.
-
 (* ---------------------------------------------------------------------- *)
-(* 7. Power-on state: reset configuration, empty interrupt, blank disk.    *)
+(* 8. Power-on state: reset configuration, empty interrupt, blank disk.    *)
 (* ---------------------------------------------------------------------- *)
 
 Definition virtio0_state : virtio_state :=
@@ -720,14 +981,15 @@ Definition virtio0_state : virtio_state :=
 Lemma virtio0_not_live : virtio_live (v_cfg virtio0_state) = false.
 Proof. reflexivity. Qed.
 
-Lemma virtio0_dma_ok ctl D : virtio_dma_ok (v_cfg virtio0_state) ctl D.
-Proof. apply virtio_dma_ok_not_live, virtio0_not_live. Qed.
+Lemma virtio0_queue_ok ctl D S ai sn :
+  virtio_queue_ok (v_cfg virtio0_state) ctl D S ai sn.
+Proof. apply virtio_queue_ok_not_live, virtio0_not_live. Qed.
 
 Lemma virtio0_irq : virtio_irq virtio0_state = false.
 Proof. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 8. The driver's own sequence, run against this model.                   *)
+(* 9. The driver's own sequence, run against this model.                   *)
 (*                                                                        *)
 (*    These are not lemmas anything else needs; they are a CHECK that the  *)
 (*    register model matches kernel/virtio_disk.c -- the cheap way to      *)
@@ -741,9 +1003,15 @@ Lemma virtio_ident_reads (v : virtio_state) :
   virtio_read v vio_off_magic_value = Some (Z_to_bv 32 0x74726976)
   /\ virtio_read v vio_off_version = Some (Z_to_bv 32 2)
   /\ virtio_read v vio_off_device_id = Some (Z_to_bv 32 2)
-  /\ virtio_read v vio_off_vendor_id = Some (Z_to_bv 32 0x554d4551)
-  /\ virtio_read v vio_off_queue_num_max = Some (Z_to_bv 32 8).
+  /\ virtio_read v vio_off_vendor_id = Some (Z_to_bv 32 0x554d4551).
 Proof. repeat split; reflexivity. Qed.
+
+(* "check maximum queue size": the capability read reports on the SELECTED
+   queue, and the driver has selected queue 0 by then. *)
+Lemma virtio_queue_num_max_read (v : virtio_state) :
+  bv_unsigned (vc_qsel (v_cfg v)) = 0 ->
+  virtio_read v vio_off_queue_num_max = Some (Z_to_bv 32 8).
+Proof. intro H. unfold virtio_read. cbv zeta. rewrite H. reflexivity. Qed.
 
 (* "ensure queue 0 is not in use": after the reset command it is not *)
 Lemma virtio_reset_not_ready (v : virtio_state) :
@@ -849,26 +1117,18 @@ Lemma virtio_isr_ok0 : virtio_isr_ok virtio0_state.
 Proof. by vm_compute. Qed.
 
 (* a completion ORs in bit 0, which keeps the invariant *)
-Lemma virtio_complete_isr_ok (v : virtio_state) (mm : gmap Arch.pa (bv 8))
-    (r : vio_req) (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_isr_ok v -> virtio_complete v mm r = Some (v', w) -> virtio_isr_ok v'.
+Lemma virtio_req_step_isr_ok (v : virtio_state) (mv : vmem)
+    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  virtio_isr_ok v -> virtio_req_step v mv = Some (v', w) -> virtio_isr_ok v'.
 Proof.
-  intros Hok Hc. unfold virtio_isr_ok.
-  rewrite (virtio_complete_isr _ _ _ _ _ Hc), bv_or_unsigned.
+  intros Hok H. unfold virtio_isr_ok.
+  rewrite (virtio_req_step_isr _ _ _ _ H), bv_or_unsigned.
   assert (Hone : bv_unsigned (Z_to_bv 32 vio_isr_used_buffer) = 1)
     by (by vm_compute).
   rewrite Hone. apply land3_intro. intros i Hi.
   rewrite Z.lor_spec, (land3_bit_high _ i Hok Hi).
   rewrite (Z.bits_above_log2 1 i); [ reflexivity | lia | ].
   change (Z.log2 1) with 0. lia.
-Qed.
-
-Lemma virtio_req_step_isr_ok (v : virtio_state) (mm : gmap Arch.pa (bv 8))
-    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
-  virtio_isr_ok v -> virtio_req_step v mm = Some (v', w) -> virtio_isr_ok v'.
-Proof.
-  intros Hok H. destruct (virtio_req_step_complete _ _ _ _ H) as (r & _ & Hc).
-  exact (virtio_complete_isr_ok _ _ _ _ _ Hok Hc).
 Qed.
 
 (* And so the acknowledgement [virtio_disk_intr] writes really does drop the

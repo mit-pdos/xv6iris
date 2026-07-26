@@ -197,7 +197,10 @@ Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
 (*   not confined to the device fabric: [dev_step] therefore carries the     *)
 (*   byte memory, and [DevStepDisk] overrides it with the write set the DMA  *)
 (*   produced ([w ∪ m], VirtioModel.virtio_req_step).  Every other device    *)
-(*   transition returns the memory untouched.                               *)
+(*   transition returns the memory untouched.  The disk is also the only     *)
+(*   device that steps NONDETERMINISTICALLY, in two ways: the bus view it    *)
+(*   reads is unconstrained off the byte map, and a malformed queue lets it  *)
+(*   write anything anywhere ([DevStepDiskWild]).                            *)
 (*                                                                          *)
 (*   Note the wire is updated by its OWN step (DevStepWire), not             *)
 (*   synchronously with the MMIO write that caused the level change: the     *)
@@ -217,9 +220,30 @@ Inductive dev_step (d : dev_state) (m : gmap Arch.pa (bv 8)) (gr : CPU -> regsta
       dev_irq_level d i = true ->
       plic_latch d.(dplic) i = Some p' ->
       dev_step d m gr (set_dplic d p') m gr
-  | DevStepDisk v' w :
-      virtio_req_step d.(dvirtio) m = Some (v', w) ->
+  (* The disk masters the bus.  It does not read the byte MAP -- it reads a
+     total VIEW of the bus that agrees with the map wherever the map is
+     defined and is UNCONSTRAINED everywhere else (VirtioModel section 4), and
+     the view is quantified here, existentially.  So a DMA read of an address
+     nobody has accounted for returns an arbitrary byte, which is what a real
+     bus does, and what forces a driver proof to account for every address it
+     hands the device. *)
+  | DevStepDisk (mv : vmem) v' w :
+      mem_view m mv ->
+      virtio_req_step d.(dvirtio) mv = Some (v', w) ->
       dev_step d m gr (set_dvirtio d v') (w ∪ m) gr
+  (* ... and when the queue the driver published is MALFORMED, the device may
+     do anything at all: [w] is arbitrary, so this constructor lets the disk
+     scribble over any address in the machine.  That is the honest reading of
+     a driver-must-not obligation.  An earlier model instead had the device
+     quietly do NOTHING, which let a driver that misconfigured the queue
+     satisfy its DMA obligation vacuously and be verified anyway.
+     [wp_dev_loop] can only be proven by REFUTING this case from the device
+     invariant, so queue well-formedness becomes a standing obligation on the
+     driver rather than a gift from the model. *)
+  | DevStepDiskWild (mv : vmem) (w : gmap Arch.pa (bv 8)) :
+      mem_view m mv ->
+      virtio_stalled d.(dvirtio) mv = true ->
+      dev_step d m gr d (w ∪ m) gr
   | DevStepWire (c : CPU) :
       dev_step d m gr d m
         (<[c := register_set sig_seip

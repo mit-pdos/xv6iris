@@ -12,23 +12,27 @@ fabric this plugs into.
 
 - **`VirtioModel.v`** (iris-free) — the pure device: `virtio_cfg`/`virtio_state`,
   the 32-bit MMIO register decode (`virtio_read`/`virtio_write` + the
-  `vio_readable`/`vio_writable` totality lemmas), the virtqueue reader
-  (`read_desc`/`read_avail_idx`/`read_avail_ring`/`read_req`), the autonomous
-  request step (`virtio_req_step` → `virtio_complete`), the byte-addressed disk
-  image (`disk_read`/`disk_write`), the interrupt line (`virtio_irq`), and the
-  DMA-footprint obligation `virtio_dma_ok` with its preservation kit.
+  `vio_write_ok` totality lemma), the memory VIEW layer (§4), the virtqueue
+  reader over a view (`desc_at`/`avail_idx_at`/`avail_ring_at`/`chain_at`/
+  `req_at`), the autonomous request step (`virtio_req_step` → the TOTAL
+  `virtio_complete`), `virtio_stalled`, the byte-addressed disk image
+  (`disk_read`/`disk_write`), the interrupt line (`virtio_irq`), and the queue
+  obligation `virtio_queue_ok` with its payoff lemmas.
 - **`DevModel.v`** — `dev_state` carries `dvirtio`; `in_virtio` routes
   `[0x1000_1000, 0x1000_2000)` 4-byte accesses; `plic_latch` is now
   per-SOURCE and `dev_irq_level` says which device drives which source
   (UART = 10, disk = 1).
-- **`RiscvLang.v`** — `dev_step` carries the byte memory and has a
-  `DevStepDisk` constructor; the `DevLoop` branch of `prim_step` writes the
-  memory back.
+- **`RiscvLang.v`** — `dev_step` carries the byte memory and has TWO disk
+  constructors: `DevStepDisk` (a real request, over an existentially
+  quantified bus view) and `DevStepDiskWild` (a malformed queue: an arbitrary
+  write set anywhere in the machine). The `DevLoop` branch of `prim_step`
+  writes the memory back.
 - **`RiscvExec.v`** — `wp_dev_step` hands the device thread `gen_heap_interp`
   instead of framing it.
 - **`WpVirtio.v`** — the `virtio_auth`/`virtio_frag` halves, the DMA lease
-  (`dma_own`/`virtio_lease`) with `dma_agree`/`dma_update`, and the device-thread
-  rule `virtio_lease_step`.
+  (`dma_own`/`virtio_lease`) with `dma_agree`/`dma_update`, and the two
+  device-thread rules: `virtio_lease_not_stalled` (refutes the wild step) and
+  `virtio_lease_step` (justifies a real one).
 - **`WpUart.v`** — `dev_inv_body` carries the virtio half, its lease and
   `virtio_isr_ok`; `wp_dev_loop` proves the DMA case.
 - **`RiscvAdequacy.v`** — the virtio ghost is allocated and `riscv_device_adequacy`
@@ -58,52 +62,110 @@ modelled register set changes.
 The disk is the only BUS MASTER in the model, and that is the one thing that
 makes it structurally different from the UART and the PLIC. Its step
 *overwrites bytes of the harts' memory*, so at the Iris level the device thread
-must OWN what it overwrites. The whole design follows from that:
+must OWN what it overwrites. Two design decisions follow, and they are
+load-bearing in opposite directions — one makes the device *harder* to satisfy,
+the other makes the driver's obligation *positive*.
 
-- `virtio_lease v` (WpVirtio.v) is an existentially-quantified set of physical
-  bytes `dma_own dma` plus a distinguished CONTROL sub-map `ctl ⊆ dma` (the
-  descriptor table and the available ring — the bytes the device reads to
-  decide *where* to write), plus the pure obligation
-  `virtio_dma_ok (v_cfg v) ctl (dom dma)`.
-- `virtio_dma_ok c ctl D` reads: *whatever the rest of memory says, and at any
-  value of the dynamic device state, a step from configuration `c` writes only
-  inside `D`, and never over `ctl`.* Both conjuncts are load-bearing:
-  - `dom w ⊆ D` is what lets the device thread update the byte memory at all;
-  - `dom w ## dom ctl` is what keeps the control region PINNED, which is in
-    turn what makes the footprint a function of the configuration. Without it
-    the obligation would not survive its own step.
-- The obligation is stated over `virtio_cfg` — the driver-written half of the
-  device state — and an autonomous step provably preserves it
-  (`virtio_req_step_cfg` → `virtio_dma_ok_step`). So `virtio_lease_step` hands
-  the lease back with **nothing re-proved**: the device thread never reasons
-  about descriptor contents.
-- The flip side, and the whole point: **only a driver's MMIO write can
-  invalidate the lease**, and re-establishing it there is exactly the real
-  obligation "the descriptors I published point into memory I have handed to
-  the device". That is where the work is, and it is deliberately pushed there.
-  `virtio_lease_cfg` + `virtio_write_cfg_stable` say the two steady-state
-  writes (QUEUE_NOTIFY, INTERRUPT_ACK) are free.
+### The bus view: reads off the end of the map are arbitrary
 
-The alternative designs were considered and rejected: quantifying
-`virtio_dma_ok` over all memories makes the footprint unbounded (a descriptor
-could say anything), and restricting `virtio_req_step` itself to a leased
-region would be a modelling assumption that hides a real class of driver bug.
+The device does not read the byte `gmap`. It reads a total view `vmem`, tied to
+the machine only by `mem_view m mv` ("agrees with the map wherever the map is
+defined"), and `DevStepDisk` quantifies the view **existentially**. So:
+
+- no device read can fail, hence no read can silently stall the device;
+- a DMA read of an address nobody accounted for yields an arbitrary byte, which
+  is what a real bus does;
+- a claim about what the device *read* is exactly a claim about memory the
+  claimant **owns** — `view_word_read` turns a successful partial read of an
+  owned sub-map into an equation about the view. That is the only channel
+  through which the invariant learns anything about the queue.
+
+### The lease and its POSITIVE obligation
+
+`virtio_lease v` (WpVirtio.v) owns a set of physical bytes `dma_own dma` with a
+distinguished CONTROL sub-map `ctl ⊆ dma` (the descriptor table and the
+available ring — bytes the device only ever READS), and carries the pure
+obligation `virtio_queue_ok (v_cfg v) ctl (dom dma) S ai (v_seen v)`:
+
+- `ai` is the published available-ring index, and it must be **pinned in
+  `ctl`** — `read_bytes ctl (avail+2) 2 = Some ai`. This single clause is what
+  closes the old hole: a live queue can no longer coexist with an empty lease.
+- `S` is the set of ring positions the device may still reach. It is closed
+  under advancing by one *until* the position reaches `ai`. That is the
+  reachable window with no 16-bit arithmetic, and crucially it is **not** all of
+  `bv 16` — a driver could not maintain well-formedness of positions it has not
+  published, because xv6 leaves the stale entries of completed requests lying in
+  the ring.
+- every `i ∈ S` satisfies `virtio_slot_ok`: for **every** view agreeing with
+  `ctl`, the chain at `i` is well formed, and any step from it writes only
+  inside the lease and never over `ctl`.
+
+The two conjuncts of `virtio_slot_ok` do different jobs. `dom w ⊆ D` lets the
+device thread update the byte memory. `dom w ## dom ctl` keeps the control
+region pinned across the device's own writes, which is what makes the queue's
+shape and footprint predictable in the first place; without it the obligation
+would not survive its own step.
+
+**Why POSITIVE matters.** The obligation asserts that the reachable entries
+*are* well-formed requests. An earlier version stated it as an implication — if
+a step happens then its writes are inside the lease — and that version was
+unsound: a driver that misconfigured the queue made the step never fire, and
+then satisfied the obligation *vacuously with an empty lease* while the real
+device DMA'd into wild memory. `DevStepDiskWild` is the enforcement mechanism:
+`wp_dev_loop` can only be proven by refuting it
+(`virtio_lease_not_stalled`), so a driver must positively establish
+well-formedness or be unverifiable.
+
+Preservation is still nearly free. `virtio_req_step_cfg` says the device never
+writes its own configuration and `virtio_req_step_seen` says it advances one
+position, so `virtio_queue_ok_step` hands the obligation back with the same
+`ctl`, `S` and `ai`. Only a driver's MMIO write can invalidate it, which is
+exactly where re-establishing it belongs.
 
 ## Modelling choices, and why each is SAFE
 
-Each of these ADDS device behaviours or is neutral, so a driver proof can only
-get harder, never unsound. They are also all documented at the definitions.
+The rule this model follows: **an absent device transition silently excuses the
+software that caused it, so undefined behaviour is modelled as "anything", never
+as "nothing".** Concretely, the only way the device can decline to act is when
+it genuinely has nothing to do (queue not live, nothing published). Everything
+else either has a defined behaviour or goes through `DevStepDiskWild`.
 
-- QUEUE_NOTIFY is a no-op: the device polls the available ring itself, so it
+Choices that ADD device behaviours (so a driver proof can only get harder):
+
+- **Reads off the byte map are arbitrary**, not zero and not stuck.
+- **QUEUE_NOTIFY is a no-op**: the device polls the available ring itself, so it
   may take a request as soon as it is published, before the notify store.
-- A request completes ATOMICALLY (data + status + used element + used index in
-  one transition). The index bump is what a driver waits on and is ordered last
-  either way.
-- DMA is not restricted to bytes already present in the byte memory; the lease
-  is what bounds the device's reach.
-- A malformed queue simply does not step. That costs LIVENESS only (a driver
-  that builds a bad chain waits forever) and adds no unreachable state. It is
-  the one deliberate weakness: a driver bug of that shape would not be caught.
+- **Descriptor WRITE flags are ignored**: the transfer direction follows the
+  request TYPE, and the data buffer is written whatever the flag says. A driver
+  proof cannot lean on the flag.
+- **The status descriptor's length is ignored**: one byte is written at its
+  address regardless.
+- **A malformed queue may write anything anywhere** (`DevStepDiskWild`).
+
+Choices that make the model STRICTER than reality — incompleteness, never
+unsoundness, and each is a genuine obligation on the driver:
+
+- **Only the exact three-descriptor chain of spec §5.2 is served.** A real
+  device handles longer chains (using the last descriptor as status); this one
+  treats anything else as undefined. xv6 always builds exactly three.
+- **An illegal QUEUE_NUM, a non-zero QUEUE_SEL on a per-queue register, or a
+  QUEUE_NOTIFY naming a queue that does not exist are REFUSED at the MMIO
+  write** — the store gets stuck, so a driver proof has to show it configured
+  the device legally. Config-time misuse belongs here, not in the device.
+
+Faithful, defined behaviours:
+
+- **An unrecognised request type completes with status `UNSUPP`** and no data
+  transfer, as a real block device does.
+- **A request completes atomically** (data + status + used element + used index
+  in one transition). The index bump is what a driver waits on and is ordered
+  last either way.
+
+One thing the model is deliberately silent about: the request HEADER
+(`disk.ops[]`) is not part of the control region, so the request *type* and
+*sector* are unpinned. Memory safety does not need them — the lease must cover
+the buffer either way — but a future disk-CONTENTS spec will need the header
+pinned to predict which sector is touched.
 
 ## Remaining work (the driver side), in dependency order
 
@@ -119,7 +181,12 @@ get harder, never unsound. They are also all documented at the definitions.
    the way `wp_uartinit_sconf` runs against the raw `uart_frag` — it does a
    device RESET, and it is also where the queue becomes live, which is where the
    lease must be established. Note it calls `kalloc` three times and `memset`;
-   the queue pages it allocates are what it must hand into the lease.
+   the queue pages it allocates are what it must hand into the lease. The
+   obligation it has to discharge at the QUEUE_READY / DRIVER_OK writes is
+   `virtio_queue_ok` with `S = ∅` and `ai = 0`: the rings are freshly zeroed and
+   nothing is published yet, so `v_seen = ai = 0` and there is no slot to prove
+   well formed. That is the cheapest non-trivial instance of the obligation and
+   the right place to start.
 3. **The lease-transfer protocol on the driver side.** `virtio_disk_rw` gives
    the device a buffer (`b->data`, inside the static `bcache`) and takes it back
    at completion; `virtio_disk_intr` reads the used ring. Expect the used-ring

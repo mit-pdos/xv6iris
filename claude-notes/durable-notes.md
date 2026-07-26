@@ -120,4 +120,16 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 
 - **Cleaner specs and abstractions beat avoiding rework** (see the guiding principle at the top of this file). Refactor or rewrite freely to reach a better shape; do NOT keep near-duplicate lemma families, awkward interfaces, or leaky abstractions merely because they already compile. Prefer one parametric lemma over a cross-product of special cases.
 - A `stack_own` (or any) resource bound must be the function's own max depth as a CONSTANT, stated `∀ n, (K ≤ n) → … stack_own sp n` — never a value coupled to the function's arguments.
+- **Model undefined behaviour as "anything", never as "nothing".** A transition
+  that is merely ABSENT from a model silently excuses the software that caused
+  it: a WP over that model is then provable for code that in reality corrupts
+  memory. So when the software does something the hardware calls illegal, either
+  model what the hardware really does, or give the model a transition that may
+  do ANYTHING — and let the proof obligation of ruling that out fall on the
+  software. This bites hardest for a device the software configures: a
+  misconfigured device that quietly does nothing lets a conditional obligation
+  ("if the device acts, its writes are bounded") be satisfied vacuously. State
+  such obligations POSITIVELY instead. Config-time misuse is the one case that
+  belongs elsewhere: refuse the offending MMIO write, so a stuck CPU store makes
+  it the driver's obligation. Worked example: `claude-notes/projects/virtio-disk.md`.
 - Avoid ad-hoc argument couplings in preconditions (e.g. a precondition like `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` that ties an argument to a branch condition). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
