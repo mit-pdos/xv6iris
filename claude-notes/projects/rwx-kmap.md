@@ -586,6 +586,59 @@ correspondence lemma; hand out
    items 2-3, which this project's tree-spec revision unblocks — the
    "boot introduction" there IS this switch lemma).
 
+   STAGE-6 EXECUTION DESIGN (2026-07-26, in flight; kvminit cone done):
+   6a. THE strans_bit ARM GHOST (the design unlock): strans_inv's
+       disjunction is untagged, so after the boot chain folds
+       sie_cap_gpr and threads it through the regime-oblivious init
+       calls (kinit/kvminit...), no proof could show the slot is
+       still Bare at kvminithart.  Fix mirrors sie_arm's pattern:
+       riscvGS gains `strans_name : gname` (kmap_name precedent;
+       the ghost_varG (mword 1) INSTANCE stays sieG's — a second
+       instance of the same class would split the camera between
+       mint and use sites); `strans_bit b := ghost_var strans_name
+       (1/2) b`; each strans_inv arm carries its bit ('0 Bare /
+       '1 KPT); adequacy allocs it and hands out both halves; the
+       boot client's half is the "still-Bare receipt", pinned by
+       agreement (strans_inv_acc_bare), flipped with both halves at
+       the switch (strans_bit_flip).  One-way: the receipt is the
+       only outside half ever minted.  PAYOFF: kvminithart keeps the
+       standard folded sie_cap_gpr house spec — pre carries
+       strans_bit '0, post hands back strans_bit '1.
+   6b. WpKvminithartInstr.v: 17 instrs @ 0x80000f30 (2-slot frame,
+       sfence.vma 0x12000073, auipc/ld of kernel_pagetable, srli 12,
+       li -1 / slli 63 / or (MAKE_SATP: 0x8000000000000000 | root>>12
+       — mode 8, asid 0 since root < 2^56), csrw satp 0x18079073,
+       sfence.vma, epilogue).  kernel.asm has DRIFTED -0xe; decode
+       from KernelInstrs only.
+   6c. The switch (SpecKvminithart/ProofKvminithart/Link + the ghost
+       fold in KvmMap): spec pre = sie_cap_gpr + strans_bit '0 +
+       tlb ↦ᵣ tlbvec0 (floats client-side at boot; kernelvec takes
+       it explicitly too) + kernel_pagetable ↦₈ root_b + ptree_own t
+       + ⌜pt_rep0 t (kvm_map_full pas)⌝ + ⌜kvm_pas_ok pas⌝ +
+       ⌜pt_base t = root⌝; post = sie_cap_gpr (slot now KPT) +
+       strans_bit '1 + (∃v, stvec ↦ᵣ v) (recovered from the Bare arm)
+       + the cell back + kmap_at tramp_vpn tramp_ppn KP_rx +
+       [∗ list] i<64, kmap_at (kstack_vpn i) (pas i) KP_rw +
+       callee_saved.  Proof skeleton: frame; first sfence under Bare
+       (exec_execute_SFENCE_VMA_S, UserretDefs.v:129 — full flush at
+       TVM=0; needs the tlb cell); ld/srli/li/slli/or compute the
+       satp word (pure facts: Mode=8/asid=0/ppn=root — root < 2^56);
+       csrw satp = THE STEP: open slot via strans_inv_acc_bare
+       (refutes KPT arm), take satp cell out of bare_inv, write it,
+       kvm_M_mint folds kmap_auth kmap_M0 ==∗ kmap_auth (kvm_M pas)
+       + the 65 claims (freshness: kmap_class tramp/kstacks = None +
+       kstack_vpn_inj), kvm_bridge (KvmMap:764) gives
+       kpt_tree_spec_gen root (kvm_M pas) t, tlb_ok_pt_empty
+       (PtTree:976) + the TLB zeroed by the first sfence gives the
+       TLB clause, pmp_config's root param is PHANTOM (re-apply at
+       the new root), tlb_inv_pt_intro + strans_bit_flip reseal the
+       slot at KPT; the fetch of the NEXT instruction already
+       translates through the new table (pc is identity-mapped text;
+       TLB empty — the BOOT NOTE's no-window argument); second
+       sfence + epilogue under the kpt regime.  TransPt's pt2
+       enter/exit lemmas (l.374-450) are the closest satp-write/
+       sfence step templates.
+
 ## Interactions to keep in mind
 
 - The sconf tier is regime-blind through `strans_regime` — the re-keying
