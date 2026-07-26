@@ -261,7 +261,15 @@ rewrite traverses the giant term and compounds to a timeout);
 the folding discipline is the real fix; (c) cbn unfolds
 pte_set_ad/bv_unsigned-of-literal — use cbn [fst snd]; (d) the zify hook
 breaks lia on large-literal and evar goals — explicit boolean asserts +
-Z.leb_gt/Z.ltb_ge projections.  NOTE: kvm_M_wf will be DELETED and
+Z.leb_gt/Z.ltb_ge projections; (e) folding a kvmmap post's
+pt_insert_run into the next kvm_m_k with `change`/`reflexivity` makes
+the KERNEL normalize the fixpoint over npages (220+s and >2GB RSS on
+the 16384/32761-page regions) — discharge the continuation's
+⌜pt_rep0 t' kvm_m_k⌝ with `unfold kvm_m_k; exact Hrep'` (one delta
+step + syntactic exact, no normalization; ProofKvmmake compiles in
+~27s this way); (f) lia also fails with ANY mword merely in CONTEXT —
+package arithmetic into mword-free top-level helper lemmas and apply
+them as closed facts.  NOTE: kvm_M_wf will be DELETED and
 kvm_M gains the tramp entry in the uniform-claims revision stage C
 (rwx-kmap.md).  (iii) proc_mapstacks/kvmmake/kvminit
 specs (KvmSpec.v) — sign-off shape below is superseded by the above;

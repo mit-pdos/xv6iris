@@ -190,6 +190,8 @@ LinkKvmmap.v
 SpecProcMapstacks.v
 ProofProcMapstacks.v
 LinkProcMapstacks.v
+ProofKvmmake.v
+LinkKvmmake.v
 SpecKvmmake.v
 SpecKvminit.v
 SpecWakeupParts.v
