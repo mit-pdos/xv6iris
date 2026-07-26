@@ -35,17 +35,6 @@ Import Defs.
 (* Extra ExecuteAs-expansion facts not already in WpGprRvc: the           *)
 (* compressed branch/jump opcodes (c.bnez / c.beqz / c.j) that kalloc /    *)
 (* kfree use.  Representation-independent, mirrors of the WpGprRvc ones.    *)
-(* (c.ld / c.sd now live in the shared WpMmodeLeafBase, via WpGprRvc.)      *)
-(* ===================================================================== *)
-Lemma exec_execute_C_BNEZ (imm : mword 8) (rs : cregidx) s :
-  exec (execute (C_BNEZ (imm, rs))) s
-  = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BNE)), s).
-Proof. unfold execute. cbn match. unfold execute_C_BNEZ. apply exec_returnM. Qed.
-
-Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
-  exec (execute (C_BEQZ (imm, rs))) s
-  = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BEQ)), s).
-Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed.
 (* ===================================================================== *)
 (* Compressed decode facts (one per distinct 16-bit encoding).            *)
 (* ===================================================================== *)

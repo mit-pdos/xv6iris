@@ -1,7 +1,6 @@
 (* WpAcquireTop.v -- decode/leaf lemmas for xv6's acquire() in S-mode: one
    [instr] lemma per instruction of acquire() (aqi_00 .. aqi_32) plus the
-   underlying decode/execute facts they build on (aqdec_*, aq_cr1, aq_imm16,
-   aqexec_sd, aq_addv_zero_l, aq_sextw_round, ...).  These are consumed by
+   underlying decode/execute facts they build on (aqdec_*, aqexec_sd, aq_addv_zero_l, aq_sextw_round, ...).  These are consumed by
    WpAcquireLock.wp_acquire_lock{_loop}, the CSL acquire spec that supersedes
    the plain-ownership top-level WP formerly proved in this file (see
    WpAcquireLock.v's header for the current top-level story).
@@ -139,19 +138,10 @@ Lemma aqdec_jal_mycpu s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
 
 (* ---- creg / ExecuteAs expansions ---- *)
-Lemma aq_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma aq_imm16 : zero_extend' 12 (concat_vec (mword_of_int 2 : mword 5) ('b"000")) = (mword_of_int 16 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
 Lemma aqexec_sd s :
   exec (execute (C_SD (mword_of_int 2, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)))) s
   = Some (ExecuteAs (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SD. cbn zeta.
-  rewrite exec_returnM. rewrite aq_cr1. rewrite po_cr2. rewrite aq_imm16. reflexivity.
-Qed.
+Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* zero_reg is a left identity for add_vec (mirror of po_addv_assoc's proof) *)
 Lemma aq_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.

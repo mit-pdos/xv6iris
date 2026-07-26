@@ -11,6 +11,7 @@ Require Import WpRvcBridge.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 
 Section WpSpin.
@@ -39,12 +40,6 @@ Section WpSpin.
   Proof.
   intro HmisaC. rvc_oneshot s HmisaC.
 Qed.
-
-  (* ---- the two execute steps (C_J -> JAL x0 -> nextPC := PC) ---- *)
-  Lemma exec_execute_C_J (imm : mword 11) s :
-    exec (execute (C_J imm)) s
-      = Some (ExecuteAs (JAL (sign_extend' 21 (concat_vec imm ('b"0")), zreg)), s).
-  Proof. unfold execute. cbn match. unfold execute_C_J. apply exec_returnM. Qed.
 
   (* JAL to a 2-byte-aligned target with the C extension enabled: the
      misalignment check ([bit1] && not Zca) is false (port of

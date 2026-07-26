@@ -20,13 +20,6 @@ Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* ---- creg -> reg conversions used by the shared prologue decodes ---- *)
-Lemma po_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10).
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma po_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-
 (* ---- shared prologue / epilogue RVC decodes ---- *)
 
 (* +0x00  0x1101  c.addi sp,-32 *)
@@ -109,10 +102,26 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* ---- shared push_off/pop_off instruction facts (both functions load/store the
-   same mycpu-relative stack slot via the same c.lw a5,120(a0) / c.sw a5,120(a0);
-   these live here beside po_cr2/po_cr7 so WpPushOffTop and WpPopOff share them
-   rather than one depending on the other). ---- *)
+(* ---- specialized C_* -> base expansions that TWO functions share (the
+   one-function ones stay in that function's own file).  Each is a one-line
+   instance of WpMmodeLeafBase's [exec_execute_C_*_leaf] bridge. ---- *)
+
+(* 0x8b89  c.andi a5,2  -- pop_off's and sched's interrupt-enable test *)
+Lemma cexec_8b89 s :
+  exec (execute (C_ANDI (mword_of_int 2, Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)), s).
+Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
+
+(* 0xcc9c  c.sw a5,24(s1)  -- sleep's and yield's p->state store *)
+Lemma cexec_cc9c s :
+  exec (execute (C_SW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* ---- shared push_off/pop_off instruction facts: both functions load and
+   store the same mycpu-relative stack slot via the same c.lw a5,120(a0) /
+   c.sw a5,120(a0), so the decodes and their leaf-form expansions live here
+   rather than one function depending on the other. ---- *)
 
 (* +0x14/+0x1c  0x5d3c  c.lw a5,120(a0) *)
 Lemma cdec_5d3c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -130,24 +139,15 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-Lemma po_imm120 : zero_extend' 12 (concat_vec (mword_of_int 30 : mword 5) ('b"00")) = (mword_of_int 120 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
 Lemma poexec_lw s :
   exec (execute (C_LW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 120, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_LW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite po_imm120. reflexivity.
-Qed.
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Lemma poexec_sw120 s :
   exec (execute (C_SW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (STORE (mword_of_int 120, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite po_imm120. reflexivity.
-Qed.
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Lemma po_addv_assoc (a b c : mword 64) :
   add_vec (add_vec a b) c = add_vec a (add_vec b c).

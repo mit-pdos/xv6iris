@@ -150,13 +150,6 @@ Lemma wkd_f90 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0x709c : mword 16)) s
   = Some (C_LD (mword_of_int 4, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
-(* C_LW ExecuteAs bridge (no generic one in WpGprRvc; mirrors exec_execute_C_LD). *)
-Lemma wkx_clw (uimm : mword 5) (rsc rdc : cregidx) s :
-  exec (execute (C_LW (uimm, rsc, rdc))) s
-  = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
-                           creg2reg_idx rsc, creg2reg_idx rdc, false, 4)), s).
-Proof. unfold execute. cbn match. unfold execute_C_LW. cbn zeta. apply exec_returnM. Qed.
-
 
 (* struct proc / struct cpu geometry (NPROC, proc_addr, p_state/p_chan/
    p_context, state codes, needs_ctx, proc_addr_succ, ...) now lives in
@@ -243,7 +236,7 @@ Section WkLeaves.
   Lemma wki_42 : WKI 0x42 false (JAL (mword_of_int 2092148 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.wakeup + 0x42)%Z (mword_of_int 0xc75fe0ef : mword 32) (mword_of_int (KernelSyms.wakeup + 0x42) : mword 64) (JAL (mword_of_int 2092148 : mword 21, Regidx (mword_of_int 1))) wkd_f86. Qed.
   Lemma wki_46 : WKI 0x46 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)).
-  Proof. mk_rvc (KernelSyms.wakeup + 0x46)%Z (mword_of_int 0x4c9c : mword 16) (mword_of_int (KernelSyms.wakeup + 0x46) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) wkd_f8a wkx_clw. Qed.
+  Proof. mk_rvc (KernelSyms.wakeup + 0x46)%Z (mword_of_int 0x4c9c : mword 16) (mword_of_int (KernelSyms.wakeup + 0x46) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) wkd_f8a exec_execute_C_LW. Qed.
   Lemma wki_48 : WKI 0x48 false (BTYPE (mword_of_int 8162 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 15), BNE)).
   Proof. mk_base (KernelSyms.wakeup + 0x48)%Z (mword_of_int 0xff3791e3 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x48) : mword 64) (BTYPE (mword_of_int 8162 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 15), BNE)) wkd_f8c. Qed.
   Lemma wki_4c : WKI 0x4c true (LOAD (cld_imm 4, creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).

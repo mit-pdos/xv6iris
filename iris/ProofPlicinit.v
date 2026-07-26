@@ -86,18 +86,6 @@ Lemma pldec_lui_a4 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* ---- creg -> reg and immediate helpers for the two c.sw sites ---- *)
-Lemma pl_cr6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14).
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma pl_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma pl_imm40 : zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00")) = (mword_of_int 40 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
-Lemma pl_imm4 : zero_extend' 12 (concat_vec (mword_of_int 1 : mword 5) ('b"00")) = (mword_of_int 4 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
 (* +0x0e  d71c  c.sw a5,40(a4) *)
 Lemma pldec_sw40 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xd71c : mword 16)) s
@@ -107,10 +95,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma plexec_sw40 s :
   exec (execute (C_SW (mword_of_int 10, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (STORE (mword_of_int 40, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite pl_cr6. rewrite pl_cr7. rewrite pl_imm40. reflexivity.
-Qed.
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* +0x10  c35c  c.sw a5,4(a4) *)
 Lemma pldec_sw4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -121,10 +106,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma plexec_sw4 s :
   exec (execute (C_SW (mword_of_int 1, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite pl_cr6. rewrite pl_cr7. rewrite pl_imm4. reflexivity.
-Qed.
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Module PlicinitProof : PLICINIT.
 

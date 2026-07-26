@@ -46,22 +46,6 @@ Lemma sldec_li_a5_2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   = Some (C_LI (mword_of_int 2, Regidx (mword_of_int 15)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* the specialized C_SW -> STORE bridge (mirror of WpYieldDecode.ydexec_sw24). *)
-Lemma sl_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
-Lemma sl_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-Lemma sl_imm24 : zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")) = (mword_of_int 24 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
-Lemma slexec_sw24 s :
-  exec (execute (C_SW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite sl_cr1 sl_cr7 sl_imm24. reflexivity.
-Qed.
-
 (* ===================================================================== *)
 (* Fresh base (32-bit) decode templates.                                  *)
 (* ===================================================================== *)
@@ -195,7 +179,7 @@ Section WpSleepDecode.
   (* ---- +0x28: c.sw a5,24(s1) ---- *)
   Lemma sli_28 : kernel_text -∗ instr (mword_of_int (SL + 0x28) : mword 64) true (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
   Proof. mk_rvc (SL + 0x28)%Z (mword_of_int 0xcc9c : mword 16)
-    (mword_of_int (SL + 0x28) : mword 64) (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_cc9c slexec_sw24. Qed.
+    (mword_of_int (SL + 0x28) : mword 64) (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_cc9c cexec_cc9c. Qed.
 
   (* ---- +0x2a: jal sched ---- *)
   Lemma sli_2a : kernel_text -∗ instr (mword_of_int (SL + 0x2a) : mword 64) false (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))).

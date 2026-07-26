@@ -51,36 +51,18 @@ Lemma sddec_lw_a4_24 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
   = Some (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* the specialized C_LW -> LOAD bridge in the leaf-friendly (Regidx / mword_of_int)
-   form (mirror of KernelRvcDecode.poexec_lw). *)
-Lemma sd_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
-Lemma sd_cr6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14).
-Proof. vm_compute. reflexivity. Qed.
-Lemma sd_imm24 : zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")) = (mword_of_int 24 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
+(* sched's own c.lw slot, in the leaf-friendly (Regidx / literal-immediate)
+   form: one instance of WpMmodeLeafBase's [exec_execute_C_LW_leaf]. *)
 Lemma sdexec_lw24 s :
   exec (execute (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 6)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_LW. cbn zeta.
-  rewrite exec_returnM. rewrite sd_cr1 sd_cr6 sd_imm24. reflexivity.
-Qed.
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* +0x36  0x4791  c.li a5,4 *)
 Lemma sddec_li_a5_4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4791 : mword 16)) s
   = Some (C_LI (mword_of_int 4, Regidx (mword_of_int 15)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma sdexec_andi2 s :
-  exec (execute (C_ANDI (mword_of_int 2, Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_ANDI. cbn zeta.
-  rewrite exec_returnM. rewrite !po_cr7. reflexivity.
-Qed.
 
 (* +0x42  0xe7bd  c.bnez a5,<panic> *)
 Lemma sddec_bnez_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -325,7 +307,7 @@ Section WpSchedDecode.
   (* ---- +0x40: c.andi a5,a5,2 ---- *)
   Lemma sdi_40 : kernel_text -∗ instr (mword_of_int (SD + 0x40) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_rvc (SD + 0x40)%Z (mword_of_int 0x8b89 : mword 16)
-    (mword_of_int (SD + 0x40) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) cdec_8b89 sdexec_andi2. Qed.
+    (mword_of_int (SD + 0x40) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) cdec_8b89 cexec_8b89. Qed.
 
   (* ---- +0x42: c.bnez a5,<panic> ---- *)
   Lemma sdi_42 : kernel_text -∗ instr (mword_of_int (SD + 0x42) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 55 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).

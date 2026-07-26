@@ -40,21 +40,6 @@ Section ProcMapstacksInstrs.
 
   (* ExecuteAs redirects not in WpMmodeLeafBase (Local copies, as in
      WpMappagesInstr / WpWalkInstr) *)
-  Local Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
-    exec (execute (C_BEQZ (imm, rs))) s
-    = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BEQ)), s).
-  Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed.
-
-  Local Lemma exec_execute_C_SRAI (shamt : mword 6) (rsd : cregidx) s :
-    exec (execute (C_SRAI (shamt, rsd))) s
-    = Some (ExecuteAs (SHIFTIOP (shamt, creg2reg_idx rsd, creg2reg_idx rsd, SRAI)), s).
-  Proof. apply exec_returnm. Qed.
-
-  Local Lemma exec_execute_C_ADDW (rsd rs2 : cregidx) s :
-    exec (execute (C_ADDW (rsd, rs2))) s
-    = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, ADDW)), s).
-  Proof. apply exec_returnm. Qed.
-
   Lemma pmsdec_14 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0xe062 : mword 16)) s
     = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 24)), s).

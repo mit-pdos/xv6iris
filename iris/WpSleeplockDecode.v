@@ -46,19 +46,6 @@ Notation HSL := KernelSyms.holdingsleep.
 (* compressed memory ops -- the creg-indexed counterparts of C_LD/C_SD). *)
 (* No shared copy exists in WpMmodeLeafBase, so state them here.          *)
 (* ===================================================================== *)
-Lemma exec_execute_C_LW (uimm : mword 5) (rsc rdc : cregidx) s :
-  exec (execute (C_LW (uimm, rsc, rdc))) s
-  = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
-                           creg2reg_idx rsc, creg2reg_idx rdc, false, 4)), s).
-Proof. unfold execute. cbn match. unfold execute_C_LW. cbn zeta. apply exec_returnM. Qed.
-
-Lemma exec_execute_C_SW (uimm : mword 5) (rsc1 rsc2 : cregidx) s :
-  exec (execute (C_SW (uimm, rsc1, rsc2))) s
-  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")),
-                            creg2reg_idx rsc2, creg2reg_idx rsc1, 4)), s).
-Proof. unfold execute. cbn match. unfold execute_C_SW. cbn zeta. apply exec_returnM. Qed.
-
-(* ===================================================================== *)
 (* Fresh compressed decode templates (words unique to sleeplock).        *)
 (* ===================================================================== *)
 

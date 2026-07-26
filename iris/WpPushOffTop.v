@@ -138,26 +138,19 @@ Lemma podec_30 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; po_dbase s Hpriv ]. Qed.
 
 (* ===================================================================== *)
-(* po_imm120, poexec_lw, poexec_sw120 are shared with pop_off — now in
-   KernelRvcDecode.  po_imm124/poexec_sw124 below are push_off-specific. *)
-Lemma po_imm124 : zero_extend' 12 (concat_vec (mword_of_int 31 : mword 5) ('b"00")) = (mword_of_int 124 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
+(* poexec_lw/poexec_sw120 are shared with pop_off and live in
+   KernelRvcDecode; poexec_sw124 below is push_off's own slot.  Every one of
+   these is a one-line instance of WpMmodeLeafBase's [exec_execute_C_*_leaf]
+   bridge -- do not hand-roll the creg/immediate reduction again. *)
 Lemma poexec_sw124 s :
   exec (execute (C_SW (mword_of_int 31, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (STORE (mword_of_int 124, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite po_imm124. reflexivity.
-Qed.
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Lemma poexec_andi s :
   exec (execute (C_ANDI (mword_of_int 1, Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_ANDI. cbn zeta.
-  rewrite exec_returnM. rewrite !po_cr7. reflexivity.
-Qed.
+Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
 
 
 (* named form of wp_mycpu's output register file (= call_mycpu's m11 chain),

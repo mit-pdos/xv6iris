@@ -1283,6 +1283,83 @@ Lemma exec_execute_C_SD (uimm : mword 5) (rsc1 rsc2 : cregidx) s :
                             creg2reg_idx rsc2, creg2reg_idx rsc1, 8)), s).
 Proof. unfold execute. cbn match. unfold execute_C_SD. cbn zeta. apply exec_returnM. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  Leaf-friendly forms of the four compressed load/store expansions.       *)
+(*                                                                          *)
+(*  The generic facts above leave the operands as the decoder produces them  *)
+(*  -- [zero_extend' 12 (concat_vec uimm _)] for the scaled offset and       *)
+(*  [creg2reg_idx rsc] for the 3-bit register fields -- while every WP leaf  *)
+(*  (wp_lw_s_sconf, wp_csd_s_sconf, ...) wants a literal [mword 12] and a    *)
+(*  plain [Regidx].  Eight proofs had each hand-rolled that bridge for its   *)
+(*  own concrete operands, with a bespoke [*_imm*] helper apiece; these four *)
+(*  lemmas are that bridge, once, with the three reductions as premises the  *)
+(*  caller discharges by [vm_compute] on its own literals.  A specialization *)
+(*  is then a one-liner, and it stays next to the function(s) that need it -- *)
+(*  concrete operands do not belong in this file. *)
+(* ---------------------------------------------------------------------- *)
+
+(* c.srai / c.addw : the two remaining creg-form compressed ALU expansions.
+   Each was proved privately in BOTH WpKvmmakeInstr.v and
+   WpProcMapstacksInstr.v; neither had a copy at this altitude. *)
+Lemma exec_execute_C_SRAI (shamt : mword 6) (rsd : cregidx) s :
+  exec (execute (C_SRAI (shamt, rsd))) s
+  = Some (ExecuteAs (SHIFTIOP (shamt, creg2reg_idx rsd, creg2reg_idx rsd, SRAI)), s).
+Proof. unfold execute. cbn match. unfold execute_C_SRAI. cbn zeta. apply exec_returnM. Qed.
+
+Lemma exec_execute_C_ADDW (rsd rs2 : cregidx) s :
+  exec (execute (C_ADDW (rsd, rs2))) s
+  = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, ADDW)), s).
+Proof. unfold execute. cbn match. unfold execute_C_ADDW. cbn zeta. apply exec_returnM. Qed.
+
+Lemma exec_execute_C_ANDI (imm : mword 6) (rsd : cregidx) s :
+  exec (execute (C_ANDI (imm, rsd))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, creg2reg_idx rsd, creg2reg_idx rsd, ANDI)), s).
+Proof. unfold execute. cbn match. unfold execute_C_ANDI. cbn zeta. apply exec_returnM. Qed.
+
+(* c.andi keeps its immediate symbolic (the leaves take [sign_extend' 12 imm]
+   directly), so only the register field needs bridging. *)
+Lemma exec_execute_C_ANDI_leaf (imm : mword 6) (rsd : cregidx) (rd : mword 5) s :
+  creg2reg_idx rsd = Regidx rd ->
+  exec (execute (C_ANDI (imm, rsd))) s
+  = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI)), s).
+Proof. intros H. rewrite exec_execute_C_ANDI H. reflexivity. Qed.
+
+Lemma exec_execute_C_LW_leaf (uimm : mword 5) (rsc1 rdc : cregidx)
+      (imm : mword 12) (rs1 rd : mword 5) s :
+  zero_extend' 12 (concat_vec uimm ('b"00")) = imm ->
+  creg2reg_idx rsc1 = Regidx rs1 ->
+  creg2reg_idx rdc = Regidx rd ->
+  exec (execute (C_LW (uimm, rsc1, rdc))) s
+  = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 4)), s).
+Proof. intros H1 H2 H3. rewrite exec_execute_C_LW H1 H2 H3. reflexivity. Qed.
+
+Lemma exec_execute_C_SW_leaf (uimm : mword 5) (rsc1 rsc2 : cregidx)
+      (imm : mword 12) (rs1 rs2 : mword 5) s :
+  zero_extend' 12 (concat_vec uimm ('b"00")) = imm ->
+  creg2reg_idx rsc1 = Regidx rs1 ->
+  creg2reg_idx rsc2 = Regidx rs2 ->
+  exec (execute (C_SW (uimm, rsc1, rsc2))) s
+  = Some (ExecuteAs (STORE (imm, Regidx rs2, Regidx rs1, 4)), s).
+Proof. intros H1 H2 H3. rewrite exec_execute_C_SW H1 H2 H3. reflexivity. Qed.
+
+Lemma exec_execute_C_LD_leaf (uimm : mword 5) (rsc rdc : cregidx)
+      (imm : mword 12) (rs1 rd : mword 5) s :
+  zero_extend' 12 (concat_vec uimm ('b"000")) = imm ->
+  creg2reg_idx rsc = Regidx rs1 ->
+  creg2reg_idx rdc = Regidx rd ->
+  exec (execute (C_LD (uimm, rsc, rdc))) s
+  = Some (ExecuteAs (LOAD (imm, Regidx rs1, Regidx rd, false, 8)), s).
+Proof. intros H1 H2 H3. rewrite exec_execute_C_LD H1 H2 H3. reflexivity. Qed.
+
+Lemma exec_execute_C_SD_leaf (uimm : mword 5) (rsc1 rsc2 : cregidx)
+      (imm : mword 12) (rs1 rs2 : mword 5) s :
+  zero_extend' 12 (concat_vec uimm ('b"000")) = imm ->
+  creg2reg_idx rsc1 = Regidx rs1 ->
+  creg2reg_idx rsc2 = Regidx rs2 ->
+  exec (execute (C_SD (uimm, rsc1, rsc2))) s
+  = Some (ExecuteAs (STORE (imm, Regidx rs2, Regidx rs1, 8)), s).
+Proof. intros H1 H2 H3. rewrite exec_execute_C_SD H1 H2 H3. reflexivity. Qed.
+
 (* c.bnez : the compressed branch-if-nonzero expands to a base BTYPE/BNE
    against x0.  Shared exec fact -- used by holding(), pop_off()'s and
    acquire()'s compressed retry loops. *)

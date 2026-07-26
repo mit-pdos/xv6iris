@@ -39,6 +39,7 @@ Require Import SmodeCore.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase.
+Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -83,11 +84,6 @@ Section WpMemsetS.
      return target under the C extension: the misalignment check reduces via
      [exec_jump_to_zca] instead of requiring bit1 = 0. *)
 
-
-  Lemma exec_execute_C_BEQZ (imm : mword 8) (rs : cregidx) s :
-    exec (execute (C_BEQZ (imm, rs))) s
-      = Some (ExecuteAs (BTYPE (sign_extend' 13 (concat_vec imm ('b"0")), zreg, creg2reg_idx rs, BEQ)), s).
-  Proof. unfold execute. cbn match. unfold execute_C_BEQZ. apply exec_returnM. Qed.
 
   (* ---- bne rs1,rs2  NOT taken (rs1 == rs2): fall through to pc+4 ---- *)
 

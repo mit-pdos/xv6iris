@@ -131,19 +131,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ppexec_lw124 s :
   exec (execute (C_LW (mword_of_int 31, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 124, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_LW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7.
-  pp_ast.
-Qed.
-
-Lemma ppexec_andi2 s :
-  exec (execute (C_ANDI (mword_of_int 2, Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_ANDI. cbn zeta.
-  rewrite exec_returnM. rewrite !po_cr7. pp_ast.
-Qed.
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* ===================================================================== *)
 (* BGE fall-through execute.                                              *)
@@ -265,7 +253,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_10 : kernel_text -∗ instr (mword_of_int (PP + 0x10) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_rvc (PP + 0x10)%Z (mword_of_int 0x8b89 : mword 16)
-    (mword_of_int (PP + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) cdec_8b89 ppexec_andi2. Qed.
+    (mword_of_int (PP + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) cdec_8b89 cexec_8b89. Qed.
 
   Lemma ppi_12 : kernel_text -∗ instr (mword_of_int (PP + 0x12) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (PP + 0x12)%Z (mword_of_int 0xef99 : mword 16)

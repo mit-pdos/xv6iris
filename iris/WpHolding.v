@@ -74,17 +74,10 @@ Qed.
 
 (* +0x6  0x8082  c.ret: reuse WpPushOffTop.cdec_8082 *)
 
-(* the C_LW ExecuteAs expansion for imm 0 / a0-base / a5-dest *)
-Lemma h_imm0 : zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")) = (mword_of_int 0 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
 Lemma hexec_lw s :
   exec (execute (C_LW (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_LW. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite h_imm0. reflexivity.
-Qed.
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* [hexec_bnez] moved to WpMmodeLeafBase as [exec_execute_C_BNEZ] (shared
    compressed-BNEZ exec fact; also used by pop_off/acquire retry loops). *)
@@ -108,16 +101,10 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-Lemma h_imm16 : zero_extend' 12 (concat_vec (mword_of_int 2 : mword 5) ('b"000")) = (mword_of_int 16 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
 Lemma hexec_ld s :
   exec (execute (C_LD (mword_of_int 2, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_LD. cbn zeta.
-  rewrite exec_returnM. rewrite po_cr2. rewrite po_cr7. rewrite h_imm16. reflexivity.
-Qed.
+Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Local Ltac h_dbase s Hpriv :=
   decode_pause_prefix s Hpriv;

@@ -69,21 +69,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* the specialized C_SW -> STORE bridge (leaf-friendly Regidx / mword_of_int
    form; mirror of ProofPlicinit.plexec_sw40). *)
-Lemma yd_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
-Lemma yd_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-Lemma yd_imm24 : zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")) = (mword_of_int 24 : mword 12).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
-Lemma ydexec_sw24 s :
-  exec (execute (C_SW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
-Proof.
-  unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
-  rewrite exec_returnM. rewrite yd_cr1 yd_cr7 yd_imm24. reflexivity.
-Qed.
-
 Section WpYieldDecode.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
@@ -132,7 +117,7 @@ Section WpYieldDecode.
   (* ---- +0x16: c.sw a5,24(s1) ---- *)
   Lemma ydi_16 : kernel_text -∗ instr (mword_of_int (YD + 0x16) : mword 64) true (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
   Proof. mk_rvc (YD + 0x16)%Z (mword_of_int 0xcc9c : mword 16)
-    (mword_of_int (YD + 0x16) : mword 64) (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_cc9c ydexec_sw24. Qed.
+    (mword_of_int (YD + 0x16) : mword 64) (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_cc9c cexec_cc9c. Qed.
 
   (* ---- +0x18: jal sched ---- *)
   Lemma ydi_18 : kernel_text -∗ instr (mword_of_int (YD + 0x18) : mword 64) false (JAL (mword_of_int 2096940 : mword 21, Regidx (mword_of_int 1))).
