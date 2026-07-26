@@ -325,6 +325,8 @@ ProofHoldingsleep.v
 LinkHoldingsleep.v
 ProofAcquiresleep.v
 LinkAcquiresleep.v
+ArrCursor.v
+BcacheInv.v
 WpBinitDecode.v
 SpecBinit.v
 ProofBinit.v

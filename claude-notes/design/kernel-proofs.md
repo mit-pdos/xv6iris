@@ -28,6 +28,70 @@
 - **Applying a callee's whole-function WP from a caller:** transcribe the callee's ENTIRE precondition into the caller's statement as shared `let`s + hyps + window resources, instantiating params to the caller's post-jal state (`m := mA` with ra:=return, `sp0 := mA!!!csp_rs1`, …). Sharing the same `let`s makes every frame/lock resource match by name and every side condition discharge from the mirrored hyp.
 
 
+## Array-initializer loops (binit / iinit, and the next one)
+
+`binit` and `iinit` are the worked examples of "initialize every element of a
+global array": a 6-slot-frame prologue, `initlock(&X.lock, "name")`, then a
+do-while walking a cursor register by the element stride and stopping when it
+reaches a precomputed end pointer, calling `initsleeplock` per element (and, for
+binit, splicing the element into a list). The reusable pieces:
+
+- **The cursor is `ArrCursor.acur base stride i`** (`acur base stride i :=
+  mword_of_int (base + stride*i)`), so the loop's two address obligations become
+  index arithmetic: `acur_step` is the `addi cur,cur,<stride>` bump (its `o =
+  mword_of_int stride` premise is discharged at the call site by `vm_compute` on
+  the function's own literal, so the file stays width-agnostic) and `acur_neq`
+  turns the `bne cur,end` test into `negb (i =? n)`. `acur_inj`/`acur_unsigned`
+  are there for element-disjointness. A new array loop instantiates these; do not
+  re-derive the bitvector arithmetic. Pick the end pointer as `acur base stride
+  n` — in bcache's case `&bcache.head` IS one past the last buffer, so the head
+  sentinel is just `bnode NBUF` and one cursor names every node.
+- **Fuel induction over the remaining COUNT, not a list.** `iAssert (∀ (fuel j :
+  nat) (M : regfile) …, ⌜(N - j <= fuel)%nat⌝ -∗ ⌜(j < N)%nat⌝ -∗ ⌜register
+  invariant⌝ -∗ … ) with "[]" as "Hloop"`, then `iInduction fuel`. The `fuel = 0`
+  case is `exfalso; lia`. Enter with `fuel := N`, `j := 0`.
+- **Per-element resources split accumulator / remaining**: carry `[∗ list] i ∈
+  seq 0 j, <done i>` and `[∗ list] i ∈ seq j (N - j), <raw i>`. Peel the head
+  with `assert (Hsplit : (N - j)%nat = S (N - S j)) by lia; iEval (rewrite
+  Hsplit) in "Hraw"; iEval (cbn [seq]) in "Hraw"`, and append to the accumulator
+  with `rewrite seq_S; rewrite big_sepL_app; … rewrite Nat.add_0_l; cbn [seq]`.
+- **A list/graph the loop BUILDS: thread it abstractly and pass the final value
+  as a parameter with a pure premise.** binit's loop carries `bcache_lru bhead l`
+  with `l` completely abstract plus `(L : list …)` and `⌜L = blist j (NBUF - j)
+  ++ l⌝`; the exit continuation takes `bcache_lru bhead L`. The recursion
+  re-instantiates the SAME `L` and discharges the premise from `blist_step` +
+  `app_assoc`, so nothing ever rewrites inside a hypothesis. (Threading the
+  concrete list instead would force the loop to know its own shape.)
+- **Mutating cells that live INSIDE a data-structure predicate: give the
+  predicate an open/close lemma whose closing half is a wand.**
+  `BcacheInv.bcache_lru_splice` hands the body the only two cells a
+  splice-after-head touches outside the new node, plus `∀ a, … -∗ … -∗ … -∗ … -∗
+  bcache_lru h (a :: l)`; the leftover resources ride in the wand's closure. This
+  is what makes binit's body case-split-free: the "head.next->prev" store lands
+  on the head itself in the first iteration and on the previous buffer
+  afterwards, and `bprev (List.hd h l) ↦₈ h` covers both uniformly (the value is
+  `h` either way). Reach for this shape whenever a loop updates a structure
+  in place.
+- **Branch conditions: `destruct (decide (S j = N))`, NOT `destruct
+  (Nat.eqb_spec (S j) N)`.** Destructing the `reflect` abstracts the term `S j =?
+  N` out of the *hypotheses* too, so the `neq_vec … = negb (S j =? N)` fact the
+  branch leaves need no longer matches and the rewrite fails with a confusing
+  "LHS does not match any subterm". Then state each arm's leaf premise as a named
+  `assert` (`rewrite Hcmp. rewrite (proj2 (Nat.eqb_eq _ _) Hend). reflexivity.`)
+  rather than an inline `ltac:(…)`, so a failure points at the right line.
+- **The loop's tail must reach the epilogue, so factor the epilogue as a
+  top-level (payload-free) lemma** — `iiepi`/`biepi`, mirroring `frepi`. Give it
+  no postcondition resources at all: the caller's payload rides in the `[-]`
+  frame and comes back in scope after `iIntros (mr) "Hcg Hpc %Hcs"`. Fold the
+  outer `Hcont` into a smaller `Hpost` with an `iAssert` before entering the loop
+  so the loop statement does not repeat the lock's returned cells.
+- **`sl_raw` / `sl_fresh` (SleepLock.v)** are the two ends of `initsleeplock`
+  bundled — an uninitialized sleeplock's six cells, and the four zeroed cells
+  plus the two persistent names. A caller initializing ONE sleeplock names the
+  six fields individually (`SpecInitsleeplock`); a caller initializing an array
+  must not, or its contract becomes a big-sep of six-field tuples with six
+  existentials each. `sl_fresh_new` is the ghost step on to `is_sleeplock`.
+
 ## Spinlocks (WpLock.v)
 
 - `lockG Σ = exclR unitO`; `locked γ := own γ (Excl ())`; `lock_inv γ lk R := ∃ v, lock_word lk v ∗ (⌜v=0⌝ ∗ locked γ ∗ R ∨ ⌜v≠0⌝)`; `is_lock γ lk s R := lock_name lk s ∗ inv lockN (lock_inv γ lk R)` (`lockN` disjoint from `minstretN`). Core: `newlock`, `locked_exclusive`.
@@ -40,4 +104,7 @@
 - `struct proc` (sizeof 360): lock@0 (24 B spinlock: locked word@0, cpu ptr@16), state@24 (4 B), chan@32 (8 B), pid@48, parent@56, context@96 (14×8 B: ra,sp,s0..s11). States UNUSED=0 USED=1 SLEEPING=2 RUNNABLE=3 RUNNING=4 ZOMBIE=5. NPROC=64, `proc[]`@0x80012778.
 - `struct cpu` (sizeof 128): base 0x80012378, noff@120, intena@124.
 - proc/cpu geometry (NPROC, proc_addr, field offsets, state codes, needs_ctx, the cpu cell addresses `a_cpu_{proc,ctx,noff,int}` over `mycpu_ret`) lives in ProcGeom.v; WpWakeup.v Require-Exports it.
+- `struct bcache` (bio.c, `BcacheInv.v`): lock@0 (24 B spinlock), `buf[NBUF]`@24, `head` immediately past the array — so the head sentinel is at `bcache+24+1112*NBUF` and IS the loop's end pointer, i.e. `bnode NBUF`. NBUF=30, sizeof(struct buf)=1112; inside a buf: sleeplock@16, refcnt@64, prev@72, next@80, data@88. `bcache`@0x80018190. gcc keeps `bcache+0x8000` in a register and reaches head.prev/head.next at +688/+696 off it (`hbase_prev`/`hbase_next` bridge those spellings to `bprev bhead`/`bnext bhead`). `BcacheInv.v` also holds the circular-LRU predicate (`bcache_lru`/`bseg`/`blink_raw`) and `blist`, the order binit leaves the list in — reverse address order, MRU first, which is what bget's scan expects.
+- `struct itable` (fs.c, `SpecIinit.v`): lock@0 (24 B), `inode[NINODE]`@24. NINODE=50, sizeof(struct inode)=136, sleeplock@16 inside an inode — so `&itable.inode[i].lock` is `itable+40+136*i`. `itable`@0x80020870.
+- **Data addresses come from the tracked `KernelInstrs.v`/`KernelSyms.v`, never from `xv6-riscv/kernel/kernel.asm`.** That tree is gitignored and drifts: at the time binit/iinit were proved its text sat 14 bytes below the tracked image, so every auipc/addi/jal/branch immediate in the asm was wrong while the data symbols happened to match — the most confusing possible failure mode. Read the immediates out of the `MkKInstr` table (its comments carry the disassembly).
 

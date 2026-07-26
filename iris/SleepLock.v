@@ -157,4 +157,46 @@ Section SleepLock.
     iApply (is_lock_intro with "Hlnm Hinv").
   Qed.
 
+  (* ---- the two ends of initsleeplock, bundled.
+
+     A caller that initializes ONE sleeplock names the six struct fields and
+     the six results individually (as [SpecInitsleeplock.v] does).  A caller
+     that initializes an ARRAY of them -- binit over bcache.buf[], iinit over
+     itable.inode[] -- must not: its pre/postcondition would be a big-sep of
+     six-field tuples with six existentially quantified contents each.  So the
+     two ends get names: [sl_raw slk] is an uninitialized sleeplock (all six
+     cells, contents arbitrary) and [sl_fresh slk s] is initsleeplock's result
+     (the four zeroed cells plus the two persistent names).  [sl_fresh] is
+     exactly [new_sleeplock]'s premises minus the resource, so a caller turns
+     an array of them into an array of sleeplocks one [sl_fresh_new] at a
+     time. *)
+  Definition sl_raw (slk : mword 64) : iProp Σ :=
+    (∃ (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64),
+       slk ↦₄ vlocked ∗
+       sl_lk slk ↦₄ vlk ∗
+       lock_name_field (sl_lk slk) ↦₈ vlkname ∗
+       sl_lkcpu slk ↦₈ vcpu ∗
+       sl_name_field slk ↦₈ vname ∗
+       sl_pid slk ↦₄ vpid)%I.
+
+  Definition sl_fresh (slk : mword 64) (s : string) : iProp Σ :=
+    (slk ↦₄ (mword_of_int 0 : mword 32) ∗
+     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) ∗
+     lock_name (sl_lk slk) "sleep lock"%string ∗
+     sl_lkcpu slk ↦₈ (zero_reg : mword 64) ∗
+     sl_name slk s ∗
+     sl_pid slk ↦₄ (mword_of_int 0 : mword 32))%I.
+
+  (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
+     word of the inner spinlock is NOT part of [lock_inv], so it comes back out
+     for the caller to thread on (acquire/release want it). *)
+  Lemma sl_fresh_new E (slk : mword 64) (s : string) (R : iProp Σ) :
+    sl_fresh slk s -∗ R ={E}=∗
+    (∃ γl γ : gname, is_sleeplock γl γ slk s R) ∗ sl_lkcpu slk ↦₈ (zero_reg : mword 64).
+  Proof.
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
+    iMod (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hw Hpid HR") as "Hsl".
+    iModIntro. iFrame "Hsl Hcpu".
+  Qed.
+
 End SleepLock.

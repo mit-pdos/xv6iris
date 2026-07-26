@@ -214,6 +214,15 @@ over the callees you need, then the one-line `Link<F>.v`, and add all three to
 `_CoqProject`. Only lemmas another file consumes belong in the `Module Type`;
 everything else stays hidden behind the seal.
 
+**`Link<F>.v` must APPLY the functor, not re-abstract it.** The link is
+`Require Import LinkG LinkH Proof<F>. Module F := <F>Proof G H.` — an *applied*
+module against the callees' own links. Writing it as another functor
+(`Module LinkF (G : GSPEC) : FSPEC := FProof G.`) type-checks and looks
+plausible, but nothing is ever instantiated: the proof is never sealed against
+the real callee proofs, a callee-side spec/proof mismatch stays invisible, and
+`tools/proof_coverage.py` does not count the function as proven. `LinkBinit.v`
+and `LinkIinit.v` were both in that shape and were repaired.
+
 Before writing a straight-line body, check whether `F` is an instance of a shape
 that is already proved — a body that is just `initlock(&L, "name")` is a member
 of the thin-wrapper family above and needs no proof of its own.

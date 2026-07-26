@@ -1,5 +1,6 @@
-(* LinkIinit.v *)
-Require Import SpecInitlock SpecInitsleeplock SpecIinit ProofIinit.
+(* LinkIinit.v -- instantiates the iinit proof against its callees' proofs
+   (initlock and initsleeplock).  Sealed, so this is the only place the three
+   ever meet. *)
+Require Import LinkInitlock LinkInitsleeplock ProofIinit.
 
-Module LinkIinit (Initlock : INITLOCK) (Initsleeplock : INITSLEEPLOCK) : IINIT :=
-  IinitProof Initlock Initsleeplock.
+Module Iinit := IinitProof Initlock Initsleeplock.
