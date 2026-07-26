@@ -12,7 +12,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
 - sie_inv owns free stack locations, requires sufficient depth for interrupt/kernelvec
 - swtch spec
-- acquire/release separation logic spec (standard, but does work)
+- acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
 - kalloc/kfree separation-logic-style specs
 - kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None
 - re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
