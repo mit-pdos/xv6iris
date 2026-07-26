@@ -185,12 +185,19 @@ Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
 (* 3c. The device execution context.                                        *)
 (*                                                                          *)
 (*   The devices run CONCURRENTLY with the harts: between any two CPU        *)
-(*   instructions the UART may transmit or receive a byte, the PLIC gateway  *)
-(*   may latch the UART's (level) interrupt output, and the PLIC may         *)
-(*   propagate its per-hart EIP level onto a hart's external S-interrupt     *)
-(*   pin -- the [sig_seip] register, which is exactly the model's external   *)
-(*   interrupt WIRE: [read_mip IncludePlatformInterrupts] ORs it into mip,   *)
-(*   so [dispatchInterrupt] sees it on the next instruction boundary.        *)
+(*   instructions the UART may transmit or receive a byte, the virtio disk   *)
+(*   may complete a queued request, the PLIC gateway may latch either        *)
+(*   device's (level) interrupt output, and the PLIC may propagate its       *)
+(*   per-hart EIP level onto a hart's external S-interrupt pin -- the        *)
+(*   [sig_seip] register, which is exactly the model's external interrupt    *)
+(*   WIRE: [read_mip IncludePlatformInterrupts] ORs it into mip, so          *)
+(*   [dispatchInterrupt] sees it on the next instruction boundary.           *)
+(*                                                                          *)
+(*   The disk is a BUS MASTER, so unlike the UART and the PLIC its step is   *)
+(*   not confined to the device fabric: [dev_step] therefore carries the     *)
+(*   byte memory, and [DevStepDisk] overrides it with the write set the DMA  *)
+(*   produced ([w ∪ m], VirtioModel.virtio_req_step).  Every other device    *)
+(*   transition returns the memory untouched.                               *)
 (*                                                                          *)
 (*   Note the wire is updated by its OWN step (DevStepWire), not             *)
 (*   synchronously with the MMIO write that caused the level change: the     *)
@@ -198,20 +205,23 @@ Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
 (*   weaker (hence safer) modelling choice.                                  *)
 (* ---------------------------------------------------------------------- *)
 
-Inductive dev_step (d : dev_state) (gr : CPU -> regstate)
-    : dev_state -> (CPU -> regstate) -> Prop :=
+Inductive dev_step (d : dev_state) (m : gmap Arch.pa (bv 8)) (gr : CPU -> regstate)
+    : dev_state -> gmap Arch.pa (bv 8) -> (CPU -> regstate) -> Prop :=
   | DevStepTx b u' :
       uart_tx_pop d.(duart) = Some (b, u') ->
-      dev_step d gr (set_duart d u') gr
+      dev_step d m gr (set_duart d u') m gr
   | DevStepRx b u' :
       uart_rx_push d.(duart) b = Some u' ->
-      dev_step d gr (set_duart d u') gr
-  | DevStepLatch p' :
-      uart_irq d.(duart) = true ->
-      plic_latch d.(dplic) = Some p' ->
-      dev_step d gr (set_dplic d p') gr
+      dev_step d m gr (set_duart d u') m gr
+  | DevStepLatch (i : N) p' :
+      dev_irq_level d i = true ->
+      plic_latch d.(dplic) i = Some p' ->
+      dev_step d m gr (set_dplic d p') m gr
+  | DevStepDisk v' w :
+      virtio_req_step d.(dvirtio) m = Some (v', w) ->
+      dev_step d m gr (set_dvirtio d v') (w ∪ m) gr
   | DevStepWire (c : CPU) :
-      dev_step d gr d
+      dev_step d m gr d m
         (<[c := register_set sig_seip
                   (bool_to_bit (dev_seip d (fin_to_nat c))) (gr c)]> gr).
 
@@ -247,9 +257,9 @@ Definition prim_step
       g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev))
   \/
   (e = DevLoopE /\ e' = DevLoopE /\ κ = [] /\ efs = [] /\
-    exists d' gr',
-      dev_step g.(gdev) g.(gregs) d' gr' /\
-      g' = GState gr' g.(gmem) d').
+    exists d' m' gr',
+      dev_step g.(gdev) g.(gmem) g.(gregs) d' m' gr' /\
+      g' = GState gr' m' d').
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
 Proof.

@@ -81,9 +81,9 @@ Context `{CID : CpuId}.
   iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-  iDestruct "Hdev" as "[Hua Hpldev]".
+  iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
   iInv "Hdinv" as ">Hdbody" "Hdclose".
-  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg & %Hpok)".
+  iDestruct "Hdbody" as (u p vst) "(Huf & Hplf & Hvf & Hg & Hlease & %Hpok & %Hvok)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
   destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -163,10 +163,11 @@ Context `{CID : CpuId}.
                ltac:(rewrite !Lva Hpa; apply dev_addr_uart; exact Hoff)
                ltac:(rewrite !Lva !Lv2 Hpa; exact Hwr_uart)).
     subst s_x d'. reflexivity. }
-  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev] Huf") as "[Hdev' Huf']".
+  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
   iMod ("Hacc" $! u u' with "[//] Hg HR") as "[Hg' HS]".
-  iMod ("Hdclose" with "[Huf' Hplf Hg']") as "_".
-  { iNext. iExists u', p. iFrame. iPureIntro. exact Hpok. }
+  iMod ("Hdclose" with "[Huf' Hplf Hvf Hg' Hlease]") as "_".
+  { iNext. iExists u', p, vst. iFrame.
+    iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hstore. }
@@ -235,7 +236,7 @@ Qed.
   iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-  iDestruct "Hdev" as "[Hua Hpldev]".
+  iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
@@ -314,7 +315,7 @@ Qed.
                ltac:(rewrite !Lva Hpa; apply dev_addr_uart; exact Hoff)
                ltac:(rewrite !Lva !Lv2 Hpa; exact Hwr_uart)).
     subst s_x d'. reflexivity. }
-  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev] Huf") as "[Hdev' Huf']".
+  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hstore. }
@@ -377,9 +378,9 @@ Qed.
   iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-  iDestruct "Hdev" as "[Hua Hpldev]".
+  iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
   iInv "Hdinv" as ">Hdbody" "Hdclose".
-  iDestruct "Hdbody" as (u p) "(Huf & Hplf & Hg & %Hpok)".
+  iDestruct "Hdbody" as (u p vst) "(Huf & Hplf & Hvf & Hg & Hlease & %Hpok & %Hvok)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
   destruct (uart_read_total u off Hoff) as (b & u' & Hread_u).
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -456,15 +457,16 @@ Qed.
              ltac:(rewrite !Lva Hpa; apply within_htif_false; exact Lhtif_tr)
              ltac:(rewrite !Lva Hpa; apply dev_addr_uart; exact Hoff)
              ltac:(rewrite !Lva Hpa; exact Hdrd_uart)). }
-  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev] Huf") as "[Hdev' Huf']".
+  iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
   iMod ("Hacc" $! u b u' with "[//] Hg HR") as "[Hg' HS]".
   iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (ldval b)) with "Hfmap") as "[Hrdc Hfins]".
   rewrite (gpr_pt_nz rd _ Hrd).
   iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval b)) with "Hreg Hrdc") as "[Hreg Hrdc]".
   iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
   { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-  iMod ("Hdclose" with "[Huf' Hplf Hg']") as "_".
-  { iNext. iExists u', p. iFrame. iPureIntro. exact Hpok. }
+  iMod ("Hdclose" with "[Huf' Hplf Hvf Hg' Hlease]") as "_".
+  { iNext. iExists u', p, vst. iFrame.
+    iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hload. }

@@ -41,7 +41,8 @@ are working on that effort — the relevant `projects/` file.
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy
   (`RiscvAdequacy.v`).
 - **[`device.md`](design/device.md)** — the memory-mapped device model (16550
-  UART + PLIC), `DevModel.v`/`WpUart.v`, the four device ghosts, and the
+  UART + PLIC + virtio-mmio disk), `DevModel.v`/`VirtioModel.v`/`WpUart.v`/
+  `WpVirtio.v`, the device ghosts, the bus-master/DMA-lease story, and the
   S-mode instruction-level UART access layer.
 - **[`tlb-translation.md`](design/tlb-translation.md)** — the kvmmake-faithful
   all-4KB kernel page table, TLB/page-walk/translation, userret / trampoline /
@@ -65,6 +66,10 @@ are working on that effort — the relevant `projects/` file.
   mappages / walk proofs (`KvmSpec.v`).
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
+- **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
+  machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
+  done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
+  MMIO leaves, the lease-transfer protocol) is the remaining work.
 
 ### `completed/` — finished projects, archived for reference
 

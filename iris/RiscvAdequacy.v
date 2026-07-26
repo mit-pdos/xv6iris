@@ -56,7 +56,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
 Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import WireInv.
-Require Import PlicPlan WpUart.
+Require Import PlicPlan WpVirtio WpUart.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)
@@ -70,6 +70,7 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_memGS  :: gen_heapGpreS Arch.pa (bv 8) Σ;
   riscv_pre_uartGS :: ghost_varG Σ uart_state;
   riscv_pre_plicGS :: ghost_varG Σ plic_state;
+  riscv_pre_virtioGS :: ghost_varG Σ virtio_state;
   (* the UART ghosts carried by [dev_inv_body] (WpUart.v) *)
   riscv_pre_uartGhostGS :: uartGhostG Σ;
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): capacity only --
@@ -85,6 +86,7 @@ Definition riscvΣ : gFunctors :=
      gen_heapΣ Arch.pa (bv 8);
      ghost_varΣ uart_state;
      ghost_varΣ plic_state;
+     ghost_varΣ virtio_state;
      uartGhostΣ;
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27) ].
@@ -227,7 +229,8 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ}
        (* ... and the persisted static-claims bundle (uniform-claims):
           the client threads it into hw_config *)
        kmap_static_claims ∗
-       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic))
+       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
+       virtio_frag (g.(gdev).(dvirtio))
        ={⊤}=∗
        ([∗ list] c ∈ cs, WP (LoopE c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
        WP (DevLoop : expr riscv_lang) @ ⊤ {{ _, True }}) ->
@@ -250,12 +253,15 @@ Proof.
     as (f) "Hcpus".
   iMod (ghost_var_alloc g.(gdev).(duart)) as (γu) "Hu".
   iMod (ghost_var_alloc g.(gdev).(dplic)) as (γp) "Hp".
+  iMod (ghost_var_alloc g.(gdev).(dvirtio)) as (γv) "Hv".
   iEval (rewrite -Qp.half_half) in "Hu".
   iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
   iEval (rewrite -Qp.half_half) in "Hp".
   iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
+  iEval (rewrite -Qp.half_half) in "Hv".
+  iDestruct (ghost_var_split with "Hv") as "[HvA HvF]".
   iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ γu γp _ γk).
+  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
@@ -311,13 +317,14 @@ Proof.
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HuF HpF]") as "[Hwps Hdwp]".
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HuF HpF HvF]") as "[Hwps Hdwp]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
     iFrame "Htext Hdata". iSplitL "Hkauth".
     { iExact "Hkauth". }
     iSplitR; [iExact "Hkbundle" |].
-    iSplitL "HuF"; [iExact "HuF"|iExact "HpF"]. }
+    iSplitL "HuF"; [iExact "HuF"|].
+    iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -327,11 +334,12 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ HR)).
   cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA".
+  iSplitL "Hauths Hh HuA HpA HvA".
   { (* the initial state interpretation *)
     iSplitL "Hauths".
     { rewrite /gregs_interp. iApply big_sepL_enum_to_set. iExact "Hauths". }
-    iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|iExact "HpA"]. }
+    iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
+    iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
   iSplitL "Hwps Hdwp".
   { (* the WPs of the initial threads *)
     rewrite big_sepL2_replicate_r; [|done].
@@ -364,7 +372,16 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ} (g : gstate)
     (* [dev_inv] also maintains the kernel's PLIC plan (PlicPlan.v), so the
        initial PLIC must already satisfy it -- a reset PLIC (all S-context
        enable words clear) does. *)
-    (Hplic : plic_ok g.(gdev).(dplic)) :
+    (Hplic : plic_ok g.(gdev).(dplic))
+    (* [dev_inv] carries the disk's DMA lease (WpVirtio.v), and the lease the
+       invariant is BORN with is the empty one -- which is only good while the
+       queue is not live.  So the invariant must be allocated before the
+       driver makes the queue ready; a reset device satisfies this. *)
+    (Hvlive : virtio_live (v_cfg g.(gdev).(dvirtio)) = false)
+    (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
+       PLIC plan): the interrupt-status register holds only defined bits.  A
+       reset device does. *)
+    (Hvisr : virtio_isr_ok g.(gdev).(dvirtio)) :
   forall t2 g2 e2,
     rtc erased_step (cpu_pool [], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -373,16 +390,18 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & Huf & Hpf)".
+  iIntros "(Hwires & _ & _ & _ & _ & Huf & Hpf & Hvf)".
   (* allocate the four UART ghosts at the initial device state *)
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
-  iMod (dev_inv_alloc _ γ with "[Huf Hpf Hacc Hout Htx Hdl]") as "#Hinv".
+  iMod (dev_inv_alloc _ γ with "[Huf Hpf Hvf Hacc Hout Htx Hdl]") as "#Hinv".
   { rewrite /dev_inv_body.
-    iExists g.(gdev).(duart), g.(gdev).(dplic).
+    iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).
     iFrame "Hacc Hout Htx Hdl".
     iSplitL "Huf"; [iExact "Huf"|].
     iSplitL "Hpf"; [iExact "Hpf"|].
-    iPureIntro. exact Hplic. }
+    iSplitL "Hvf"; [iExact "Hvf"|].
+    iSplitR; [ by iApply virtio_lease_init |].
+    iSplit; [ iPureIntro; exact Hplic | iPureIntro; exact Hvisr ]. }
   iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
           (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
     as "#Hwinv".

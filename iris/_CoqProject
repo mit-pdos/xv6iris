@@ -8,6 +8,7 @@
 -arg -w
 -arg -notation-overridden
 RiscvModelBytes.v
+VirtioModel.v
 DevModel.v
 RiscvLang.v
 RegFile.v
@@ -16,6 +17,7 @@ KptExecMap.v
 RiscvExec.v
 MinstretInv.v
 WireInv.v
+WpVirtio.v
 RiscvExtras.v
 AlignBits.v
 RiscvTryStep.v

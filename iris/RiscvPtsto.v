@@ -94,8 +94,10 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      invariant shared between the driver's hart and the device thread. *)
   riscv_uartGS :: ghost_varG Σ uart_state;
   riscv_plicGS :: ghost_varG Σ plic_state;
+  riscv_virtioGS :: ghost_varG Σ virtio_state;
   uart_name : gname;
   plic_name : gname;
+  virtio_name : gname;
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): one global
      vpn ↦ (ppn, class) map.  Lives here -- not as a separate class --
      because [tlb_inv_pt] rides inside [sie_cap_gpr], and a separate
@@ -525,10 +527,14 @@ Definition plic_auth `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
   ghost_var plic_name (1/2) p.
 Definition plic_frag `{!riscvGS Σ} (p : plic_state) : iProp Σ :=
   ghost_var plic_name (1/2) p.
+Definition virtio_auth `{!riscvGS Σ} (v : virtio_state) : iProp Σ :=
+  ghost_var virtio_name (1/2) v.
+Definition virtio_frag `{!riscvGS Σ} (v : virtio_state) : iProp Σ :=
+  ghost_var virtio_name (1/2) v.
 
 (* the state_interp conjunct for the shared device state *)
 Definition dev_interp `{!riscvGS Σ} (d : dev_state) : iProp Σ :=
-  (uart_auth d.(duart) ∗ plic_auth d.(dplic))%I.
+  (uart_auth d.(duart) ∗ plic_auth d.(dplic) ∗ virtio_auth d.(dvirtio))%I.
 
 Section DevBridge.
   Context `{!riscvGS Σ}.
@@ -547,6 +553,14 @@ Section DevBridge.
   Qed.
   Lemma plic_update p p' p'' :
     plic_auth p -∗ plic_frag p' ==∗ plic_auth p'' ∗ plic_frag p''.
+  Proof. iApply ghost_var_update_halves. Qed.
+
+  Lemma virtio_agree v v' : virtio_auth v -∗ virtio_frag v' -∗ ⌜v' = v⌝.
+  Proof.
+    iIntros "Ha Hf". by iDestruct (ghost_var_agree with "Ha Hf") as %->.
+  Qed.
+  Lemma virtio_update v v' v'' :
+    virtio_auth v -∗ virtio_frag v' ==∗ virtio_auth v'' ∗ virtio_frag v''.
   Proof. iApply ghost_var_update_halves. Qed.
 End DevBridge.
 

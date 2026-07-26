@@ -36,7 +36,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
    write_kind/...) win over SailStdpp's homonyms -- same order as WpLoad.v. *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import WireInv.
+Require Import WireInv WpVirtio.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -50,7 +50,7 @@ Section DevGhost.
   Lemma dev_interp_agree d u p :
     dev_interp d -∗ uart_frag u -∗ plic_frag p -∗ ⌜duart d = u /\ dplic d = p⌝.
   Proof.
-    iIntros "[Hua Hpa] Hu Hp".
+    iIntros "(Hua & Hpa & _) Hu Hp".
     iDestruct (uart_agree with "Hua Hu") as %->.
     iDestruct (plic_agree with "Hpa Hp") as %->.
     done.
@@ -61,17 +61,17 @@ Section DevGhost.
   Lemma dev_interp_update_uart d u u' :
     dev_interp d -∗ uart_frag u ==∗ dev_interp (set_duart d u') ∗ uart_frag u'.
   Proof.
-    iIntros "[Hua Hpa] Hu".
+    iIntros "(Hua & Hpa & Hva) Hu".
     iMod (uart_update with "Hua Hu") as "[$ $]".
-    rewrite /set_duart /dev_interp /=. by iFrame "Hpa".
+    rewrite /set_duart /dev_interp /=. by iFrame "Hpa Hva".
   Qed.
 
   Lemma dev_interp_update_plic d p p' :
     dev_interp d -∗ plic_frag p ==∗ dev_interp (set_dplic d p') ∗ plic_frag p'.
   Proof.
-    iIntros "[Hua Hpa] Hp".
+    iIntros "(Hua & Hpa & Hva) Hp".
     iMod (plic_update with "Hpa Hp") as "[$ $]".
-    rewrite /set_dplic /dev_interp /=. by iFrame "Hua".
+    rewrite /set_dplic /dev_interp /=. by iFrame "Hua Hva".
   Qed.
 End DevGhost.
 
@@ -551,14 +551,32 @@ Section DevLoop.
      enable bit, and it is per-hart-local enough that a hart running
      [plicinithart] concurrently with the others re-establishes it from its
      own write alone. *)
+  (* The VIRTIO half carries the disk's DMA LEASE ([virtio_lease], WpVirtio.v):
+     ownership of every byte the device may write, plus the pure obligation
+     that the queue its configuration names really does live inside those
+     bytes.  Unlike the other two halves this one is not merely a mirror of
+     the device state -- it is what MAKES the device thread's DMA step
+     justifiable, since the thread has to own what it overwrites.  It rides in
+     [dev_inv] rather than in a separate invariant because the driver hands the
+     lease over (and takes it back) at exactly the MMIO writes that already
+     open this one.
+
+     It also carries [virtio_isr_ok] (VirtioModel.v), the exact analogue of
+     the PLIC's [plic_ok]: the interrupt-status register holds only the two
+     bits the spec defines, which is what makes [virtio_disk_intr]'s 0x3
+     acknowledgement provably drop the interrupt line ([virtio_ack_clears]). *)
   Definition dev_inv_body (γ : uart_names) : iProp Σ :=
-    (∃ (u : uart_state) (p : plic_state),
-       uart_frag u ∗ plic_frag p ∗ uart_ghosts γ u ∗ ⌜ plic_ok p ⌝)%I.
+    (∃ (u : uart_state) (p : plic_state) (v : virtio_state),
+       uart_frag u ∗ plic_frag p ∗ virtio_frag v ∗
+       uart_ghosts γ u ∗ virtio_lease v ∗
+       ⌜ plic_ok p ⌝ ∗ ⌜ virtio_isr_ok v ⌝)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
   Proof. rewrite /uart_frag. apply _. Qed.
   Global Instance plic_frag_timeless p : Timeless (plic_frag p).
   Proof. rewrite /plic_frag. apply _. Qed.
+  Global Instance virtio_frag_timeless v : Timeless (virtio_frag v).
+  Proof. rewrite /virtio_frag. apply _. Qed.
   Global Instance dev_inv_body_timeless γ : Timeless (dev_inv_body γ).
   Proof. rewrite /dev_inv_body. apply _. Qed.
 
@@ -624,16 +642,18 @@ Section DevLoop.
     iIntros "#Hinv #Hwinv". rewrite /dev_inv.
     iLöb as "IH".
     iApply wp_dev_step.
-    iIntros (gr d) "[Hgr Hdev]".
+    iIntros (gr m d) "(Hgr & Hmem & Hdev)".
     iInv "Hinv" as ">Hbody" "Hclose".
     iInv "Hwinv" as ">Hwbody" "Hwclose".
-    iDestruct "Hbody" as (u p) "(Hu & Hp & Hg & %Hpok)".
+    iDestruct "Hbody" as (u p vs) "(Hu & Hp & Hv & Hg & Hlease & %Hpok & %Hvok)".
     iDestruct "Hwbody" as (seip meip) "Hwires".
     iDestruct (dev_interp_agree with "Hdev Hu Hp") as %[Hu Hp].
+    iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' gr' Hstep).
+    iNext. iIntros (d' m' gr' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [b u' Htx0 | b u' Hrx | p' Hirq Hlatch | c].
+    destruct Hstep as [b u' Htx0 | b u' Hrx | i p' Hirq Hlatch
+                      | vnew w Hdisk | c].
     - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the
          tail of [u_out], so the accepted trace is UNCHANGED. *)
       rewrite Hu in Htx0.
@@ -652,9 +672,10 @@ Section DevLoop.
       { rewrite (uart_tx_pop_out _ _ _ Htx0). by apply prefix_app_r. }
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp Hacc Hout Htx Hdl]") as "_".
-      { iNext. iExists u', p. rewrite /uart_ghosts. iFrame. iPureIntro. exact Hpok. }
-      iModIntro. iFrame "Hgr Hdev'". iApply "IH".
+      iMod ("Hclose" with "[Hu' Hp Hv Hacc Hout Htx Hdl Hlease]") as "_".
+      { iNext. iExists u', p, vs. rewrite /uart_ghosts. iFrame.
+        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
     - (* a byte arrives from the outside world: rx only, trace untouched *)
       rewrite Hu in Hrx.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
@@ -665,17 +686,35 @@ Section DevLoop.
                    (uart_rx_push_dlab _ b _ Hrx) with "Hg") as "Hg".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp Hg]") as "_".
-      { iNext. iExists u', p. iFrame. iPureIntro. exact Hpok. }
-      iModIntro. iFrame "Hgr Hdev'". iApply "IH".
+      iMod ("Hclose" with "[Hu' Hp Hv Hg Hlease]") as "_".
+      { iNext. iExists u', p, vs. iFrame.
+        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
     - (* the gateway latches the UART's interrupt level: the UART is untouched *)
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu Hp' Hg]") as "_".
-      { iNext. iExists u, p'. iFrame. iPureIntro.
-        apply (plic_ok_latch p p'); [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
-      iModIntro. iFrame "Hgr Hdev'". iApply "IH".
+      iMod ("Hclose" with "[Hu Hp' Hv Hg Hlease]") as "_".
+      { iNext. iExists u, p', vs. iFrame. iSplitR; [iPureIntro|iPureIntro; exact Hvok].
+        apply (plic_ok_latch p p' i); [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
+      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+    - (* the disk completes a queued request.  This is the only step that
+         touches the byte memory, and the ONLY thing that justifies it is the
+         DMA lease inside the invariant: [virtio_lease_step] consumes the
+         lease's ownership of the written bytes and hands the same lease back,
+         because the write set provably lands inside it and misses the queue's
+         control region (VirtioModel.virtio_dma_ok). *)
+      rewrite Hv in Hdisk.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iMod (virtio_lease_step vs m vnew w Hdisk with "Hmem Hlease")
+        as "[Hmem' Hlease']".
+      iMod ("Hwclose" with "[Hwires]") as "_".
+      { iNext. iExists seip, meip. iFrame. }
+      iMod ("Hclose" with "[Hu Hp Hv' Hg Hlease']") as "_".
+      { iNext. iExists u, p, vnew. iFrame.
+        iSplitR; [iPureIntro; exact Hpok |].
+        iPureIntro. exact (virtio_req_step_isr_ok vs m vnew w Hvok Hdisk). }
+      iModIntro. iFrame "Hgr Hmem' Hdev'". iApply "IH".
     - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
       iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
       iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
@@ -696,8 +735,9 @@ Section DevLoop.
         intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
         rewrite /seip' decide_False; [ done | ].
         intros ->. apply Hne, elem_of_singleton. reflexivity. }
-      iMod ("Hclose" with "[Hu Hp Hg]") as "_".
-      { iNext. iExists u, p. iFrame. iPureIntro. exact Hpok. }
-      iModIntro. iFrame "Hgr' Hdev". iApply "IH".
+      iMod ("Hclose" with "[Hu Hp Hv Hg Hlease]") as "_".
+      { iNext. iExists u, p, vs. iFrame.
+        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iModIntro. iFrame "Hgr' Hmem Hdev". iApply "IH".
   Qed.
 End DevLoop.

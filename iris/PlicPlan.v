@@ -65,13 +65,13 @@ Lemma plic_ok_nupd_prio (p : plic_state) (i : N) (w : bv 32) :
                      (p_enable p) (p_thresh p)).
 Proof. intros Hp k. exact (Hp k). Qed.
 
-(* the gateway latching a pending source touches no enable word *)
-Lemma plic_ok_latch (p p' : plic_state) :
-  plic_latch p = Some p' -> plic_ok p -> plic_ok p'.
+(* the gateway latching a pending source touches no enable word -- whichever
+   of the machine's sources it was *)
+Lemma plic_ok_latch (p p' : plic_state) (i : N) :
+  plic_latch p i = Some p' -> plic_ok p -> plic_ok p'.
 Proof.
   unfold plic_latch.
-  destruct (negb (p_pending p uart_irq_id) && negb (p_claimed p uart_irq_id));
-    [ | discriminate ].
+  destruct (negb (p_pending p i) && negb (p_claimed p i)); [ | discriminate ].
   intros Heq. injection Heq as <-. intros Hp k. exact (Hp k).
 Qed.
 

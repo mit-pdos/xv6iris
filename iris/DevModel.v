@@ -1,7 +1,9 @@
 (* ====================================================================== *)
 (* DevModel.v                                                             *)
 (*                                                                        *)
-(* Memory-mapped devices: a 16550-style UART and a (S-context) PLIC.      *)
+(* Memory-mapped devices: a 16550-style UART, a (S-context) PLIC, and a   *)
+(* virtio-mmio block device (the latter modelled in VirtioModel.v, which   *)
+(* this file re-exports and wires into the bus decode).                    *)
 (*                                                                        *)
 (* This file is the OPERATIONAL device model, imported by RiscvLang.v:    *)
 (*                                                                        *)
@@ -20,10 +22,13 @@
 (*     and access widths return None = the machine is STUCK, so a WP      *)
 (*     certifies the kernel never performs such an access.                 *)
 (*   - the AUTONOMOUS transitions ([uart_tx_pop], [uart_rx_push],          *)
-(*     [plic_latch], [plic_eip]): the device also runs CONCURRENTLY with   *)
-(*     the harts.  RiscvLang.v exposes these as the step relation of a     *)
-(*     separate device execution context (the [DevLoop] "thread"),         *)
-(*     interleaved with the CPU steps at instruction granularity.          *)
+(*     [plic_latch], [plic_eip], and the disk's [virtio_req_step]): the    *)
+(*     devices also run CONCURRENTLY with the harts.  RiscvLang.v exposes  *)
+(*     these as the step relation of a separate device execution context   *)
+(*     (the [DevLoop] "thread"), interleaved with the CPU steps at         *)
+(*     instruction granularity.  The disk is a BUS MASTER, so its step --  *)
+(*     alone among these -- is a function of, and changes, the harts' byte *)
+(*     memory; that is why [dev_step] carries it.                          *)
 (*                                                                        *)
 (* Like RiscvModelBytes.v, this file is deliberately iris-free.            *)
 (* ====================================================================== *)
@@ -33,6 +38,7 @@ From stdpp Require Import bitvector.definitions.
 
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
+Require Export VirtioModel.
 
 Local Open Scope Z_scope.
 
@@ -537,11 +543,14 @@ Definition plic_write (p : plic_state) (off : Z) (v : bv 32) : option plic_state
     end
   end.
 
-(* gateway: latch the UART's level output into the pending bit.  A level
-   source is forwarded only when it is neither already pending nor claimed. *)
-Definition plic_latch (p : plic_state) : option plic_state :=
-  if negb (p_pending p uart_irq_id) && negb (p_claimed p uart_irq_id) then
-    Some (PlicState (p_prio p) (nupd (p_pending p) uart_irq_id true)
+(* gateway: latch source [i]'s level output into its pending bit.  A level
+   source is forwarded only when it is neither already pending nor claimed.
+   The source is a PARAMETER: this machine has two of them (the UART and the
+   virtio disk), and the gateway treats them identically -- which device
+   drives which line is [dev_irq_level]'s business, in §3. *)
+Definition plic_latch (p : plic_state) (i : N) : option plic_state :=
+  if negb (p_pending p i) && negb (p_claimed p i) then
+    Some (PlicState (p_prio p) (nupd (p_pending p) i true)
                     (p_claimed p) (p_enable p) (p_thresh p))
   else None.
 
@@ -552,15 +561,28 @@ Definition plic_latch (p : plic_state) : option plic_state :=
 Record dev_state := DevState {
   duart : uart_state;
   dplic : plic_state;
+  dvirtio : virtio_state;
 }.
 
 Definition set_duart (d : dev_state) (u : uart_state) : dev_state :=
-  DevState u (dplic d).
+  DevState u (dplic d) (dvirtio d).
 Definition set_dplic (d : dev_state) (p : plic_state) : dev_state :=
-  DevState (duart d) p.
+  DevState (duart d) p (dvirtio d).
+Definition set_dvirtio (d : dev_state) (v : virtio_state) : dev_state :=
+  DevState (duart d) (dplic d) v.
 
 Definition in_uart (a : Z) : bool := (uart_base <=? a) && (a <? uart_base + uart_size).
 Definition in_plic (a : Z) : bool := (plic_base <=? a) && (a <? plic_base + plic_size).
+Definition in_virtio (a : Z) : bool :=
+  (virtio_base <=? a) && (a <? virtio_base + virtio_size).
+
+(* The interrupt LEVEL each of this machine's two sources is driving.  The
+   gateway ([plic_latch]) forwards exactly these; every other PLIC source id
+   is permanently low, because nothing is wired to it. *)
+Definition dev_irq_level (d : dev_state) (i : N) : bool :=
+  if (i =? uart_irq_id)%N then uart_irq (duart d)
+  else if (i =? virtio_irq_id)%N then virtio_irq (dvirtio d)
+  else false.
 
 (* An MMIO READ transaction: [n]-byte read at physical address [pa].
    Serviced directly by the device; the UART decodes 1-byte accesses, the
@@ -580,6 +602,16 @@ Definition dev_read (d : dev_state) (pa : Arch.pa) (n : N)
     match n return option (bv (8 * n) * dev_state) with
     | 4%N => match plic_read (dplic d) (a - plic_base) with
              | Some (w, p') => Some (w, set_dplic d p')
+             | None => None
+             end
+    | _ => None
+    end
+  else if in_virtio a then
+    (* virtio-mmio registers are all 32 bits wide, and none of them is
+       read-sensitive: the device is left alone by a read. *)
+    match n return option (bv (8 * n) * dev_state) with
+    | 4%N => match virtio_read (dvirtio d) (a - virtio_base) with
+             | Some w => Some (w, d)
              | None => None
              end
     | _ => None
@@ -607,6 +639,14 @@ Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
                       end
     | _ => fun _ => None
     end v
+  else if in_virtio a then
+    match n return bv (8 * n) -> option dev_state with
+    | 4%N => fun v => match virtio_write (dvirtio d) (a - virtio_base) v with
+                      | Some vd' => Some (set_dvirtio d vd')
+                      | None => None
+                      end
+    | _ => fun _ => None
+    end v
   else None.
 
 (* the level the PLIC drives on hart [h]'s S-mode external interrupt pin *)
@@ -621,4 +661,5 @@ Definition uart0_state : uart_state :=
 Definition plic0_state : plic_state :=
   PlicState (fun _ => Z_to_bv 32 0) (fun _ => false) (fun _ => false)
             (fun _ => Z_to_bv 32 0) (fun _ => Z_to_bv 32 0).
-Definition dev0_state : dev_state := DevState uart0_state plic0_state.
+Definition dev0_state : dev_state :=
+  DevState uart0_state plic0_state virtio0_state.

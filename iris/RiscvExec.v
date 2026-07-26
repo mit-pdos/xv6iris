@@ -1,5 +1,6 @@
 (* RiscvExec.v -- the run/exec interpreters, determinism bridge, wp_exec_step. *)
 From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import gen_heap.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -201,34 +202,41 @@ Section WPDev.
      execution context.  The device is ALWAYS reducible (the wire step exists
      for any hart), so the user only proves PRESERVATION: for EVERY possible
      device transition -- a byte leaving the tx FIFO, a byte arriving from
-     the outside world, the PLIC gateway latching the UART's interrupt level,
-     or the PLIC driving a hart's [sig_seip] wire -- re-establish the
-     register bridges (the wire step writes a hart's [sig_seip] register,
-     which needs its ghost-map fragment unless the written value is
-     unchanged) and the device interpretation.  [gen_heap_interp] is framed:
-     no device step touches the byte memory. *)
+     the outside world, the virtio disk completing a queued request, the PLIC
+     gateway latching a device's interrupt level, or the PLIC driving a
+     hart's [sig_seip] wire -- re-establish the register bridges (the wire
+     step writes a hart's [sig_seip] register, which needs its ghost-map
+     fragment unless the written value is unchanged), the byte memory and the
+     device interpretation.
+
+     The BYTE MEMORY is handed over rather than framed, because the disk is a
+     bus master: [DevStepDisk] returns a memory that differs from the one it
+     was given (RiscvLang §3c).  A client therefore has to own every byte the
+     DMA writes -- which is exactly what the device invariant's DMA lease
+     (WpVirtio.v) is for.  Every other device transition returns the memory
+     unchanged, so those cases still frame it. *)
   Lemma wp_dev_step Φ :
-    (∀ gr d, gregs_interp gr ∗ dev_interp d ={⊤,∅}=∗
-       ▷ (∀ d' gr', ⌜dev_step d gr d' gr'⌝ ={∅,⊤}=∗
-            gregs_interp gr' ∗ dev_interp d' ∗
+    (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
+       ▷ (∀ d' m' gr', ⌜dev_step d m gr d' m' gr'⌝ ={∅,⊤}=∗
+            gregs_interp gr' ∗ gen_heap_interp m' ∗ dev_interp d' ∗
             WP (DevLoop : expr riscv_lang) {{ Φ }}))
     ⊢ WP (DevLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
-    iMod ("H" $! g.(gregs) g.(gdev) with "[$Hgr $Hdev]") as "Hk".
+    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. do 4 eexists. right.
       split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. split; [reflexivity|].
-      do 2 eexists. split; [apply (DevStepWire _ _ 0%fin) | reflexivity]. }
+      do 3 eexists. split; [apply (DevStepWire _ _ _ 0%fin) | reflexivity]. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct Hstep as [(cpu2 & Hcontra & _)
-                      |(_ & -> & _ & -> & d' & gr' & Hdstep & ->)];
+                      |(_ & -> & _ & -> & d' & m' & gr' & Hdstep & ->)];
       first discriminate Hcontra.
-    iMod ("Hk" $! d' gr' with "[//]") as "(Hgr' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem Hdev' HWP".
+    iMod ("Hk" $! d' m' gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.
 
 End WPDev.
