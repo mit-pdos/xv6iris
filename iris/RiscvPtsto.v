@@ -298,6 +298,78 @@ Notation "a ↦ₘ□ v" := (mem_pointsto a DfracDiscarded v)
 Notation "a ↦ₘ v" := (mem_pointsto a (DfracOwn 1) v)
   (at level 20, format "a  ↦ₘ  v") : bi_scope.
 
+(* ---------------------------------------------------------------------- *)
+(* SHARING a byte: agreement and the fractional split.  [↦ₘ] carries a real
+   [dfrac], so a resource that is read-only-while-shared (a reference-counted
+   kernel object: [struct file]'s immutable fields, an inode's, a buf's) can
+   be handed out at a fraction and RECOMBINED when the last share comes back.
+   Agreement is what makes the value-knowledge come for free: two holders of
+   the same byte cannot disagree, so no separate [agree] ghost is needed.
+   The byte-window forms below lift straight to [↦₂]/[↦₄]/[↦₈].              *)
+Section mem_pointsto_share.
+  Context `{!riscvGS Σ}.
+
+  (* two owners of the same byte, at ANY two dfracs, agree on its value. *)
+  Lemma mem_pointsto_agree a dq1 b1 dq2 b2 :
+    a ↦ₘ{dq1} b1 -∗ a ↦ₘ{dq2} b2 -∗ ⌜b1 = b2⌝.
+  Proof.
+    rewrite /mem_pointsto. iIntros "H1 H2".
+    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & Hp1)".
+    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & Hp2)".
+    iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
+    by iDestruct (pointsto_agree with "Hp1 Hp2") as %->.
+  Qed.
+
+  (* the fractional split.  [kmap_at] is persistent, so the claim and the two
+     pure conjuncts ride along on both halves at no cost. *)
+  Lemma mem_pointsto_frac_split a q1 q2 b :
+    a ↦ₘ{DfracOwn (q1 + q2)} b ⊣⊢ a ↦ₘ{DfracOwn q1} b ∗ a ↦ₘ{DfracOwn q2} b.
+  Proof.
+    rewrite /mem_pointsto. iSplit.
+    - iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & Hp)".
+      rewrite -dfrac_op_own pointsto_fractional.
+      iDestruct "Hp" as "[Hp1 Hp2]".
+      iSplitL "Hp1"; iExists ppn.
+      + by iFrame "Hk Hp1".
+      + by iFrame "Hk Hp2".
+    - iIntros "[H1 H2]".
+      iDestruct "H1" as (ppn1) "(#Hk1 & %Hc & %Hd & Hp1)".
+      iDestruct "H2" as (ppn2) "(#Hk2 & _ & _ & Hp2)".
+      iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
+      iDestruct (pointsto_combine with "Hp1 Hp2") as "[Hp _]".
+      rewrite dfrac_op_own. iExists ppn2. by iFrame "Hk1 Hp".
+  Qed.
+
+  (* ---- the same two facts over a WINDOW of bytes, which is the form the
+     [↦₂]/[↦₄]/[↦₈] bundles are built from.  Stated over an arbitrary start
+     index [k] so the induction goes through. ---- *)
+
+  Lemma mem_bytes_agree {m : N} (a : Arch.pa) (k n : nat) (dq1 dq2 : dfrac) (w1 w2 : bv m) :
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{dq1} nth_byte w1 j) -∗
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{dq2} nth_byte w2 j) -∗
+    ⌜forall j, (k <= j < k + n)%nat -> nth_byte w1 j = nth_byte w2 j⌝.
+  Proof.
+    revert k. induction n as [|n IH]; intros k; simpl.
+    - iIntros "_ _". iPureIntro. intros j Hj. lia.
+    - iIntros "[Hh1 Ht1] [Hh2 Ht2]".
+      iDestruct (mem_pointsto_agree with "Hh1 Hh2") as %Heq.
+      iDestruct (IH (S k) with "Ht1 Ht2") as %Hrest.
+      iPureIntro. intros j Hj.
+      destruct (decide (j = k)) as [->|Hne]; [exact Heq|].
+      apply Hrest. lia.
+  Qed.
+
+  Lemma mem_bytes_frac_split {m : N} (a : Arch.pa) (k n : nat) (q1 q2 : Qp) (w : bv m) :
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{DfracOwn (q1 + q2)} nth_byte w j) ⊣⊢
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{DfracOwn q1} nth_byte w j) ∗
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{DfracOwn q2} nth_byte w j).
+  Proof.
+    rewrite -big_sepL_sep. apply big_sepL_proper. intros ? j _.
+    apply mem_pointsto_frac_split.
+  Qed.
+
+End mem_pointsto_share.
+
 (* CODE points-to, VA-BASED (uniform-claims): the KP_rx analogue -- the
    claim + ownership of the mapped physical byte; identity for the static
    kernel-text fragments, non-identity for the TRAMPOLINE va once its
@@ -373,6 +445,21 @@ Section word_pointsto.
     ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
     ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₘ{dq} nth_byte w j).
   Proof. reflexivity. Qed.
+
+  (* ---- sharing (see [mem_pointsto_share]) ---- *)
+  Lemma word_pointsto_agree a dq1 w1 dq2 w2 :
+    a ↦₈{dq1} w1 -∗ a ↦₈{dq2} w2 -∗ ⌜w1 = w2⌝.
+  Proof.
+    iIntros "[_ H1] [_ H2]".
+    iDestruct (mem_bytes_agree with "H1 H2") as %Hb.
+    iPureIntro. apply (bv_eq_of_bytes (n:=8)). intros j Hj. apply Hb. lia.
+  Qed.
+  Lemma word_pointsto_frac_split a q1 q2 w :
+    a ↦₈{DfracOwn (q1 + q2)} w ⊣⊢ a ↦₈{DfracOwn q1} w ∗ a ↦₈{DfracOwn q2} w.
+  Proof.
+    rewrite /word_pointsto mem_bytes_frac_split.
+    iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
+  Qed.
 End word_pointsto.
 
 (* ---------------------------------------------------------------------- *)
@@ -410,6 +497,57 @@ Section phys_word_pointsto.
 End phys_word_pointsto.
 
 (* ---------------------------------------------------------------------- *)
+(* 2-byte halfword points-to: a 2-byte value [w] stored little-endian at a
+   HALFWORD-ALIGNED address [a].  The exact 2-byte analogue of [word4_pointsto]
+   ([↦₄]) -- what an [lh]/[sh] to a C [short] field takes (e.g. [struct
+   file]'s [major]).                                                          *)
+Definition word2_pointsto `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (w : bv 16) : iProp Σ :=
+  (⌜is_aligned_paddr (Physaddr a) 2 = true⌝ ∗
+   [∗ list] j ∈ seq 0 2, mem_pointsto (pa_add a j) dq (nth_byte w j))%I.
+Notation "a ↦₂{ dq } w" := (word2_pointsto a dq w)
+  (at level 20, format "a  ↦₂{ dq }  w") : bi_scope.
+Notation "a ↦₂ w" := (word2_pointsto a (DfracOwn 1) w)
+  (at level 20, format "a  ↦₂  w") : bi_scope.
+(* discarded (persistent, duplicable) read-only ownership of the halfword. *)
+Notation "a ↦₂□ w" := (word2_pointsto a DfracDiscarded w)
+  (at level 20, format "a  ↦₂□  w") : bi_scope.
+
+Section word2_pointsto.
+  Context `{!riscvGS Σ}.
+
+  Lemma word2_pointsto_aligned_p a dq w :
+    word2_pointsto a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 2 = true⌝.
+  Proof. iIntros "[$ _]". Qed.
+  Lemma word2_pointsto_bytes a dq w :
+    word2_pointsto a dq w ⊢ [∗ list] j ∈ seq 0 2, (pa_add a j) ↦ₘ{dq} nth_byte w j.
+  Proof. iIntros "[_ $]". Qed.
+  Lemma word2_pointsto_intro a dq w :
+    is_aligned_paddr (Physaddr a) 2 = true ->
+    ([∗ list] j ∈ seq 0 2, (pa_add a j) ↦ₘ{dq} nth_byte w j) ⊢ word2_pointsto a dq w.
+  Proof. iIntros (Hal) "H". by iFrame. Qed.
+  Lemma word2_pointsto_unfold a dq w :
+    word2_pointsto a dq w ⊣⊢
+    ⌜is_aligned_paddr (Physaddr a) 2 = true⌝ ∗
+    ([∗ list] j ∈ seq 0 2, (pa_add a j) ↦ₘ{dq} nth_byte w j).
+  Proof. reflexivity. Qed.
+
+  (* ---- sharing (see [mem_pointsto_share]) ---- *)
+  Lemma word2_pointsto_agree a dq1 w1 dq2 w2 :
+    a ↦₂{dq1} w1 -∗ a ↦₂{dq2} w2 -∗ ⌜w1 = w2⌝.
+  Proof.
+    iIntros "[_ H1] [_ H2]".
+    iDestruct (mem_bytes_agree with "H1 H2") as %Hb.
+    iPureIntro. apply (bv_eq_of_bytes (n:=2)). intros j Hj. apply Hb. lia.
+  Qed.
+  Lemma word2_pointsto_frac_split a q1 q2 w :
+    a ↦₂{DfracOwn (q1 + q2)} w ⊣⊢ a ↦₂{DfracOwn q1} w ∗ a ↦₂{DfracOwn q2} w.
+  Proof.
+    rewrite /word2_pointsto mem_bytes_frac_split.
+    iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
+  Qed.
+End word2_pointsto.
+
+(* ---------------------------------------------------------------------- *)
 (* 4-byte word points-to: a 4-byte (word) value [w] stored little-endian at a
    WORD-ALIGNED address [a].  The exact 4-byte analogue of [word_pointsto]
    ([↦₈]): bundling the 4 byte points-to facts with the 4-byte alignment lets
@@ -445,6 +583,21 @@ Section word4_pointsto.
     ⌜is_aligned_paddr (Physaddr a) 4 = true⌝ ∗
     ([∗ list] j ∈ seq 0 4, (pa_add a j) ↦ₘ{dq} nth_byte w j).
   Proof. reflexivity. Qed.
+
+  (* ---- sharing (see [mem_pointsto_share]) ---- *)
+  Lemma word4_pointsto_agree a dq1 w1 dq2 w2 :
+    a ↦₄{dq1} w1 -∗ a ↦₄{dq2} w2 -∗ ⌜w1 = w2⌝.
+  Proof.
+    iIntros "[_ H1] [_ H2]".
+    iDestruct (mem_bytes_agree with "H1 H2") as %Hb.
+    iPureIntro. apply (bv_eq_of_bytes (n:=4)). intros j Hj. apply Hb. lia.
+  Qed.
+  Lemma word4_pointsto_frac_split a q1 q2 w :
+    a ↦₄{DfracOwn (q1 + q2)} w ⊣⊢ a ↦₄{DfracOwn q1} w ∗ a ↦₄{DfracOwn q2} w.
+  Proof.
+    rewrite /word4_pointsto mem_bytes_frac_split.
+    iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
+  Qed.
 End word4_pointsto.
 
 (* ---------------------------------------------------------------------- *)

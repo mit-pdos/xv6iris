@@ -51,6 +51,11 @@ are working on that effort — the relevant `projects/` file.
   types: the `SpecF.v` / sealed-functor / `LinkF.v` shape that keeps a function
   proof off its callees' proofs, so the build does not serialize along the
   kernel call graph.
+- **[`file-table.md`](design/file-table.md)** — the open-file table: `struct
+  file`'s geometry, the reference-count algebra (`auth (gmap nat (frac *
+  positive))`) that ties `f->ref` to fractional ownership of the immutable
+  fields, the "holding a reference" predicate, the `ftable.lock` invariant, how
+  the fd-sharing patterns come out, and the staged plan for `f->off`.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel

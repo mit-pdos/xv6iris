@@ -330,6 +330,9 @@ ProofAcquiresleep.v
 LinkAcquiresleep.v
 ArrCursor.v
 BcacheInv.v
+FileInv.v
+WpFileallocDecode.v
+SpecFilealloc.v
 WpBinitDecode.v
 SpecBinit.v
 ProofBinit.v
