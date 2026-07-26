@@ -48,7 +48,7 @@ Local Ltac m_close0 s HmisaC :=
   [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; m_ast
   | apply (exec_currentlyEnabled_Zca s HmisaC) ].
 
-(* The eight 16-byte-frame prologue/epilogue decodes ([mdec_ccc]..[mdec_cf0],
+(* The eight 16-byte-frame prologue/epilogue decodes ([mdec_ccc]..[cdec_8082],
    c.addi sp / c.sdsp / c.addi4spn / c.ldsp / c.ret) live in KernelRvcDecode.v,
    shared with the other functions that use this frame. *)
 
@@ -199,7 +199,7 @@ Section WpMemsetInstr.
   (* +0x24  c.jr ra  (ret)  ->  jalr x0,0(ra) *)
   Lemma minstr_cde : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x24) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (KernelSyms.memset + 0x24)%Z (mword_of_int 0x8082 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x24) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+           (mword_of_int (KernelSyms.memset + 0x24) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* =================================================================== *)
   (*  THE CAPSTONE: [wp_memset_s_full_kt] — the whole-function memset WP,   *)

@@ -98,12 +98,6 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma pl_imm4 : zero_extend' 12 (concat_vec (mword_of_int 1 : mword 5) ('b"00")) = (mword_of_int 4 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
-(* +0x0c  4785  c.li a5,1 *)
-Lemma pldec_li_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4785 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x0e  d71c  c.sw a5,40(a4) *)
 Lemma pldec_sw40 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xd71c : mword 16)) s
@@ -167,7 +161,7 @@ Section ProofPlicinit.
 
   Lemma pi_0c : kernel_text -∗ instr (mword_of_int (PL + 0x0c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (PL + 0x0c)%Z (mword_of_int 0x4785 : mword 16)
-    (mword_of_int (PL + 0x0c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)) pldec_li_a5 exec_execute_C_LI. Qed.
+    (mword_of_int (PL + 0x0c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)) cdec_4785 exec_execute_C_LI. Qed.
 
   Lemma pi_0e : kernel_text -∗ instr (mword_of_int (PL + 0x0e) : mword 64) true (STORE (mword_of_int 40, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)).
   Proof. mk_rvc (PL + 0x0e)%Z (mword_of_int 0xd71c : mword 16)
@@ -191,7 +185,7 @@ Section ProofPlicinit.
 
   Lemma pi_18 : kernel_text -∗ instr (mword_of_int (PL + 0x18) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (PL + 0x18)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (PL + 0x18) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (PL + 0x18) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plicinit(), entry through return.  *)

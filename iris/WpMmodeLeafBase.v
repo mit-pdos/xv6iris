@@ -1258,6 +1258,16 @@ Lemma exec_execute_C_JR (rs1 : regidx) s :
   exec (execute (C_JR rs1)) s = Some (ExecuteAs (JALR (zeros' 12, rs1, zreg)), s).
 Proof. unfold execute. cbn match. unfold execute_C_JR. apply exec_returnM. Qed.
 
+(* c.j : the unconditional compressed jump expands to a base JAL against x0.
+   An execute fact, so it belongs here beside its siblings -- it previously sat
+   in WpKallocDecode.v (a DECODE file) with a second [Local Lemma] copy in
+   WpMappagesInstr.v, and three other proofs imported one of those two files to
+   reach it. *)
+Lemma exec_execute_C_J (imm : mword 11) s :
+  exec (execute (C_J imm)) s
+  = Some (ExecuteAs (JAL (sign_extend' 21 (concat_vec imm ('b"0")), zreg)), s).
+Proof. unfold execute. cbn match. unfold execute_C_J. apply exec_returnM. Qed.
+
 (* c.ld / c.sd : the register-relative width-8 compressed memory ops (the
    creg-indexed counterparts of C_LDSP/C_SDSP above). Shared exec facts --
    used by kalloc/kfree decode, swtch, wakeup, and the userret trampoline. *)

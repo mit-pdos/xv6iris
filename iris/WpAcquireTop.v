@@ -40,7 +40,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import InstrBytes.
 Require Import WpDecode ExecCommon KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpMycpu KernelRvcDecode.
+Require Import KernelRvcDecode.
 Require Import WpAmo.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
@@ -72,22 +72,6 @@ Local Ltac aq_close0 s HmisaC :=
             (_ : exec (currentlyEnabled Ext_Zca) s = Some (true, s)));
   [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; aq_ast
   | apply (exec_currentlyEnabled_Zca s HmisaC) ].
-
-(* +0x0a  0x84aa  c.mv s1,a0 *)
-Lemma aqdec_mv_s1_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 10)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x10  0x8526  c.mv a0,s1 *)
-Lemma aqdec_mv_a0_s1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8526 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 9)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
 
 (* +0x1a  0x87ba  c.mv a5,a4 *)
 Lemma aqdec_mv_a5_a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -250,7 +234,7 @@ Section WpAcquireTop.
 
   Lemma aqi_0a : kernel_text -∗ instr (mword_of_int (AQ + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (AQ + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (AQ + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) aqdec_mv_s1_a0 exec_execute_C_MV. Qed.
+    (mword_of_int (AQ + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
 
   Lemma aqi_0c : kernel_text -∗ instr (mword_of_int (AQ + 0x0c) : mword 64) false (JAL (mword_of_int 0x1fffba : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (AQ + 0x0c)%Z (mword_of_int 0xfbbff0ef : mword 32)
@@ -258,7 +242,7 @@ Section WpAcquireTop.
 
   Lemma aqi_10 : kernel_text -∗ instr (mword_of_int (AQ + 0x10) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (AQ + 0x10)%Z (mword_of_int 0x8526 : mword 16)
-    (mword_of_int (AQ + 0x10) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) aqdec_mv_a0_s1 exec_execute_C_MV. Qed.
+    (mword_of_int (AQ + 0x10) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
 
   Lemma aqi_12 : kernel_text -∗ instr (mword_of_int (AQ + 0x12) : mword 64) false (JAL (mword_of_int 0x1fff88 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (AQ + 0x12)%Z (mword_of_int 0xf89ff0ef : mword 32)
@@ -282,7 +266,7 @@ Section WpAcquireTop.
 
   Lemma aqi_20 : kernel_text -∗ instr (mword_of_int (AQ + 0x20) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (AQ + 0x20)%Z (mword_of_int 0x2781 : mword 16)
-    (mword_of_int (AQ + 0x20) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) mydec_addiw exec_execute_C_ADDIW. Qed.
+    (mword_of_int (AQ + 0x20) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_2781 exec_execute_C_ADDIW. Qed.
 
   Lemma aqi_22 : kernel_text -∗ instr (mword_of_int (AQ + 0x22) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (AQ + 0x22)%Z (mword_of_int 0xffe5 : mword 16)
@@ -314,6 +298,6 @@ Section WpAcquireTop.
 
   Lemma aqi_32 : kernel_text -∗ instr (mword_of_int (AQ + 0x32) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (AQ + 0x32)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (AQ + 0x32) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (mword_of_int (AQ + 0x32) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpAcquireTop.

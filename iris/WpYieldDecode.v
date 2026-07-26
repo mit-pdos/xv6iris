@@ -61,22 +61,10 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 (* Fresh compressed decode templates.                                     *)
 (* ===================================================================== *)
 
-(* +0x0e  0x84aa  c.mv s1,a0 *)
-Lemma yddec_mv_s1_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x14  0x478d  c.li a5,3 *)
 Lemma yddec_li_a5_3 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x478d : mword 16)) s
   = Some (C_LI (mword_of_int 3, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x16  0xcc9c  c.sw a5,24(s1) *)
-Lemma yddec_sw_a5_24 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xcc9c : mword 16)) s
-  = Some (C_SW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* the specialized C_SW -> STORE bridge (leaf-friendly Regidx / mword_of_int
@@ -95,12 +83,6 @@ Proof.
   unfold execute. cbn match. unfold execute_C_SW. cbn zeta.
   rewrite exec_returnM. rewrite yd_cr1 yd_cr7 yd_imm24. reflexivity.
 Qed.
-
-(* +0x1c  0x8526  c.mv a0,s1 *)
-Lemma yddec_mv_a0_s1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8526 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Section WpYieldDecode.
   Context `{!riscvGS Σ}.
@@ -135,7 +117,7 @@ Section WpYieldDecode.
   (* ---- +0x0e: c.mv s1,a0 ---- *)
   Lemma ydi_0e : kernel_text -∗ instr (mword_of_int (YD + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (YD + 0x0e)%Z (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (YD + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) yddec_mv_s1_a0 exec_execute_C_MV. Qed.
+    (mword_of_int (YD + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
 
   (* ---- +0x10: jal acquire ---- *)
   Lemma ydi_10 : kernel_text -∗ instr (mword_of_int (YD + 0x10) : mword 64) false (JAL (mword_of_int 2092318 : mword 21, Regidx (mword_of_int 1))).
@@ -150,7 +132,7 @@ Section WpYieldDecode.
   (* ---- +0x16: c.sw a5,24(s1) ---- *)
   Lemma ydi_16 : kernel_text -∗ instr (mword_of_int (YD + 0x16) : mword 64) true (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
   Proof. mk_rvc (YD + 0x16)%Z (mword_of_int 0xcc9c : mword 16)
-    (mword_of_int (YD + 0x16) : mword 64) (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) yddec_sw_a5_24 ydexec_sw24. Qed.
+    (mword_of_int (YD + 0x16) : mword 64) (STORE (mword_of_int 24, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_cc9c ydexec_sw24. Qed.
 
   (* ---- +0x18: jal sched ---- *)
   Lemma ydi_18 : kernel_text -∗ instr (mword_of_int (YD + 0x18) : mword 64) false (JAL (mword_of_int 2096940 : mword 21, Regidx (mword_of_int 1))).
@@ -160,7 +142,7 @@ Section WpYieldDecode.
   (* ---- +0x1c: c.mv a0,s1 ---- *)
   Lemma ydi_1c : kernel_text -∗ instr (mword_of_int (YD + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (YD + 0x1c)%Z (mword_of_int 0x8526 : mword 16)
-    (mword_of_int (YD + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) yddec_mv_a0_s1 exec_execute_C_MV. Qed.
+    (mword_of_int (YD + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
 
   (* ---- +0x1e: jal release ---- *)
   Lemma ydi_1e : kernel_text -∗ instr (mword_of_int (YD + 0x1e) : mword 64) false (JAL (mword_of_int 2092440 : mword 21, Regidx (mword_of_int 1))).
@@ -188,6 +170,6 @@ Section WpYieldDecode.
   (* ---- +0x2a: c.ret ---- *)
   Lemma ydi_2a : kernel_text -∗ instr (mword_of_int (YD + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (YD + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (YD + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (mword_of_int (YD + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpYieldDecode.

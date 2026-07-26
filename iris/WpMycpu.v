@@ -91,31 +91,11 @@ Local Ltac my_close2 s HmisaC :=
     apply exec_andM_true; [ apply exec_returnM_true; vm_compute; reflexivity |];
     apply exec_currentlyEnabled_Zca; exact HmisaC ].
 
-(* ---- the six fresh decodes (bit patterns not shared with memset) ---- *)
-(* +0x08  8792  c.mv a5,tp *)
-Lemma mydec_mv s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8792 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 4)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x0a  2781  c.addiw a5,0 (sext.w) *)
-Lemma mydec_addiw s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x2781 : mword 16)) s
-  = Some (C_ADDIW (mword_of_int 0, Regidx (mword_of_int 15)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x0c  079e  c.slli a5,7 *)
-Lemma mydec_slli s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x079e : mword 16)) s
-  = Some (C_SLLI (mword_of_int 7, Regidx (mword_of_int 15)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
+(* ---- mycpu's own decodes (bit patterns not shared with memset).  The
+   c.mv a5,tp / sext.w / c.slli a5,7 triple that materializes &cpus[cpuid] used
+   to live here too and was imported by three decode files -- from a file that
+   holds a WEAKEST PRECONDITION; it is now [cdec_8792]/[cdec_2781]/[cdec_079e]
+   in KernelRvcDecode.v. ---- *)
 (* +0x16  953e  c.add a0,a0,a5 *)
 Lemma mydec_add s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x953e : mword 16)) s
@@ -193,15 +173,15 @@ Section WpMycpu.
 
   Lemma myi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x08) : mword 64) true (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x08)%Z (mword_of_int 0x8792 : mword 16)
-    (mword_of_int (KernelSyms.mycpu + 0x08) : mword 64) (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)) mydec_mv exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x08) : mword 64) (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)) cdec_8792 exec_execute_C_MV. Qed.
 
   Lemma myi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x0a) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (KernelSyms.mycpu + 0x0a)%Z (mword_of_int 0x2781 : mword 16)
-    (mword_of_int (KernelSyms.mycpu + 0x0a) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) mydec_addiw exec_execute_C_ADDIW. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x0a) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_2781 exec_execute_C_ADDIW. Qed.
 
   Lemma myi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x0c) : mword 64) true (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x0c)%Z (mword_of_int 0x079e : mword 16)
-    (mword_of_int (KernelSyms.mycpu + 0x0c) : mword 64) (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) mydec_slli exec_execute_C_SLLI. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x0c) : mword 64) (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) cdec_079e exec_execute_C_SLLI. Qed.
 
   Lemma myi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x0e) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.mycpu + 0x0e)%Z (mword_of_int 0x00011517 : mword 32)
@@ -229,7 +209,7 @@ Section WpMycpu.
 
   Lemma myi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x1e) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x1e)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.mycpu + 0x1e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x1e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire mycpu(), entry (0x800018d6) through *)

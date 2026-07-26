@@ -35,20 +35,8 @@ Notation UPS := KernelSyms.uartputc_sync.
 
 (* ===================================================================== *)
 (*  Decode facts for the three "structural" RVC instructions that are not  *)
-(*  in the device-core / panic-check set.  (c.ret reuses [mdec_cf0].)      *)
+(*  in the device-core / panic-check set.  (c.ret reuses [cdec_8082].)      *)
 (* ===================================================================== *)
-
-(* 0x96c  84aa  c.mv s1,a0 *)
-Lemma uprvc_84aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x9ae  6105  c.addi16sp sp,32 *)
-Lemma uprvc_6105 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6105 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 2), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* The prologue's [c.addi sp,-32] then the epilogue's [c.addi16sp sp,32]
    restore sp exactly.  Proved abstractly in [X] (mirror of [mycpu_frame_cancel]);
@@ -84,15 +72,15 @@ Section WpUartPutcSyncFull.
   (* --- [instr] facts for the three structural RVC instructions --- *)
   Lemma upi_0a : kernel_text -∗ instr (mword_of_int (UPS + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (UPS + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (UPS + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) uprvc_84aa exec_execute_C_MV. Qed.
+    (mword_of_int (UPS + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
 
   Lemma upi_4c : kernel_text -∗ instr (mword_of_int (UPS + 0x4c) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 2), sp, sp, ADDI)).
   Proof. mk_rvc (UPS + 0x4c)%Z (mword_of_int 0x6105 : mword 16)
-    (mword_of_int (UPS + 0x4c) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2), sp, sp, ADDI)) uprvc_6105 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (UPS + 0x4c) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2), sp, sp, ADDI)) podec_28 exec_execute_C_ADDI16SP. Qed.
 
   Lemma upi_4e : kernel_text -∗ instr (mword_of_int (UPS + 0x4e) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (UPS + 0x4e)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (UPS + 0x4e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (UPS + 0x4e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* --- prologue frame [instr] facts (0x00 c.addi · 0x02/04/06 sd · 0x08 addi4spn) --- *)
   Lemma upi_00 : kernel_text -∗ instr (mword_of_int (UPS + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).

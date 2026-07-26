@@ -122,7 +122,7 @@ Section WpFileinitDecode.
 
   Lemma fii_22 : kernel_text -∗ instr (mword_of_int (FI + 0x22) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (FI + 0x22)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (FI + 0x22) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (FI + 0x22) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* fileinit's thirteen instructions, in the thin-initlock-wrapper pattern.
      The five immediates are exactly what the whole-function proof needs to

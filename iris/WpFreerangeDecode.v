@@ -20,37 +20,13 @@ Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
 (* Compressed decode facts (one per distinct 16-bit encoding).            *)
 (* ===================================================================== *)
-Lemma fdc_7179 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7179 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 61 : mword 6), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_f406 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf406 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_f022 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf022 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 8)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_ec26 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xec26 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 3, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_1800 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1800 : mword 16)) s
-  = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 12 : mword 8), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 Lemma fdc_6785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x6785 : mword 16)) s
   = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 15)), s).
@@ -76,26 +52,6 @@ Lemma fdc_94ce s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_ADD (Regidx (mword_of_int 9), Regidx (mword_of_int 19)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma fdc_e84a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe84a : mword 16)) s
-  = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_e44e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe44e : mword 16)) s
-  = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_e052 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe052 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_892e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x892e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 Lemma fdc_8a3a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x8a3a : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 14)), s).
@@ -104,46 +60,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma fdc_89be s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x89be : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_6942 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6942 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_69a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x69a2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_6a02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6a02 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_70a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x70a2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 5, Regidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_7402 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7402 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 4, Regidx (mword_of_int 8)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_64e2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x64e2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_6145 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6145 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 3 : mword 6), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-Lemma fdc_8082 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s
-  = Some (C_JR (Regidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
@@ -187,23 +103,23 @@ Section WpFreerangeDecode.
 
   Lemma fri_00 : kernel_text -∗ instr (mword_of_int (FR + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc (FR + 0x00)%Z (mword_of_int 0x7179 : mword 16)
-    (mword_of_int (FR + 0x00) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)) fdc_7179 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (FR + 0x00) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)) cdec_7179 exec_execute_C_ADDI16SP. Qed.
 
   Lemma fri_02 : kernel_text -∗ instr (mword_of_int (FR + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
   Proof. mk_rvc (FR + 0x02)%Z (mword_of_int 0xf406 : mword 16)
-    (mword_of_int (FR + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) fdc_f406 exec_execute_C_SDSP. Qed.
+    (mword_of_int (FR + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_f406 exec_execute_C_SDSP. Qed.
 
   Lemma fri_04 : kernel_text -∗ instr (mword_of_int (FR + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
   Proof. mk_rvc (FR + 0x04)%Z (mword_of_int 0xf022 : mword 16)
-    (mword_of_int (FR + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) fdc_f022 exec_execute_C_SDSP. Qed.
+    (mword_of_int (FR + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_f022 exec_execute_C_SDSP. Qed.
 
   Lemma fri_06 : kernel_text -∗ instr (mword_of_int (FR + 0x06) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
   Proof. mk_rvc (FR + 0x06)%Z (mword_of_int 0xec26 : mword 16)
-    (mword_of_int (FR + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) fdc_ec26 exec_execute_C_SDSP. Qed.
+    (mword_of_int (FR + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cdec_ec26 exec_execute_C_SDSP. Qed.
 
   Lemma fri_08 : kernel_text -∗ instr (mword_of_int (FR + 0x08) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 12 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
   Proof. mk_rvc (FR + 0x08)%Z (mword_of_int 0x1800 : mword 16)
-    (mword_of_int (FR + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 12 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) fdc_1800 exec_execute_C_ADDI4SPN. Qed.
+    (mword_of_int (FR + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 12 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_1800 exec_execute_C_ADDI4SPN. Qed.
 
   Lemma fri_0a : kernel_text -∗ instr (mword_of_int (FR + 0x0a) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), LUI)).
   Proof. mk_rvc (FR + 0x0a)%Z (mword_of_int 0x6785 : mword 16)
@@ -235,19 +151,19 @@ Section WpFreerangeDecode.
 
   Lemma fri_1e : kernel_text -∗ instr (mword_of_int (FR + 0x1e) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)).
   Proof. mk_rvc (FR + 0x1e)%Z (mword_of_int 0xe84a : mword 16)
-    (mword_of_int (FR + 0x1e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) fdc_e84a exec_execute_C_SDSP. Qed.
+    (mword_of_int (FR + 0x1e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) cdec_e84a exec_execute_C_SDSP. Qed.
 
   Lemma fri_20 : kernel_text -∗ instr (mword_of_int (FR + 0x20) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)).
   Proof. mk_rvc (FR + 0x20)%Z (mword_of_int 0xe44e : mword 16)
-    (mword_of_int (FR + 0x20) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) fdc_e44e exec_execute_C_SDSP. Qed.
+    (mword_of_int (FR + 0x20) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) cdec_e44e exec_execute_C_SDSP. Qed.
 
   Lemma fri_22 : kernel_text -∗ instr (mword_of_int (FR + 0x22) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)).
   Proof. mk_rvc (FR + 0x22)%Z (mword_of_int 0xe052 : mword 16)
-    (mword_of_int (FR + 0x22) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)) fdc_e052 exec_execute_C_SDSP. Qed.
+    (mword_of_int (FR + 0x22) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)) cdec_e052 exec_execute_C_SDSP. Qed.
 
   Lemma fri_24 : kernel_text -∗ instr (mword_of_int (FR + 0x24) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (FR + 0x24)%Z (mword_of_int 0x892e : mword 16)
-    (mword_of_int (FR + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)) fdc_892e exec_execute_C_MV. Qed.
+    (mword_of_int (FR + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)) cdec_892e exec_execute_C_MV. Qed.
 
   Lemma fri_26 : kernel_text -∗ instr (mword_of_int (FR + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 14), zreg, Regidx (mword_of_int 20), ADD)).
   Proof. mk_rvc (FR + 0x26)%Z (mword_of_int 0x8a3a : mword 16)
@@ -275,34 +191,34 @@ Section WpFreerangeDecode.
 
   Lemma fri_38 : kernel_text -∗ instr (mword_of_int (FR + 0x38) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
   Proof. mk_rvc (FR + 0x38)%Z (mword_of_int 0x6942 : mword 16)
-    (mword_of_int (FR + 0x38) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) fdc_6942 exec_execute_C_LDSP. Qed.
+    (mword_of_int (FR + 0x38) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) cdec_6942 exec_execute_C_LDSP. Qed.
 
   Lemma fri_3a : kernel_text -∗ instr (mword_of_int (FR + 0x3a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
   Proof. mk_rvc (FR + 0x3a)%Z (mword_of_int 0x69a2 : mword 16)
-    (mword_of_int (FR + 0x3a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) fdc_69a2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (FR + 0x3a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) cdec_69a2 exec_execute_C_LDSP. Qed.
 
   Lemma fri_3c : kernel_text -∗ instr (mword_of_int (FR + 0x3c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
   Proof. mk_rvc (FR + 0x3c)%Z (mword_of_int 0x6a02 : mword 16)
-    (mword_of_int (FR + 0x3c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) fdc_6a02 exec_execute_C_LDSP. Qed.
+    (mword_of_int (FR + 0x3c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) cdec_6a02 exec_execute_C_LDSP. Qed.
 
   Lemma fri_3e : kernel_text -∗ instr (mword_of_int (FR + 0x3e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (FR + 0x3e)%Z (mword_of_int 0x70a2 : mword 16)
-    (mword_of_int (FR + 0x3e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) fdc_70a2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (FR + 0x3e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_70a2 exec_execute_C_LDSP. Qed.
 
   Lemma fri_40 : kernel_text -∗ instr (mword_of_int (FR + 0x40) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
   Proof. mk_rvc (FR + 0x40)%Z (mword_of_int 0x7402 : mword 16)
-    (mword_of_int (FR + 0x40) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) fdc_7402 exec_execute_C_LDSP. Qed.
+    (mword_of_int (FR + 0x40) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_7402 exec_execute_C_LDSP. Qed.
 
   Lemma fri_42 : kernel_text -∗ instr (mword_of_int (FR + 0x42) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
   Proof. mk_rvc (FR + 0x42)%Z (mword_of_int 0x64e2 : mword 16)
-    (mword_of_int (FR + 0x42) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) fdc_64e2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (FR + 0x42) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cdec_64e2 exec_execute_C_LDSP. Qed.
 
   Lemma fri_44 : kernel_text -∗ instr (mword_of_int (FR + 0x44) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc (FR + 0x44)%Z (mword_of_int 0x6145 : mword 16)
-    (mword_of_int (FR + 0x44) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) fdc_6145 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (FR + 0x44) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) cdec_6145 exec_execute_C_ADDI16SP. Qed.
 
   Lemma fri_46 : kernel_text -∗ instr (mword_of_int (FR + 0x46) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (FR + 0x46)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (FR + 0x46) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) fdc_8082 exec_execute_C_JR. Qed.
+    (mword_of_int (FR + 0x46) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpFreerangeDecode.

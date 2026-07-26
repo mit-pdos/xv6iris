@@ -88,14 +88,6 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x34  0x8b85  c.andi a5,a5,1 *)
-Lemma podec_34 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8b85 : mword 16)) s
-  = Some (C_ANDI (mword_of_int 1, Cregidx (mword_of_int 7)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
 (* +0x38  0xb7c5  c.j 80000bd8 *)
 Lemma podec_38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xb7c5 : mword 16)) s
@@ -266,7 +258,7 @@ Section WpPushOffTop.
 
   Lemma poi_2a : kernel_text -∗ instr (mword_of_int (PO + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (PO + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (PO + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (mword_of_int (PO + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   Lemma poi_2c : kernel_text -∗ instr (mword_of_int (PO + 0x2c) : mword 64) false (JAL (mword_of_int 0xcea : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PO + 0x2c)%Z (mword_of_int 0x4eb000ef : mword 32)
@@ -278,7 +270,7 @@ Section WpPushOffTop.
 
   Lemma poi_34 : kernel_text -∗ instr (mword_of_int (PO + 0x34) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_rvc (PO + 0x34)%Z (mword_of_int 0x8b85 : mword 16)
-    (mword_of_int (PO + 0x34) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) podec_34 poexec_andi. Qed.
+    (mword_of_int (PO + 0x34) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) cdec_8b85 poexec_andi. Qed.
 
   Lemma poi_36 : kernel_text -∗ instr (mword_of_int (PO + 0x36) : mword 64) true (STORE (mword_of_int 124, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)).
   Proof. mk_rvc (PO + 0x36)%Z (mword_of_int 0xdd7c : mword 16)

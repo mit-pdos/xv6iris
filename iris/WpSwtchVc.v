@@ -358,7 +358,7 @@ Section WpSwtchVc.
       (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (SW + 0x68)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (SW + 0x68) : mword 64)
-    (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* the 28-instruction body's code resource, extracted from kernel_text. *)
   Lemma swtch_code : kernel_text -∗ block_instrs_s KernelSyms.swtch swtch_prog.

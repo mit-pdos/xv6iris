@@ -72,15 +72,7 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x4  0x4501  c.li a0,0 *)
-Lemma hdec_li s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4501 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 10)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* +0x6  0x8082  c.ret: reuse WpPushOffTop.podec_2a *)
+(* +0x6  0x8082  c.ret: reuse WpPushOffTop.cdec_8082 *)
 
 (* the C_LW ExecuteAs expansion for imm 0 / a0-base / a5-dest *)
 Lemma h_imm0 : zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")) = (mword_of_int 0 : mword 12).
@@ -216,13 +208,13 @@ Section WpHolding.
       (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.holding + 0x4)%Z (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x4) : mword 64)
-    (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) hdec_li exec_execute_C_LI. Qed.
+    (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
 
   Lemma hi_06 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x6) : mword 64) true
       (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (KernelSyms.holding + 0x6)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x6) : mword 64)
-    (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 
   Lemma his_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x08) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
@@ -283,6 +275,6 @@ Section WpHolding.
 
   Lemma his_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.holding + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (KernelSyms.holding + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (KernelSyms.holding + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (mword_of_int (KernelSyms.holding + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpHolding.

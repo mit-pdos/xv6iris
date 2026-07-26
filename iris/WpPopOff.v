@@ -90,12 +90,6 @@ Lemma ppdec_fence s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
                  Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
-(* +0x10  0x8b89  c.andi a5,2 *)
-Lemma ppdec_andi s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8b89 : mword 16)) s
-  = Some (C_ANDI (mword_of_int 2, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x12  0xef99  c.bnez a5,+0x1e *)
 Lemma ppdec_bnez1e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xef99 : mword 16)) s
@@ -271,7 +265,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_10 : kernel_text -∗ instr (mword_of_int (PP + 0x10) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_rvc (PP + 0x10)%Z (mword_of_int 0x8b89 : mword 16)
-    (mword_of_int (PP + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) ppdec_andi ppexec_andi2. Qed.
+    (mword_of_int (PP + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) cdec_8b89 ppexec_andi2. Qed.
 
   Lemma ppi_12 : kernel_text -∗ instr (mword_of_int (PP + 0x12) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (PP + 0x12)%Z (mword_of_int 0xef99 : mword 16)
@@ -319,7 +313,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_2e : kernel_text -∗ instr (mword_of_int (PP + 0x2e) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (PP + 0x2e)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (PP + 0x2e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (PP + 0x2e) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpPopOffInstr.
 

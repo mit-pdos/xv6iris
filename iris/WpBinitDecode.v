@@ -6,9 +6,9 @@
    it proves a [kernel_text -* instr pc <is_rvc> <AST>] fact ([bii_<off>]) plus
    the per-instruction decode facts they consume ([bidc_<word>] compressed /
    [bidb_<word>] base).  Pure mirror of WpFreerangeDecode.v; binit shares
-   freerange's 48-byte / 6-slot frame, so the frame words here are the same
-   shared prologue/epilogue encodings (kept local, like every other function's
-   decode file, so no decode file depends on another's).
+   freerange's 48-byte / 6-slot frame, so every frame word comes from the shared
+   [cdec_*] templates in KernelRvcDecode.v and only binit's own words are
+   proved here.
 
    The two compressed [c.sd]s (the buffer's next field and the old head-next's
    prev field) are the only instructions whose AST needs massaging: the RVC
@@ -32,60 +32,13 @@ Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
 (* Compressed decode facts (one per distinct 16-bit encoding).            *)
 (* ===================================================================== *)
-
-(* 0x7179  c.addi16sp sp,-48 *)
-Lemma bidc_7179 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7179 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 61 : mword 6), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xf406  c.sdsp ra,40(sp) *)
-Lemma bidc_f406 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf406 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xf022  c.sdsp s0,32(sp) *)
-Lemma bidc_f022 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf022 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 8)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xec26  c.sdsp s1,24(sp) *)
-Lemma bidc_ec26 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xec26 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 3, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xe84a  c.sdsp s2,16(sp) *)
-Lemma bidc_e84a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe84a : mword 16)) s
-  = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xe44e  c.sdsp s3,8(sp) *)
-Lemma bidc_e44e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe44e : mword 16)) s
-  = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xe052  c.sdsp s4,0(sp) *)
-Lemma bidc_e052 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe052 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x1800  c.addi4spn s0,sp,48 *)
-Lemma bidc_1800 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1800 : mword 16)) s
-  = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 12 : mword 8), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x893e  c.mv s2,a5 *)
 Lemma bidc_893e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -115,54 +68,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma bidc_e7a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xe7a4 : mword 16)) s
   = Some (C_SD (mword_of_int 9, Cregidx (mword_of_int 7), Cregidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x70a2  c.ldsp ra,40(sp) *)
-Lemma bidc_70a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x70a2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 5, Regidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x7402  c.ldsp s0,32(sp) *)
-Lemma bidc_7402 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7402 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 4, Regidx (mword_of_int 8)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x64e2  c.ldsp s1,24(sp) *)
-Lemma bidc_64e2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x64e2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x6942  c.ldsp s2,16(sp) *)
-Lemma bidc_6942 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6942 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x69a2  c.ldsp s3,8(sp) *)
-Lemma bidc_69a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x69a2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x6a02  c.ldsp s4,0(sp) *)
-Lemma bidc_6a02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6a02 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x6145  c.addi16sp sp,48 *)
-Lemma bidc_6145 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6145 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 3 : mword 6), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x8082  c.jr ra *)
-Lemma bidc_8082 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8082 : mword 16)) s
-  = Some (C_JR (Regidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
@@ -316,35 +221,35 @@ Section WpBinitDecode.
   (* ---- prologue: 6-slot frame, save ra/s0/s1/s2/s3/s4, s0 := frame top ---- *)
   Lemma bii_00 : kernel_text -∗ instr (mword_of_int (BI + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc (BI + 0x00)%Z (mword_of_int 0x7179 : mword 16)
-    (mword_of_int (BI + 0x00) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)) bidc_7179 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (BI + 0x00) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)) cdec_7179 exec_execute_C_ADDI16SP. Qed.
 
   Lemma bii_02 : kernel_text -∗ instr (mword_of_int (BI + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
   Proof. mk_rvc (BI + 0x02)%Z (mword_of_int 0xf406 : mword 16)
-    (mword_of_int (BI + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) bidc_f406 exec_execute_C_SDSP. Qed.
+    (mword_of_int (BI + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_f406 exec_execute_C_SDSP. Qed.
 
   Lemma bii_04 : kernel_text -∗ instr (mword_of_int (BI + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
   Proof. mk_rvc (BI + 0x04)%Z (mword_of_int 0xf022 : mword 16)
-    (mword_of_int (BI + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) bidc_f022 exec_execute_C_SDSP. Qed.
+    (mword_of_int (BI + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_f022 exec_execute_C_SDSP. Qed.
 
   Lemma bii_06 : kernel_text -∗ instr (mword_of_int (BI + 0x06) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
   Proof. mk_rvc (BI + 0x06)%Z (mword_of_int 0xec26 : mword 16)
-    (mword_of_int (BI + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) bidc_ec26 exec_execute_C_SDSP. Qed.
+    (mword_of_int (BI + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cdec_ec26 exec_execute_C_SDSP. Qed.
 
   Lemma bii_08 : kernel_text -∗ instr (mword_of_int (BI + 0x08) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)).
   Proof. mk_rvc (BI + 0x08)%Z (mword_of_int 0xe84a : mword 16)
-    (mword_of_int (BI + 0x08) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) bidc_e84a exec_execute_C_SDSP. Qed.
+    (mword_of_int (BI + 0x08) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) cdec_e84a exec_execute_C_SDSP. Qed.
 
   Lemma bii_0a : kernel_text -∗ instr (mword_of_int (BI + 0x0a) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)).
   Proof. mk_rvc (BI + 0x0a)%Z (mword_of_int 0xe44e : mword 16)
-    (mword_of_int (BI + 0x0a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) bidc_e44e exec_execute_C_SDSP. Qed.
+    (mword_of_int (BI + 0x0a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) cdec_e44e exec_execute_C_SDSP. Qed.
 
   Lemma bii_0c : kernel_text -∗ instr (mword_of_int (BI + 0x0c) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)).
   Proof. mk_rvc (BI + 0x0c)%Z (mword_of_int 0xe052 : mword 16)
-    (mword_of_int (BI + 0x0c) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)) bidc_e052 exec_execute_C_SDSP. Qed.
+    (mword_of_int (BI + 0x0c) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)) cdec_e052 exec_execute_C_SDSP. Qed.
 
   Lemma bii_0e : kernel_text -∗ instr (mword_of_int (BI + 0x0e) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 12 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
   Proof. mk_rvc (BI + 0x0e)%Z (mword_of_int 0x1800 : mword 16)
-    (mword_of_int (BI + 0x0e) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 12 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) bidc_1800 exec_execute_C_ADDI4SPN. Qed.
+    (mword_of_int (BI + 0x0e) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 12 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_1800 exec_execute_C_ADDI4SPN. Qed.
 
   (* ---- a1 := &"bcache", a0 := &bcache, jal initlock ---- *)
   Lemma bii_10 : kernel_text -∗ instr (mword_of_int (BI + 0x10) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)).
@@ -474,34 +379,34 @@ Section WpBinitDecode.
   (* ---- epilogue ---- *)
   Lemma bii_76 : kernel_text -∗ instr (mword_of_int (BI + 0x76) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (BI + 0x76)%Z (mword_of_int 0x70a2 : mword 16)
-    (mword_of_int (BI + 0x76) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) bidc_70a2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (BI + 0x76) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_70a2 exec_execute_C_LDSP. Qed.
 
   Lemma bii_78 : kernel_text -∗ instr (mword_of_int (BI + 0x78) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
   Proof. mk_rvc (BI + 0x78)%Z (mword_of_int 0x7402 : mword 16)
-    (mword_of_int (BI + 0x78) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) bidc_7402 exec_execute_C_LDSP. Qed.
+    (mword_of_int (BI + 0x78) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_7402 exec_execute_C_LDSP. Qed.
 
   Lemma bii_7a : kernel_text -∗ instr (mword_of_int (BI + 0x7a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
   Proof. mk_rvc (BI + 0x7a)%Z (mword_of_int 0x64e2 : mword 16)
-    (mword_of_int (BI + 0x7a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) bidc_64e2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (BI + 0x7a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cdec_64e2 exec_execute_C_LDSP. Qed.
 
   Lemma bii_7c : kernel_text -∗ instr (mword_of_int (BI + 0x7c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).
   Proof. mk_rvc (BI + 0x7c)%Z (mword_of_int 0x6942 : mword 16)
-    (mword_of_int (BI + 0x7c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) bidc_6942 exec_execute_C_LDSP. Qed.
+    (mword_of_int (BI + 0x7c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) cdec_6942 exec_execute_C_LDSP. Qed.
 
   Lemma bii_7e : kernel_text -∗ instr (mword_of_int (BI + 0x7e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).
   Proof. mk_rvc (BI + 0x7e)%Z (mword_of_int 0x69a2 : mword 16)
-    (mword_of_int (BI + 0x7e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) bidc_69a2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (BI + 0x7e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) cdec_69a2 exec_execute_C_LDSP. Qed.
 
   Lemma bii_80 : kernel_text -∗ instr (mword_of_int (BI + 0x80) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).
   Proof. mk_rvc (BI + 0x80)%Z (mword_of_int 0x6a02 : mword 16)
-    (mword_of_int (BI + 0x80) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) bidc_6a02 exec_execute_C_LDSP. Qed.
+    (mword_of_int (BI + 0x80) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) cdec_6a02 exec_execute_C_LDSP. Qed.
 
   Lemma bii_82 : kernel_text -∗ instr (mword_of_int (BI + 0x82) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc (BI + 0x82)%Z (mword_of_int 0x6145 : mword 16)
-    (mword_of_int (BI + 0x82) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) bidc_6145 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (BI + 0x82) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) cdec_6145 exec_execute_C_ADDI16SP. Qed.
 
   Lemma bii_84 : kernel_text -∗ instr (mword_of_int (BI + 0x84) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (BI + 0x84)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (BI + 0x84) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) bidc_8082 exec_execute_C_JR. Qed.
+    (mword_of_int (BI + 0x84) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpBinitDecode.

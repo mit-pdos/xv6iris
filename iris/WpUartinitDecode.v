@@ -234,6 +234,6 @@ Section WpUartinitDecode.
 
   Lemma uii_54 : kernel_text -∗ instr (mword_of_int (UI + 0x54) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (UI + 0x54)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (UI + 0x54) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (UI + 0x54) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpUartinitDecode.

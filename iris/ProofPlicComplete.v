@@ -21,7 +21,7 @@
        +0x24  8082      c.ret
 
    The 32-byte frame is byte-identical to kalloc's, so the prologue and
-   epilogue reuse KernelRvcDecode's shared templates ([podec_00]..[podec_2a])
+   epilogue reuse KernelRvcDecode's shared templates ([podec_00]..[cdec_8082])
    and the Proof{Mem,Ctl,Alu} frame leaves.  The MMIO write goes through
    [wp_sw_plic_dev_s_sconf] (WpPlic.v), which opens the device invariant across
    the (atomic) store -- every hart runs this concurrently, so none of them may
@@ -74,12 +74,6 @@ Proof.
 Qed.
 
 (* ---- the decodes used only by plic_complete ---- *)
-
-(* +0x0a  84aa  c.mv s1,a0 *)
-Lemma pcdec_mv_s1_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x0c  bd8fc0ef  jal ra,cpuid *)
 Lemma pcdec_jal s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -151,7 +145,7 @@ Section ProofPlicComplete.
 
   Lemma pci_0a : kernel_text -∗ instr (mword_of_int (PC + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (PC + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (PC + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) pcdec_mv_s1_a0 exec_execute_C_MV. Qed.
+    (mword_of_int (PC + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
 
   Lemma pci_0c : kernel_text -∗ instr (mword_of_int (PC + 0x0c) : mword 64) false (JAL (mword_of_int 2081752 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PC + 0x0c)%Z (mword_of_int 0xbd8fc0ef : mword 32)
@@ -191,7 +185,7 @@ Section ProofPlicComplete.
 
   Lemma pci_24 : kernel_text -∗ instr (mword_of_int (PC + 0x24) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (PC + 0x24)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (PC + 0x24) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+    (mword_of_int (PC + 0x24) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plic_complete(), entry to return. *)

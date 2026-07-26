@@ -84,7 +84,7 @@ Section Kvmmap.
   Lemma ki_18 : KMP 0x18 true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (KM + 0x18)%Z (mword_of_int 0x0141 : mword 16) (mword_of_int (KM + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_cee exec_execute_C_ADDI. Qed.
   Lemma ki_1a : KMP 0x1a true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (KM + 0x1a)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int (KM + 0x1a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) mdec_cf0 exec_execute_C_JR. Qed.
+  Proof. mk_rvc (KM + 0x1a)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int (KM + 0x1a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* ---- the (unreachable-return) panic arm ---- *)
   Lemma kvdec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

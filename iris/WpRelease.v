@@ -111,7 +111,7 @@ Section WpReleaseInstr.
 
   Lemma rli_0a : kernel_text -∗ instr (mword_of_int (RL + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (RL + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (RL + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) aqdec_mv_s1_a0 exec_execute_C_MV. Qed.
+    (mword_of_int (RL + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
 
   Lemma rli_0c : kernel_text -∗ instr (mword_of_int (RL + 0x0c) : mword 64) false (JAL (mword_of_int 0x1fff06 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (RL + 0x0c)%Z (mword_of_int 0xf07ff0ef : mword 32)
@@ -155,7 +155,7 @@ Section WpReleaseInstr.
 
   Lemma rli_2a : kernel_text -∗ instr (mword_of_int (RL + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (RL + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (RL + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (mword_of_int (RL + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpReleaseInstr.
 

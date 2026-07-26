@@ -5,8 +5,8 @@
    c.addi4spn / three c.ldsp / c.addi16sp / c.ret) is byte-identical to
    acquire's, so its decodes reuse the shared [podec_*] templates from
    KernelRvcDecode.v; the a5-materialization triple (c.mv a5,tp / c.addiw /
-   c.slli a5,7) is byte-identical to mycpu's, reusing [mydec_mv]/[mydec_addiw]/
-   [mydec_slli] from WpMycpu.v.  Only the two jal's, the auipc/addi pid_lock
+   c.slli a5,7) is byte-identical to mycpu's, reusing [cdec_8792]/[cdec_2781]/
+   [cdec_079e] from WpMycpu.v.  Only the two jal's, the auipc/addi pid_lock
    materialization, the c.add and c.ld, and the two other c.mv's are myproc's
    own and get fresh templates here. *)
 From Stdlib Require Import ZArith.
@@ -25,7 +25,6 @@ Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Import WpMycpu.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.
@@ -60,22 +59,10 @@ Lemma mpdec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 0xa30 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x1c  0x97ba  c.add a5,a5,a4 *)
-Lemma mpdec_add s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x97ba : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x1e  0x7b9c  c.ld a5,48(a5) *)
 Lemma mpdec_ld s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x7b9c : mword 16)) s
   = Some (C_LD (mword_of_int 6, Cregidx (mword_of_int 7), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x26  0x8526  c.mv a0,s1 *)
-Lemma mpdec_mv_a0_s1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8526 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 9)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 Section WpMyprocDecode.
@@ -111,15 +98,15 @@ Section WpMyprocDecode.
   (* ---- +0x0e..+0x12: c.mv a5,tp / c.addiw a5,0 / c.slli a5,7 (mycpu decodes) ---- *)
   Lemma mpi_0e : kernel_text -∗ instr (mword_of_int (MP + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (MP + 0x0e)%Z (mword_of_int 0x8792 : mword 16)
-    (mword_of_int (MP + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)) mydec_mv exec_execute_C_MV. Qed.
+    (mword_of_int (MP + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)) cdec_8792 exec_execute_C_MV. Qed.
 
   Lemma mpi_10 : kernel_text -∗ instr (mword_of_int (MP + 0x10) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (MP + 0x10)%Z (mword_of_int 0x2781 : mword 16)
-    (mword_of_int (MP + 0x10) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) mydec_addiw exec_execute_C_ADDIW. Qed.
+    (mword_of_int (MP + 0x10) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_2781 exec_execute_C_ADDIW. Qed.
 
   Lemma mpi_12 : kernel_text -∗ instr (mword_of_int (MP + 0x12) : mword 64) true (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_rvc (MP + 0x12)%Z (mword_of_int 0x079e : mword 16)
-    (mword_of_int (MP + 0x12) : mword 64) (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) mydec_slli exec_execute_C_SLLI. Qed.
+    (mword_of_int (MP + 0x12) : mword 64) (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) cdec_079e exec_execute_C_SLLI. Qed.
 
   (* ---- +0x14: auipc a4,0x11 ---- *)
   Lemma mpi_14 : kernel_text -∗ instr (mword_of_int (MP + 0x14) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)).
@@ -134,7 +121,7 @@ Section WpMyprocDecode.
   (* ---- +0x1c: c.add a5,a5,a4 ---- *)
   Lemma mpi_1c : kernel_text -∗ instr (mword_of_int (MP + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (MP + 0x1c)%Z (mword_of_int 0x97ba : mword 16)
-    (mword_of_int (MP + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) mpdec_add exec_execute_C_ADD. Qed.
+    (mword_of_int (MP + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) mdec_97ba exec_execute_C_ADD. Qed.
 
   (* ---- +0x1e: c.ld a5,48(a5) ---- *)
   Lemma mpi_1e : kernel_text -∗ instr (mword_of_int (MP + 0x1e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
@@ -154,7 +141,7 @@ Section WpMyprocDecode.
   (* ---- +0x26: c.mv a0,s1 ---- *)
   Lemma mpi_26 : kernel_text -∗ instr (mword_of_int (MP + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (MP + 0x26)%Z (mword_of_int 0x8526 : mword 16)
-    (mword_of_int (MP + 0x26) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) mpdec_mv_a0_s1 exec_execute_C_MV. Qed.
+    (mword_of_int (MP + 0x26) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
 
   (* ---- +0x28..+0x2c: c.ldsp ra/s0/s1 (shared podec_* decodes) ---- *)
   Lemma mpi_28 : kernel_text -∗ instr (mword_of_int (MP + 0x28) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
@@ -177,6 +164,6 @@ Section WpMyprocDecode.
   (* ---- +0x30: c.ret ---- *)
   Lemma mpi_30 : kernel_text -∗ instr (mword_of_int (MP + 0x30) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (MP + 0x30)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (MP + 0x30) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) podec_2a exec_execute_C_JR. Qed.
+    (mword_of_int (MP + 0x30) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End WpMyprocDecode.
