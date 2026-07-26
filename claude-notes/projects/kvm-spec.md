@@ -295,7 +295,17 @@ LEDGER (all on main, each full-build green at its commit):
            Type, sie_cap_gpr interface; KvmSpec's dead legacy trio and
            Variable R deleted)
 
-NEXT WORK, IN ORDER:
+STATUS 2026-07-26: items (v).0 through (v).3 are ALL DONE and pushed
+(ledger: pt_present_mono surgery 59ea448; wp_proc_mapstacks ee92d98
++ the 9e8a90b interleaved-peel optimization; wp_kvmmake acb4655 —
+census-pinned 102 tables, exact 166-page consumption, K_kvmmake
+premise STRICT per the spare-page note below; wp_kvminit is the
+commit carrying this note).  The kvminit deliverable stands:
+kernel_pagetable ↦₈ root with pt_rep0 t (kvm_map_full pas), feeding
+kvm_bridge.  NEXT: rwx-kmap STAGE 6 (the kvminithart switch — see
+the outline further down and rwx-kmap.md staging C→6).
+
+ORIGINAL WORKLIST (all done, kept for the design record):
 (v).0  THE pt_present_mono SPEC SURGERY (decided 2026-07-24; option B
    of the proc_mapstacks agent's analysis — chosen over per-vpn
    offpath threading per the one-general-abstraction principle):

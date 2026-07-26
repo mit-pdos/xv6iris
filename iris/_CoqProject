@@ -194,6 +194,8 @@ ProofKvmmake.v
 LinkKvmmake.v
 SpecKvmmake.v
 SpecKvminit.v
+ProofKvminit.v
+LinkKvminit.v
 SpecWakeupParts.v
 ProofWakeupParts.v
 LinkWakeupParts.v
