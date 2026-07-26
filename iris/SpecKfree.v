@@ -19,6 +19,7 @@ Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import WpMycpu WpLock.
 Require Import IntrDefs.
+Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -26,14 +27,11 @@ From Kernel Require KernelSyms.
 Notation KF := KernelSyms.kfree.
 
 Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfree in
   let p := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (14 <= K)%nat ->
-  eq_vec (cpuold : mword 64) cpuv = false ->
   (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   lk = mword_of_int KernelSyms.kmem ->
@@ -45,20 +43,19 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   kfree_pre p -∗
   kalloc_avail γk on -∗
-  a_cpu ↦₈ cpuold -∗
+  panic_wp -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
     cpu_own γ n eb pcur C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (avail_inc on) -∗
-    a_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type KFREE.
   Parameter wp_kfree_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat),
-      wp_kfree_sconf_body γ Φ γl γk lk fl m cpuold on n eb pcur C K.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat),
+      wp_kfree_sconf_body γ Φ γl γk lk fl m on n eb pcur C K.
 End KFREE.

@@ -30,6 +30,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
+Require Import SpecPanic.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
@@ -60,11 +61,10 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   cpu_own γ 0 eb pj C -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
-  sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
+  panic_wp -∗
   (* the caller's own pid (read-only fraction) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
-  p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
   procs_inv γ Φ γs -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
@@ -77,9 +77,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
       R -∗
-      sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
       p_pid pj ↦₄{dq} pidv -∗
-      p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

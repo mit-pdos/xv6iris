@@ -70,14 +70,14 @@ Section SchedCtx.
      wand interface (SwtchCtx.v), at the RESUMER's [eb]/proc; the payload
      below carries only the chain-protocol facts and the held lock. *)
 
-  (* holding proc j's spinlock, contents out: the token, the state and chan
-     cells, and the lock's cpu word pinned at this CPU (set by acquire,
-     needed by holding/release). *)
+  (* holding proc j's spinlock, contents out: the holder token and the state
+     and chan cells.  The lock's own cpu word is inside [lock_inv] and the
+     token PINS it at this hart (WpLock.v), which is exactly what holding /
+     release need -- so no cell rides here. *)
   Definition proc_held (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
-    (locked γl ∗
+    (locked γl cpu_id ∗
      p_state (proc_addr j) ↦₄ st ∗
-     p_chan (proc_addr j) ↦₈ ch ∗
-     p_lkcpu (proc_addr j) ↦₈ mycpu_ret cid_word)%I.
+     p_chan (proc_addr j) ↦₈ ch)%I.
 
   (* ------------------------------------------------------------------ *)
   (* The chain payload predicate.                                        *)

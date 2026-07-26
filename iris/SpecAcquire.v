@@ -1,6 +1,17 @@
 (* SpecAcquire.v -- the public interface of Acquire, stated independently of its
    proof.  Requires only the definitional layer -- never a whole-function proof
-   file -- so every function proof can be checked in parallel. *)
+   file -- so every function proof can be checked in parallel.
+
+   The lock's [cpu] word is owned by the lock invariant (WpLock.v), so no cell
+   is threaded here.  What the caller gets back is the [locked γl cpu_id]
+   token, which PINS [lk->cpu] at this hart's [struct cpu] -- so release needs
+   nothing else.
+
+   A caller does NOT have to prove it is not already holding the lock: it
+   supplies [panic_wp] (SpecPanic.v) instead, and acquire's
+   [if(holding(lk)) panic] arm is discharged by that contract.  So the spec
+   reads "acquire either returns holding the lock, or panics" -- exactly what
+   the C code promises for a hart that violates the no-reentrance rule. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -18,19 +29,17 @@ Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import WpMycpu.
+Require Import SpecPanic.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 Notation AQ := KernelSyms.acquire.
 
 Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let a_cpu := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  eq_vec cpuold cpuv = false ->
   (* the tp register holds THIS cpu's id (push_off's cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -39,14 +48,13 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
-  a_cpu ↦₈ cpuold -∗
+  panic_wp -∗
   ( ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
     sie_cap_gpr γ mfin av -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
-    locked γl -∗ R -∗
-    a_cpu ↦₈ cpuv -∗
+    locked γl cpu_id -∗ R -∗
     cpu_own γ (S n) eb p C -∗
     trap_csrs_pay n eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -55,6 +63,6 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
 Module Type ACQUIRE.
   Parameter wp_acquire_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (cpuold : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_acquire_sconf_body γ Φ γl s R m cpuold n eb p C av.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_acquire_sconf_body γ Φ γl s R m n eb p C av.
 End ACQUIRE.

@@ -157,6 +157,7 @@ WpIntenaBits.v
 SpecPushOff.v
 ProofPushOff.v
 LinkPushOff.v
+SpecPanic.v
 SpecHolding.v
 ProofHolding.v
 LinkHolding.v

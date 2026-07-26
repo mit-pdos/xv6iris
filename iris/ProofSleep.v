@@ -33,6 +33,7 @@ Require Import SchedCtx.
 Require Import WpSleepDecode.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecSleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SpecPanic.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -145,9 +146,9 @@ Section ProofSleep.
     : wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av eb C.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
-    intros pcE pj chan lk0 a_cpu_k ret_tgt Htp Hj Hgl Hlka0 Hav.
+    intros pcE pj chan lk0 ret_tgt Htp Hj Hgl Hlka0 Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk Hkcpu Hlkcpu Hown Hvc Hcont".
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk #Hpanic Hown Hvc Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
     (* ------------------------------------------------------------------ *)
@@ -329,16 +330,13 @@ Section ProofSleep.
       by (rewrite /B1 upd_eq; reflexivity).
     iPoseProof (procs_inv_lookup γ Φ γs j γl Hgl with "Hprocs") as "#Hislock".
     iApply (Acquire.wp_acquire_sconf γ Φ γl "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (zero_reg : mword 64) 1 eb (proc_addr j) C (av - 6)%nat
-              ltac:(rewrite HtpB1; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
+              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 1 eb (proc_addr j) C (av - 6)%nat
               HtpB1
               ltac:(lia)
               ltac:(lia)
-              with "Hcg Hcpu Htext Hpc [Hislock] [Hlkcpu] [-]").
+              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
-    { iEval (rewrite Ha0_B1). iExact "Hlkcpu". }
-    iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hlkcpu Hcpu Hpay1".
-    iEval (rewrite Ha0_B1 HtpB1) in "Hlkcpu".
+    iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay1".
     assert (Hpc1c : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SL + 0x1c)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
@@ -386,20 +384,12 @@ Section ProofSleep.
       by (rewrite /C1 upd_eq; reflexivity).
     assert (Hlka_r1 : add_vec (C1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
       by (rewrite Ha0_C1; exact Hlka0).
-    assert (Hcpueq_r1 : eq_vec (mycpu_ret cid_word) (mycpu_ret (C1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
-      by (rewrite HtpC1; apply eq_vec_true_iff; reflexivity).
-    (* a_cpu_k address: reconcile lk-derived release address to a_cpu_k. *)
-    assert (Hacpu_r1 : add_vec (C1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu_k)
-      by (rewrite Ha0_C1; reflexivity).
-    iApply (Release.wp_release_sconf γ Φ γk lka sk Rk C1 (mycpu_ret cid_word) 1 eb (proc_addr j) C (av - 6)%nat
+    iApply (Release.wp_release_sconf γ Φ γk lka sk Rk C1 1 eb (proc_addr j) C (av - 6)%nat
               Hlka_r1
-              Hcpueq_r1
               HtpC1
               ltac:(lia)
-              with "Hcg Htext Hpc Hkislock Hklocked HRk [Hkcpu] Hcpu Hpay1 [-]").
-    { iEval (rewrite Hacpu_r1). iExact "Hkcpu". }
-    iIntros (mrel1) "Hcg Hpc %Hcs_rel1 Hkcpu Hcpu".
-    iEval (rewrite Hacpu_r1) in "Hkcpu".
+              with "Hcg Htext Hpc Hkislock Hklocked HRk Hcpu Hpay1 [-]").
+    iIntros (mrel1) "Hcg Hpc %Hcs_rel1 Hcpu".
     assert (Hpc22 : ret_pc (C1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SL + 0x22)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
@@ -485,10 +475,10 @@ Section ProofSleep.
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
     iApply (Sched.wp_sched_sconf γ Φ γs j γl SLEEPING chan D1 (av - 6)%nat eb
               HtpD1 Hj Hgl (needs_ctx_SLEEPING) ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hlkcpu] Hcpuemp Hown Hvc [-]").
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hlkcpu". }
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan] Hcpuemp Hown Hvc [-]").
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan". }
     iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Hcpuemp Hown' Hvc'".
-    iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hlkcpu)".
+    iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan)".
     iAssert (cpu_own γ 1 eb (proc_addr j) C) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
     assert (Hpc2e : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
@@ -556,18 +546,13 @@ Section ProofSleep.
     iAssert (proc_lock_res γ Φ γs γl (proc_addr j)) with "[Hstate Hchan]" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, (zero_reg : mword 64). iFrame "Hstate Hchan".
       rewrite needs_ctx_RUNNING. done. }
-    assert (Hcpueq_r2 : eq_vec (mycpu_ret cid_word) (mycpu_ret (E1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
-      by (rewrite HtpE1; apply eq_vec_true_iff; reflexivity).
     iApply (Release.wp_release_sconf γ Φ γl (proc_addr j) "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) E1 (mycpu_ret cid_word) 0 eb (proc_addr j) C (av - 6)%nat
+              (proc_lock_res γ Φ γs γl (proc_addr j)) E1 0 eb (proc_addr j) C (av - 6)%nat
               Hlka_r2
-              Hcpueq_r2
               HtpE1
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 [Hlkcpu] Hcpu Hpay0 [-]").
-    { iEval (rewrite Ha0_E1). iExact "Hlkcpu". }
-    iIntros (mrel2) "Hcg Hpc %Hcs_rel2 Hlkcpu Hcpu".
-    iEval (rewrite Ha0_E1) in "Hlkcpu".
+              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay0 [-]").
+    iIntros (mrel2) "Hcg Hpc %Hcs_rel2 Hcpu".
     assert (Hpc38 : ret_pc (E1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SL + 0x38)) by (rewrite HE1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc38) in "Hpc".
@@ -618,18 +603,13 @@ Section ProofSleep.
     { rewrite Ha0_F1 -Hlka0. symmetry.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H0. apply kv_addv_zero. }
-    assert (Hacpu_f : add_vec (F1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu_k)
-      by (rewrite Ha0_F1; reflexivity).
-    iApply (Acquire.wp_acquire_sconf γ Φ γk sk Rk F1 (zero_reg : mword 64) 0 eb (proc_addr j) C (av - 6)%nat
-              ltac:(rewrite HtpF1; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
+    iApply (Acquire.wp_acquire_sconf γ Φ γk sk Rk F1 0 eb (proc_addr j) C (av - 6)%nat
               HtpF1
               ltac:(lia)
               ltac:(lia)
-              with "Hcg Hcpu Htext Hpc [Hkislock] [Hkcpu] [-]").
+              with "Hcg Hcpu Htext Hpc [Hkislock] Hpanic [-]").
     { iEval (rewrite Hislk_f). iExact "Hkislock". }
-    { iEval (rewrite Hacpu_f). iExact "Hkcpu". }
-    iIntros (ms3 macq2) "%Hmsf3 Hcg Hpc %Hcs_acq2 Hklocked HRk Hkcpu Hcpu Hpay0'".
-    iEval (rewrite Hacpu_f HtpF1) in "Hkcpu".
+    iIntros (ms3 macq2) "%Hmsf3 Hcg Hpc %Hcs_acq2 Hklocked HRk Hcpu Hpay0'".
     assert (Hpc3e : ret_pc (F1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SL + 0x3e)) by (rewrite HF1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3e) in "Hpc".
@@ -808,7 +788,7 @@ Section ProofSleep.
       rewrite /A4 upd_ne; [| exact H1]. rewrite /A3 upd_ne; [| exact H18].
       rewrite /A2 upd_ne; [| exact H19]. rewrite /A1 upd_ne; [| exact H8].
       rewrite /A0 upd_ne; [| exact Hsp]. reflexivity. }
-    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc Hklocked HRk Hkcpu Hlkcpu Hown' Hvc'").
+    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc Hklocked HRk Hown' Hvc'").
     (* callee_saved m Gf *)
     assert (Csp : Gf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite /Gf upd_eq HcspG8 Hpopsp; reflexivity).

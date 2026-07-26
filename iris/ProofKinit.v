@@ -30,6 +30,7 @@ Require Import WpKinitDecode.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecKinit.
+Require Import SpecPanic.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -48,11 +49,11 @@ Section ProofKinit.
     : wp_kinit_sconf_body γ Φ m ps K ncnt eb pcur C vlock vname vcpu.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
-    intros pcE ret_tgt cpuv lk fl c_name c_cpu endaddr phystop s1entry
-      HK Hncnt Hmycpu Htp Hprun.
+    intros pcE ret_tgt lk fl c_name c_cpu endaddr phystop s1entry
+      HK Hncnt Htp Hprun.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic Hlock Hname Hcpu Hflw Hpages Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
     assert (Hkmem : forall j b, cstring_bytes "kmem"%string !! j = Some b ->
                       KernelData.kernel_data !! (0x80007040 + Z.of_nat j)%Z = Some b).
@@ -220,19 +221,16 @@ Section ProofKinit.
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KI + 0x1c)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
-    (* ===== newlock ghost: allocate is_kmem γl γk lk fl + kalloc_avail (Some 0) ===== *)
+    (* ===== newlock ghost: allocate is_kmem γl γk lk fl + kalloc_avail (Some 0);
+       initlock's two zeroed words (locked + cpu) go INTO the invariant and
+       every hart's not-holder ticket comes out ===== *)
     iApply fupd_wp.
-    iMod (own_alloc (Excl () : exclR unitO)) as (γl) "Hlocked"; [done|].
     iMod (kalloc_avail_alloc 0%nat) as (γk) "[Havail Hauth]".
     iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
-    iMod (inv_alloc lockN ⊤ (lock_inv γl lk (kmem_res γk fl)) with "[Hlock Hlocked HR]") as "#Hkinv".
-    { iNext. iExists (mword_of_int 0 : mword 32). rewrite /lock_word.
-      iSplitL "Hlock"; [iExact "Hlock" |]. iLeft. iSplit; [done |]. iFrame "Hlocked HR". }
-    (* the lock = its (persistent) name + the invariant over its word *)
-    iAssert (is_kmem γl γk lk fl) with "[Hlname]" as "#Hkmem".
-    { rewrite /is_kmem. iApply (is_lock_intro with "Hlname Hkinv"). }
+    iMod (newlock ⊤ lk "kmem"%string (kmem_res γk fl)
+            with "Hlname Hlock Hcpu HR") as (γl) "#Hkmem".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
     destruct Hilcs as (Hilsp & Hiltp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).
@@ -311,14 +309,13 @@ Section ProofKinit.
     (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads the count *)
     iApply (Freerange.wp_freerange_sconf γ Φ γl γk lk fl R12 ps (K - 2) ncnt eb pcur C
               ltac:(lia) Hncnt
-              ltac:(rewrite HR12tp; exact Hmycpu)
               ltac:(rewrite HR12tp; exact Htp)
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun)
-              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hcpu] [Havail] [-]").
-    { iExact "Hcpu". }
+              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hpanic] [Havail] [-]").
+    { iExact "Hpanic". }
     { iExact "Havail". }
-    iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Hqcpu Havail".
+    iIntros (mfr) "Hcg Hcnt Hpc %Hfrcs Havail".
     assert (Hpcfr : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KI + 0x2c)).
     { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcfr) in "Hpc".
@@ -387,7 +384,7 @@ Section ProofKinit.
     assert (Hretf : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail Hqcpu").
+    iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail").
     (* callee_saved m E3: the two sub-calls preserve s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

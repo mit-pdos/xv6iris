@@ -42,6 +42,7 @@ Require Import SleepLock.
 Require Import WpSleeplockDecode.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
+Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
@@ -80,7 +81,7 @@ Section ProofReleasesleep.
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : eq_vec (zero_reg : mword 64) (mycpu_ret cid_word) = false)
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HRcaller Hcpu Hlockcells #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HRcaller #Hpanic #Hpinv Hcont".
     iDestruct (is_sleeplock_lock with "Hslp") as "#Hlockinv".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
@@ -223,21 +224,17 @@ Section ProofReleasesleep.
       exact HA_s2_s2. }
     (* ===== acquire(&slk->lk): intr_count 0 -> 1, returns sl_res + locked ===== *)
     iApply (Acquire.wp_acquire_sconf γ Φ γl "sleep lock"%string (sl_res γsl slk R) Kacq
-              (zero_reg : mword 64) 0%nat eb pme C (av - 4)%nat
-              ltac:(rewrite HKacqtp; exact Hcpune)
+              0%nat eb pme C (av - 4)%nat
               HKacqtp
               ltac:(lia)
               ltac:(lia)
-              with "Hcg Hown Htext Hpc [] [Hcpu] [-]").
+              with "Hcg Hown Htext Hpc [] Hpanic [-]").
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
-    { iEval (rewrite HKacqa0). iExact "Hcpu". }
-    iIntros (ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hcpu2 Hown Hpay".
+    iIntros (ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hown Hpay".
     assert (Hpc18 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (RSL + 0x18)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
-    (* normalise the acquire-returned lock cpu word (address to sl_lkcpu). *)
-    iEval (rewrite HKacqa0) in "Hcpu2". iEval (rewrite HKacqtp) in "Hcpu2".
     (* s1 preserved by acquire (callee_saved). *)
     assert (HMacqs1 : Macq !!! Regidx (mword_of_int 9 : mword 5) = slk).
     { rewrite (callee_saved_lookup Hpins (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact HKacqs1. }
@@ -298,8 +295,8 @@ Section ProofReleasesleep.
               ltac:(rewrite HCwktp; reflexivity)
               ltac:(rewrite HCwktp; exact Hcpune)
               ltac:(lia)
-              with "Hcg Hown Htext Hpc Hlockcells Hpinv [-]").
-    iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hown Htext2 Hpc Hlockcells".
+              with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
+    iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hown Htext2 Hpc".
     assert (Hpc26 : ret_pc (Cwk !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (RSL + 0x26)).
     { rewrite HCwkra. apply bv_eq; vm_compute; reflexivity. }
@@ -354,21 +351,17 @@ Section ProofReleasesleep.
     iDestruct (sl_res_close_free γsl slk R with "Hslkw Hslk Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γ Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
-              (mycpu_ret cid_word) 0%nat eb pme C (av - 4)%nat
+              0%nat eb pme C (av - 4)%nat
               ltac:(rewrite HKrela0; apply wk_add_vec_0)
-              ltac:(rewrite HKreltp; apply wk_eq_vec_refl)
               HKreltp
               ltac:(lia)
-              with "Hcg Htext Hpc [] HtokL HRsl [Hcpu2] Hown Hpay [-]").
+              with "Hcg Htext Hpc [] HtokL HRsl Hown Hpay [-]").
     { iExact "Hlockinv". }
-    { iEval (rewrite HKrela0). iExact "Hcpu2". }
-    iIntros (Mrel) "Hcg Hpc %Hrelcs Hcpu3 Hown".
+    iIntros (Mrel) "Hcg Hpc %Hrelcs Hown".
     assert (Hpc2c : ret_pc (Krel !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (RSL + 0x2c)).
     { rewrite HKrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc2c) in "Hpc".
-    (* normalise release-returned lock cpu word for the continuation. *)
-    iEval (rewrite HKrela0) in "Hcpu3".
     assert (HspMrel : Mrel !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hrelcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HKrelsp. }
     (* ===== EPILOGUE: restore ra/s0/s1/s2, pop frame, ret ===== *)
@@ -465,8 +458,7 @@ Section ProofReleasesleep.
     assert (Hretf : ret_pc (Q34 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ34ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc [Hcpu3] Hlockcells").
-    2:{ iExact "Hcpu3". }
+    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc").
     (* callee_saved m Q34 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->

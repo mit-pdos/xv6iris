@@ -318,12 +318,10 @@ Section ProcInv.
   Definition wk_intena_addr (a0f : mword 64) : mword 64 :=
     add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)).
 
-  (* the lock->cpu word of every proc, all 0 at each loop-test (acquire sets it
-     to mycpu, release clears it back to 0). *)
-  Definition wk_cpu_addr (pa : mword 64) : mword 64 :=
-    add_vec pa (sign_extend' 64 (mword_of_int 16 : mword 12)).
-  Definition wk_lockcells (γs : list gname) : iProp Σ :=
-    ([∗ list] i ↦ _ ∈ γs, wk_cpu_addr (proc_addr i) ↦₈ (zero_reg : mword 64))%I.
+  (* Nothing per-proc rides with the scan any more: both words of every proc
+     lock are inside its [lock_inv] (WpLock.v), and what acquire needs beside
+     the lock itself is only [panic_wp] -- persistent, so one copy serves all
+     64 iterations. *)
 
   (* wakeup's own 7-entry register-save frame, at spF+8..spF+56 (written by the
      [c.sdsp] prologue, read back by the epilogue).  Cell addresses are given in

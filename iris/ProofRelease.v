@@ -1,7 +1,7 @@
 (* ProofRelease.v: release over the SIE-agnostic v2 bundle (stage 8).
 
    release = holding-check (the lock token forces a0=1), lk->cpu := 0,
-   fence, the lock-word clear (locked ∗ R re-enter the invariant), then
+   fence, the lock-word clear (the token ∗ R re-enter the invariant), then
    pop_off -- the FIRST composition that threads push_off's payload
    disjunct end-to-end: release's caller hands the intenav-keyed input
    (built from push_off's post via WpIntenaBits), pop_off's restore may
@@ -24,7 +24,7 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock KernelRvcDecode.
+Require Import WpLock ProcGeom KernelRvcDecode.
 Require Import SpecHolding.
 Require Import SpecPushOff.
 Require Import WpRelease.
@@ -54,14 +54,13 @@ Section ProofRelease.
   Lemma wp_release_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
-      (cpuold : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_sconf_body γ Φ γl lka s R m cpuold n eb p C av.
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+    : wp_release_sconf_body γ Φ γl lka s R m n eb p C av.
   Proof.
     cbv beta delta [wp_release_sconf_body].
-    intros pcE lk0 a_cpu cpuv ret_tgt
-           Hlka Hmine Htp Hav.
+    intros pcE lk0 ret_tgt Hlka Htp Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hcpu Hown Hpay Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
     iPoseProof (rli_02 with "Htext") as "Hi02".
     iPoseProof (rli_04 with "Htext") as "Hi04".
@@ -179,14 +178,15 @@ Section ProofRelease.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_ne; [| vm_compute; discriminate].
       exact HcspR0. }
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka s R R3 (av - 4)%nat cpuold (dqc := DfracOwn 1)
-              ltac:(rewrite Ha0R3; exact Hlka)
-              ltac:(rewrite HtpR3; exact Hmine)
-              ltac:(lia)
-              with "Hcg Htext Hpc Hlock Htoken [Hcpu] [-]").
-    { iEval (rewrite Ha0R3). iExact "Hcpu". }
-    iIntros (mh) "Hcg Hpc %Hmh Htoken Hcpu".
-    iEval (rewrite Ha0R3) in "Hcpu".
+    assert (HlkaR3 : add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5))
+                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
+      by (rewrite Ha0R3; exact Hlka).
+    assert (HtpR3c : R3 !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
+      by (rewrite HtpR3; exact Htp).
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka s R R3 (av - 4)%nat
+              HlkaR3 HtpR3c ltac:(lia)
+              with "Hcg Htext Hpc Hlock Htoken [-]").
+    iIntros (mh) "Hcg Hpc %Hmh Htoken".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Htph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
     iEval (rewrite upd_eq) in "Hpc".
@@ -211,12 +211,17 @@ Section ProofRelease.
       rewrite /R0 upd_ne; [| vm_compute; discriminate].
       apply addv_zero_l. }
     iPoseProof (rli_12 with "Htext") as "Hi12".
-    iApply (wp_sd_zero_s_sconf γ Φ (mword_of_int (RL + 0x12)) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) mh (av - 4)%nat cpuold
-              with "Hcg Hpc Hi12 [Hcpu] [-]").
-    { iEval (rewrite Hs1mh). iExact "Hcpu". }
-    iIntros "Hcg Hpc Hcpu".
-    iEval (rewrite Hs1mh) in "Hcpu".
+    assert (Hacpu : add_vec (mh !!! Regidx (mword_of_int 9 : mword 5))
+                      (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka).
+    { rewrite Hs1mh. rewrite -Hlka.
+      replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite kv_addv_zero. reflexivity. }
+    iApply (wp_sd_zero_lkcpu_lockinv_s_sconf γ Φ γl lka s R (mword_of_int (RL + 0x12))
+              (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (av - 4)%nat
+              Hacpu
+              with "Hcg Hpc Hi12 Hlock Htoken [-]").
+    iIntros "Hcg Hpc Htoken".
     assert (Hpc16 : add_vec_int (mword_of_int (RL + 0x12) : mword 64) 4 = mword_of_int (RL + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)
@@ -363,7 +368,7 @@ Section ProofRelease.
     assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! E4 with "Hcg Hpc [%] Hcpu Hown").
+    iApply ("Hcont" $! E4 with "Hcg Hpc [%] Hown").
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).

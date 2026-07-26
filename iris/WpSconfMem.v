@@ -30,6 +30,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import WpLoad.
+Require Import MinstretInv.
 Require Import UserBits.
 Require Import WpGpr InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
@@ -148,9 +149,18 @@ Section WpSconfMem.
     - iDestruct "Hb" as "[Hb _]". rewrite pa_add_0. iExact "Hb".
   Qed.
 
-  Lemma wp_load_s_sconf_gen (width : Z) (c : bool) (γ : gname)
+  (* ------------------------------------------------------------------- *)
+  (* The width/RVC-generic load in ATOMIC-UPDATE form: the cell need NOT   *)
+  (* be owned by the caller across the step -- it is produced, and handed  *)
+  (* back, inside the engine callback's own mask.  That is what lets a     *)
+  (* lock leaf open [is_lock] around exactly this step (WpSconfLock.v);    *)
+  (* [wp_load_s_sconf_gen] below is the trivial instance in which the      *)
+  (* caller already owns the cell.                                         *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_load_s_sconf_au (width : Z) (c uns : bool) (γ : gname)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) {dqm : dfrac} :
+      (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
+      (Ψ : mword (8*width) -> iProp Σ) (Em : coPset) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (width | 4096) ->
     uint (to_bits 64 width) = width ->
@@ -160,42 +170,33 @@ Section WpSconfMem.
           s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
        exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
          = Some ((w, default_meta), s)) ->
-    extend_value false
-      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-        (autocast (T := mword) v)) = lv ->
+    (forall v : mword (8*width),
+       extend_value uns
+         (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
+           (autocast (T := mword) v)) = ext v) ->
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sie_cap_gpr γ m n -∗
     pc_is pc -∗
-    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, false, width)) -∗
-    wordw_pointsto width pa dqm v -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg lv]> m) n -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
+       wordw_pointsto width pa dqm v ∗
+       (wordw_pointsto width pa dqm v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
+    ( ∀ v : mword (8*width),
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (ext v)]> m) n -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
-      wordw_pointsto width pa dqm v -∗
+      Ψ v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdsp.
+    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hext pa Hrd Hrdsp.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
-    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    rewrite /wordw_pointsto.
-    iDestruct "Hbytes" as "(%Hpalign & Hbytes)".
-    assert (Halign : is_aligned_vaddr (Virtaddr pa) width = true) by exact Hpalign.
-    (* the word's OWN base claim + canonicality (peek byte 0, refold to keep) *)
-    iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
-    { rewrite lookup_seq_lt; [reflexivity | lia]. }
-    iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
-    iDestruct ("Href0" with "Hp0") as "Hb0".
-    iEval (rewrite -(pa_add_0 pa)) in "Hb0".
-    iDestruct ("Hbclose" with "Hb0") as "Hbytes".
-    pose proof (off_bound_div pa width Hw0 Hwdvd Halign) as Hoff.
-    rewrite (uint_unsigned_n _) in Hoff.
+    iIntros "Hcg Hpc Hinstr HAU Hcont".
     iApply (wp_instr_s_sconf γ m n Φ pc c
-              (LOAD (imm, Regidx rs1, Regidx rd, false, width))
+              (LOAD (imm, Regidx rs1, Regidx rd, uns, width))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc Hsi".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
@@ -208,6 +209,21 @@ Section WpSconfMem.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+    (* open the caller's atomic update: the cell, and how to give it back *)
+    iMod "HAU" as (v) "[Hbw Hcl]".
+    iEval (rewrite /wordw_pointsto) in "Hbw".
+    iDestruct "Hbw" as "(%Hpalign & Hbytes)".
+    assert (Halign : is_aligned_vaddr (Virtaddr pa) width = true) by exact Hpalign.
+    (* the word's OWN base claim + canonicality (peek byte 0, refold to keep) *)
+    iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct ("Href0" with "Hp0") as "Hb0".
+    iEval (rewrite -(pa_add_0 pa)) in "Hb0".
+    iDestruct ("Hbclose" with "Hb0") as "Hbytes".
+    pose proof (off_bound_div pa width Hw0 Hwdvd Halign) as Hoff.
+    rewrite (uint_unsigned_n _) in Hoff.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid    with "Hreg Hmenv") as %Lmenv.
@@ -297,13 +313,13 @@ Section WpSconfMem.
     { replace ((bits_of_virtaddr (Virtaddr pa))) with pa
         by (cbn [bits_of_virtaddr]; reflexivity).
       exact Htr0. }
-    assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, false, width))) s_pc
+    assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, uns, width))) s_pc
                     = Some (RETIRE_SUCCESS,
                             set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd)))
-                              (regval_into_reg lv))).
-    { rewrite <- Hlv.
+                              (regval_into_reg (ext v)))).
+    { rewrite <- (Hext v).
       pose proof (ram_pmp_match_w (pa_of ppn pa) (vec_access_dec (register_lookup pmpaddr_n s_tr.(sregs)) 0) width Hw0 Huintw Hlo Hfit Hcov) as Hrange_ld.
-      apply (exec_execute_LOAD_w_gpr_S_walk_pt width Hw8 Hread_plain false rs1 rd imm v region_ld s_pc s_tr (pa_of ppn pa) Hrd
+      apply (exec_execute_LOAD_w_gpr_S_walk_pt width Hw8 Hread_plain uns rs1 rd imm v region_ld s_pc s_tr (pa_of ppn pa) Hrd
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign)
                ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mulw; exact Htr_pc)
@@ -317,13 +333,17 @@ Section WpSconfMem.
                Hbytesf_tr). }
     iDestruct (big_sepM_insert_acc _ _ _ _ Hmd with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg lv)
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ext v))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" $! (regval_into_reg lv) with "[Hrdc]") as "Hfmap".
+    iDestruct ("Hfins" $! (regval_into_reg (ext v)) with "[Hrdc]") as "Hfmap".
     { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
     iEval (rewrite -rf_to_gmap_upd) in "Hfmap".
+    (* hand the (unchanged) cell back and collect the caller's payload *)
+    iAssert (wordw_pointsto width pa dqm v)%I with "[Hbytes]" as "Hbw".
+    { rewrite /wordw_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign. }
+    iMod ("Hcl" with "Hbw") as "HPsi".
     iModIntro.
-    iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg lv)).
+    iExists (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ext v))).
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hload. }
     iSplitL "Hreg Hmem Hdev".
@@ -332,14 +352,12 @@ Section WpSconfMem.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg lv)).(sregs)
+             (set_reg s_tr (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ext v))).(sregs)
              = add_vec_int pc (if c then 2 else 4)).
     { unfold set_reg at 1; cbn [sregs]. tmig.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (wordw_pointsto width pa dqm v)%I with "[Hbytes]" as "Hbw".
-    { rewrite /wordw_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign. }
     iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf".
@@ -349,15 +367,60 @@ Section WpSconfMem.
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg lv]> m !!! Regidx csp_rs1)
+                  = <[Regidx rd := regval_into_reg (ext v)]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; exact Hspne).
     iDestruct (sie_cap_retarget γ m
-                 (<[Regidx rd := regval_into_reg lv]> m) n Hsp with "Hcap") as "Hcap".
-    iAssert (gpr_file (<[Regidx rd := regval_into_reg lv]> m)) with "[Hfmap]" as "Hfile".
+                 (<[Regidx rd := regval_into_reg (ext v)]> m) n Hsp with "Hcap") as "Hcap".
+    iAssert (gpr_file (<[Regidx rd := regval_into_reg (ext v)]> m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; apply rf_to_gmap_dom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] Hbw").
+    iApply ("Hcont" $! v with "Hcg [$Hpc' $Hnpc] HPsi").
   Qed.
+
+  (* the non-atomic instance: the caller owns the cell throughout. *)
+  Lemma wp_load_s_sconf_gen (width : Z) (c : bool) (γ : gname)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) {dqm : dfrac} :
+    0 < width -> width <= 8 ->
+    (width | 4096) ->
+    uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (w : mword (8*width)) s,
+       dev_addr addr = false ->
+       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
+          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
+         = Some ((w, default_meta), s)) ->
+    extend_value false
+      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
+        (autocast (T := mword) v)) = lv ->
+    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, false, width)) -∗
+    wordw_pointsto width pa dqm v -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg lv]> m) n -∗
+      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+      wordw_pointsto width pa dqm v -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdsp.
+    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iApply (wp_load_s_sconf_au width c false γ Φ pc rd rs1 imm m n
+              (fun w => extend_value false
+                 (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
+                    (autocast (T := mword) w)))
+              (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN)
+              Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdsp
+              with "Hcg Hpc Hinstr [Hbytes]").
+    { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
+    iIntros (w) "Hcg Hpc [-> Hbw]".
+    iEval (rewrite Hlv) in "Hcg".
+    iApply ("Hcont" with "Hcg Hpc Hbw").
+  Qed.
+
 
   Local Lemma run_read_ram_plain_1 (addr : mword 64) (w : bv 8) s :
     dev_addr addr = false ->
@@ -733,9 +796,15 @@ Section WpSconfMem.
   (* c.sd rs2, imm(rs1) -- width-8 RVC store.  No register write, so no   *)
   (* rd premises and no [sie_cap] retarget.                               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_store_s_sconf_gen (width : Z) (c : bool) (γ : gname)
+  (* ------------------------------------------------------------------- *)
+  (* The width/RVC-generic store in ATOMIC-UPDATE form (twin of           *)
+  (* [wp_load_s_sconf_au]): the caller produces the cell inside the        *)
+  (* engine callback's mask and takes the WRITTEN cell back there, so a    *)
+  (* lock leaf can open [is_lock] around exactly this step.                *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_store_s_sconf_au (width : Z) (c : bool) (γ : gname)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) (vold sv : mword (8*width)) :
+      (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) :
     0 < width -> width <= 8 -> (width | 4096) -> uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (data : mword (8*width)) s,
        dev_addr addr = false ->
@@ -750,10 +819,12 @@ Section WpSconfMem.
     sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
-    wordw_pointsto width pa (DfracOwn 1) vold -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword (8*width),
+       wordw_pointsto width pa (DfracOwn 1) vold ∗
+       (wordw_pointsto width pa (DfracOwn 1) sv ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     ( sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
-      wordw_pointsto width pa (DfracOwn 1) sv -∗
+      Ψ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -761,20 +832,7 @@ Section WpSconfMem.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
-    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    rewrite /wordw_pointsto.
-    iDestruct "Hbytes" as "(%Hpalign & Hbytes)".
-    assert (Halign : is_aligned_vaddr (Virtaddr pa) width = true) by exact Hpalign.
-    (* the word's OWN base claim + canonicality (peek byte 0, refold to keep) *)
-    iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
-    { rewrite lookup_seq_lt; [reflexivity | lia]. }
-    iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
-    iDestruct ("Href0" with "Hp0") as "Hb0".
-    iEval (rewrite -(pa_add_0 pa)) in "Hb0".
-    iDestruct ("Hbclose" with "Hb0") as "Hbytes".
-    pose proof (off_bound_div pa width Hw0 Hwdvd Halign) as Hoff.
-    rewrite (uint_unsigned_n _) in Hoff.
+    iIntros "Hcg Hpc Hinstr HAU Hcont".
     iApply (wp_instr_s_sconf γ m n Φ pc c
               (STORE (imm, Regidx rs2, Regidx rs1, width))
               with "Hcg Hpc Hinstr").
@@ -789,6 +847,21 @@ Section WpSconfMem.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+    (* open the caller's atomic update: the cell, and how to give it back *)
+    iMod "HAU" as (vold) "[Hbw Hcl]".
+    iEval (rewrite /wordw_pointsto) in "Hbw".
+    iDestruct "Hbw" as "(%Hpalign & Hbytes)".
+    assert (Halign : is_aligned_vaddr (Virtaddr pa) width = true) by exact Hpalign.
+    (* the word's OWN base claim + canonicality (peek byte 0, refold to keep) *)
+    iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct ("Href0" with "Hp0") as "Hb0".
+    iEval (rewrite -(pa_add_0 pa)) in "Hb0".
+    iDestruct ("Hbclose" with "Hb0") as "Hbytes".
+    pose proof (off_bound_div pa width Hw0 Hwdvd Halign) as Hoff.
+    rewrite (uint_unsigned_n _) in Hoff.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid    with "Hreg Hmenv") as %Lmenv.
@@ -902,6 +975,8 @@ Section WpSconfMem.
     iMod (wordw_pointsto_write_c width s_tr.(mem) pa ppn vold sv Hw0 Hcan Hoff with "Hk Hmem [Hbytes]")
       as "[Hmem Hbytes]".
     { rewrite /wordw_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign. }
+    (* hand the WRITTEN cell back and collect the caller's payload *)
+    iMod ("Hcl" with "Hbytes") as "HPsi".
     iModIntro.
     iExists (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn pa) (Z.to_N width) sv) s_tr.(mdev)).
     iSplitR.
@@ -928,7 +1003,43 @@ Section WpSconfMem.
     iAssert (gpr_file m) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] Hbytes").
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] HPsi").
+  Qed.
+
+
+  (* the non-atomic instance: the caller owns the cell throughout. *)
+  Lemma wp_store_s_sconf_gen (width : Z) (c : bool) (γ : gname)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (n : nat) (vold sv : mword (8*width)) :
+    0 < width -> width <= 8 -> (width | 4096) -> uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (data : mword (8*width)) s,
+       dev_addr addr = false ->
+       exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
+         = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N width) data) s.(mdev))) ->
+    autocast (T := mword)
+      (subrange_vec_dec
+         (autocast (T := mword)
+            (subrange_vec_dec (m !!! Regidx rs2) (width*8-1) 0) : mword (8*width))
+         (8*(0+1)*width-1) (8*0*width)) = sv ->
+    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗
+    instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
+    wordw_pointsto width pa (DfracOwn 1) vold -∗
+    ( sie_cap_gpr γ m n -∗
+      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+      wordw_pointsto width pa (DfracOwn 1) sv -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv pa.
+    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iApply (wp_store_s_sconf_au width c γ Φ pc rs2 rs1 imm m n sv
+              (wordw_pointsto width pa (DfracOwn 1) sv) (⊤ ∖ ↑minstretN)
+              Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv
+              with "Hcg Hpc Hinstr [Hbytes]").
+    { iModIntro. iExists vold. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
+    iIntros "Hcg Hpc Hbw". iApply ("Hcont" with "Hcg Hpc Hbw").
   Qed.
 
   Lemma store_ext_8 (r : mword 64) :

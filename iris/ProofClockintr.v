@@ -291,7 +291,6 @@ Section ProofClockintr.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (ra0 := (m !!! Regidx ra_idx : mword 64)).
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
-    rewrite /tickslock_cpu.
     iIntros "Hcg Hcnt #Htext Hpc #Htcap Htk Hcont".
     (* ===================== PROLOGUE (16-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -404,7 +403,7 @@ Section ProofClockintr.
     (* ===================== the cpuid() == 0 case split ===================== *)
     destruct (tick_hart) as [|] eqn:Hth.
     - (* ---------------- THIS HART KEEPS TIME: the tick block ------------- *)
-      iDestruct "Htk" as "[%Hno | (#Hlk & Hcpuf & #Hpi & Hwk)]".
+      iDestruct "Htk" as "[%Hno | (#Hlk & #Hpi & #Hpanic)]".
       { rewrite Hth in Hno. discriminate. }
       iPoseProof "Hpi" as "Hpi2".
       iDestruct "Hpi2" as "[%Hlen _]".
@@ -482,19 +481,16 @@ Section ProofClockintr.
         rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Hmosp. }
       (* ===================== acquire(&tickslock) ===================== *)
       iApply (Acquire.wp_acquire_sconf γ Φ γl "time"%string ticks_res B2
-                (zero_reg : mword 64) n eb p C (av - 2)%nat
-                ltac:(rewrite HB2tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
+                n eb p C (av - 2)%nat
                 HB2tp
                 ltac:(lia)
                 ltac:(lia)
-                with "Hcg Hcnt Htext Hpc [Hlkl] [Hcpuf] [-]").
+                with "Hcg Hcnt Htext Hpc [Hlkl] Hpanic [-]").
       { iEval (rewrite HB2a0). iExact "Hlkl". }
-      { iEval (rewrite HB2a0). iExact "Hcpuf". }
-      iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcpuf Hcnt Hpay".
+      iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
       assert (Hpc34 : ret_pc (B2 !!! Regidx ra_idx) = mword_of_int (CI + 0x34))
         by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc34) in "Hpc".
-      iEval (rewrite HB2a0 HB2tp) in "Hcpuf".
       iDestruct "HR" as (t) "Hticks".
       (* ---- +0x34/+0x38: a4 := &ticks ---- *)
       iPoseProof (cii_34 with "Htext") as "Hi34".
@@ -637,8 +633,8 @@ Section ProofClockintr.
                 ltac:(rewrite HD5tp; reflexivity)
                 ltac:(rewrite HD5tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
                 ltac:(lia)
-                with "Hcg Hcnt Htext Hpc Hwk Hpi [-]").
-      iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc Hwk".
+                with "Hcg Hcnt Htext Hpc Hpanic Hpi [-]").
+      iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
       destruct HcsW as [HcsW _].
       assert (Hpc48 : ret_pc (D5 !!! Regidx ra_idx) = mword_of_int (CI + 0x48))
         by (rewrite HD5ra; apply bv_eq; vm_compute; reflexivity).
@@ -708,21 +704,18 @@ Section ProofClockintr.
       (* ===================== release(&tickslock) ===================== *)
       iDestruct (ticks_res_intro _ with "Hticks") as "HR".
       iApply (Release.wp_release_sconf γ Φ γl a_tickslock "time"%string ticks_res E2
-                (mycpu_ret cid_word) n eb p C (av - 2)%nat
+                n eb p C (av - 2)%nat
                 ltac:(rewrite HE2a0; apply ci_add_vec_0)
-                ltac:(rewrite HE2tp; apply ci_eq_vec_refl)
                 HE2tp
                 ltac:(lia)
-                with "Hcg Htext Hpc [Hlkl] [Htok] [HR] [Hcpuf] Hcnt Hpay [-]").
+                with "Hcg Htext Hpc [Hlkl] [Htok] [HR] Hcnt Hpay [-]").
       { iExact "Hlkl". }
       { iExact "Htok". }
       { iExact "HR". }
-      { iEval (rewrite HE2a0). iExact "Hcpuf". }
-      iIntros (MR) "Hcg Hpc %HcsR Hcpuf Hcnt".
+      iIntros (MR) "Hcg Hpc %HcsR Hcnt".
       assert (Hpc54 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (CI + 0x54))
         by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc54) in "Hpc".
-      iEval (rewrite HE2a0) in "Hcpuf".
       (* ---- +0x54: c.j back to the timer tail ---- *)
       assert (HMRsp : MR !!! Regidx csp_rs1 = pa_stk sp0 2).
       { rewrite (callee_saved_lookup HcsR csp_rs1 ltac:(vm_compute; reflexivity)). exact HE2sp. }
@@ -785,7 +778,7 @@ Section ProofClockintr.
         split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
         apply Hthr; vm_compute; first [reflexivity | discriminate]. }
       { iExact "Hpc". }
-      iRight. iFrame "Hlk Hpi Hwk". iExact "Hcpuf".
+      iRight. iFrame "Hlk Hpi Hpanic".
     - (* ---------------- ANOTHER HART: straight to the timer tail -------- *)
       assert (Hnzero : eq_vec (mo !!! Regidx a0_idx) (zero_reg : mword 64) = false)
         by (rewrite Hmoa0; exact Hth).

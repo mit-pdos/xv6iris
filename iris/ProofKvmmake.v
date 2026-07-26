@@ -906,9 +906,9 @@ Section KvmmakeBody.
 
   Hypothesis wp_kalloc :
     forall (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname)
-      (fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat)
+      (fl : mword 64) (m : regfile) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_kalloc_sconf_body γ Φ γl γk fl m cpuold on n eb p C K.
+      wp_kalloc_sconf_body γ Φ γl γk fl m on n eb p C K.
   Hypothesis wp_memset :
     forall (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8),
@@ -1071,20 +1071,19 @@ Section KvmmakeBody.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KMK + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KMK + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095638 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk qcpu) "(%Hqne & %H0ne & #Hlock & Havail & Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J /W2. repeat (rewrite upd_ne; [| reg_neq]). exact HspW1. }
     iApply (wp_kalloc γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J qcpu (Some nb) 0%nat eb p C (K - 4)%nat
+              J (Some nb) 0%nat eb p C (K - 4)%nat
               Hc14
-              ltac:(rewrite HJ4; exact Hqne)
               ltac:(rewrite HJ4; exact Hcid)
               ltac:(reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu [-]").
-    iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost Hcpu2".
+    iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KMK + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0e) in "Hpc".
@@ -1097,9 +1096,8 @@ Section KvmmakeBody.
     { rewrite avail_sub_Some. reflexivity. }
     iEval (rewrite Hav1) in "Havail2".
     iAssert (kalloc_env γa (avail_sub (Some nb) 1) (mm !!! Regidx (mword_of_int 4)))
-      with "[Hcpu2 Havail2]" as "Henv".
-    { iExists γk, (zero_reg : mword 64). iSplitR. { iPureIntro; exact H0ne. }
-      iSplitR. { iPureIntro; exact H0ne. } iFrame "Hlock". iFrame "Havail2". iExact "Hcpu2". }
+      with "[Havail2]" as "Henv".
+    { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
     set (root0 := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     (* recover callee-saved through kalloc *)
     assert (Hmr0sp : mr0 !!! Regidx csp_rs1 = spr).

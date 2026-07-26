@@ -57,6 +57,7 @@ Require Import WpLock.
 Require Import TicksInv.
 Require Import TimerCap.
 Require Import SchedCtx.
+Require Import SpecPanic.
 Require Import WpWakeup.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -76,9 +77,8 @@ Section SpecClockintr.
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
     ∨ ( is_tickslock γl ∗
-        tickslock_cpu ↦₈ (zero_reg : mword 64) ∗
         procs_inv γ Φ γs ∗
-        wk_lockcells γs ) )%I.
+        panic_wp ) )%I.
 
 End SpecClockintr.
 

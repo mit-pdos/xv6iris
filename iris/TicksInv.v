@@ -4,7 +4,6 @@
 
      a_ticks        -- &ticks       (the 4-byte global tick counter)
      a_tickslock    -- &tickslock   (the spinlock guarding it)
-     tickslock_cpu  -- &tickslock->cpu, in acquire/release's [a_cpu] form
      ticks_res      -- the resource the lock protects
      is_tickslock   -- the lock itself (persistent)
 
@@ -32,13 +31,10 @@ Local Open Scope Z_scope.
 Section TicksInv.
   Context `{!riscvGS Σ, !lockG Σ}.
 
-  (* ---- geometry.  [tickslock_cpu] is spelled in acquire/release's [a_cpu]
-     form (lk + sign_extend' 64 16) so the cell unifies with their specs
-     without rewriting. *)
+  (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
+     belong to [lock_inv] (WpLock.v); nothing here names the cpu word. *)
   Definition a_ticks : mword 64 := mword_of_int KernelSyms.ticks.
   Definition a_tickslock : mword 64 := mword_of_int KernelSyms.tickslock.
-  Definition tickslock_cpu : mword 64 :=
-    add_vec a_tickslock (sign_extend' 64 (mword_of_int 16 : mword 12)).
 
   (* the protected resource: the counter cell, contents existential. *)
   Definition ticks_res : iProp Σ := (∃ t : mword 32, a_ticks ↦₄ t)%I.
@@ -62,17 +58,13 @@ Section TicksInv.
   Lemma new_tickslock E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_cpu a_tickslock ↦₈ (zero_reg : mword 64) -∗
     a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
   Proof.
-    iIntros "#Hnm Hlkw Hticks".
-    iMod (own_alloc (Excl () : exclR unitO)) as (γl) "Htok"; [done|].
-    iMod (inv_alloc lockN E (lock_inv γl a_tickslock ticks_res)
-            with "[Hlkw Htok Hticks]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0 : mword 32). rewrite /lock_word.
-      iFrame "Hlkw". iLeft. iSplit; [done|]. iFrame "Htok".
-      iApply (ticks_res_intro with "Hticks"). }
-    iModIntro. iExists γl.
-    iApply (is_lock_intro with "Hnm Hinv").
+    iIntros "#Hnm Hlkw Hcpu Hticks".
+    iApply (newlock E a_tickslock "time"%string ticks_res
+              with "Hnm Hlkw Hcpu [Hticks]").
+    iApply (ticks_res_intro with "Hticks").
   Qed.
 
 End TicksInv.

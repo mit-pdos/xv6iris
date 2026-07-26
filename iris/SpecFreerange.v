@@ -18,6 +18,7 @@ Require Import KernelText.
 Require Import WpMycpu WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
+Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -47,12 +48,9 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let s1entry := add_vec (and_vec (add_vec pa_start (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (20 <= K)%nat ->
   ncnt = 0%nat ->
-  eq_vec (zero_reg : mword 64) cpuv = false ->
   (* the tp register holds THIS cpu's id (kfree cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   lk = mword_of_int KernelSyms.kmem ->
@@ -63,14 +61,13 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
-  a_cpu ↦₈ (zero_reg : mword 64) -∗
+  panic_wp -∗
   kalloc_avail γk (Some 0%nat) -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
     cpu_own γ ncnt eb pcur C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    a_cpu ↦₈ (zero_reg : mword 64) -∗
     kalloc_avail γk (Some (length ps)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

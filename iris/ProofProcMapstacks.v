@@ -863,7 +863,7 @@ Section ProofPMS.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (PM + 0x52) : mword 64) 4)]> Mk).
     assert (Htgtk : add_vec (mword_of_int (PM + 0x52) : mword 64) (sign_extend' 64 (mword_of_int 2093926 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk qcpu) "(%Hqne & %H0ne & #Hlock & Havail & Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Htp. }
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
@@ -871,14 +871,13 @@ Section ProofPMS.
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (PM + 0x52) : mword 64) 4)
       by (rewrite /J upd_eq; reflexivity).
     iApply (K.wp_kalloc_sconf γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J qcpu (avail_sub (Some nb) (i + gk)) lvl eb p C (K - 10)%nat
+              J (avail_sub (Some nb) (i + gk)) lvl eb p C (K - 10)%nat
               ltac:(lia)
-              ltac:(rewrite HJ4; exact Hqne)
               ltac:(rewrite HJ4; exact Hcid)
               ltac:(reflexivity)
               ltac:(rewrite Hlvl; vm_compute; reflexivity)
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu [-]").
-    iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost Hcpu2".
+    iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret56 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (PM + 0x56)).
     { rewrite HJ1. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret56) in "Hpc".
@@ -894,9 +893,8 @@ Section ProofPMS.
     iEval (rewrite Hav1) in "Havail2".
     (* rebuild kalloc_env at avail_sub (Some nb) (i+gk+1) *)
     iAssert (kalloc_env γa (avail_sub (Some nb) (i + gk + 1)) (mm !!! Regidx (mword_of_int 4)))
-      with "[Hcpu2 Havail2]" as "Henv".
-    { iExists γk, (zero_reg : mword 64). iSplitR. { iPureIntro; exact H0ne. }
-      iSplitR. { iPureIntro; exact H0ne. } iFrame "Hlock". iFrame "Havail2". iExact "Hcpu2". }
+      with "[Havail2]" as "Henv".
+    { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
     (* a0 = page, page_valid, nonzero *)
     set (page := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     assert (Hpanz : page <> mword_of_int 0).

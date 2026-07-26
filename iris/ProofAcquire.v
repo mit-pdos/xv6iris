@@ -11,7 +11,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes WpMmodeLeafBase.
+Require Import InstrBytes WpMmodeLeafBase WpAuipc.
 Require Import RegFile.
 From Stdlib Require Import FunctionalExtensionality.
 Require Import SmodeCore.
@@ -19,8 +19,8 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock WpAmo KernelRvcDecode.
-Require Import SpecMycpu SpecHolding.
+Require Import WpLock WpMycpu ProcGeom WpAmo KernelRvcDecode.
+Require Import SpecMycpu SpecHolding SpecPanic.
 Require Import SpecPushOff.
 Require Import WpAcquireTop.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -49,7 +49,7 @@ Section ProofAcquire.
     is_lock γl lk s R -∗
     ( sie_cap_gpr γ (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n -∗
       pc_is (mword_of_int (AQ + 0x24)) -∗
-      locked γl -∗ R -∗
+      locked_pre γl cpu_id -∗ R -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -118,7 +118,7 @@ Section ProofAcquire.
     iEval (rewrite Hroundw) in "Hcg".
     assert (Hpp22 : add_vec_int (mword_of_int (AQ + 0x20) : mword 64) 2 = mword_of_int (AQ + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
-    iDestruct "Hpay" as "[(%Hw0 & Htok & HRes) | %Hwnz]".
+    iDestruct "Hpay" as "[(%Hw0 & Htokp & HRes) | %Hwnz]".
     - (* ---- w = 0: ACQUIRED -- c.bnez falls through ---- *)
       subst w.
       iApply (wp_cbnez_fall_s_sconf γ Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
@@ -129,7 +129,7 @@ Section ProofAcquire.
       iIntros "Hcg Hpc".
       assert (Hpp24 : add_vec_int (mword_of_int (AQ + 0x22) : mword 64) 2 = mword_of_int (AQ + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp24) in "Hpc".
-      iApply ("Hcont" with "Hcg Hpc Htok HRes").
+      iApply ("Hcont" with "Hcg Hpc Htokp HRes").
     - (* ---- w <> 0: c.bnez TAKEN back; Löb ---- *)
       iApply (wp_cbnez_taken_s_sconf γ Φ (mword_of_int (AQ + 0x22)) (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
                 (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 w)]> M0) n
@@ -147,13 +147,13 @@ Section ProofAcquire.
   Lemma wp_acquire_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
-      (cpuold : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_acquire_sconf_body γ Φ γl s R m cpuold n eb p C av.
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+    : wp_acquire_sconf_body γ Φ γl s R m n eb p C av.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].
-    intros pcE lk0 a_cpu cpuv ret_tgt Hnotmine Htp Hpos Hav.
+    intros pcE lk0 ret_tgt Htp Hpos Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hown #Htext Hpc #Hlock Hcpu Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
     iPoseProof (aqi_02 with "Htext") as "Hi02".
     iPoseProof (aqi_04 with "Htext") as "Hi04".
@@ -325,14 +325,12 @@ Section ProofAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (Holding.wp_holding_lockinv_s_sconf γ Φ γl lk0 s R B2 (av - 4)%nat cpuold (dqc := DfracOwn 1)
-              Hlkb
-              ltac:(rewrite HtpB2; exact Hnotmine)
-              ltac:(lia)
-              with "Hcg Htext Hpc Hlock [Hcpu] [-]").
-    { iEval (rewrite HB2a0 !aq_addv_zero_l). iExact "Hcpu". }
-    iIntros (mh) "Hcg Hpc %Hmh Hcpu".
-    iEval (rewrite HB2a0 !aq_addv_zero_l) in "Hcpu".
+    assert (HtpB2c : B2 !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
+      by (rewrite HtpB2; exact Htp).
+    iApply (Holding.wp_holding_lockinv_s_sconf γ Φ γl lk0 s R B2 (av - 4)%nat
+              Hlkb HtpB2c ltac:(lia)
+              with "Hcg Htext Hpc Hlock [-]").
+    iIntros (mh) "Hcg Hpc %Hmh".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Htph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
     iEval (rewrite upd_eq) in "Hpc".
@@ -352,11 +350,61 @@ Section ProofAcquire.
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> mh) with B3.
     assert (Hpc18 : add_vec_int (mword_of_int (AQ + 0x16) : mword 64) 2 = mword_of_int (AQ + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
-    (* ---- 0x18: c.bnez a0 falls (a0 = 0) ---- *)
+    (* ---- 0x18: c.bnez a0 -- holding()'s answer decides which arm runs ---- *)
     iPoseProof (aqi_18 with "Htext") as "Hi18".
+    assert (HB3a0v : B3 !!! Regidx (mword_of_int 10 : mword 5)
+                     = mh !!! Regidx (mword_of_int 10 : mword 5))
+      by (rewrite /B3 upd_ne; [reflexivity | vm_compute; discriminate]).
+    assert (Htgt34 : add_vec (mword_of_int (AQ + 0x18) : mword 64)
+              (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0"))))
+            = mword_of_int (AQ + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
+    destruct Ha0h as [Ha0h | Ha0h].
+    2:{ (* ===== holding() said 1: this hart already holds it -- panic() ===== *)
+      assert (Ha0B3t : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = true)
+        by (rewrite HB3a0v Ha0h; vm_compute; reflexivity).
+      iApply (wp_cbnez_taken_s_sconf γ Φ (mword_of_int (AQ + 0x18)) (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
+                B3 (av - 4)%nat
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                Ha0B3t
+                ltac:(rewrite Htgt34; vm_compute; reflexivity)
+                with "Hcg Hpc Hi18 [-]").
+      iNext. iIntros "Hcg Hpc".
+      iEval (rewrite Htgt34) in "Hpc".
+      iPoseProof (aqi_34 with "Htext") as "Hi34".
+      iPoseProof (aqi_38 with "Htext") as "Hi38".
+      iPoseProof (aqi_3c with "Htext") as "Hi3c".
+      (* +0x34 auipc a0 / +0x38 addi a0 : the message pointer *)
+      iApply (wp_auipc_s_sconf γ Φ (mword_of_int (AQ + 0x34)) (mword_of_int 10 : mword 5) (mword_of_int 6 : mword 20)
+                B3 (av - 4)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hcg Hpc Hi34 [-]").
+      iIntros "Hcg Hpc".
+      set (P1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
+          (add_vec (mword_of_int (AQ + 0x34) : mword 64) (auipc_off (mword_of_int 6 : mword 20)))]> B3).
+      assert (Hpp38 : add_vec_int (mword_of_int (AQ + 0x34) : mword 64) 4 = mword_of_int (AQ + 0x38))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp38) in "Hpc".
+      iApply (wp_addi4_s_sconf γ Φ (mword_of_int (AQ + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
+                (mword_of_int 0x40c : mword 12) P1 (av - 4)%nat
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                with "Hcg Hpc Hi38 [-]").
+      iIntros "Hcg Hpc".
+      set (P2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
+          (add_vec (P1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x40c : mword 12)))]> P1).
+      assert (Hpp3c : add_vec_int (mword_of_int (AQ + 0x38) : mword 64) 4 = mword_of_int (AQ + 0x3c))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp3c) in "Hpc".
+      (* +0x3c jal panic : never returns *)
+      iApply (wp_jal_s_sconf γ Φ (mword_of_int (AQ + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 2096098 : mword 21)
+                P2 (av - 4)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi3c [-]").
+      iIntros "Hcg Hpc".
+      assert (Hpcpn : add_vec (mword_of_int (AQ + 0x3c) : mword 64) (sign_extend' 64 (mword_of_int 2096098 : mword 21))
+                      = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpcpn) in "Hpc".
+      iApply ("Hpanic" $! Φ γ _ _ with "Htext Hpc Hcg"). }
+    (* ===== holding() said 0: the c.bnez falls through to the loop ===== *)
     assert (Ha0B3 : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = false).
-    { rewrite /B3 upd_ne; [| vm_compute; discriminate].
-      rewrite Ha0h. vm_compute. reflexivity. }
+    { rewrite HB3a0v Ha0h. vm_compute. reflexivity. }
     iApply (wp_cbnez_fall_s_sconf γ Φ (mword_of_int (AQ + 0x18)) (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               B3 (av - 4)%nat
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Ha0B3
@@ -381,7 +429,7 @@ Section ProofAcquire.
               HB3a4 HB3s1
               with "[Hcg] Htext Hpc Hlock [-]").
     { rewrite (Hupd_id B3 (Regidx (mword_of_int 15 : mword 5))). iExact "Hcg". }
-    iIntros "Hcg Hpc Htok HRes".
+    iIntros "Hcg Hpc Htokp HRes".
     set (B8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> B3).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> B3) with B8.
     (* ---- 0x24: jal ra,mycpu ---- *)
@@ -402,8 +450,8 @@ Section ProofAcquire.
     { rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Htph. exact HtpB2. }
-    assert (Ha0C : Cm !!! Regidx (mword_of_int 10 : mword 5) = cpuv)
-      by (rewrite /Cm Hmo_a0 HtpB8; reflexivity).
+    assert (Ha0C : Cm !!! Regidx (mword_of_int 10 : mword 5) = mycpu_ret cid_word)
+      by (rewrite /Cm Hmo_a0 HtpB8 Htp; reflexivity).
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc28 : ret_pc (add_vec_int (mword_of_int (AQ + 0x24) : mword 64) 4)
                     = (mword_of_int (AQ + 0x28) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -412,15 +460,15 @@ Section ProofAcquire.
     assert (Hs1C : Cm !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk0).
     { rewrite /Cm Hs1o /B8 upd_ne; [| vm_compute; discriminate].
       exact HB3s1. }
-    assert (Hpacpu : add_vec (Cm !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = a_cpu).
+    assert (Hpacpu : add_vec (Cm !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lk0).
     { rewrite Hs1C aq_addv_zero_l. reflexivity. }
     iPoseProof (aqi_28 with "Htext") as "Hi28".
-    iApply (wp_csd_s_sconf γ Φ (mword_of_int (AQ + 0x28)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) Cm (av - 4)%nat cpuold
-              with "Hcg Hpc Hi28 [Hcpu] [-]").
-    { iEval (rewrite Hpacpu). iExact "Hcpu". }
-    iIntros "Hcg Hpc Hcpu".
-    iEval (rewrite Hpacpu Ha0C) in "Hcpu".
+    iApply (wp_csd_lkcpu_lockinv_s_sconf γ Φ γl lk0 s R (mword_of_int (AQ + 0x28))
+              (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+              (mword_of_int 16 : mword 12) Cm (av - 4)%nat
+              Hpacpu Ha0C
+              with "Hcg Hpc Hi28 Hlock Htokp [-]").
+    iIntros "Hcg Hpc Htok".
     assert (Hpc2a : add_vec_int (mword_of_int (AQ + 0x28) : mword 64) 2 = mword_of_int (AQ + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)
@@ -521,7 +569,7 @@ Section ProofAcquire.
     assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! ms E4 with "[%] Hcg Hpc [%] Htok HRes Hcpu Hown Hpay").
+    iApply ("Hcont" $! ms E4 with "[%] Hcg Hpc [%] Htok HRes Hown Hpay").
     { exact Hmsf. }
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.

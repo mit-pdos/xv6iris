@@ -89,11 +89,6 @@ Definition p_state (pa : mword 64) : mword 64 := add_vec pa (mword_of_int state_
 Definition p_chan (pa : mword 64) : mword 64 := add_vec pa (mword_of_int chan_off).
 Definition p_context (pa : mword 64) : mword 64 := add_vec pa (mword_of_int context_off).
 
-(* the lock's cpu-pointer word (spinlock field at +16), in the exact address
-   form acquire/release/holding use ([a_cpu] with lk0 = pa, lock at +0). *)
-Definition p_lkcpu (pa : mword 64) : mword 64 :=
-  add_vec pa (sign_extend' 64 (mword_of_int 16 : mword 12)).
-
 (* the pid word (int at +48), in the exact address form of the [lw rd,48(a0)]
    reads after a myproc() call (acquiresleep/holdingsleep). *)
 Definition p_pid (pa : mword 64) : mword 64 :=
@@ -255,21 +250,61 @@ Qed.
 (* The hart id: tp holds the ambient CpuId.                               *)
 (* ===================================================================== *)
 
-(* the ambient hart id as a tp-register value.  mycpu()'s return for this
-   hart is [mycpu_ret cid_word] = &cpus[cpu_id]. *)
-Definition cid_word `{CID : CpuId} : mword 64 :=
-  mword_of_int (Z.of_nat (fin_to_nat cpu_id)).
+(* ANY hart's id as a tp-register value, and its [struct cpu] pointer --
+   what mycpu() returns on that hart.  [cpus_ptr] is the value a lock's
+   [cpu] field holds while hart [i] holds the lock (WpLock.v), so the
+   lock-holder token is keyed by [i] and the field's value is [cpus_ptr i];
+   the two injectivity/nonzeroness facts below are what let a NON-holder
+   conclude that the field does not name it. *)
+Definition cid_word_of (i : CPU) : mword 64 :=
+  mword_of_int (Z.of_nat (fin_to_nat i)).
+Definition cpus_ptr (i : CPU) : mword 64 := mycpu_ret (cid_word_of i).
 
-Lemma tp_ok_cid `{CID : CpuId} : tp_ok cid_word.
+Lemma tp_ok_cid_of (i : CPU) : tp_ok (cid_word_of i).
 Proof.
-  unfold tp_ok, cid_word.
-  pose proof (fin_to_nat_lt cpu_id) as Hlt. unfold NCPU in Hlt.
-  assert (Hz : 0 <= Z.of_nat (fin_to_nat cpu_id) < 8).
+  unfold tp_ok, cid_word_of.
+  pose proof (fin_to_nat_lt i) as Hlt. unfold NCPU in Hlt.
+  assert (Hz : 0 <= Z.of_nat (fin_to_nat i) < 8).
   { split; [ apply Nat2Z.is_nonneg | ].
     change 8 with (Z.of_nat 8%nat). apply inj_lt. exact Hlt. }
   rewrite uint_unsigned pg_moi_unsigned bv_wrap_small;
     [ exact Hz | rewrite pg_modulus64; lia ].
 Qed.
+
+Lemma uint_cid_word_of (i : CPU) : uint (cid_word_of i) = Z.of_nat (fin_to_nat i).
+Proof.
+  pose proof (fin_to_nat_lt i) as Hlt. unfold NCPU in Hlt.
+  unfold cid_word_of. rewrite uint_unsigned pg_moi_unsigned.
+  apply bv_wrap_small. rewrite pg_modulus64.
+  split; [ apply Nat2Z.is_nonneg | ].
+  assert (Z.of_nat (fin_to_nat i) < Z.of_nat 8%nat) by (apply inj_lt; exact Hlt).
+  lia.
+Qed.
+
+(* distinct harts have distinct [struct cpu] pointers *)
+Lemma cpus_ptr_inj (i j : CPU) : cpus_ptr i = cpus_ptr j -> i = j.
+Proof.
+  intro Heq. apply (f_equal bv_unsigned) in Heq.
+  unfold cpus_ptr in Heq.
+  rewrite (mycpu_ret_unsigned _ (tp_ok_cid_of i)) in Heq.
+  rewrite (mycpu_ret_unsigned _ (tp_ok_cid_of j)) in Heq.
+  rewrite !uint_cid_word_of in Heq.
+  apply fin_to_nat_inj. lia.
+Qed.
+
+(* a hart's [struct cpu] pointer is never the null the free lock records *)
+Lemma cpus_ptr_nonzero (i : CPU) : eq_vec (zero_reg : mword 64) (cpus_ptr i) = false.
+Proof. apply mycpu_ret_nonzero, tp_ok_cid_of. Qed.
+
+(* the ambient hart id as a tp-register value.  mycpu()'s return for this
+   hart is [mycpu_ret cid_word] = &cpus[cpu_id] = [cpus_ptr cpu_id]. *)
+Definition cid_word `{CID : CpuId} : mword 64 := cid_word_of cpu_id.
+
+Lemma cpus_ptr_cid `{CID : CpuId} : cpus_ptr cpu_id = mycpu_ret cid_word.
+Proof. reflexivity. Qed.
+
+Lemma tp_ok_cid `{CID : CpuId} : tp_ok cid_word.
+Proof. apply tp_ok_cid_of. Qed.
 
 (* ===================================================================== *)
 (* The current-process resource.                                          *)
