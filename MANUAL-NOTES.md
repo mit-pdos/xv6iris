@@ -24,7 +24,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write; should allow concurrent rx + tx
 - user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
 - start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
-- userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v)
+- userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v); not needed during kvminithart because Bare has no TLB entries
 - kpt_regime: unified Bare + Sv39 page-table configurations
 - needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
 - push_off returns intr_count counting token, which is needed to call pop_off to ensure no panic
@@ -32,6 +32,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - kernel ptsto: PA own + VA map fact via kmap_at (code RX, data RW), monotonic for Bare-to-Sv39
 - page tables need to track kmap_at for intermediate PT pages, to reconstruct data ptsto
 - MMIO just needs mapping fact, no memory points-to (because it's not memory)
+- kvminithart: need strans_bit to track whether satp is currently Bare or Sv39
 
 Big things that still need to be done/explored:
 
