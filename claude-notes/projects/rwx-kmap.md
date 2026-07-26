@@ -610,6 +610,16 @@ correspondence lemma; hand out
        — mode 8, asid 0 since root < 2^56), csrw satp 0x18079073,
        sfence.vma, epilogue).  kernel.asm has DRIFTED -0xe; decode
        from KernelInstrs only.
+   STAGE-6 CORE: DONE 2026-07-26, pushed 5a46a50 (6a strans_bit
+   4dadc97/3a99606, 6b catalog same commit, kvm_M_mint 05dfd3a, TVM
+   + spec 47c622b, the pma fix + ProofKvminithart/Link 5a46a50).
+   wp_kvminithart is sealed and linked; its post hands out the KPT
+   receipt, the stvec cell, and the 65 persistent mapping claims.
+   REMAINING of stage 6: the vmem/vcode general points-to forms +
+   the ↦ᵥ-style kstack width-8 leaf demonstrator; then the parked
+   cleanups (heap-domain invariant; intr_frame slot-carry; KvmSpec's
+   redundant Variable R note in kvm-spec.md stage (d)).
+
    TWO ABSTRACTION FIXES surfaced by 6c (both decided; the switch is
    the first proof forced to MINT the ambient invariants rather than
    thread them):

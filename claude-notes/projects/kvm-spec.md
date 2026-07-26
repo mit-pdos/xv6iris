@@ -302,8 +302,11 @@ census-pinned 102 tables, exact 166-page consumption, K_kvmmake
 premise STRICT per the spare-page note below; wp_kvminit is the
 commit carrying this note).  The kvminit deliverable stands:
 kernel_pagetable ↦₈ root with pt_rep0 t (kvm_map_full pas), feeding
-kvm_bridge.  NEXT: rwx-kmap STAGE 6 (the kvminithart switch — see
-the outline further down and rwx-kmap.md staging C→6).
+kvm_bridge.  STAGE 6 CORE IS ALSO DONE (2026-07-26, 5a46a50):
+wp_kvminithart installs the table — see rwx-kmap.md's stage-6
+status block for what little remains there (demonstrator +
+cleanups).  This project's own worklist is EXHAUSTED; candidate to
+move to completed/ after the demonstrator lands.
 
 ORIGINAL WORKLIST (all done, kept for the design record):
 (v).0  THE pt_present_mono SPEC SURGERY (decided 2026-07-24; option B
