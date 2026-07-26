@@ -610,6 +610,26 @@ correspondence lemma; hand out
        — mode 8, asid 0 since root < 2^56), csrw satp 0x18079073,
        sfence.vma, epilogue).  kernel.asm has DRIFTED -0xe; decode
        from KernelInstrs only.
+   TWO ABSTRACTION FIXES surfaced by 6c (both decided; the switch is
+   the first proof forced to MINT the ambient invariants rather than
+   thread them):
+   - TVM (DONE, pushed 47c622b): sconf_ms_facts/intr_ms_facts pin
+     mstatus.TVM = 0 (sfence.vma / csrw satp demand it; an M-mode bit
+     xv6 never sets, sstatus writes cannot touch it — same class as
+     the TSR pin).
+   - PMA-PTE (decided 2026-07-26): tlb_inv_pt and pmp_config stored
+     ⌜∀ pmar0, pma_allows_all pmar0 -> pma_allows_pte_{write,read}
+     pmar0⌝ — FALSE as a general proposition (supports_pte_* is an
+     independent region field; counter-model exists), so the core
+     invariant was latently unconstructible.  Fix: strengthen
+     pma_allows_all (RiscvFetchExec.v:60) with supports_pte_read/
+     write = true conjuncts (true of the concrete boot pma by
+     vm_compute), prove both implications as TOP-LEVEL lemmas, and
+     DELETE the stored ⌜∀…⌝ conjuncts from tlb_inv_pt/pmp_config as
+     redundant (~30 fixed-arity destructure sites re-patterned;
+     threading sites cite the lemmas).  Do NOT merely mirror the
+     write-∀ into pmp_config — that relocates an unprovable
+     obligation to the boot construction.
    6c. The switch (SpecKvminithart/ProofKvminithart/Link + the ghost
        fold in KvmMap): spec pre = sie_cap_gpr + strans_bit '0 +
        tlb ↦ᵣ tlbvec0 (floats client-side at boot; kernelvec takes
