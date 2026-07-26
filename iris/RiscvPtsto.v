@@ -1110,19 +1110,41 @@ Section Bridge.
     iFrame "Hp Hcl". iPureIntro. split; [exact Hc | exact Hd].
   Qed.
 
+  (* GENERAL (non-identity) VA-tier introduction: a physical byte sitting at
+     [pa_of ppn va] -- the pa the claim [kmap_at (svpn_of va) ppn KP_rw] takes
+     [va] to -- IS the [↦ₘ] byte at [va].  This is the primary form of the
+     [↦ₚ -> ↦ₘ] direction: [va] and its physical page [ppn] are ARBITRARY (the
+     claim need not be an identity leaf), so it constructs a genuinely
+     non-identity [↦ₘ] -- e.g. a kstack byte owned at its virtual address but
+     physically living at a kalloc-chosen page.  The caller supplies only the
+     RAM/canonicality facts about the physical target; the claim carries the
+     translation. *)
+  Lemma phys_to_mem_map (va : mword 64) (ppn : mword 44) dq b :
+    addr_is_ram (pa_of ppn va) -> (uint va < 274877906944)%Z ->
+    kmap_at (svpn_of va) ppn KP_rw -∗ (pa_of ppn va) ↦ₚ{dq} b -∗ va ↦ₘ{dq} b.
+  Proof.
+    intros Hram Hcan. iIntros "#Hk [Hp _]".
+    rewrite /mem_pointsto. iExists ppn. iFrame "Hk Hp".
+    iPureIntro. split; [exact Hcan | exact Hram].
+  Qed.
+
   (* Claim-keyed byte conversions ↦ₚ ⇄ ↦ₘ for an IDENTITY-mapped kdata va
      ([pa_of ppn pa = pa]): the [kmap_at] supplies the mapping, the caller the
      pure kdata/canonical facts.  These are what let a physical PT-slot cell
      ([↦ₚ₈], owned by [ptree_own]) become a VA-tier [↦₈] for a software walk's
      S-mode load, carrying NOTHING but the node's own claim
-     ([pt_node_claim] = this [kmap_at] + [node_kdata]). *)
+     ([pt_node_claim] = this [kmap_at] + [node_kdata]).  [phys_to_mem_claim] is
+     now a RESTATEMENT of the general [phys_to_mem_map] above (the identity
+     premise [pa_of ppn pa = pa] specializes [pa_of ppn pa] to [pa]). *)
   Lemma phys_to_mem_claim (pa : mword 64) (ppn : mword 44) dq b :
     pa_of ppn pa = pa -> addr_is_ram pa -> (uint pa < 274877906944)%Z ->
     kmap_at (svpn_of pa) ppn KP_rw -∗ pa ↦ₚ{dq} b -∗ pa ↦ₘ{dq} b.
   Proof.
-    intros Hid Hkd Hcan. iIntros "#Hk [Hp _]".
-    rewrite /mem_pointsto. iExists ppn. rewrite Hid. iFrame "Hk Hp".
-    iPureIntro. split; [exact Hcan | exact Hkd].
+    intros Hid Hkd Hcan. iIntros "#Hk Hp".
+    iApply (phys_to_mem_map pa ppn dq b with "Hk [Hp]").
+    { rewrite Hid. exact Hkd. }
+    { exact Hcan. }
+    { rewrite Hid. iExact "Hp". }
   Qed.
 
   Lemma mem_to_phys_claim (pa : mword 64) (ppn : mword 44) dq b :

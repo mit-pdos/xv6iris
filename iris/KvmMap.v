@@ -20,7 +20,9 @@ From stdpp Require Import gmap list_numbers bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
+Require Import RiscvExtras.
 Require Import Pt4kWalk.
 Require Import KptPt.
 Require Import KptExecMap.
@@ -125,11 +127,15 @@ Fixpoint kvm_M_stacks (pas : nat -> mword 44) (k : nat)
 Definition kvm_M (pas : nat -> mword 44) : gmap (mword 27) (mword 44 * kperm) :=
   kvm_M_stacks pas 64 (<[tramp_vpn := (tramp_ppn, KP_rx)]> kmap_M0).
 
-(* legal stack pas: whole RAM pages (what kalloc returns) *)
+(* legal stack pas: each is a whole kernel-data page -- exactly PtTree's
+   [node_kdata] ("ppn's 4096-byte page lies wholly in RAM").  This is what
+   kalloc's [page_valid] guarantees (kalloc returns pages at [kmem_lo =
+   0x80023558 >= text_end], so every stack page sits in kernel data); the
+   RAM lower bound [ram_base] recorded here is the part the downstream
+   [page_own_kstack] capstone needs (per-byte [addr_is_ram], which combines
+   with the byte's own KP_rw claim to re-key it onto the kstack VA). *)
 Definition kvm_pas_ok (pas : nat -> mword 44) : Prop :=
-  forall i : nat, (i < 64)%nat ->
-    ram_base <= bv_unsigned (pas i) * 4096 /\
-    (bv_unsigned (pas i) + 1) * 4096 <= ram_base + ram_size.
+  forall i : nat, (i < 64)%nat -> node_kdata (pas i).
 
 (* The naive per-run table-page cost of proc_mapstacks' 64 one-page kstack
    runs, summed against the SAME (starting) tree [t].  This is an UPPER
@@ -308,6 +314,118 @@ Lemma kstack_vpn_inj (i j : nat) :
 Proof.
   intros Hi Hj Hne Heq. apply (f_equal bv_unsigned) in Heq.
   rewrite (kstack_vpn_uns i Hi), (kstack_vpn_uns j Hj) in Heq. lia.
+Qed.
+
+(* ===================================================================== *)
+(* The kstack VIRTUAL address KSTACK(i) at byte granularity: page-aligned  *)
+(* just below the trampoline, whose Sv39 vpn is [kstack_vpn i].  These pure *)
+(* facts are stated so the capstone [page_own_kstack] proof is assembly-    *)
+(* only.  Mirrors ProofProcMapstacks' internal [va_i], lifted here as a     *)
+(* shared fact (a Proof file must not be imported).                        *)
+(* ===================================================================== *)
+Definition kstack_va (i : nat) : mword 64 :=
+  mword_of_int (0x3FFFFFF000 - 8192 * (Z.of_nat i + 1)).
+
+Lemma kstack_va_uns (i : nat) :
+  (i < 64)%nat -> bv_unsigned (kstack_va i) = 0x3FFFFFF000 - 8192 * (Z.of_nat i + 1).
+Proof.
+  intro Hi. unfold kstack_va, mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+  split; [| lia]. assert (8192 * (Z.of_nat i + 1) <= 8192 * 64) by (apply Z.mul_le_mono_nonneg_l; lia). lia.
+Qed.
+
+(* low 12 bits zero: KSTACK(i) is page-aligned *)
+Lemma kstack_va_align (i : nat) :
+  (i < 64)%nat -> subrange_vec_dec (kstack_va i) 11 0 = (zeros' 12 : mword 12).
+Proof.
+  intro Hi. apply bv_eq.
+  rewrite subrange64_unsigned_11_0. rewrite (kstack_va_uns i Hi).
+  change (2 ^ 12) with 4096.
+  replace (0x3FFFFFF000 - 8192 * (Z.of_nat i + 1)) with ((0x3FFFFFF - 2 * (Z.of_nat i + 1)) * 4096) by lia.
+  rewrite Z.mod_mul; [| lia]. vm_compute. reflexivity.
+Qed.
+
+Lemma kstack_va_canon (i : nat) :
+  (i < 64)%nat -> (uint (kstack_va i) < 274877906944)%Z.
+Proof.
+  intro Hi. rewrite uint_unsigned. rewrite (kstack_va_uns i Hi).
+  assert (0 <= 8192 * (Z.of_nat i + 1)) by (apply Z.mul_nonneg_nonneg; lia). lia.
+Qed.
+
+Lemma kstack_va_svpn (i : nat) :
+  (i < 64)%nat -> svpn_of (kstack_va i) = kstack_vpn i.
+Proof.
+  intro Hi. apply bv_eq.
+  rewrite (svpn_of_unsigned_lo (kstack_va i) (kstack_va_canon i Hi)).
+  rewrite uint_unsigned. rewrite (kstack_va_uns i Hi). rewrite (kstack_vpn_uns i Hi).
+  rewrite Z.shiftr_div_pow2; [| lia]. change (2 ^ 12) with 4096.
+  replace (0x3FFFFFF000 - 8192 * (Z.of_nat i + 1)) with ((0x3FFFFFF - 2 * (Z.of_nat i + 1)) * 4096) by lia.
+  rewrite Z.div_mul; [| lia]. reflexivity.
+Qed.
+
+(* the within-page offset premise the KptPt accessors want, for KSTACK(i) *)
+Lemma kstack_va_off (i j : nat) :
+  (i < 64)%nat -> (j < 4096)%nat ->
+  (bv_unsigned (subrange_vec_dec (kstack_va i) 11 0) + Z.of_nat j < 4096)%Z.
+Proof.
+  intros Hi Hj.
+  rewrite subrange64_unsigned_11_0. rewrite (kstack_va_uns i Hi).
+  change (2 ^ 12) with 4096.
+  replace (0x3FFFFFF000 - 8192 * (Z.of_nat i + 1)) with ((0x3FFFFFF - 2 * (Z.of_nat i + 1)) * 4096) by lia.
+  rewrite Z.mod_mul; [| lia]. lia.
+Qed.
+
+(* per-byte (j < 4096) facts: the svpn is unchanged, the byte is canonical,
+   and [pa_of] of KSTACK(i)+j is the identity page's byte offset j. *)
+Lemma kstack_va_svpn_add (i j : nat) :
+  (i < 64)%nat -> (j < 4096)%nat ->
+  svpn_of (pa_add (kstack_va i) j) = kstack_vpn i.
+Proof.
+  intros Hi Hj.
+  rewrite (svpn_of_pa_add (kstack_va i) j (kstack_va_canon i Hi) (kstack_va_off i j Hi Hj)).
+  apply kstack_va_svpn; exact Hi.
+Qed.
+
+Lemma kstack_va_canon_add (i j : nat) :
+  (i < 64)%nat -> (j < 4096)%nat ->
+  (uint (pa_add (kstack_va i) j) < 274877906944)%Z.
+Proof.
+  intros Hi Hj. rewrite uint_unsigned. unfold pa_add.
+  rewrite (pt_add_vec_int_small (kstack_va i) (Z.of_nat j) (Nat2Z.is_nonneg j)
+            ltac:(rewrite (kstack_va_uns i Hi);
+                  assert (0 <= 8192 * (Z.of_nat i + 1)) by (apply Z.mul_nonneg_nonneg; lia); lia)).
+  rewrite (kstack_va_uns i Hi).
+  assert (8192 * 1 <= 8192 * (Z.of_nat i + 1)) by (apply Z.mul_le_mono_nonneg_l; lia). lia.
+Qed.
+
+Lemma kstack_va_pa_of (ppn : mword 44) (i j : nat) :
+  (i < 64)%nat -> (j < 4096)%nat ->
+  pa_of ppn (pa_add (kstack_va i) j)
+  = pa_add (zero_extend' 64 (concat_vec ppn (zeros' 12 : mword 12))) j.
+Proof.
+  intros Hi Hj.
+  rewrite (pa_of_pa_add ppn (kstack_va i) j (kstack_va_canon i Hi) (kstack_va_off i j Hi Hj)).
+  assert (Hpo : pa_of ppn (kstack_va i) = zero_extend' 64 (concat_vec ppn (zeros' 12 : mword 12))).
+  { unfold pa_of. rewrite (kstack_va_align i Hi). reflexivity. }
+  rewrite Hpo. reflexivity.
+Qed.
+
+(* every byte of the identity page [zext (ppn ++ 0^12)] of a [node_kdata] ppn
+   is real RAM -- the per-byte [addr_is_ram] the capstone needs. *)
+Lemma kstack_ident_ram (ppn : mword 44) (j : nat) :
+  node_kdata ppn -> (j < 4096)%nat ->
+  addr_is_ram (pa_add (zero_extend' 64 (concat_vec ppn (zeros' 12 : mword 12))) j).
+Proof.
+  intros [Hlo Hhi] Hj. unfold addr_is_ram.
+  assert (Hz : bv_unsigned (zeros' 12 : mword 12) = 0) by (vm_compute; reflexivity).
+  assert (HP : bv_unsigned (zero_extend' 64 (concat_vec ppn (zeros' 12 : mword 12)) : mword 64)
+               = bv_unsigned ppn * 4096).
+  { rewrite zext64_concat44_12_unsigned. lia. }
+  rewrite uint_unsigned. unfold pa_add.
+  rewrite (pt_add_vec_int_small _ (Z.of_nat j) (Nat2Z.is_nonneg j)
+            ltac:(rewrite HP; unfold ram_base, ram_size in *; lia)).
+  rewrite HP. unfold ram_base, ram_size in *. lia.
 Qed.
 
 (* the kstacks-fixpoint lookup: hit at each kstack vpn, miss elsewhere *)

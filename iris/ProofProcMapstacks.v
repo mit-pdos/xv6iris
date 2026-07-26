@@ -798,9 +798,7 @@ Section ProofPMS.
     pt_nodes tk = (pt_nodes t + gk)%nat ->
     (gk + sum_list_with (fun j => pt_missing tk (kstack_vpn j) 1) (seq i (64 - i))
        <= kstacks_missing t)%nat ->
-    (forall j, (j < i)%nat ->
-       ram_base <= bv_unsigned (pas j) * 4096 /\
-       (bv_unsigned (pas j) + 1) * 4096 <= ram_base + ram_size) ->
+    (forall j, (j < i)%nat -> node_kdata (pas j)) ->
     sie_cap_gpr γ Mk (K - 10)%nat -∗ cpu_own γ lvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (PM + 0x52)) -∗
@@ -1261,10 +1259,11 @@ Section ProofPMS.
       { apply sum_list_with_le. intros x _. apply pt_missing_present_mono. exact Hpres. }
       pose proof Hbud as HB. rewrite (pms_seq_peel i Hilt) in HB. cbn [sum_list_with] in HB.
       replace (64 - S i)%nat with (63 - i)%nat in Htail |- * by lia. lia. }
-    (* the new page's ppn0 is a legal stack pa (kalloc validity) *)
-    assert (Hppnb : ram_base <= bv_unsigned ppn0 * 4096 /\
-                    (bv_unsigned ppn0 + 1) * 4096 <= ram_base + ram_size).
-    { assert (Hpp : (bv_unsigned ppn0 * 4096 = bv_unsigned page)%Z).
+    (* the new page's ppn0 is a legal stack pa (kalloc validity): its 4096-byte
+       page lies wholly in RAM, i.e. [node_kdata ppn0] = [kvm_pas_ok]'s clause *)
+    assert (Hppnb : node_kdata ppn0).
+    { unfold node_kdata.
+      assert (Hpp : (bv_unsigned ppn0 * 4096 = bv_unsigned page)%Z).
       { unfold ppn0. pose proof Hpbase as HpbC. apply (f_equal bv_unsigned) in HpbC.
         rewrite page_base_unsigned in HpbC. exact HpbC. }
       pose proof Hpal as Hpal2. apply Z.mod_divide in Hpal2; [| discriminate]. destruct Hpal2 as [q Hq].
@@ -1273,8 +1272,7 @@ Section ProofPMS.
       split.
       - rewrite Hpp. unfold ram_base.
         apply (Z.le_trans _ 0x80023558); [apply Z.leb_le; vm_compute; reflexivity | rewrite Hq; nia].
-      - replace ((bv_unsigned ppn0 + 1) * 4096)%Z with (bv_unsigned ppn0 * 4096 + 4096)%Z by ring.
-        rewrite Hpp. unfold ram_base, ram_size. rewrite Hq. nia. }
+      - rewrite Hpp. unfold ram_base, ram_size. rewrite Hq. nia. }
     (* case on i+1 = 64 (fall to epilogue) or < 64 (recurse) *)
     destruct rem' as [| rem''].
     { (* LAST iteration: S i = 64, bne s1,s5 FALLS *)
