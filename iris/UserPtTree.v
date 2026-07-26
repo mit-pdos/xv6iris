@@ -224,7 +224,7 @@ Section UserPtTranslate.
     iDestruct "Hinv" as (usatp tlbvec t)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     iPureIntro.
@@ -302,7 +302,7 @@ Section UserPtFault.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     pose proof Hspec as (Hbase & _ & _ & _ & Hblkspec).
@@ -323,7 +323,7 @@ Section UserPtFault.
     assert (Hcov' : (ram_base + ram_size
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
-    pose proof (Hpmarimpl _ Hall) as Hpmar.
+    pose proof (pma_allows_all_pte_read _ Hall) as Hpmar.
     assert (Hlk : exec (lookup_TLB 39 (mword_of_int 0) vpn) σ = Some (None, σ))
       by exact (tlb_ok_pt_lookup_blocked t vpn tlbvec σ Htlbok Hblk Htlbv).
     (* the stopping prefix, as [read_pte] facts at the walk's spellings *)
@@ -418,7 +418,7 @@ Section UserPtFault.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     pose proof Hspec as (Hbase & _).
@@ -442,7 +442,7 @@ Section UserPtFault.
     assert (Hcov' : (ram_base + ram_size
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
-    pose proof (Hpmarimpl _ Hall) as Hpmar.
+    pose proof (pma_allows_all_pte_read _ Hall) as Hpmar.
     assert (Htm := exec_translationMode_U_sv39 usatp σ HSXL Hsatpv Hmode).
     (* the walk-DENIED translate (shared by the empty-slot and
        foreign-entry cases) *)

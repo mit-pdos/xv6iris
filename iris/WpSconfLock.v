@@ -784,7 +784,7 @@ Section WpSconfLock.
     iDestruct (s_mem_chunk s_tr pa pa 0 4 4 (nth_byte w) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(Hbytesf_tr & Hram0 & Hram3 & Hkd).
-    destruct (Hpma_all (pa_of ppn pa) 4) as (region_amo & Hmatch_amo & _ & Hread_amo & Hwrite_amo & Hatomic_supp_amo).
+    destruct (Hpma_all (pa_of ppn pa) 4) as (region_amo & Hmatch_amo & _ & Hread_amo & Hwrite_amo & Hatomic_supp_amo & _ & _).
     assert (Hatomic_amo : pma_allows_atomic_op
               ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
               AMOSWAP 4 = true)

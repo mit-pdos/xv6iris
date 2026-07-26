@@ -220,7 +220,7 @@ Section SRegimeDef.
   Proof.
     iIntros "Hri Hpmp".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmar & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     iPureIntro. rewrite /pmp_grant_facts Hpcv Hpav. tauto.
@@ -231,7 +231,7 @@ Section SRegimeDef.
   Proof.
     iIntros "Hri Hinv".
     iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M)
-      "(Hsatp & _ & _ & _ & Htlb & _ & _ & _ & _ & Ht & Hpmp)".
+      "(Hsatp & _ & _ & _ & Htlb & _ & _ & _ & Ht & Hpmp)".
     iApply (pmp_config_grant_facts with "Hri Hpmp").
   Qed.
 

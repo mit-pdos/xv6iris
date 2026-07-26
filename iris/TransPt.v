@@ -529,7 +529,7 @@ Section Pt2TranslateIris.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     set (vpn := svpn_of va) in *.
@@ -554,7 +554,7 @@ Section Pt2TranslateIris.
     assert (Hcov' : (ram_base + ram_size
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
-    pose proof (Hpmarimpl _ Hall) as Hpmar.
+    pose proof (pma_allows_all_pte_read _ Hall) as Hpmar.
     assert (Hvarp : forall a d : mword 1, pte_pbmt0 (pte_set_ad w a d))
       by (intros a d; exact (proj2 (proj2 (proj2 (Hvar a d))))).
     destruct (ptree2_translateAddr_cases acc rc va w pa satp0 tp tc tlbvec
@@ -567,7 +567,7 @@ Section Pt2TranslateIris.
     (* the PMP cells re-seal in every arm *)
     iAssert (pmp_config rc) with "[Hpc Hpa]" as "Hpmp".
     { iApply (pmp_config_intro rc pmpcfg0 pmpaddr00
-                HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa"). }
+                HA Hord HX HW HR Hcov with "Hpc Hpa"). }
     destruct Hshape as [-> | [-> | [ (a1 & d1 & ->) | (a1 & d1 & ->) ]]].
     - (* O1: nothing moved *)
       iModIntro. iExists σ.
@@ -763,7 +763,7 @@ Section Pt2TrampInst.
     iDestruct (tlb_inv_pt2_open with "Hinv") as (satp1 tlbvec1 tp1 tc1)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %HSp1 & %HSc1 & %Hpmawimpl & Htp & Htc & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc0 & Hpa0 & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc0") as %Lc.
     iDestruct (reg_valid_dq with "Hri Hpa0") as %La.
     iModIntro. iExists σ'.
@@ -779,7 +779,7 @@ Section Pt2TrampInst.
               Hmode Hasid Hppn Htlbok HSp1 HSc1 Hpmawimpl
               with "Hsatp Htlb Htp Htc").
     iApply (pmp_config_intro rc pmpcfg0 pmpaddr00
-              HA Hord Hpmarimpl HX HW HR Hcov with "Hpc0 Hpa0").
+              HA Hord HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.
 
 End Pt2TrampInst.

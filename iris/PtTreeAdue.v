@@ -648,6 +648,15 @@ Definition pma_allows_pte_write (regions : list PMA_Region) : Prop :=
     matching_pma_region regions (Physaddr a) 8 = Some r /\
     (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true.
 
+(* the boot [pma_allows_all] table serves 8-byte PTE writes: a direct
+   projection now that [pma_allows_all] pins [PMA_supports_pte_write]. *)
+Lemma pma_allows_all_pte_write (pmar0 : list PMA_Region) :
+  pma_allows_all pmar0 -> pma_allows_pte_write pmar0.
+Proof.
+  intros H a. destruct (H a 8) as (r & Hm & _ & _ & _ & _ & _ & Hpw).
+  exists r. split; [exact Hm | exact Hpw].
+Qed.
+
 Section PtWriteIris.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.

@@ -64,7 +64,18 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_executable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true /\
-      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_atomic_support) = AMOSwap.
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_atomic_support) = AMOSwap /\
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_read) = true /\
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true.
+
+(* the boot [pma_allows_all] table serves 8-byte PTE reads: a direct
+   projection now that [pma_allows_all] pins [PMA_supports_pte_read]. *)
+Lemma pma_allows_all_pte_read (pmar0 : list PMA_Region) :
+  pma_allows_all pmar0 -> KptPt.pma_allows_pte_read pmar0.
+Proof.
+  intros H a. destruct (H a 8) as (r & Hm & _ & _ & _ & _ & Hpr & _).
+  exists r. split; [exact Hm | exact Hpr].
+Qed.
 
 (* ====================================================================== *)
 (* hw_config: the immutable hardware configuration the boot relies on,      *)

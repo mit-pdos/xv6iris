@@ -604,9 +604,9 @@ Section TrampFetchInst.
             Lpma with "Hclaimva Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
     iDestruct "Hinv" as (satp1 tlbvec1 t1 M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & Ht & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc0 & Hpa0 & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc0") as %Lc.
     iDestruct (reg_valid_dq with "Hri Hpa0") as %La.
     iModIntro. iExists σ'.
@@ -619,9 +619,9 @@ Section TrampFetchInst.
     iSplit; [iPureIntro; rewrite La; exact Hcov |].
     iFrame "Hri Hgh Hclaim".
     iApply (tlb_inv_pt_intro root_ppn satp1 tlbvec1 t1 M
-              Hmode Hasid Hppn Htlbok Hspec Hpmawimpl with "Hsatp Htlb HM Ht").
+              Hmode Hasid Hppn Htlbok Hspec with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
-              HA Hord Hpmarimpl HX HW HR Hcov with "Hpc0 Hpa0").
+              HA Hord HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.
 
   (* the USER instance: [utlb_inv_pt uroot tfp um] absorbs the same fetch. *)
@@ -663,7 +663,7 @@ Section TrampFetchInst.
     iDestruct "Hinv" as (usatp tlbvec1 t1)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hwf & %Hpmawimpl & Ht & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc0 & Hpa0 & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc0 & Hpa0 & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc0") as %Lc.
     iDestruct (reg_valid_dq with "Hri Hpa0") as %La.
     iModIntro. iExists σ'.
@@ -678,7 +678,7 @@ Section TrampFetchInst.
     iApply (utlb_inv_pt_intro uroot tfp um usatp tlbvec1 t1
               Hmode Hasid Hppn Htlbok Hspec Hwf Hpmawimpl with "Hsatp Htlb Ht").
     iApply (pmp_config_intro uroot pmpcfg0 pmpaddr00
-              HA Hord Hpmarimpl HX HW HR Hcov with "Hpc0 Hpa0").
+              HA Hord HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.
 
   (* the two instantiated trampoline fetches *)

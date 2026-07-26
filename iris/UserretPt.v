@@ -382,7 +382,7 @@ Section WpUldPt.
     iDestruct "Hutlb" as (usatp tlbvec1 t1)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & %Hwf & %Hpmawimpl & Ht & Hpmp)".
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc0 & Hpa0 & %HA0 & %Hord0 & %Hpma_imp & %HX & %HW & %HR & %Hcov)".
+      "(Hpc0 & Hpa0 & %HA0 & %Hord0 & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hreg Hsatp") as %Lsatp.
     iDestruct (reg_valid_dq with "Hreg Hpc0")  as %Lpmpc.
     iDestruct (reg_valid_dq with "Hreg Hpa0")  as %Lpmpaddr.

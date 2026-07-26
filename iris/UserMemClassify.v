@@ -5679,7 +5679,7 @@ Section AmoGeneric.
                Hrange
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR))
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))
-               Hpmam Halp Hrd (proj1 Hwrat) (proj2 Hwrat) Hmmior (addr_is_ram_not_dev _ Hram0) Hbytes
+               Hpmam Halp Hrd (proj1 Hwrat) (proj1 (proj2 Hwrat)) Hmmior (addr_is_ram_not_dev _ Hram0) Hbytes
                (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
     iSplit; [ iPureIntro; intros v | ].
@@ -5689,7 +5689,7 @@ Section AmoGeneric.
                Hrange
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR))
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))
-               Hpmam Halp Hrd (proj1 Hwrat) (proj2 Hwrat) Hmmiow (addr_is_ram_not_dev _ Hram0)
+               Hpmam Halp Hrd (proj1 Hwrat) (proj1 (proj2 Hwrat)) Hmmiow (addr_is_ram_not_dev _ Hram0)
                (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
     iSplit; [ iPureIntro; exact Hmdev | ].

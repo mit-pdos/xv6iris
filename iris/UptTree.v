@@ -366,7 +366,7 @@ Section UptTranslateIris.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     destruct (upt_spec_maps uroot tfp um t (svpn_of va) w Hspec Hleaf)
@@ -387,7 +387,7 @@ Section UptTranslateIris.
     assert (Hcov' : (ram_base + ram_size
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
-    pose proof (Hpmarimpl _ Hall) as Hpmar.
+    pose proof (pma_allows_all_pte_read _ Hall) as Hpmar.
     assert (Htm : exec (translationMode p) σ = Some (Sv39, σ))
       by exact (Htmk usatp Hsatpv Hmode).
     iMod (ptree_translateAddr_own acc p uroot t w va pa usatp
@@ -409,7 +409,7 @@ Section UptTranslateIris.
     iApply (utlb_inv_pt_intro uroot tfp um usatp tlbvec' t'
               Hmode Hasid Hppn Htlbok' Hspec' Hwf Hpmawimpl with "Hsatp Htlb Ht").
     iApply (pmp_config_intro uroot pmpcfg0 pmpaddr00
-              HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa").
+              HA Hord HX HW HR Hcov with "Hpc Hpa").
   Qed.
 
 End UptTranslateIris.

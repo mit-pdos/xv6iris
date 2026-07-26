@@ -134,12 +134,12 @@ Section UserretEntryPt.
                 ltac:(rewrite Lms1p; exact HTVM)) as (tlbz1 & Hex1 & Hnone1).
     (* flush the invariant's TLB cell and re-seal with the empty vector *)
     iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp1 tlbvec1 kt1 M)
-      "(Hsatp & %HkMode1 & %Hkasid1 & %Hkppn1 & Htlb & %Hokk1 & %Hspeck1 & HM & %Hpmaw1 & Hkt & Hpmp)".
+      "(Hsatp & %HkMode1 & %Hkasid1 & %Hkppn1 & Htlb & %Hokk1 & %Hspeck1 & HM & Hkt & Hpmp)".
     iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb") as "[Hreg Htlb]".
     iDestruct (tlb_inv_pt_intro kroot ksatp1 tlbz1 kt1 M HkMode1 Hkasid1 Hkppn1
                  (tlb_ok_pt_empty (mword_of_int 0) kt1 tlbz1
                     (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
-                 Hspeck1 Hpmaw1 with "Hsatp Htlb HM Hkt Hpmp") as "Hktlb".
+                 Hspeck1 with "Hsatp Htlb HM Hkt Hpmp") as "Hktlb".
     iModIntro.
     iExists (set_reg s_pc1 tlb tlbz1).
     iSplitR.
@@ -199,12 +199,12 @@ Section UserretEntryPt.
     rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) usatp HuMode) in Hex2.
     (* dissolve the kernel invariant into the two-table window *)
     iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp2 tlbvec2 kt2 M2)
-      "(Hsatp & %HkMode2 & %Hkasid2 & %Hkppn2 & Htlb & %Hokk2 & %Hspeck2 & HM & %Hpmaw2 & Hkt & Hpmp)".
+      "(Hsatp & %HkMode2 & %Hkasid2 & %Hkppn2 & Htlb & %Hokk2 & %Hspeck2 & HM & Hkt & Hpmp)".
     (* stage C: the window's tramp premise comes from the claim vs the auth *)
     iDestruct (kmap_at_lookup with "HM Hclaim") as %HMtramp.
     iMod (reg_update _ satp _ usatp with "Hreg Hsatp") as "[Hreg Hsatp]".
     iDestruct (tlb_inv_pt2_enter uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
-                 usatp tlbvec2 kt2 HuMode Huasid Huppn Hokk2 Hspeck2 Hpmaw2
+                 usatp tlbvec2 kt2 HuMode Huasid Huppn Hokk2 Hspeck2 PtTreeAdue.pma_allows_all_pte_write
                  with "Hsatp Htlb Hkt Hufr [Hpmp]") as "Hpt2".
     { iApply (pmp_config_reindex kroot uroot with "Hpmp"). }
     iModIntro.

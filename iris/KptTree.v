@@ -586,7 +586,6 @@ Section KptTreeInv.
        tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
        ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
        kmap_auth M ∗
-       ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
        ptree_own 2 (DfracOwn 1) t ∗
        pmp_config root_ppn)%I.
 
@@ -598,13 +597,12 @@ Section KptTreeInv.
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     tlb_ok_pt (mword_of_int 0) t tlbvec ->
     kpt_tree_spec_gen root_ppn M t ->
-    (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
     satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ kmap_auth M -∗
     ptree_own 2 (DfracOwn 1) t -∗
     pmp_config root_ppn -∗
     tlb_inv_pt root_ppn.
   Proof.
-    intros Hmode Hasid Hppn Hok Hspec Hpmaw. iIntros "Hsatp Htlb HM Ht Hpmp".
+    intros Hmode Hasid Hppn Hok Hspec. iIntros "Hsatp Htlb HM Ht Hpmp".
     iExists satp0, tlbvec, t, M. iFrame "Hsatp Htlb HM Ht Hpmp". iPureIntro. tauto.
   Qed.
 
@@ -619,7 +617,6 @@ Section KptTreeInv.
       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt (mword_of_int 0) t tlbvec ⌝ ∗
       ⌜ kpt_tree_spec_gen root_ppn M t ⌝ ∗
       kmap_auth M ∗
-      ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
       ptree_own 2 (DfracOwn 1) t ∗
       pmp_config root_ppn.
   Proof. iIntros "H". iExact "H". Qed.
@@ -1153,13 +1150,13 @@ Section KptTranslateIris.
     intros Hchk Hcanon Hid4k Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
     iIntros "Hat Hri Hgh Hinv".
     iDestruct "Hinv" as (satp0 tlbvec t M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & %Hpmawimpl & Ht & Hpmp)".
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Htlbok & %Hspec & HM & Ht & Hpmp)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
-    pose proof (Hpmawimpl _ Hall) as Hpmaw.
+    pose proof (pma_allows_all_pte_write _ Hall) as Hpmaw.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
     iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
-      "(Hpc & Hpa & %HA & %Hord & %Hpmarimpl & %HX & %HW & %HR & %Hcov)".
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     set (vpn := svpn_of va) in *.
@@ -1184,7 +1181,7 @@ Section KptTranslateIris.
     assert (Hcov' : (ram_base + ram_size
       <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
-    pose proof (Hpmarimpl _ Hall) as Hpmar.
+    pose proof (pma_allows_all_pte_read _ Hall) as Hpmar.
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (mk_pte ppn (kperm_flags pc) : mword 64))) : mword 44)) : mword 44)
@@ -1224,9 +1221,9 @@ Section KptTranslateIris.
                Hspec Hmaps HMlk).
       exists a0, d0. rewrite Hlf. reflexivity. }
     iApply (tlb_inv_pt_intro root_ppn satp0 tlbvec' t' M
-              Hmode Hasid Hppn Htlbok' Hspec' Hpmawimpl with "Hsatp Htlb HM Ht").
+              Hmode Hasid Hppn Htlbok' Hspec' with "Hsatp Htlb HM Ht").
     iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
-              HA Hord Hpmarimpl HX HW HR Hcov with "Hpc Hpa").
+              HA Hord HX HW HR Hcov with "Hpc Hpa").
   Qed.
 
 End KptTranslateIris.

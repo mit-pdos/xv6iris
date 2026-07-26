@@ -1259,7 +1259,6 @@ Section SmodeCoreIris.
        pmpcfg_n ↦ᵣ pmpcfg0 ∗ pmpaddr_n ↦ᵣ pmpaddr00 ∗
        ⌜ pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ⌝ ∗
        ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ⌝ ∗
-       ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_read pmar0 ⌝ ∗
        ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
        ⌜ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
        ⌜ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
@@ -1271,14 +1270,13 @@ Section SmodeCoreIris.
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n) :
     pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
     zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
-    (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_read pmar0) ->
     eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
     (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
     pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pmp_config root_ppn.
   Proof.
-    intros HA Hord Hpma HX HW HR Hcov. iIntros "Hc Ha".
+    intros HA Hord HX HW HR Hcov. iIntros "Hc Ha".
     iExists pmpcfg0, pmpaddr00. iFrame "Hc Ha". iPureIntro. tauto.
   Qed.
 
