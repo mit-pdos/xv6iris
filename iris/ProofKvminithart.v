@@ -5,7 +5,7 @@
    sfence.vma (under Bare), the auipc/ld of kernel_pagetable into a5, the
    MAKE_SATP assembly (srli a5,12; li a4,-1; slli a4,0x3f; or a5,a5,a4),
    the csrw satp,a5 -- THE SWITCH -- a second sfence.vma (under the new
-   kernel PT), and the 2-slot frame teardown + ret.  rwx-kmap STAGE 6c. *)
+   kernel PT), and the 2-slot frame teardown + ret. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad list_numbers bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.

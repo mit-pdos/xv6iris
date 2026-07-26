@@ -1,5 +1,22 @@
 # Project: kvminit / kvmmake / kvmmap / mappages / walk proofs (KvmSpec.v)
 
+## COMPLETE — 2026-07-26.  Nothing outstanding.
+
+All five functions (walk / mappages / kvmmap / proc_mapstacks / kvmmake,
+plus kvminit) are proven, sealed and linked, and `wp_kvminithart`
+installs the resulting table (see
+[`design/tlb-translation.md`](../design/tlb-translation.md) for the boot
+introduction and the mapping model it establishes).  The two cleanups
+once parked in stage (d) below are closed: KvmSpec's `Variable R :
+s_regime` was deleted at 099294f, and `intr_frame`'s slot-carry is
+by-design (interrupts only ever run on the KPT table) — see
+`design/interrupts.md`.
+
+Everything below is the DESIGN RECORD and its proof-engineering notes;
+text phrased as a plan or worklist is historical.  The broadly reusable
+lessons (the WRAPPER RECIPE, the large-pure-map landmines) have been
+lifted into [`durable-notes.md`](../durable-notes.md).
+
 The five spec statements are compiled iProp definitions in KvmSpec.v; read its
 header — it fixes the design: edited-table vs ambient-regime separation; the
 `pt_rep t m` map view; walk's `ptree_same_rep` + `ptree_level0` post; mappages'
@@ -149,15 +166,16 @@ thread sie_cap_gpr, whose translation slot is the Bare∨KPT disjunction
 consumed foldedly through the derived instance [strans_regime : s_regime]),
 and the funnel + every sconf leaf dispatches through it — the sconf tier
 holds at Bare, so the kvm chain (and memset, the lock/kalloc cone at
-[cpu_own γ n false p C]) is callable during early boot.  What remains of
-the old item:
-  - the '1' SIE arm still requires the KPT disjunct (intr_frame carries
+[cpu_own γ n false p C]) is callable during early boot.  The two
+follow-ups once listed here are both CLOSED:
+  - the '1' SIE arm requires the KPT disjunct (intr_frame carries
     tlb_inv_pt; Bare ∧ '1' is refuted by the Bare arm's stvec cell against
-    intr_inv's) — making intr_frame carry the slot and proving kernelvec
-    regime-generically stays a possible later cleanup, not a blocker;
-  - KvmSpec.v's Variable R : s_regime threading of [sr_inv R] is now
+    intr_inv's) — this is BY DESIGN, not debt: interrupts are only ever
+    enabled on the KPT table, so there is no reason to make intr_frame
+    slot-generic or kernelvec regime-generic;
+  - KvmSpec.v's Variable R : s_regime threading of [sr_inv R] was
     redundant at the whole-function altitude (the chain reaches translation
-    through the slot) — collapse it at the next KvmSpec touch.
+    through the slot) and was DELETED at 099294f.
 
 Gotcha: WpSmodePtUart stays kpt-specific — its DEV absorption needs kpt-shaped
 premises; a Bare device access (uartinit/printf during boot) instead needs a
@@ -558,10 +576,11 @@ kvmmap calls each want callee_saved recovery + the accumulator-tree transport
 (t_k repr m_k) between calls; the a0/a1/.. arg-register reloads between calls are
 the per-call auipc/lui/addi sequences already in the dump.
 
-### 3. Boot introduction (separate, later)
+### 3. Boot introduction — DONE (`wp_kvminithart`, 5a46a50)
 
-kvminithart establishes `tlb_inv_pt` from `pt_rep t kvm_map` — at which point
-`kpt_tree_spec` must be REVISED to the true per-region flags (text RX / data RW /
-devices RW; the KptPt uniform-RWX deviation dies), rippling into the
-`kpt_variant_check_*` dispatch (fetches only from text, stores only to data — the
-`addr_is_ram`-keyed wrappers become region-keyed).
+`kvm_bridge` (KvmMap.v) turns kvminit's `pt_rep0 t (kvm_map_full pas)` into
+`kpt_tree_spec_gen root (kvm_M pas) t`, and `wp_kvminithart` installs it as
+`tlb_inv_pt` — minting the 65 non-identity claims (64 kstacks + trampoline)
+in the process.  The per-region flags (text RX / data RW / devices RW,
+fetches only from text and stores only to data) came in with the
+uniform-claims model; see `design/tlb-translation.md`.

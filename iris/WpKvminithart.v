@@ -1,8 +1,8 @@
-(* WpKvminithart.v -- support lemmas for the rwx-kmap STAGE 6c whole-function
-   proof of kvminithart (the Bare->Sv39 kernel-page-table switch).
+(* WpKvminithart.v -- support lemmas for the whole-function proof of
+   kvminithart (the Bare->Sv39 kernel-page-table switch).
 
-   Currently lands the ghost-side switch fold [kvm_M_mint] (rwx-kmap
-   deliverable 2): the switch dissolves the Bare arm's [kmap_auth kmap_M0]
+   The ghost-side switch fold is [kvm_M_mint]: the switch dissolves the
+   Bare arm's [kmap_auth kmap_M0]
    and mints, in one update, the target auth [kmap_auth (kvm_M pas)] together
    with the 65 persistent claims it hands the boot code -- the trampoline
    claim + the 64 kstack claims.  Freshness comes purely from the KvmMap

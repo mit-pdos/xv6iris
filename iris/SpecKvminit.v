@@ -30,7 +30,8 @@ Notation KVMI := KernelSyms.kvminit.
    root page's byte address).  COUNTED-ONLY like kvmmake (boot-only, STRICT
    budget premise ⌜166 < nb⌝ -- see SpecKvmmake's spare-page note), so
    unconditional success, NO panic_wp.  This is THE deliverable: the verified
-   construction whose post feeds the stage-6 boot switch (kvm_bridge).
+   construction whose post feeds the boot switch [wp_kvminithart] through
+   [kvm_bridge].
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
 Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) :=

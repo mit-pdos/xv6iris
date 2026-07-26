@@ -3,7 +3,7 @@
    claiming one page worth of entries (512 x 8-byte slots), with
    recursion down the hierarchy for every present child pointer.
 
-   Motivation (see iris/CLAUDE.md, "TLB, page-walk & translation"): the
+   Motivation (see claude-notes/design/tlb-translation.md): the
    kernel S-mode invariant [tlb_inv] enumerates the kvmmake layout slot
    by slot with PRESET A/D bits, and the user page table (UserPt.v) is a
    separate ad-hoc {slots, map, data} record.  This file provides ONE

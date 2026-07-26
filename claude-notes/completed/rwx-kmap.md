@@ -1,19 +1,40 @@
 # Project: R/W/X-accurate kernel PT, code points-to, and non-identity mappings
 
-## UNIFORM-CLAIMS REVISION (2026-07-23, user-signed-off; SUPERSEDES parts
-## of the design below — read this first)
+## COMPLETE — 2026-07-26.  Nothing outstanding.
 
-STATUS: COMPLETE 2026-07-24 (A′ 2af5603, B′ 705131e, pte8 cleanup
-27ed01f, C 713627a; all 302/302 green).  The kernel mapping model is
-one mechanism end-to-end: one ghost map with bare-fragment claims and
-library uniqueness, VA-based ↦ₘ/↦ₓ carrying claim+mapping, the physical
-tier ↦ₚ for untranslated actors, one claim-keyed absorption interface,
-the one-clause exact-representation tree spec, and the trampoline as an
-ordinary mapping.  REMAINING for the wider rwx-kmap project: stage 6
-(the kvminithart switch minting the 65 fragments + establishing
-tlb_inv_pt from the kvm_bridge) — now blocked only on the kvm-spec
-project delivering kvmmake/kvminit (items iii-v there).  The PARKED
-heap-domain-invariant cleanup stands.
+The live design this project produced is documented in
+[`design/tlb-translation.md`](../design/tlb-translation.md) (the kernel
+mapping model: the claim ghost, VA-based `↦ₘ`/`↦ₓ`, the physical tier
+`↦ₚ`, the one claim-keyed absorption theorem, the exact-representation
+tree spec, the boot switch and `page_own_kstack`) and in
+[`design/interrupts.md`](../design/interrupts.md) (`strans_bit`, and why
+`intr_frame` carries `tlb_inv_pt` directly).  Read those first; this file
+is kept for the DECISION RECORD and the proof-engineering notes below.
+
+Delivered: A′ 2af5603, B′ 705131e, pte8 cleanup 27ed01f, C 713627a,
+strans_bit 4dadc97/3a99606, kvm_M_mint 05dfd3a, TVM+spec 47c622b,
+the switch 5a46a50, page_own_kstack e2c30c0 — all full-build green.
+
+TWO CLEANUPS WERE CONSIDERED AND CLOSED WITHOUT WORK (2026-07-26,
+user decisions — do not re-open them as debt):
+  - THE HEAP-DOMAIN INVARIANT: DECLINED.  The idea was to add
+    `⌜∀ a ∈ dom mem, addr_is_ram a⌝` to the state interp (true today:
+    the heap is born RAM-only and bus routing keeps it so) so that the
+    RAM content of the points-to conjuncts became derivable at any
+    interp-holding site, giving `↦ₚ → ` bare `pointsto`.  (The other
+    half of the original payoff has since evaporated: `↦ₘ`'s region
+    conjunct is already `⌜addr_is_ram (pa_of ppn va)⌝`, not
+    `addr_is_kdata` — the kdata-vs-ram sharpening was never
+    load-bearing, since the no-writable-text guarantee rests on the
+    concrete table and on `↦ₓ` carrying KP_rx.)  The user chose not to:
+    the cost is a domain obligation in every step-preservation proof
+    plus re-plumbing tower derivations from resource-destruct to
+    interp-lookup.
+  - `intr_frame` SLOT-CARRY: CLOSED as by-design.  Interrupts are only
+    ever enabled on the KPT table, so `tlb_inv_pt` inside `intr_frame`
+    IS the intended statement; there is no need to support SIE='1' at
+    Bare.  Recorded at `IntrDefs.v`'s `intr_frame` and in
+    `design/interrupts.md`.
 
 The points-to layer was REFOUNDED va-based and the claim ghost made
 fully uniform.  User decisions, ironed out over several rounds:
@@ -69,17 +90,8 @@ fully uniform.  User decisions, ironed out over several rounds:
    a static-fragment identity corollary (pa = va) for the M-mode paths
    (M-mode has no translation and never touches tramp/kstack vas).
 
-PARKED CLEANUP (user-deferred 2026-07-24, revisit after the project):
-the heap-domain invariant — add ⌜∀ a ∈ dom mem, addr_is_ram a⌝ to
-mstate_interp (true, currently unreified: the heap is born RAM-only and
-bus routing keeps it so).  Once in, the RAM content of the points-to
-region conjuncts is derivable at any interp-holding site
-(gen_heap_valid + domain), enabling: ↦ₚ → bare pointsto, and ↦ₘ's
-⌜addr_is_kdata pa⌝ slimmed or dropped (the kdata-vs-ram sharpening is
-NOT load-bearing — the no-writable-text guarantee rests on the concrete
-table; kdata just keeps it visible in the resource type).  Cost: the
-domain obligation in every step-preservation proof + re-plumbing tower
-derivations from resource-destruct to interp-lookup.
+(The heap-domain-invariant cleanup once parked here was DECLINED — see
+the header.)
 
 EXECUTION STAGES (revised for green-per-stage; KvmMap item (ii) is done
 so sequencing is clear):
@@ -630,12 +642,10 @@ correspondence lemma; hand out
    suffice.  The lemma carries the forward pointer: proc_lock_res/
    procs_inv (WpWakeup) will gain a per-proc page_own (kstack_va i)
    conjunct; sp-migration consumes that.
-   THIS PROJECT'S WORKLIST IS NOW EXHAUSTED except the PARKED
-   cleanups (heap-domain invariant; intr_frame slot-carry; KvmSpec
-   Variable-R collapse note in kvm-spec.md stage (d)) -- move this
-   file + kvm-spec.md to completed/ at the next tidy-up, lifting
-   the durable recipes (WRAPPER RECIPE, the zify/lia and map-fold
-   landmines) into durable-notes.md if not already there.
+   THIS PROJECT'S WORKLIST IS EXHAUSTED; the two cleanups once
+   parked here are closed (see the header).  The durable recipes
+   (WRAPPER RECIPE, the zify/lia and map-fold landmines) now live in
+   durable-notes.md, and the design in design/tlb-translation.md.
 
    TWO ABSTRACTION FIXES surfaced by 6c (both decided; the switch is
    the first proof forced to MINT the ambient invariants rather than

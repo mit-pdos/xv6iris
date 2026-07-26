@@ -5,7 +5,13 @@
      - the VIRTIO (va = pa = 0x10001000, R|W, one page),
      - the PLIC   (va = pa = [0x0c000000, 0x10000000), R|W, 64 MB), and
      - all of DRAM (va = pa = [0x80000000, 0x88000000) = the model's whole
-       RAM window, R|W|X).
+       RAM window), split per kvmmake: kernel text [ram_base, text_end) is
+       R|X and data [text_end, PHYSTOP) is R|W, classified by §15's
+       [kperm]/[kmap_class].  The §1 byte-level image constants
+       ([PTE_RAM]/[kpt_lflags]/[kpt_mem]) are uniformly R|W|X and survive
+       only as the pre-tree byte-level [tlb_inv] layer that SmodeCore
+       still consumes; the tree/invariant layer above them (the M-indexed
+       [kpt_tree_spec_gen], KptTree) carries the real per-region flags.
    Table PAGES sit at consecutive ppns from the (abstract) root:
      root+0   = the root (level-2) table:   [0] -> l1_dev, [2] -> l1_dram
      root+1   = l1_dev  (level-1, vpn2=0):  [96+k] -> l0_dev k, k in [0,33)
@@ -13,15 +19,8 @@
                 the UART leaf (slot 0) and the VIRTIO leaf (slot 1)
      root+35  = l1_dram (level-1, vpn2=2):  [j] -> l0_dram j, j in [0,64)
      root+36+j = l0_dram j (level-0):       512 identity DRAM leaves each.
-   Deliberate DEVIATIONS from kvmmake (kept to avoid touching the spec
-   layer above the leaves; see iris/CLAUDE.md):
-     - DRAM is now split per kvmmake at the tree/invariant layer (rwx-kmap):
-       kernel text [ram_base, text_end) is R|X and data [text_end, PHYSTOP)
-       is R|W, classified by §15's [kperm]/[kmap_class] and carried through
-       the M-indexed [kpt_tree_spec_gen] (KptTree).  The §1 byte-level image
-       constants ([PTE_RAM]/[kpt_lflags]/[kpt_mem]) are uniformly R|W|X and
-       survive only as the pre-tree byte-level [tlb_inv] layer that
-       SmodeCore still consumes;
+   Deliberate DEVIATIONS from kvmmake, all confined to the byte-level
+   layer of this file (see claude-notes/design/tlb-translation.md):
      - leaf A/D bits are PRESET in the default instance (xv6 leaves them
        clear).  §12 below generalizes the whole layer over a per-leaf A/D
        assignment [kpt_adf].  This build is Svadu (menvcfg.ADUE = 1): an
@@ -33,8 +32,10 @@
      - table pages are CONSECUTIVE from the root (kalloc's actual boot
        order yields descending pages);
      - the TRAMPOLINE mapping (root[255]) and the per-proc kernel stacks
-       are NOT included: the trampoline path stays client-owned
-       (TrampPt/TrampTlb, userret layer), and kernel stacks are dynamic.
+       are not part of THIS file's byte-level image: both are non-identity
+       mappings, so they live as ordinary entries of the mapping ghost's
+       map M (their claims are minted at the kvminithart switch,
+       WpKvminithart.v) and reach the tree through [kpt_tree_spec_gen].
    This file is IRIS-FREE and in the vanilla-Ltac dialect (like Pt4kWalk);
    the Iris ownership bundle for the PT bytes lives in SmodeCore. *)
 From Stdlib Require Import ZArith Bool.
@@ -412,7 +413,7 @@ Definition kpt_ad_bits (ad : bool * bool) : Z :=
 (* A/D preset), data and devices are R|W (0xC7).  [kmap_class]            *)
 (* classifies every statically (identity-)mapped vpn; [kmap_M0] is the    *)
 (* same classification as a gmap -- the initial kernel-mapping ghost map  *)
-(* of KMap.v (see claude-notes/projects/rwx-kmap.md).                     *)
+(* of KMap.v (see claude-notes/design/tlb-translation.md).                *)
 (* HAZARD: NEVER normalize [kmap_M0] (no simpl/vm_compute may touch the   *)
 (* ~49k-entry comprehension) -- every use goes through [kmap_M0_lookup].  *)
 (* ===================================================================== *)
@@ -523,10 +524,13 @@ Proof.
   intros Hram. apply kpt_mapped_static. left. exact (ram_svpn_range a Hram).
 Qed.
 
-(* address-level regions land in the matching vpn class -- the conversion
-   hooks the engines use: a fetch chunk's own [↦ₓ□] bytes give
-   [addr_is_text] hence a KP_rx claim; a store's own [↦ₘ] bytes give
-   [addr_is_kdata] hence a KP_rw claim (both via [kmap_at_static]). *)
+(* address-level regions land in the matching vpn class.  A TRANSLATED
+   actor needs no such conversion -- its own [↦ₓ]/[↦ₘ] byte carries the
+   claim (KP_rx / KP_rw) directly.  These are the hooks for the
+   PHYSICAL/identity side: given an address region, feed the class to
+   the static-claims bundle's extraction lemma [kmap_static_claims_at]
+   (KMap.v) to MANUFACTURE the identity claim -- e.g. an untranslated
+   [↦ₚ] byte being assembled into [↦ₘ], or a device address. *)
 Lemma text_svpn_class (a : mword 64) :
   addr_is_text a -> kmap_static (svpn_of a) KP_rx.
 Proof.

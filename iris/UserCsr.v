@@ -4,8 +4,7 @@
    VALUES NEVER MATTER (safety only): a permitted CSR access at U is a
    RETIRING READ of an existential value (the counter shadows, when the
    counter-enable bits allow them); everything else is Illegal.  The
-   target statements and the proof driver are recorded in
-   iris/CLAUDE.md (§CSR-AT-U PLAN): destruct each dispatch guard
+   proof driver: destruct each dispatch guard
    [eq_vec csr ADDR] with eqn:, SUBSTITUTE csr := ADDR in the true
    branch (everything downstream reduces concretely), chain the false
    branches linearly; the priv-bits compare is destructed first and

@@ -7,9 +7,9 @@
    of the old one ([update_PTE_Bits_set_ad]), the invariant absorbs the
    write: [ptree_own_path_upd] reseals the ownership at
    [ptree_set_leaf], [tlb_ok_pt_fill]/[tlb_ok_pt_set_leaf] reseal the
-   TLB consistency, and an instance spec like [kpt_tree_spec] survives
-   by [kpt_tree_spec_set_leaf].  Clients of the invariant never see the
-   memory change.
+   TLB consistency, and an instance spec like [kpt_tree_spec_gen]
+   survives by [kpt_tree_spec_gen_set_leaf].  Clients of the invariant
+   never see the memory change.
 
    Layers here (all exec-level):
      §1 the raw PTE write ([write_pte] = an 8-byte Supervisor
@@ -22,9 +22,10 @@
         the UPDATED leaf ([pt_fill_ent_uwe] -- needs only that the new
         word is an A/D variant: PPN and G are stable);
      §4 the write-back translate: [exec_translate_TLB_miss_pt_upd] and
-        the three-way [exec_translate_pt_upd] (miss arms; a HIT that
-        needs an update also write-backs and refreshes the entry --
-        worklisted, see iris/CLAUDE.md).                                 *)
+        the three-way [exec_translate_pt_upd] (miss arms), plus
+        [exec_translate_TLB_hit_pt_upd] -- a HIT whose cached word lacks
+        A/D writes back through the cached pteAddr and refreshes the
+        entry in place.                                                  *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.

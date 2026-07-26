@@ -247,6 +247,13 @@ Section IntrDefs.
      need [cfg_ok], the PT walk needs PBMTE=0 / ADUE), and S-mode never runs
      at any other value, so a parameter would only ever be instantiated at
      [MENVCFG_S] anyway. *)
+  (* [intr_frame] carries [tlb_inv_pt] -- the KPT arm of the translation
+     slot -- rather than the slot itself, and that is deliberate: xv6
+     enables interrupts only after kvminithart has installed the kernel
+     table, so an interrupt can never be taken under Bare.  (Bare with
+     SIE = '1' is also refuted concretely: [bare_inv]'s stvec cell
+     contradicts [intr_inv]'s.)  So there is nothing to gain from making
+     this slot-generic. *)
   Definition intr_frame (root_ppn : mword 44)
       (m : regfile) : iProp Σ :=
     (menvcfg ↦ᵣ MENVCFG_S ∗

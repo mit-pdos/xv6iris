@@ -63,12 +63,6 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`rwx-kmap.md`](projects/rwx-kmap.md)** — uniform-claims model and RAM-bounds cleanup complete (2026-07-24); stage 6 (boot switch) remains:
-  R/W/X-accurate kernel PT (text RX / data RW), the code points-to `↦ₓ`
-  inside `instr`, the monotone kernel-mapping claim ghost for non-identity
-  mappings, and `mem_pointsto`/`node_kdata` generalization to `addr_is_ram`.
-- **[`kvm-spec.md`](projects/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
-  mappages / walk proofs (`KvmSpec.v`).
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
@@ -81,6 +75,19 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`rwx-kmap.md`](completed/rwx-kmap.md)** — the R/W/X-accurate kernel page
+  table and the kernel mapping model: one claim ghost for identity AND
+  non-identity mappings, VA-based `↦ₘ`/`↦ₓ` (a store to kernel text is
+  unprovable), the physical tier `↦ₚ`, the boot switch, and
+  `page_own_kstack`. The live design is in
+  [`design/tlb-translation.md`](design/tlb-translation.md); the archive keeps
+  the decision record, including the two cleanups deliberately NOT done (the
+  heap-domain invariant, and slot-generic `intr_frame`).
+- **[`kvm-spec.md`](completed/kvm-spec.md)** — the kvminit / kvmmake / kvmmap /
+  mappages / walk proofs (`KvmSpec.v`), all sealed and linked: the counted-kalloc
+  tier (`avail_sub`, the additive `∃g` growth form), the `pt_rep0` zero-stop-word
+  map view, the `kvm_map` literal + `kvm_bridge`, and the large-pure-map
+  proof-engineering landmines.
 - **[`yield-sched.md`](completed/yield-sched.md)** — yield/sched/myproc specs and
   proofs (S1–S9 complete): the sconf-tier swtch port, the global scheduler-chain predicate
   `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.

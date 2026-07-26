@@ -4,11 +4,13 @@
    Where [tlb_inv] (SmodeCore.v) enumerates the kvmmake layout slot by
    slot with PRESET A/D bits ([kpt_bytes]), [tlb_inv_pt] owns the table
    as ONE recursive tree ([ptree_own], PtTree.v) constrained only by the
-   layout-free MAPPING spec [kpt_tree_spec]:
+   layout-free MAPPING spec [kpt_tree_spec_gen], the EXACT
+   representation of the mapping ghost's map M (§3b):
 
-     - every kvmmake-mapped vpn (DRAM identity RWX / device identity RW)
-       walks through some pointer path to a leaf that is an A/D VARIANT
-       ([pte_set_ad]) of the canonical [kpt_leaf_pte] -- the A/D bits
+     - every vpn M maps (text R|X / data R|W / devices R|W / trampoline /
+       the per-proc kernel stacks -- all just entries of M) walks through
+       some pointer path to a leaf that is an A/D VARIANT ([pte_set_ad])
+       of the canonical [kpt_leaf_pte_of vpn e] -- the A/D bits
        are whatever happens to be in the page-table page, as Svadu/ADUE
        requires (the hardware write-back is absorbed inside the
        invariant: [ptree_set_leaf] + [tlb_ok_pt_set_leaf]);
@@ -23,14 +25,16 @@
    into KptPt §12's [kpt_leaf_pte_ad] form, so ALL the concrete-flag
    dispatch machinery there (validity / leafness / permission checks /
    update_PTE_Bits conditions, proved for every A/D assignment) applies
-   to the tree's leaves verbatim -- see the [kpt_variant_*] corollaries,
-   which discharge exactly the hypotheses [ptree_maps] and the exec walk
-   lemmas consume.
+   to the tree's leaves verbatim -- see §2c's [kperm_variant_*]
+   corollaries (arbitrary ppn, class-keyed), which discharge exactly the
+   hypotheses [ptree_maps] and the exec walk lemmas consume.
 
-   Worklist (see iris/CLAUDE.md): the tree-generic translateAddr lemmas
-   (success incl. the ADUE write-back arm, fault), the engine rework
-   [wp_instr_s_tlbinv] -> [tlb_inv_pt], the concrete kvmmake witness
-   tree + boot introduction, and porting UserPt.v onto [ptree].          *)
+   The absorption theorem is the ONE claim-keyed
+   [tlb_inv_pt_translateAddr_at] (§6): a consumer holding
+   [kmap_at (svpn_of va) ppn pc] plus [kperm_allows pc acc] translates va
+   to ppn's page -- so a fetch is provable only at KP_rx and a store only
+   at KP_rw, and identity is just the case where the claim's ppn is
+   [kpt_leaf_ppn].  See claude-notes/design/tlb-translation.md.        *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -94,7 +98,7 @@ Qed.
 (*     dispatch facts for A/D variants of [mk_pte ppn (kperm_flags pc)],  *)
 (*     feeding [kpt_tree_spec_gen]'s uniform maps-clause: identity        *)
 (*     text/data/device leaves AND the dynamic kstack leaves are all      *)
-(*     instances (KptPt §15; claude-notes/projects/rwx-kmap.md).          *)
+(*     instances (KptPt §15; claude-notes/design/tlb-translation.md).     *)
 (* ===================================================================== *)
 
 (* an A/D variant of a class-keyed leaf IS the leaf at the corresponding

@@ -35,7 +35,7 @@
       built by kvmmake/mappages have zero stop words by construction.
       [pt_rep0_rep] weakens to the model-invalid view [pt_rep], which is
       the same shape as UptTree's [um] (and [upt_tree_spec] /
-      [kpt_tree_spec] are derivable at the concrete maps, exact leaves
+      [kpt_tree_spec_gen] are derivable at the concrete maps, exact leaves
       being A/D variants of themselves) -- so the specs compose unchanged
       into both the kernel boot story and the user page-table story.
 
@@ -157,15 +157,15 @@ Section KvmSpecs.
   (* -- built with [pt_insert_run] at the six (vpn0, ppn0, perm, npages)   *)
   (* tuples so the kvmmap posts chain definitionally; defined at proof     *)
   (* time next to the witness, not here.                                   *)
-  (* NOTE for the boot introduction (out of scope here): [kpt_tree_spec]   *)
-  (* currently claims uniform-RWX DRAM leaves (the KptPt deviation); the   *)
-  (* real table is text-RX / data-RW, so that spec gets REVISED to the     *)
-  (* true per-region flags when [tlb_inv_pt] is first established from     *)
-  (* [pt_rep t kvm_map] at kvminithart.                                    *)
+  (* The boot introduction lives elsewhere: [kvm_bridge] (KvmMap.v) turns *)
+  (* this post's [pt_rep0 t (kvm_map_full pas)] into                      *)
+  (* [kpt_tree_spec_gen root (kvm_M pas) t], and [wp_kvminithart]         *)
+  (* installs it as [tlb_inv_pt].                                         *)
   (* ------------------------------------------------------------------- *)
 
   (* Total kalloc consumption of kvmmake: 102 table pages (the root L2 +
-     3 L1 group tables + 98 L0 tables -- see kvm-spec.md's node accounting,
+     3 L1 group tables + 98 L0 tables -- see the node accounting in
+     claude-notes/completed/kvm-spec.md,
      pinned to [pt_nodes = 102] in the proof) + 64 kstack leaf pages. *)
   Definition K_kvmmake : nat := 166.
 

@@ -1,10 +1,10 @@
-(* KvmMap.v -- the CONCRETE kernel map kvmmake builds (kvm-spec item ii):
+(* KvmMap.v -- the CONCRETE kernel map kvmmake builds:
    the xv6 memory-layout constants, the six-region [kvm_map] gmap literal
    (chained [pt_insert_run]s in kvmmake's call order) + the 64 kstack
    entries, and THE BRIDGE: a table representing [kvm_map_full pas]
    satisfies the kpt mapping invariants ([kpt_tree_spec_gen] at the
-   target auth map [kvm_M pas] = kmap_M0 ∪ kstacks) -- what the boot
-   switch (rwx-kmap stage 6) installs into [tlb_inv_pt].
+   target auth map [kvm_M pas] = kmap_M0 ∪ kstacks) -- what
+   [wp_kvminithart] installs into [tlb_inv_pt].
 
    The A/D story is free: kvmmake writes A/D-CLEAR words
    [mappages_pte ppn perm i = mk_pte (ppn+i) (perm|1)], and the gen tree
@@ -13,8 +13,8 @@
    (0xCB -> 0x0B text, 0xC7 -> 0x07 data/dev), and
    [pte_set_ad pte_tramp 0 0] IS the trampoline word (0x4B -> 0x0B).
 
-   Pure (no Iris): the ghost/auth side of the switch stays in stage 6.
-   See claude-notes/projects/kvm-spec.md. *)
+   Pure (no Iris): the ghost/auth side of the switch is [kvm_M_mint]
+   (WpKvminithart.v).  See claude-notes/design/tlb-translation.md. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list_numbers bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -112,7 +112,7 @@ Definition kvm_map_full (pas : nat -> mword 44) : gmap (mword 27) (mword 64) :=
 
 (* ===================================================================== *)
 (* §3 The TARGET AUTH MAP: kmap_M0 extended with the kstack entries --    *)
-(*    exactly what the stage-6 switch folds [kmap_insert] over.           *)
+(*    exactly what the kvminithart switch folds [kmap_insert] over.       *)
 (* ===================================================================== *)
 
 Fixpoint kvm_M_stacks (pas : nat -> mword 44) (k : nat)
@@ -846,7 +846,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 (* §5 THE BRIDGE (the deliverable): a table representing the full kvm     *)
 (*    map satisfies the kpt mapping invariants at the target auth map,   *)
-(*    and that map is wf (so the stage-6 switch can install it).          *)
+(*    and that map is wf (so the kvminithart switch can install it).      *)
 (* ===================================================================== *)
 
 (* the full-map word at an M-entry IS the zero-A/D variant of the class leaf *)

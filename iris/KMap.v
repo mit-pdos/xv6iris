@@ -22,7 +22,7 @@
    claim honored under Bare is a static identity entry (a fragment agreeing
    against auth-[kmap_M0] looks up in [kmap_M0], [kmap_M0_lookup]); the KPT
    arm holds [kmap_auth M] for the existential [M] of [tlb_inv_pt].
-   See claude-notes/projects/rwx-kmap.md. *)
+   See claude-notes/design/tlb-translation.md. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -98,7 +98,8 @@ Section KMap.
   Proof. apply _. Qed.
 
   (* extraction: any statically classified vpn's identity claim, off the
-     bundle (replaces the old pure-arm [kmap_at_static]) *)
+     bundle -- this is how a proof with no claim in hand gets one (the
+     bundle is persistent and rides in [hw_config], so it is ambient) *)
   Lemma kmap_static_claims_at (vpn : mword 27) (pc : kperm) :
     kmap_static vpn pc ->
     kmap_static_claims -∗ kmap_at vpn (kpt_leaf_ppn vpn) pc.

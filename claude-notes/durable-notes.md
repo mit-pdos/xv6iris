@@ -116,6 +116,16 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - The Sail model (`Import Defs` / `Riscv.rv64d`) SHADOWS `filter` (a bool list filter) and `not` (bool negation): in model-importing files write `base.filter` for the stdpp map filter and `¬` (never `not`) for Logic negation, or the elaborator demands `bool`. Similarly, do NOT `Require Import SailStdpp.Values` just to name `mword` in a type annotation — it leaks typeclass instances that break unrelated Iris proofs ("Unable to find an instance"); reference it qualified (`SailStdpp.Values.mword`) instead.
 - Section gotchas: a lemma using NO section vars is not generalized over them; `intros ->` on a section-variable equation BREAKS references to sibling section lemmas (state such wrappers outside the section); `Proof using All` generalizes over ALL context vars (callers must then pass them). A section `Variable` (e.g. `root_ppn`) auto-threads intra-file but external callers pass it as the LEADING argument.
 
+## Reusable recipes (validated; reuse verbatim)
+
+- **WRAPPER RECIPE — generalizing a lemma without churning call sites.** The generic lemma gets the NEW name; the old name becomes a RESTATEMENT `Lemma` with the verbatim original statement, closed by `exact (<generic> <instance> <explicit binders>)`. NEVER make the old name a `Definition`/notation alias — an implicit argument (`dq`, a section variable) becomes positional and every call site churns. This is how the whole S-mode leaf layer went regime-generic (`R : s_regime`) with zero consumer edits.
+- **Large pure-map / big-literal work** (e.g. a page-table map built by `pt_insert_run` over 16384- and 31977-page regions — KvmMap.v is the worked example). These are not micro-optimizations; each mistake is a 200 s+ compile or an OOM:
+  - **Peel ONE run at a time with the accumulator kept FOLDED.** Never unfold a chain of run-inserts into a single term before rewriting — every subsequent rewrite then traverses the giant term and the cost compounds to a timeout. Write per-step peel helpers (`kvm_m*_peel`).
+  - `Typeclasses Opaque`/`Opaque` do NOT stop kernel/`rewrite` conversion. The folding discipline above is the only real fix.
+  - `cbn` unfolds `pte_set_ad` and `bv_unsigned`-of-literal; use `cbn [fst snd]`.
+  - Folding one call's post into the next accumulator with `change`/`reflexivity` makes the KERNEL normalize the fixpoint over the page count (220 s+, >2 GB RSS). Discharge such a `⌜pt_rep0 t' m_k⌝` obligation with `unfold m_k; exact Hrep'` — one delta step plus a syntactic `exact`, no normalization.
+  - `lia` fails on large-literal and evar goals under the `bitvector.tactics` zify hook (see the gotchas above), and ALSO fails when ANY `mword` is merely in CONTEXT. Package the arithmetic into `mword`-free top-level helper lemmas and apply them as closed facts; project booleans explicitly (`Z.leb_gt`/`Z.ltb_ge`).
+
 ## Spec-design preferences (durable)
 
 - **Cleaner specs and abstractions beat avoiding rework** (see the guiding principle at the top of this file). Refactor or rewrite freely to reach a better shape; do NOT keep near-duplicate lemma families, awkward interfaces, or leaky abstractions merely because they already compile. Prefer one parametric lemma over a cross-product of special cases.
