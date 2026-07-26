@@ -285,7 +285,7 @@ Section WpSchedDecode.
   (* ---- +0x28: c.add a5,a5,a4 ---- *)
   Lemma sdi_28 : kernel_text -∗ instr (mword_of_int (SD + 0x28) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (SD + 0x28)%Z (mword_of_int 0x97ba : mword 16)
-    (mword_of_int (SD + 0x28) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) mdec_97ba exec_execute_C_ADD. Qed.
+    (mword_of_int (SD + 0x28) : mword 64) (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) cdec_97ba exec_execute_C_ADD. Qed.
 
   (* ---- +0x2a: lw a4,168(a5) ---- *)
   Lemma sdi_2a : kernel_text -∗ instr (mword_of_int (SD + 0x2a) : mword 64) false (LOAD (mword_of_int 168 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), false, 4)).

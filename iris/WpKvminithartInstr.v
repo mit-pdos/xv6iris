@@ -69,13 +69,13 @@ Section KvminithartInstrs.
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
   (* ---- kvminithart instr lemmas ---- *)
   Lemma kvi_00 : KVI 0x00 true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).  (* addi sp,sp,-16 *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x00)%Z (mword_of_int 0x1141 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) mdec_ccc exec_execute_C_ADDI. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x00)%Z (mword_of_int 0x1141 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
   Lemma kvi_02 : KVI 0x02 true (STORE (csdsp_imm 1, Regidx (mword_of_int 1), sp, 8)).  (* sd ra,8(sp) *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x02)%Z (mword_of_int 0xe406 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x02) : mword 64) (STORE (csdsp_imm 1, Regidx (mword_of_int 1), sp, 8)) mdec_cce exec_execute_C_SDSP. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x02)%Z (mword_of_int 0xe406 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x02) : mword 64) (STORE (csdsp_imm 1, Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
   Lemma kvi_04 : KVI 0x04 true (STORE (csdsp_imm 0, Regidx (mword_of_int 8), sp, 8)).  (* sd s0,0(sp) *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x04)%Z (mword_of_int 0xe022 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x04) : mword 64) (STORE (csdsp_imm 0, Regidx (mword_of_int 8), sp, 8)) mdec_cd0 exec_execute_C_SDSP. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x04)%Z (mword_of_int 0xe022 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x04) : mword 64) (STORE (csdsp_imm 0, Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
   Lemma kvi_06 : KVI 0x06 true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).  (* addi s0,sp,16 *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x06)%Z (mword_of_int 0x0800 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) mdec_cd2 exec_execute_C_ADDI4SPN. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x06)%Z (mword_of_int 0x0800 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
   Lemma kvi_08 : KVI 0x08 false (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0))).  (* sfence.vma zero,zero *)
   Proof. mk_base (KernelSyms.kvminithart + 0x08)%Z (mword_of_int 0x12000073 : mword 32) (mword_of_int (KernelSyms.kvminithart + 0x08) : mword 64) (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0))) kvidec_08. Qed.
   Lemma kvi_0c : KVI 0x0c false (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)).  (* auipc a5,0x9 *)
@@ -95,11 +95,11 @@ Section KvminithartInstrs.
   Lemma kvi_20 : KVI 0x20 false (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0))).  (* sfence.vma zero,zero *)
   Proof. mk_base (KernelSyms.kvminithart + 0x20)%Z (mword_of_int 0x12000073 : mword 32) (mword_of_int (KernelSyms.kvminithart + 0x20) : mword 64) (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0))) kvidec_20. Qed.
   Lemma kvi_24 : KVI 0x24 true (LOAD (csdsp_imm 1, sp, Regidx (mword_of_int 1), false, 8)).  (* ld ra,8(sp) *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x24)%Z (mword_of_int 0x60a2 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x24) : mword 64) (LOAD (csdsp_imm 1, sp, Regidx (mword_of_int 1), false, 8)) mdec_cea exec_execute_C_LDSP. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x24)%Z (mword_of_int 0x60a2 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x24) : mword 64) (LOAD (csdsp_imm 1, sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
   Lemma kvi_26 : KVI 0x26 true (LOAD (csdsp_imm 0, sp, Regidx (mword_of_int 8), false, 8)).  (* ld s0,0(sp) *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x26)%Z (mword_of_int 0x6402 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x26) : mword 64) (LOAD (csdsp_imm 0, sp, Regidx (mword_of_int 8), false, 8)) mdec_cec exec_execute_C_LDSP. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x26)%Z (mword_of_int 0x6402 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x26) : mword 64) (LOAD (csdsp_imm 0, sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
   Lemma kvi_28 : KVI 0x28 true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)).  (* addi sp,sp,16 *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x28)%Z (mword_of_int 0x0141 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x28) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) mdec_cee exec_execute_C_ADDI. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x28)%Z (mword_of_int 0x0141 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x28) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 2), Regidx (mword_of_int 2), ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
   Lemma kvi_2a : KVI 0x2a true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).  (* ret *)
   Proof. mk_rvc (KernelSyms.kvminithart + 0x2a)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 

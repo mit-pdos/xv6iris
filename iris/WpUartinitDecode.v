@@ -5,7 +5,7 @@
 
    it proves a [kernel_text -* instr pc <is_rvc> <AST>] fact ([uii_<off>]).  The
    16-byte-frame prologue/epilogue compressed encodings reuse the shared
-   [mdec_*] helpers from KernelRvcDecode (identical to kinit); the LUI/SB/AUIPC/
+   [cdec_*] helpers from KernelRvcDecode (identical to kinit); the LUI/SB/AUIPC/
    ADDI/JAL base words and the c.li/c.mv get fresh decode helpers here. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
@@ -123,22 +123,22 @@ Section WpUartinitDecode.
 
   Notation UI := KernelSyms.uartinit.
 
-  (* --- prologue (0x00..0x06): shared mdec_* helpers, as in kinit --- *)
+  (* --- prologue (0x00..0x06): shared cdec_* helpers, as in kinit --- *)
   Lemma uii_00 : kernel_text -∗ instr (mword_of_int (UI + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (UI + 0x00)%Z (mword_of_int 0x1141 : mword 16)
-    (mword_of_int (UI + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_ccc exec_execute_C_ADDI. Qed.
+    (mword_of_int (UI + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
 
   Lemma uii_02 : kernel_text -∗ instr (mword_of_int (UI + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
   Proof. mk_rvc (UI + 0x02)%Z (mword_of_int 0xe406 : mword 16)
-    (mword_of_int (UI + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) mdec_cce exec_execute_C_SDSP. Qed.
+    (mword_of_int (UI + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
 
   Lemma uii_04 : kernel_text -∗ instr (mword_of_int (UI + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
   Proof. mk_rvc (UI + 0x04)%Z (mword_of_int 0xe022 : mword 16)
-    (mword_of_int (UI + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) mdec_cd0 exec_execute_C_SDSP. Qed.
+    (mword_of_int (UI + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
 
   Lemma uii_06 : kernel_text -∗ instr (mword_of_int (UI + 0x06) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
   Proof. mk_rvc (UI + 0x06)%Z (mword_of_int 0x0800 : mword 16)
-    (mword_of_int (UI + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) mdec_cd2 exec_execute_C_ADDI4SPN. Qed.
+    (mword_of_int (UI + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
 
   (* --- body (0x08..0x36): LUI/SB/ADDI/c.li/c.mv --- *)
   Lemma uii_08 : kernel_text -∗ instr (mword_of_int (UI + 0x08) : mword 64) false (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)).
@@ -219,18 +219,18 @@ Section WpUartinitDecode.
   Proof. mk_base (UI + 0x4a)%Z (mword_of_int 0x2b8000ef : mword 32)
     (mword_of_int (UI + 0x4a) : mword 64) (JAL (mword_of_int 696 : mword 21, Regidx (mword_of_int 1))) uidb_2b8000ef. Qed.
 
-  (* --- epilogue (0x4e..0x54): shared mdec_* helpers, as in kinit --- *)
+  (* --- epilogue (0x4e..0x54): shared cdec_* helpers, as in kinit --- *)
   Lemma uii_4e : kernel_text -∗ instr (mword_of_int (UI + 0x4e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (UI + 0x4e)%Z (mword_of_int 0x60a2 : mword 16)
-    (mword_of_int (UI + 0x4e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) mdec_cea exec_execute_C_LDSP. Qed.
+    (mword_of_int (UI + 0x4e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
 
   Lemma uii_50 : kernel_text -∗ instr (mword_of_int (UI + 0x50) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
   Proof. mk_rvc (UI + 0x50)%Z (mword_of_int 0x6402 : mword 16)
-    (mword_of_int (UI + 0x50) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) mdec_cec exec_execute_C_LDSP. Qed.
+    (mword_of_int (UI + 0x50) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
 
   Lemma uii_52 : kernel_text -∗ instr (mword_of_int (UI + 0x52) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (UI + 0x52)%Z (mword_of_int 0x0141 : mword 16)
-    (mword_of_int (UI + 0x52) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_cee exec_execute_C_ADDI. Qed.
+    (mword_of_int (UI + 0x52) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
 
   Lemma uii_54 : kernel_text -∗ instr (mword_of_int (UI + 0x54) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (UI + 0x54)%Z (mword_of_int 0x8082 : mword 16)

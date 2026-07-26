@@ -48,7 +48,7 @@ Local Ltac m_close0 s HmisaC :=
   [ cbn beta iota; rewrite exec_returnM; cbn beta iota; rewrite exec_returnM; m_ast
   | apply (exec_currentlyEnabled_Zca s HmisaC) ].
 
-(* The eight 16-byte-frame prologue/epilogue decodes ([mdec_ccc]..[cdec_8082],
+(* The eight 16-byte-frame prologue/epilogue decodes ([cdec_1141]..[cdec_8082],
    c.addi sp / c.sdsp / c.addi4spn / c.ldsp / c.ret) live in KernelRvcDecode.v,
    shared with the other functions that use this frame. *)
 
@@ -117,29 +117,31 @@ Section WpMemsetInstr.
   (* [mk_rvc] targets the ExecuteAs-EXPANDED base instruction:
      [instr pc true base], where [decname] decodes the compressed form i0 and
      [expname] is i0's [exec_execute_C_*] ExecuteAs-expansion into [base].
-     Addresses are given as [KernelSyms.memset + offset]; the [mdec_*] decode
-     lemmas are keyed by instruction BITS (address-independent), so their names
-     carry a low-byte address that need not match the current image. *)
+     Addresses are given as [KernelSyms.memset + offset].  This file's own
+     [mdec_*] decode lemmas are keyed by instruction BITS (address-independent)
+     even though their names carry a low-byte address, so those names need not
+     match the current image; the SHARED decodes it uses are [cdec_<word>] from
+     KernelRvcDecode.v. *)
 
   (* +0x00  c.addi16sp sp,-16  ->  addi sp,sp,-16 *)
   Lemma minstr_cba : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (KernelSyms.memset + 0x00)%Z (mword_of_int 0x1141 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_ccc exec_execute_C_ADDI. Qed.
+           (mword_of_int (KernelSyms.memset + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
 
   (* +0x02  c.sdsp ra,8(sp)  ->  sd ra,8(sp) *)
   Lemma minstr_cbc : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
   Proof. mk_rvc (KernelSyms.memset + 0x02)%Z (mword_of_int 0xe406 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) mdec_cce exec_execute_C_SDSP. Qed.
+           (mword_of_int (KernelSyms.memset + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
 
   (* +0x04  c.sdsp s0,0(sp)  ->  sd s0,0(sp) *)
   Lemma minstr_cbe : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
   Proof. mk_rvc (KernelSyms.memset + 0x04)%Z (mword_of_int 0xe022 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) mdec_cd0 exec_execute_C_SDSP. Qed.
+           (mword_of_int (KernelSyms.memset + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
 
   (* +0x06  c.addi4spn s0,sp,16  ->  addi s0,sp,16 *)
   Lemma minstr_cc0 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x06) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
   Proof. mk_rvc (KernelSyms.memset + 0x06)%Z (mword_of_int 0x0800 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) mdec_cd2 exec_execute_C_ADDI4SPN. Qed.
+           (mword_of_int (KernelSyms.memset + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
 
   (* +0x08  c.beqz a2,+0x1e  ->  beq a2,x0,+0x1e *)
   Lemma minstr_cc2 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x08) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 4)), BEQ)).
@@ -184,17 +186,17 @@ Section WpMemsetInstr.
   (* +0x1e  c.ldsp ra,8(sp)  ->  ld ra,8(sp) *)
   Lemma minstr_cd8 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.memset + 0x1e)%Z (mword_of_int 0x60a2 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) mdec_cea exec_execute_C_LDSP. Qed.
+           (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
 
   (* +0x20  c.ldsp s0,0(sp)  ->  ld s0,0(sp) *)
   Lemma minstr_cda : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x20) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
   Proof. mk_rvc (KernelSyms.memset + 0x20)%Z (mword_of_int 0x6402 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x20) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) mdec_cec exec_execute_C_LDSP. Qed.
+           (mword_of_int (KernelSyms.memset + 0x20) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
 
   (* +0x22  c.addi16sp sp,16  ->  addi sp,sp,16 *)
   Lemma minstr_cdc : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x22) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (KernelSyms.memset + 0x22)%Z (mword_of_int 0x0141 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x22) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) mdec_cee exec_execute_C_ADDI. Qed.
+           (mword_of_int (KernelSyms.memset + 0x22) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
 
   (* +0x24  c.jr ra  (ret)  ->  jalr x0,0(ra) *)
   Lemma minstr_cde : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x24) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).

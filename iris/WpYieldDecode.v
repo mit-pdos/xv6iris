@@ -3,7 +3,7 @@
 
    yield's 32-byte frame prologue/epilogue (c.addi sp,-32 / three c.sdsp /
    c.addi4spn / three c.ldsp / c.addi16sp / c.ret) is byte-identical to
-   myproc's/acquire's, so those decodes reuse the shared [podec_*] templates
+   myproc's/acquire's, so those decodes reuse the shared [cdec_*] templates
    from KernelRvcDecode.v.  The four jal's (myproc / acquire / sched /
    release), the two c.mv's (s1,a0 and a0,s1), the c.li a5,3 and the
    c.sw a5,24(s1) are yield's own and get fresh templates here. *)
@@ -88,26 +88,26 @@ Section WpYieldDecode.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* ---- prologue: 32-byte frame, saves ra/s0/s1 (shared podec_* decodes) ---- *)
+  (* ---- prologue: 32-byte frame, saves ra/s0/s1 (shared cdec_* decodes) ---- *)
   Lemma ydi_00 : kernel_text -∗ instr (mword_of_int (YD + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (YD + 0x00)%Z (mword_of_int 0x1101 : mword 16)
-    (mword_of_int (YD + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) podec_00 exec_execute_C_ADDI. Qed.
+    (mword_of_int (YD + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1101 exec_execute_C_ADDI. Qed.
 
   Lemma ydi_02 : kernel_text -∗ instr (mword_of_int (YD + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
   Proof. mk_rvc (YD + 0x02)%Z (mword_of_int 0xec06 : mword 16)
-    (mword_of_int (YD + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) podec_02 exec_execute_C_SDSP. Qed.
+    (mword_of_int (YD + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_ec06 exec_execute_C_SDSP. Qed.
 
   Lemma ydi_04 : kernel_text -∗ instr (mword_of_int (YD + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
   Proof. mk_rvc (YD + 0x04)%Z (mword_of_int 0xe822 : mword 16)
-    (mword_of_int (YD + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) podec_04 exec_execute_C_SDSP. Qed.
+    (mword_of_int (YD + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e822 exec_execute_C_SDSP. Qed.
 
   Lemma ydi_06 : kernel_text -∗ instr (mword_of_int (YD + 0x06) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
   Proof. mk_rvc (YD + 0x06)%Z (mword_of_int 0xe426 : mword 16)
-    (mword_of_int (YD + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) podec_06 exec_execute_C_SDSP. Qed.
+    (mword_of_int (YD + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cdec_e426 exec_execute_C_SDSP. Qed.
 
   Lemma ydi_08 : kernel_text -∗ instr (mword_of_int (YD + 0x08) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
   Proof. mk_rvc (YD + 0x08)%Z (mword_of_int 0x1000 : mword 16)
-    (mword_of_int (YD + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) podec_08 exec_execute_C_ADDI4SPN. Qed.
+    (mword_of_int (YD + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_1000 exec_execute_C_ADDI4SPN. Qed.
 
   (* ---- +0x0a: jal myproc ---- *)
   Lemma ydi_0a : kernel_text -∗ instr (mword_of_int (YD + 0x0a) : mword 64) false (JAL (mword_of_int 2095648 : mword 21, Regidx (mword_of_int 1))).
@@ -149,23 +149,23 @@ Section WpYieldDecode.
   Proof. mk_base (YD + 0x1e)%Z (mword_of_int 0xd99fe0ef : mword 32)
     (mword_of_int (YD + 0x1e) : mword 64) (JAL (mword_of_int 2092440 : mword 21, Regidx (mword_of_int 1))) yddec_jal_release. Qed.
 
-  (* ---- +0x22..+0x26: c.ldsp ra/s0/s1 (shared podec_* decodes) ---- *)
+  (* ---- +0x22..+0x26: c.ldsp ra/s0/s1 (shared cdec_* decodes) ---- *)
   Lemma ydi_22 : kernel_text -∗ instr (mword_of_int (YD + 0x22) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (YD + 0x22)%Z (mword_of_int 0x60e2 : mword 16)
-    (mword_of_int (YD + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) podec_22 exec_execute_C_LDSP. Qed.
+    (mword_of_int (YD + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60e2 exec_execute_C_LDSP. Qed.
 
   Lemma ydi_24 : kernel_text -∗ instr (mword_of_int (YD + 0x24) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
   Proof. mk_rvc (YD + 0x24)%Z (mword_of_int 0x6442 : mword 16)
-    (mword_of_int (YD + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) podec_24 exec_execute_C_LDSP. Qed.
+    (mword_of_int (YD + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6442 exec_execute_C_LDSP. Qed.
 
   Lemma ydi_26 : kernel_text -∗ instr (mword_of_int (YD + 0x26) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
   Proof. mk_rvc (YD + 0x26)%Z (mword_of_int 0x64a2 : mword 16)
-    (mword_of_int (YD + 0x26) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) podec_26 exec_execute_C_LDSP. Qed.
+    (mword_of_int (YD + 0x26) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cdec_64a2 exec_execute_C_LDSP. Qed.
 
   (* ---- +0x28: c.addi16sp sp,32 ---- *)
   Lemma ydi_28 : kernel_text -∗ instr (mword_of_int (YD + 0x28) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc (YD + 0x28)%Z (mword_of_int 0x6105 : mword 16)
-    (mword_of_int (YD + 0x28) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) podec_28 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (YD + 0x28) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) cdec_6105 exec_execute_C_ADDI16SP. Qed.
 
   (* ---- +0x2a: c.ret ---- *)
   Lemma ydi_2a : kernel_text -∗ instr (mword_of_int (YD + 0x2a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
