@@ -44,6 +44,8 @@ Big things that still need to be done/explored:
     - https://plv.mpi-sws.org/gps/
     - https://people.mpi-sws.org/~haidang/publications/thesis.pdf
 - liveness, or at least deadlock avoidance
+  - acquire currently calls panic if already holding lock on same CPU
+  - lock ordering could solve deadlock and acquire's panic
 - crash reasoning for file system
 
 Don't know where else to put this:
