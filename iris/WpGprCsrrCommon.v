@@ -38,11 +38,16 @@ Proof. destruct b; reflexivity. Qed.
 
 (* Generic register-generic CSR-read step: csrr rd, csr  (= csrrs rd,csr,rs1z
    with rs1z = x0).  Parameterised over the CSR; the per-CSR facts
-   (accessibility, read value, callback) are supplied as hypotheses. *)
-Lemma csrr_read_step (csr : mword 12) (rd : mword 5) (readval : mword 64) (s s_w : mstate) :
-  register_lookup cur_privilege s.(sregs) = Machine ->
-  exec (check_CSR_result csr Machine CSRRead) s = Some (CSR_Check_OK tt, s) ->
-  ext_check_CSR csr Machine CSRRead = true ->
+   (accessibility, read value, callback) are supplied as hypotheses.
+
+   Privilege is a parameter for the same reason as in [exec_doCSR_csrw_p]:
+   nothing on the read path inspects it beyond the [cur_privilege] read that
+   the check_CSR_result premise already speaks about, so ONE lemma serves the
+   Machine-mode boot leaves and the S-mode ones (time in WpSconfTimer). *)
+Lemma csrr_read_step_p (p : Privilege) (csr : mword 12) (rd : mword 5) (readval : mword 64) (s s_w : mstate) :
+  register_lookup cur_privilege s.(sregs) = p ->
+  exec (check_CSR_result csr p CSRRead) s = Some (CSR_Check_OK tt, s) ->
+  ext_check_CSR csr p CSRRead = true ->
   exec (read_CSR csr) s = Some (readval, s) ->
   eq_vec csr ((Ox"344") : mword 12) = false ->
   eq_vec csr ((Ox"144") : mword 12) = false ->
@@ -75,6 +80,18 @@ Proof.
   apply exec_returnM.
 Qed.
 
+Lemma csrr_read_step (csr : mword 12) (rd : mword 5) (readval : mword 64) (s s_w : mstate) :
+  register_lookup cur_privilege s.(sregs) = Machine ->
+  exec (check_CSR_result csr Machine CSRRead) s = Some (CSR_Check_OK tt, s) ->
+  ext_check_CSR csr Machine CSRRead = true ->
+  exec (read_CSR csr) s = Some (readval, s) ->
+  eq_vec csr ((Ox"344") : mword 12) = false ->
+  eq_vec csr ((Ox"144") : mword 12) = false ->
+  exec (csr_id_read_callback csr readval) s = Some (tt, s) ->
+  exec (wX_bits (Regidx rd) readval) s = Some (tt, s_w) ->
+  exec (execute_CSRReg csr zreg (Regidx rd) CSRRS) s = Some (RETIRE_SUCCESS, s_w).
+Proof. apply (csrr_read_step_p Machine csr rd readval s s_w). Qed.
+
 (* Walk the [read_CSR] dispatch; see WpGprCsrrAny provenance / build-perf note. *)
 Ltac drive_csr :=
   unfold read_CSR;
@@ -97,12 +114,13 @@ Ltac drive_csr :=
       end; cbn match ].
 
 (* Gated check_CSR_result engine for CSRRead. *)
-Lemma exec_check_CSR_read (csr : mword 12) s :
-  exec (check_CSR_priv csr Machine) s = Some (true, s) ->
+(* privilege-generic, for the same reason as [csrr_read_step_p]. *)
+Lemma exec_check_CSR_read_p (p : Privilege) (csr : mword 12) s :
+  exec (check_CSR_priv csr p) s = Some (true, s) ->
   check_CSR_access csr CSRRead = true ->
-  exec (is_CSR_accessible csr Machine CSRRead) s = Some (true, s) ->
-  exec (stateen_allows_CSR_access csr Machine CSRRead) s = Some (true, s) ->
-  exec (check_CSR csr Machine CSRRead) s = Some (true, s).
+  exec (is_CSR_accessible csr p CSRRead) s = Some (true, s) ->
+  exec (stateen_allows_CSR_access csr p CSRRead) s = Some (true, s) ->
+  exec (check_CSR csr p CSRRead) s = Some (true, s).
 Proof.
   intros Hpriv Hca Hacc Hst. unfold check_CSR.
   rewrite (exec_and_boolM_Some _ _ _ _ _ Hpriv). cbn match.
@@ -113,13 +131,26 @@ Proof.
   exact Hst.
 Qed.
 
-Lemma exec_check_CSR_result_read (csr : mword 12) s :
-  exec (check_CSR csr Machine CSRRead) s = Some (true, s) ->
-  exec (check_CSR_result csr Machine CSRRead) s = Some (CSR_Check_OK tt, s).
+Lemma exec_check_CSR_read (csr : mword 12) s :
+  exec (check_CSR_priv csr Machine) s = Some (true, s) ->
+  check_CSR_access csr CSRRead = true ->
+  exec (is_CSR_accessible csr Machine CSRRead) s = Some (true, s) ->
+  exec (stateen_allows_CSR_access csr Machine CSRRead) s = Some (true, s) ->
+  exec (check_CSR csr Machine CSRRead) s = Some (true, s).
+Proof. apply (exec_check_CSR_read_p Machine csr s). Qed.
+
+Lemma exec_check_CSR_result_read_p (p : Privilege) (csr : mword 12) s :
+  exec (check_CSR csr p CSRRead) s = Some (true, s) ->
+  exec (check_CSR_result csr p CSRRead) s = Some (CSR_Check_OK tt, s).
 Proof.
   intro Hcc. unfold check_CSR_result.
   rewrite (exec_bind_Some _ _ _ _ _ Hcc). cbn match. apply exec_returnm.
 Qed.
+
+Lemma exec_check_CSR_result_read (csr : mword 12) s :
+  exec (check_CSR csr Machine CSRRead) s = Some (true, s) ->
+  exec (check_CSR_result csr Machine CSRRead) s = Some (CSR_Check_OK tt, s).
+Proof. apply (exec_check_CSR_result_read_p Machine csr s). Qed.
 
 (* currentlyEnabled Ext_U. *)
 Lemma exec_hartSupports_U s : exec (hartSupports Ext_U) s = Some (true, s).

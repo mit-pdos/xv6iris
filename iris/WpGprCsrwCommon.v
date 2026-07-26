@@ -25,11 +25,15 @@ Proof.
   reflexivity.
 Qed.
 
-(* The doCSR write path, parameterised by the per-CSR write_CSR result. *)
-Lemma exec_doCSR_csrw (csr : mword 12) (v : mword 64) (s s' : mstate) (cfinal : mword 64) :
-  register_lookup cur_privilege s.(sregs) = Machine ->
-  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s) ->
-  ext_check_CSR csr Machine CSRWrite = true ->
+(* The doCSR write path, parameterised by the per-CSR write_CSR result AND by
+   the current privilege: nothing on this path inspects [p] beyond the
+   [cur_privilege] read that the check_CSR_result premise already speaks about,
+   so ONE lemma serves the Machine-mode boot leaves and the S-mode ones
+   (satp in UserretDefs, stimecmp in WpSconfTimer) alike. *)
+Lemma exec_doCSR_csrw_p (p : Privilege) (csr : mword 12) (v : mword 64) (s s' : mstate) (cfinal : mword 64) :
+  register_lookup cur_privilege s.(sregs) = p ->
+  exec (check_CSR_result csr p CSRWrite) s = Some (CSR_Check_OK tt, s) ->
+  ext_check_CSR csr p CSRWrite = true ->
   eq_vec csr (Ox"344") = false ->
   eq_vec csr (Ox"144") = false ->
   exec (write_CSR csr v) s = Some (Ok cfinal, s') ->
@@ -43,7 +47,8 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ Hchk). cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
   rewrite Hpriv.
-  rewrite Hext. cbn match.
+  rewrite Hext.
+  change (Riscv.rv64d.not true) with false. cbn match.
   replace (if generic_neq CSRWrite CSRWrite then read_CSR csr else returnM (zeros' 64))
     with (returnM (zeros' 64) : M (mword 64)) by reflexivity.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (zeros' 64) s)).
@@ -51,19 +56,33 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (zeros' 64) s)).
   replace (generic_eq CSRWrite CSRRead) with false by reflexivity. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ Hwr). cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_zreg (zeros' 64) s')).
-  rewrite (exec_bind0_Some _ _ _ _ _ Hcb).
+  match goal with |- context[Defs.bind0 (Defs.bind0 ?a ?b) ?c] =>
+    assert (Hab : exec (Defs.bind0 a b) s' = Some (tt, s')) end.
+  { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_zreg (zeros' 64) s')).
+    exact Hcb. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hab).
   apply exec_returnM.
 Qed.
+
+Lemma exec_doCSR_csrw (csr : mword 12) (v : mword 64) (s s' : mstate) (cfinal : mword 64) :
+  register_lookup cur_privilege s.(sregs) = Machine ->
+  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s) ->
+  ext_check_CSR csr Machine CSRWrite = true ->
+  eq_vec csr (Ox"344") = false ->
+  eq_vec csr (Ox"144") = false ->
+  exec (write_CSR csr v) s = Some (Ok cfinal, s') ->
+  exec (csr_id_write_callback csr cfinal) s' = Some (tt, s') ->
+  exec (doCSR csr v zreg CSRRW CSRWrite) s = Some (RETIRE_SUCCESS, s').
+Proof. apply (exec_doCSR_csrw_p Machine csr v s s' cfinal). Qed.
 
 (* execute_CSRReg for csrw (rd=x0=zreg, op=CSRRW): reads rs1 (generic -- rs1=0
    is a legitimate "write literal 0" and is handled like any other index, by
    baking the same if-guard [rX_bits] itself uses directly into the [write_CSR]
    premise, rather than imposing a [uint rs1 <> 0] side condition). *)
-Lemma exec_execute_csrw_gpr (csr : mword 12) (rs1 : mword 5) (s s' : mstate) (cfinal : mword 64) :
-  register_lookup cur_privilege s.(sregs) = Machine ->
-  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s) ->
-  ext_check_CSR csr Machine CSRWrite = true ->
+Lemma exec_execute_csrw_gpr_p (p : Privilege) (csr : mword 12) (rs1 : mword 5) (s s' : mstate) (cfinal : mword 64) :
+  register_lookup cur_privilege s.(sregs) = p ->
+  exec (check_CSR_result csr p CSRWrite) s = Some (CSR_Check_OK tt, s) ->
+  ext_check_CSR csr p CSRWrite = true ->
   eq_vec csr (Ox"344") = false ->
   eq_vec csr (Ox"144") = false ->
   exec (write_CSR csr (if Z.eqb (uint rs1) 0 then zero_reg
@@ -77,16 +96,30 @@ Proof.
   replace (csr_access_type CSRRW (generic_eq zreg zreg) (generic_eq (Regidx rs1) zreg))
     with CSRWrite by (replace (generic_eq zreg zreg) with true by reflexivity; reflexivity).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  apply (exec_doCSR_csrw csr _ s s' cfinal); assumption.
+  apply (exec_doCSR_csrw_p p csr _ s s' cfinal); assumption.
 Qed.
 
-(* ---- check_CSR reduction for Machine+CSRWrite (engine for the hypothesis) ---- *)
-Lemma exec_check_CSR_csrw (csr : mword 12) s :
-  exec (check_CSR_priv csr Machine) s = Some (true, s) ->
+Lemma exec_execute_csrw_gpr (csr : mword 12) (rs1 : mword 5) (s s' : mstate) (cfinal : mword 64) :
+  register_lookup cur_privilege s.(sregs) = Machine ->
+  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s) ->
+  ext_check_CSR csr Machine CSRWrite = true ->
+  eq_vec csr (Ox"344") = false ->
+  eq_vec csr (Ox"144") = false ->
+  exec (write_CSR csr (if Z.eqb (uint rs1) 0 then zero_reg
+                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))) s
+    = Some (Ok cfinal, s') ->
+  exec (csr_id_write_callback csr cfinal) s' = Some (tt, s') ->
+  exec (execute_CSRReg csr (Regidx rs1) zreg CSRRW) s = Some (RETIRE_SUCCESS, s').
+Proof. apply (exec_execute_csrw_gpr_p Machine csr rs1 s s' cfinal). Qed.
+
+(* ---- check_CSR reduction for CSRWrite (engine for the hypothesis), generic
+   over privilege for the same reason as [exec_doCSR_csrw_p] ---- *)
+Lemma exec_check_CSR_csrw_p (p : Privilege) (csr : mword 12) s :
+  exec (check_CSR_priv csr p) s = Some (true, s) ->
   check_CSR_access csr CSRWrite = true ->
-  exec (is_CSR_accessible csr Machine CSRWrite) s = Some (true, s) ->
-  exec (stateen_allows_CSR_access csr Machine CSRWrite) s = Some (true, s) ->
-  exec (check_CSR csr Machine CSRWrite) s = Some (true, s).
+  exec (is_CSR_accessible csr p CSRWrite) s = Some (true, s) ->
+  exec (stateen_allows_CSR_access csr p CSRWrite) s = Some (true, s) ->
+  exec (check_CSR csr p CSRWrite) s = Some (true, s).
 Proof.
   intros Hpriv Hca Hacc Hst. unfold check_CSR.
   rewrite (exec_and_boolM_Some _ _ _ _ _ Hpriv). cbn match.
@@ -97,13 +130,26 @@ Proof.
   exact Hst.
 Qed.
 
-Lemma exec_check_CSR_result_csrw (csr : mword 12) s :
-  exec (check_CSR csr Machine CSRWrite) s = Some (true, s) ->
-  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s).
+Lemma exec_check_CSR_csrw (csr : mword 12) s :
+  exec (check_CSR_priv csr Machine) s = Some (true, s) ->
+  check_CSR_access csr CSRWrite = true ->
+  exec (is_CSR_accessible csr Machine CSRWrite) s = Some (true, s) ->
+  exec (stateen_allows_CSR_access csr Machine CSRWrite) s = Some (true, s) ->
+  exec (check_CSR csr Machine CSRWrite) s = Some (true, s).
+Proof. apply (exec_check_CSR_csrw_p Machine csr s). Qed.
+
+Lemma exec_check_CSR_result_csrw_p (p : Privilege) (csr : mword 12) s :
+  exec (check_CSR csr p CSRWrite) s = Some (true, s) ->
+  exec (check_CSR_result csr p CSRWrite) s = Some (CSR_Check_OK tt, s).
 Proof.
   intro Hcc. unfold check_CSR_result.
   rewrite (exec_bind_Some _ _ _ _ _ Hcc). cbn match. apply exec_returnm.
 Qed.
+
+Lemma exec_check_CSR_result_csrw (csr : mword 12) s :
+  exec (check_CSR csr Machine CSRWrite) s = Some (true, s) ->
+  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s).
+Proof. apply (exec_check_CSR_result_csrw_p Machine csr s). Qed.
 
 (* pure-CSR (is_CSR_accessible = returnM true): mstatus 0x300, mepc 0x341 *)
 Lemma exec_check_CSR_result_csrw_pure (csr : mword 12) s :

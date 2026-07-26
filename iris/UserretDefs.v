@@ -200,59 +200,9 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ Hcc). cbn match. apply exec_returnm.
 Qed.
 
-(* the S-mode doCSR / execute_CSRReg for a csrw (privilege-generic copies of
-   WpGprCsrwCommon's Machine-pinned versions). *)
-Lemma exec_doCSR_csrw_S (csr : mword 12) (v : mword 64) (s s' : mstate) (cfinal : mword 64) :
-  register_lookup cur_privilege s.(sregs) = Supervisor ->
-  exec (check_CSR_result csr Supervisor CSRWrite) s = Some (CSR_Check_OK tt, s) ->
-  ext_check_CSR csr Supervisor CSRWrite = true ->
-  eq_vec csr (Ox"344") = false ->
-  eq_vec csr (Ox"144") = false ->
-  exec (write_CSR csr v) s = Some (Ok cfinal, s') ->
-  exec (csr_id_write_callback csr cfinal) s' = Some (tt, s') ->
-  exec (doCSR csr v zreg CSRRW CSRWrite) s = Some (RETIRE_SUCCESS, s').
-Proof.
-  intros Hpriv Hchk Hext H344 H144 Hwr Hcb.
-  unfold doCSR.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite Hpriv.
-  rewrite (exec_bind_Some _ _ _ _ _ Hchk). cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite Hpriv.
-  rewrite Hext.
-  change (Riscv.rv64d.not true) with false. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (zeros' 64) s)).
-  rewrite H344 H144. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (zeros' 64) s)).
-  replace (generic_eq CSRWrite CSRRead) with false by reflexivity. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ Hwr). cbn match.
-  match goal with |- context[Defs.bind0 (Defs.bind0 ?a ?b) ?c] =>
-    assert (Hab : exec (Defs.bind0 a b) s' = Some (tt, s')) end.
-  { rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_zreg (zeros' 64) s')).
-    exact Hcb. }
-  rewrite (exec_bind0_Some _ _ _ _ _ Hab).
-  apply exec_returnM.
-Qed.
-
-Lemma exec_execute_csrw_gpr_S (csr : mword 12) (rs1 : mword 5) (s s' : mstate) (cfinal : mword 64) :
-  register_lookup cur_privilege s.(sregs) = Supervisor ->
-  exec (check_CSR_result csr Supervisor CSRWrite) s = Some (CSR_Check_OK tt, s) ->
-  ext_check_CSR csr Supervisor CSRWrite = true ->
-  eq_vec csr (Ox"344") = false ->
-  eq_vec csr (Ox"144") = false ->
-  exec (write_CSR csr (if Z.eqb (uint rs1) 0 then zero_reg
-                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))) s
-    = Some (Ok cfinal, s') ->
-  exec (csr_id_write_callback csr cfinal) s' = Some (tt, s') ->
-  exec (execute_CSRReg csr (Regidx rs1) zreg CSRRW) s = Some (RETIRE_SUCCESS, s').
-Proof.
-  intros Hpriv Hchk Hext H344 H144 Hwr Hcb.
-  unfold execute_CSRReg.
-  replace (csr_access_type CSRRW (generic_eq zreg zreg) (generic_eq (Regidx rs1) zreg))
-    with CSRWrite by (replace (generic_eq zreg zreg) with true by reflexivity; reflexivity).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  apply (exec_doCSR_csrw_S csr _ s s' cfinal); assumption.
-Qed.
+(* The S-mode doCSR / execute_CSRReg for a csrw are WpGprCsrwCommon.v's
+   privilege-generic [exec_doCSR_csrw_p] / [exec_execute_csrw_gpr_p] at
+   Supervisor -- see the note there. *)
 
 (* csrw satp,rs1 in S-mode: writes satp := legalized(rs1 value). *)
 Lemma exec_execute_csrw_satp_S (rs1 : mword 5) s :
@@ -274,7 +224,7 @@ Proof.
     with (if Z.eqb (uint rs1) 0 then zero_reg
           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
     by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
-  apply (exec_execute_csrw_gpr_S csr_satp rs1 s _
+  apply (exec_execute_csrw_gpr_p Supervisor csr_satp rs1 s _
            (satp_legalized (register_lookup satp s.(sregs))
               (if Z.eqb (uint rs1) 0 then zero_reg
                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).

@@ -346,3 +346,9 @@ WpSysUptimeDecode.v
 SpecSysUptime.v
 ProofSysUptime.v
 LinkSysUptime.v
+TimerCap.v
+WpSconfTimer.v
+WpClockintrDecode.v
+SpecClockintr.v
+ProofClockintr.v
+LinkClockintr.v

@@ -29,7 +29,11 @@ Two consumer-side items were never in the sweep's scope and remain undone:
 - **Boot wiring** (the "item 8" section at the bottom): nothing yet DRIVES the
   sconf whole-function layer; the top consumer gap is above kinit (kvminit /
   `main`→`trapinithart`, [[kvm-spec]]).  No `csrw stvec` leaf exists and
-  `intr_inv_alloc_off` still has no caller outside `IntrDefs.v`.
+  `intr_inv_alloc_off` still has no caller outside `IntrDefs.v`.  The boot path
+  also owes `timer_cap` (`TimerCap.v`): freeze the mcounteren cell timerinit
+  wrote and seal the `stimecmp` cell into `timerN` via `timer_cap_intro` — that
+  persistent capability is what clockintr (and hence any handler above it)
+  takes for its `rdtime`/`csrw stimecmp`.
 - **vcgen-to-sconf**: `wp_vc_block_s_sconf` is built but has no consumer outside
   `WpSconfVc.v` (the sconf functions leaf-chain today); the only remaining
   `wp_vc_block_s` (SIE-0) consumer is the kernelvec handler `WpKernelvecNew.v`
