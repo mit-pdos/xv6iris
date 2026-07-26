@@ -44,7 +44,7 @@ Big things that still need to be done/explored:
     - https://plv.mpi-sws.org/gps/
     - https://people.mpi-sws.org/~haidang/publications/thesis.pdf
 - liveness, or at least deadlock avoidance
-- file system
+- crash reasoning for file system
 
 Don't know where else to put this:
 
