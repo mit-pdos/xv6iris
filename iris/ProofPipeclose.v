@@ -504,7 +504,7 @@ Section ProofPipeclose.
         iEval (rewrite Hpc30) in "Hpc".
         iDestruct "TAILS" as "[REL _]".
         iApply ("REL" $! J1 with "[%] Hcg Hpc Hown Hpay Hlocked [-]"); [exact HcsJ1|].
-        iExists nr, nw, ro, wo, vname, bs. iFrame. done. }
+        iExists nr, nw, ro, wo, vname, bs. iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack". done. }
       (* ===== the read end is SHUT: fall to 0x2a and test the write end ===== *)
       assert (Hroc : ~ pflag_open ro).
       { unfold pflag_open. rewrite Hroop. intro Hc. discriminate. }
@@ -549,7 +549,7 @@ Section ProofPipeclose.
         iEval (rewrite Hpc30') in "Hpc".
         iDestruct "TAILS" as "[REL _]".
         iApply ("REL" $! J2 with "[%] Hcg Hpc Hown Hpay Hlocked [-]"); [exact HcsJ2|].
-        iExists nr, nw, ro, wo, vname, bs. iFrame. done. }
+        iExists nr, nw, ro, wo, vname, bs. iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack". done. }
       (* ===== BOTH ends shut: free the page ===== *)
       assert (Hwoc : ~ pflag_open wo).
       { unfold pflag_open, neq_vec. rewrite Hwoeq. intro Hc. discriminate. }
@@ -602,7 +602,7 @@ Section ProofPipeclose.
                 HlkaK2 HtpK2 ltac:(lia)
                 ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                 with "Hcg Htext Hpc Hopen Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] [] Hown Hpay [-]").
-      { iExists nr, nw, ro, wo, vname, bs. iFrame. done. }
+      { iExists nr, nw, ro, wo, vname, bs. iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack". done. }
       { iIntros "Hfrag Hres". iModIntro.
         iApply (pipe_res_dead with "Hs0 Hs1 Hfrag Hres"). }
       iIntros (mr) "Hword Hcpu Hbytes Hcg Hpc %Hcsr Hown".
@@ -730,9 +730,23 @@ Section ProofPipeclose.
       iEval (rewrite Hpcwk) in "Hpc".
       assert (HtpW2 : W2 !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
       { rewrite /W2 /W1; do 2 (rewrite upd_ne; [| nz]). exact HtpM0. }
+      (* Every wakeup premise is pre-established as a NAMED hypothesis.  [W2] is
+         built over [M0], the ∀-quantified map acquire's continuation hands
+         back, and [wp_wakeup_sconf_body] states its post through a
+         [let sp0/spF/rettgt] chain -- so an inline [ltac:(rewrite HtpW2; …)]
+         here elaborates against the iApply's UNRESOLVED EVARS and chases the
+         lookups through those lets.  Unfixed, this single [iApply] did not
+         finish (6.8 GB and climbing at 95 s); by name it is ~0.1 s.
+         See optimization.md, "inline ltac: over an OPAQUE register map". *)
+      assert (HwK : (18 <= av - 4)%nat) by lia.
+      assert (HwdomW : forall r : regidx, r ∈ dom (rf_to_gmap W2)) by (intro r; apply rf_to_gmap_dom).
+      assert (Hwa0f : mycpu_ret (W2 !!! Regidx (mword_of_int 4 : mword 5)) = mycpu_ret cid_word)
+        by (rewrite HtpW2; reflexivity).
+      assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (W2 !!! Regidx (mword_of_int 4 : mword 5))) = false)
+        by (rewrite HtpW2; exact Hcpune).
+      assert (Hwlvl : (Z.of_nat (S n) + 1 < 2 ^ 31)%Z) by lia.
       iApply (Wakeup.wp_wakeup_sconf γ Φ W2 γs (mycpu_ret cid_word) pme (S n) (av - 4)%nat eb C
-                ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen HtpW2
-                ltac:(rewrite HtpW2; reflexivity) ltac:(rewrite HtpW2; exact Hcpune) ltac:(lia)
+                HwK HwdomW Hlen HtpW2 Hwa0f Hwnz Hwlvl
                 with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
       iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
       assert (HraW2 : W2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (PC + 0x20) : mword 64) 4)
@@ -746,7 +760,7 @@ Section ProofPipeclose.
         rewrite /W2 /W1.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsM0. }
-      iExists nr, nw, ro, (mword_of_int 0 : mword 32), vname, bs. iFrame. done.
+      iExists nr, nw, ro, (mword_of_int 0 : mword 32), vname, bs. iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack". done.
     - (* ===== not writable: the branch is TAKEN, the READ end closes ===== *)
       assert (Hbz : eq_vec (M0 !!! Regidx (mword_of_int 18 : mword 5)) (zero_reg : mword 64) = true)
         by (rewrite Hs2M0; exact Hw).
@@ -791,9 +805,23 @@ Section ProofPipeclose.
       iEval (rewrite Hpcwk) in "Hpc".
       assert (HtpW2 : W2 !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
       { rewrite /W2 /W1; do 2 (rewrite upd_ne; [| nz]). exact HtpM0. }
+      (* Every wakeup premise is pre-established as a NAMED hypothesis.  [W2] is
+         built over [M0], the ∀-quantified map acquire's continuation hands
+         back, and [wp_wakeup_sconf_body] states its post through a
+         [let sp0/spF/rettgt] chain -- so an inline [ltac:(rewrite HtpW2; …)]
+         here elaborates against the iApply's UNRESOLVED EVARS and chases the
+         lookups through those lets.  Unfixed, this single [iApply] did not
+         finish (6.8 GB and climbing at 95 s); by name it is ~0.1 s.
+         See optimization.md, "inline ltac: over an OPAQUE register map". *)
+      assert (HwK : (18 <= av - 4)%nat) by lia.
+      assert (HwdomW : forall r : regidx, r ∈ dom (rf_to_gmap W2)) by (intro r; apply rf_to_gmap_dom).
+      assert (Hwa0f : mycpu_ret (W2 !!! Regidx (mword_of_int 4 : mword 5)) = mycpu_ret cid_word)
+        by (rewrite HtpW2; reflexivity).
+      assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (W2 !!! Regidx (mword_of_int 4 : mword 5))) = false)
+        by (rewrite HtpW2; exact Hcpune).
+      assert (Hwlvl : (Z.of_nat (S n) + 1 < 2 ^ 31)%Z) by lia.
       iApply (Wakeup.wp_wakeup_sconf γ Φ W2 γs (mycpu_ret cid_word) pme (S n) (av - 4)%nat eb C
-                ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen HtpW2
-                ltac:(rewrite HtpW2; reflexivity) ltac:(rewrite HtpW2; exact Hcpune) ltac:(lia)
+                HwK HwdomW Hlen HtpW2 Hwa0f Hwnz Hwlvl
                 with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
       iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
       assert (HraW2 : W2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (PC + 0x4a) : mword 64) 4)
@@ -817,7 +845,7 @@ Section ProofPipeclose.
         rewrite /W2 /W1.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsM0. }
-      iExists nr, nw, (mword_of_int 0 : mword 32), wo, vname, bs. iFrame. done.
+      iExists nr, nw, (mword_of_int 0 : mword 32), wo, vname, bs. iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack". done.
   Qed.
 End ProofPipeclose.
 End PipecloseProof.
