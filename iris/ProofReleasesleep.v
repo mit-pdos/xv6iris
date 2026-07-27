@@ -50,18 +50,6 @@ Local Open Scope Z_scope.
 (* Pure reconciliation lemmas (closed, so vm_compute decides).           *)
 (* ===================================================================== *)
 
-(* the frame push (-32) and pop (+32) cancel around a symbolic sp. *)
-Lemma rsl_sp_cancel (x : mword 64) :
-  add_vec (add_vec x (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = x.
-Proof.
-  rewrite po_addv_assoc.
-  assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
-                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
-    by (apply bv_eq; vm_compute; reflexivity).
-  rewrite HAB. apply kv_addv_zero.
-Qed.
-
 Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
@@ -421,7 +409,7 @@ Section ProofReleasesleep.
     (* +0x34 c.addi16sp sp,32 -- pop the frame *)
     set (Q34 := <[Regidx csp_rs1 := regval_into_reg (add_vec (Q32 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q32).
     assert (Hwv : add_vec (Q32 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HspQ32. unfold spr, sp0. apply rsl_sp_cancel. }
+    { rewrite HspQ32. unfold spr, sp0. apply frame_cancel_32. }
     assert (Hpop : Q32 !!! Regidx csp_rs1
                    = pa_stk (add_vec (Q32 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HspQ32. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal.
@@ -481,7 +469,7 @@ Section ProofReleasesleep.
       { rewrite /Q32 /Q30 /Q2e /Q2c.
         repeat (rewrite upd_ne; [| vm_compute; discriminate]).
         exact HspMrel. }
-      rewrite HQ32csp. unfold regval_into_reg, spr, sp0. apply rsl_sp_cancel. }
+      rewrite HQ32csp. unfold regval_into_reg, spr, sp0. apply frame_cancel_32. }
     split.
     { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
     split.

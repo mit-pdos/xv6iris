@@ -31,6 +31,7 @@ Require Import PtTree PtBuild KptPt KvmMap KvmSpec.
 Require Import WpProcMapstacksInstr.
 Require Import SpecKalloc SpecKvmmap SpecProcMapstacks.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -410,28 +411,10 @@ Section WpArith.
   Qed.
 End WpArith.
 
-(* the -80/+80 c.addi16sp frame cancel (identical to ProofMappages') *)
-Lemma pms_sp_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)) : mword 64) = 18446744073709551536) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)) : mword 64) = 80) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551536 + 80) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
-
 Lemma pms_seq_peel (i : nat) : (i < 64)%nat -> seq i (64 - i) = i :: seq (S i) (63 - i).
 Proof. intro H. replace (64 - i)%nat with (S (63 - i)) by lia. reflexivity. Qed.
 
-Module ProcMapstacksProof (K : KALLOC) (KM : KVMMAP) <: PROC_MAPSTACKS.
+Module ProcMapstacksProof (K : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS.
 
 Section ProofPMS.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
@@ -676,7 +659,7 @@ Section ProofPMS.
     set (E11 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E10 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> E10).
     assert (Hwv : add_vec (E10 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = sp0).
-    { rewrite HspE10. unfold spr. apply pms_sp_cancel. }
+    { rewrite HspE10. unfold spr. apply frame_cancel_80. }
     assert (Hpop : E10 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E10 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
     { rewrite Hwv HspE10. symmetry. exact Hsprstk. }
@@ -716,7 +699,7 @@ Section ProofPMS.
     { (* callee_saved mm E11 *)
       unfold callee_saved.
       split.
-      { rewrite /E11 upd_eq. rewrite HspE10. unfold spr. apply pms_sp_cancel. }
+      { rewrite /E11 upd_eq. rewrite HspE10. unfold spr. apply frame_cancel_80. }
       split.
       { peel_reg_step. exact Htp. }
       split. { peel_reg. }

@@ -439,25 +439,6 @@ Section ProcInv.
      entry shape [wk_loop_regs .. k] (NPROC = 64, so proc_addr NPROC = proc_addr 64;
      the extra [ra] constraint is simply dropped). *)
 
-  (* the epilogue restores sp by [+60][+4], which cancels the prologue's
-     [-64] frame allocation, so the final sp equals the caller's sp. *)
-  Lemma wakeup_sp_cancel (X : mword 64) :
-    add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
-            (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
-  Proof.
-    assert (add_vec_unsigned : forall x y : mword 64,
-              bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-    { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-        SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-      rewrite bv_add_unsigned. reflexivity. }
-    apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-    assert (HA : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)) : mword 64) = 18446744073709551552) by (vm_compute; reflexivity).
-    assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)) : mword 64) = 64) by (vm_compute; reflexivity).
-    rewrite HA HB. rewrite <- Z.add_assoc.
-    replace (18446744073709551552 + 64) with (bv_modulus 64) by (vm_compute; reflexivity).
-    rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-  Qed.
-
   (* ===================================================================== *)
   (* Whole-function WP for wakeup(chan): prologue -> loop (k=0, exiting to  *)
   (* the epilogue) -> return.  The caller provides the callee-save frame     *)

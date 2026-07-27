@@ -35,6 +35,7 @@ Require Import WpKalloc.
 Require Import SpecKalloc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 Module KallocProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELEASE) : KALLOC.
@@ -364,9 +365,9 @@ Section ProofKalloc.
       (* +0x48 c.addi16sp sp,32 -- the frame trade back (pop 4) *)
       set (P45 := <[Regidx csp_rs1 := regval_into_reg (add_vec (P44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> P44).
       assert (HP45csp : P45 !!! Regidx csp_rs1 = sp0).
-      { rewrite /P45 upd_eq. rewrite HspP44. unfold spr, sp0. apply kalloc_sp_cancel. }
+      { rewrite /P45 upd_eq. rewrite HspP44. unfold spr, sp0. apply frame_cancel_32. }
       assert (Hwv : add_vec (P44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-      { rewrite HspP44. unfold spr, sp0. apply kalloc_sp_cancel. }
+      { rewrite HspP44. unfold spr, sp0. apply frame_cancel_32. }
       assert (Hpop : P44 !!! Regidx csp_rs1 = pa_stk (add_vec (P44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HspP44. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
@@ -424,7 +425,7 @@ Section ProofKalloc.
         split.
         { rewrite /P45 upd_eq.
           assert (HP44csp : P44 !!! Regidx csp_rs1 = spr) by exact HspP44.
-          rewrite HP44csp. unfold regval_into_reg, spr. apply kalloc_sp_cancel. }
+          rewrite HP44csp. unfold regval_into_reg, spr. apply frame_cancel_32. }
         split.
         { apply Hthread; vm_compute; first [reflexivity | discriminate]. }
         split.
@@ -693,9 +694,9 @@ Section ProofKalloc.
       (* +0x48 c.addi16sp sp,32 -- the frame trade back (pop 4) *)
       set (Q45 := <[Regidx csp_rs1 := regval_into_reg (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q44).
       assert (HQ45csp : Q45 !!! Regidx csp_rs1 = sp0).
-      { rewrite /Q45 upd_eq. rewrite HspQ44. unfold spr, sp0. apply kalloc_sp_cancel. }
+      { rewrite /Q45 upd_eq. rewrite HspQ44. unfold spr, sp0. apply frame_cancel_32. }
       assert (Hwv : add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-      { rewrite HspQ44. unfold spr, sp0. apply kalloc_sp_cancel. }
+      { rewrite HspQ44. unfold spr, sp0. apply frame_cancel_32. }
       assert (Hpop : Q44 !!! Regidx csp_rs1 = pa_stk (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HspQ44. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe4".
@@ -756,7 +757,7 @@ Section ProofKalloc.
         unfold callee_saved.
         split.
         { rewrite /Q45 upd_eq.
-          rewrite HspQ44. unfold regval_into_reg, spr. apply kalloc_sp_cancel. }
+          rewrite HspQ44. unfold regval_into_reg, spr. apply frame_cancel_32. }
         split.
         { apply Hthread; vm_compute; first [reflexivity | discriminate]. }
         split.

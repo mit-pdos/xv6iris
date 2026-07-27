@@ -15,21 +15,18 @@
   - **The CSR exec frameworks are generic over PRIVILEGE — instantiate, never copy.** `WpGprCsrwCommon.v` holds `exec_doCSR_csrw_p` / `exec_execute_csrw_gpr_p` / `exec_check_CSR{,_result}_csrw_p` and `WpGprCsrrCommon.v` holds `csrr_read_step_p` / `exec_check_CSR{,_read,_result_read}_p`, all taking `(p : Privilege)`; the Machine-pinned names are one-line instances of them, and the S-mode users (`exec_execute_csrw_satp_S` in `UserretDefs.v`, the time/stimecmp leaves in `WpSconfTimer.v`) instantiate at `Supervisor`. Nothing on either path inspects `p` beyond the `cur_privilege` read the `check_CSR_result` premise already speaks about, which is why one lemma serves both — a Supervisor copy of the framework in a high file (that is where the satp one used to live) makes the next S-mode CSR leaf either import the userret cone or clone it a third time. Only the per-CSR pieces (`exec_{read,write}_CSR_<csr>`, the id read/write callbacks) are privilege-specific, and most of those are privilege-free already.
   - **Per-instruction execute/value facts** → `WpMmodeLeafBase.v` (bullet above). **Pure bv/`add_vec` identities** → `KernelRvcDecode.v` / `RiscvExtras.v` / `AlignBits.v` (whichever the callers already import). **`callee_saved`/`stack_own` structural lemmas** → `CalleeSaved.v` / `StackOwn.v`.
   - **A loop's pointer arithmetic is shared infrastructure, one file per cursor shape.** Two definitional files hold everything a walking loop needs about its cursor, over an arbitrary base and with no no-wrap assumption, so a new loop reuses them instead of re-deriving bitvector arithmetic: **`ArrCursor.v`** for strided array elements at a CONCRETE base (`acur base stride i`, `acur_step`, `acur_neq`, `acur_inj` — binit, iinit, the file table) and **`ByteCursor.v`** for BYTE cursors at a SYMBOLIC base, indexed exactly as the caller's buffer resource is (`pa_add base j`): `pa_add_step` (+1 bump), `pa_add_back1` (the `-1(reg)` displacement gcc emits when it bumps before accessing), `pa_add_cmp_bound` (the end-pointer compare read back as an index compare), `neq_vec_comm`/`add_vec_comm` (the compare/`add` operand order depends on which register the encoder put in rs1), and `slli32_srli32` (the `(unsigned int)n` count truncation is the identity below 2^32). memset and memmove both run on ByteCursor; `pa_add_cmp_bound` and `slli32_srli32` were lifted out of `WpMemsetArray.v` to get there. **Do not re-prove a cursor fact inside a function proof** — and note that `ByteCursor` restates `add_vec_unsigned`/`moi_unsigned` locally (`bc_*`) exactly as `ArrCursor` does, because those two general identities are still misfiled in `WpMemsetS.v`; they belong in `RiscvExtras.v`, and ~27 files currently reach them only by importing a memset leaf file.
-  - **The balanced-frame cancellation is already shared: use `frame_cancel_16`
-    (`KernelRvcDecode.v`).** `add_vec (add_vec X (−16)) (+16) = X` is a pure bv
-    identity keyed by two immediates, and the tree still carries **13**
-    byte-identical local re-proofs of it under different names
-    (`mycpu_frame_cancel`, `initlock_sp_cancel`, `cpuid_frame_cancel`,
-    `plicinit_frame_cancel`, `ci_frame_cancel`, `kfree_sp_cancel`,
-    `kalloc_sp_cancel`, `kii_sp_cancel`, `kmk_sp_cancel`, `rsl_sp_cancel`,
-    `pms_sp_cancel`, `plic_complete_frame_cancel`, and a copy inlined in
-    `ProofKvminithart.v`), several of them in `Wp<Function>.v` files that other
-    function proofs then import just for it. Do not add a fourteenth: `Require
-    Import KernelRvcDecode` and `apply frame_cancel_16`. Collapsing the existing
-    copies onto it (via the WRAPPER RECIPE, so no call site churns) is an open
-    cleanup with no owner. The 32-byte variant `ups_frame_cancel`
-    (`WpUartPutcSyncFull.v`, `c.addi sp,-32` / `c.addi16sp sp,32`) is the same
-    fact at other immediates and wants the same treatment.
+  - **Balanced-frame cancellation is ONE lemma, in `KernelRvcDecode.v`.**
+    `frame_cancel X a b : add_vec a b = 0 → add_vec (add_vec X a) b = X` is the
+    general fact — sp returns to its entry value exactly when the prologue and
+    epilogue immediates sum to zero — and the sized instances `frame_cancel_16`
+    / `_32` / `_64` / `_80` are one line each off it, so a new frame size costs
+    no bv proof. A whole-function epilogue discharges its `sp` obligation with
+    `apply frame_cancel_<size>` (after `unfold regval_into_reg, spr, sp0` where
+    the map lookup is still folded), never with an inline `bv_wrap_add_idemp_l`
+    /`bv_wrap_add_modulus_1` block: **do not re-derive it.** Seventeen
+    byte-identical copies of this fact once lived under seventeen different
+    names, six of them in `Wp<Function>.v` files that other function proofs
+    imported purely to borrow one. State the general form and instantiate.
   - Rule of thumb before adding a `Require Import` of a `Wp<Function>.v` file: if you only need a bits-/index-/offset-keyed fact from it, that fact is misfiled — relocate it down, don't import the function proof up.
   - **The rule binds hardest on *definitions*, and a `Wp` prefix on a file with no WP in it is the tell.** `MstatusBits.v` (the pure mstatus transform theory: `trap_ms`, `sret_ms1..5`, `sret_newpriv`, `sret_tgt` + their field lemmas and the trap/SRET round trip) contains no Iris and no WP, and both the S-mode WP tower and the user-mode trap proofs need it. It used to be called `WpIntrBits.v` and borrowed the six `sret_ms*` one-line `Definition`s from `WpSmodeSret.v` — which put the whole S-mode WP tower (`InstrBytes → WpGprCsrwB → SmodePte → SmodeCore → WpSmodeSret`) in front of every user-mode proof and cost 9 s of critical path. The theory and the definitions it is about now live together at the bottom of the graph, with the WP file requiring them. **When a pure-theory file needs a `Require` of a WP file, the definitions are in the wrong place — move them down to the theory, don't move the theory up.**
   - **Expect non-transitive-import fallout when relocating a definition** (`Require Import` is not transitive for names): every file that reached the moved name *through* its old home breaks with "The reference … was not found", and only when the build gets that far. Grep for the moved names across `iris/*.v` (stripping comments) and check each user has a direct `Require` of the new home, rather than discovering them one failed build at a time.

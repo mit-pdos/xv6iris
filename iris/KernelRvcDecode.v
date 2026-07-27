@@ -738,47 +738,44 @@ Lemma cdec_97aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* The standard 32-byte frame cancels: entry [c.addi sp,-32] and exit
-   [c.addi16sp sp,+32] compose to the identity.  Same pure-bv character as
-   [frame_cancel_16] below, keyed by the two immediates. *)
-Lemma frame_cancel_32 (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
+(* ===================================================================== *)
+(*  Balanced-frame cancellation.                                          *)
+(* ===================================================================== *)
+
+(* A function's prologue moves sp by [a] and its epilogue moves it back by
+   [b]; sp returns to its entry value exactly when the two immediates sum to
+   zero.  ONE lemma over that pair -- the sized instances below are a line
+   each, so a new frame size costs no bv proof.  Stated so no [vm_compute]
+   ever touches the SYMBOLIC base [X] (which is an opaque [gpr_file] lookup
+   at every call site, and diverges under [vm_compute]). *)
+Lemma frame_cancel (X a b : mword 64) :
+  add_vec a b = mword_of_int 0 -> add_vec (add_vec X a) b = X.
 Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. repeat rewrite add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA, HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+  intro Hab. rewrite po_addv_assoc, Hab.
+  apply bv_add_0_r. vm_compute. reflexivity.
 Qed.
 
-(* The standard 16-byte frame cancels: entry [c.addi sp,-16] and exit
-   [c.addi sp,+16] compose to the identity.  A pure bv fact keyed by the two
-   immediates, so it belongs here rather than in each function's proof. *)
+(* -16/+16, the standard 16-byte frame ([c.addi sp,-16] / [c.addi sp,16];
+   48 is -16 in a 6-bit field). *)
 Lemma frame_cancel_16 (X : mword 64) :
   add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
           (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  (* plain Stdlib [rewrite] in this file (no ssreflect): commas, no [!]. *)
-  apply bv_eq. repeat rewrite add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-             = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-             = 16) by (vm_compute; reflexivity).
-  rewrite HA, HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -32/+32 ([c.addi sp,-32] / [c.addi16sp sp,32]). *)
+Lemma frame_cancel_32 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -64/+64, both [c.addi16sp] (60 is -4 in a 6-bit field, scaled by 16). *)
+Lemma frame_cancel_64 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -80/+80, both [c.addi16sp] (59 is -5 in a 6-bit field, scaled by 16). *)
+Lemma frame_cancel_80 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.

@@ -33,6 +33,7 @@ Require Import WpKfree.
 Require Import SpecKfree.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 
@@ -667,9 +668,9 @@ Section ProofKfree.
     set (Q5c := <[Regidx csp_rs1 := regval_into_reg (add_vec (Q5a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q5a).
     assert (HQ5csp : Q5c !!! Regidx csp_rs1 = sp0).
     { rewrite /Q5c upd_eq. rewrite HspQ5a. unfold spr, sp0.
-      apply kfree_sp_cancel. }
+      apply frame_cancel_32. }
     assert (Hwv : add_vec (Q5a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HspQ5a. unfold spr, sp0. apply kfree_sp_cancel. }
+    { rewrite HspQ5a. unfold spr, sp0. apply frame_cancel_32. }
     assert (Hpop : Q5a !!! Regidx csp_rs1
                    = pa_stk (add_vec (Q5a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HspQ5a. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal.
@@ -732,7 +733,7 @@ Section ProofKfree.
         { rewrite /Q5a /Q58 /Q56 /Q54.
           repeat (rewrite upd_ne; [| vm_compute; discriminate]).
           exact HspMrel. }
-        rewrite HQ5acsp. unfold regval_into_reg, spr. apply kfree_sp_cancel. }
+        rewrite HQ5acsp. unfold regval_into_reg, spr. apply frame_cancel_32. }
       split.
       { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
       split.

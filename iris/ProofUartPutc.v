@@ -9,10 +9,11 @@
    the device core (LSR poll loop + THR write) run over the sconf leaves; the
    two device leaves are the ProofUart accessor forms.
 
-   All config-independent [instr] decode facts, the ppc_f* register maps, the
-   lsr_* device helpers and [ups_frame_cancel] are REUSED from the smode
-   WpUartPutcSync / WpUartPutcSyncFull files (persistent / pure facts, so the
-   sconf port only re-does the resource threading). *)
+   All config-independent [instr] decode facts, the ppc_f* register maps and
+   the lsr_* device helpers are REUSED from the smode WpUartPutcSync /
+   WpUartPutcSyncFull files (persistent / pure facts, so the sconf port only
+   re-does the resource threading); the frame cancellation is the shared
+   [frame_cancel_32] (KernelRvcDecode.v). *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -39,6 +40,7 @@ Require Import WpSconfUartAccess.
 Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 Module UartPutcProof (Uart : UART) : UARTPUTC.
@@ -525,9 +527,9 @@ Section ProofUartPutc.
     (* +0x4c c.addi16sp sp,32 -- pop 4 *)
     set (Q4c := <[Regidx csp_rs1 := regval_into_reg (add_vec (Q4a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q4a).
     assert (HQ4ccsp : Q4c !!! Regidx csp_rs1 = sp0).
-    { rewrite /Q4c upd_eq. rewrite HspQ4a. unfold spr, sp0. apply ups_frame_cancel. }
+    { rewrite /Q4c upd_eq. rewrite HspQ4a. unfold spr, sp0. apply frame_cancel_32. }
     assert (Hwval : add_vec (Q4a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HspQ4a. unfold spr, sp0. apply ups_frame_cancel. }
+    { rewrite HspQ4a. unfold spr, sp0. apply frame_cancel_32. }
     assert (Hpop : Q4a !!! Regidx csp_rs1
                    = pa_stk (add_vec (Q4a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwval HspQ4a. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -582,7 +584,7 @@ Section ProofUartPutc.
     split.
     { (* sp *)
       rewrite /Q4c upd_eq. rewrite HspQ4a. unfold regval_into_reg, spr, sp0.
-      apply ups_frame_cancel. }
+      apply frame_cancel_32. }
     split.
     { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
     split.

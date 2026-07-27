@@ -36,6 +36,7 @@ Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import SpecWalk.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -64,25 +65,6 @@ Section ProofWalk.
       | rewrite upd_ne; [| reg_neq]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ];
     reflexivity.
-
-  (* the +64/-64 c.addi16sp frame cancel *)
-  Lemma walk_sp_cancel (X : mword 64) :
-    add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
-            (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
-  Proof.
-    assert (add_vec_unsigned : forall x y : mword 64,
-              bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-    { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-        SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-      rewrite bv_add_unsigned. reflexivity. }
-    apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-    assert (HA : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)) : mword 64) = 18446744073709551552) by (vm_compute; reflexivity).
-    assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)) : mword 64) = 64) by (vm_compute; reflexivity).
-    rewrite HA HB. rewrite <- Z.add_assoc.
-    replace (18446744073709551552 + 64) with (bv_modulus 64) by (vm_compute; reflexivity).
-    rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-  Qed.
-
 
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x52..+0x64) -- sconf mirror.                 *)
@@ -296,9 +278,9 @@ Section ProofWalk.
     set (E9 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E8 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))))]> E8).
     assert (HspE9 : E9 !!! Regidx csp_rs1 = sp0).
-    { rewrite /E9 upd_eq. rewrite HspE8. unfold spr. apply walk_sp_cancel. }
+    { rewrite /E9 upd_eq. rewrite HspE8. unfold spr. apply frame_cancel_64. }
     assert (Hwv : add_vec (E8 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0).
-    { rewrite HspE8. unfold spr. apply walk_sp_cancel. }
+    { rewrite HspE8. unfold spr. apply frame_cancel_64. }
     assert (Hpop : E8 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E8 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8).
     { rewrite Hwv HspE8. symmetry. exact Hsprstk. }
@@ -338,7 +320,7 @@ Section ProofWalk.
     { (* callee_saved mm E9 *)
       unfold callee_saved.
       split.
-      { rewrite /E9 upd_eq. rewrite HspE8. unfold spr. apply walk_sp_cancel. }
+      { rewrite /E9 upd_eq. rewrite HspE8. unfold spr. apply frame_cancel_64. }
       split.
       { rewrite /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
         repeat (rewrite upd_ne; [| reg_neq]). exact Htp. }

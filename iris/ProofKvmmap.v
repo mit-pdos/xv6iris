@@ -28,6 +28,7 @@ Require Import SpecMappages.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKvmmap.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 Module KvmmapProof (Mappages : MAPPAGES) : KVMMAP.
@@ -322,14 +323,7 @@ Section ProofKvmmap.
         (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> E2).
     assert (HspE3 : E3 !!! Regidx csp_rs1 = sp0).
     { rewrite /E3 upd_eq. rewrite HspE2.
-      apply bv_eq. unfold spr, sp0.
-      rewrite bv_add_unsigned. rewrite bv_add_unsigned.
-      replace (bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)) with 18446744073709551600 by (vm_compute; reflexivity).
-      replace (bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)) with 16 by (vm_compute; reflexivity).
-      rewrite bv_wrap_add_idemp_l.
-      rewrite <- Z.add_assoc.
-      replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-      rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned. }
+      unfold regval_into_reg, spr, sp0. apply frame_cancel_16. }
     assert (Hwv : add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
     { rewrite -HspE3. rewrite /E3 upd_eq. reflexivity. }
     assert (Hpop : E2 !!! Regidx csp_rs1

@@ -40,6 +40,7 @@ Require Import ProcGeom SpecMyproc.
 Require Import SpecWakeup.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 Module WakeupProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUPPARTS) : WAKEUP.
@@ -821,7 +822,7 @@ Section ProofWakeup.
       destruct Hepi as (Hf1v & Hf0v & Hf9v & Hf18v & Hf19v & Hf20v & Hf21v & Hfcsp & Hf4v & Hf22v & Hf23v & Hf24v & Hf25v & Hf26v & Hf27v & Hfdom).
       (* the epilogue's restored sp equals the caller's sp0 (the -64/+60+4 cancel) *)
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)
-        by (rewrite Hecsp; subst spF sp0; apply wakeup_sp_cancel).
+        by (rewrite Hecsp; subst spF sp0; apply frame_cancel_64).
       iApply ("Hcont" $! Mf with "[%] Hcg Hown Htext [Hpc]").
       - (* callee_saved m Mf /\ dom Mf *)
         split; [| exact Hfdom].

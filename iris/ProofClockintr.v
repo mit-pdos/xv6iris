@@ -61,19 +61,6 @@ Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 Lemma ci_eq_vec_refl {k} (x : mword k) : eq_vec x x = true.
 Proof. apply eq_vec_true_iff. reflexivity. Qed.
 
-(* the 16-byte frame cancels (mirrors [cpuid_frame_cancel]). *)
-Lemma ci_frame_cancel (x : mword 64) :
-  add_vec (add_vec x (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = x.
-Proof.
-  rewrite po_addv_assoc.
-  assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
-                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))
-                = mword_of_int 0)
-    by (apply bv_eq; vm_compute; reflexivity).
-  rewrite HAB. apply bv_add_0_r. vm_compute. reflexivity.
-Qed.
-
 Module ClockintrProof (Cpuid : CPUID) (Acquire : ACQUIRE) (Release : RELEASE)
                       (Wakeup : WAKEUP) : CLOCKINTR.
 
@@ -225,7 +212,7 @@ Section ProofClockintr.
       assert (Hps : pa_stk sp0 2
                     = add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
       { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-      rewrite Hps. apply ci_frame_cancel. }
+      rewrite Hps. apply frame_cancel_16. }
     assert (Hpop : T5 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T5 !!! Regidx csp_rs1)
                                (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).

@@ -32,6 +32,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
+Require Import KernelRvcDecode.
 Import Defs.
 
 Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
@@ -108,7 +109,7 @@ Section WpMemsetArray.
       rewrite Hmeq.
       unfold callee_saved. repeat split.
       rewrite upd_eq. rewrite Hsuf_sp.
-      unfold sp', imm_entry. apply add_vec_frame_cancel.
+      unfold sp', imm_entry. apply frame_cancel_16.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -142,7 +143,7 @@ Section WpMemsetArray.
     set (m4 := <[Regidx a2_idx := regval_into_reg (shift_bits_left (m3 !!! Regidx a2_idx) (subrange_vec_dec shamt_l (Z.sub log2_xlen 1) 0))]> m3).
     set (m5 := <[Regidx a2_idx := regval_into_reg (shift_bits_right (m4 !!! Regidx a2_idx) (subrange_vec_dec shamt_r (Z.sub log2_xlen 1) 0))]> m4).
     set (m6 := <[Regidx a4_idx := regval_into_reg wval_add]> m5).
-    pose proof (add_vec_frame_cancel) as Hframe.
+    pose proof (frame_cancel_16) as Hframe.
     (* [bv_unsigned] of the count literal, used repeatedly *)
     assert (Hlen64 : Z.of_nat len < 2 ^ 64)
       by (apply (Z.lt_trans _ (2 ^ 32)); [ exact Hlen32 | vm_compute; reflexivity ]).

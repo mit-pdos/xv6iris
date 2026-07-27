@@ -52,27 +52,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-(* plic_complete's balanced 32-byte frame: entry [addi sp,-32] and exit
-   [addi16sp sp,+32] cancel. *)
-Lemma plic_complete_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
-
 (* ---- the decodes used only by plic_complete ---- *)
 
 (* +0x0c  bd8fc0ef  jal ra,cpuid *)
@@ -423,7 +402,7 @@ Section ProofPlicComplete.
     assert (HN7sp : N7 !!! Regidx csp_rs1 = sp').
     { unfold N7. rewrite upd_ne; [| vm_compute; discriminate]. rewrite HN6sp. exact HN4sp. }
     assert (Hwv : add_vec (N7 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HN7sp. unfold sp', imm_entry, sp0. apply plic_complete_frame_cancel. }
+    { rewrite HN7sp. unfold sp', imm_entry, sp0. apply frame_cancel_32. }
     assert (Hpop : N7 !!! Regidx csp_rs1
                    = pa_stk (add_vec (N7 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HN7sp. unfold sp', imm_entry, sp0. exact Hpush. }

@@ -103,10 +103,12 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   `KernelSyms.<f>` textually, either as `pc_is (mword_of_int KernelSyms.<f>)` or
   — the form to prefer — a `let pcE : mword 64 := mword_of_int KernelSyms.<f> in`
   binding used as `pc_is pcE`. A `Notation F := KernelSyms.<f>` alias written
-  into the `pc_is` hides the symbol, and the function is silently under-reported
-  as *partial* even though it is fully proven and linked. `SpecKvminithart.v` is
-  in exactly that state today (`pc_is (mword_of_int KVMIH)`); keep the notation
-  for the decode/proof files' addresses, but not for the spec's entry pc.
+  into the `pc_is` hides the symbol, and the function reads as *partial* even
+  though it is fully proven and linked. Keep the notation for the decode/proof
+  files' addresses, but not for the spec's entry pc. Both failure modes are
+  silent — a spec-shape slip shows up as a status downgrade, never as an error,
+  so **check the report after adding a function** rather than assuming it
+  counted.
 - The whole-function proofs that predate the shape (M-mode boot and the
   assembly: `_entry`, `start`, `timerinit`, `spin`, `swtch`, `kernelvec`,
   `userret`) name their entry pc through a local `Definition`, so they are

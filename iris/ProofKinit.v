@@ -30,6 +30,7 @@ Require Import WpKinitDecode.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecKinit.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -352,7 +353,7 @@ Section ProofKinit.
     set (E3 := <[Regidx csp_rs1 := regval_into_reg (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> E2).
     assert (HE3csp : E3 !!! Regidx csp_rs1 = sp0).
     { rewrite /E3 upd_eq. rewrite HE2sp. unfold regval_into_reg, spr, sp0.
-      apply initlock_sp_cancel. }
+      apply frame_cancel_16. }
     assert (Hwv : add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
     { rewrite -HE3csp /E3 upd_eq. reflexivity. }
     assert (Hpop : E2 !!! Regidx csp_rs1
