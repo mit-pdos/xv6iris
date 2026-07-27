@@ -78,9 +78,9 @@ Section ProofFiledup.
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
   Lemma wp_filedup_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl γf γs : gname) (k : nat) (q : Qp) (Cf : fcontent)
+      (γl γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat)
-    : wp_filedup_sconf_body γ Φ γl γf γs k q Cf m n eb p C K.
+    : wp_filedup_sconf_body γ Φ γl γf k q Cf m n eb p C K.
   Proof.
     cbv beta delta [wp_filedup_sconf_body].
     intros pcE ret_tgt HK Htp Hnoffpos Ha0.
@@ -238,7 +238,7 @@ Section ProofFiledup.
       rewrite /R4 upd_ne; [| vm_compute; discriminate]. exact HR3s1. }
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (FD + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iApply (Acquire.wp_acquire_sconf γ Φ γl "ftable"%string (ftable_res γf γs) mA
+    iApply (Acquire.wp_acquire_sconf γ Φ γl "ftable"%string (ftable_res γf) mA
               n eb p C (K - 4)%nat
               ltac:(etransitivity; [exact HmAtp | exact Htp])
               Hnoffpos ltac:(lia)
@@ -261,7 +261,7 @@ Section ProofFiledup.
     iDestruct "Href" as "[Hrtok Hrfields]".
     iDestruct (fref_tok_lookup with "Hauth Hrtok") as %(qt & cnt & HMk & _ & _).
     assert (Hk : (k < NFILE)%nat) by (apply Hdom; rewrite HMk; eauto).
-    iDestruct (ftable_slots_acc γs Mg k Hk with "Hslots") as "[Hslot Hback]".
+    iDestruct (ftable_slots_acc Mg k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /fslot HMk) in "Hslot".
     iDestruct "Hslot" as "(%Hcnt & Hcell & Hrest & Hfd)".
     (* the fd-slot conservation law: the caller's slot plus the ones the table
@@ -343,7 +343,7 @@ Section ProofFiledup.
     iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> Mg) with "[%] [Hcell Hrest Hfd]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | congruence]. }
     { rewrite /fslot lookup_insert. iFrame "Hcell Hrest Hfd". iPureIntro. exact Hno. }
-    iAssert (ftable_res γf γs) with "[Hauth Hfdauth Hslots]" as "HRres".
+    iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
     { iExists (<[k := (qt, Pos.succ cnt)]> Mg). iFrame "Hauth Hfdauth Hslots".
       iPureIntro. intros j Hj.
       destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
@@ -405,7 +405,7 @@ Section ProofFiledup.
       rewrite /D3 upd_ne; [| vm_compute; discriminate]. exact HD2s1. }
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (FD + 0x2a) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
-    iApply (Release.wp_release_sconf γ Φ γl ftable_addr "ftable"%string (ftable_res γf γs) D5
+    iApply (Release.wp_release_sconf γ Φ γl ftable_addr "ftable"%string (ftable_res γf) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HD5tp; exact Htp)

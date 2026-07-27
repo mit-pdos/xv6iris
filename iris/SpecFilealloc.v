@@ -62,7 +62,7 @@ Section SpecFilealloc.
 End SpecFilealloc.
 
 Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname) (m : regfile)
+    (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -75,11 +75,11 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
   sie_cap_gpr γ m K -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  is_ftable γl γf γs -∗
+  is_ftable γl γf -∗
   panic_wp -∗
   (* the new reference needs somewhere to live: one fd slot goes into the
      table and comes back out of fileclose. *)
-  fd_slot γs -∗
+  fd_slot -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
     cpu_own γ n eb p C -∗
@@ -92,7 +92,7 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname) (m : regfile)
+      (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_filealloc_sconf_body γ Φ γl γf γs m n eb p C K.
+      wp_filealloc_sconf_body γ Φ γl γf m n eb p C K.
 End FILEALLOC.

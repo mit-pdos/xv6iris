@@ -28,6 +28,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 From iris.algebra Require Import excl ofe.
 From iris.base_logic.lib Require Import invariants own ghost_var.
+Require Import FdSlots.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
@@ -297,7 +298,7 @@ End WkScfgLeaves.
    smode-config / [contains_lock]-based versions that used to live here.
    WpWakeup keeps only the decode/leaf/loop-arithmetic content below. *)
 Section ProcInv.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* ===================================================================== *)

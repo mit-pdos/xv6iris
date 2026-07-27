@@ -48,7 +48,8 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
-Require Import FileInv.
+Require Import WpLock.
+Require Import FdSlots FileInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -112,7 +113,7 @@ Section ProcInv.
   Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
 
-  Context `{!lockG Σ, !fileG Σ}.
+  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ}.
 
   (* A LIVE fd slot: the cell, and -- when non-null -- an actual reference on
      the [struct file] it points at.  [file_ref] is deliberately neither
@@ -120,9 +121,16 @@ Section ProcInv.
      the physical count under ftable.lock.  Naming the file by its ftable slot
      index [k] with [v = fnode k] is what bridges FileInv's index-keyed
      algebra to the pointer actually stored in memory. *)
+  (* Either way the slot owns ONE unit of fd-slot capability (FdSlots.v),
+     and the disjunction is where it currently is: an EMPTY descriptor holds
+     the unit itself; a descriptor naming a file has given it away, and the
+     ftable holds it against that file's count.  That conservation is what
+     bounds any file's [ref] by FDSLOTS, hence what makes filedup's unchecked
+     [f->ref++] safe -- so this predicate is the proc-side end of the law
+     whose file-side end is [FileInv.fslot]. *)
   Definition ofile_slot (γf : gname) (pa : mword 64) (fd : nat) (v : mword 64) : iProp Σ :=
     (p_ofile pa fd ↦₈ v ∗
-     (⌜v = (zero_reg : mword 64)⌝ ∨
+     (⌜v = (zero_reg : mword 64)⌝ ∗ fd_slot ∨
       ∃ (k : nat) (q : Qp) (C : fcontent),
         ⌜v = fnode k /\ (k < NFILE)%nat⌝ ∗ file_ref γf k q C))%I.
 
@@ -304,6 +312,11 @@ Section ProcInv.
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗
+       (* a dormant process still OWNS its NOFILE units -- every descriptor
+          is null, so it holds all of them itself.  Parking them here rather
+          than making allocproc conjure them is what keeps the supply
+          conserved across the whole UNUSED -> live -> ZOMBIE cycle. *)
+       ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        own_ctx (p_context pa) ∗
        (* The address-space cells, keyed on WHICH dormant state -- tied to
           [st], not a free disjunction.  A ZOMBIE still owns a live user
@@ -332,13 +345,16 @@ Section ProcInv.
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hs & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf".
     iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
-    iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "Hcell".
-    apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". by iLeft.
+    iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
+               (p_ofile pa fd ↦₈ v ∗ fd_slot))%I with "[Ho Hs]" as "Ho".
+    { rewrite big_sepL_sep. iFrame "Ho Hs". }
+    iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "[Hcell Hslot]".
+    apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". iLeft. by iFrame "Hslot".
   Qed.
 
   (* =================================================================== *)

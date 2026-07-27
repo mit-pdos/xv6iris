@@ -30,6 +30,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import SpecPanic.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
@@ -40,7 +41,7 @@ Import Defs.
 
 Notation SL := KernelSyms.sleep.
 
-Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
@@ -91,7 +92,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)

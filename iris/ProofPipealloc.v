@@ -111,10 +111,10 @@ Section ProofPipealloc.
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
   Lemma wp_pipealloc_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γfl γf γs : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+      (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat)
-    : wp_pipealloc_sconf_body γ Φ γfl γf γs γkl γk fl m v0 v1 on n eb p C K.
+    : wp_pipealloc_sconf_body γ Φ γfl γf γkl γk fl m v0 v1 on n eb p C K.
   Proof.
     cbv beta delta [wp_pipealloc_sconf_body].
     intros pcE pf0 pf1 ret_tgt HK Htp Hfl Hnoffpos.
@@ -638,7 +638,7 @@ Section ProofPipealloc.
                      ltac:(vm_compute; discriminate)). exact Htp. }
         assert (HU4ra : U4 !!! Regidx Rra = add_vec_int (mword_of_int (PA + 0xb2) : mword 64) 4)
           by (rewrite /U4; apply upd_eq).
-        iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf γs k1 1%Qp Cf1 U4 n eb p C (K - 6)%nat
+        iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k1 1%Qp Cf1 U4 n eb p C (K - 6)%nat
                   ltac:(unfold fileclose_stack; lia) HU4tp Hnoffpos HU4a0
                   with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [-]").
         iIntros (mr) "Hcg Hcnt Hpc %Hfcpins".
@@ -699,7 +699,7 @@ Section ProofPipealloc.
                    ltac:(vm_compute; discriminate)). exact Htp. }
       assert (HV1ra : V1 !!! Regidx Rra = add_vec_int (mword_of_int (PA + 0xa4) : mword 64) 4)
         by (rewrite /V1; apply upd_eq).
-      iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf γs k0 1%Qp Cf0 V1 n eb p C (K - 6)%nat
+      iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k0 1%Qp Cf0 V1 n eb p C (K - 6)%nat
                 ltac:(unfold fileclose_stack; lia) HV1tp Hnoffpos HV1a0
                 with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [-]").
       iIntros (mr) "Hcg Hcnt Hpc %Hfcpins".
@@ -763,7 +763,7 @@ Section ProofPipealloc.
       by (rewrite /mA upd_ne; [exact HR4s4 | vm_compute; discriminate]).
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (PA + 0x18) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iApply (Filealloc.wp_filealloc_sconf γ Φ γfl γf γs mA n eb p C (K - 6)%nat
+    iApply (Filealloc.wp_filealloc_sconf γ Φ γfl γf mA n eb p C (K - 6)%nat
               ltac:(lia) HmAtp Hnoffpos
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslota [-]").
     iIntros (mB) "Hcg Hcnt Hpc %HcsB Hpost0".
@@ -858,7 +858,7 @@ Section ProofPipealloc.
       by (rewrite /mC upd_ne; [exact HmBs4 | vm_compute; discriminate]).
     assert (HmCra : mC !!! Regidx Rra = add_vec_int (mword_of_int (PA + 0x20) : mword 64) 4)
       by (rewrite /mC; apply upd_eq).
-    iApply (Filealloc.wp_filealloc_sconf γ Φ γfl γf γs mC n eb p C (K - 6)%nat
+    iApply (Filealloc.wp_filealloc_sconf γ Φ γfl γf mC n eb p C (K - 6)%nat
               ltac:(lia) HmCtp Hnoffpos
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslotb [-]").
     iIntros (mD) "Hcg Hcnt Hpc %HcsD Hpost1".

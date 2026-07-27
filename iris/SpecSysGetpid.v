@@ -53,7 +53,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FileInv.
+Require Import FdSlots FileInv.
 Require Import ProcInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -61,7 +61,7 @@ Import Defs.
 
 Notation SG := KernelSyms.sys_getpid.
 
-Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) :=
@@ -89,7 +89,7 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG �
 
 Module Type SYSGETPID.
   Parameter wp_sys_getpid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate),

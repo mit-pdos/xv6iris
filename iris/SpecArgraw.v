@@ -48,7 +48,8 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FileInv ProcInv.
+Require Import WpLock.
+Require Import FdSlots FileInv ProcInv.
 Require Import UserPtTree ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -56,7 +57,7 @@ Import Defs.
 
 Notation AR := KernelSyms.argraw.
 
-Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
@@ -89,7 +90,7 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `
 
 Module Type ARGRAW.
   Parameter wp_argraw_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)

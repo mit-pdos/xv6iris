@@ -36,6 +36,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import KernelRvcDecode.
 Require Import WpSmodeIntr.
 Require Import WpMycpu ProcGeom.
+Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import SwtchCtx.
@@ -90,7 +91,7 @@ Qed.
 
 (* the shared exit-path continuation (control at +0x28): everything the exit
    straight-line needs, phrased over the abstract register map [M]. *)
-Definition asl_exit `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition asl_exit `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
     (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
     (slk spd sp0 pj cpuv : mword 64) (eb : bool) (C : iProp Σ) : iProp Σ :=
@@ -110,7 +111,7 @@ Definition asl_exit `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
 
 (* the wait-loop invariant (control at +0x1c): held-word cell + the sleep bundle,
    threading the exit continuation as its last premise. *)
-Definition asl_loop `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition asl_loop `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
     (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
     (slk spd sp0 pj cpuv : mword 64) (eb : bool) (C : iProp Σ) : iProp Σ :=
@@ -132,7 +133,7 @@ Definition asl_loop `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
 Module AcquiresleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC) (Sleep : SLEEP) : ACQUIRESLEEP.
 
 Section ProofAcquiresleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
 
   (* register disequality guard (perf rule): unify settles convertibility

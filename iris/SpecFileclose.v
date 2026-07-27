@@ -81,7 +81,7 @@ Notation FC := KernelSyms.fileclose.
 Definition fileclose_stack : nat := 18%nat.
 
 Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname)
+    (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname)
     (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
@@ -95,7 +95,7 @@ Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
   sie_cap_gpr γ m K -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  is_ftable γl γf γs -∗
+  is_ftable γl γf -∗
   panic_wp -∗
   file_ref γf k q Cf -∗
   ( ∀ mr,
@@ -109,8 +109,8 @@ Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname)
+      (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_fileclose_sconf_body γ Φ γl γf γs k q Cf m n eb p C K.
+      wp_fileclose_sconf_body γ Φ γl γf k q Cf m n eb p C K.
 End FILECLOSE.

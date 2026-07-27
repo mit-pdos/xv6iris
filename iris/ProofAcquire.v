@@ -96,12 +96,14 @@ Section ProofAcquire.
                      ((<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
                         !!! Regidx (mword_of_int 15 : mword 5)))) zero_reg = true)
       by (rewrite upd_eq Hst1; vm_compute; reflexivity).
-    iApply (wp_amoswap_lockinv_s_sconf γ Φ γl lk s R (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
+    iApply (wp_amoswap_lockopen_s_sconf γ Φ γl lk R emp%I False%I (mword_of_int (AQ + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n
               HPAlk HSTZ
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hj1c Hlock [-]").
-    iIntros (w) "Hcg Hpc Hpay".
+              with "Hcg Hpc Hj1c [] [] [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros (w) "_ Hcg Hpc Hpay".
     iEval (rewrite upd_upd) in "Hcg".
     assert (Hpp20 : add_vec_int (mword_of_int (AQ + 0x1c) : mword 64) 4 = mword_of_int (AQ + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
@@ -463,12 +465,14 @@ Section ProofAcquire.
     assert (Hpacpu : add_vec (Cm !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lk0).
     { rewrite Hs1C aq_addv_zero_l. reflexivity. }
     iPoseProof (aqi_28 with "Htext") as "Hi28".
-    iApply (wp_csd_lkcpu_lockinv_s_sconf γ Φ γl lk0 s R (mword_of_int (AQ + 0x28))
+    iApply (wp_csd_lkcpu_lockopen_s_sconf γ Φ γl lk0 R emp%I False%I (mword_of_int (AQ + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 16 : mword 12) Cm (av - 4)%nat
               Hpacpu Ha0C
-              with "Hcg Hpc Hi28 Hlock Htokp [-]").
-    iIntros "Hcg Hpc Htok".
+              with "Hcg Hpc Hi28 [] [] Htokp [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros "_ Hcg Hpc Htok".
     assert (Hpc2a : add_vec_int (mword_of_int (AQ + 0x28) : mword 64) 2 = mword_of_int (AQ + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)

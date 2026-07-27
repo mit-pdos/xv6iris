@@ -217,11 +217,13 @@ Section ProofRelease.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite kv_addv_zero. reflexivity. }
-    iApply (wp_sd_zero_lkcpu_lockinv_s_sconf γ Φ γl lka s R (mword_of_int (RL + 0x12))
+    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf γ Φ γl lka R emp%I False%I (mword_of_int (RL + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (av - 4)%nat
               Hacpu
-              with "Hcg Hpc Hi12 Hlock Htoken [-]").
-    iIntros "Hcg Hpc Htoken".
+              with "Hcg Hpc Hi12 [] [] Htoken [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros "_ Hcg Hpc Htoken".
     assert (Hpc16 : add_vec_int (mword_of_int (RL + 0x12) : mword 64) 4 = mword_of_int (RL + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)
@@ -233,11 +235,13 @@ Section ProofRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iPoseProof (rli_1a with "Htext") as "Hi1a".
-    iApply (wp_sw_zero_lockinv_s_sconf γ Φ γl lka s R (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
+    iApply (wp_sw_zero_lockopen_s_sconf γ Φ γl lka R emp%I False%I (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh (av - 4)%nat
               ltac:(rewrite Hs1mh; exact Hlka)
-              with "Hcg Hpc Hi1a Hlock Htoken HR [-]").
-    iIntros "Hcg Hpc".
+              with "Hcg Hpc Hi1a [] [] Htoken HR [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros "_ Hcg Hpc".
     assert (Hpc1e : add_vec_int (mword_of_int (RL + 0x1a) : mword 64) 4 = mword_of_int (RL + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
     (* ---- 0x1e: jal ra,pop_off ---- *)

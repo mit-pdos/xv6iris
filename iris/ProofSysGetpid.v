@@ -31,7 +31,7 @@ Require Import KernelRvcDecode WpRvcBridge WpDecodeBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FileInv ProcInv.
+Require Import FdSlots FileInv ProcInv.
 Require Import SpecMyproc.
 Require Import SpecSysGetpid.
 From Kernel Require KernelInstrs.
@@ -83,7 +83,7 @@ Qed.
 Module SysGetpidProof (Myproc : MYPROC) : SYSGETPID.
 
 Section ProofSysGetpid.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)

@@ -88,9 +88,9 @@ Section ProofFilealloc.
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
   Lemma wp_filealloc_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl γf γs : gname) (m : regfile)
+      (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat)
-    : wp_filealloc_sconf_body γ Φ γl γf γs m n eb p C K.
+    : wp_filealloc_sconf_body γ Φ γl γf m n eb p C K.
   Proof.
     cbv beta delta [wp_filealloc_sconf_body].
     intros pcE ret_tgt HK Htp Hnoffpos.
@@ -233,7 +233,7 @@ Section ProofFilealloc.
     { rewrite /mA upd_ne; [| vm_compute; discriminate]. exact HR4a0. }
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (FA + 0x12) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iApply (Acquire.wp_acquire_sconf γ Φ γl "ftable"%string (ftable_res γf γs) mA
+    iApply (Acquire.wp_acquire_sconf γ Φ γl "ftable"%string (ftable_res γf) mA
               n eb p C (K - 4)%nat
               ltac:(etransitivity; [exact HmAtp | exact Htp])
               Hnoffpos ltac:(lia)
@@ -485,14 +485,14 @@ Section ProofFilealloc.
                 Mi !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr γ Mi (K - 4)%nat -∗
         pc_is (mword_of_int (FA + 0x42)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot γs Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
     set (Cfull := (∀ (Mf : regfile),
         ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
              Mf !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr γ Mf (K - 4)%nat -∗
         pc_is (mword_of_int (FA + 0x32)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot γs Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
     iAssert (∀ (fuel j : nat) (M : regfile),
         ⌜ (NFILE - j <= fuel)%nat ⌝ -∗
@@ -503,7 +503,7 @@ Section ProofFilealloc.
                 M !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr γ M (K - 4)%nat -∗
         pc_is (mword_of_int (FA + 0x26)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot γs Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
         (* the two exits are conjoined, NOT separated: exactly one is taken,
            so they must SHARE the ambient resources (lock token, cpu_own,
            the authority, the epilogue) rather than split them. *)
@@ -514,7 +514,7 @@ Section ProofFilealloc.
         iIntros (j M) "%Hfuel %Hj (%Hs1 & %Ha4 & %Hthr) Hcg Hpc Hslots Hexit".
       { exfalso. lia. }
       (* --- +0x26 c.lw a5,4(s1) : read this entry's ref field --- *)
-      iDestruct (ftable_slots_acc γs Mg j ltac:(lia) with "Hslots") as "[Hslot Hback]".
+      iDestruct (ftable_slots_acc Mg j ltac:(lia) with "Hslots") as "[Hslot Hback]".
       assert (Hpa : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = a_fref j) by (rewrite Hs1; reflexivity).
       destruct (Mg !! j) as [[qt cnt]|] eqn:HMj.
@@ -670,7 +670,7 @@ Section ProofFilealloc.
       iPoseProof (fai_46 with "Htext") as "Hi46".
       iPoseProof (fai_4a with "Htext") as "Hi4a".
       iPoseProof (fai_4e with "Htext") as "Hi4e".
-      iDestruct (ftable_slots_acc γs Mg i ltac:(lia) with "Hslots") as "[Hslot Hback]".
+      iDestruct (ftable_slots_acc Mg i ltac:(lia) with "Hslots") as "[Hslot Hback]".
       iEval (rewrite /fslot HMgi) in "Hslot".
       iDestruct "Hslot" as "[Hcell Hfree]".
       iDestruct "Hfree" as (Cf) "[%HCtype Hfields]".
@@ -707,7 +707,7 @@ Section ProofFilealloc.
         iFrame "Hcell". rewrite /fd_slot /=. iFrame "Hfdslot". iPureIntro.
         assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
         rewrite E31. lia. }
-      iAssert (ftable_res γf γs) with "[Hauth Hfdauth Hslots]" as "HRres".
+      iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
       { iExists (<[i := (1%Qp, 1%positive)]> Mg). iFrame "Hauth Hfdauth Hslots".
         iPureIntro. intros k Hk.
         destruct (decide (k = i)) as [->|Hne]; [lia|].
@@ -770,7 +770,7 @@ Section ProofFilealloc.
         rewrite /F2 upd_ne; [| vm_compute; discriminate]. exact HF1s1. }
       assert (HF4ra : F4 !!! Regidx Rra = add_vec_int (mword_of_int (FA + 0x4e) : mword 64) 4)
         by (rewrite /F4; apply upd_eq).
-      iApply (Release.wp_release_sconf γ Φ γl ftable_addr "ftable"%string (ftable_res γf γs) F4
+      iApply (Release.wp_release_sconf γ Φ γl ftable_addr "ftable"%string (ftable_res γf) F4
                 n eb p C (K - 4)%nat
                 ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(rewrite HF4tp; exact Htp)
@@ -807,7 +807,7 @@ Section ProofFilealloc.
       iPoseProof (fai_3a with "Htext") as "Hi3a".
       iPoseProof (fai_3e with "Htext") as "Hi3e".
       iPoseProof (fai_40 with "Htext") as "Hi40".
-      iAssert (ftable_res γf γs) with "[Hauth Hfdauth Hslots]" as "HRres".
+      iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
       { iExists Mg. iFrame "Hauth Hfdauth Hslots". iPureIntro. exact Hdom. }
       (* +0x32 auipc a0,0x1e ; +0x36 addi a0,a0,1142 *)
       iApply (wp_auipc_s_sconf γ Φ (mword_of_int (FA + 0x32)) Ra0 (mword_of_int 0x1e : mword 20)
@@ -856,7 +856,7 @@ Section ProofFilealloc.
         by (rewrite (HG3thr (mword_of_int 4) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact Hmtp).
       assert (HG3ra : G3 !!! Regidx Rra = add_vec_int (mword_of_int (FA + 0x3a) : mword 64) 4)
         by (rewrite /G3; apply upd_eq).
-      iApply (Release.wp_release_sconf γ Φ γl ftable_addr "ftable"%string (ftable_res γf γs) G3
+      iApply (Release.wp_release_sconf γ Φ γl ftable_addr "ftable"%string (ftable_res γf) G3
                 n eb p C (K - 4)%nat
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(rewrite HG3tp; exact Htp)

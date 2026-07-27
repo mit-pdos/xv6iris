@@ -69,11 +69,13 @@ Section ProofHolding.
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockinv_s_sconf γ Φ γl lka s R pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockopen_s_sconf γ Φ γl lka R emp%I False%I pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n
               Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi00 Hlock [-]").
-    iIntros (lockv) "Hcg Hpc".
+              with "Hcg Hpc Hi00 [] [] [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros (lockv) "_ Hcg Hpc".
     set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m) with H1.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (HD + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
@@ -222,12 +224,14 @@ Section ProofHolding.
     assert (Hacpu : add_vec (S2 !!! Regidx (mword_of_int 10 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka)
       by (rewrite Ha0S2 Hlkeq; reflexivity).
-    iApply (wp_cld_lkcpu_lockinv_s_sconf γ Φ γl lka s R (mword_of_int (HD + 0x12))
+    iApply (wp_cld_lkcpu_lockopen_s_sconf γ Φ γl lka R emp%I False%I (mword_of_int (HD + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat
               Hacpu ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi12 Hlock [-]").
-    iIntros (cpuv) "Hcg Hpc".
+              with "Hcg Hpc Hi12 [] [] [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros (cpuv) "_ Hcg Hpc".
     set (S3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg cpuv]> S2).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg cpuv]> S2) with S3.
     assert (Hpc14 : add_vec_int (mword_of_int (HD + 0x12) : mword 64) 2 = mword_of_int (HD + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -531,11 +535,13 @@ Section ProofHolding.
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockinv_locked_s_sconf γ Φ γl lka s R pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockopen_locked_s_sconf γ Φ γl lka R emp%I False%I pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n
               Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi00 Hlock Htok [-]").
-    iIntros (lockv) "%Hlv Htok Hcg Hpc".
+              with "Hcg Hpc Hi00 [] [] Htok [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros (lockv) "_ %Hlv Htok Hcg Hpc".
     set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m) with H1.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (HD + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
@@ -643,12 +649,14 @@ Section ProofHolding.
     assert (Hacpu : add_vec (S2 !!! Regidx (mword_of_int 10 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka)
       by (rewrite Ha0S2 Hlkeq; reflexivity).
-    iApply (wp_cld_lkcpu_lockinv_locked_s_sconf γ Φ γl lka s R (mword_of_int (HD + 0x12))
+    iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γ Φ γl lka R emp%I False%I (mword_of_int (HD + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat
               Hacpu ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi12 Hlock Htok [-]").
-    iIntros "Htok Hcg Hpc".
+              with "Hcg Hpc Hi12 [] [] Htok [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    iIntros "_ Htok Hcg Hpc".
     set (S3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mycpu_ret cid_word)]> S2).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mycpu_ret cid_word)]> S2) with S3.
     assert (Hpc14 : add_vec_int (mword_of_int (HD + 0x12) : mword 64) 2 = mword_of_int (HD + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
