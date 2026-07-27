@@ -85,9 +85,8 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes KernelText RegFile.
-Require Import IntrDefs.
-Require Import SmodeCore KallocInv WpLock WpMycpu.
+Require Import SmodeCore KallocInv WpLock.
+Require Export SpecPanic.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -108,38 +107,23 @@ Section KvmSpecs.
   Context `{CID : CpuId}.
 
   (* kalloc's ambient resources, bundled so callers can invoke kalloc
-     REPEATEDLY: the kmem lock, and THIS cpu's push_off/pop_off cells in
-     their quiescent interrupts-off state (noff = 0, which makes
-     pop_off's intena arm vacuous, so every kalloc call restores the
-     bundle: wp_kalloc's post returns the lock's cpu field zeroed, noff
-     decremented back to 0, intena at pop_off's zero write).  [tp] is
-     the caller's thread pointer (callee-saved, never written by the
-     kvm chain).  The 0-not-mycpu fact rides along so the bundle
-     re-establishes after kalloc zeroes the cpu field. *)
+     REPEATEDLY: the kmem lock, the count ghost, and panic's contract (which
+     acquire's "already holding" arm needs).  [tp] is the caller's thread
+     pointer (callee-saved, never written by the kvm chain), kept as a
+     parameter because the whole chain's specs are stated tp-indexed. *)
   (* The kvm chain runs in the allocator's STEADY STATE: the bundled count
      ghost is the persistent sealed witness [kalloc_avail γk None] (count
      unknown, kalloc may fail), so every kalloc call threads [on := None] and
      the bundle trivially re-establishes. *)
   Definition kalloc_env (γ : gname) (on : option nat) (tp : mword 64) : iProp Σ :=
-    (∃ (γk : gname * gname) (qcpu : mword 64),
-      ⌜eq_vec qcpu (mycpu_ret tp) = false⌝ ∗
-      ⌜eq_vec (zero_reg : mword 64) (mycpu_ret tp) = false⌝ ∗
+    (∃ γk : gname * gname,
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk on ∗
-      add_vec (mword_of_int KernelSyms.kmem : mword 64)
-        (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈ qcpu)%I.
+      panic_wp)%I.
 
-  (* ------------------------------------------------------------------- *)
-  (* The panic contract: panic never returns, so a safety WP holds with    *)
-  (* any postcondition.  (Eventually a lemma -- uartputc + a Löb spin      *)
-  (* loop; an axiom in the interim -- as myproc once was, now proven.)      *)
-  (* a0 = msg.                                                              *)
-  (* ------------------------------------------------------------------- *)
-  Definition panic_wp : iProp Σ :=
-    (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (m : regfile) (avail : nat),
-       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr γ m avail -∗
-       WP (Loop : expr riscv_lang) {{ Φ }})%I.
+  (* The panic contract now lives in SpecPanic.v (Require Export above), so
+     the spinlock layer and the kvm chain share one statement. *)
 
   (* ------------------------------------------------------------------- *)
   (* kvmmake() / kvminit().  kvmmake returns (a0) the root of a fresh      *)

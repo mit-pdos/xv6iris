@@ -28,8 +28,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen.
 Require Import WpLock.
-Require Import WpMycpu ProcGeom.
-Require Import IntrDefs CpuOwn.
+Require Import ProcGeom.
 Require Import KernelRvcDecode WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSysUptimeDecode.
@@ -123,10 +122,7 @@ Section ProofSysUptime.
     cbv beta delta [wp_sys_uptime_sconf_body].
     intros pcE ret_tgt Htp Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    (* the lock's cpu field: unfold once, so every acquire/release-shaped
-       [add_vec lk (sext 16)] goal matches the resource we hold. *)
-    rewrite /tickslock_cpu.
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock Hcpuf Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hcont".
     iDestruct (is_tickslock_lock with "Hlock") as "#Hlk".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (sui_00 with "Htext") as "Hi00".
@@ -257,19 +253,16 @@ Section ProofSysUptime.
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspA0. }
     (* ===================== acquire(&tickslock) ===================== *)
     iApply (Acquire.wp_acquire_sconf γ Φ γl "time"%string ticks_res A4
-              (zero_reg : mword 64) n eb p C (av - 4)%nat
-              ltac:(rewrite HA4tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
+              n eb p C (av - 4)%nat
               HA4tp
               ltac:(exact Hn)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hlk] [Hcpuf] [-]").
+              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic [-]").
     { iEval (rewrite HA4a0). iExact "Hlk". }
-    { iEval (rewrite HA4a0). iExact "Hcpuf". }
-    iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcpuf Hcnt Hpay".
+    iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
     assert (Hpc16 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (SU + 0x16))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
-    iEval (rewrite HA4a0 HA4tp) in "Hcpuf".
     (* the protected resource: the counter cell at an arbitrary value *)
     iDestruct "HR" as (t) "Hticks".
     (* ===================== a5 := ticks ===================== *)
@@ -380,21 +373,18 @@ Section ProofSysUptime.
     (* ===================== release(&tickslock) ===================== *)
     iDestruct (ticks_res_intro t with "Hticks") as "HR".
     iApply (Release.wp_release_sconf γ Φ γl a_tickslock "time"%string ticks_res B5
-              (mycpu_ret cid_word) n eb p C (av - 4)%nat
+              n eb p C (av - 4)%nat
               ltac:(rewrite HB5a0; apply su_add_vec_0)
-              ltac:(rewrite HB5tp; apply su_eq_vec_refl)
               HB5tp
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlk] [Htok] [HR] [Hcpuf] Hcnt Hpay [-]").
+              with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay [-]").
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR". }
-    { iEval (rewrite HB5a0). iExact "Hcpuf". }
-    iIntros (MR) "Hcg Hpc %HcsR Hcpuf Hcnt".
+    iIntros (MR) "Hcg Hpc %HcsR Hcnt".
     assert (Hpc2c : ret_pc (B5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (SU + 0x2c))
       by (rewrite HB5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
-    iEval (rewrite HB5a0) in "Hcpuf".
     (* ===================== the (uint) return cast ===================== *)
     assert (HMRs1 : MR !!! Regidx (mword_of_int 9 : mword 5) = sign_extend' 64 (t : mword 32)).
     { rewrite (callee_saved_lookup HcsR (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
@@ -579,7 +569,7 @@ Section ProofSysUptime.
       rewrite /A2 upd_ne; [| congruence].
       rewrite /A1 upd_ne; [| congruence].
       rewrite /A0 upd_ne; [| congruence]. reflexivity. }
-    iApply ("Hcont" $! E4 t with "[%] Hcg Hcnt Hpc Hcpuf").
+    iApply ("Hcont" $! E4 t with "[%] Hcg Hcnt Hpc").
     split; [| exact HE4a0].
     unfold callee_saved.
     split; [exact HE4csp|].

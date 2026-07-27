@@ -52,11 +52,11 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import WpLock WpMycpu.
+Require Import WpLock.
 Require Import KallocInv.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
-Require Import DevModel.
+Require Import VirtioModel.
 Require Import IntrDefs.
 Require Import RegFile.
 From Kernel Require KernelSyms.

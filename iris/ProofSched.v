@@ -152,7 +152,7 @@ Section ProofSched.
     iIntros "Hcg #Htext Hpc #Hprocs Hheld Hcpu Hown Hvc Hcont".
     (* the cpu bundle [cpu_own γ 1 eb pj emp] arrives whole at level 1; unfold
        it to the individual cells + counting token the check-chain threads. *)
-    iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hpub & Hlkcpu)".
+    iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hpub)".
     (* a persistent copy of the level-1 handler-avail payload (needed only when
        the saved base enable [eb] is true) for the return-path retune. *)
     iAssert (cpu_own γ 1 eb (proc_addr j) emp ∗
@@ -327,20 +327,13 @@ Section ProofSched.
     { rewrite Ha0_B1.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H0. apply kv_addv_zero. }
-    (* the lock's cpu word cell (p_lkcpu) equals holding's a_cpu form. *)
-    assert (Hpacpu : add_vec (B1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = p_lkcpu (proc_addr j)).
-    { rewrite Ha0_B1. reflexivity. }
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SD + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
-    assert (Hcpueq : eq_vec (mycpu_ret cid_word) (mycpu_ret (B1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
-      by (rewrite HtpB1; apply eq_vec_true_iff; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl (proc_addr j) "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (av - 6)%nat (mycpu_ret cid_word) (dqc := DfracOwn 1)
-              Hlkb Hcpueq ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked [Hlkcpu] [-]").
-    { iEval (rewrite Hpacpu). iExact "Hlkcpu". }
-    iIntros (mh) "Hcg Hpc %Hmh Hlocked Hlkcpu".
-    iEval (rewrite Hpacpu) in "Hlkcpu".
+              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (av - 6)%nat
+              Hlkb HtpB1 ltac:(lia)
+              with "Hcg Htext Hpc Hislock Hlocked [-]").
+    iIntros (mh) "Hcg Hpc %Hmh Hlocked".
     destruct Hmh as [Hcs_mh Ha0_mh].
     assert (Hpc18 : ret_pc (add_vec_int (mword_of_int (SD + 0x14) : mword 64) 4)
                     = mword_of_int (SD + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -856,8 +849,8 @@ Section ProofSched.
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs j γl st ch Hj Hgl Hneeds
-                  with "[Hlocked Hstate Hchan Hpub Hlkcpu]") as "HP".
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hlkcpu". }
+                  with "[Hlocked Hstate Hchan]") as "HP".
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     (* apply swtch. *)
     iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj

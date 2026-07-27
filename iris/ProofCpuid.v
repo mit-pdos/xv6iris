@@ -51,27 +51,6 @@ Lemma cdec_addiw_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   = Some (C_ADDIW (mword_of_int 0, Regidx (mword_of_int 10)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* cpuid's balanced frame: entry [addi sp,-16] and exit [addi sp,+16] cancel
-   (identical to WpMycpu.mycpu_frame_cancel). *)
-Lemma cpuid_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-             = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-             = 16) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
-
 (* the [sext.w a0] result, applied to a0 = [add_vec zero_reg tp] with imm 0,
    truncates to exactly [subrange tp 31 0] -- i.e. it bridges the model's
    ADDIW value to [cpuid_ret]'s definition. *)
@@ -274,7 +253,7 @@ Section ProofCpuid.
     { unfold m6, m5; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       exact Hm4sp. }
     assert (Hwv : add_vec (m6 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
-    { rewrite Hm6sp. unfold sp', imm_dealloc, imm_entry, sp0. apply cpuid_frame_cancel. }
+    { rewrite Hm6sp. unfold sp', imm_dealloc, imm_entry, sp0. apply frame_cancel_16. }
     assert (Hpop : m6 !!! Regidx csp_rs1
                    = pa_stk (add_vec (m6 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc))) 2).
     { rewrite Hwv Hm6sp. exact Hpush. }
@@ -320,7 +299,7 @@ Section ProofCpuid.
       rewrite Hm6sp.
       change (m0 !!! Regidx (mword_of_int 2)) with (m0 !!! Regidx csp_rs1).
       unfold sp', imm_dealloc, imm_entry.
-      apply cpuid_frame_cancel.
+      apply frame_cancel_16.
     - rewrite /m7 /m6 /m5 /m4 /m3 /m2 /m1 /s00 /ra0.
       repeat first [ rewrite upd_eq
                    | rewrite upd_ne; [| vm_compute; discriminate] ].

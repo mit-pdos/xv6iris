@@ -24,7 +24,6 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
-Require Import WpMycpu.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -108,7 +107,7 @@ Section ProofYield.
     cbv beta delta [wp_yield_sconf_body].
     intros pcE pj ret_tgt Htp Hj Hgl Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hlk0 Hown Hvc Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hown Hvc Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 32-byte frame (push 4), save ra/s0/s1 (mirror myproc).   *)
     (* ------------------------------------------------------------------ *)
@@ -251,17 +250,13 @@ Section ProofYield.
       by (rewrite /B1 upd_eq; reflexivity).
     iPoseProof (procs_inv_lookup γ Φ γs j γl Hgl with "Hprocs") as "#Hislock".
     iApply (Acquire.wp_acquire_sconf γ Φ γl "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 (zero_reg : mword 64) 0 eb (proc_addr j) C (av - 4)%nat
-              ltac:(rewrite HtpB1; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
+              (proc_lock_res γ Φ γs γl (proc_addr j)) B1 0 eb (proc_addr j) C (av - 4)%nat
               HtpB1
               ltac:(lia)
               ltac:(lia)
-              with "Hcg Hcpu Htext Hpc [Hislock] [Hlk0] [-]").
+              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
-    { iEval (rewrite Ha0_B1). iExact "Hlk0". }
-    iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hlkcpu Hcpu Hpay".
-    (* reconcile acquire's lock-cpu cell back to the proc_addr form. *)
-    iEval (rewrite Ha0_B1 HtpB1) in "Hlkcpu".
+    iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (YD + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
@@ -326,10 +321,10 @@ Section ProofYield.
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
     iApply (Sched.wp_sched_sconf γ Φ γs j γl RUNNABLE ch0 C1 (av - 4)%nat eb
               HtpC1 Hj Hgl (needs_ctx_RUNNABLE) ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hpub Hlkcpu] Hcpuemp Hown Hvc [-]").
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hlkcpu". }
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan] Hcpuemp Hown Hvc [-]").
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Hcpuemp Hown' Hvc'".
-    iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub & Hlkcpu)".
+    iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub)".
     (* re-inject the opaque context-slot payload into the returned bundle. *)
     iAssert (cpu_own γ 1 eb (proc_addr j) C) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
@@ -384,20 +379,13 @@ Section ProofYield.
     iAssert (proc_lock_res γ Φ γs γl (proc_addr j)) with "[Hstate Hchan Hpub]" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, ch'. iFrame "Hstate Hchan Hpub".
       rewrite /proc_slots needs_ctx_RUNNING inv_dormant_RUNNING. done. }
-    (* reconcile the lock-cpu / noff / intena cell addresses for release. *)
-    assert (Hcpueq_rel : eq_vec (mycpu_ret cid_word) (mycpu_ret (D1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
-      by (rewrite HtpD1; apply eq_vec_true_iff; reflexivity).
     iApply (Release.wp_release_sconf γ Φ γl (proc_addr j) "proc"%string
-              (proc_lock_res γ Φ γs γl (proc_addr j)) D1 (mycpu_ret cid_word) 0 eb (proc_addr j) C (av - 4)%nat
+              (proc_lock_res γ Φ γs γl (proc_addr j)) D1 0 eb (proc_addr j) C (av - 4)%nat
               Hlka
-              Hcpueq_rel
               HtpD1
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 [Hlkcpu] Hcpu Hpay [-]").
-    { iEval (rewrite Ha0_D1). iExact "Hlkcpu". }
-    iIntros (mrel) "Hcg Hpc %Hcs_rel Hlkcpu Hcpu".
-    (* reconcile release's post lock-cpu cell back to the proc_addr form. *)
-    iEval (rewrite Ha0_D1) in "Hlkcpu".
+              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay [-]").
+    iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
     assert (Hpc22 : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (YD + 0x22)) by (rewrite HD1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
@@ -518,7 +506,7 @@ Section ProofYield.
     (* ------------------------------------------------------------------ *)
     (* Post: hand every resource straight back; callee_saved via threading.*)
     (* ------------------------------------------------------------------ *)
-    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hlkcpu Hown' Hvc'").
+    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hown' Hvc'").
     (* callee_saved m E4 *)
     assert (Csp : E4 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite HE4sp Hspm; reflexivity).

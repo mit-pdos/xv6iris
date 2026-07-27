@@ -55,12 +55,14 @@ Section SleepLock.
   Global Instance sl_name_persistent slk s : Persistent (sl_name slk s).
   Proof. apply _. Qed.
 
-  (* the holder's exclusive token (same ghost as the spinlock's [locked],
-     under its own gname). *)
-  Definition sleeplocked (γ : gname) : iProp Σ := locked γ.
+  (* the holder's exclusive token: the bare exclusive token of WpLock's RA
+     under its own gname.  Deliberately NOT the spinlock's [locked], which is
+     keyed by the holding HART -- a sleeplock is held by a PROCESS (its pid
+     rides in [sl_pid]), across context switches and possibly harts. *)
+  Definition sleeplocked (γ : gname) : iProp Σ := lock_tok_excl γ.
 
   Lemma sleeplocked_exclusive γ : sleeplocked γ -∗ sleeplocked γ -∗ False.
-  Proof. apply locked_exclusive. Qed.
+  Proof. apply lock_tok_excl_exclusive. Qed.
 
   Global Instance sleeplocked_timeless γ : Timeless (sleeplocked γ).
   Proof. apply _. Qed.
@@ -139,22 +141,18 @@ Section SleepLock.
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    R ={E}=∗
-    ∃ γl γ : gname, is_sleeplock γl γ slk s R.
+    R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
-    iIntros "#Hlnm #Hsnm Hlkw Hw Hpid HR".
-    iMod (own_alloc (Excl () : exclR unitO)) as (γ) "Htok"; [done|].
-    iMod (own_alloc (Excl () : exclR unitO)) as (γl) "Htokl"; [done|].
-    iMod (inv_alloc lockN E (lock_inv γl (sl_lk slk) (sl_res γ slk R))
-            with "[Hlkw Htokl Hw Htok Hpid HR]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0 : mword 32). rewrite /lock_word.
-      iFrame "Hlkw". iLeft. iSplit; [done|]. iFrame "Htokl".
-      iApply (sl_res_close_free with "Hw Htok Hpid HR"). }
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
+    iMod lock_tok_excl_alloc as (γ) "Htok".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res γ slk R)
+            with "Hlnm Hlkw Hcpu [Hw Htok Hpid HR]") as (γl) "#Hlk".
+    { iApply (sl_res_close_free with "Hw Htok Hpid HR"). }
     iModIntro. iExists γl, γ.
-    iApply (is_sleeplock_intro with "Hsnm").
-    iApply (is_lock_intro with "Hlnm Hinv").
+    iApply (is_sleeplock_intro with "Hsnm Hlk").
   Qed.
 
   (* ---- the two ends of initsleeplock, bundled.
@@ -188,15 +186,13 @@ Section SleepLock.
      sl_pid slk ↦₄ (mword_of_int 0 : mword 32))%I.
 
   (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
-     word of the inner spinlock is NOT part of [lock_inv], so it comes back out
-     for the caller to thread on (acquire/release want it). *)
+     word of the inner spinlock goes INTO [lock_inv] (WpLock.v owns both lock
+     words). *)
   Lemma sl_fresh_new E (slk : mword 64) (s : string) (R : iProp Σ) :
-    sl_fresh slk s -∗ R ={E}=∗
-    (∃ γl γ : gname, is_sleeplock γl γ slk s R) ∗ sl_lkcpu slk ↦₈ (zero_reg : mword 64).
+    sl_fresh slk s -∗ R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
     iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
-    iMod (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hw Hpid HR") as "Hsl".
-    iModIntro. iFrame "Hsl Hcpu".
+    iApply (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
   Qed.
 
 End SleepLock.

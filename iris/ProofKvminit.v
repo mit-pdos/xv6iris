@@ -17,39 +17,18 @@ From iris.base_logic.lib Require Import gen_heap invariants ghost_var.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras RiscvExec RiscvFetchExec.
-Require Import SmodeCore RegFile WpGpr WpMmodeShiftiop WpMmodeMul WpMmodeLeafBase ExecCommon VcGen.
-Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpAuipc.
-Require Import WpLock CpuOwn.
+Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import SmodeCore RegFile WpMmodeLeafBase.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
+Require Import WpLock.
 Require Import CalleeSaved StackOwn.
-Require Import InstrBytes KernelText.
-Require Import ProcGeom SwtchCtx.
 Require Import KallocInv.
-Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.
 Require Import WpKvmmakeInstr.
 Require Import SpecKvmmake SpecKvminit.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
-
-(* frame push (-16) then pop (+16) cancels -- avoids vm_compute on a symbolic
-   sp.  The 16-byte analogue of [kmk_sp_cancel]. *)
-Lemma kii_sp_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64) = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64) = 16) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* clean-context (mword-free) nat bounds, so [lia] never sees a bv. *)
 Lemma kii_cap_bounds (K : nat) : (50 <= K)%nat -> (2 <= K)%nat /\ (48 <= K - 2)%nat.
@@ -210,7 +189,7 @@ Section KvminitBody.
     iEval (rewrite Hp18) in "Hpc".
     (* +0x18 addi sp,sp,16 : the frame pop *)
     assert (Hwv : add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = mm !!! Regidx csp_rs1).
-    { rewrite HL2sp. apply kii_sp_cancel. }
+    { rewrite HL2sp. apply frame_cancel_16. }
     assert (Hpop : L2 !!! Regidx csp_rs1 = pa_stk (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv. rewrite HL2sp. exact Hpush. }
     iAssert (stack_own (mm !!! Regidx csp_rs1) 2) with "[Hc1 Hc2]" as "Hframe".
@@ -255,7 +234,7 @@ End KvminitBody.
 (* THE SEALED FUNCTOR: instantiate the kvmmake WP hypothesis with its      *)
 (* proven spec, discharging the KVMINIT Module Type.                       *)
 (* ===================================================================== *)
-Module KvminitProof (KMK : KVMMAKE) <: KVMINIT.
+Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64)
       : wp_kvminit_sconf_body γ γa Φ mm lvl K eb p C on kpt0 :=

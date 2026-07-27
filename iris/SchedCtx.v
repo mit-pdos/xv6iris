@@ -37,7 +37,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import WpLock.
-Require Import WpMycpu.
 Require Import ProcGeom.
 Require Import ProcInv.
 Require Import SwtchCtx.
@@ -71,26 +70,26 @@ Section SchedCtx.
      wand interface (SwtchCtx.v), at the RESUMER's [eb]/proc; the payload
      below carries only the chain-protocol facts and the held lock. *)
 
+  (* holding proc j's spinlock, contents out: the holder token and the state
+     and chan cells.  The lock's own cpu word is inside [lock_inv] and the
+     token PINS it at this hart (WpLock.v), which is exactly what holding /
+     release need -- so no cell rides here. *)
   (* The lock-protected cells whose VALUES no protocol step needs to name:
      killed and xstate (mutable under p->lock, read by kill / wait), and the
      invariant's permanent HALF of the pid cell -- the other half rides with
-     the running process in [ProcInv.proc_priv], and the two agree for free
-     by [word4_pointsto_agree].  Existentially bundled precisely so that
-     growing the invariant by these three cells costs every existing caller
-     one opaque conjunct instead of three spec parameters. *)
+     the running process in [ProcInv.proc_priv], and the two agree for free by
+     [word4_pointsto_agree].  Bundled EXISTENTIALLY so that growing the
+     invariant by these three cells costs every existing caller one opaque
+     conjunct instead of three new spec parameters. *)
   Definition proc_pub (pa : mword 64) : iProp Σ :=
     (∃ (kl xs pid : mword 32),
        p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/2)} pid)%I.
 
-  (* holding proc j's spinlock, contents out: the token, the state and chan
-     cells, the always-resident public cells, and the lock's cpu word pinned
-     at this CPU (set by acquire, needed by holding/release). *)
   Definition proc_held (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
-    (locked γl ∗
+    (locked γl cpu_id ∗
      p_state (proc_addr j) ↦₄ st ∗
      p_chan (proc_addr j) ↦₈ ch ∗
-     proc_pub (proc_addr j) ∗
-     p_lkcpu (proc_addr j) ↦₈ mycpu_ret cid_word)%I.
+     proc_pub (proc_addr j))%I.
 
   (* ------------------------------------------------------------------ *)
   (* The chain payload predicate.                                        *)
@@ -193,34 +192,31 @@ Section SchedCtx.
      right after the dispatcher set c->proc to it, and never wrote it). *)
   Definition proc_ctx (pa : mword 64) : iProp Σ := sched_vc (p_context pa) pa.
 
+  (* the resource protected by [p->lock].  The context slot is ▷-guarded:
+     its producer (the scheduler, releasing a freshly parked proc) only ever
+     holds the context under ▷ (from its own swtch), and its consumers feed
+     it straight into wp_swtch_sconf's ▷ premise. *)
   (* ------------------------------------------------------------------ *)
   (* The two DETACHABLE slots -- and there are exactly two.               *)
   (*                                                                      *)
-  (* Everything else the lock protects sits unconditionally at the top    *)
-  (* level of [proc_lock_res], so kill() and wakeup() -- the two          *)
-  (* functions that walk procs they do not own -- reach every cell they   *)
-  (* touch without ever learning the state.  These two genuinely move:    *)
-  (*                                                                      *)
-  (*   - the saved context, resident as a live [▷ proc_ctx] exactly on    *)
-  (*     RUNNABLE/SLEEPING ([needs_ctx]); the running thread or the       *)
-  (*     mid-flight lock holder owns it otherwise;                        *)
-  (*   - the private field block ([ProcInv.proc_dormant]), resident       *)
-  (*     exactly on UNUSED/ZOMBIE ([inv_dormant]) -- sys_sbrk writes      *)
-  (*     [myproc()->sz] with NO lock held, so the invariant can retain no *)
-  (*     fraction of that block while the process is live.                *)
-  (*                                                                      *)
-  (* They are FLAT and INDEPENDENT: two single-boolean guards side by     *)
-  (* side, never a nested chain, so no caller destructs more than one.    *)
-  (* See claude-notes/design/proc-struct.md.                              *)
+  (* Everything else the lock protects sits unconditionally at the top     *)
+  (* level of [proc_lock_res], so kill() and wakeup() -- the two functions *)
+  (* that walk procs they do not own -- reach every cell they touch        *)
+  (* without ever learning the state.  These two genuinely move:           *)
+  (*   - the saved context, resident as a live [▷ proc_ctx] exactly on     *)
+  (*     RUNNABLE/SLEEPING ([needs_ctx]);                                  *)
+  (*   - the private field block ([ProcInv.proc_dormant]), resident        *)
+  (*     exactly on UNUSED/ZOMBIE ([inv_dormant]) -- sys_sbrk writes       *)
+  (*     [myproc()->sz] with NO lock held, so the invariant can retain no  *)
+  (*     fraction of that block while the process is live.                 *)
+  (* FLAT and INDEPENDENT: two single-boolean guards side by side, never a *)
+  (* nested chain, so no caller destructs more than one.  See              *)
+  (* claude-notes/design/proc-struct.md.                                   *)
   (* ------------------------------------------------------------------ *)
   Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
     ((if needs_ctx st   then ▷ proc_ctx pa   else emp) ∗
      (if inv_dormant st then proc_dormant pa else emp))%I.
 
-  (* the resource protected by [p->lock].  The context slot is ▷-guarded:
-     its producer (the scheduler, releasing a freshly parked proc) only ever
-     holds the context under ▷ (from its own swtch), and its consumers feed
-     it straight into wp_swtch_sconf's ▷ premise. *)
   Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
     (∃ (st : mword 32) (ch : mword 64),
        p_state pa ↦₄ st ∗
@@ -257,8 +253,8 @@ Section SchedCtx.
   Qed.
 
   (* reassemble [proc_lock_res] from its parts -- what every release does:
-     whatever the (possibly updated) state, the always-resident public cells
-     plus whichever of the two slots that state demands. *)
+     whatever the (possibly updated) state, if it now demands a context we
+     supply the (▷-guarded) [proc_ctx]. *)
   Lemma proc_lock_res_intro (γl : gname) (pa : mword 64) (st : mword 32) (ch : mword 64) :
     p_state pa ↦₄ st -∗
     p_chan pa ↦₈ ch -∗
@@ -273,10 +269,9 @@ Section SchedCtx.
       p_state pa ↦₄ st ∗ p_chan pa ↦₈ ch ∗ proc_pub pa ∗ proc_slots pa st.
   Proof. iIntros "H". iExact "H". Qed.
 
-  (* the wakeup transition: a proc found SLEEPING, its state cell flipped to
-     RUNNABLE, still satisfies [proc_lock_res].  SLEEPING and RUNNABLE sit in
-     the SAME guard class, so the slots cross untouched and this is exactly
-     [proc_slots_recast] -- wakeup never opens a guard at all. *)
+  (* the wakeup transition: a proc found SLEEPING (hence carrying the
+     ▷-guarded context), with its state cell flipped to RUNNABLE, still
+     satisfies [proc_lock_res].  The saved context survives untouched. *)
   Lemma proc_lock_res_wakeup (γl : gname) (pa : mword 64) (st : mword 32) (ch : mword 64) :
     st = SLEEPING ->
     p_state pa ↦₄ RUNNABLE -∗
@@ -287,8 +282,7 @@ Section SchedCtx.
   Proof.
     intros ->. iIntros "Hs Hc Hpub Hsl". iExists RUNNABLE, ch. iFrame "Hs Hc Hpub".
     iApply (proc_slots_recast pa SLEEPING RUNNABLE
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              with "Hsl").
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) with "Hsl").
   Qed.
 
 End SchedCtx.

@@ -320,6 +320,23 @@ Section mem_pointsto_share.
     by iDestruct (pointsto_agree with "Hp1 Hp2") as %->.
   Qed.
 
+  (* ...and the DUAL of agreement: full ownership of a byte is EXCLUSIVE, so an
+     address owned outright cannot be an address owned at any dfrac at all.
+     This is what makes SEPARATION carry the disjointness of two buffers -- a
+     function whose contract takes two byte ranges as separate conjuncts never
+     needs a pure non-aliasing side condition; the aliasing case is refuted from
+     the resources themselves (see [mem_bytes_notin]). *)
+  Lemma mem_pointsto_ne a1 a2 dq b1 b2 :
+    a1 ↦ₘ b1 -∗ a2 ↦ₘ{dq} b2 -∗ ⌜a1 ≠ a2⌝.
+  Proof.
+    rewrite /mem_pointsto. iIntros "H1 H2".
+    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & Hp1)".
+    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & Hp2)".
+    destruct (decide (a1 = a2)) as [->|Hne]; [| by iPureIntro ].
+    iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
+    by iDestruct (pointsto_ne with "Hp1 Hp2") as %Hne.
+  Qed.
+
   (* the fractional split.  [kmap_at] is persistent, so the claim and the two
      pure conjuncts ride along on both halves at no cost. *)
   Lemma mem_pointsto_frac_split a q1 q2 b :
@@ -356,6 +373,24 @@ Section mem_pointsto_share.
       iDestruct (IH (S k) with "Ht1 Ht2") as %Hrest.
       iPureIntro. intros j Hj.
       destruct (decide (j = k)) as [->|Hne]; [exact Heq|].
+      apply Hrest. lia.
+  Qed.
+
+  (* an address held SEPARATELY from a byte buffer lies OUTSIDE that buffer.
+     The two-buffer disjointness a copy loop needs ([memmove]'s src vs dst)
+     follows by peeling one byte off the second buffer and applying this. *)
+  Lemma mem_bytes_notin (a c : Arch.pa) (k n : nat) (dq : dfrac) (f : nat -> bv 8) (v : bv 8) :
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ f j) -∗
+    c ↦ₘ{dq} v -∗
+    ⌜forall j, (k <= j < k + n)%nat -> pa_add a j <> c⌝.
+  Proof.
+    revert k. induction n as [|n IH]; intros k; simpl.
+    - iIntros "_ _". iPureIntro. intros j Hj. lia.
+    - iIntros "[Hh Ht] Hc".
+      iDestruct (mem_pointsto_ne with "Hh Hc") as %Hne0.
+      iDestruct (IH (S k) with "Ht Hc") as %Hrest.
+      iPureIntro. intros j Hj.
+      destruct (decide (j = k)) as [->|Hjk]; [exact Hne0|].
       apply Hrest. lia.
   Qed.
 

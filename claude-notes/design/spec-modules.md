@@ -76,6 +76,8 @@ Module Acquire := AcquireProof Mycpu Holding PushOff.
   pruned; unsealed it carries a full substituted copy. Sealing also hides the
   proof file's internal helpers — a helper a *caller* needs is misfiled and
   belongs at a lower altitude (see [`code-organization.md`](code-organization.md)).
+  `tools/proof_coverage.py` reads the ascription to find which `Module Type` a
+  functor implements; it accepts `<:` as well, but the rule is `:`.
 - **The statement lives only in the `_body` `Definition`.** Never spell it out
   inside `Module Type` — it would be duplicated between signature and proof and
   the two would drift.

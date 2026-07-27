@@ -38,8 +38,9 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import FileInv.
+Require Import FdSlots FileInv.
 Require Import WpMycpu WpLock.
+Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
 From Kernel Require KernelSyms.
@@ -60,39 +61,38 @@ Section SpecFilealloc.
 
 End SpecFilealloc.
 
-Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile) (cpuold : mword 64)
+Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname) (m : regfile)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_cpu := add_vec ftable_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (* filealloc's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
      below that. *)
   (14 <= K)%nat ->
-  eq_vec (cpuold : mword 64) cpuv = false ->
   (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr γ m K -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  is_ftable γl γf -∗
-  a_cpu ↦₈ cpuold -∗
+  is_ftable γl γf γs -∗
+  panic_wp -∗
+  (* the new reference needs somewhere to live: one fd slot goes into the
+     table and comes back out of fileclose. *)
+  fd_slot γs -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
     cpu_own γ n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     filealloc_post γf (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    a_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile) (cpuold : mword 64)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+      (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_filealloc_sconf_body γ Φ γl γf m cpuold n eb p C K.
+      wp_filealloc_sconf_body γ Φ γl γf γs m n eb p C K.
 End FILEALLOC.

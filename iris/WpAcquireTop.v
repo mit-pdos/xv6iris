@@ -131,6 +131,25 @@ Lemma aqdec_jal_holding s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s 
   = Some (JAL (mword_of_int 0x1fff88 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
 
+(* ---- the panic arm (+0x34 .. +0x3c): auipc a0 / addi a0 / jal panic ---- *)
+(* +0x34  0x00006517  auipc a0,0x6 *)
+Lemma aqdec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
+  = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
+
+(* +0x38  0x40c50513  addi a0,a0,1036 *)
+Lemma aqdec_addi_msg s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x40c50513 : mword 32)) s
+  = Some (ITYPE (mword_of_int 0x40c : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
+
+(* +0x3c  0xbe3ff0ef  jal ra,panic (offset -0x41e) *)
+Lemma aqdec_jal_panic s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xbe3ff0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2096098 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
+
 (* +0x24  0x4b9000ef  jal ra,mycpu (offset +0xcb8) *)
 Lemma aqdec_jal_mycpu s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x4b9000ef : mword 32)) s
@@ -289,5 +308,18 @@ Section WpAcquireTop.
   Lemma aqi_32 : kernel_text -∗ instr (mword_of_int (AQ + 0x32) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
   Proof. mk_rvc (AQ + 0x32)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (AQ + 0x32) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
+
+  (* the panic arm: the c.bnez at +0x18 lands here when holding() said 1. *)
+  Lemma aqi_34 : kernel_text -∗ instr (mword_of_int (AQ + 0x34) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
+  Proof. mk_base (AQ + 0x34)%Z (mword_of_int 0x00006517 : mword 32)
+    (mword_of_int (AQ + 0x34) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) aqdec_auipc. Qed.
+
+  Lemma aqi_38 : kernel_text -∗ instr (mword_of_int (AQ + 0x38) : mword 64) false (ITYPE (mword_of_int 0x40c : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (AQ + 0x38)%Z (mword_of_int 0x40c50513 : mword 32)
+    (mword_of_int (AQ + 0x38) : mword 64) (ITYPE (mword_of_int 0x40c : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) aqdec_addi_msg. Qed.
+
+  Lemma aqi_3c : kernel_text -∗ instr (mword_of_int (AQ + 0x3c) : mword 64) false (JAL (mword_of_int 2096098 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (AQ + 0x3c)%Z (mword_of_int 0xbe3ff0ef : mword 32)
+    (mword_of_int (AQ + 0x3c) : mword 64) (JAL (mword_of_int 2096098 : mword 21, Regidx (mword_of_int 1))) aqdec_jal_panic. Qed.
 
 End WpAcquireTop.

@@ -16,11 +16,12 @@ Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpMycpu.
 Require Import WpLock.
+Require Import SpecPanic.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import WpWakeup.
+Require Import ProcGeom.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
@@ -40,13 +41,12 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
   sie_cap_gpr γ m K -∗
   cpu_own γ lvl eb pme C -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
-  wk_lockcells γs -∗ procs_inv γ Φ γs -∗
+  panic_wp -∗ procs_inv γ Φ γs -∗
   ( ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr γ Mf K -∗
       cpu_own γ lvl eb pme C -∗
       kernel_text -∗ pc_is rettgt -∗
-      wk_lockcells γs -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

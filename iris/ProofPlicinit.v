@@ -28,7 +28,7 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KptPt.
@@ -48,27 +48,6 @@ Import Defs.
    witness" even on ground literals (durable-notes), so decide each side
    through the boolean reflection lemmas instead. *)
 Ltac zrange_vm := split; [ apply Z.leb_le | apply Z.ltb_lt ]; vm_compute; reflexivity.
-
-(* plicinit's balanced 16-byte frame: entry [addi sp,-16] and exit [addi sp,+16]
-   cancel (identical to cpuid_frame_cancel / mycpu_frame_cancel). *)
-Lemma plicinit_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-             = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-             = 16) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* PLIC priority-branch write: an [off] in the source-priority window with a
    4-aligned offset writes source [off/4]'s priority, all other fields fixed. *)
@@ -342,7 +321,7 @@ Section ProofPlicinit.
     { unfold m6, m5; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       exact Hm4sp. }
     assert (Hwv : add_vec (m6 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
-    { rewrite Hm6sp. unfold sp', imm_dealloc, imm_entry, sp0. apply plicinit_frame_cancel. }
+    { rewrite Hm6sp. unfold sp', imm_dealloc, imm_entry, sp0. apply frame_cancel_16. }
     assert (Hpop : m6 !!! Regidx csp_rs1
                    = pa_stk (add_vec (m6 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc))) 2).
     { rewrite Hwv Hm6sp. exact Hpush. }
@@ -388,7 +367,7 @@ Section ProofPlicinit.
       rewrite Hm6sp.
       change (m0 !!! Regidx (mword_of_int 2)) with (m0 !!! Regidx csp_rs1).
       unfold sp', imm_dealloc, imm_entry.
-      apply plicinit_frame_cancel.
+      apply frame_cancel_16.
     - exact Hm7ra.
   Qed.
 

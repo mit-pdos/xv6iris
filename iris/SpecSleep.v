@@ -29,7 +29,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import WpMycpu.
+Require Import SpecPanic.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
@@ -50,7 +50,6 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   (* a0 = the channel, a1 = the caller's condition lock *)
   let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let a_cpu_k := add_vec lk0 (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
@@ -69,11 +68,10 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   procs_inv γ Φ γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
   is_lock γk lka sk Rk -∗
-  locked γk -∗
+  locked γk cpu_id -∗
   Rk -∗
-  a_cpu_k ↦₈ mycpu_ret cid_word -∗
   (* the running-thread bundle *)
-  p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
+  panic_wp -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   ( ∀ mf : regfile,
@@ -83,11 +81,9 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
       trap_csrs_pay 0 eb -∗
       pc_is ret_tgt -∗
       (* lk reacquired, with its resource *)
-      locked γk -∗
+      locked γk cpu_id -∗
       Rk -∗
-      a_cpu_k ↦₈ mycpu_ret cid_word -∗
       (* the running-thread bundle, refreshed *)
-      p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

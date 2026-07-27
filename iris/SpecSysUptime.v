@@ -33,6 +33,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
 Require Import WpLock.
+Require Import SpecPanic.
 Require Import TicksInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -54,14 +55,13 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : 
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   is_tickslock γl -∗
-  tickslock_cpu ↦₈ (zero_reg : mword 64) -∗
+  panic_wp -∗
   ( ∀ (mf : regfile) (t : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = zero_extend' 64 t ⌝ -∗
       sie_cap_gpr γ mf av -∗
       cpu_own γ n eb p C -∗
       pc_is ret_tgt -∗
-      tickslock_cpu ↦₈ (zero_reg : mword 64) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

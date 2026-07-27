@@ -23,6 +23,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
+Require Import SpecPanic.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
@@ -49,7 +50,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   cpu_own γ 0 eb pj C -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γ Φ γs -∗
-  p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
+  panic_wp -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   ( ∀ mf : regfile,
@@ -57,7 +58,6 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
       sie_cap_gpr γ mf av -∗
       cpu_own γ 0 eb pj C -∗
       pc_is ret_tgt -∗
-      p_lkcpu pj ↦₈ (zero_reg : mword 64) -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

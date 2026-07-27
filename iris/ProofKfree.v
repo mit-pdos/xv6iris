@@ -24,7 +24,7 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
 Require Import VcGen.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -33,6 +33,7 @@ Require Import WpKfree.
 Require Import SpecKfree.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 
@@ -47,15 +48,14 @@ Section ProofKfree.
   Lemma wp_kfree_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (cpuold : mword 64)
+
       (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat)
-    : wp_kfree_sconf_body γ Φ γl γk lk fl m cpuold on n eb pcur C K.
+    : wp_kfree_sconf_body γ Φ γl γk lk fl m on n eb pcur C K.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
-    intros pcE p ret_tgt cpuv a_cpu
-      HK Hcpune Htp Hlk Hfl Hnoffpos.
+    intros pcE p ret_tgt HK Htp Hlk Hfl Hnoffpos.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail Hqcpu Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail #Hpanic Hcont".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     (* the caller-supplied page precondition: validity + full ownership *)
     iDestruct "Hpre" as "[%Hpv Hpown]".
@@ -488,15 +488,13 @@ Section ProofKfree.
       rewrite /R5 upd_ne; [| vm_compute; discriminate].
       rewrite Hp10. apply add_vec_zero_l. }
     iApply (Acquire.wp_acquire_sconf γ Φ γl "kmem"%string (kmem_res γk fl) Kacq
-              cpuold n eb pcur C (K - 4)%nat
-              ltac:(rewrite HKacqtp; exact Hcpune)
+              n eb pcur C (K - 4)%nat
               ltac:(etransitivity; [exact HKacqtp | exact Htp])
               Hnoffpos
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hkmem] [Hqcpu] [-]").
+              with "Hcg Hcnt Htext Hpc [Hkmem] Hpanic [-]").
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
-    { iEval (rewrite HKacqa0 -Hlk). iExact "Hqcpu". }
-    iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hacpu Hcnt Hpay".
+    iIntros (ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc44 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KF + 0x44)).
     { rewrite HKacqra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc44) in "Hpc".
@@ -597,16 +595,13 @@ Section ProofKfree.
     assert (HRrelra : Rrel !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KF + 0x50) : mword 64) 4)
       by (rewrite /Rrel; apply upd_eq).
     iApply (Release.wp_release_sconf γ Φ γl lk "kmem"%string (kmem_res γk fl) Rrel
-              (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)))
               n eb pcur C (K - 4)%nat
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HRreltp; apply eq_vec_true_iff; reflexivity)
               ltac:(rewrite HRreltp; exact Htp)
               ltac:(lia)
-              with "Hcg Htext Hpc [Hkmem] Htok HRres [Hacpu] Hcnt Hpay [-]").
+              with "Hcg Htext Hpc [Hkmem] Htok HRres Hcnt Hpay [-]").
     { iExact "Hkmem". }
-    { iEval (rewrite HKacqa0 -Hlk HKacqtp) in "Hacpu". iEval (rewrite HRrela0 -Hlk). iExact "Hacpu". }
-    iIntros (mrel) "Hcg Hpc %Hrelpins Hcpu2 Hcnt".
+    iIntros (mrel) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hpc54 : ret_pc (Rrel !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KF + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".
@@ -673,9 +668,9 @@ Section ProofKfree.
     set (Q5c := <[Regidx csp_rs1 := regval_into_reg (add_vec (Q5a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q5a).
     assert (HQ5csp : Q5c !!! Regidx csp_rs1 = sp0).
     { rewrite /Q5c upd_eq. rewrite HspQ5a. unfold spr, sp0.
-      apply kfree_sp_cancel. }
+      apply frame_cancel_32. }
     assert (Hwv : add_vec (Q5a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HspQ5a. unfold spr, sp0. apply kfree_sp_cancel. }
+    { rewrite HspQ5a. unfold spr, sp0. apply frame_cancel_32. }
     assert (Hpop : Q5a !!! Regidx csp_rs1
                    = pa_stk (add_vec (Q5a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HspQ5a. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal.
@@ -712,9 +707,7 @@ Section ProofKfree.
     assert (Hretf : ret_pc (Q5c !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ5cra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] Havail [Hcpu2]").
-    2:{ (* a_cpu ↦₈ zero_reg -- release cleared lk->cpu *)
-        iEval (rewrite HRrela0 -Hlk) in "Hcpu2". iExact "Hcpu2". }
+    iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] Havail").
     { (* callee_saved m Q5c *)
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
                 c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
@@ -740,7 +733,7 @@ Section ProofKfree.
         { rewrite /Q5a /Q58 /Q56 /Q54.
           repeat (rewrite upd_ne; [| vm_compute; discriminate]).
           exact HspMrel. }
-        rewrite HQ5acsp. unfold regval_into_reg, spr. apply kfree_sp_cancel. }
+        rewrite HQ5acsp. unfold regval_into_reg, spr. apply frame_cancel_32. }
       split.
       { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
       split.

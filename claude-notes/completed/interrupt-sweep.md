@@ -28,8 +28,9 @@ Two consumer-side items were never in the sweep's scope and remain undone:
 
 - **Boot wiring** (the "item 8" section at the bottom): nothing yet DRIVES the
   sconf whole-function layer; the top consumer gap is above kinit (kvminit /
-  `main`→`trapinithart`, [[kvm-spec]]).  No `csrw stvec` leaf exists and
-  `intr_inv_alloc_off` still has no caller outside `IntrDefs.v`.  The boot path
+  `main`, [[kvm-spec]]).  `trapinithart` itself is now proven and the `csrw
+  stvec` leaf exists (see item 8 below), but `intr_inv_alloc_off` still has no
+  caller outside `IntrDefs.v`.  The boot path
   also owes `timer_cap` (`TimerCap.v`): freeze the mcounteren cell timerinit
   wrote and seal the `stimecmp` cell into `timerN` via `timer_cap_intro` — that
   persistent capability is what clockintr (and hence any handler above it)
@@ -203,15 +204,20 @@ Bigger than "just allocate + plumb"; there is a real execution gap.  Current
 state (mapped): `wp_kernel` (WpKernelNew.v:36) composes `_entry`→`start()` and
 STOPS at `<main>` (0x80000e82, Supervisor) handing back RAW cells (hart_state,
 cur_privilege, mstatus, mie, mideleg, menvcfg, satp, stack_own …) — NO γ, NO
-bundle, NO stvec install.  The stvec handler is installed by `csrw stvec,a5`
-inside `trapinithart` (0x80002436, KernelInstrs.v:12708), reached via
-`main`→`trapinithart`.  Needs, IN ORDER:
+bundle.  The stvec handler is installed by `csrw stvec,a5` inside
+`trapinithart`, reached via `main`→`trapinithart`.  Steps 1 and 2 are DONE:
 
-1. a NEW `csrw stvec` WP leaf (none exists; model on the general CSR-write
-   engines WpGprCsrwA/B/C.v; it turns `stvec ↦ᵣ v0` into `stvec ↦ᵣ kernelvec`
-   over the raw S-mode cells);
-2. drive the `main`→`trapinithart` body to that csrw (an unproven whole-function
-   stretch — the biggest chunk);
+1. ~~a NEW `csrw stvec` WP leaf~~ — **done**: `wp_csrw_stvec_s_sconf`
+   (WpSconfCsr.v), over the sconf tier rather than the raw cells, with the
+   `stvec` cell threaded explicitly (`stvec ↦ᵣ tv0` in, `stvec ↦ᵣ wval` out).
+   Its exec layer is in WpGprCsrwB.v (`exec_write_CSR_stvec` & co.).
+2. ~~drive the `main`→`trapinithart` body to that csrw~~ — **done for
+   trapinithart**: `SpecTrapinithart` / `ProofTrapinithart` / `LinkTrapinithart`
+   prove the whole function on the standard `sie_cap_gpr` house spec (pre
+   carries `stvec ↦ᵣ tv0`, post `stvec ↦ᵣ kernelvec` + `callee_saved`, `2 ≤ K`).
+   What is left of this step is `main` itself — the stretch from `<main>` down
+   to the `jal trapinithart`, plus the bundle assembly of step 3, which
+   trapinithart's caller (not trapinithart) owns.
 3. at the install point: `sie_ghost_alloc 'b0` → fresh γ with 1/2+1/4+1/4,
    re-split one 1/4 into two `(1/4/2)` eighths; build `sconf γ` from the raw
    cells (SmodeCore.v:1086 `smode_config_rebuild` or IntrDefs.v:350 direct);

@@ -610,6 +610,71 @@ Proof.
   - apply exec_csr_id_write_callback_stimecmp.
 Qed.
 
+(* ===================================================================== *)
+(* stvec (0x105): Ext_S-gated; legalize = legalize_tvec at the platform's *)
+(* stvec parameters.  The S-mode accessibility/execute instances are in   *)
+(* WpSconfCsr.v (no M-mode code writes stvec).                            *)
+(* ===================================================================== *)
+Definition csr_stvec : mword 12 := mword_of_int 0x105.
+
+(* [legalize_tvec] with direct AND vectored mode both supported and both
+   base alignments = 2 -- which is what the platform hands [set_stvec] -- is
+   the IDENTITY on any value whose MODE field is not the reserved encoding:
+   neither the mode fixup nor the base masking fires.  The previous value
+   [o] is read only on the reserved arm. *)
+Lemma exec_legalize_tvec_stvec (o v : mword 64) s :
+  trapVectorMode_forwards (_get_Mtvec_Mode v) <> TV_Reserved ->
+  exec (legalize_tvec o v plat_stvec_direct_mode_supported 2
+          plat_stvec_vectored_mode_supported plat_stvec_vectored_base_alignment_exp) s
+    = Some (v, s).
+Proof.
+  intro Hm. unfold legalize_tvec, Mk_Mtvec.
+  unfold plat_stvec_direct_mode_supported, plat_stvec_vectored_mode_supported,
+    plat_stvec_vectored_base_alignment_exp.
+  destruct (trapVectorMode_forwards (_get_Mtvec_Mode v)) eqn:Hmode;
+    [ | | contradiction ].
+  - rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM v s)). rewrite Hmode.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM 2 s)). apply exec_returnM.
+  - rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM v s)). rewrite Hmode.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM 2 s)). apply exec_returnM.
+Qed.
+
+(* [set_stvec] is a helper the write_CSR dispatch CALLS, so the whole
+   read/legalize/write/read-back chain is peeled HERE: at the dispatch the
+   term is left-nested ([set_stvec v >>= ...]) and the inner binds are not
+   directly under an [exec]. *)
+Lemma exec_set_stvec (v : mword 64) s :
+  trapVectorMode_forwards (_get_Mtvec_Mode v) <> TV_Reserved ->
+  exec (set_stvec v) s = Some (v, set_reg s stvec v).
+Proof.
+  intro Hm. unfold set_stvec.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stvec s)).
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_legalize_tvec_stvec (register_lookup stvec s.(sregs)) v s Hm)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg stvec v s)).
+  rewrite (exec_read_reg stvec (set_reg s stvec v)).
+  rewrite register_lookup_set. reflexivity.
+Qed.
+
+Lemma exec_write_CSR_stvec (v : mword 64) s :
+  trapVectorMode_forwards (_get_Mtvec_Mode v) <> TV_Reserved ->
+  exec (write_CSR csr_stvec v) s = Some (Ok v, set_reg s stvec v).
+Proof.
+  intro Hm. unfold write_CSR.
+  skip_csr_false_clauses.
+  match goal with |- context[if ?g then _ else _] =>
+    replace g with true by (vm_compute; reflexivity) end. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_set_stvec v s Hm)).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_csr_id_write_callback_stvec (d : mword 64) s :
+  exec (csr_id_write_callback csr_stvec d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_write_callback csr_stvec d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnM.
+Qed.
+
 (* ====================================================================== *)
 (* NEW-STYLE register-generic CSR-WRITE WPs (csrw csr, rs1 = csrrw x0,csr,rs1) *)
 (* on the [instr] / [mmode_config] / [gpr_file] layer, built on [wp_instr]. *)

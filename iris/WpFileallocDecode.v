@@ -57,9 +57,10 @@ From iris.program_logic Require Import lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
+Require Import KernelBaseDecode.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
@@ -72,12 +73,6 @@ Import Defs.
 (* Compressed decode facts for the words no other function uses.  Anything *)
 (* a second proof ever needs should move to KernelRvcDecode as cdec_<word>. *)
 (* ===================================================================== *)
-
-(* +0x26  0x40dc  c.lw a5,4(s1) *)
-Lemma fadc_40dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x40dc : mword 16)) s
-  = Some (C_LW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x28  0xcf89  c.beqz a5,+0x1a *)
 Lemma fadc_cf89 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -97,33 +92,9 @@ Lemma fadc_a809 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 9), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x44  0xc0dc  c.sw a5,4(s1) *)
-Lemma fadc_c0dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc0dc : mword 16)) s
-  = Some (C_SW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* filealloc's two ref-field accesses in the leaf-friendly (Regidx /
-   literal-immediate) form: one instance each of WpMmodeLeafBase's
-   [exec_execute_C_{LW,SW}_leaf]. *)
-Lemma faexec_lw4 s :
-  exec (execute (C_LW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
-
-Lemma faexec_sw4 s :
-  exec (execute (C_SW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
-Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
-
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
 (* ===================================================================== *)
-
-Lemma fadb_0001e517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma fadb_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0001e497 : mword 32)) s
@@ -222,7 +193,7 @@ Section FileallocInstrs.
 
   Lemma fai_0a : kernel_text -∗ instr (mword_of_int (FA + 0x0a) : mword 64) false (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (FA + 0x0a)%Z (mword_of_int 0x0001e517 : mword 32)
-    (mword_of_int (FA + 0x0a) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)) fadb_0001e517. Qed.
+    (mword_of_int (FA + 0x0a) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_0001e517. Qed.
 
   Lemma fai_0e : kernel_text -∗ instr (mword_of_int (FA + 0x0e) : mword 64) false (ITYPE (mword_of_int 0x49e : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (FA + 0x0e)%Z (mword_of_int 0x49e50513 : mword 32)
@@ -254,7 +225,7 @@ Section FileallocInstrs.
 
   Lemma fai_26 : kernel_text -∗ instr (mword_of_int (FA + 0x26) : mword 64) true (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (FA + 0x26)%Z (mword_of_int 0x40dc : mword 16)
-    (mword_of_int (FA + 0x26) : mword 64) (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) fadc_40dc faexec_lw4. Qed.
+    (mword_of_int (FA + 0x26) : mword 64) (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) cdec_40dc cexec_40dc. Qed.
 
   Lemma fai_28 : kernel_text -∗ instr (mword_of_int (FA + 0x28) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 13 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 15), BEQ)).
   Proof. mk_rvc (FA + 0x28)%Z (mword_of_int 0xcf89 : mword 16)
@@ -272,7 +243,7 @@ Section FileallocInstrs.
 
   Lemma fai_32 : kernel_text -∗ instr (mword_of_int (FA + 0x32) : mword 64) false (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (FA + 0x32)%Z (mword_of_int 0x0001e517 : mword 32)
-    (mword_of_int (FA + 0x32) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)) fadb_0001e517. Qed.
+    (mword_of_int (FA + 0x32) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_0001e517. Qed.
 
   Lemma fai_36 : kernel_text -∗ instr (mword_of_int (FA + 0x36) : mword 64) false (ITYPE (mword_of_int 0x476 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (FA + 0x36)%Z (mword_of_int 0x47650513 : mword 32)
@@ -298,11 +269,11 @@ Section FileallocInstrs.
 
   Lemma fai_44 : kernel_text -∗ instr (mword_of_int (FA + 0x44) : mword 64) true (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
   Proof. mk_rvc (FA + 0x44)%Z (mword_of_int 0xc0dc : mword 16)
-    (mword_of_int (FA + 0x44) : mword 64) (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) fadc_c0dc faexec_sw4. Qed.
+    (mword_of_int (FA + 0x44) : mword 64) (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_c0dc cexec_c0dc. Qed.
 
   Lemma fai_46 : kernel_text -∗ instr (mword_of_int (FA + 0x46) : mword 64) false (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (FA + 0x46)%Z (mword_of_int 0x0001e517 : mword 32)
-    (mword_of_int (FA + 0x46) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)) fadb_0001e517. Qed.
+    (mword_of_int (FA + 0x46) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_0001e517. Qed.
 
   Lemma fai_4a : kernel_text -∗ instr (mword_of_int (FA + 0x4a) : mword 64) false (ITYPE (mword_of_int 0x462 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (FA + 0x4a)%Z (mword_of_int 0x46250513 : mword 32)

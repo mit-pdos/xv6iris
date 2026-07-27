@@ -4,9 +4,10 @@
    instead of the 16 [instr]/decode premises.
 
    The eight standard prologue/epilogue instructions (c.addi16sp / c.sdsp /
-   c.ldsp / c.jr) share their byte patterns with WpTimerinit's, so their decode
-   lemmas are reused verbatim; the other eight (c.mv / c.slli / c.srli / c.beqz /
-   c.addi a5,1 and the three base add/sb/bne) get fresh decode lemmas here. *)
+   c.ldsp / c.jr) and the c.slli/c.srli (unsigned int) count-truncation pair are
+   shared words, so their [cdec_<word>] decodes come from KernelRvcDecode.v; the
+   other six (c.mv / c.beqz / c.addi a5,1 and the three base add/sb/bne) get
+   fresh decode lemmas here. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -18,7 +19,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode ExecCommon.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore KernelText WpMemsetS.
+Require Import SmodeCore KernelText.
 Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
@@ -52,24 +53,11 @@ Local Ltac m_close0 s HmisaC :=
    c.addi sp / c.sdsp / c.addi4spn / c.ldsp / c.ret) live in KernelRvcDecode.v,
    shared with the other functions that use this frame. *)
 
-(* ---- the five fresh RVC decodes ---- *)
+(* ---- the three fresh RVC decodes (the c.slli/c.srli count-truncation pair
+   is shared with memmove and lives in KernelRvcDecode as cdec_1602/cdec_9201) ---- *)
 (* cd6: 0x87aa -> c.mv a5,a0 *)
 Lemma mdec_cd6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x87aa : mword 16)) s = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* cd8: 0x1602 -> c.slli a2,32 *)
-Lemma mdec_cd8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1602 : mword 16)) s = Some (C_SLLI (mword_of_int 32, Regidx (mword_of_int 12)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
-
-(* cda: 0x9201 -> c.srli a2,32 *)
-Lemma mdec_cda s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x9201 : mword 16)) s = Some (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 4)), s).
 Proof.
   intro H. rvc_oneshot s H.
 Qed.
@@ -156,12 +144,12 @@ Section WpMemsetInstr.
   (* +0x0c  c.slli a2,32  ->  slli a2,a2,32 *)
   Lemma minstr_cc6 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0c) : mword 64) true (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)).
   Proof. mk_rvc (KernelSyms.memset + 0x0c)%Z (mword_of_int 0x1602 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x0c) : mword 64) (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)) mdec_cd8 exec_execute_C_SLLI. Qed.
+           (mword_of_int (KernelSyms.memset + 0x0c) : mword 64) (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)) cdec_1602 exec_execute_C_SLLI. Qed.
 
   (* +0x0e  c.srli a2,32  ->  srli a2,a2,32 *)
   Lemma minstr_cc8 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0e) : mword 64) true (SHIFTIOP (mword_of_int 32 : mword 6, creg2reg_idx (Cregidx (mword_of_int 4)), creg2reg_idx (Cregidx (mword_of_int 4)), SRLI)).
   Proof. mk_rvc (KernelSyms.memset + 0x0e)%Z (mword_of_int 0x9201 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x0e) : mword 64) (SHIFTIOP (mword_of_int 32 : mword 6, creg2reg_idx (Cregidx (mword_of_int 4)), creg2reg_idx (Cregidx (mword_of_int 4)), SRLI)) mdec_cda exec_execute_C_SRLI. Qed.
+           (mword_of_int (KernelSyms.memset + 0x0e) : mword 64) (SHIFTIOP (mword_of_int 32 : mword 6, creg2reg_idx (Cregidx (mword_of_int 4)), creg2reg_idx (Cregidx (mword_of_int 4)), SRLI)) cdec_9201 exec_execute_C_SRLI. Qed.
 
   (* +0x10  add a4,a2,a0        (base, 2-aligned) *)
   Lemma minstr_cca : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x10) : mword 64) false (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)).

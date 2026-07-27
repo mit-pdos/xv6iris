@@ -28,7 +28,7 @@ Require Import RegFile.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import PtTree.
-Require Import PtBuild KptPt KptExecMap KMap KptTree KvmMap.
+Require Import PtBuild KptExecMap KvmMap.
 From Kernel Require KernelSyms.
 
 Notation KVMIH := KernelSyms.kvminithart.
@@ -38,6 +38,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
     (t : ptree) (pas : nat -> mword 44)
     (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   let root_b := zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
@@ -47,7 +48,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr γ mm K -∗
   strans_bit strans_bit_bare -∗
   kernel_text -∗
-  pc_is (mword_of_int KVMIH) -∗
+  pc_is pcE -∗
   tlb ↦ᵣ tlbvec0 -∗
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ root_b -∗
   ptree_own 2 (DfracOwn 1) t -∗

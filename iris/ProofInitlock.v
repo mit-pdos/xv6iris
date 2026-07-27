@@ -31,6 +31,7 @@ Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecInitlock.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -191,7 +192,7 @@ Section ProofInitlock.
     (* +0x16 c.addi sp,16 -- the frame trade back (move_up 2) *)
     set (R5 := <[Regidx csp_rs1 := regval_into_reg (add_vec (R4 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> R4).
     assert (HR5csp : R5 !!! Regidx csp_rs1 = sp0).
-    { rewrite /R5 upd_eq. rewrite HspR4. unfold regval_into_reg, spr, sp0. apply initlock_sp_cancel. }
+    { rewrite /R5 upd_eq. rewrite HspR4. unfold regval_into_reg, spr, sp0. apply frame_cancel_16. }
     assert (Hwv : add_vec (R4 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
     { rewrite -HR5csp /R5 upd_eq. reflexivity. }
     assert (Hpop : R4 !!! Regidx csp_rs1
@@ -246,7 +247,7 @@ Section ProofInitlock.
     split.
     { (* sp *)
       rewrite /R5 upd_eq. rewrite HspR4.
-      unfold regval_into_reg, spr. apply initlock_sp_cancel. }
+      unfold regval_into_reg, spr. apply frame_cancel_16. }
     split.
     { (* tp *) apply Hthread; vm_compute; first [reflexivity | discriminate]. }
     split.

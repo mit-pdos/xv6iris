@@ -14,7 +14,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvExec RiscvTryStep.
+Require Import RiscvLang RiscvExec.
 Require Import WpRvcBridge.
 Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
@@ -191,6 +191,17 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma cdec_0141 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0141 : mword 16)) s = Some (C_ADDI (mword_of_int 16, Regidx csp_rs1), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* The (unsigned int) count truncation pair -- c.slli a2,32 then c.srli a2,32,
+   how gcc materializes the [uint n] cast in a byte-count argument.  memset and
+   memmove both open with it. *)
+Lemma cdec_1602 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x1602 : mword 16)) s = Some (C_SLLI (mword_of_int 32, Regidx (mword_of_int 12)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_9201 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x9201 : mword 16)) s = Some (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 4)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
@@ -721,31 +732,86 @@ Lemma cdec_97ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+(* 0x2785  c.addiw a5,a5,1 -- shared by clockintr, push_off, filedup *)
+Lemma cdec_2785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x2785 : mword 16)) s
+  = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x40dc  c.lw a5,4(s1) -- the [f->ref] read, shared by filealloc and filedup *)
+Lemma cdec_40dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x40dc : mword 16)) s
+  = Some (C_LW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xc0dc  c.sw a5,4(s1) -- the [f->ref] write, likewise *)
+Lemma cdec_c0dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xc0dc : mword 16)) s
+  = Some (C_SW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* their leaf-form expansions, one instance each of WpMmodeLeafBase's
+   [exec_execute_C_{LW,SW}_leaf] at offset 4 / s1 / a5. *)
+Lemma cexec_40dc s :
+  exec (execute (C_LW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+Lemma cexec_c0dc s :
+  exec (execute (C_SW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 (* c.add a5,a5,a0 *)
 Lemma cdec_97aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x97aa : mword 16)) s
   = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* The standard 16-byte frame cancels: entry [c.addi sp,-16] and exit
-   [c.addi sp,+16] compose to the identity.  A pure bv fact keyed by the two
-   immediates, so it belongs here rather than in each function's proof. *)
+(* ===================================================================== *)
+(*  Balanced-frame cancellation.                                          *)
+(* ===================================================================== *)
+
+(* A function's prologue moves sp by [a] and its epilogue moves it back by
+   [b]; sp returns to its entry value exactly when the two immediates sum to
+   zero.  ONE lemma over that pair -- the sized instances below are a line
+   each, so a new frame size costs no bv proof.  Stated so no [vm_compute]
+   ever touches the SYMBOLIC base [X] (which is an opaque [gpr_file] lookup
+   at every call site, and diverges under [vm_compute]). *)
+Lemma frame_cancel (X a b : mword 64) :
+  add_vec a b = mword_of_int 0 -> add_vec (add_vec X a) b = X.
+Proof.
+  intro Hab. rewrite po_addv_assoc, Hab.
+  apply bv_add_0_r. vm_compute. reflexivity.
+Qed.
+
+(* -16/+16, the standard 16-byte frame ([c.addi sp,-16] / [c.addi sp,16];
+   48 is -16 in a 6-bit field). *)
 Lemma frame_cancel_16 (X : mword 64) :
   add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
           (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  (* plain Stdlib [rewrite] in this file (no ssreflect): commas, no [!]. *)
-  apply bv_eq. repeat rewrite add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-             = 18446744073709551600) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-             = 16) by (vm_compute; reflexivity).
-  rewrite HA, HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -32/+32 ([c.addi sp,-32] / [c.addi16sp sp,32]). *)
+Lemma frame_cancel_32 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -48/+48, both [c.addi16sp] (61 is -3 in a 6-bit field, scaled by 16). *)
+Lemma frame_cancel_48 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -64/+64, both [c.addi16sp] (60 is -4 in a 6-bit field, scaled by 16). *)
+Lemma frame_cancel_64 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* -80/+80, both [c.addi16sp] (59 is -5 in a 6-bit field, scaled by 16). *)
+Lemma frame_cancel_80 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.

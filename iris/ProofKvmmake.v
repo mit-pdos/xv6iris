@@ -16,18 +16,19 @@ From iris.base_logic.lib Require Import gen_heap invariants ghost_var.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras RiscvExec RiscvFetchExec.
-Require Import SmodeCore RegFile WpGpr WpMmodeShiftiop WpMmodeMul WpMmodeLeafBase ExecCommon VcGen.
-Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpAuipc.
+Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
+Require Import SmodeCore RegFile WpMmodeLeafBase.
+Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
 Require Import WpLock CpuOwn.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes KernelText.
-Require Import ProcGeom SwtchCtx.
+Require Import ProcGeom.
 Require Import KallocInv.
 Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.
 Require Import WpKvmmakeInstr.
 Require Import SpecKalloc SpecMemset SpecKvmmap SpecProcMapstacks SpecKvmmake.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -612,25 +613,6 @@ Proof. lia. Qed.
 (* THE WP HOUSE.                                                          *)
 (* ===================================================================== *)
 
-(* frame push (-32) then pop (+32) cancels -- avoids vm_compute on a
-   symbolic sp (the classic OOM). *)
-Lemma kmk_sp_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64) = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64) = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
-
 Section KvmmakeHouse.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
   Context `{CID : CpuId}.
@@ -769,7 +751,7 @@ Section KvmmakeHouse.
     set (E4 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3).
     assert (Hwv : add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HE3sp. unfold spr. apply kmk_sp_cancel. }
+    { rewrite HE3sp. unfold spr. apply frame_cancel_32. }
     assert (Hpop : E3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3sp. symmetry. exact Hsprstk. }
@@ -807,7 +789,7 @@ Section KvmmakeHouse.
     { exact Hnodes. }
     { (* callee_saved mm E4 *)
       unfold callee_saved.
-      split. { rewrite /E4 upd_eq. rewrite HE3sp. unfold spr. apply kmk_sp_cancel. }
+      split. { rewrite /E4 upd_eq. rewrite HE3sp. unfold spr. apply frame_cancel_32. }
       split. { rewrite /E4 /E3 /E2 /E1 /E0. repeat (rewrite upd_ne; [| reg_neq]). exact Htp. }
       split. { rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3. rewrite upd_ne; [| reg_neq]. rewrite /E2 upd_eq. reflexivity. }
       split. { rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3 upd_eq. reflexivity. }
@@ -906,9 +888,9 @@ Section KvmmakeBody.
 
   Hypothesis wp_kalloc :
     forall (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname)
-      (fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat)
+      (fl : mword 64) (m : regfile) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_kalloc_sconf_body γ Φ γl γk fl m cpuold on n eb p C K.
+      wp_kalloc_sconf_body γ Φ γl γk fl m on n eb p C K.
   Hypothesis wp_memset :
     forall (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8),
@@ -1071,20 +1053,19 @@ Section KvmmakeBody.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KMK + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KMK + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095638 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk qcpu) "(%Hqne & %H0ne & #Hlock & Havail & Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J /W2. repeat (rewrite upd_ne; [| reg_neq]). exact HspW1. }
     iApply (wp_kalloc γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J qcpu (Some nb) 0%nat eb p C (K - 4)%nat
+              J (Some nb) 0%nat eb p C (K - 4)%nat
               Hc14
-              ltac:(rewrite HJ4; exact Hqne)
               ltac:(rewrite HJ4; exact Hcid)
               ltac:(reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu [-]").
-    iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost Hcpu2".
+    iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KMK + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret0e) in "Hpc".
@@ -1097,9 +1078,8 @@ Section KvmmakeBody.
     { rewrite avail_sub_Some. reflexivity. }
     iEval (rewrite Hav1) in "Havail2".
     iAssert (kalloc_env γa (avail_sub (Some nb) 1) (mm !!! Regidx (mword_of_int 4)))
-      with "[Hcpu2 Havail2]" as "Henv".
-    { iExists γk, (zero_reg : mword 64). iSplitR. { iPureIntro; exact H0ne. }
-      iSplitR. { iPureIntro; exact H0ne. } iFrame "Hlock". iFrame "Havail2". iExact "Hcpu2". }
+      with "[Havail2]" as "Henv".
+    { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
     set (root0 := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     (* recover callee-saved through kalloc *)
     assert (Hmr0sp : mr0 !!! Regidx csp_rs1 = spr).
@@ -2251,7 +2231,7 @@ End KvmmakeBody.
 (* THE SEALED FUNCTOR: instantiate the four callee WP hypotheses with the *)
 (* callees' proven specs, discharging the KVMMAKE Module Type.            *)
 (* ===================================================================== *)
-Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) <: KVMMAKE.
+Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE.
   Definition wp_kvmmake_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
       : wp_kvmmake_sconf_body γ γa Φ mm lvl K eb p C on :=

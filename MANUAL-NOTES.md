@@ -33,6 +33,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - page tables need to track kmap_at for intermediate PT pages, to reconstruct data ptsto
 - MMIO just needs mapping fact, no memory points-to (because it's not memory)
 - kvminithart: need strans_bit to track whether satp is currently Bare or Sv39
+- filedup ref overflow: track which [fd_slot] owns a reference; there can't be more than 2^31
+- cancellable lock invariant: pipe->lock needs to be cancelled when underlying pipe page is freed; pipe lock invariant conditional on holding a reference on pipe
 
 Big things that still need to be done/explored:
 
@@ -44,6 +46,8 @@ Big things that still need to be done/explored:
     - https://plv.mpi-sws.org/gps/
     - https://people.mpi-sws.org/~haidang/publications/thesis.pdf
 - liveness, or at least deadlock avoidance
+  - acquire currently calls panic if already holding lock on same CPU
+  - lock ordering could solve deadlock and acquire's panic
 - crash reasoning for file system
 
 Don't know where else to put this:

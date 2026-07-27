@@ -81,59 +81,58 @@ Definition proc_base : mword 64 := mword_of_int KernelSyms.proc.
 Definition proc_addr (i : nat) : mword 64 :=
   add_vec proc_base (mword_of_int (proc_size * Z.of_nat i)).
 
-(* Field offsets, all corroborated by the compiled image (see
-   claude-notes/design/proc-struct.md for the per-field disassembly
-   evidence): fdalloc's [addi a5,a0,208] + stride-8 x 16 scan pins
-   [ofile_off]; growproc's [ld a1,72(a0)] / [ld a0,80(a0)] pin [sz_off] /
-   [pagetable_off]; sys_chdir's [ld a0,336(s2)] pins [cwd_off]. *)
 Definition state_off : Z := 24.
 Definition chan_off : Z := 32.
-Definition killed_off : Z := 40.
-Definition xstate_off : Z := 44.
-Definition parent_off : Z := 56.
-Definition kstack_off : Z := 64.
-Definition sz_off : Z := 72.
-Definition pagetable_off : Z := 80.
-Definition trapframe_off : Z := 88.
 Definition context_off : Z := 96.
-Definition ofile_off : Z := 208.
-Definition cwd_off : Z := 336.
-Definition name_off : Z := 344.
 
 Definition p_state (pa : mword 64) : mword 64 := add_vec pa (mword_of_int state_off).
 Definition p_chan (pa : mword 64) : mword 64 := add_vec pa (mword_of_int chan_off).
 Definition p_context (pa : mword 64) : mword 64 := add_vec pa (mword_of_int context_off).
 
-Definition p_killed (pa : mword 64) : mword 64 := add_vec pa (mword_of_int killed_off).
-Definition p_xstate (pa : mword 64) : mword 64 := add_vec pa (mword_of_int xstate_off).
-Definition p_parent (pa : mword 64) : mword 64 := add_vec pa (mword_of_int parent_off).
-Definition p_kstack (pa : mword 64) : mword 64 := add_vec pa (mword_of_int kstack_off).
-Definition p_sz (pa : mword 64) : mword 64 := add_vec pa (mword_of_int sz_off).
-Definition p_pagetable (pa : mword 64) : mword 64 := add_vec pa (mword_of_int pagetable_off).
-Definition p_trapframe (pa : mword 64) : mword 64 := add_vec pa (mword_of_int trapframe_off).
-Definition p_cwd (pa : mword 64) : mword 64 := add_vec pa (mword_of_int cwd_off).
-
-(* p->name is a 16-byte char array, not a word; [p_name pa i] is byte [i]. *)
-Definition PNAMELEN : nat := 16%nat.
-Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
-  add_vec pa (mword_of_int (name_off + Z.of_nat i)).
-
-(* p->ofile[fd]: an ARRAY that gets scanned (fdalloc, kexit), so it takes the
-   [ArrCursor] treatment [fnode]/[bnode] get rather than a flat offset. *)
-Definition NOFILE : nat := 16%nat.
-Definition ofile_stride : Z := 8.
-Definition p_ofile (pa : mword 64) (fd : nat) : mword 64 :=
-  add_vec pa (mword_of_int (ofile_off + ofile_stride * Z.of_nat fd)).
-
-(* the lock's cpu-pointer word (spinlock field at +16), in the exact address
-   form acquire/release/holding use ([a_cpu] with lk0 = pa, lock at +0). *)
-Definition p_lkcpu (pa : mword 64) : mword 64 :=
-  add_vec pa (sign_extend' 64 (mword_of_int 16 : mword 12)).
-
 (* the pid word (int at +48), in the exact address form of the [lw rd,48(a0)]
    reads after a myproc() call (acquiresleep/holdingsleep). *)
 Definition p_pid (pa : mword 64) : mword 64 :=
   add_vec pa (sign_extend' 64 (mword_of_int 48 : mword 12)).
+
+(* The three private (p->lock-free) address-space fields -- sz (+72),
+   pagetable (+80), trapframe (+88) -- packed between kstack (+64) and
+   context (+96).  [proc_size = 360] pins the whole layout: 96 + context
+   (14 words = 112) + ofile[16] (128) + cwd (8) + name[16] (16) = 360.
+
+   Spelled in the exact address form of the [ld/sd rd,off(rs)] that reach
+   them (the [p_pid] shape, NOT the [mword_of_int] shape above) --
+   proc_pagetable's [ld a3,88(s2)] is the first consumer.  ONE definition
+   each: [p_trapframe] used to be a local in SpecProcPagetable.v. *)
+Definition p_sz (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 72 : mword 12)).
+Definition p_pagetable (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 80 : mword 12)).
+Definition p_trapframe (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 88 : mword 12)).
+
+(* The rest of [struct proc], in the [mword_of_int] shape (these are reached
+   by whole-word address computations, not by a 12-bit [ld/sd] displacement;
+   a consumer that needs the [sign_extend'] spelling rewrites at its own
+   access site, as the sleeplock proofs do for [p_pid]).  Offsets corroborated
+   by the compiled image -- see claude-notes/design/proc-struct.md:
+   fdalloc's [addi a5,a0,208] + stride-8 x 16 scan pins ofile,
+   sys_chdir's [ld a0,336(s2)] pins cwd. *)
+Definition p_killed (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 40).
+Definition p_xstate (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 44).
+Definition p_parent (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 56).
+Definition p_kstack (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 64).
+Definition p_cwd    (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 336).
+
+(* p->name is a 16-byte char array, not a word; [p_name pa i] is byte [i]. *)
+Definition PNAMELEN : nat := 16%nat.
+Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
+  add_vec pa (mword_of_int (344 + Z.of_nat i)).
+
+(* p->ofile[fd].  NOFILE lives HERE rather than in FdSlots.v: it is
+   [struct proc]'s array length, and FdSlots already imports this file. *)
+Definition NOFILE : nat := 16%nat.
+Definition p_ofile (pa : mword 64) (fd : nat) : mword 64 :=
+  add_vec pa (mword_of_int (208 + 8 * Z.of_nat fd)).
 
 (* enum procstate codes (kernel/proc.h): UNUSED=0 USED=1 SLEEPING=2
    RUNNABLE=3 RUNNING=4 ZOMBIE=5. *)
@@ -142,13 +141,16 @@ Definition USED : mword 32 := mword_of_int 1.
 Definition SLEEPING : mword 32 := mword_of_int 2.
 Definition RUNNABLE : mword 32 := mword_of_int 3.
 Definition RUNNING : mword 32 := mword_of_int 4.
+
+(* A state that requires the saved-context obligation: the two "parked"
+   states that own a saved context reachable by swtch. *)
 Definition ZOMBIE : mword 32 := mword_of_int 5.
 
-(* The second of the two state predicates the proc-lock invariant keys on
-   (the first is [needs_ctx] below): the states in which NOBODY outside the
-   invariant owns this slot's private field block, so the invariant holds it
-   and allocproc/wait find it there.  Deliberately a flat boolean, sitting
-   beside [needs_ctx] rather than nested inside a case chain -- see
+(* The SECOND of the two flat state predicates the proc-lock invariant keys
+   on (the first is [needs_ctx] below): the states in which nobody outside
+   the invariant owns this slot's private field block, so the invariant holds
+   it and allocproc/wait find it there.  Deliberately a flat boolean sitting
+   BESIDE [needs_ctx] rather than nested inside a case chain --
    claude-notes/design/proc-struct.md. *)
 Definition inv_dormant (st : mword 32) : bool :=
   bool_decide (st = UNUSED) || bool_decide (st = ZOMBIE).
@@ -157,17 +159,15 @@ Lemma inv_dormant_UNUSED : inv_dormant UNUSED = true.
 Proof. vm_compute. reflexivity. Qed.
 Lemma inv_dormant_ZOMBIE : inv_dormant ZOMBIE = true.
 Proof. vm_compute. reflexivity. Qed.
-Lemma inv_dormant_RUNNING : inv_dormant RUNNING = false.
-Proof. vm_compute. reflexivity. Qed.
-Lemma inv_dormant_RUNNABLE : inv_dormant RUNNABLE = false.
+Lemma inv_dormant_USED : inv_dormant USED = false.
 Proof. vm_compute. reflexivity. Qed.
 Lemma inv_dormant_SLEEPING : inv_dormant SLEEPING = false.
 Proof. vm_compute. reflexivity. Qed.
-Lemma inv_dormant_USED : inv_dormant USED = false.
+Lemma inv_dormant_RUNNABLE : inv_dormant RUNNABLE = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma inv_dormant_RUNNING : inv_dormant RUNNING = false.
 Proof. vm_compute. reflexivity. Qed.
 
-(* A state that requires the saved-context obligation: the two "parked"
-   states that own a saved context reachable by swtch. *)
 Definition needs_ctx (st : mword 32) : bool :=
   bool_decide (st = RUNNABLE) || bool_decide (st = SLEEPING).
 
@@ -316,21 +316,61 @@ Qed.
 (* The hart id: tp holds the ambient CpuId.                               *)
 (* ===================================================================== *)
 
-(* the ambient hart id as a tp-register value.  mycpu()'s return for this
-   hart is [mycpu_ret cid_word] = &cpus[cpu_id]. *)
-Definition cid_word `{CID : CpuId} : mword 64 :=
-  mword_of_int (Z.of_nat (fin_to_nat cpu_id)).
+(* ANY hart's id as a tp-register value, and its [struct cpu] pointer --
+   what mycpu() returns on that hart.  [cpus_ptr] is the value a lock's
+   [cpu] field holds while hart [i] holds the lock (WpLock.v), so the
+   lock-holder token is keyed by [i] and the field's value is [cpus_ptr i];
+   the two injectivity/nonzeroness facts below are what let a NON-holder
+   conclude that the field does not name it. *)
+Definition cid_word_of (i : CPU) : mword 64 :=
+  mword_of_int (Z.of_nat (fin_to_nat i)).
+Definition cpus_ptr (i : CPU) : mword 64 := mycpu_ret (cid_word_of i).
 
-Lemma tp_ok_cid `{CID : CpuId} : tp_ok cid_word.
+Lemma tp_ok_cid_of (i : CPU) : tp_ok (cid_word_of i).
 Proof.
-  unfold tp_ok, cid_word.
-  pose proof (fin_to_nat_lt cpu_id) as Hlt. unfold NCPU in Hlt.
-  assert (Hz : 0 <= Z.of_nat (fin_to_nat cpu_id) < 8).
+  unfold tp_ok, cid_word_of.
+  pose proof (fin_to_nat_lt i) as Hlt. unfold NCPU in Hlt.
+  assert (Hz : 0 <= Z.of_nat (fin_to_nat i) < 8).
   { split; [ apply Nat2Z.is_nonneg | ].
     change 8 with (Z.of_nat 8%nat). apply inj_lt. exact Hlt. }
   rewrite uint_unsigned pg_moi_unsigned bv_wrap_small;
     [ exact Hz | rewrite pg_modulus64; lia ].
 Qed.
+
+Lemma uint_cid_word_of (i : CPU) : uint (cid_word_of i) = Z.of_nat (fin_to_nat i).
+Proof.
+  pose proof (fin_to_nat_lt i) as Hlt. unfold NCPU in Hlt.
+  unfold cid_word_of. rewrite uint_unsigned pg_moi_unsigned.
+  apply bv_wrap_small. rewrite pg_modulus64.
+  split; [ apply Nat2Z.is_nonneg | ].
+  assert (Z.of_nat (fin_to_nat i) < Z.of_nat 8%nat) by (apply inj_lt; exact Hlt).
+  lia.
+Qed.
+
+(* distinct harts have distinct [struct cpu] pointers *)
+Lemma cpus_ptr_inj (i j : CPU) : cpus_ptr i = cpus_ptr j -> i = j.
+Proof.
+  intro Heq. apply (f_equal bv_unsigned) in Heq.
+  unfold cpus_ptr in Heq.
+  rewrite (mycpu_ret_unsigned _ (tp_ok_cid_of i)) in Heq.
+  rewrite (mycpu_ret_unsigned _ (tp_ok_cid_of j)) in Heq.
+  rewrite !uint_cid_word_of in Heq.
+  apply fin_to_nat_inj. lia.
+Qed.
+
+(* a hart's [struct cpu] pointer is never the null the free lock records *)
+Lemma cpus_ptr_nonzero (i : CPU) : eq_vec (zero_reg : mword 64) (cpus_ptr i) = false.
+Proof. apply mycpu_ret_nonzero, tp_ok_cid_of. Qed.
+
+(* the ambient hart id as a tp-register value.  mycpu()'s return for this
+   hart is [mycpu_ret cid_word] = &cpus[cpu_id] = [cpus_ptr cpu_id]. *)
+Definition cid_word `{CID : CpuId} : mword 64 := cid_word_of cpu_id.
+
+Lemma cpus_ptr_cid `{CID : CpuId} : cpus_ptr cpu_id = mycpu_ret cid_word.
+Proof. reflexivity. Qed.
+
+Lemma tp_ok_cid `{CID : CpuId} : tp_ok cid_word.
+Proof. apply tp_ok_cid_of. Qed.
 
 (* ===================================================================== *)
 (* The current-process resource.                                          *)

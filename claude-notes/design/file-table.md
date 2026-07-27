@@ -275,22 +275,69 @@ definition rather than every caller.
 
 ## Open items
 
-- **`ref` overflow.** Nothing in `filedup` checks for it. The invariant carries
-  `n < 2^31`; `filedup` therefore needs a "there is room" premise, ultimately
-  discharged from a global bound (`NPROC*NOFILE` + in-flight references). Until
-  that argument exists, carry it as an explicit hypothesis on `filedup`.
-- **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
+## Why `f->ref++` cannot overflow: the fd-slot resource
+
+`filedup` increments `f->ref` with no check, and the invariant needs every
+count to stay a faithful `int` (`< 2^31`) — that is what makes `ref == 0` mean
+"free" and what the sign-extended branch tests read. **No unconditional
+increment preserves a finite bound**, so this is not something `filedup` can
+re-establish on its own, and it is not a pure fact about the table either.
+
+It is a *whole-kernel conservation law*, and a slightly subtle one:
+
+> every holder of a reference is a file descriptor of some process; there are
+> at most `NPROC` processes with at most `NOFILE` descriptors each; that
+> product is ~1000, nowhere near 2^31.
+
+Nothing in `file.c` enforces it, so it is carried as a resource — `FdSlots.v`:
+
+- `fd_slot γs` is one unit of "somewhere to put a file reference". The supply
+  is fixed at `FDSLOTS = NPROC * (NOFILE + 4)` and minted once at boot by
+  `fd_slots_alloc`; the `+4` is the per-process allowance for references a
+  syscall holds in *locals* before installing them in a descriptor (`sys_open`
+  one, `pipealloc` two).
+- `ftable_res` holds `fd_slots_auth γs` **and**, per referenced slot,
+  `fd_slots γs (Pos.to_nat n)` — one unit per outstanding reference. A
+  descriptor naming a file has given its slot away and gets it back on close.
+- The bound then needs no arithmetic and no ghost update at all: the units for
+  one slot are literally `◯ n`, `◯ n ⋅ ◯ 1 = ◯ (S n)`, and auth validity
+  against `● FDSLOTS` gives `n ≤ FDSLOTS`. `fd_slots_no_overflow` packages
+  that as `Z.pos n < 2^31 ∧ Z.pos (n+1) < 2^31`.
+
+`filedup` is **proven** on this footing (`ProofFiledup.v`), axiom-clean: the
+overflow freedom is a theorem, and the `f->ref < 1` panic arm is dead (the
+caller's `file_ref` puts the slot in the domain with a `positive` count, and
+`fref_word_spos` turns that into "the sign-extended load is signed-positive",
+which is exactly what `bge x0,a5` tests) — so the panic tail gets no `instr`
+fact at all.
+
+So `filedup` **requires** an `fd_slot` and `fileclose` **returns** one;
+`filealloc` consumes one too (it creates the first reference), and
+`pipealloc` two. The `⌜Z.pos n < 2^31⌝` conjunct inside `fslot` is the *local
+projection* of the bound — what a consumer walking the table actually needs,
+so it does not have to reach for the authority at every slot. It is not an
+independent assumption: every operation that changes a count re-derives it.
+
+**Do not shortcut this with an axiom.** The missing step,
+`∀ n, Z.pos n < 2^31 → Z.pos (Pos.succ n) < 2^31`, is *false* at
+`n = 2^31 - 1`; asserting it makes every proof in every file that transitively
+requires it vacuous. (A "dup budget" pool with a lifetime cap and no returns
+was also tried and is strictly worse — it bounds calls rather than live
+references, and its supply has no principled source.)
+
+ **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
-- **`ProofFilealloc.v`.** `FileInv.v`, `SpecFilealloc.v` and
-  `WpFileallocDecode.v` (all 32 instruction facts) are done; the whole-function
-  proof is not. Shape: prologue → `acquire` → the do-while scan as a fuel
-  induction over the remaining count (`ArrCursor.acur_step` at stride 40,
-  `acur_neq` against `fnode NFILE`) with the loop invariant "every slot below
-  the cursor is in `dom M`", carrying `[∗ list]` accumulator/remaining halves
-  of `fslot M k` → the found/not-found split → `release` → epilogue. `s1`
-  (the cursor) is live across both `release` calls and is covered by
-  `callee_saved`; `a4` (the end pointer) is caller-saved but no call sits
-  inside the loop.
+- **The next function is `fileclose`.** Its ghost steps
+  (`file_close_step` / `file_close_last_step`) are already proved and its
+  contract is written; what is missing is the instruction-level proof, and
+  that needs the last-reference arm's callees — `pipeclose`, `begin_op`,
+  `iput`, `end_op` — to have specs first. `fileclose_stack` in
+  `SpecFileclose.v` will grow when they do.
+- **Where the fd slots come from.** `fd_slots_alloc` mints the supply and
+  `fd_slots_to_list` parcels it out, but nothing distributes them yet: that
+  is the proc-side model of `p->ofile[]`, which is the other end of the
+  conservation law. Until it exists, `filedup`'s `fd_slot` premise has no
+  producer, so the spec is provable but not yet *usable* from `sys_dup`.
 - **Generalize the pool.** `bcache` (`b->refcnt` under `bcache.lock`), `itable`
   (`ip->ref` under `itable.lock`) and `ftable` are the *same* object: an array
   of slots with an int refcount under one spinlock, contents shared read-only

@@ -51,3 +51,10 @@ Lemma bdec_00015517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00015517 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x15 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
+
+(* 0x0001e517  auipc a0,0x1e -- every function that materializes a pointer
+   into the 0x8002xxxx globals: fileinit, iinit, filealloc, filedup. *)
+Lemma bdec_0001e517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0001e517 : mword 32)) s
+  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
+Proof. decode_bridge_ms. Qed.

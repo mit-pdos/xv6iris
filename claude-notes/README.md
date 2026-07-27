@@ -56,12 +56,20 @@ are working on that effort — the relevant `projects/` file.
   positive))`) that ties `f->ref` to fractional ownership of the immutable
   fields, the "holding a reference" predicate, the `ftable.lock` invariant, how
   the fd-sharing patterns come out, and the staged plan for `f->off`.
+- **[`pipe.md`](design/pipe.md)** — pipes: `struct pipe`'s geometry, the
+  well-formedness predicate (`is_pipe` = `is_lock` over a `pipe_res` owning
+  every other byte of the page), the two-ended fractional reference algebra
+  that mirrors `readopen`/`writeopen`, `PageFields.v` (carving a kalloc'd page
+  into typed struct fields — reusable for any page-backed object), the
+  `pipealloc` spec and proof, and the page-reclamation problem that
+  `pipeclose` must solve first.
 - **[`proc-struct.md`](design/proc-struct.md)** — `struct proc`: the verified
   geometry of all 15 fields, the five sharing disciplines the code actually
-  uses (not the three `proc.h` claims), and the proposed resources — the
-  state-keyed lock invariant any CPU can peek at, and `proc_priv`, the
-  exclusive private bundle (`sz`/`pagetable`/`trapframe`/`ofile`/`cwd`) that
-  rides alongside `cur_proc p` and carries a `FileInv.file_ref` per open fd.
+  uses (not the three `proc.h` claims), and the resources — the state-keyed
+  lock invariant any CPU can peek at (`proc_pub` + the two flat `proc_slots`
+  guards), and `proc_priv`, the exclusive private bundle
+  (`sz`/`pagetable`/`trapframe`/`ofile`/`cwd`) that rides alongside
+  `cur_proc p` and carries a `FileInv.file_ref` per open fd.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel
@@ -70,10 +78,20 @@ are working on that effort — the relevant `projects/` file.
 ### `projects/` — ongoing worklists & plans (one per effort)
 
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
-  `struct proc` resource split: what has landed (`ProcInv.v`, `sys_getpid`) and
-  the `proc_lock_res` rewiring still to do.
+  `struct proc` resource split: what has landed (`ProcInv.v`, `sys_getpid`,
+  `argint` over an assumed `argraw`) and what is next (`argraw` — parked, with
+  a measured account of why its six-arm proof cost 74 GB — then `killed` and
+  `sys_pause`).
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
+- **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
+  the process page table's OWNERSHIP side (`ProcPtOwn.v`): `proc_pt`, one
+  predicate for a valid parked user table — trampoline + trapframe + the pages
+  it OWNS — the footprint derived from `um` (retiring `uptd`'s `ud_data`
+  field), the physical-tier decision, the `page_own ⇄ udata_own` bridges, and
+  the worklist for folding `UserPtTree.user_pt_inv` onto it. The CONSTRUCTION
+  side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md); they
+  meet at `ProcPtOwn.proc_pt_intro_ppt`.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
@@ -100,6 +118,17 @@ their durable design notes, gotchas, and reusable recipes.
 - **[`yield-sched.md`](completed/yield-sched.md)** — yield/sched/myproc specs and
   proofs (S1–S9 complete): the sconf-tier swtch port, the global scheduler-chain predicate
   `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
+- **[`memmove.md`](completed/memmove.md)** — memmove, proven for non-overlapping
+  ranges, where the non-overlap hypothesis is carried by SEPARATION (the two
+  buffers as separate conjuncts) rather than a pure side condition, so the
+  source's descending-copy arm closes by contradiction and is never even
+  decoded. Also: `ByteCursor.v` (the shared byte-loop arithmetic) and the
+  register-map rewrite gotchas the proof turned up.
+- **[`proc-pagetable.md`](completed/proc-pagetable.md)** — proc_pagetable +
+  uvmcreate: the user page table's CONSTRUCTION side (the execution side is
+  UptTree/userret). `ProcPt.v`'s `ppt_bridge` carries the built table to
+  `upt_tree_spec`; counted-budget-only, so both error tails (uvmfree /
+  uvmunmap, unverified) are dead.
 - **[`sleeplock.md`](completed/sleeplock.md)** — the sleeplock subsystem, all
   four functions proven (initsleeplock / acquiresleep / releasesleep /
   holdingsleep): the `is_sleeplock`/`sl_res` lock abstraction over the inner
@@ -138,8 +167,9 @@ their durable design notes, gotchas, and reusable recipes.
   on the sie-cap-avail interface. Keeps the `sconf`/`sie_cap`/`intr_count`
   architecture, the avail-param push/pop conventions, and the reusable recipes.
   Two consumer-side items are PARKED there with no owner: the boot wiring that
-  would drive the sconf layer (`main`→`trapinithart`) and wiring
-  `wp_vc_block_s_sconf` into the whole-function proofs.
+  would drive the sconf layer (`main`; `trapinithart` and the `csrw stvec` leaf
+  it needed are done) and wiring `wp_vc_block_s_sconf` into the whole-function
+  proofs.
 
 When a project is fully finished — no remaining work and no cleanup — move its
 file from `projects/` to `completed/` (rather than deleting it), so its durable

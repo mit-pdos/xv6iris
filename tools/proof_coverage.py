@@ -102,7 +102,7 @@ MANIFEST_PROVEN = {
 # Functions whose contract is *stated* but deliberately assumed (an Axiom, or a
 # hypothesis threaded through callers' specs) rather than proven.
 MANIFEST_ASSUMED = {
-    "panic": ("KvmSpec.v", "panic_wp", "assumed as a hypothesis carried by callers"),
+    "panic": ("SpecPanic.v", "panic_wp", "assumed as a hypothesis carried by callers"),
     "kerneltrap": ("WpKernelvecNew.v", "kerneltrap_returns",
                    "only 'it returns' is assumed, as an Axiom"),
 }
@@ -182,8 +182,11 @@ def runs_to_return(text: str) -> bool:
 REQUIRE = re.compile(r"^\s*(?:From\s+\w+\s+)?Require\s+(?:Import|Export)?\s*([^.]*)\.", re.M)
 MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)
 # `Module KfreeProof (A : ACQUIRE) (B : MEMSETPAGE) : KFREE.`
+# `<:` (transparent ascription) is accepted too: the tree's convention is the
+# opaque `:` (see design/spec-modules.md), but a stray `<:` must not make a
+# proven+linked function silently read as `assumed`.
 MODIMPL_DECL = re.compile(
-    r"^\s*Module\s+(\w+)\s*((?:\(\s*\w+\s*:\s*\w+\s*\)\s*)*):\s*(\w+)\s*\.", re.M)
+    r"^\s*Module\s+(\w+)\s*((?:\(\s*\w+\s*:\s*\w+\s*\)\s*)*)<?:\s*(\w+)\s*\.", re.M)
 # `Module Kfree := KfreeProof Acquire MemsetPage Release.`
 MODINST_DECL = re.compile(r"^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.", re.M)
 

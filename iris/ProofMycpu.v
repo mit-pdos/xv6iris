@@ -24,6 +24,7 @@ Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecMycpu.
+Require Import KernelRvcDecode.
 Import Defs.
 
 Module MycpuProof : MYCPU.
@@ -210,7 +211,7 @@ Section ProofMycpu.
     { unfold m10, m9; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       exact Hcsp1. }
     assert (Hwv : add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
-    { rewrite Hm10sp. unfold sp', imm_dealloc, imm_entry, sp0. apply mycpu_frame_cancel. }
+    { rewrite Hm10sp. unfold sp', imm_dealloc, imm_entry, sp0. apply frame_cancel_16. }
     assert (Hpop : m10 !!! Regidx csp_rs1
                    = pa_stk (add_vec (m10 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc))) 2).
     { rewrite Hwv Hm10sp. exact Hpush. }
@@ -260,7 +261,7 @@ Section ProofMycpu.
       rewrite Hm10sp.
       change (m0 !!! Regidx (mword_of_int 2)) with (m0 !!! Regidx csp_rs1).
       unfold sp', imm_dealloc, imm_entry.
-      apply mycpu_frame_cancel.
+      apply frame_cancel_16.
     - rewrite /m11 /m10 /m9 /m8 /m7 /m6 /m5 /m4 /m3 /m2 /m1 /s00 /ra0.
       repeat first [ rewrite upd_eq
                    | rewrite upd_ne; [| vm_compute; discriminate] ].

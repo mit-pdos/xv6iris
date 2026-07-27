@@ -15,7 +15,8 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
+Require Import SpecPanic.
 Require Import KallocInv.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -29,7 +30,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (vlock : bv 32) (vname vcpu : bv 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
   let lk : mword 64 := mword_of_int KernelSyms.kmem in
   let fl : mword 64 := mword_of_int (KernelSyms.kmem + 24) in
   let c_name := lock_name_field lk in
@@ -39,7 +39,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   let s1entry := add_vec (and_vec (add_vec endaddr (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (22 <= K)%nat ->
   ncnt = 0%nat ->
-  eq_vec (zero_reg : mword 64) cpuv = false ->
   (* the tp register holds THIS cpu's id (freerange cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   prun phystop s1entry ps ->
@@ -48,6 +47,8 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   (* [kernel_data] supplies the "kmem" string literal kinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  (* freerange -> kfree -> acquire sits above panic() *)
+  panic_wp -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
@@ -60,7 +61,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
     ⌜ callee_saved m mr ⌝ -∗
     is_kmem γl γk lk fl -∗
     kalloc_avail γk (Some (length ps)) -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

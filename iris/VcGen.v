@@ -319,6 +319,33 @@ Proof.
   rewrite bv_wrap_add_idemp. reflexivity.
 Qed.
 
+(* [c.addiw rd,rd,1] on a small non-negative [int]: the 32-bit truncation of
+   the widened result is the literal successor.  This is the whole arithmetic
+   content of "++ on an int field", shared by push_off's noff and filedup's
+   f->ref. *)
+Lemma moi32_storeval_succ (z : Z) : (0 <= z)%Z -> (z + 1 < 2^31)%Z ->
+  trunc32 (sign_extend' 64 (subrange_vec_dec
+     (add_vec (sign_extend' 64 (mword_of_int z : mword 32))
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
+  = (mword_of_int (z + 1) : mword 32).
+Proof.
+  intros Hz0 Hb.
+  rewrite <- trunc32_subrange. rewrite trunc32_sext. rewrite trunc32_add.
+  rewrite trunc32_sext.
+  assert (HK : trunc32 (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) = (mword_of_int 1 : mword 32))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite HK.
+  apply bv_eq.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  rewrite (moi32_small z ltac:(change (2^32) with (2*2^31); lia)).
+  rewrite (moi32_small 1 ltac:(lia)).
+  rewrite moi32_unsigned.
+  rewrite (bvw32_small (z+1) ltac:(change (2^32) with (2*2^31); lia)).
+  lia.
+Qed.
+
 (* truncation of a 64-bit constant is the 32-bit constant. *)
 Lemma trunc32_mword_of_int (z : Z) :
   trunc32 (mword_of_int z : mword 64) = (mword_of_int z : mword 32).

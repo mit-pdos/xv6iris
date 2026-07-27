@@ -23,7 +23,7 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Values.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpMmodeLeafBase.

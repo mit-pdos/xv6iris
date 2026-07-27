@@ -17,8 +17,9 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KallocInv.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
 Require Import IntrDefs.
+Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -26,13 +27,10 @@ From Kernel Require KernelSyms.
 Notation AK := KernelSyms.kalloc.
 
 Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  let cpuv := mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5)) in
-  let a_cpu := add_vec (mword_of_int KernelSyms.kmem : mword 64) (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (14 <= K)%nat ->
-  eq_vec (cpuold : mword 64) cpuv = false ->
   (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
@@ -42,20 +40,19 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   kernel_text -∗ pc_is pcE -∗
   is_lock γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
-  a_cpu ↦₈ cpuold -∗
+  panic_wp -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
     cpu_own γ n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_post γk on (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    a_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type KALLOC.
   Parameter wp_kalloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (cpuold : mword 64) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_kalloc_sconf_body γ Φ γl γk fl m cpuold on n eb p C K.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
+      wp_kalloc_sconf_body γ Φ γl γk fl m on n eb p C K.
 End KALLOC.

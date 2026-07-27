@@ -19,7 +19,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import WpLock.
-Require Import WpMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpWakeup.
@@ -79,7 +79,7 @@ Section ProofHoldingsleep.
     intros pcE slk ret_tgt Htp Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield Hlkcpu Hpidproc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield #Hpanic Hpidproc Hcont".
     (* stack-slot address bridges (spr-relative store offset -> pa_stk sp0 k). *)
     assert (Hspr6 : spr = pa_stk sp0 6).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -227,20 +227,16 @@ Section ProofHoldingsleep.
       rewrite /M0 upd_ne; [| vm_compute; discriminate]. reflexivity. }
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
     iApply (Acquire.wp_acquire_sconf γ Φ γl "sleep lock"%string (sl_res γsl slk R) M5
-              (zero_reg : mword 64) 0%nat eb p C (av - 6)%nat
-              ltac:(rewrite HM5tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid))
+              0%nat eb p C (av - 6)%nat
               HM5tp
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [Hlk] [Hlkcpu] [-]").
+              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic [-]").
     { iEval (rewrite HM5a0). iExact "Hlk". }
-    { iEval (rewrite HM5a0). iExact "Hlkcpu". }
-    iIntros (ms A) "%Hms Hcg Hpc %HcsA Htok HR Hcpu Hcnt Hpay".
+    iIntros (ms A) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
     assert (Hpc18 : ret_pc (M5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (HSL + 0x18))
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
-    (* rewrite the returned sl_lkcpu cell into canonical (slk / cid_word) form. *)
-    iEval (rewrite HM5a0 HM5tp) in "Hcpu".
     (* open sl_res with the caller's token: refute the free arm. *)
     iDestruct (sl_res_open_held γsl slk R with "HR Hsl") as "(Hsl & Hcellex)".
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
@@ -477,22 +473,18 @@ Section ProofHoldingsleep.
     iDestruct (sl_res_close_held γsl slk R v Hvnz with "Hslk") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γ Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20
-              (mycpu_ret cid_word) 0%nat eb p C (av - 6)%nat
+              0%nat eb p C (av - 6)%nat
               ltac:(rewrite HD20a0; apply wk_add_vec_0)
-              ltac:(rewrite HD20tp; apply wk_eq_vec_refl)
               HD20tp
               ltac:(lia)
-              with "Hcg Htext Hpc [Hlk] [Htok] [HR2] [Hcpu] Hcnt Hpay [-]").
+              with "Hcg Htext Hpc [Hlk] [Htok] [HR2] Hcnt Hpay [-]").
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR2". }
-    { iEval (rewrite HD20a0). iExact "Hcpu". }
-    iIntros (MR) "Hcg Hpc %HcsMR Hcpu Hcnt".
+    iIntros (MR) "Hcg Hpc %HcsMR Hcnt".
     assert (Hpc24 : ret_pc (D20 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (HSL + 0x24))
       by (rewrite HD20ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".
-    (* rewrite the released sl_lkcpu cell back into the canonical sl_lk form. *)
-    iEval (rewrite HD20a0) in "Hcpu".
     (* register-preservation facts for the epilogue and callee_saved. *)
     assert (HMRcsp : MR !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup HcsMR csp_rs1 ltac:(vm_compute; reflexivity)). exact HD20csp. }
@@ -678,7 +670,7 @@ Section ProofHoldingsleep.
       rewrite /M2 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence].
       rewrite /M0 upd_ne; [| congruence]. reflexivity. }
-    iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidfield Hcpu Hpidproc").
+    iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidfield Hpidproc").
     { split.
       - unfold callee_saved.
         split; [exact HE2e_csp|].

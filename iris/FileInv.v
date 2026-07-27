@@ -35,8 +35,9 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto.
+Require Import RiscvPtsto RiscvExtras.
 Require Import ArrCursor.
+Require Import FdSlots.
 Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -115,6 +116,68 @@ Record fcontent := MkFContent {
   fc_major    : bv 16;
 }.
 
+(* ------------------------------------------------------------------ *)
+(*  The [ref] word: zero exactly on a free slot                         *)
+(* ------------------------------------------------------------------ *)
+
+(* filealloc's scan tests [f->ref] with a sign-extending 4-byte load and a
+   [c.beqz], so what the branch consumes is the 64-bit sign extension of the
+   stored word.  These two lemmas are the whole content of "the physical test
+   and the ghost state agree": a slot outside the authority reads zero, a slot
+   inside it reads its (positive, in-range) count and so reads nonzero. *)
+Lemma fref_word_zero :
+  eq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) (zero_reg : mword 64) = true.
+Proof. apply eq_vec_true_iff. apply bv_eq. vm_compute. reflexivity. Qed.
+
+Lemma fref_word_nonzero (n : positive) :
+  Z.pos n < 2 ^ 31 ->
+  eq_vec (sign_extend' 64 (mword_of_int (Z.pos n) : mword 32)) (zero_reg : mword 64) = false.
+Proof.
+  intro Hn.
+  (* [lia] cannot evaluate [2^k]; name the three literals first. *)
+  assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
+  rewrite E31 in Hn.
+  assert (Hlt32 : (Z.pos n < 2 ^ 32)%Z) by (rewrite E32; lia).
+  (* the stored word's unsigned value is [n] itself (no wrap) ... *)
+  assert (Hu : bv_unsigned (mword_of_int (Z.pos n) : mword 32) = Z.pos n).
+  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+    rewrite Z_to_bv_unsigned. unfold bv_wrap, bv_modulus.
+    change (Z.of_N 32) with 32. rewrite E32.
+    rewrite Z.mod_small; [reflexivity | lia]. }
+  (* ... and it is below the half modulus, so the sign extension is the
+     identity on the value. *)
+  assert (Hs : bv_signed (mword_of_int (Z.pos n) : mword 32) = Z.pos n).
+  { unfold bv_signed. rewrite Hu. apply bv_swrap_small.
+    unfold bv_half_modulus, bv_modulus. change (Z.of_N 32) with 32.
+    assert (Ehalf : (2 ^ 32 / 2 = 2147483648)%Z) by (vm_compute; reflexivity).
+    rewrite Ehalf. lia. }
+  apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
+  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
+  rewrite Hz in Hc. revert Hc.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned. rewrite Hs.
+  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
+  rewrite E64. rewrite Z.mod_small; [lia|]. lia.
+Qed.
+
+(* the signed [f->ref < 1] test: a positive in-range count is signed-positive,
+   so [bge x0,a5] falls through.  This is what makes filedup's and
+   fileclose's panic arms dead for a caller that holds a reference. *)
+Lemma fref_word_spos (n : positive) :
+  Z.pos n < 2 ^ 31 ->
+  zopz0zKzJ_s (zero_reg : mword 64)
+              (sign_extend' 64 (mword_of_int (Z.pos n) : mword 32)) = false.
+Proof.
+  intro Hn.
+  unfold zopz0zKzJ_s.
+  rewrite Z.geb_leb. apply Z.leb_gt.
+  assert (Hz0 : sint (zero_reg : mword 64) = 0%Z) by reflexivity. rewrite Hz0.
+  rewrite sint64_moi32; lia.
+Qed.
+
 (* the count component's [⋅] IS [Pos.add]; naming it lets [lia] see the
    arithmetic in the local-update side conditions. *)
 Lemma pos_op_add (a b : positive) : (a ⋅ b) = (a + b)%positive.
@@ -123,7 +186,7 @@ Lemma pos_succ_1_add (b : positive) : Pos.succ (1 + b) = (2 + b)%positive.
 Proof. lia. Qed.
 
 Section FileInv.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
 
   (* ---- the content cells, at an arbitrary dfrac ---- *)
   Definition file_fields (k : nat) (dq : dfrac) (C : fcontent) : iProp Σ :=
@@ -162,7 +225,25 @@ Section FileInv.
     | None    => emp%I
     end.
 
-  Definition fslot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+  (* q = 1 -- every share is out, so the invariant keeps nothing. *)
+  Lemma file_rest_full (k : nat) : file_rest k 1 ⊣⊢ emp.
+  Proof.
+    rewrite /file_rest.
+    assert (Hs : (1 - 1)%Qp = None) by (apply Qp.sub_None; done).
+    rewrite Hs. reflexivity.
+  Qed.
+
+  (* A referenced slot holds ONE fd slot per outstanding reference: every
+     holder of a reference is a file descriptor, and a descriptor that names
+     a file has given its [fd_slot] away (FdSlots.v).  That is what bounds
+     the count, and hence what makes [f->ref++] safe.
+
+     The [< 2^31] conjunct is the LOCAL PROJECTION of that bound -- it is
+     what a consumer walking the table actually needs, and reaching for the
+     authority at every slot would infect every consumer.  It is not an
+     independent assumption: every operation that changes a count re-derives
+     it from [fd_slots_no_overflow]. *)
+  Definition fslot (γs : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
     match M !! k with
     | None =>
         (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
@@ -170,21 +251,25 @@ Section FileInv.
     | Some (q, n) =>
         (⌜Z.pos n < 2 ^ 31⌝ ∗
          a_fref k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
-         file_rest k q)%I
+         file_rest k q ∗
+         fd_slots γs (Pos.to_nat n))%I
     end.
 
-  Definition ftable_res (γ : gname) : iProp Σ :=
+  Definition ftable_res (γ γs : gname) : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
        own γ (● M) ∗
+       (* the fd-slot supply: the table is where the conservation law is
+          checked, because the table is what holds one unit per reference. *)
+       fd_slots_auth γs ∗
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
-       [∗ list] k ∈ seq 0 NFILE, fslot M k)%I.
+       [∗ list] k ∈ seq 0 NFILE, fslot γs M k)%I.
 
   (* the whole table: the spinlock named "ftable" over that resource.
      Persistent, so every core shares it. *)
-  Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string (ftable_res γ).
+  Definition is_ftable (γl γ γs : gname) : iProp Σ :=
+    is_lock γl ftable_addr "ftable"%string (ftable_res γ γs).
 
-  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
+  Global Instance is_ftable_persistent γl γ γs : Persistent (is_ftable γl γ γs).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -231,6 +316,38 @@ Section FileInv.
       iFrame.
     - iIntros "[(A1 & A2 & A3 & A4 & A5 & A6 & A7) (B1 & B2 & B3 & B4 & B5 & B6 & B7)]".
       iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  Reaching into the table                                             *)
+  (* ------------------------------------------------------------------ *)
+
+  (* Borrow one slot out of the NFILE-way big-sep and put it back, possibly
+     under a DIFFERENT authority map -- which is what filealloc needs: its
+     scan borrows slot after slot unchanged (M' := M), and the slot it takes
+     is given back at [<[i := (1,1)]> M].  Since [fslot M k] reads only
+     [M !! k], every other slot is untouched by the update. *)
+  Lemma ftable_slots_acc (γs : gname) (M : gmap nat (Qp * positive)) (i : nat) :
+    (i < NFILE)%nat ->
+    ([∗ list] k ∈ seq 0 NFILE, fslot γs M k) -∗
+    fslot γs M i ∗
+    (∀ M' : gmap nat (Qp * positive),
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γs M' i -∗
+       [∗ list] k ∈ seq 0 NFILE, fslot γs M' k).
+  Proof.
+    iIntros (Hi) "H".
+    assert (Hlk : seq 0 NFILE !! i = Some i).
+    { apply lookup_seq. lia. }
+    rewrite (big_sepL_delete (fun _ k => fslot γs M k) (seq 0 NFILE) i i Hlk).
+    iDestruct "H" as "[$ Hrest]".
+    iIntros (M' HM') "Hi".
+    rewrite (big_sepL_delete (fun _ k => fslot γs M' k) (seq 0 NFILE) i i Hlk).
+    iFrame "Hi".
+    iApply (big_sepL_mono with "Hrest").
+    intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].
+    (* in [seq 0 NFILE] the element IS the index, so [y <> i] *)
+    apply lookup_seq in Hy as [-> _].
+    unfold fslot. rewrite (HM' _ Hne). done.
   Qed.
 
   (* ------------------------------------------------------------------ *)

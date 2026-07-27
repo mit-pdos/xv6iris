@@ -17,7 +17,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvExtras.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* the cursor at element [i] of an array of [stride]-byte elements based at

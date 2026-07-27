@@ -37,7 +37,7 @@ Require Import InstrBytes RiscvFetchExec KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import VcGen.
-Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge.
+Require Import RiscvExec RiscvExtras WpDecode WpRvcBridge.
 From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
@@ -318,12 +318,10 @@ Section ProcInv.
   Definition wk_intena_addr (a0f : mword 64) : mword 64 :=
     add_vec a0f (sign_extend' 64 (mword_of_int 124 : mword 12)).
 
-  (* the lock->cpu word of every proc, all 0 at each loop-test (acquire sets it
-     to mycpu, release clears it back to 0). *)
-  Definition wk_cpu_addr (pa : mword 64) : mword 64 :=
-    add_vec pa (sign_extend' 64 (mword_of_int 16 : mword 12)).
-  Definition wk_lockcells (γs : list gname) : iProp Σ :=
-    ([∗ list] i ↦ _ ∈ γs, wk_cpu_addr (proc_addr i) ↦₈ (zero_reg : mword 64))%I.
+  (* Nothing per-proc rides with the scan any more: both words of every proc
+     lock are inside its [lock_inv] (WpLock.v), and what acquire needs beside
+     the lock itself is only [panic_wp] -- persistent, so one copy serves all
+     64 iterations. *)
 
   (* wakeup's own 7-entry register-save frame, at spF+8..spF+56 (written by the
      [c.sdsp] prologue, read back by the epilogue).  Cell addresses are given in
@@ -440,25 +438,6 @@ Section ProcInv.
   (* the prologue's exit register shape [wk_regs .. k] refines the loop's
      entry shape [wk_loop_regs .. k] (NPROC = 64, so proc_addr NPROC = proc_addr 64;
      the extra [ra] constraint is simply dropped). *)
-
-  (* the epilogue restores sp by [+60][+4], which cancels the prologue's
-     [-64] frame allocation, so the final sp equals the caller's sp. *)
-  Lemma wakeup_sp_cancel (X : mword 64) :
-    add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))
-            (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
-  Proof.
-    assert (add_vec_unsigned : forall x y : mword 64,
-              bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-    { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-        SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-      rewrite bv_add_unsigned. reflexivity. }
-    apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-    assert (HA : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)) : mword 64) = 18446744073709551552) by (vm_compute; reflexivity).
-    assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)) : mword 64) = 64) by (vm_compute; reflexivity).
-    rewrite HA HB. rewrite <- Z.add_assoc.
-    replace (18446744073709551552 + 64) with (bv_modulus 64) by (vm_compute; reflexivity).
-    rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-  Qed.
 
   (* ===================================================================== *)
   (* Whole-function WP for wakeup(chan): prologue -> loop (k=0, exiting to  *)

@@ -33,13 +33,12 @@ Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
+Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import WpGpr.
 Require Import SmodeCore.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase.
-Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -451,22 +450,6 @@ Section WpMemsetS.
     rewrite Nat2Z.inj_succ.
     rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
     f_equal. lia.
-  Qed.
-
-  (* memset's frame alloc (c.addi16sp sp,-16 ; encoded imm 48 = -16 in 6-bit)
-     and dealloc (c.addi16sp sp,+16 ; imm 16) cancel, so sp is net-preserved. *)
-  Lemma add_vec_frame_cancel (X : mword 64) :
-    add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
-            (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-  Proof.
-    apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-    assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
-               = 18446744073709551600) by (vm_compute; reflexivity).
-    assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
-               = 16) by (vm_compute; reflexivity).
-    rewrite HA HB. rewrite <- Z.add_assoc.
-    replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
-    rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
   Qed.
 
   Lemma seq_cons (a b : nat) : seq a (S b) = a :: seq (S a) b.

@@ -12,9 +12,8 @@
 
    The holder surrenders the token, the pid field and the protected
    resource back into the lock.  The body wakes every process sleeping on
-   the lock, so the <thread resources> include wakeup()'s: procs_inv, the
-   whole per-proc lock-cpu cell array [wk_lockcells], and -- since wakeup
-   runs over the PROVEN myproc -- the current-process resource
+   the lock, so the <thread resources> include wakeup()'s: procs_inv and --
+   since wakeup runs over the PROVEN myproc -- the current-process resource
    [cur_proc pme] (any pme; releasesleep does not inspect it) with
    tp = cid_word. *)
 From Stdlib Require Import ZArith Lia List.
@@ -31,10 +30,11 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
+Require Import SpecPanic.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import WpWakeup.
+Require Import ProcGeom.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -62,18 +62,15 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pd -∗
   R -∗
-  sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
+  panic_wp -∗
   (* wakeup's resources *)
-  wk_lockcells γs -∗
   procs_inv γ Φ γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr γ mf av -∗
       cpu_own γ 0 eb pme C -∗
       pc_is ret_tgt -∗
-      sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
-      wk_lockcells γs -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type RELEASESLEEP.
