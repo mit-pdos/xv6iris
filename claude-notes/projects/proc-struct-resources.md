@@ -42,16 +42,35 @@ the evidence for every offset. This file is only the worklist.
       sleeplock layer purely to read a pid — a strictly worse interface. The
       bare fraction is both the weaker premise and the honest one.
 
-- [ ] **S3a — `argraw`, and linking `argint`.** `argint` is proven over the
-      `ARGRAW` module type but `LinkArgint.v` is empty until argraw is proven.
-      Everything needed has been checked to exist; this is writing, not
-      research. The derived facts:
+- [ ] **S3a — `argraw`, and linking `argint`. PARKED, with a working proof
+      that is too expensive to commit.** A complete six-arm proof was written
+      and it *does* compile — but at ~30 min and a **74 GB** peak, so it was not
+      committed. Kept at `scratchpad/ProofArgraw.6arm.v` in the session that
+      wrote it; everything below is what a rewrite needs.
 
-      * argraw @ `0x8000271a`, 30 instructions. 32-byte ra/s0/s1 frame,
-        byte-identical to sys_uptime's / argint's, so reuse those decodes.
-      * gcc compiles the switch to a **`.rodata` jump table** at `0x80007758`
-        (inside `kernel_data`, verified present). The six self-relative
-        4-byte entries and their targets, extracted from `KernelData.v`:
+      **Why it is expensive, measured.** With one arm the file is 98 s / 2.3 GB,
+      and `coqc -time` attributes **81 s to the single `destruct i`** on the
+      capstone's Iris goal. Two things compound:
+      * `destruct` on the big goal re-typechecks the dependently-typed Sail
+        bitvector context once per branch (`subrange_vec_dec _ (log2_xlen-1) 0`
+        has a *Z-computation* in its type). `clearbody` on the register-map
+        chain, `clear`ing the unused i-facts, and restricting `try lia` to the
+        one impossible branch each bought ~0 — it is the `destruct` itself.
+      * Coq retains **all six arms' proof terms until `Qed`** — measured 8 GB at
+        4 min, 16.6 GB at 7.5 min, climbing linearly to the 74 GB peak.
+
+      **The fix (designed, not yet written): prove the arm ONCE over a symbolic
+      index.** Add `ar_case_off`/`ar_ld_off : nat -> Z` for the per-case PCs,
+      then push the only six-way `destruct`s down into *small* helper lemmas —
+      `ar_i_tf` / `ar_i_ld` (dispatch the two `instr` facts to `ari_28`/`ari_36`/…),
+      `ar_jump_tgt` (the table entry really lands on the case body),
+      `ar_arg_addr` (the `112+8k` displacement; note the C_LD imm field is
+      exactly `14+k`), and `ar_join` (case 0 falls through, 1..5 take a `c.j`;
+      a plain continuation may be fed to `wp_cj_s_sconf`'s `▷` slot since
+      `P ⊢ ▷ P`). The capstone then needs **no `destruct` at all** — one
+      `ar_arm` application with `i` symbolic.
+
+      **The rest, still valid.** Jump table @ `0x80007758` in `kernel_data`:
 
         | n | entry | target | = argraw+ |
         |---|---|---|---|
@@ -62,33 +81,23 @@ the evidence for every offset. This file is only the worklist.
         | 4 | `0xffffb00a` | `0x80002762` | `+0x48` |
         | 5 | `0xffffb010` | `0x80002768` | `+0x4e` |
 
-      * Fresh decodes (all validated with a decoder cross-checked against
-        `sldec_lw_locked` / `sgdec_lw_a0_procpid` / `aidec_sw_a0_ip` /
-        `aidec_mv_s1_a1` / `cdec_8082`):
-        `+0x0a 0x84aa` C_MV s1,a0 · `+0x0c 0x9deff0ef` jal myproc (imm21
-        2093534) · `+0x10 0x4795` C_LI 5,a5 · `+0x12 0x0497e163` BLTU a5,s1
-        → `+0x54` · `+0x16 0x048a` C_SLLI 2,s1 · `+0x18 0x00005717` auipc
-        a4,0x5 · `+0x1c 0x03470713` addi a4,a4,52 · `+0x20 0x94ba` C_ADD
-        s1,a4 · `+0x22 0x409c` C_LW 0(s1)→a5 (shared `sldec_lw_locked`) ·
-        `+0x24 0x97ba` C_ADD a5,a4 · `+0x26 0x8782` C_JR a5 ·
-        `0x6d3c` C_LD 88(a0)→a5 (imm field 11) · the six
-        `C_LD <112+8i>(a5)→a0` words `0x7ba8/0x7fa8/0x63c8/0x67c8/0x6bc8/0x6fc8`
-        (imm fields 14..19) · the five `c.j` words
-        `0xbfcd/0xb7f5/0xb7dd/0xb7c5/0xbfe9`, ALL targeting `+0x2c`.
-      * **No new WP rule is needed.** `wp_cret_s_sconf` is already general
-        over the register, so it IS the indirect-jump rule for `c.jr a5`.
-        `wp_bltu_fall_s_sconf` (WpSconfBtype.v) is the not-taken branch —
-        and the spec's `i < NARG` precondition is what discharges it, so
-        argraw needs NO `panic_wp` hypothesis. `kernel_data_window`'s output
-        is literally `word4_pointsto`'s definition at `DfracDiscarded`, so
-        the table read needs only an alignment fact. A `kernel_data` lookup
-        proves by `vm_compute` in well under a second (measured) despite the
-        18k-entry map, so the table read is cheap.
-      * Shape: case-split on `i` into six concrete branches right after the
-        `c.add s1,s1,a4`; prove the shared epilogue at `+0x2c` ONCE as a
-        local lemma over an arbitrary arrival map (the `wp_ci_tail` pattern
-        from `ProofClockintr`, see design/kernel-proofs.md), since all six
-        arms re-join there.
+      * **`wp_cret_s_sconf` is not a "return" rule** — it is already general
+        over its register, so it IS the `jr rs` rule. The indirect jump needs
+        no new leaf.
+      * **The `i < NARG` precondition replaces `panic_wp`**: it discharges
+        `bltu a5,s1,panic` via `wp_bltu_fall_s_sconf`, so argraw carries no
+        panic hypothesis.
+      * **`kernel_data` byte facts do NOT close by `vm_compute; reflexivity`** —
+        the two `bv 8` literals differ in their proof component. Use
+        `vm_compute; f_equal; apply bv_eq; reflexivity`.
+      * `unfold NARG in Hi` before any `destruct i`, or `lia` cannot kill the
+        out-of-range branch.
+      * Stack budget is cumulative: argraw needs `14 <= av` (4 frame slots +
+        myproc's 10), argint `18 <= av`. **Both spec bounds are now corrected
+        in-tree**; the originally committed 12/16 were unprovable.
+      * One instruction word (`addi a4,a4,52`) was taken from the STALE
+        `kernel.asm`; `KernelInstrs` has `addi a4,a4,38`. Same table base, but
+        the decode failed. Read words from `KernelInstrs.v`, never the `.asm`.
 
 - [ ] **S3b — `sys_pause`.** Needs S3a first (it opens with `argint(0,&n)`),
       and is materially bigger than anything above: `acquire(&tickslock)`,

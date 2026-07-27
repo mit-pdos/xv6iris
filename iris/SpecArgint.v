@@ -65,7 +65,8 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `
   m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (Z.of_nat i) ->
   args !! i = Some v ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  (16 <= av)%nat ->
+  (* 4 slots for this frame, 14 for argraw's *)
+  (18 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
