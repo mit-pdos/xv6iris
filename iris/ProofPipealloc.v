@@ -1347,12 +1347,13 @@ Section ProofPipealloc.
     assert (Hpc54 : ret_pc (G5 !!! Regidx Rra) = mword_of_int (PA + 0x54))
       by (rewrite HG5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc54) in "Hpc".
-    iEval (rewrite HG5a0) in "Hlkw". iEval (rewrite HG5a0) in "Hlkn".
+    iEval (rewrite HG5a0) in "Hlkw". iEval (rewrite HG5a0 HG5a1) in "Hlkn".
     iEval (rewrite HG5a0) in "Hlkc".
+    iMod (lock_name_intro with "Hstr Hlkn") as "#Hlnm".
     (* the pipe is born *)
     iApply fupd_wp.
     iMod (new_pipe ⊤ pi bs Hpv Hbslen
-            with "Hlkn Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack") as (γpl γp) "(#Hpipe & Hrd & Hwr)".
+            with "Hlnm Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack") as (γpl γp) "(#Hpipe & Hrd & Hwr)".
     iModIntro.
 
     (* ---- the eight unlocked stores into the two struct files ---- *)

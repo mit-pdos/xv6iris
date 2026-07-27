@@ -25,6 +25,7 @@ Require Import AlignBits.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import WpLock.
 Require Import WpInitlock SpecInitlock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -175,7 +176,8 @@ Section WpInitlockWrapper.
     { iEval (rewrite HR7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
-    iEval (rewrite HR7a0) in "Hlname".
+    iEval (rewrite HR7a0 HR7a1) in "Hlname".
+    iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     iEval (rewrite HR7a0) in "Hcpu".
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (F + 0x1c)).
     { rewrite HR7ra. rewrite <- ret_pc_jalr. exact (jalr_ret_id _ Halign). }
@@ -240,7 +242,7 @@ Section WpInitlockWrapper.
     assert (Hretf : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE3ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Hlock Hlname Hcpu").
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Hlock Hlnm Hcpu").
     (* callee_saved m E3: the sub-call preserves s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

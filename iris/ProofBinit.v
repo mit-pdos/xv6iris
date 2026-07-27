@@ -545,7 +545,8 @@ Section ProofBinit.
     { iEval (rewrite HR7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
-    iEval (rewrite HR7a0) in "Hlname".
+    iEval (rewrite HR7a0 HR7a1) in "Hlname".
+    iMod (lock_name_intro with "Hstr_bcache Hlname") as "#Hlnm".
     iEval (rewrite HR7a0) in "Hcpu".
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (BI + 0x24)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
@@ -738,9 +739,9 @@ Section ProofBinit.
               ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
               bcache_lru bhead (blist 0 NBUF) -∗
               WP (Loop : expr riscv_lang) {{ Φ }})%I
-      with "[Hcont Hlock Hlname Hcpu]" as "Hpost".
+      with "[Hcont Hlock Hcpu]" as "Hpost".
     { iIntros (mr) "Hcg Hpc %Hcs Hfresh Hlru".
-      iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlname Hcpu Hfresh Hlru"). }
+      iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh Hlru"). }
     (* ================================================================= *)
     (* THE LOOP.  Fuel induction on the number of buffers left.           *)
     (* ================================================================= *)

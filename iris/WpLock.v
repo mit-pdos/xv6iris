@@ -248,6 +248,19 @@ Section Lock.
   Global Instance lock_name_persistent lk s : Persistent (lock_name lk s).
   Proof. apply _. Qed.
 
+  (* Sealing the name field.  [initlock] hands the field back OWNED (it is
+     inside the object's storage, and [kfree] memsets it, so a lock on a
+     kalloc'd page cannot afford to have it discarded); a caller whose lock is
+     static seals it here and forgets it.  A basic update, so this works in
+     place inside a WP goal -- no [fupd_wp] needed. *)
+  Lemma lock_name_intro (lk p : mword 64) (s : string) :
+    p ↦ₛ□ s -∗ lock_name_field lk ↦₈ p ==∗ lock_name lk s.
+  Proof.
+    iIntros "#Hs Hf".
+    iMod (word_pointsto_persist with "Hf") as "#Hfp".
+    iModIntro. iExists p. by iFrame "Hfp Hs".
+  Qed.
+
   (* a lock is its (immutable) name plus the invariant over its two words. *)
   Definition is_lock (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) : iProp Σ :=
     (lock_name lk s ∗ inv lockN (lock_inv γ lk R))%I.

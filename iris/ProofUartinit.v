@@ -25,6 +25,7 @@ Require Import DevModel WpUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import WpLock.
 Require Import WpInitlock SpecInitlock.
 Require Import SpecUart.
 Require Import WpUartinitDecode.
@@ -457,7 +458,8 @@ Section ProofUartinit.
     { iEval (rewrite HR14a0). iExact "Hname". }
     { iEval (rewrite HR14a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
-    iEval (rewrite HR14a0) in "Hlock". iEval (rewrite HR14a0) in "Hlname". iEval (rewrite HR14a0) in "Hcpu".
+    iEval (rewrite HR14a0) in "Hlock". iEval (rewrite HR14a0 HR14a1) in "Hlname". iEval (rewrite HR14a0) in "Hcpu".
+    iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     assert (Hpcil : ret_pc (R14 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (UI + 0x4e)).
     { rewrite HR14ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
@@ -553,7 +555,7 @@ Section ProofUartinit.
       rewrite /R3 upd_ne; [| congruence].
       rewrite /R2 upd_ne; [| congruence].
       rewrite /R1 upd_ne; [reflexivity | congruence]. }
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Huf Hlock Hlname Hcpu").
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Huf Hlock Hlnm Hcpu").
     unfold callee_saved.
     split. { rewrite HE3csp. reflexivity. }
     split. { apply Hthread; vm_compute; first [reflexivity | discriminate]. }

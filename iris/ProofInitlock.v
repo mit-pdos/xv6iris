@@ -226,13 +226,10 @@ Section ProofInitlock.
     assert (Hretf : ret_pc (R5 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HR5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    (* the name field is now written for good: discard its fraction, so what
-       the caller gets back is the persistent [lock_name lk s]. *)
-    iApply fupd_wp.
-    iMod (word_pointsto_persist with "Hname") as "#Hnamep".
-    iModIntro.
-    iApply ("Hcont" $! R5 with "Hcg Hpc [%] Hlock [] Hcpu").
-    2:{ iExists name. iFrame "Hnamep Hstr". }
+    (* the name field goes back to the caller OWNED, holding the string
+       pointer just stored -- sealing it into [lock_name] is the caller's
+       call, not ours (SpecInitlock.v). *)
+    iApply ("Hcont" $! R5 with "Hcg Hpc [%] Hlock Hname Hcpu").
     (* callee_saved m R5 *)
     assert (Hthread : forall c : mword 5, c <> csp_rs1 -> c <> mword_of_int 8 -> c <> mword_of_int 1 ->
                 R5 !!! Regidx c = m !!! Regidx c).
