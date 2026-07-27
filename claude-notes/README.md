@@ -102,6 +102,11 @@ their durable design notes, gotchas, and reusable recipes.
   source's descending-copy arm closes by contradiction and is never even
   decoded. Also: `ByteCursor.v` (the shared byte-loop arithmetic) and the
   register-map rewrite gotchas the proof turned up.
+- **[`proc-pagetable.md`](completed/proc-pagetable.md)** — proc_pagetable +
+  uvmcreate: the user page table's CONSTRUCTION side (the execution side is
+  UptTree/userret). `ProcPt.v`'s `ppt_bridge` carries the built table to
+  `upt_tree_spec`; counted-budget-only, so both error tails (uvmfree /
+  uvmunmap, unverified) are dead.
 - **[`sleeplock.md`](completed/sleeplock.md)** — the sleeplock subsystem, all
   four functions proven (initsleeplock / acquiresleep / releasesleep /
   holdingsleep): the `is_sleeplock`/`sl_res` lock abstraction over the inner

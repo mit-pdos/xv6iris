@@ -368,3 +368,12 @@ WpTrapinithartDecode.v
 SpecTrapinithart.v
 ProofTrapinithart.v
 LinkTrapinithart.v
+ProcPt.v
+SpecUvmcreate.v
+WpUvmcreateInstr.v
+ProofUvmcreate.v
+LinkUvmcreate.v
+SpecProcPagetable.v
+WpProcPagetableInstr.v
+ProofProcPagetable.v
+LinkProcPagetable.v
