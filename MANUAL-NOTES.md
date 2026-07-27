@@ -33,6 +33,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - page tables need to track kmap_at for intermediate PT pages, to reconstruct data ptsto
 - MMIO just needs mapping fact, no memory points-to (because it's not memory)
 - kvminithart: need strans_bit to track whether satp is currently Bare or Sv39
+- actual bug: filedup overflow
 
 Big things that still need to be done/explored:
 
