@@ -28,6 +28,7 @@ Require Import StackOwn CalleeSaved KernelText KernelDataInv.
 Require Import KernelRvcDecode WpRvcBridge WpDecodeBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs WpLock.
+Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import FileInv ProcInv.
 Require Import SpecArgraw.
@@ -110,7 +111,7 @@ Qed.
 Module ArgintProof (Argraw : ARGRAW) : ARGINT.
 
 Section ProofArgint.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
   Context `{CID : CpuId}.
   Lemma ai_00 : kernel_text -∗ instr (mword_of_int (AI + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (AI + 0x00)%Z (mword_of_int 0x1101 : mword 16)

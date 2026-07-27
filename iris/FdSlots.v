@@ -10,7 +10,7 @@
      descriptors each; NPROC * NOFILE is ~1000, which is nowhere near 2^31.
 
    Nothing in file.c enforces that -- it is a whole-kernel invariant -- so it
-   has to be carried as a RESOURCE.  [fd_slot γ] is one unit of "somewhere to
+   has to be carried as a RESOURCE.  [fd_slot] is one unit of "somewhere to
    put a file reference".  The supply is fixed at [FDSLOTS] and minted once,
    at boot, by [fd_slots_alloc]; the proc layer distributes them to the
    NPROC * NOFILE descriptor slots.  A descriptor that names a file has GIVEN
@@ -47,28 +47,40 @@ Definition FDSLOTS : nat := (NPROC * (NOFILE + 4))%nat.
 
 Definition fdslotUR : ucmra := authUR natUR.
 
-Class fdslotG (Σ : gFunctors) := FdSlotG { fdslot_inG :: inG Σ fdslotUR }.
+(* The ghost NAME lives in the class, not in every predicate that mentions a
+   slot.  There is exactly one fd-slot supply per system, and the alternative
+   -- a [γs] parameter -- would drag a filesystem ghost name through
+   [ProcInv.proc_dormant], hence [SchedCtx.proc_slots], [proc_lock_res] and
+   every scheduler spec, purely so that an EMPTY descriptor can hold a token.
+   That is the leakage SpecArgraw.v already argues against for [γf]. *)
+Class fdslotGpreS (Σ : gFunctors) := { fdslot_pre_inG :: inG Σ fdslotUR }.
+Class fdslotG (Σ : gFunctors) := FdSlotG {
+  fdslot_inG :: inG Σ fdslotUR;
+  fdslot_name : gname;
+}.
+Global Instance fdslotG_preS `{!fdslotG Σ} : fdslotGpreS Σ :=
+  {| fdslot_pre_inG := fdslot_inG |}.
 Definition fdslotΣ : gFunctors := #[GFunctor fdslotUR].
-Global Instance subG_fdslotΣ {Σ} : subG fdslotΣ Σ -> fdslotG Σ.
+Global Instance subG_fdslotΣ {Σ} : subG fdslotΣ Σ -> fdslotGpreS Σ.
 Proof. solve_inG. Qed.
 
 Section FdSlots.
   Context `{!fdslotG Σ}.
 
-  (* [n] units of fd-slot capability.  [fd_slot γ] is one. *)
-  Definition fd_slots (γ : gname) (n : nat) : iProp Σ := own γ (◯ n).
-  Definition fd_slot (γ : gname) : iProp Σ := fd_slots γ 1.
+  (* [n] units of fd-slot capability.  [fd_slot] is one. *)
+  Definition fd_slots (n : nat) : iProp Σ := own fdslot_name (◯ n).
+  Definition fd_slot : iProp Σ := fd_slots 1.
 
   (* the fixed supply, held by whoever owns the accounting -- for files, the
      ftable lock's resource. *)
-  Definition fd_slots_auth (γ : gname) : iProp Σ := own γ (● FDSLOTS).
+  Definition fd_slots_auth : iProp Σ := own fdslot_name (● FDSLOTS).
 
-  Global Instance fd_slots_timeless γ n : Timeless (fd_slots γ n).
+  Global Instance fd_slots_timeless n : Timeless (fd_slots n).
   Proof. apply _. Qed.
 
   (* units split and merge freely: this is what lets a slot's [n] tokens sit
      in the table as one [◯ n] and still hand one back on close. *)
-  Lemma fd_slots_op γ a b : fd_slots γ (a + b) ⊣⊢ fd_slots γ a ∗ fd_slots γ b.
+  Lemma fd_slots_op a b : fd_slots (a + b) ⊣⊢ fd_slots a ∗ fd_slots b.
   Proof.
     rewrite /fd_slots.
     assert (Hop : (◯ (a + b)%nat : fdslotUR) = ◯ a ⋅ ◯ b)
@@ -76,15 +88,15 @@ Section FdSlots.
     rewrite Hop own_op. reflexivity.
   Qed.
 
-  Lemma fd_slots_split γ a b : fd_slots γ (a + b) -∗ fd_slots γ a ∗ fd_slots γ b.
+  Lemma fd_slots_split a b : fd_slots (a + b) -∗ fd_slots a ∗ fd_slots b.
   Proof. rewrite fd_slots_op. iIntros "$". Qed.
-  Lemma fd_slots_combine γ a b : fd_slots γ a -∗ fd_slots γ b -∗ fd_slots γ (a + b).
+  Lemma fd_slots_combine a b : fd_slots a -∗ fd_slots b -∗ fd_slots (a + b).
   Proof. iIntros "Ha Hb". rewrite fd_slots_op. iFrame. Qed.
 
   (* THE bound.  No update, no arithmetic: auth validity says the fragments
      in circulation cannot exceed the supply. *)
-  Lemma fd_slots_bound γ n :
-    fd_slots_auth γ -∗ fd_slots γ n -∗ ⌜(n <= FDSLOTS)%nat⌝.
+  Lemma fd_slots_bound n :
+    fd_slots_auth -∗ fd_slots n -∗ ⌜(n <= FDSLOTS)%nat⌝.
   Proof.
     rewrite /fd_slots_auth /fd_slots. iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
@@ -95,8 +107,8 @@ Section FdSlots.
      by fd slots is far below what an [int] can hold, so incrementing it is
      safe.  This is where "there are only so many file descriptors" turns
      into "f->ref++ does not overflow". *)
-  Lemma fd_slots_no_overflow γ (n : positive) :
-    fd_slots_auth γ -∗ fd_slots γ (Pos.to_nat n) -∗
+  Lemma fd_slots_no_overflow (n : positive) :
+    fd_slots_auth -∗ fd_slots (Pos.to_nat n) -∗
     ⌜(Z.pos n < 2 ^ 31)%Z /\ (Z.pos (Pos.succ n) < 2 ^ 31)%Z⌝.
   Proof.
     iIntros "Ha Hf".
@@ -110,20 +122,9 @@ Section FdSlots.
     rewrite E31. lia.
   Qed.
 
-  (* boot: mint the supply and hand every unit out.  The authority goes to
-     the file table; the [FDSLOTS] units go to the proc layer, which parcels
-     them out to the descriptor slots. *)
-  Lemma fd_slots_alloc :
-    ⊢ |==> ∃ γ, fd_slots_auth γ ∗ fd_slots γ FDSLOTS.
-  Proof.
-    iMod (own_alloc (● FDSLOTS ⋅ ◯ FDSLOTS)) as (γ) "[Ha Hf]".
-    { apply auth_both_valid_discrete. split; [done | done]. }
-    iModIntro. iExists γ. by iFrame.
-  Qed.
-
   (* the parcelled-out form the proc layer wants *)
-  Lemma fd_slots_to_list γ n :
-    fd_slots γ n -∗ [∗ list] _ ∈ seq 0 n, fd_slot γ.
+  Lemma fd_slots_to_list n :
+    fd_slots n -∗ [∗ list] _ ∈ seq 0 n, fd_slot.
   Proof.
     induction n as [|n IH]; iIntros "H".
     - done.
@@ -134,3 +135,16 @@ Section FdSlots.
   Qed.
 
 End FdSlots.
+
+(* boot: mint the supply and hand every unit out.  This CREATES the [fdslotG]
+   instance, so it sits outside the section -- before the name exists only the
+   [pre] class is available.  The authority goes to the file table; the
+   FDSLOTS units go to the proc layer, which parcels them out to the
+   descriptor slots ([fd_slots_to_list]). *)
+Lemma fd_slots_alloc `{!fdslotGpreS Σ} :
+  ⊢ |==> ∃ _ : fdslotG Σ, fd_slots_auth ∗ fd_slots FDSLOTS.
+Proof.
+  iMod (own_alloc (● FDSLOTS ⋅ ◯ FDSLOTS)) as (γ) "[Ha Hf]".
+  { apply auth_both_valid_discrete. split; [done | done]. }
+  iModIntro. iExists (FdSlotG Σ _ γ). by iFrame.
+Qed.

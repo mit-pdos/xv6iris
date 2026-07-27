@@ -34,6 +34,7 @@ Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import SpecAcquire SpecRelease.
 Require Import WpWakeup SpecWakeupParts.
+Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcGeom SpecMyproc.
@@ -46,7 +47,7 @@ Local Open Scope Z_scope.
 Module WakeupProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUPPARTS) : WAKEUP.
 
 Section ProofWakeup.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
   (* wakeup only RELAYS parked contexts (SLEEPING->RUNNABLE, untouched), never

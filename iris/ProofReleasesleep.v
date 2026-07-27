@@ -26,6 +26,7 @@ From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
+Require Import FdSlots.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -53,7 +54,7 @@ Local Open Scope Z_scope.
 Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
 
   Lemma wp_releasesleep_sconf (γ : gname) (Φ : mval -> iProp Σ)

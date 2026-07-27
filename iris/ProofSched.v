@@ -18,6 +18,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpLock.
 Require Import WpMycpu.
 Require Import WpAuipc.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.
 Require Import CpuOwn.
@@ -138,7 +139,7 @@ Qed.
 Module SchedProof (Myproc : MYPROC) (Holding : HOLDING) (Swtch : SWTCH) : SCHED.
 
 Section ProofSched.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
 
   Lemma wp_sched_sconf (γ : gname) (Φ : mval -> iProp Σ)

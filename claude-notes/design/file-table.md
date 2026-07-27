@@ -291,14 +291,23 @@ It is a *whole-kernel conservation law*, and a slightly subtle one:
 
 Nothing in `file.c` enforces it, so it is carried as a resource — `FdSlots.v`:
 
-- `fd_slot γs` is one unit of "somewhere to put a file reference". The supply
-  is fixed at `FDSLOTS = NPROC * (NOFILE + 4)` and minted once at boot by
+- `fd_slot` is one unit of "somewhere to put a file reference". The supply is
+  fixed at `FDSLOTS = NPROC * (NOFILE + 4)` and minted once at boot by
   `fd_slots_alloc`; the `+4` is the per-process allowance for references a
   syscall holds in *locals* before installing them in a descriptor (`sys_open`
-  one, `pipealloc` two).
-- `ftable_res` holds `fd_slots_auth γs` **and**, per referenced slot,
-  `fd_slots γs (Pos.to_nat n)` — one unit per outstanding reference. A
-  descriptor naming a file has given its slot away and gets it back on close.
+  one, `pipealloc` two). The ghost **name lives in the `fdslotG` class**, not
+  in a `γs` parameter: there is one supply per system, and threading a
+  parameter would drag a filesystem gname through `proc_dormant`, hence
+  `proc_slots`, `proc_lock_res` and all 18 scheduler files, purely so an empty
+  descriptor can hold a token.
+- `ftable_res` holds `fd_slots_auth` **and**, per referenced slot,
+  `fd_slots (Pos.to_nat n)` — one unit per outstanding reference.
+- **The other end of the law is `ProcInv.ofile_slot`**: an *empty* descriptor
+  (`v = 0`) holds its unit itself; a descriptor naming a file has given it
+  away, and the ftable holds it against that file's count. `proc_dormant`
+  holds all NOFILE units (every descriptor there is null), so the supply is
+  conserved across the whole UNUSED → live → ZOMBIE cycle and `allocproc` has
+  to conjure nothing.
 - The bound then needs no arithmetic and no ghost update at all: the units for
   one slot are literally `◯ n`, `◯ n ⋅ ◯ 1 = ◯ (S n)`, and auth validity
   against `● FDSLOTS` gives `n ≤ FDSLOTS`. `fd_slots_no_overflow` packages
@@ -333,11 +342,12 @@ references, and its supply has no principled source.)
   that needs the last-reference arm's callees — `pipeclose`, `begin_op`,
   `iput`, `end_op` — to have specs first. `fileclose_stack` in
   `SpecFileclose.v` will grow when they do.
-- **Where the fd slots come from.** `fd_slots_alloc` mints the supply and
-  `fd_slots_to_list` parcels it out, but nothing distributes them yet: that
-  is the proc-side model of `p->ofile[]`, which is the other end of the
-  conservation law. Until it exists, `filedup`'s `fd_slot` premise has no
-  producer, so the spec is provable but not yet *usable* from `sys_dup`.
+- **Nothing calls `fd_slots_alloc` yet.** The proc side now *holds* the units
+  (`ofile_slot`, `proc_dormant`), but boot does not yet mint them and hand
+  `proc_dormant` its NOFILE — that is `procinit`'s obligation, and `procinit`
+  is unproven. Until then `filedup`'s `fd_slot` premise is satisfiable only by
+  a caller that already has a `proc_priv`, which is the intended route
+  (`sys_dup` takes it from the empty descriptor `fdalloc` picked).
 - **Generalize the pool.** `bcache` (`b->refcnt` under `bcache.lock`), `itable`
   (`ip->ref` under `itable.lock`) and `ftable` are the *same* object: an array
   of slots with an int refcount under one spinlock, contents shared read-only

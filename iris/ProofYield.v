@@ -24,6 +24,7 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -80,7 +81,7 @@ Proof. vm_compute. reflexivity. Qed.
 Module YieldProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release : RELEASE) : YIELD.
 
 Section ProofYield.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)

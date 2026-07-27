@@ -122,7 +122,7 @@ End SpecPipealloc.
 Definition wp_pipealloc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
-    (γfl γf γs : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
+    (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
@@ -145,7 +145,7 @@ Definition wp_pipealloc_sconf_body
   cpu_own γ n eb p C -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
-  is_ftable γfl γf γs -∗
+  is_ftable γfl γf -∗
   is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
@@ -153,8 +153,8 @@ Definition wp_pipealloc_sconf_body
   (* pipealloc creates TWO references, so it needs two fd slots -- one per
      end of the pipe.  Both come back from the fileclose calls on the error
      paths. *)
-  fd_slot γs -∗
-  fd_slot γs -∗
+  fd_slot -∗
+  fd_slot -∗
   (* the caller's two [struct file *] cells; both are overwritten on entry, so
      their incoming contents are arbitrary *)
   pf0 ↦₈ v0 -∗
@@ -172,8 +172,8 @@ Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
-      (γfl γf γs : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+      (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_pipealloc_sconf_body γ Φ γfl γf γs γkl γk fl m v0 v1 on n eb p C K.
+      wp_pipealloc_sconf_body γ Φ γfl γf γkl γk fl m v0 v1 on n eb p C K.
 End PIPEALLOC.

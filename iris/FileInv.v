@@ -243,7 +243,7 @@ Section FileInv.
      authority at every slot would infect every consumer.  It is not an
      independent assumption: every operation that changes a count re-derives
      it from [fd_slots_no_overflow]. *)
-  Definition fslot (γs : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+  Definition fslot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
     match M !! k with
     | None =>
         (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
@@ -252,24 +252,24 @@ Section FileInv.
         (⌜Z.pos n < 2 ^ 31⌝ ∗
          a_fref k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
          file_rest k q ∗
-         fd_slots γs (Pos.to_nat n))%I
+         fd_slots (Pos.to_nat n))%I
     end.
 
-  Definition ftable_res (γ γs : gname) : iProp Σ :=
+  Definition ftable_res (γ : gname) : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
        own γ (● M) ∗
        (* the fd-slot supply: the table is where the conservation law is
           checked, because the table is what holds one unit per reference. *)
-       fd_slots_auth γs ∗
+       fd_slots_auth ∗
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
-       [∗ list] k ∈ seq 0 NFILE, fslot γs M k)%I.
+       [∗ list] k ∈ seq 0 NFILE, fslot M k)%I.
 
   (* the whole table: the spinlock named "ftable" over that resource.
      Persistent, so every core shares it. *)
-  Definition is_ftable (γl γ γs : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string (ftable_res γ γs).
+  Definition is_ftable (γl γ : gname) : iProp Σ :=
+    is_lock γl ftable_addr "ftable"%string (ftable_res γ).
 
-  Global Instance is_ftable_persistent γl γ γs : Persistent (is_ftable γl γ γs).
+  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -327,21 +327,21 @@ Section FileInv.
      scan borrows slot after slot unchanged (M' := M), and the slot it takes
      is given back at [<[i := (1,1)]> M].  Since [fslot M k] reads only
      [M !! k], every other slot is untouched by the update. *)
-  Lemma ftable_slots_acc (γs : gname) (M : gmap nat (Qp * positive)) (i : nat) :
+  Lemma ftable_slots_acc (M : gmap nat (Qp * positive)) (i : nat) :
     (i < NFILE)%nat ->
-    ([∗ list] k ∈ seq 0 NFILE, fslot γs M k) -∗
-    fslot γs M i ∗
+    ([∗ list] k ∈ seq 0 NFILE, fslot M k) -∗
+    fslot M i ∗
     (∀ M' : gmap nat (Qp * positive),
-       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γs M' i -∗
-       [∗ list] k ∈ seq 0 NFILE, fslot γs M' k).
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot M' i -∗
+       [∗ list] k ∈ seq 0 NFILE, fslot M' k).
   Proof.
     iIntros (Hi) "H".
     assert (Hlk : seq 0 NFILE !! i = Some i).
     { apply lookup_seq. lia. }
-    rewrite (big_sepL_delete (fun _ k => fslot γs M k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot M k) (seq 0 NFILE) i i Hlk).
     iDestruct "H" as "[$ Hrest]".
     iIntros (M' HM') "Hi".
-    rewrite (big_sepL_delete (fun _ k => fslot γs M' k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot M' k) (seq 0 NFILE) i i Hlk).
     iFrame "Hi".
     iApply (big_sepL_mono with "Hrest").
     intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].

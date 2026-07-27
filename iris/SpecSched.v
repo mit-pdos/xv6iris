@@ -26,6 +26,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
@@ -35,7 +36,7 @@ Import Defs.
 
 Notation SD := KernelSyms.sched.
 
-Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
@@ -74,7 +75,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
 
 Module Type SCHED.
   Parameter wp_sched_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),

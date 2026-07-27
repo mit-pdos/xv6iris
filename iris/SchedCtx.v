@@ -38,6 +38,7 @@ Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import WpLock.
 Require Import ProcGeom.
+Require Import FdSlots.
 Require Import ProcInv.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
@@ -52,7 +53,7 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{CID : CpuId} : iProp Σ :=
      ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
 
 Section SchedCtx.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
   (* the ambient S-mode world: the SIE ghost name and the whole-machine
      postcondition.  (The kernel page table rides inside [swconf]'s

@@ -26,6 +26,7 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -125,7 +126,7 @@ Proof. vm_compute. reflexivity. Qed.
 Module SleepProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release : RELEASE) : SLEEP.
 
 Section ProofSleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
 
   (* extract the opaque context-slot payload, leaving the bundle at slot

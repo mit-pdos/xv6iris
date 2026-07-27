@@ -12,6 +12,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import RegFile.
 Require Import SmodeCore.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpMycpu.
@@ -25,7 +26,7 @@ Require Import ProcGeom.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
-Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -52,7 +53,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuI
 
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ),
       wp_wakeup_sconf_body γ Φ m γs a0f pme lvl K eb C.
 End WAKEUP.

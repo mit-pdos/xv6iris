@@ -31,6 +31,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import SpecPanic.
+Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -42,7 +43,7 @@ Import Defs.
 
 Notation RSL := KernelSyms.releasesleep.
 
-Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
@@ -75,7 +76,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
 
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
