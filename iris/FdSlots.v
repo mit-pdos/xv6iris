@@ -122,6 +122,32 @@ Section FdSlots.
     rewrite E31. lia.
   Qed.
 
+  (* ---- the boot-time distribution ----
+     procinit hands each of the NPROC processes NOFILE units, one per
+     descriptor.  Stated over an arbitrary [n * m] because that is all the
+     induction needs, and over an arbitrary LIST at the leaf because
+     [proc_dormant] pairs its units with [pv_ofile V], whose elements are
+     irrelevant -- only its length is. *)
+  Lemma fd_slots_split_n (n m : nat) :
+    fd_slots (n * m) -∗ [∗ list] _ ∈ seq 0 n, fd_slots m.
+  Proof.
+    induction n as [|n IH]; iIntros "H"; [done|].
+    rewrite seq_S big_sepL_app /=.
+    replace (S n * m)%nat with (m + n * m)%nat by lia.
+    iDestruct (fd_slots_split with "H") as "[Hm Hn]".
+    iSplitR "Hm"; [iApply IH; iFrame | iFrame].
+  Qed.
+
+  Lemma fd_slots_to_any {A} (l : list A) :
+    fd_slots (length l) -∗ [∗ list] _ ∈ l, fd_slot.
+  Proof.
+    induction l as [|x l IH]; iIntros "H"; [done|].
+    cbn [length big_opL].
+    replace (S (length l)) with (length l + 1)%nat by lia.
+    iDestruct (fd_slots_split with "H") as "[Hl H1]".
+    iSplitL "H1"; [iFrame | iApply IH; iFrame].
+  Qed.
+
   (* the parcelled-out form the proc layer wants *)
   Lemma fd_slots_to_list n :
     fd_slots n -∗ [∗ list] _ ∈ seq 0 n, fd_slot.
@@ -131,7 +157,7 @@ Section FdSlots.
     - rewrite seq_S big_sepL_app /=.
       replace (S n) with (n + 1)%nat by lia.
       iDestruct (fd_slots_split with "H") as "[Hn H1]".
-      iSplitL "Hn"; [by iApply IH | by iFrame].
+      iSplitL "Hn"; [iApply IH; iExact "Hn" | by iFrame].
   Qed.
 
 End FdSlots.

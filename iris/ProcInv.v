@@ -292,6 +292,28 @@ Section ProcInv.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        own_ctx (p_context pa))%I.
 
+  (* The same block WITHOUT its fd-slot units: what procinit is handed for
+     each process before the supply is distributed.  Nothing in procinit
+     touches these cells (the BSS is already zero); the units are the one
+     thing boot has to route, and [proc_dormant_seal] is that step. *)
+  Definition proc_dormant_nofd (pa : mword 64) : iProp Σ :=
+    (∃ (V : pprivate) (pid : mword 32),
+       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
+        pv_cwd V = (zero_reg : mword 64)⌝ ∗
+       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+       proc_fields pa (DfracOwn 1) V ∗
+       ofile_cells pa (pv_ofile V) ∗
+       own_ctx (p_context pa))%I.
+
+  Lemma proc_dormant_seal (pa : mword 64) :
+    proc_dormant_nofd pa -∗ fd_slots NOFILE -∗ proc_dormant pa.
+  Proof.
+    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx) Hs".
+    iExists V, pid. iFrame "Hpid Hf Ho Hctx". iSplit; [done|].
+    iApply fd_slots_to_any.
+    by rewrite Hof length_replicate.
+  Qed.
+
   (* allocproc's move: the dormant block plus the invariant's own pid half is
      a full [proc_priv] (and a writable pid cell).  The null-ofile fact is
      exactly what discharges every [ofile_slot]'s left disjunct, with no
