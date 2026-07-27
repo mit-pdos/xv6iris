@@ -112,17 +112,23 @@ the evidence for every offset. This file is only the worklist.
         `kernel.asm`; `KernelInstrs` has `addi a4,a4,38`. Read words from
         `KernelInstrs.v`, never the `.asm`.
 
-- [ ] **S3b — `sys_pause`.** Needs S3a first (it opens with `argint(0,&n)`),
-      and is materially bigger than anything above: `acquire(&tickslock)`,
-      a `while (ticks - ticks0 < n)` loop whose body is
-      `killed(myproc())` + `sleep(&ticks,&tickslock)`, and `release`. So it
-      needs (i) `killed()` specified and proven — which S1 just enabled, since
-      `p_killed` now lives in `proc_pub` at the top level of `proc_lock_res`;
-      (ii) an iLöb loop over the proven `SLEEP` interface, the same shape as
-      `acquiresleep`'s sleep-retry loop (`ProofAcquiresleep.v`, 824 lines) —
-      that file is the template; (iii) `TicksInv`'s tick cell, already used by
-      `sys_uptime`. Budget it like acquiresleep, not like sys_getpid.
-
+- [x] **`killed` PROVEN** — the first consumer of the invariant's
+      always-resident row. `p_killed` lives in `SchedCtx.proc_pub`, at the top
+      level of `proc_lock_res`, so the read is: open the lock, destruct ONE
+      existential, `c.lw a5,40(s1)`, reassemble. It never learns the process's
+      state and never touches either `proc_slots` guard — which is exactly what
+      S1's flat row was for. Nineteen instructions, a 32-byte ra/s0/s1/s2 frame
+      with all four slots used (no gap); `p` parks in s1 across acquire and the
+      value in s2 across release. `panic_wp` is threaded because the reworked
+      `acquire` takes it.
+- [ ] **S3b — `sys_pause`.** All callees are now proven: `argint` ✓ `acquire` ✓
+      `myproc` ✓ `sleep` ✓ `release` ✓ `killed` ✓. What remains is sys_pause's
+      own shape — `acquire(&tickslock)`, then a `while (ticks - ticks0 < n)`
+      loop whose body is `killed(myproc())` + `sleep(&ticks,&tickslock)`, then
+      `release`. That needs an iLöb loop over the proven `SLEEP` interface; the
+      template is `ProofAcquiresleep.v`'s sleep-retry loop (824 lines), and
+      `TicksInv`'s tick cell is already used by `sys_uptime`. Budget it like
+      acquiresleep, not like sys_getpid.
 - [ ] **S3 — `p_ofile` loop lemmas.** `fdalloc` scans the array, so it needs a
       successor lemma and injectivity on `fd < NOFILE`, in the style of
       `ProcGeom.proc_addr_succ` / `p_context_proc_addr_inj`. (`ArrCursor.acur`
