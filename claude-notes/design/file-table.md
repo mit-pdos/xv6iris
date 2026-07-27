@@ -275,10 +275,26 @@ definition rather than every caller.
 
 ## Open items
 
-- **`ref` overflow.** Nothing in `filedup` checks for it. The invariant carries
-  `n < 2^31`; `filedup` therefore needs a "there is room" premise, ultimately
-  discharged from a global bound (`NPROC*NOFILE` + in-flight references). Until
-  that argument exists, carry it as an explicit hypothesis on `filedup`.
+- **`ref` overflow — a bug in the C, being fixed upstream.** `filedup` does
+  `f->ref++` with no check. The invariant needs every count to stay a faithful
+  `int` (`< 2^31`) — that is what makes `ref == 0` mean "free" and what the
+  sign-extended branch tests read — and **no unconditional increment can
+  preserve a finite bound**, so `filedup` cannot re-establish it. This is not
+  a modelling artifact: it is a real (astronomically unreachable) bug.
+
+  Do **not** bridge the gap with an axiom. The missing step is
+  `∀ n, Z.pos n < 2^31 → Z.pos (Pos.succ n) < 2^31`, which is *false* at
+  `n = 2^31 - 1`; asserting it makes every proof in every file that
+  transitively requires it vacuous. A ghost "dup budget" token (a pool in
+  `ftable_res`, spent by `filedup`) was considered and rejected as
+  over-engineering for a bug that is about to disappear.
+
+  **When the check lands:** regenerate `KernelInstrs.v`/`KernelSyms.v` (the
+  instruction sequence changes, so any proof written against today's
+  disassembly is void), and expect `SpecFiledup.v` to change shape — a
+  `panic` on the bound makes today's dead panic arm *live*, so either the
+  caller gains a premise bounding the count or `filedup` gains a failing
+  return. `SpecFileclose.v` is unaffected.
 - **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
 - **The next function.** `filealloc` is proven (`ProofFilealloc.v` /

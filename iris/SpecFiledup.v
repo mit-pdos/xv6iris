@@ -47,23 +47,28 @@ Local Open Scope Z_scope.
 Notation FD := KernelSyms.filedup.
 
 (* ------------------------------------------------------------------ *)
-(*  The one assumption filedup rests on                                 *)
+(*  The one thing filedup will rest on -- NOT stated as an axiom         *)
 (* ------------------------------------------------------------------ *)
 
 (* xv6's filedup increments [f->ref] with no overflow check.  The ftable
    invariant needs every count to stay a faithful [int] (< 2^31) -- that is
    what makes [ref == 0] mean "free" and what the sign-extended branch tests
    read -- but NO unconditional increment can preserve a finite bound, so
-   filedup cannot re-establish it.  This is a real (if astronomically
+   filedup cannot re-establish it.  That is a real (if astronomically
    unreachable) bug in the C, not an artifact of the model, and it is being
    fixed upstream by bounding the count in the code.
 
-   Until that check lands, the missing side condition is assumed here, as a
-   named [Axiom] rather than buried in a proof: [Print Assumptions] and
-   tools/proof_coverage.py both report it against filedup, and it disappears
-   the moment the C grows its check. *)
-Axiom filedup_no_overflow : forall n : positive,
-  Z.pos n < 2 ^ 31 -> Z.pos (Pos.succ n) < 2 ^ 31.
+   Do NOT paper over it with an axiom.  The missing step is
+
+     forall n, Z.pos n < 2^31 -> Z.pos (Pos.succ n) < 2^31
+
+   which is FALSE at n = 2^31 - 1, so asserting it would make every proof in
+   any file that transitively requires this one vacuous.  The contract below
+   is therefore stated without it, and filedup is deliberately left unproven
+   until the check lands -- at which point the branch it adds becomes a live
+   arm of this spec (see "when the check lands" in
+   claude-notes/design/file-table.md), so a proof written against today's
+   instruction sequence would have to be thrown away regardless. *)
 
 (* ------------------------------------------------------------------ *)
 
