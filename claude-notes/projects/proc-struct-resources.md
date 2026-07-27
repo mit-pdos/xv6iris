@@ -213,7 +213,7 @@ sys_close  --proof over-->  ARGFD, MYPROC, FILECLOSE
 argfd      --proof over-->  ARGINT, MYPROC     (no LinkArgfd yet: needs FILECLOSE's sibling)
 argint     --LINKED-->      real (LinkArgint.v)
 argraw     --LINKED-->      real (LinkArgraw.v)
-fileclose  --no proof-->    needs pipeclose / begin_op / iput / end_op
+fileclose  --no proof-->    needs begin_op / iput / end_op (pipeclose: DONE, LinkPipeclose.v)
 myproc     --LINKED-->      real
 ```
 
