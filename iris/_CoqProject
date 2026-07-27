@@ -339,6 +339,8 @@ BcacheInv.v
 FileInv.v
 WpFileallocDecode.v
 SpecFilealloc.v
+ProofFilealloc.v
+LinkFilealloc.v
 WpBinitDecode.v
 SpecBinit.v
 ProofBinit.v

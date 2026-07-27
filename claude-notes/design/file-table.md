@@ -281,16 +281,10 @@ definition rather than every caller.
   that argument exists, carry it as an explicit hypothesis on `filedup`.
 - **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
-- **`ProofFilealloc.v`.** `FileInv.v`, `SpecFilealloc.v` and
-  `WpFileallocDecode.v` (all 32 instruction facts) are done; the whole-function
-  proof is not. Shape: prologue → `acquire` → the do-while scan as a fuel
-  induction over the remaining count (`ArrCursor.acur_step` at stride 40,
-  `acur_neq` against `fnode NFILE`) with the loop invariant "every slot below
-  the cursor is in `dom M`", carrying `[∗ list]` accumulator/remaining halves
-  of `fslot M k` → the found/not-found split → `release` → epilogue. `s1`
-  (the cursor) is live across both `release` calls and is covered by
-  `callee_saved`; `a4` (the end pointer) is caller-saved but no call sits
-  inside the loop.
+- **The next function.** `filealloc` is proven (`ProofFilealloc.v` /
+  `LinkFilealloc.v`); `filedup` and `fileclose` are the natural next two —
+  their ghost steps already exist and are proved, so the work is the
+  instruction-level proof plus, for `filedup`, the overflow premise above.
 - **Generalize the pool.** `bcache` (`b->refcnt` under `bcache.lock`), `itable`
   (`ip->ref` under `itable.lock`) and `ftable` are the *same* object: an array
   of slots with an int refcount under one spinlock, contents shared read-only
