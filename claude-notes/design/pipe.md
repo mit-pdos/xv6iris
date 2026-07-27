@@ -38,15 +38,15 @@ member, so `&pi->lock = pi` — which is literally the `a0` pipealloc passes to
 ## The predicate
 
 ```coq
+pipe_dead γl γp := lock_frag γl None ∗ pipe_end_full γp false ∗ pipe_end_full γp true
 is_pipe γl γp pi := ⌜page_valid pi⌝ ∗
-                    cinv lockN (pn_cancel γp) (lock_inv γl pi (pipe_res γp pi))
+                    inv lockN (lock_inv γl pi (pipe_res γp pi) ∨ pipe_dead γl γp)
 ```
 
 Persistent, so every holder of either end shares it. `page_valid` is kalloc's
 guarantee riding along with the object — it is what makes the page re-freeable,
-so it has to survive to `pipeclose`. The lock is **cancellable** (`WpLock`'s
-`lock_openable` over `cinv`, `claude-notes/projects/lock-cancel-pipeclose.md`)
-because the page goes back to `kfree`.
+so it has to survive to `pipeclose`. The invariant carries a **dead branch**
+because the page goes back to `kfree` — see below.
 
 `pipe_res` owns **every remaining byte of the page** except the lock's two
 words, which belong to `lock_inv`: the lock's 8-byte **name field** (held raw,
@@ -70,7 +70,7 @@ and frees the page when both have reached 0. The number of outstanding
 references *is* `readopen + writeopen`, so the ghost mirrors the **ends**:
 
 ```coq
-pipe_ref γp w q := own (pn_end γp w) q ∗ cinv_own (pn_cancel γp) (q/2)
+pipe_ref γp w q := own (pn_end γp w) q        (* fracR, one gname per end *)
 ```
 
 `w` is the `struct file`'s `writable` flag — the same bool pipeclose receives.
@@ -99,45 +99,61 @@ apart from one close of each end.
 `pflag_open v := neq_vec (sign_extend' 64 v) zero_reg = true` — the shape the
 `c.beqz`/`c.bnez` tests consume, as in `SleepLock.v`.
 
-## The cancel token: where the halves have to sit
+## Killing the pipe: why not `cinv`
 
-A reference also carries half the lock's cancel token, so **any** share of an
-end is the licence to open `pi->lock` (a hart with no reference to a pipe
-cannot even take its lock) and the two ends together are the licence to destroy
-it. Where the halves live is *forced*, and getting it wrong is the trap:
+The obvious construction is a cancellable invariant whose token the references
+carry. **It cannot work**, and the reason is worth keeping:
 
-| state | end0 | end1 | `pipe_bank` | total |
-|---|---|---|---|---|
-| both open | 1/2 | 1/2 | 0 | 1 |
-| one closed | — | 1/2 | 1/2 | 1 |
-| both closed | — | 1/2 (kept) | 1/2 | 1 |
+> `cinv_acc` demands a share of the very token that must be *whole* to cancel.
+> The first end to close has surrendered its share — into `pipe_res`, which
+> `release` must be handed intact — by the time it calls `release`, and
+> `release` opens the lock four times.
 
-Release must be handed `pipe_res` **intact** — its word clear reassembles
-`lock_inv` on the branch it does not take — and still needs a positive share
-*outside* `pipe_res` to open the lock with. So `pipe_res` can hold at most half
-the token. `pipe_bank` is that conjunct: the invariant banks half as soon as
-**either** end closes, and no more. The closer of the *first* end banks its
-half and walks away with nothing; the closer of the *second* finds the bank
-already full, banks nothing, and keeps its own half — which is exactly the
-share it needs to open the lock one instruction before freeing it. Banking
-both halves leaves the last closer unable to open the lock it is about to
-free; banking neither loses the first closer's half for good.
+The arithmetic has no solution. Let each reference carry `r`, let the invariant
+hold `b1` once one end is closed, and let the first closer keep `Tc` for its
+release call:
 
-Nobody else can observe the both-closed row: seeing it requires holding the
-lock, acquiring requires a reference, and both references are home.
+| | equation |
+|---|---|
+| first closer's release | `b1 + Tc = r`, `Tc > 0`, so `b1 < r` |
+| last closer's dispose | `r + b1 = 1` |
+| creation | `2r + b0 = 1`, so `r ≤ 1/2` |
 
-**The receipt.** `pipe_res` hides its flag words behind existentials, so inside
-release's finisher the last closer cannot re-read them to show the bank is
-full. It carries a witness instead: `pipe_endstate`'s OPEN side holds an
-exclusive per-end marker (`pipe_openmark`), which whoever shuts that end takes
-and keeps. `PipeInv.pipe_res_cancel` is the whole argument in one lemma —
-marker + own half + `pipe_res` gives `cinv_own 1` and the bare bytes — and it
-is precisely the wand `RELEASE_CANCEL` asks for.
+The second gives `b1 = 1 − r ≥ 1/2 ≥ r`, contradicting `b1 < r`. Whatever the
+split, the first closer's credential is stranded: it must drop it after
+release, and `cinv_cancel` needs exactly 1.
 
-**Allocation order.** `pipe_res` mentions `pn_cancel γp`, i.e. the gname of the
-invariant it lives in, so `cinv_alloc` (which fixes the body before the gname)
-cannot build a pipe at all. `WpLock.newlock_c_delayed` chooses the cancel gname
-first and takes the resource afterwards; `new_pipe` allocates in that order.
+So the licence to open `pi->lock` is not one resource but two — **a reference,
+or the lock itself** — and `WpLock.lock_openable` quantifies the credential
+inside the accessor precisely so the two can coexist:
+
+```coq
+lock_openable γ lk R D :=
+  □ ∀ E T, ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E,E∖↑lockN}=∗ …
+```
+
+`pipe_dead` is refuted by a reference (it parks both ends at 1) and by any
+lock-state fragment (it parks `lock_frag γl None`, and `lock_frag` is
+exclusive). acquire presents its reference; release presents the `locked` /
+`locked_pre` token it is already carrying, which is why those four leaves take
+no separate credential at all.
+
+## The receipt
+
+`pipe_res` hides its flag words behind existentials, so inside release's
+finisher the last closer cannot re-read them to show both ends are home. It
+carries witnesses instead: `pipe_endstate`'s OPEN side holds an exclusive
+per-end marker (`pipe_openmark`, a `DfracOwn 1`), and closing an end
+**discards** it, yielding the persistent `pipe_shut`. So an end can never
+re-open, and the closed side keeps a copy of `pipe_shut` that the *other*
+closer picks up when it reads that flag as 0.
+
+`PipeInv.pipe_res_dead` is the whole argument in one lemma: two receipts plus
+the spent `lock_frag γl None` turn `pipe_res` into `pipe_dead ∗ pipe_bytes` —
+exactly the wand `RELEASE_CANCEL` asks for.
+
+**Allocation order.** `pipe_dead` mentions the lock's state gname, so
+`WpLock.newlock_d` chooses that gname first and takes `R` and `D` afterwards.
 
 ## Wiring to `struct file`
 

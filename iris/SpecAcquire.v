@@ -34,13 +34,15 @@ Import Defs.
 
 Notation AQ := KernelSyms.acquire.
 
-(* The generic form: the right to TOUCH the lock is the resource [Tc]
-   ([lock_openable], WpLock.v), presented on the way in and handed back on the
-   way out -- acquire opens the invariant three times (holding's two reads, the
-   amoswap, the [lk->cpu] store) and disposes of nothing, so [Dc] merely rides
-   along.  A static kernel lock instantiates this at [emp]/[False]
-   ([wp_acquire_sconf_body] below); a kalloc'd object's lock passes its
-   [cinv_own] share, which is what keeps the storage reclaimable. *)
+(* The generic form, over [lock_openable] (WpLock.v): the right to TOUCH the
+   lock is the resource [Tc], presented on the way in and handed back on the
+   way out -- for a kalloc'd object that is a REFERENCE to it, which is what
+   makes the storage reclaimable (a hart with no reference cannot even take
+   the lock).  acquire opens the invariant four times; the first three present
+   [Tc] and the last presents the [locked_pre] token it has just won, so the
+   caller owes a refutation of the dead state [Dc] for each.  acquire disposes
+   of nothing, so [Dc] merely rides along.  A static kernel lock instantiates
+   at [Dc := False] ([wp_acquire_sconf_body] below). *)
 Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
@@ -50,10 +52,12 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
+  (⊢ Tc -∗ Dc -∗ False) ->
+  (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
   sie_cap_gpr γ m av -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lk0 R Tc Dc -∗
+  lock_openable γl lk0 R Dc -∗
   Tc -∗
   panic_wp -∗
   ( ∀ (ms : mword 64) (mfin : regfile),

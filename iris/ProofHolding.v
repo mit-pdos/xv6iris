@@ -58,7 +58,7 @@ Section ProofHolding.
     : wp_holding_lockinv_s_sconf_body γ Φ γl lka R Tc Dc m n.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
-    intros pcE lk ret_tgt Hlka Htp Hn.
+    intros pcE lk ret_tgt Hlka Htp Hn Href.
     assert (Hlkeq : lk = lka).
     { rewrite -Hlka.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
@@ -71,7 +71,7 @@ Section ProofHolding.
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
     iApply (wp_clw_lockopen_s_sconf γ Φ γl lka R Tc Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n
-              Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Href
               with "Hcg Hpc Hi00 Hlock HTc [-]").
     iIntros (lockv) "HTc Hcg Hpc".
     set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m).
@@ -225,7 +225,7 @@ Section ProofHolding.
     iApply (wp_cld_lkcpu_lockopen_s_sconf γ Φ γl lka R Tc Dc (mword_of_int (HD + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat
-              Hacpu ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              Hacpu ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Href
               with "Hcg Hpc Hi12 Hlock HTc [-]").
     iIntros (cpuv) "HTc Hcg Hpc".
     set (S3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg cpuv]> S2).
@@ -515,27 +515,27 @@ Section ProofHolding.
   Qed.
 
   Lemma wp_holding_lockinv_locked_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (R Dc : iProp Σ)
       (m : regfile) (n : nat)
-    : wp_holding_lockinv_locked_s_sconf_body γ Φ γl lka R Tc Dc m n.
+    : wp_holding_lockinv_locked_s_sconf_body γ Φ γl lka R Dc m n.
   Proof.
     cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
-    intros pcE lk ret_tgt Hlka Htp Hn.
+    intros pcE lk ret_tgt Hlka Htp Hn Href.
     assert (Hlkeq : lk = lka).
     { rewrite -Hlka.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       symmetry. apply kv_addv_zero. }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock HTc Htok Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock Htok Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockopen_locked_s_sconf γ Φ γl lka R Tc Dc pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockopen_locked_s_sconf γ Φ γl lka R Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n
-              Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi00 Hlock HTc Htok [-]").
-    iIntros (lockv) "HTc %Hlv Htok Hcg Hpc".
+              Hlka ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Href
+              with "Hcg Hpc Hi00 Hlock Htok [-]").
+    iIntros (lockv) "%Hlv Htok Hcg Hpc".
     set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 lockv)]> m) with H1.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (HD + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
@@ -643,12 +643,12 @@ Section ProofHolding.
     assert (Hacpu : add_vec (S2 !!! Regidx (mword_of_int 10 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka)
       by (rewrite Ha0S2 Hlkeq; reflexivity).
-    iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γ Φ γl lka R Tc Dc (mword_of_int (HD + 0x12))
+    iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γ Φ γl lka R Dc (mword_of_int (HD + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat
-              Hacpu ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi12 Hlock HTc Htok [-]").
-    iIntros "HTc Htok Hcg Hpc".
+              Hacpu ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Href
+              with "Hcg Hpc Hi12 Hlock Htok [-]").
+    iIntros "Htok Hcg Hpc".
     set (S3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mycpu_ret cid_word)]> S2).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mycpu_ret cid_word)]> S2) with S3.
     assert (Hpc14 : add_vec_int (mword_of_int (HD + 0x12) : mword 64) 2 = mword_of_int (HD + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -833,7 +833,7 @@ Section ProofHolding.
     assert (Hra_final : ret_pc (S10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HS10ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! S10 with "HTc Hcg Hpc [%] Htok").
+    iApply ("Hcont" $! S10 with "Hcg Hpc [%] Htok").
     split.
     - unfold callee_saved. repeat split.
       + rewrite HS10sp. reflexivity.

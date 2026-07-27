@@ -331,12 +331,11 @@ Section ProofSched.
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SD + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl (proc_addr j)
-              (proc_lock_res γ Φ γs γl (proc_addr j)) emp%I False%I B1 (av - 6)%nat
-              Hlkb HtpB1 ltac:(lia)
-              with "Hcg Htext Hpc [] [] Hlocked [-]").
+              (proc_lock_res γ Φ γs γl (proc_addr j)) False%I B1 (av - 6)%nat
+              Hlkb HtpB1 ltac:(lia) (lock_refute_False _)
+              with "Hcg Htext Hpc [] Hlocked [-]").
     { iApply (is_lock_openable with "Hislock"). }
-    { done. }
-    iIntros (mh) "_ Hcg Hpc %Hmh Hlocked".
+    iIntros (mh) "Hcg Hpc %Hmh Hlocked".
     destruct Hmh as [Hcs_mh Ha0_mh].
     assert (Hpc18 : ret_pc (add_vec_int (mword_of_int (SD + 0x14) : mword 64) 4)
                     = mword_of_int (SD + 0x18)) by (apply bv_eq; vm_compute; reflexivity).

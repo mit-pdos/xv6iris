@@ -23,7 +23,8 @@ version of the key idea, because it is not obvious:
 | `ae7a255`, `0f93891` | the word-clear leaves; `wp_sw_zero_lockfin_s_sconf` is the one that survives. |
 | `efd7c15` | **Tasks 1 + 2.** `HOLDING` generic outright; `ACQUIRE_GEN`/`ACQUIRE`; `RELEASE_GEN`/`RELEASE`/`RELEASE_CANCEL`, one proof instantiated twice. `lock_finisher` + `lock_finisher_close`/`_destroy` in `WpLock.v`. The close-only and destroy-only word-clear leaves deleted. |
 | `d00cc1e` | **Task 3.** `SpecInitlock` hands the name field back OWNED (`c_name ↦₈ name`); `lock_name_intro` seals it, and all seven callers do so. |
-| `a84dd8c` | **Task 4.** `is_pipe` over `cinv`; `pipe_ref` carries half the cancel token; `pipe_bank`; `pipe_openmark`; `pipe_res_cancel`; `newlock_c_delayed`. |
+| `a84dd8c` | **Task 4**, first attempt: `is_pipe` over `cinv`. Superseded — the arithmetic does not close (see below). |
+| `d99eb1d` | **Task 4.** `lock_openable` quantifies the credential internally; `lock_openable_of_dead`; `is_pipe` over a dead-state disjunct; `pipe_dead`; the `pipe_openmark`/`pipe_shut` receipt; `pipe_res_dead`. Plus pipeclose's decode file, spec, and the backward page carve. |
 
 Verified facts worth not re-deriving:
 
@@ -44,51 +45,57 @@ Verified facts worth not re-deriving:
 
 ## Task 5 — pipeclose (the remaining work)
 
-34 instructions at `0x80004440`, straight-line with two branches; callees
-`acquire`, `wakeup`, `release`, `kfree`, all with existing specs.
+33 instructions at `0x80004440`; callees `acquire`, `wakeup`, `release`,
+`kfree`, all proven.  Everything around the proof now exists:
 
-```c
-void pipeclose(struct pipe *pi, int writable) {
-  acquire(&pi->lock);
-  if (writable) { pi->writeopen = 0; wakeup(&pi->nread); }
-  else          { pi->readopen  = 0; wakeup(&pi->nwrite); }
-  if (pi->readopen == 0 && pi->writeopen == 0) { release(&pi->lock); kfree((char *)pi); }
-  else release(&pi->lock);
-}
-```
+- **`WpPipecloseDecode.v`** — all 33 `instr` facts, landed and green.  The
+  three compressed words nothing else decodes (`e781`, `c38d`, `bfe9`) and the
+  thirteen 4-byte ones are local to it.
+- **`SpecPipeclose.v`** — the contract, landed.  `pipe_ref γp w 1` in,
+  `kalloc_avail γk on ∨ kalloc_avail γk (avail_inc on)` out (the caller cannot
+  tell whether the page came back, and does not need to).  `av ≥ 22`
+  (wakeup's 18 over pipeclose's own 4), `n + 2 < 2^31` (acquire's push_off,
+  then wakeup's myproc on top).
+- **`WpSconfBtype.wp_beqz_x0_taken_s_sconf`** — the 4-byte twin the
+  `beq s2,zero` arm needs.
+- **`PipeInv.pipe_bytes_page_own` / `pipe_raw_page_own`** and PageFields'
+  backward leaves — release's spoils reassembled into `kfree_pre`.
 
-Everything it needs now exists. The shape:
+What is left is `ProofPipeclose.v` itself.  The shape, worked out and worth
+not re-deriving:
 
-- precondition takes `pipe_ref γp w 1` for the end `writable` selects
-  (`fileclose` passes `f->writable`), plus `is_pipe`;
-- `ACQUIRE_GEN` at `Tc := cinv_own (pn_cancel γp) (1/2)`, the accessor from
-  `PipeInv.is_pipe_openable`. The credential comes back out;
-- clearing the flag: `pipe_endstate_take` yields the end ghost, the closer's
-  half of the cancel token, **and the marker** (`pipe_openmark`), then
-  `pipe_endstate_close` puts the end ghost back;
-- the branch on the other flag decides which release runs:
-  - other end still open → deposit the half with `pipe_bank_deposit`,
-    reassemble `pipe_res`, ordinary `RELEASE`;
-  - other end closed → `pipe_bank_keep` (the bank is already full), keep the
-    half, reassemble `pipe_res`, and call `RELEASE_CANCEL` at `q := 1/2` with
-    `PipeInv.pipe_res_cancel γp pi w` as the completion wand and
-    `Out := pipe_bytes pi`;
-- release then hands back `pi ↦₄ 0`, `lock_cpu pi ↦₈ 0` and `pipe_bytes pi`;
-  run `PageFields`' lemmas backwards (`bwin_split`/`bwin_rebase` are
-  equivalences, `word{4,8}_pointsto_bytes` is in `RiscvPtsto`; the forward
-  direction is `PipeInv.page_own_pipe_raw`) to rebuild `page_own pi`, then
-  `kfree`.
+- frame `c.addi sp,-32`, four slots: ra@3, s0@2, s1@1, **s2@0** (release
+  spills three, this one four — slot 4 is no longer a gap);
+- `ACQUIRE_GEN` at `Tc := pipe_ref γp w 1`, accessor `is_pipe_openable`,
+  refutations `pipe_ref_dead` and `locked_pre_dead`;
+- `beq s2,zero` at +0x14 branches on `w` — `Hw` couples a1 to it, and
+  `add_vec zero_reg x = x` is what connects `s2` back to a1;
+- **the +0x24 join must be an `iAssert`ed continuation built BEFORE that
+  branch**, or the whole tail is duplicated across the two arms of
+  `destruct w`.  It takes `M`, `⌜callee_saved A4 M⌝`, the gpr bundle, the pc,
+  `cpu_own γ (S n)`, `trap_csrs_pay`, `locked`, a whole `pipe_res γp pi`
+  (each arm reassembles it after its store) and `pipe_shut γp w`;
+- the epilogue at +0x36 is a second `iAssert`ed continuation, taking the
+  `kalloc_avail` disjunction — it is shared by the release-only and the
+  release-then-kfree paths, which rejoin there via the `c.j` at +0x5c;
+- flag reads: `pflag_open ro` decides the +0x28 `c.bnez`; when both are shut,
+  `pipe_endstate_closed` hands over the OTHER end's receipt (it is
+  persistent, so the invariant keeps its copy) and `pipe_shut_both` orders
+  the pair for `pipe_res_dead`;
+- freeing arm: `RELEASE_CANCEL` at `D := pipe_dead γl γp`,
+  `Out := pipe_bytes pi`, wand `pipe_res_dead γl γp pi` (add an `iModIntro` —
+  it is not modal, the wand is `==∗`); then `pipe_bytes_page_own` and `kfree`;
+- non-freeing arm: `RELEASE_GEN` at the same `D` with `lock_finisher_close`
+  (**not** `RELEASE`, which takes an `is_lock` the pipe does not have).
 
-Two things still **unverified**:
+Both `wakeup` premises that were unverified are now settled: it needs
+`procs_inv` (persistent) and `panic_wp`, takes no resource on `&pi->nread`,
+and `length γs = NPROC` / `mycpu_ret cid_word ≠ 0` are derived in the proof
+(`procs_inv`'s first conjunct; `mycpu_ret_nonzero` + `tp_ok_cid`), exactly as
+`ProofReleasesleep` does.
 
-- `wakeup`'s spec (`SpecWakeup`) — what it demands of `cpu_own`/`procs_inv`,
-  and whether it can be called while holding `pi->lock` (it takes the proc
-  locks, so the lock order matters to nothing in the logic, but check the
-  `av`/stack budget);
-- the frame/stack budget for the whole function, and hence its `K`.
-
-`LinkPipeclose` cannot exist before `fileclose`, same as `LinkPipealloc` —
-see [`../design/pipe.md`](../design/pipe.md).
+`LinkPipeclose` CAN exist once the proof does — every callee has a Link
+module — so pipeclose will count as proven in `tools/proof_coverage.py`.
 
 ## Task 6 — `pipealloc` leaks the two `fd_slot`s on its error paths
 
@@ -136,3 +143,9 @@ proof that already depends on it is the expensive order.
   three.
 - Verify "these files depend on X" by grepping the actual lemma names, never a
   substring of them.
+- **`cinv` is the wrong primitive for an object with more than one owner.**
+  Its accessor demands a share of the very token that must be whole to
+  cancel, and the first owner to let go has surrendered its share by the time
+  it calls release. The arithmetic is in [`../design/pipe.md`](../design/pipe.md);
+  the fix is a plain `inv` with a dead branch and a credential that refutes
+  it, which is what `WpLock.lock_openable_of_dead` builds.
