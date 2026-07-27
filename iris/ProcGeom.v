@@ -81,13 +81,49 @@ Definition proc_base : mword 64 := mword_of_int KernelSyms.proc.
 Definition proc_addr (i : nat) : mword 64 :=
   add_vec proc_base (mword_of_int (proc_size * Z.of_nat i)).
 
+(* Field offsets, all corroborated by the compiled image (see
+   claude-notes/design/proc-struct.md for the per-field disassembly
+   evidence): fdalloc's [addi a5,a0,208] + stride-8 x 16 scan pins
+   [ofile_off]; growproc's [ld a1,72(a0)] / [ld a0,80(a0)] pin [sz_off] /
+   [pagetable_off]; sys_chdir's [ld a0,336(s2)] pins [cwd_off]. *)
 Definition state_off : Z := 24.
 Definition chan_off : Z := 32.
+Definition killed_off : Z := 40.
+Definition xstate_off : Z := 44.
+Definition parent_off : Z := 56.
+Definition kstack_off : Z := 64.
+Definition sz_off : Z := 72.
+Definition pagetable_off : Z := 80.
+Definition trapframe_off : Z := 88.
 Definition context_off : Z := 96.
+Definition ofile_off : Z := 208.
+Definition cwd_off : Z := 336.
+Definition name_off : Z := 344.
 
 Definition p_state (pa : mword 64) : mword 64 := add_vec pa (mword_of_int state_off).
 Definition p_chan (pa : mword 64) : mword 64 := add_vec pa (mword_of_int chan_off).
 Definition p_context (pa : mword 64) : mword 64 := add_vec pa (mword_of_int context_off).
+
+Definition p_killed (pa : mword 64) : mword 64 := add_vec pa (mword_of_int killed_off).
+Definition p_xstate (pa : mword 64) : mword 64 := add_vec pa (mword_of_int xstate_off).
+Definition p_parent (pa : mword 64) : mword 64 := add_vec pa (mword_of_int parent_off).
+Definition p_kstack (pa : mword 64) : mword 64 := add_vec pa (mword_of_int kstack_off).
+Definition p_sz (pa : mword 64) : mword 64 := add_vec pa (mword_of_int sz_off).
+Definition p_pagetable (pa : mword 64) : mword 64 := add_vec pa (mword_of_int pagetable_off).
+Definition p_trapframe (pa : mword 64) : mword 64 := add_vec pa (mword_of_int trapframe_off).
+Definition p_cwd (pa : mword 64) : mword 64 := add_vec pa (mword_of_int cwd_off).
+
+(* p->name is a 16-byte char array, not a word; [p_name pa i] is byte [i]. *)
+Definition PNAMELEN : nat := 16%nat.
+Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
+  add_vec pa (mword_of_int (name_off + Z.of_nat i)).
+
+(* p->ofile[fd]: an ARRAY that gets scanned (fdalloc, kexit), so it takes the
+   [ArrCursor] treatment [fnode]/[bnode] get rather than a flat offset. *)
+Definition NOFILE : nat := 16%nat.
+Definition ofile_stride : Z := 8.
+Definition p_ofile (pa : mword 64) (fd : nat) : mword 64 :=
+  add_vec pa (mword_of_int (ofile_off + ofile_stride * Z.of_nat fd)).
 
 (* the lock's cpu-pointer word (spinlock field at +16), in the exact address
    form acquire/release/holding use ([a_cpu] with lk0 = pa, lock at +0). *)
@@ -101,9 +137,34 @@ Definition p_pid (pa : mword 64) : mword 64 :=
 
 (* enum procstate codes (kernel/proc.h): UNUSED=0 USED=1 SLEEPING=2
    RUNNABLE=3 RUNNING=4 ZOMBIE=5. *)
+Definition UNUSED : mword 32 := mword_of_int 0.
+Definition USED : mword 32 := mword_of_int 1.
 Definition SLEEPING : mword 32 := mword_of_int 2.
 Definition RUNNABLE : mword 32 := mword_of_int 3.
 Definition RUNNING : mword 32 := mword_of_int 4.
+Definition ZOMBIE : mword 32 := mword_of_int 5.
+
+(* The second of the two state predicates the proc-lock invariant keys on
+   (the first is [needs_ctx] below): the states in which NOBODY outside the
+   invariant owns this slot's private field block, so the invariant holds it
+   and allocproc/wait find it there.  Deliberately a flat boolean, sitting
+   beside [needs_ctx] rather than nested inside a case chain -- see
+   claude-notes/design/proc-struct.md. *)
+Definition inv_dormant (st : mword 32) : bool :=
+  bool_decide (st = UNUSED) || bool_decide (st = ZOMBIE).
+
+Lemma inv_dormant_UNUSED : inv_dormant UNUSED = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma inv_dormant_ZOMBIE : inv_dormant ZOMBIE = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma inv_dormant_RUNNING : inv_dormant RUNNING = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma inv_dormant_RUNNABLE : inv_dormant RUNNABLE = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma inv_dormant_SLEEPING : inv_dormant SLEEPING = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma inv_dormant_USED : inv_dormant USED = false.
+Proof. vm_compute. reflexivity. Qed.
 
 (* A state that requires the saved-context obligation: the two "parked"
    states that own a saved context reachable by swtch. *)

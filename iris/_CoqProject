@@ -331,6 +331,7 @@ LinkAcquiresleep.v
 ArrCursor.v
 BcacheInv.v
 FileInv.v
+ProcInv.v
 WpFileallocDecode.v
 SpecFilealloc.v
 WpBinitDecode.v
@@ -346,6 +347,9 @@ WpSysUptimeDecode.v
 SpecSysUptime.v
 ProofSysUptime.v
 LinkSysUptime.v
+SpecSysGetpid.v
+ProofSysGetpid.v
+LinkSysGetpid.v
 TimerCap.v
 WpSconfTimer.v
 WpClockintrDecode.v

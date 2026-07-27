@@ -56,6 +56,12 @@ are working on that effort — the relevant `projects/` file.
   positive))`) that ties `f->ref` to fractional ownership of the immutable
   fields, the "holding a reference" predicate, the `ftable.lock` invariant, how
   the fd-sharing patterns come out, and the staged plan for `f->off`.
+- **[`proc-struct.md`](design/proc-struct.md)** — `struct proc`: the verified
+  geometry of all 15 fields, the five sharing disciplines the code actually
+  uses (not the three `proc.h` claims), and the proposed resources — the
+  state-keyed lock invariant any CPU can peek at, and `proc_priv`, the
+  exclusive private bundle (`sz`/`pagetable`/`trapframe`/`ofile`/`cwd`) that
+  rides alongside `cur_proc p` and carries a `FileInv.file_ref` per open fd.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel
@@ -63,6 +69,9 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
+  `struct proc` resource split: what has landed (`ProcInv.v`, `sys_getpid`) and
+  the `proc_lock_res` rewiring still to do.
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
