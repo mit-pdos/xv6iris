@@ -330,6 +330,34 @@ Section ProcInv.
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 
+  (* The UNUSED block WITHOUT its fd-slot units: what procinit is handed for
+     each process before the supply is distributed.  Nothing in procinit
+     touches these cells (the BSS is already zero); the units are the one
+     thing boot has to route, and [proc_dormant_seal] is that step.  Fixed at
+     UNUSED -- procinit produces no ZOMBIEs -- so the two address-space cells
+     are the zeroed pair. *)
+  Definition proc_dormant_nofd (pa : mword 64) : iProp Σ :=
+    (∃ (V : pprivate) (pid : mword 32),
+       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
+        pv_cwd V = (zero_reg : mword 64)⌝ ∗
+       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+       proc_fields pa (DfracOwn 1) V ∗
+       ofile_cells pa (pv_ofile V) ∗
+       own_ctx (p_context pa) ∗
+       p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
+       p_trapframe pa ↦₈ (zero_reg : mword 64))%I.
+
+  Lemma proc_dormant_seal (pa : mword 64) :
+    proc_dormant_nofd pa -∗ fd_slots NOFILE -∗ proc_dormant pa UNUSED.
+  Proof.
+    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs".
+    iExists V, pid. iFrame "Hpid Hf Ho Hctx". iSplit; [done|].
+    rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
+    iSplitL "Hs".
+    { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
+    iFrame "Hpg Htf".
+  Qed.
+
   (* allocproc's move: it finds an UNUSED slot, so the two address-space
      cells are zero and it must BUILD the table itself (kalloc a trapframe,
      proc_pagetable) -- which is exactly what allocproc's C does.  The
