@@ -15,7 +15,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
+From iris.base_logic.lib Require Import ghost_var invariants cancelable_invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
@@ -45,22 +45,22 @@ Proof.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
 
-Module ReleaseProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE.
+Module ReleaseGenProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE_GEN.
 
 Section ProofRelease.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_release_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
+  Lemma wp_release_gen_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (γl : gname) (lka : mword 64) (R Tc Dc Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_sconf_body γ Φ γl lka s R m n eb p C av.
+    : wp_release_gen_sconf_body γ Φ γl lka R Tc Dc Out m n eb p C av.
   Proof.
-    cbv beta delta [wp_release_sconf_body].
+    cbv beta delta [wp_release_gen_sconf_body].
     intros pcE lk0 ret_tgt Hlka Htp Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock HTc Htoken HR Hfin Hown Hpay Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
     iPoseProof (rli_02 with "Htext") as "Hi02".
     iPoseProof (rli_04 with "Htext") as "Hi04".
@@ -183,10 +183,10 @@ Section ProofRelease.
       by (rewrite Ha0R3; exact Hlka).
     assert (HtpR3c : R3 !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
       by (rewrite HtpR3; exact Htp).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka s R R3 (av - 4)%nat
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka R Tc Dc R3 (av - 4)%nat
               HlkaR3 HtpR3c ltac:(lia)
-              with "Hcg Htext Hpc Hlock Htoken [-]").
-    iIntros (mh) "Hcg Hpc %Hmh Htoken".
+              with "Hcg Htext Hpc Hlock HTc Htoken [-]").
+    iIntros (mh) "HTc Hcg Hpc %Hmh Htoken".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Htph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
     iEval (rewrite upd_eq) in "Hpc".
@@ -217,13 +217,11 @@ Section ProofRelease.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite kv_addv_zero. reflexivity. }
-    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf γ Φ γl lka R emp%I False%I (mword_of_int (RL + 0x12))
+    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf γ Φ γl lka R Tc Dc (mword_of_int (RL + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (av - 4)%nat
               Hacpu
-              with "Hcg Hpc Hi12 [] [] Htoken [-]").
-    { iApply (is_lock_openable with "Hlock"). }
-    { done. }
-    iIntros "_ Hcg Hpc Htoken".
+              with "Hcg Hpc Hi12 Hlock HTc Htoken [-]").
+    iIntros "HTc Hcg Hpc Htoken".
     assert (Hpc16 : add_vec_int (mword_of_int (RL + 0x12) : mword 64) 4 = mword_of_int (RL + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)
@@ -235,13 +233,11 @@ Section ProofRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iPoseProof (rli_1a with "Htext") as "Hi1a".
-    iApply (wp_sw_zero_lockopen_s_sconf γ Φ γl lka R emp%I False%I (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
+    iApply (wp_sw_zero_lockfin_s_sconf γ Φ γl lka R Tc Dc Out (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh (av - 4)%nat
               ltac:(rewrite Hs1mh; exact Hlka)
-              with "Hcg Hpc Hi1a [] [] Htoken HR [-]").
-    { iApply (is_lock_openable with "Hlock"). }
-    { done. }
-    iIntros "_ Hcg Hpc".
+              with "Hcg Hpc Hi1a Hlock HTc Htoken HR Hfin [-]").
+    iIntros "HOut Hcg Hpc".
     assert (Hpc1e : add_vec_int (mword_of_int (RL + 0x1a) : mword 64) 4 = mword_of_int (RL + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
     (* ---- 0x1e: jal ra,pop_off ---- *)
@@ -372,7 +368,7 @@ Section ProofRelease.
     assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! E4 with "Hcg Hpc [%] Hown").
+    iApply ("Hcont" $! E4 with "HOut Hcg Hpc [%] Hown").
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
@@ -461,4 +457,69 @@ Section ProofRelease.
 
 End ProofRelease.
 
-End ReleaseProof.
+End ReleaseGenProof.
+
+(* The static-kernel-lock instance: the finisher closes the invariant, so
+   nothing comes back out.  Verbatim the statement the thirteen ordinary
+   consumers were written against. *)
+Module ReleaseOfGen (G : RELEASE_GEN) : RELEASE.
+
+Section OfGen.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma wp_release_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+    : wp_release_sconf_body γ Φ γl lka s R m n eb p C av.
+  Proof.
+    cbv beta delta [wp_release_sconf_body].
+    intros pcE lk0 ret_tgt Hlka Htp Hav.
+    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
+    iApply (G.wp_release_gen_sconf γ Φ γl lka R emp%I False%I emp%I m n eb p C av
+              Hlka Htp Hav
+              with "Hcg Htext Hpc [] [] Htoken HR [] Hown Hpay [-]").
+    { iApply (is_lock_openable with "Hlock"). }
+    { done. }
+    { iApply lock_finisher_close. }
+    iIntros (mr) "_ Hcg Hpc %Hcs Hown".
+    iApply ("Hcont" $! mr with "Hcg Hpc [//] Hown").
+  Qed.
+
+End OfGen.
+
+End ReleaseOfGen.
+
+(* The cancelling instance: bring every share of the cancel token and the
+   finisher DESTROYS the invariant at the store, so release walks off with the
+   lock's own two words and R -- the storage, reclaimable. *)
+Module ReleaseCancelOfGen (G : RELEASE_GEN) : RELEASE_CANCEL.
+
+Section CancelOfGen.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !cinvG Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma wp_release_cancel_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (γl γc : gname) (lka : mword 64) (R : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+    : wp_release_cancel_sconf_body γ Φ γl γc lka R m n eb p C av.
+  Proof.
+    cbv beta delta [wp_release_cancel_sconf_body].
+    intros pcE lk0 ret_tgt Hlka Htp Hav.
+    iIntros "Hcg #Htext Hpc #Hcinv Hown_c Htoken HR Hown Hpay Hcont".
+    iApply (G.wp_release_gen_sconf γ Φ γl lka R (cinv_own γc 1) (cinv_own γc 1)
+              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ R)%I
+              m n eb p C av
+              Hlka Htp Hav
+              with "Hcg Htext Hpc [] Hown_c Htoken HR [] Hown Hpay [-]").
+    { iApply (lock_openable_cinv with "Hcinv"). }
+    { iApply lock_finisher_destroy. }
+    iIntros (mr) "(Hword & Hcpu & HR) Hcg Hpc %Hcs Hown".
+    iApply ("Hcont" $! mr with "Hword Hcpu HR Hcg Hpc [//] Hown").
+  Qed.
+
+End CancelOfGen.
+
+End ReleaseCancelOfGen.

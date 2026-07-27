@@ -300,6 +300,49 @@ Section Lock.
     Persistent (lock_openable γ lk R T D).
   Proof. apply _. Qed.
 
+  (* ---- THE FINISHING INTERFACE ---------------------------------------
+
+     The other half: what the CALLER of release's word clear supplies to
+     decide the invariant's fate.  At that instant the store has happened and
+     the state ghost is back at [None], so the zeroed lock word, the cleared
+     cpu word, the ghost state and [R] are all in hand at once -- which is why
+     the choice has to be made HERE and not one instruction later.  The
+     finisher is handed the credential [T], the close-or-destroy choice at
+     mask [E], and the contents in BOTH shapes it might want them --
+     reassembled as [lock_inv] (to put back) or raw (to keep) -- and produces
+     the leaf's output resource [Out].
+
+     The two canonical instances are below: close, and [Out := emp]; or
+     surrender [D] and walk off with the lock's own two words and [R] -- i.e.
+     with the memory.                                                       *)
+  Definition lock_finisher (γ : gname) (lk : mword 64) (R T D Out : iProp Σ)
+      (E : coPset) : iProp Σ :=
+    ( T -∗
+      ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)
+       ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
+      (▷ lock_inv γ lk R
+       ∧ (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R)) -∗
+      |={E ∖ ↑lockN, E}=> Out)%I.
+
+  (* put it back: today's release. *)
+  Lemma lock_finisher_close γ lk R E : ⊢ lock_finisher γ lk R emp False emp E.
+  Proof.
+    iIntros "_ [Hclose _] [Hbody _]".
+    iMod ("Hclose" with "Hbody") as "_". by iModIntro.
+  Qed.
+
+  (* destroy it and keep the storage.  [D] plays both roles -- the credential
+     that opened and the certificate that disposes -- so the two must be the
+     SAME resource: for a [cinv] that is [cinv_own γc 1], exactly what a caller
+     holding every share of the object has. *)
+  Lemma lock_finisher_destroy γ lk R D E :
+    ⊢ lock_finisher γ lk R D D
+        (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R) E.
+  Proof.
+    iIntros "HD [_ Hdispose] [_ Hraw]".
+    iMod ("Hdispose" with "HD") as "_". by iModIntro.
+  Qed.
+
   (* a permanent [inv]: no credential needed, no disposal possible. *)
   Lemma lock_openable_inv γ lk R :
     inv lockN (lock_inv γ lk R) ⊢ lock_openable γ lk R emp False.
