@@ -340,6 +340,8 @@ FileInv.v
 WpFileallocDecode.v
 SpecFilealloc.v
 ProofFilealloc.v
+SpecFiledup.v
+SpecFileclose.v
 LinkFilealloc.v
 PipeInv.v
 SpecPipealloc.v
