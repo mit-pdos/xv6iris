@@ -91,6 +91,12 @@ their durable design notes, gotchas, and reusable recipes.
 - **[`yield-sched.md`](completed/yield-sched.md)** — yield/sched/myproc specs and
   proofs (S1–S9 complete): the sconf-tier swtch port, the global scheduler-chain predicate
   `P_sched`, the ▷-guarded proc-lock context slot, and the `cur_proc` resource.
+- **[`memmove.md`](completed/memmove.md)** — memmove, proven for non-overlapping
+  ranges, where the non-overlap hypothesis is carried by SEPARATION (the two
+  buffers as separate conjuncts) rather than a pure side condition, so the
+  source's descending-copy arm closes by contradiction and is never even
+  decoded. Also: `ByteCursor.v` (the shared byte-loop arithmetic) and the
+  register-map rewrite gotchas the proof turned up.
 - **[`sleeplock.md`](completed/sleeplock.md)** — the sleeplock subsystem, all
   four functions proven (initsleeplock / acquiresleep / releasesleep /
   holdingsleep): the `is_sleeplock`/`sl_res` lock abstraction over the inner

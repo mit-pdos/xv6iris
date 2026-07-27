@@ -5,12 +5,12 @@
    sie_cap + gpr_file).  This is memset's real contract; the page-level spec
    (ProofMemsetPage) and walk's page-zeroing step are instances at len = 4096.
 
-   Two pure facts generalize the page proof away from the fixed 4096:
-   [slli32_srli32] (the source's [(unsigned int)n] count truncation is the
-   identity for len < 2^32) and [ms_cmp_bound] (the loop's end-pointer compare
-   reflects the offset compare, wraparound or not).  [len] is otherwise
-   unconstrained: len = 0 takes the source's [n == 0] exit and the array may
-   wrap the address space. *)
+   Two pure facts from ByteCursor.v generalize the page proof away from the
+   fixed 4096: [slli32_srli32] (the source's [(unsigned int)n] count truncation
+   is the identity for len < 2^32) and [pa_add_cmp_bound] (the loop's
+   end-pointer compare reflects the offset compare, wraparound or not).  [len]
+   is otherwise unconstrained: len = 0 takes the source's [n == 0] exit and the
+   array may wrap the address space. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -19,7 +19,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras ByteCursor.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpMemsetS.
@@ -33,86 +33,6 @@ Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
 Import Defs.
-
-(* ===================================================================== *)
-(*  Pure helpers generalizing the page geometry to an arbitrary [len].    *)
-(* ===================================================================== *)
-
-(* the memset source computes the byte count as [(unsigned int)n], i.e.
-   [n << 32 >> 32] in a 64-bit register; for a count that already fits in
-   32 bits this round-trip is the identity. *)
-Lemma slli32_srli32 (x : mword 64) :
-  bv_unsigned x < 2 ^ 32 ->
-  shift_bits_right
-    (shift_bits_left x (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))
-    (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0) = x.
-Proof.
-  intro Hx.
-  assert (Hl : shift_bits_left x (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0)
-             = shiftl x 32).
-  { unfold shift_bits_left. f_equal; vm_compute; reflexivity. }
-  assert (Hr : shift_bits_right (shiftl x 32) (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0)
-             = shiftr (shiftl x 32) 32).
-  { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
-  rewrite Hl Hr. apply bv_eq.
-  unfold shiftl, shiftr, SailStdpp.Values.with_word, get_word,
-    MachineWord.MachineWord.logical_shift_left, MachineWord.MachineWord.logical_shift_right.
-  rewrite bv_shiftr_unsigned bv_shiftl_unsigned.
-  assert (H32 : bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 32)) = 32).
-  { unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
-    rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
-  rewrite H32.
-  pose proof (bv_unsigned_in_range 64 x) as [Hx0 _].
-  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
-  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
-  assert (Hmul_nonneg : 0 <= bv_unsigned x * 2 ^ 32)
-    by (apply Z.mul_nonneg_nonneg; [ exact Hx0 | rewrite E32; lia ]).
-  assert (Hmul_lt : bv_unsigned x * 2 ^ 32 < 2 ^ 64)
-    by (rewrite E32 in Hx |- *; rewrite E64; nia).
-  rewrite Z.shiftl_mul_pow2; [| lia].
-  assert (Hmod : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 2 ^ 64)
-    by (unfold bv_modulus; f_equal).
-  rewrite bv_wrap_small; [| rewrite Hmod; split; [ exact Hmul_nonneg | exact Hmul_lt ] ].
-  rewrite Z.shiftr_div_pow2; [| lia].
-  rewrite Z.div_mul; [ reflexivity | rewrite E32; lia ].
-Qed.
-
-(* the loop's end-pointer compare [p+(j+1) =? p+len] reflects the offset
-   compare [(j+1) =? len].  The two addresses differ by [len - (j+1)], which is
-   a nonzero residue mod 2^64 for every 0 < j+1 < len < 2^64, so NO no-wrap
-   assumption on [p .. p+len) is needed: if the array wraps the address space
-   the cursor wraps with it, exactly as the caller's [pa_add]-indexed buffer
-   does. *)
-Lemma ms_cmp_bound (p : mword 64) (len j : nat) :
-  Z.of_nat len < 2 ^ 64 -> (j < len)%nat ->
-  neq_vec (ms_addr p (S j)) (add_vec (mword_of_int (Z.of_nat len) : mword 64) p)
-    = negb (Nat.eqb (S j) len).
-Proof.
-  intros Hlen Hj.
-  assert (Hmod64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
-  rewrite E64 in Hlen.
-  (* both addresses, as the wrapped sum of the base and the offset *)
-  assert (HxL : bv_unsigned (ms_addr p (S j)) = bv_wrap 64 (bv_unsigned p + Z.of_nat (S j))).
-  { unfold ms_addr. rewrite add_vec_unsigned moi_unsigned.
-    rewrite bv_wrap_add_idemp_r. reflexivity. }
-  assert (HeL : bv_unsigned (add_vec (mword_of_int (Z.of_nat len) : mword 64) p)
-              = bv_wrap 64 (bv_unsigned p + Z.of_nat len)).
-  { rewrite add_vec_unsigned moi_unsigned.
-    rewrite bv_wrap_add_idemp_l. f_equal. lia. }
-  unfold neq_vec. f_equal.
-  destruct (Nat.eqb_spec (S j) len) as [He | Hne].
-  - apply eq_vec_true_iff. apply bv_eq. rewrite HxL HeL He. reflexivity.
-  - apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
-    rewrite HxL HeL in Hc. unfold bv_wrap in Hc.
-    (* equal residues => the modulus divides [len - (j+1)], which is too small *)
-    assert (Hd : (((bv_unsigned p + Z.of_nat len) - (bv_unsigned p + Z.of_nat (S j)))
-                    mod bv_modulus 64 = 0)%Z).
-    { rewrite Zminus_mod. rewrite Hc. rewrite Z.sub_diag. apply Zmod_0_l. }
-    replace ((bv_unsigned p + Z.of_nat len) - (bv_unsigned p + Z.of_nat (S j)))%Z
-      with (Z.of_nat len - Z.of_nat (S j))%Z in Hd by lia.
-    rewrite Z.mod_small in Hd; [ lia | rewrite Hmod64; lia ].
-Qed.
 
 Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
 
@@ -313,7 +233,7 @@ Section WpMemsetArray.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(intros j; exact (ms_incr_step p j))
-              ltac:(intros j Hj; exact (ms_cmp_bound p len j Hlen64 Hj))
+              ltac:(intros j Hj; exact (pa_add_cmp_bound p len j Hlen64 Hj))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               minstr_cce minstr_cd2 minstr_cd4

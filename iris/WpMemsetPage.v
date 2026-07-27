@@ -64,8 +64,8 @@ Proof. rewrite ms_pa_id. apply ms_addr_pa_add. Qed.
 (* STEP 3 (the crux): adding an in-page offset [j < 4096] to a 4096-aligned RAM
    base leaves the Sv39 VPN unchanged, because it only touches bits [11:0]. *)
 
-(* The end-pointer loop compare is now handled generically by [ms_cmp_bound]
-   (WpMemsetArray.v), over an arbitrary byte count rather than a fixed page;
+(* The end-pointer loop compare is handled generically by [pa_add_cmp_bound]
+   (ByteCursor.v), over an arbitrary byte count rather than a fixed page;
    the page users derive the [uint p + len < 2^64] bound from [page_valid]. *)
 
 Section WpMemsetPage.

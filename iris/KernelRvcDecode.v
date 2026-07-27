@@ -193,6 +193,17 @@ Lemma cdec_0141 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0x0141 : mword 16)) s = Some (C_ADDI (mword_of_int 16, Regidx csp_rs1), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+(* The (unsigned int) count truncation pair -- c.slli a2,32 then c.srli a2,32,
+   how gcc materializes the [uint n] cast in a byte-count argument.  memset and
+   memmove both open with it. *)
+Lemma cdec_1602 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x1602 : mword 16)) s = Some (C_SLLI (mword_of_int 32, Regidx (mword_of_int 12)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_9201 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x9201 : mword 16)) s = Some (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 4)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 (* ===================================================================== *)
 (* Shared 48-byte / 6-slot stack-frame prologue/epilogue RVC decode        *)
 (* templates: c.addi16sp sp,∓48, the six c.sdsp/c.ldsp spills of           *)

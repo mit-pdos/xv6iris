@@ -167,6 +167,7 @@ LinkRelease.v
 SpecAcquire.v
 ProofAcquire.v
 LinkAcquire.v
+ByteCursor.v
 SpecMemsetParts.v
 ProofMemset.v
 LinkMemset.v
@@ -176,6 +177,10 @@ LinkMemsetArray.v
 SpecMemsetPage.v
 ProofMemsetPage.v
 LinkMemsetPage.v
+SpecMemmove.v
+WpMemmoveInstr.v
+ProofMemmove.v
+LinkMemmove.v
 SpecKfree.v
 ProofKfree.v
 LinkKfree.v
