@@ -491,9 +491,11 @@ End OfGen.
 
 End ReleaseOfGen.
 
-(* The cancelling instance: bring every share of the cancel token and the
-   finisher DESTROYS the invariant at the store, so release walks off with the
-   lock's own two words and R -- the storage, reclaimable. *)
+(* The cancelling instance: the finisher DESTROYS the invariant at the store,
+   so release walks off with the lock's own two words and whatever the caller
+   makes of R -- the storage, reclaimable.  The caller's completion wand is
+   what turns its opening share into the disposal certificate; see
+   SpecRelease.v for why that cannot be done before the call. *)
 Module ReleaseCancelOfGen (G : RELEASE_GEN) : RELEASE_CANCEL.
 
 Section CancelOfGen.
@@ -501,23 +503,23 @@ Section CancelOfGen.
   Context `{CID : CpuId}.
 
   Lemma wp_release_cancel_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl γc : gname) (lka : mword 64) (R : iProp Σ)
+      (γl γc : gname) (lka : mword 64) (R Out : iProp Σ) (q : Qp)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_cancel_sconf_body γ Φ γl γc lka R m n eb p C av.
+    : wp_release_cancel_sconf_body γ Φ γl γc lka R Out q m n eb p C av.
   Proof.
     cbv beta delta [wp_release_cancel_sconf_body].
     intros pcE lk0 ret_tgt Hlka Htp Hav.
-    iIntros "Hcg #Htext Hpc #Hcinv Hown_c Htoken HR Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γ Φ γl lka R (cinv_own γc 1) (cinv_own γc 1)
-              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ R)%I
+    iIntros "Hcg #Htext Hpc #Hcinv Hown_c Htoken HR Hfull Hown Hpay Hcont".
+    iApply (G.wp_release_gen_sconf γ Φ γl lka R (cinv_own γc q) (cinv_own γc 1)
+              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
               m n eb p C av
               Hlka Htp Hav
-              with "Hcg Htext Hpc [] Hown_c Htoken HR [] Hown Hpay [-]").
+              with "Hcg Htext Hpc [] Hown_c Htoken HR [Hfull] Hown Hpay [-]").
     { iApply (lock_openable_cinv with "Hcinv"). }
-    { iApply lock_finisher_destroy. }
-    iIntros (mr) "(Hword & Hcpu & HR) Hcg Hpc %Hcs Hown".
-    iApply ("Hcont" $! mr with "Hword Hcpu HR Hcg Hpc [//] Hown").
+    { iApply (lock_finisher_destroy with "Hfull"). }
+    iIntros (mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
+    iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").
   Qed.
 
 End CancelOfGen.

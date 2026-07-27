@@ -344,16 +344,22 @@ Section Lock.
     iMod ("Hclose" with "Hbody") as "_". by iModIntro.
   Qed.
 
-  (* destroy it and keep the storage.  [D] plays both roles -- the credential
-     that opened and the certificate that disposes -- so the two must be the
-     SAME resource: for a [cinv] that is [cinv_own γc 1], exactly what a caller
-     holding every share of the object has. *)
-  Lemma lock_finisher_destroy γ lk R D E :
-    ⊢ lock_finisher γ lk R D D
-        (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R) E.
+  (* destroy it and keep the storage.  The certificate [D] is assembled HERE,
+     from the credential [T] that opened plus the lock's own resource [R] --
+     not brought along ready-made.  That generality is what a multiply-owned
+     object needs: the last holder to let go has necessarily already
+     surrendered part of the certificate into [R] (see PipeInv.v), and [R] is
+     only in hand at this instant.  A caller that really does arrive holding
+     the whole certificate takes [T := D] and the identity wand. *)
+  Lemma lock_finisher_destroy γ lk R T D Out E :
+    (T -∗ R ==∗ D ∗ Out) -∗
+    lock_finisher γ lk R T D
+      (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ Out) E.
   Proof.
-    iIntros "HD [_ Hdispose] [_ Hraw]".
-    iMod ("Hdispose" with "HD") as "_". by iModIntro.
+    iIntros "Hcomplete HT [_ Hdispose] [_ (Hword & Hcpu & HR)]".
+    iMod ("Hcomplete" with "HT HR") as "[HD HOut]".
+    iMod ("Hdispose" with "HD") as "_".
+    iModIntro. by iFrame "Hword Hcpu HOut".
   Qed.
 
   (* a permanent [inv]: no credential needed, no disposal possible. *)
@@ -379,8 +385,29 @@ Section Lock.
 
   (* ---- lock construction (the "newlock" ghost step) ------------------ *)
 
-  (* a FREE physical lock (word 0, cpu word 0) plus the resource it protects
-     and its name become a lock. *)
+  (* THE lock body, built: a free physical lock (word 0, cpu word 0) plus the
+     resource it protects.  Whether that body then goes into a permanent [inv]
+     or a cancellable [cinv] is the caller's business -- this is the piece both
+     constructions share, and a basic update, so it can be done before the
+     invariant's namespace or gname exists (which is what an object whose
+     resource mentions its OWN cancel gname needs; see [newlock_c_delayed]). *)
+  Lemma lock_inv_alloc (lk : mword 64) (R : iProp Σ) :
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+    R ==∗ ∃ γ : gname, lock_inv γ lk R.
+  Proof.
+    iIntros "Hword Hcpu HR".
+    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
+                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iDestruct (own_op with "H") as "[Ha Hf]".
+    iModIntro. iExists γ.
+    iExists (mword_of_int 0 : mword 32), None.
+    rewrite /lock_word. iFrame "Hword Hcpu Ha".
+    iLeft. iFrame "Hf HR". done.
+  Qed.
+
+  (* a FREE physical lock plus the resource it protects and its name become a
+     (permanent) lock. *)
   Lemma newlock E (lk : mword 64) (s : string) (R : iProp Σ) :
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -388,13 +415,9 @@ Section Lock.
     R ={E}=∗ ∃ γ : gname, is_lock γ lk s R.
   Proof.
     iIntros "#Hnm Hword Hcpu HR".
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
-    iDestruct (own_op with "H") as "[Ha Hf]".
-    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0 : mword 32), None.
-      rewrite /lock_word. iFrame "Hword Hcpu Ha".
-      iLeft. iFrame "Hf HR". done. }
+    iMod (lock_inv_alloc lk R with "Hword Hcpu HR") as (γ) "Hbody".
+    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hbody]") as "#Hinv";
+      [ by iNext | ].
     iModIntro. iExists γ.
     iApply (is_lock_intro with "Hnm Hinv").
   Qed.
@@ -426,22 +449,27 @@ Section LockCancel.
 
   (* a FREE physical lock plus its resource become a CANCELLABLE lock: the
      whole disposal certificate comes out with it, for the creator to split
-     among whatever will hold references to the object. *)
-  Lemma newlock_c E (lk : mword 64) (R : iProp Σ) :
-    lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-    R ={E}=∗ ∃ (γ γc : gname), cinv lockN γc (lock_inv γ lk R) ∗ cinv_own γc 1.
+     among whatever will hold references to the object.
+
+     DELAYED, and it has to be: the cancel gname is chosen FIRST and the
+     resource [R] is supplied afterwards, so that [R] may mention it.  That is
+     not a refinement -- it is the only order that works for an object whose
+     references CARRY shares of its cancel token, since then the resource the
+     lock protects mentions the gname of the invariant it lives in.  [cinv_alloc],
+     which fixes the body before the gname, cannot build such an object at all. *)
+  Lemma newlock_c_delayed E (lk : mword 64) :
+    ⊢ |={E}=> ∃ γc : gname, cinv_own γc 1 ∗
+        (∀ R : iProp Σ,
+           lk ↦₄ (mword_of_int 0 : mword 32) -∗
+           lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+           R ={E}=∗ ∃ γ : gname, cinv lockN γc (lock_inv γ lk R)).
   Proof.
-    iIntros "Hword Hcpu HR".
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
-    iDestruct (own_op with "H") as "[Ha Hf]".
-    iMod (cinv_alloc E lockN (lock_inv γ lk R) with "[Hword Hcpu Ha Hf HR]")
-      as (γc) "[#Hc Hown]".
-    { iNext. iExists (mword_of_int 0 : mword 32), None.
-      rewrite /lock_word. iFrame "Hword Hcpu Ha".
-      iLeft. iFrame "Hf HR". done. }
-    iModIntro. iExists γ, γc. by iFrame "Hc Hown".
+    iMod (cinv_alloc_cofinite ∅ E lockN) as (γc _) "[Hown Hmake]".
+    iModIntro. iExists γc. iFrame "Hown".
+    iIntros (R) "Hword Hcpu HR".
+    iMod (lock_inv_alloc lk R with "Hword Hcpu HR") as (γ) "Hbody".
+    iMod ("Hmake" $! (lock_inv γ lk R) with "[Hbody]") as "#Hc"; [ by iNext | ].
+    iModIntro. iExists γ. iExact "Hc".
   Qed.
 
 End LockCancel.
