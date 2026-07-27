@@ -31,6 +31,7 @@ Require Import IntrDefs WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import FileInv ProcInv.
+Require Import KallocInv KMap.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecArgraw.
 Require Import SpecArgint.

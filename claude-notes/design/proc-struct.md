@@ -521,6 +521,39 @@ genuinely moves resources and is `freeproc`'s job, not a recast.
 > `upt_pages_own`; the outer predicates need it just as much. Lemmas that must
 > see inside now say `rewrite /tf_page` explicitly.
 
+## `sys_close`: the descriptor that gives up its reference
+
+`sys_getpid` reads one private field; `sys_close` is the first proof that
+*changes* the private block, and the only interesting thing it changes is one
+descriptor:
+
+```
+proc_priv γf p pid V   ⇝   proc_priv γf p pid (upd_ofile V fd 0)
+```
+
+The three moving parts, all already in `ProcInv.v`:
+
+- **`proc_priv_ofile`** borrows descriptor `fd` and takes back a descriptor
+  holding a *different* value — that accessor's `∀ v'` is exactly the shape
+  the store needs, and it is why nothing about the fd table has to be an
+  invariant. No lock is taken anywhere in sys_close's own body: the array is
+  thread-local, so the window between `p->ofile[fd] = 0` and `fileclose(f)`
+  returning — descriptor null, reference loose in a register — is
+  unobservable.
+- **`ofile_slot`'s disjunction** does the case analysis for free: argfd
+  reports `fv ≠ 0`, which refutes the left disjunct, so the reference and its
+  `k < NFILE` fall out with no extra premise.
+- **The `fd_slot` conservation law closes the loop.** The slot gave its unit
+  away when it named a file; `fileclose` returns exactly one; the emptied
+  descriptor takes it back. That is the *only* reason sys_close's
+  postcondition is provable, and it is the proc-side end of the law whose
+  file-side end is `FileInv.fslot` (see `design/file-table.md`).
+
+The instruction-level lessons (a 4-byte local in the upper half of a frame
+slot, deriving "this stack address is not null", indexing `p_ofile` at a
+symbolic fd, and factoring a branch join) are in
+[`../projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
+
 ## Holes to be honest about
 
 - **`cwd` has no `inode_ref`.** There is no inode model in the tree

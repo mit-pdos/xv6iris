@@ -67,6 +67,49 @@ Proof.
   apply bvw64_small. lia.
 Qed.
 
+(* The DUAL direction, and unconditional: sign-extending a 4-byte cell to 64
+   bits is materializing its SIGNED value as a 64-bit literal.  Both sides are
+   [bv_wrap 64 (bv_signed w)] -- the sign extension by construction, the
+   literal because [mword_of_int] is [Z_to_bv] -- so no range premise is
+   needed.  This is what turns a C [int] read out of memory into an index a
+   spec can talk about ([SpecArgfd.arg_fd], whose fd is [bv_signed] of the
+   loaded word). *)
+Lemma sext32_64_moi (w : mword 32) :
+  (sign_extend' 64 w : mword 64) = mword_of_int (bv_signed w).
+Proof.
+  apply bv_eq.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  unfold mword_of_int, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  reflexivity.
+Qed.
+
+(* wrapping a SIGNED wrap is the unsigned wrap: the half-modulus shift the
+   signed view adds is invisible mod the modulus. *)
+Lemma bv_wrap_swrap (n : N) (z : Z) : bv_wrap n (bv_swrap n z) = bv_wrap n z.
+Proof. unfold bv_swrap, bv_wrap. rewrite Zminus_mod_idemp_l. f_equal. lia. Qed.
+
+(* ...and its consequence, the round trip a C [int] out-parameter performs:
+   argfd reloads its [int fd] local with an [lw] (sign-extending) and stores
+   the result back with an [sw] (truncating), and that is the identity. *)
+Lemma trunc32_sext64 (w : mword 32) : trunc32 (sign_extend' 64 w) = w.
+Proof.
+  apply bv_eq. unfold trunc32. rewrite autocast_id.
+  unfold subrange_vec_dec, to_word_idx, to_word, get_word,
+         MachineWord.MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  change (Z.of_N 0) with 0%Z. rewrite Z.shiftr_0_r.
+  change (MachineWord.MachineWord.Z_idx (Z.sub (Z.mul 4 8) 1 - 0 + 1)) with 32%N.
+  rewrite (bv_wrap_bv_wrap 32 64 _ ltac:(lia)).
+  unfold bv_signed. rewrite bv_wrap_swrap.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
 Lemma sint64_moi32 (z : Z) : (0 <= z < 2^31)%Z ->
   sint (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
 Proof.
@@ -194,6 +237,17 @@ Proof. exact (avi0 a). Qed.
 (* the kernelvec/kerneltrap saved-register-slot address computation always
    writes its (always-zero) sub-word byte offset as the literal product
    "0 * 8" rather than a bare 0. *)
+(* a ZERO 12-bit displacement, in the [sign_extend' 64 (mword_of_int 0)] form
+   an [ld]/[sd]/[sw] with a literal 0 offset produces (distinct from
+   [add_vec_zeros_r]'s [zeros' 12] spelling). *)
+Lemma addv_sext0 (v : mword 64) :
+  add_vec v (sign_extend' 64 (mword_of_int 0 : mword 12)) = v.
+Proof.
+  assert (H0 : (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) = mword_of_int 0)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite H0. apply kv_addv_zero.
+Qed.
+
 Lemma avi0_mul8 (a : mword 64) : add_vec_int a (0 * 8) = a.
 Proof. change (0 * 8) with 0. apply avi0. Qed.
 

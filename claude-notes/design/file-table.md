@@ -320,7 +320,10 @@ caller's `file_ref` puts the slot in the domain with a `positive` count, and
 which is exactly what `bge x0,a5` tests) — so the panic tail gets no `instr`
 fact at all.
 
-So `filedup` **requires** an `fd_slot` and `fileclose` **returns** one;
+So `filedup` **requires** an `fd_slot` and `fileclose` **returns** one (its
+postcondition says so — `SpecFileclose.v`; without that the caller could not
+re-establish an emptied `ProcInv.ofile_slot`, which is exactly what
+`sys_close` needs);
 `filealloc` consumes one too (it creates the first reference), and
 `pipealloc` two. The `⌜Z.pos n < 2^31⌝` conjunct inside `fslot` is the *local
 projection* of the bound — what a consumer walking the table actually needs,
@@ -337,11 +340,32 @@ references, and its supply has no principled source.)
  **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
 - **The next function is `fileclose`.** Its ghost steps
-  (`file_close_step` / `file_close_last_step`) are already proved and its
-  contract is written; what is missing is the instruction-level proof, and
-  that needs the last-reference arm's callees — `pipeclose`, `begin_op`,
-  `iput`, `end_op` — to have specs first. `fileclose_stack` in
-  `SpecFileclose.v` will grow when they do.
+  (`file_close_step` / `file_close_last_step`) are already proved, its
+  contract is written and it is already CONSUMED by two proofs
+  (`ProofPipealloc`, `ProofSysClose`); what is missing is the
+  instruction-level proof, and that needs the last-reference arm's callees —
+  `pipeclose`, `begin_op`, `iput`, `end_op` — to have specs first.
+  `fileclose_stack` in `SpecFileclose.v` will grow when they do. Because it
+  is unproven there is no `LinkFileclose.v`, hence no `LinkSysClose.v`
+  either: `sys_close` is proved but not yet linked.
+- **`pipealloc` drops the two `fd_slot`s fileclose hands back** on its error
+  paths (`ProofPipealloc.v` `iClear`s them), because `pipealloc_post`'s error
+  disjunct does not return them: the caller supplied two units and gets
+  nothing back. A leak of a conserved resource, not a soundness hole;
+  returning them is a purely additive change to `SpecPipealloc`, spelled out
+  as Task 6 of
+  [`../projects/lock-cancel-pipeclose.md`](../projects/lock-cancel-pipeclose.md).
+  Do it before `sys_pipe`, not after.
+- **`sys_close` is the worked example of a descriptor giving up its
+  reference** (`ProofSysClose.v`): `ProcInv.proc_priv_ofile` borrows the
+  slot, the `sd x0,0(a0)` nulls it, `fileclose` eats the `file_ref` and
+  returns the `fd_slot` the empty slot then owns. The window in which the
+  descriptor is null and the reference is loose in a register is safe for the
+  same reason sys_dup's is — the fd table is thread-local. Its fd lookup
+  contract is `SpecArgfd.v` (`arg_fd`, a FUNCTION of the syscall argument and
+  the descriptor array, so the postcondition is not an unconstrained
+  "succeeded or not"), and `argfd` itself is proven in `ProofArgfd.v` — also
+  unlinked, because `ARGINT` has no implementation while `argraw` is parked.
 - **`procinit` is where the supply gets routed, and it is not specified or
   proven yet.** Everything it needs on the ghost side is in place and checked:
   `fd_slots_split_n` cuts `NPROC * NOFILE` units into NPROC bundles of NOFILE,

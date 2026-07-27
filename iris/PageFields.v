@@ -38,14 +38,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
-(*  Address arithmetic                                                 *)
+(*  Address arithmetic  ([pa_add_add] lives in InstrBytes.v)           *)
 (* ------------------------------------------------------------------ *)
-
-Lemma pa_add_add (a : mword 64) (i j : nat) :
-  pa_add (pa_add a i) j = pa_add a (i + j).
-Proof.
-  unfold pa_add. rewrite avi_assoc. f_equal. lia.
-Qed.
 
 (* [uint] and [bv_unsigned] agree (the Sail wrapper's N/Z round trip). *)
 Lemma uint_bv_unsigned (a : mword 64) : uint a = bv_unsigned a.
@@ -123,22 +117,11 @@ Proof.
   exact Hrem.
 Qed.
 
-(* the 32-bit twin of [KallocInv.nth_byte_assemble8]. *)
+(* the 32-bit instance of [RiscvModelBytes.nth_byte_assemble_len]. *)
 Lemma nth_byte_assemble4 (bs : list (bv 8)) (j : nat) :
   length bs = 4%nat -> (j < 4)%nat ->
   nth_byte (Z_to_bv 32 (assemble_bytes bs) : mword 32) j = bs !!! j.
-Proof.
-  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
-  rewrite Z_to_bv_unsigned.
-  pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
-  assert (Hws : bv_wrap 32 (assemble_bytes bs) = assemble_bytes bs).
-  { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
-  rewrite Hws.
-  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
-    by (apply assemble_bytes_byte; lia).
-  rewrite <- Hab.
-  f_equal. f_equal. lia.
-Qed.
+Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
 
 Section PageFields.
   Context `{!riscvGS Σ}.

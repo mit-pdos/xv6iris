@@ -166,30 +166,11 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* little-endian words built from bytes reproduce those bytes (the        *)
-(* width-4/2 clones of KallocInv's width-8 [nth_byte_assemble8]) -- how a *)
-(* fetched word is conjured from the EXISTENTIAL page contents            *)
+(* little-endian words built from bytes reproduce those bytes -- how a    *)
+(* fetched word is conjured from the EXISTENTIAL page contents.  The      *)
+(* width-generic fact is [RiscvModelBytes.nth_byte_assemble_len]; the     *)
+(* width-4 instance below is one line off it.                             *)
 (* ===================================================================== *)
-(* the WIDTH-GENERIC assemble fact: a word of ANY width at least as wide
-   as the byte list reproduces the bytes *)
-Lemma nth_byte_assemble_len (m : N) (bs : list (bv 8)) (j : nat) :
-  (8 * Z.of_nat (length bs) <= Z.of_N m) ->
-  (j < length bs)%nat ->
-  nth_byte (Z_to_bv m (assemble_bytes bs) : bv m) j = bs !!! j.
-Proof.
-  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
-  rewrite Z_to_bv_unsigned.
-  pose proof (assemble_bytes_bound bs) as [Hlo Hhi].
-  assert (Hws : bv_wrap m (assemble_bytes bs) = assemble_bytes bs).
-  { apply bv_wrap_small. unfold bv_modulus. split; [lia|].
-    eapply Z.lt_le_trans; [exact Hhi|].
-    apply Z.pow_le_mono_r; lia. }
-  rewrite Hws.
-  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
-    by (apply assemble_bytes_byte; lia).
-  rewrite <- Hab.
-  f_equal. f_equal. lia.
-Qed.
 
 (* gather n per-index byte witnesses into ONE list (instance-free: the
    lookups come in as a plain function) *)
@@ -216,18 +197,7 @@ Qed.
 Lemma nth_byte_assemble4 (bs : list (bv 8)) (j : nat) :
   length bs = 4%nat -> (j < 4)%nat ->
   nth_byte (Z_to_bv 32 (assemble_bytes bs) : mword 32) j = bs !!! j.
-Proof.
-  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
-  rewrite Z_to_bv_unsigned.
-  pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
-  assert (Hws : bv_wrap 32 (assemble_bytes bs) = assemble_bytes bs).
-  { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
-  rewrite Hws.
-  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
-    by (apply assemble_bytes_byte; lia).
-  rewrite <- Hab.
-  f_equal. f_equal. lia.
-Qed.
+Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
 
 
 (* a 4-aligned va translates to a 4-aligned pa (the page offset carries

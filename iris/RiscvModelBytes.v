@@ -125,6 +125,31 @@ Proof.
     rewrite Hsh. apply IH. lia.
 Qed.
 
+(* ...and the converse of [bv_eq_of_bytes]: a word of ANY width at least as
+   wide as the byte list reproduces those bytes.  This is how an EXISTENTIAL
+   byte window is turned back into a word -- a fetched instruction word
+   (UserFetchPt), a struct field carved out of a fresh page (PageFields), the
+   two halves of a stack slot (InstrBytes' [word_of_words]).  The width-4 and
+   width-8 instances are one line each off it; do not re-derive them. *)
+Lemma nth_byte_assemble_len (m : N) (bs : list (bv 8)) (j : nat) :
+  (8 * Z.of_nat (length bs) <= Z.of_N m) ->
+  (j < length bs)%nat ->
+  nth_byte (Z_to_bv m (assemble_bytes bs) : bv m) j = bs !!! j.
+Proof.
+  intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
+  rewrite Z_to_bv_unsigned.
+  pose proof (assemble_bytes_bound bs) as [Hlo Hhi].
+  assert (Hws : bv_wrap m (assemble_bytes bs) = assemble_bytes bs).
+  { apply bv_wrap_small. unfold bv_modulus. split; [lia|].
+    eapply Z.lt_le_trans; [exact Hhi|].
+    apply Z.pow_le_mono_r; lia. }
+  rewrite Hws.
+  assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
+    by (apply assemble_bytes_byte; lia).
+  rewrite <- Hab.
+  f_equal. f_equal. lia.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* read_bytes: gather n little-endian bytes from memory (None if missing). *)
 (* ---------------------------------------------------------------------- *)

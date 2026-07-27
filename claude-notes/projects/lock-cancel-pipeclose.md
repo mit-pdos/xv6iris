@@ -97,6 +97,40 @@ and `length γs = NPROC` / `mycpu_ret cid_word ≠ 0` are derived in the proof
 `LinkPipeclose` CAN exist once the proof does — every callee has a Link
 module — so pipeclose will count as proven in `tools/proof_coverage.py`.
 
+## Task 6 — `pipealloc` leaks the two `fd_slot`s on its error paths
+
+Small, purely additive, and worth doing while the pipe files are open.
+
+`SpecPipealloc` takes two `fd_slot`s (one per end of the pipe — filealloc
+consumes one per reference it creates) and its error paths call `fileclose`
+to undo the allocations. `SpecFileclose` now RETURNS an `fd_slot` — it has to,
+because an emptied `ProcInv.ofile_slot` owns its unit itself, which is what
+makes `sys_close`'s postcondition provable — so both units genuinely come
+back inside `pipealloc`. But `pipealloc_post`'s error disjunct does not
+mention them, so `ProofPipealloc.v` `iClear`s them at the two `fileclose`
+call sites (+0xb2 and +0xa4).
+
+The caller therefore hands over two units of a CONSERVED resource and gets
+nothing back. That is a leak, not a soundness hole: nothing is unsound about
+dropping an affine resource, and the `● FDSLOTS` authority is unaffected. It
+only bites the eventual `sys_pipe` proof, which will hold two empty
+descriptors it cannot fill without conjuring units from nowhere.
+
+The fix:
+
+- add `fd_slot ∗ fd_slot` to the ERROR disjunct of `pipealloc_post`
+  (`SpecPipealloc.v`) — the success disjunct must NOT have them: there the
+  units are inside the table, against the two live references;
+- in `ProofPipealloc.v`, replace the two `iClear "Hfdslot"` with framing the
+  unit through to the epilogue, and thread the still-unspent unit on the
+  error paths that fail BEFORE `filealloc` (those never gave theirs away);
+- the arms to check are the kalloc-failure arm, the two filealloc-failure
+  arms, and the two fileclose arms — five in all, and they must agree on
+  holding exactly two units at the join.
+
+Do it before `sys_pipe`, not after: retrofitting a postcondition through a
+proof that already depends on it is the expensive order.
+
 ## Conventions to follow
 
 - Wrapper recipe (`../durable-notes.md`): the generic lemma gets the NEW name;

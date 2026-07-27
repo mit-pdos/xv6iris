@@ -74,10 +74,7 @@ Lemma kdc_4585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 11)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma kdc_e09c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe09c : mword 16)) s
-  = Some (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts (one per distinct 32-bit encoding).         *)
@@ -451,7 +448,7 @@ Section WpKallocDecode.
 
   Lemma kfi_48 : kernel_text -∗ instr (mword_of_int (KF + 0x48) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 8)).
   Proof. mk_rvc (KF + 0x48)%Z (mword_of_int 0xe09c : mword 16)
-    (mword_of_int (KF + 0x48) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 8)) kdc_e09c exec_execute_C_SD. Qed.
+    (mword_of_int (KF + 0x48) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 8)) cdec_e09c exec_execute_C_SD. Qed.
 
   Lemma kfi_4a : kernel_text -∗ instr (mword_of_int (KF + 0x4a) : mword 64) false (STORE (mword_of_int 0x18 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 18), 8)).
   Proof. mk_base (KF + 0x4a)%Z (mword_of_int 0x00993c23 : mword 32)

@@ -723,6 +723,93 @@ Lemma cdec_079e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_SLLI (mword_of_int 7, Regidx (mword_of_int 15)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+(* ---- the syscall-layer word set: sys_close's [c.li a5,-1] / [c.li a5,0]
+   error-and-success returns, the [c.mv a0,a5] that moves the return value
+   into a0, and the [c.slli a5,3] / [c.add a0,a0,a5] pair that indexes
+   [p->ofile[fd]].  [c.li a5,-1] was walk's [wdec_1a], [c.mv a0,a5]
+   pipealloc's [padc_853e] and [c.add a0,a0,a5] mycpu's [mydec_add]. ---- *)
+
+(* c.li a5,-1  (63 is -1 in a 6-bit field) *)
+Lemma cdec_57fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x57fd : mword 16)) s
+  = Some (C_LI (mword_of_int 63, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.li a5,0 *)
+Lemma cdec_4781 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4781 : mword 16)) s
+  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.mv a0,a5 *)
+Lemma cdec_853e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x853e : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.add a0,a0,a5 *)
+Lemma cdec_953e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x953e : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 10), Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.slli a5,3 *)
+Lemma cdec_078e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x078e : mword 16)) s
+  = Some (C_SLLI (mword_of_int 3, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ---- argfd's word set that other functions already had a private copy of:
+   [c.li a0,-1] (mappages, pipealloc), [c.ld a5,0(a0)] (mappages), [c.sd
+   a5,0(s1)] (kfree) and the [c.j] back to a shared epilogue (pipealloc).
+   [c.li a5,15] is argfd's NOFILE-1 bound; the only other occurrence is in
+   WpStartNew's index-keyed M-mode boot table, which is a world of its own,
+   so this is a self-contained re-proof at the shared altitude rather than an
+   import of that file. ---- *)
+
+(* c.li a0,-1  (63 is -1 in a 6-bit field) *)
+Lemma cdec_557d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x557d : mword 16)) s
+  = Some (C_LI (mword_of_int 63, Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.li a5,15 *)
+Lemma cdec_47bd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x47bd : mword 16)) s
+  = Some (C_LI (mword_of_int 15, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.ld a5,0(a0) *)
+Lemma cdec_611c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x611c : mword 16)) s
+  = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.sd a5,0(s1) *)
+Lemma cdec_e09c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe09c : mword 16)) s
+  = Some (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* their leaf-form expansions (WpMmodeLeafBase's [exec_execute_C_{LD,SD}_leaf]
+   at offset 0 / a0 / a5 and offset 0 / s1 / a5) -- the shape a WP leaf takes,
+   with a literal [mword 12] and plain [Regidx]es. *)
+Lemma cexec_611c s :
+  exec (execute (C_LD (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)), s).
+Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+Lemma cexec_e09c s :
+  exec (execute (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 0, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 8)), s).
+Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* c.j -0x0e -- the branch to a shared epilogue *)
+Lemma cdec_bfcd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbfcd : mword 16)) s
+  = Some (C_J (mword_of_int 2041), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 (* ---- shared PLIC per-hart context address arithmetic (plicinithart,
    plic_claim, plic_complete all build their context address this way) ---- *)
 
@@ -815,3 +902,38 @@ Lemma frame_cancel_80 (X : mword 64) :
   add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))
           (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = X.
 Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* ---- words shared by proc_mapstacks / walk and procinit ----
+   procinit computes KSTACK(i) with the same instruction sequence
+   proc_mapstacks uses, and saves the same s6/s7 frame walk does, so these
+   stopped being single-user the moment procinit was written. *)
+Lemma cdec_e05a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xe05a : mword 16)) s
+    = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 22)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_07b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x07b2 : mword 16)) s
+    = Some (C_SLLI (mword_of_int 12, Regidx (mword_of_int 15)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_1902 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x1902 : mword 16)) s
+    = Some (C_SLLI (mword_of_int 32, Regidx (mword_of_int 18)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_19fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x19fd : mword 16)) s
+    = Some (C_ADDI (mword_of_int 63, Regidx (mword_of_int 19)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_09b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x09b2 : mword 16)) s
+    = Some (C_SLLI (mword_of_int 12, Regidx (mword_of_int 19)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_6b02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x6b02 : mword 16)) s
+    = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 22)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
