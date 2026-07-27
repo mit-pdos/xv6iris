@@ -135,10 +135,15 @@ Section ProcInv.
 
   (* ---- projections: what callers actually use ---- *)
 
-  (* The read-only pid fraction.  This is what [myproc()->pid] reads, and it
-     RETIRES the ad-hoc [p_pid pj ↦₄{dq} pidv] premise/postcondition pair
-     threaded through SpecAcquiresleep / SpecHoldingsleep / SpecSleep: those
-     become this projection, and [dq] stops being a spec parameter. *)
+  (* The read-only pid fraction: what [myproc()->pid] reads.
+
+     This is also exactly what SpecAcquiresleep / SpecHoldingsleep already
+     consume.  Those specs take [p_pid pj ↦₄{dq} pidv] at a UNIVERSALLY
+     QUANTIFIED [dq], so they compose with [proc_priv] unchanged, at
+     [dq := DfracOwn (1/4)] -- and they should STAY that way.  Threading the
+     whole [proc_priv] through them instead would drag [fileG]/[γf] into the
+     sleeplock layer purely to read a pid; the bare fraction is both the
+     weaker premise and the honest one. *)
   Lemma proc_priv_pid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv γf pa pid V -∗
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
@@ -188,8 +193,14 @@ Section ProcInv.
      allocproc overwrites without reading), and stating it would cost an
      obligation on every release AND break [proc_dormant]'s symmetry between
      UNUSED and ZOMBIE. *)
-  Definition proc_dormant (pa : mword 64) (pid : mword 32) : iProp Σ :=
-    (∃ V : pprivate,
+  (* [pid] is existential here rather than an index: the invariant's OWN half
+     of the cell is always resident (SchedCtx's [proc_pub]), and two halves of
+     the same points-to agree for free, so indexing would only duplicate a
+     fact [word4_pointsto_agree] already gives.  Keeping [st] and [pid] both
+     out makes [proc_slots] a function of the state alone, which is what makes
+     [proc_slots_recast] hold in BOTH directions within a guard class. *)
+  Definition proc_dormant (pa : mword 64) : iProp Σ :=
+    (∃ (V : pprivate) (pid : mword 32),
        ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
         pv_cwd V = (zero_reg : mword 64)⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
@@ -201,15 +212,16 @@ Section ProcInv.
      a full [proc_priv] (and a writable pid cell).  The null-ofile fact is
      exactly what discharges every [ofile_slot]'s left disjunct, with no
      [file_ref] to conjure from nowhere. *)
-  Lemma proc_dormant_to_priv (γf : gname) (pa : mword 64) (pid : mword 32) :
-    proc_dormant pa pid -∗
+  Lemma proc_dormant_to_priv (γf : gname) (pa : mword 64) :
+    proc_dormant pa -∗
     own_ctx (p_context pa) ∗
-    p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
-    ∃ V, ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64)⌝ ∗
-         proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
+    ∃ (V : pprivate) (pid : mword 32),
+      ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64)⌝ ∗
+      p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+      proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx)".
-    iFrame "Hctx Hpid". iExists V. iSplit; [done|]. iFrame "Hf".
+    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx)".
+    iFrame "Hctx". iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "Hcell".
     apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". by iLeft.

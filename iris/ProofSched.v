@@ -152,7 +152,7 @@ Section ProofSched.
     iIntros "Hcg #Htext Hpc #Hprocs Hheld Hcpu Hown Hvc Hcont".
     (* the cpu bundle [cpu_own γ 1 eb pj emp] arrives whole at level 1; unfold
        it to the individual cells + counting token the check-chain threads. *)
-    iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hlkcpu)".
+    iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hpub & Hlkcpu)".
     (* a persistent copy of the level-1 handler-avail payload (needed only when
        the saved base enable [eb] is true) for the return-path retune. *)
     iAssert (cpu_own γ 1 eb (proc_addr j) emp ∗
@@ -856,8 +856,8 @@ Section ProofSched.
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs j γl st ch Hj Hgl Hneeds
-                  with "[Hlocked Hstate Hchan Hlkcpu]") as "HP".
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hlkcpu". }
+                  with "[Hlocked Hstate Hchan Hpub Hlkcpu]") as "HP".
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hlkcpu". }
     (* apply swtch. *)
     iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj

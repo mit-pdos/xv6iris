@@ -372,7 +372,7 @@ Section ProofWakeup.
                         = mword_of_int (KernelSyms.wakeup + 0x46)).
         { rewrite HM42ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc46) in "Hpc".
-        iDestruct (proc_lock_res_elim γ Φ γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpch & Hctx)".
+        iDestruct (proc_lock_res_elim γ Φ γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpch & Hpub & Hctx)".
         (* the acquire-returned lock cpu word: rewrite its address to the form release wants. *)
         iEval (rewrite HM42a0) in "Hcpu2".
         iEval (rewrite HM42tp) in "Hcpu2".
@@ -624,7 +624,7 @@ Section ProofWakeup.
                             (sign_extend' 64 (mword_of_int 8162 : mword 13))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite H48tgt) in "Hpc".
-          iDestruct (proc_lock_res_intro γ Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
+          iDestruct (proc_lock_res_intro γ Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hpub Hctx") as "HR".
           iApply ("Hrel" $! M48 with "[%] Hcg Hpc Htok HR").
           repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_4 | exact HM48_18
                         | exact HM48_19 | exact HM48_20 | exact HM48_21
@@ -708,7 +708,7 @@ Section ProofWakeup.
                               (sign_extend' 64 (mword_of_int 8156 : mword 13))
                             = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite H4etgt) in "Hpc".
-            iDestruct (proc_lock_res_intro γ Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hctx") as "HR".
+            iDestruct (proc_lock_res_intro γ Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hpub Hctx") as "HR".
             iApply ("Hrel" $! M4e with "[%] Hcg Hpc Htok HR").
             repeat split; [exact HM4e_9 | exact HM4e_2 | exact HM4e_4 | exact HM4e_18
                           | exact HM4e_19 | exact HM4e_20 | exact HM4e_21
@@ -743,11 +743,10 @@ Section ProofWakeup.
                             = mword_of_int (KernelSyms.wakeup + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite Hpc56) in "Hpc".
             (* reassemble proc_lock_res via the wakeup transition. *)
-            assert (Hnc : (if needs_ctx st then ▷ proc_ctx γ Φ γs (proc_addr k) else emp)%I
-                          = (▷ proc_ctx γ Φ γs (proc_addr k))%I)
-              by (rewrite Hst_sl needs_ctx_SLEEPING; reflexivity).
-            iEval (rewrite Hnc) in "Hctx".
-            iDestruct (proc_lock_res_wakeup γ Φ γs γk (proc_addr k) ch with "Hpst Hpch Hctx") as "HR".
+            (* SLEEPING -> RUNNABLE stays inside one guard class, so the slots
+               cross untouched and no guard is opened. *)
+            iDestruct (proc_lock_res_wakeup γ Φ γs γk (proc_addr k) st ch Hst_sl
+                         with "Hpst Hpch Hpub Hctx") as "HR".
             (* ---- 0x56 c.j release ---- *)
             iPoseProof (wki_56 with "Htext") as "Hi56".
             assert (H56tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64)

@@ -20,17 +20,28 @@ the evidence for every offset. This file is only the worklist.
 
 ## Next
 
-- [ ] **S1 — the `proc_lock_res` swap** (`SchedCtx.v`). Add `proc_slots pa st
-      pid` (the two flat guards) and `proc_slots_recast`; grow the
-      always-resident row with `killed`/`xstate`/the `pid` half; grow
-      `proc_held` to match. Re-prove the downstream users: `ProofYield`,
-      `ProofSched`, `ProofSleep`, `ProofWakeup(Parts)`. `proc_lock_res_wakeup`
-      becomes a corollary of `proc_slots_recast`. Nothing in `ProcInv.v`
-      changes.
-- [ ] **S2 — retire the ad-hoc pid threading.** `SpecAcquiresleep.v` /
-      `SpecHoldingsleep.v` / `SpecSleep.v` currently thread
-      `p_pid pj ↦₄{dq} pidv` through pre- and postcondition with `dq` as a spec
-      parameter. Replace with `proc_priv` + `proc_priv_pid`; `dq` disappears.
+- [x] **S1 — the `proc_lock_res` swap** (done). `SchedCtx.v` gained
+      `proc_pub` (killed + xstate + the invariant's permanent half of the pid
+      cell, existentially bundled so growing the invariant costs each caller
+      one opaque conjunct instead of three spec parameters), `proc_slots` (the
+      two flat guards), and `proc_slots_recast`. `proc_held` grew by
+      `proc_pub`. Fallout was 4 files and ~15 lines: ProofYield, ProofSleep,
+      ProofSched, ProofWakeup. `proc_lock_res_wakeup` now *is*
+      `proc_slots_recast`, which deleted wakeup's `needs_ctx`-rewrite dance.
+      `proc_dormant` ended up NOT indexed by `pid` either — the invariant's own
+      half is always resident and two halves of a points-to agree for free — so
+      `proc_slots` is a function of `st` alone and `proc_slots_recast` holds in
+      both directions within a guard class.
+- [x] **S2 — retiring the ad-hoc pid threading: NOT NEEDED, and would be
+      wrong.** The claim in the first draft of the design note was mistaken.
+      `SpecAcquiresleep` / `SpecHoldingsleep` take `p_pid pj ↦₄{dq} pidv` at a
+      *universally quantified* `dq`, so they already compose with `proc_priv`
+      unchanged at `dq := DfracOwn (1/4)` (checked: `proc_priv_pid`'s
+      conclusion is literally their premise at that instantiation). Rewriting
+      them to take `proc_priv` would add a `fileG`/`γf` dependency to the
+      sleeplock layer purely to read a pid — a strictly worse interface. The
+      bare fraction is both the weaker premise and the honest one.
+
 - [ ] **S3 — `p_ofile` loop lemmas.** `fdalloc` scans the array, so it needs a
       successor lemma and injectivity on `fd < NOFILE`, in the style of
       `ProcGeom.proc_addr_succ` / `p_context_proc_addr_inj`. (`ArrCursor.acur`

@@ -14,28 +14,35 @@ reuses verbatim), `completed/yield-sched.md` (how `proc_lock_res` came to be).
 
 ## Geometry
 
-All offsets corroborated by `xv6-riscv/kernel/kernel.asm` (`addi a5,a0,208`
-+ stride 8 × 16 in `fdalloc`; `ld a1,72(a0)` / `ld a0,80(a0)` in `growproc`;
-`ld a0,336(s2)` / `sd s1,336(s2)` in `sys_chdir`; `lw a5,48(a0)` in
-`acquiresleep`). `sizeof(struct proc)` = 360 = `ProcGeom.proc_size`. ✓
+All offsets corroborated by disassembly (`addi a5,a0,208` + stride 8 × 16 in
+`fdalloc`; `ld a1,72(a0)` / `ld a0,80(a0)` in `growproc`; `ld a0,336(s2)` /
+`sd s1,336(s2)` in `sys_chdir`; `lw a5,48(a0)` in `acquiresleep`).
+`sizeof(struct proc)` = 360 = `ProcGeom.proc_size`. ✓
 
-| field | off | width | modelled today |
+> **Caveat on where to read instructions.** `xv6-riscv/kernel/kernel.asm` is
+> *stale* relative to `kernel-rocq/KernelInstrs.v` — function symbols are
+> shifted by 0xe. Struct offsets are unaffected (they are layout, not
+> addresses), so the corroboration above stands, but any *instruction word or
+> address* must come from `KernelInstrs.v` / `KernelSyms.v`, which are what the
+> proofs actually build against.
+
+| field | off | width | resource |
 |---|---|---|---|
-| `lock` (spinlock: `locked`@0, `name`@8, `cpu`@16) | 0 | 24 | ✅ `is_lock` / `p_lkcpu` |
-| `state` | 24 | 4 | ✅ `p_state` |
-| `chan` | 32 | 8 | ✅ `p_chan` |
-| `killed` | 40 | 4 | ❌ |
-| `xstate` | 44 | 4 | ❌ |
-| `pid` | 48 | 4 | ✅ `p_pid` (threaded ad hoc at `↦₄{dq}`) |
-| `parent` | 56 | 8 | ❌ |
-| `kstack` | 64 | 8 | ❌ |
-| `sz` | 72 | 8 | ❌ |
-| `pagetable` | 80 | 8 | ❌ |
-| `trapframe` | 88 | 8 | ❌ |
-| `context` | 96 | 112 | ✅ `p_context` / `own_ctx` / `proc_ctx` |
-| `ofile[16]` | 208 | 128 | ❌ |
-| `cwd` | 336 | 8 | ❌ |
-| `name[16]` | 344 | 16 | ❌ |
+| `lock` (spinlock: `locked`@0, `name`@8, `cpu`@16) | 0 | 24 | `is_lock` / `p_lkcpu` |
+| `state` | 24 | 4 | `proc_lock_res`, top level |
+| `chan` | 32 | 8 | `proc_lock_res`, top level |
+| `killed` | 40 | 4 | `proc_pub` |
+| `xstate` | 44 | 4 | `proc_pub` |
+| `pid` | 48 | 4 | ½ in `proc_pub`, ½ in `proc_priv` |
+| `parent` | 56 | 8 | ❌ (belongs to `wait_lock`) |
+| `kstack` | 64 | 8 | `is_kstack` (persistent) |
+| `sz` | 72 | 8 | `proc_priv` / `proc_dormant` |
+| `pagetable` | 80 | 8 | `proc_priv` / `proc_dormant` |
+| `trapframe` | 88 | 8 | `proc_priv` / `proc_dormant` (pointer only) |
+| `context` | 96 | 112 | `own_ctx` / `proc_ctx` |
+| `ofile[16]` | 208 | 128 | `proc_ofiles` (a `file_ref` per non-null slot) |
+| `cwd` | 336 | 8 | `proc_priv`; `cwd_ref` still `emp` |
+| `name[16]` | 344 | 16 | `proc_priv` |
 
 `NOFILE = 16`, `NPROC = 64` (`param.h`).
 
@@ -257,10 +264,14 @@ Lemma proc_priv_ofile γf pa pid V fd v :        (* one fd slot, borrow-and-retu
     (∀ v', ofile_slot γf pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
 ```
 
-The first one *retires* the ad-hoc `p_pid pj ↦₄{dq} pidv` premise+postcondition
-pair currently threaded through `SpecAcquiresleep.v` / `SpecHoldingsleep.v` /
-`SpecSleep.v` — those become projections out of `proc_priv`, and `dq` stops
-being a spec parameter.
+The first one is exactly what `SpecAcquiresleep.v` / `SpecHoldingsleep.v`
+already consume. Those take `p_pid pj ↦₄{dq} pidv` at a *universally
+quantified* `dq`, so they compose with `proc_priv` **unchanged**, at
+`dq := DfracOwn (1/4)` — and they should stay that way. Rewriting them to take
+`proc_priv` would drag `fileG`/`γf` into the sleeplock layer purely to read a
+pid. A bare fraction is the weaker premise and the honest one; that a caller
+now obtains it from `proc_priv` rather than from thin air is a fact about the
+caller, not about the callee's contract.
 
 `kstack` is separate and persistent. It is stated over a bare address+value
 rather than `proc_addr j` / `KvmMap.kstack_va j`, so `ProcInv.v` need not
@@ -309,8 +320,8 @@ dormant bundle **never holds a `file_ref` or an inode reference.** It is raw
 cells plus pure facts, and `γf` does not appear in `proc_lock_res` at all:
 
 ```coq
-Definition proc_dormant (pa : mword 64) (pid : mword 32) : iProp Σ :=
-  (∃ V : pprivate,
+Definition proc_dormant (pa : mword 64) : iProp Σ :=
+  (∃ (V : pprivate) (pid : mword 32),
      (* the only value fact, and the one that carries weight: the dormant
         bundle owes no file and no inode reference. *)
      ⌜pv_ofile V = replicate NOFILE zero_reg /\ pv_cwd V = zero_reg⌝ ∗
@@ -328,9 +339,15 @@ Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
      p_xstate pa ↦₄ xs ∗
      p_pid pa    ↦₄{#(1/2)} pid ∗
      (* ===== two independent single-boolean slots, side by side ===== *)
-     (if needs_ctx st   then ▷ proc_ctx pa       else emp) ∗
-     (if inv_dormant st then proc_dormant pa pid else emp))%I.
+     (if needs_ctx st   then ▷ proc_ctx pa   else emp) ∗
+     (if inv_dormant st then proc_dormant pa else emp))%I.
 ```
+
+`pid` is existential inside `proc_dormant` rather than an index: the
+invariant's own half of the cell is always resident in `proc_pub`, and two
+halves of the same points-to agree for free, so indexing would only duplicate
+what `word4_pointsto_agree` already gives. The payoff is that `proc_slots` is
+a function of `st` **alone**.
 
 The `∃ V` lives inside `proc_dormant`, not at the top level: outside the
 dormant arm there is no `V` to talk about, and hoisting it would leave an
@@ -374,13 +391,13 @@ that does not move any resource, which is *every* state change except the six
 allocation/parking transitions:
 
 ```coq
-Definition proc_slots (pa : mword 64) (st pid : mword 32) : iProp Σ :=
+Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
   ((if needs_ctx st   then ▷ proc_ctx pa       else emp) ∗
-   (if inv_dormant st then proc_dormant pa pid else emp))%I.
+   (if inv_dormant st then proc_dormant pa else emp))%I.
 
-Lemma proc_slots_recast pa st st' pid :
+Lemma proc_slots_recast pa st st' :
   needs_ctx st' = needs_ctx st -> inv_dormant st' = inv_dormant st ->
-  proc_slots pa st pid -∗ proc_slots pa st' pid.
+  proc_slots pa st -∗ proc_slots pa st'.
 ```
 
 Both side conditions are `vm_compute`, and the proof is `destruct` on two

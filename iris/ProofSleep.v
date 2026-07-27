@@ -343,7 +343,7 @@ Section ProofSleep.
                     = mword_of_int (SL + 0x1c)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
     (* unpack the proc lock resource; drop the context slot. *)
-    iDestruct (proc_lock_res_elim γ Φ γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hchan & Hslot)".
+    iDestruct (proc_lock_res_elim γ Φ γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hchan & Hpub & Hslot)".
     iClear "Hslot".
     (* +0x1c c.mv a0,s2 : a0 := lk0 (via zero_reg twice) *)
     iPoseProof (sli_1c with "Htext") as "Hi1c".
@@ -485,10 +485,10 @@ Section ProofSleep.
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
     iApply (Sched.wp_sched_sconf γ Φ γs j γl SLEEPING chan D1 (av - 6)%nat eb
               HtpD1 Hj Hgl (needs_ctx_SLEEPING) ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hlkcpu] Hcpuemp Hown Hvc [-]").
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hlkcpu". }
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hpub Hlkcpu] Hcpuemp Hown Hvc [-]").
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hlkcpu". }
     iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Hcpuemp Hown' Hvc'".
-    iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hlkcpu)".
+    iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub & Hlkcpu)".
     iAssert (cpu_own γ 1 eb (proc_addr j) C) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
     assert (Hpc2e : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
@@ -553,9 +553,9 @@ Section ProofSleep.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H0. apply kv_addv_zero. }
     (* rebuild the proc lock resource: RUNNING needs no context, slot emp. *)
-    iAssert (proc_lock_res γ Φ γs γl (proc_addr j)) with "[Hstate Hchan]" as "HR2".
-    { rewrite /proc_lock_res. iExists RUNNING, (zero_reg : mword 64). iFrame "Hstate Hchan".
-      rewrite needs_ctx_RUNNING. done. }
+    iAssert (proc_lock_res γ Φ γs γl (proc_addr j)) with "[Hstate Hchan Hpub]" as "HR2".
+    { rewrite /proc_lock_res. iExists RUNNING, (zero_reg : mword 64). iFrame "Hstate Hchan Hpub".
+      rewrite /proc_slots needs_ctx_RUNNING inv_dormant_RUNNING. done. }
     assert (Hcpueq_r2 : eq_vec (mycpu_ret cid_word) (mycpu_ret (E1 !!! Regidx (mword_of_int 4 : mword 5))) = true)
       by (rewrite HtpE1; apply eq_vec_true_iff; reflexivity).
     iApply (Release.wp_release_sconf γ Φ γl (proc_addr j) "proc"%string
