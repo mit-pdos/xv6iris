@@ -37,8 +37,8 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvPtsto.
+Require Import DevModel.
 
 Section WpVirtio.
   Context `{!riscvGS Σ}.

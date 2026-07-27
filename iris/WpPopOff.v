@@ -39,7 +39,7 @@ Require Import InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS.
+Require Import SmodeCore.
 Require Import WpPushOffCsr.
 Require Import WpRvcBridge KernelRvcDecode.
 From Kernel Require KernelInstrs.

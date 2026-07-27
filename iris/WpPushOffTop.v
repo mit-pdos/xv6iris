@@ -17,7 +17,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode ExecCommon KernelText.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS WpSpinNew.
+Require Import SmodeCore.
 Require Import WpPushOffCsr.
 Require Import WpRvcBridge KernelRvcDecode.
 (* QUALIFIED (no Import): sstatus SIE-bit bridges for the saved-intena = 0 fact. *)

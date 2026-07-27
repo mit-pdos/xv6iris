@@ -20,7 +20,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock WpMycpu ProcGeom WpAmo KernelRvcDecode.
-Require Import SpecMycpu SpecHolding SpecPanic.
+Require Import SpecMycpu SpecHolding.
 Require Import SpecPushOff.
 Require Import WpAcquireTop.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

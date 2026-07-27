@@ -26,7 +26,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import WpMycpu.
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

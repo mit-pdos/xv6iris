@@ -42,7 +42,6 @@ Require Import SleepLock.
 Require Import WpSleeplockDecode.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
-Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.

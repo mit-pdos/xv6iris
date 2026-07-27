@@ -28,7 +28,7 @@ Require Import RegFile.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import PtTree.
-Require Import PtBuild KptPt KptExecMap KMap KptTree KvmMap.
+Require Import PtBuild KptExecMap KvmMap.
 From Kernel Require KernelSyms.
 
 Notation KVMIH := KernelSyms.kvminithart.

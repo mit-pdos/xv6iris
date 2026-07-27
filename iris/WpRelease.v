@@ -30,8 +30,8 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS.
-Require Import WpAcquireTop KernelRvcDecode.
+Require Import SmodeCore.
+Require Import KernelRvcDecode.
 Require Import WpLock WpPopOff.
 (* subrange_full / mSIE_lower / sie_bit for the sstatus-SIE bridge; kept
    QUALIFIED so the WpGprCsrwC namespace doesn't shadow anything. *)

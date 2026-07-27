@@ -37,7 +37,7 @@ Require Import InstrBytes RiscvFetchExec KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import VcGen.
-Require Import RiscvExec RiscvExtras RiscvTryStep WpDecode WpRvcBridge.
+Require Import RiscvExec RiscvExtras WpDecode WpRvcBridge.
 From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.

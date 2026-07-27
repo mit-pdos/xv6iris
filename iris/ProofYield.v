@@ -24,7 +24,6 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
-Require Import WpMycpu.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -32,7 +31,6 @@ Require Import KernelRvcDecode.
 Require Import WpYieldDecode.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecYield.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import SpecPanic.
 Import Defs.
 Local Open Scope Z_scope.
 

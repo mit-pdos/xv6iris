@@ -37,7 +37,7 @@ Require Import RegFile.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SmodePte.
 Require Import SmodeCore WpSmodeGpr.
-Require Import SmodeCorePt WpSmodePtMem WpSmodePtLock WpAmo.
+Require Import SmodeCorePt WpSmodePtLock WpAmo.
 Require Import MemAccessGen.
 Require Import UserBits.
 Require Import WpLock.

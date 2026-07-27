@@ -28,8 +28,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen.
 Require Import WpLock.
-Require Import WpMycpu ProcGeom.
-Require Import IntrDefs CpuOwn.
+Require Import ProcGeom.
 Require Import KernelRvcDecode WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSysUptimeDecode.
@@ -37,7 +36,6 @@ Require Import TicksInv.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecSysUptime.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import SpecPanic.
 Import Defs.
 
 Local Open Scope Z_scope.

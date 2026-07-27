@@ -36,7 +36,6 @@ Require Import MinstretInv InstrBytes WpGpr ExecCommon.
 Require Import WpGprCsrrCommon WpGprCsrrB.
 Require Import WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
-Require Import StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import TimerCap.
 Local Open Scope Z_scope.

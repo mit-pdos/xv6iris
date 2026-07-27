@@ -26,14 +26,13 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv WpKallocDecode.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
 Require Import VcGen.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMemsetPage SpecAcquire SpecRelease.
 Require Import WpKalloc.
 Require Import SpecKalloc.
-Require Import SpecPanic.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

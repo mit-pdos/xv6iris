@@ -18,7 +18,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode ExecCommon.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore KernelText WpMemsetS.
+Require Import SmodeCore KernelText.
 Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.

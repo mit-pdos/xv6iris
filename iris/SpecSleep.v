@@ -30,7 +30,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import WpMycpu.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.

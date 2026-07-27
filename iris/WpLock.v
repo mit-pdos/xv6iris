@@ -35,7 +35,7 @@ From iris.base_logic.lib Require Import invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
-Require Import WpMycpu ProcGeom.
+Require Import ProcGeom.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

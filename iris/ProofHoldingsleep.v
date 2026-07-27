@@ -19,7 +19,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import WpLock.
-Require Import WpMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpWakeup.
@@ -27,7 +27,6 @@ Require Import WpSleeplockDecode.
 Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import SpecPanic.
 Import Defs.
 
 Local Open Scope Z_scope.

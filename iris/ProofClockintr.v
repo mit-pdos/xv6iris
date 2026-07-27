@@ -35,13 +35,12 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
 Require Import WpMycpu ProcGeom.
-Require Import IntrDefs CpuOwn.
+Require Import IntrDefs.
 Require Import KernelRvcDecode WpAuipc.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpGprCsrrB WpGprCsrwB.
 Require Import TimerCap WpSconfTimer.
 Require Import TicksInv.
-Require Import SchedCtx WpWakeup.
+Require Import ProcGeom.
 Require Import WpClockintrDecode.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.

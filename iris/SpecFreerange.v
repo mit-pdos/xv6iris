@@ -15,7 +15,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
 Require Import KallocInv.
 Require Import IntrDefs.
 Require Import SpecPanic.
