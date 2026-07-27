@@ -348,12 +348,17 @@ references, and its supply has no principled source.)
   `fd_slots_to_any` turns one bundle into the per-descriptor form, and
   `ProcInv.proc_dormant_seal` glues a bundle onto the fd-slot-free block
   (`proc_dormant_nofd`) to make a real `proc_dormant`. What is missing is the
-  instruction-level work: `procinit` is 62 instructions with an 8-slot frame,
-  `initlock` called *inside* the loop (so `callee_saved` must be threaded per
-  iteration, unlike filealloc's call-free scan), and the `KSTACK(i)` address
-  arithmetic to bridge to `KvmMap.kstack_va i`. Until it lands nothing calls
-  `fd_slots_alloc`, so the law is enforced everywhere it is consumed but not
-  yet established at its origin.
+  instruction-level work: `procinit` is 62 instructions with an 8-slot frame
+  and `initlock` called *inside* the loop, so `callee_saved` must be threaded
+  per iteration (unlike filealloc's call-free scan). Its leaves are now all
+  present — `wp_srai_s_sconf` / `wp_mul_s_sconf` / `wp_addw_s_sconf` are in
+  `WpSconfAlu.v` and their exec bridges in `WpMmodeShiftiop.v`. The `KSTACK(i)`
+  arithmetic is a magic-constant division (`45 * 0x4fa4fa4fa4fa4fa5 ≡ 1 mod
+  2^64`, so the `mul` recovers `i`); `ProofProcMapstacks.v` already proves the
+  whole chain (`kstack_mul_step`, `srai3`, `slli13`, `addw_step`) for the same
+  address, and those should be lifted next — they are still stuck in a Proof
+  file. Until procinit lands nothing calls `fd_slots_alloc`, so the law is
+  enforced everywhere it is consumed but not yet established at its origin.
 - **Generalize the pool.** `bcache` (`b->refcnt` under `bcache.lock`), `itable`
   (`ip->ref` under `itable.lock`) and `ftable` are the *same* object: an array
   of slots with an int refcount under one spinlock, contents shared read-only

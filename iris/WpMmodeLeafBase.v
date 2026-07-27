@@ -2123,5 +2123,3 @@ End ExecLoadGchk.
 (* WpUserClassify.v; RTYPE/RTYPEW/MUL are proved here (the shared base), so *)
 (* the orchestrator can wire them into the rd=0 RVC HINT arm.               *)
 (* ====================================================================== *)
-
-
