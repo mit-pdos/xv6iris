@@ -383,6 +383,7 @@ LinkArgint.v
 SpecKilled.v
 ProofKilled.v
 LinkKilled.v
+SpecSysPause.v
 SpecArgfd.v
 WpArgfdDecode.v
 ProofArgfd.v
