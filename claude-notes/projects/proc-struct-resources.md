@@ -106,7 +106,8 @@ the evidence for every offset. This file is only the worklist.
       jump table at `0x80007758`, whose six self-relative entries are read out
       of `kernel_data`, added back to the table base, and entered with
       `c.jr a5`. Both functions are axiom-clean; `proof_coverage` reports them
-      `proven`. `ProofArgraw.v` costs **95 s / 2.5 GB**.
+      `proven`. `ProofArgraw.v` costs **21 s / 1.0 GB** (was 95 s / 2.5 GB —
+      see the `ar_table_word` bullet below).
 
       **Getting there took two failed shapes, and the reason is the lesson.**
 
@@ -154,25 +155,54 @@ the evidence for every offset. This file is only the worklist.
       * **`kernel_data` byte facts do NOT close by `vm_compute; reflexivity`**
         — the two `bv 8` literals differ in their proof component. Use
         `vm_compute; f_equal; apply bv_eq; reflexivity`.
-      * `ar_table_word`'s 24 map lookups are ~67 s of the file's 95 s (each
-        `vm_compute` renormalises the 18k-entry `list_to_map`). Batching them
-        into one `vm_compute` would be the next win if it matters.
+      * **`ar_table_word` was 73.6 s of the file's 93.8 s, and it was the
+        inline-`ltac:` trap, NOT the map** (fixed 2026-07-27; the earlier note
+        here blamed "24 map lookups renormalising the 18k-entry
+        `list_to_map`" and that was measurably wrong — 24 separate
+        `vm_compute` lookups total **0.152 s**, because the VM compiles
+        `kernel_data` to bytecode once per process). The real cost was six
+        `iApply (kernel_data_window … ltac:(intros j Hj; destruct j …) …)`
+        under a six-way `destruct i` ON the Iris goal: the proofmode
+        re-elaborates each spliced `ltac:` without the `Qed` vm-seal, ~12 s a
+        site — the same pathology as the `kernel_data_string` witnesses.
+        Hoisting the byte premise into a pure `ar_tbl_bytes` lemma over a
+        SYMBOLIC `i` and passing it by name kills the `destruct i` and leaves
+        ONE `iApply`: region **73.6 s → 0.2 s**, file **93.8 s → 21.0 s**,
+        RSS **2.49 GB → 0.99 GB**, `LinkArgraw`/`LinkArgint` still build and
+        `Print Assumptions Argraw.wp_argraw_sconf` is still clean (Sail
+        primitives + funext only). Full account in optimization.md.
+      * **What is left in the 21 s is FLAT** — no sentence over 0.63 s; ~10 s
+        of tactic time and ~10 s of async `Qed` spread over the six arms and
+        `ar_tail`. The six arms are byte-identical modulo the index literal,
+        so collapsing them into one symbolic-`k` arm is the only remaining
+        structural win (~5/6 of the arm cost). Shape 2 above rejected exactly
+        that at 14 GB — but it was measured WITH the inline-`ltac:` premises
+        in place and BEFORE the regfile-as-function migration, so that verdict
+        is no longer evidence. Re-measure before believing it; the symbolic-`k`
+        helpers (`ar_i_tf`/`ar_i_ld`/`ar_jump_tgt`/`ar_arg_addr`/`ar_i_cj`/
+        `ar_cj_tgt`/`ar_ld_after_case`) are already in place.
       * Stack budget is cumulative: argraw `14 <= av`, argint `18 <= av`.
       * One instruction word (`addi a4,a4,52`) came from the STALE
         `kernel.asm`; `KernelInstrs` has `addi a4,a4,38`. Read words from
         `KernelInstrs.v`, never the `.asm`.
 
-- [ ] **S3b — `sys_pause`.** Needs S3a first (it opens with `argint(0,&n)`),
-      and is materially bigger than anything above: `acquire(&tickslock)`,
-      a `while (ticks - ticks0 < n)` loop whose body is
-      `killed(myproc())` + `sleep(&ticks,&tickslock)`, and `release`. So it
-      needs (i) `killed()` specified and proven — which S1 just enabled, since
-      `p_killed` now lives in `proc_pub` at the top level of `proc_lock_res`;
-      (ii) an iLöb loop over the proven `SLEEP` interface, the same shape as
-      `acquiresleep`'s sleep-retry loop (`ProofAcquiresleep.v`, 824 lines) —
-      that file is the template; (iii) `TicksInv`'s tick cell, already used by
-      `sys_uptime`. Budget it like acquiresleep, not like sys_getpid.
-
+- [x] **`killed` PROVEN** — the first consumer of the invariant's
+      always-resident row. `p_killed` lives in `SchedCtx.proc_pub`, at the top
+      level of `proc_lock_res`, so the read is: open the lock, destruct ONE
+      existential, `c.lw a5,40(s1)`, reassemble. It never learns the process's
+      state and never touches either `proc_slots` guard — which is exactly what
+      S1's flat row was for. Nineteen instructions, a 32-byte ra/s0/s1/s2 frame
+      with all four slots used (no gap); `p` parks in s1 across acquire and the
+      value in s2 across release. `panic_wp` is threaded because the reworked
+      `acquire` takes it.
+- [ ] **S3b — `sys_pause`.** All callees are now proven: `argint` ✓ `acquire` ✓
+      `myproc` ✓ `sleep` ✓ `release` ✓ `killed` ✓. What remains is sys_pause's
+      own shape — `acquire(&tickslock)`, then a `while (ticks - ticks0 < n)`
+      loop whose body is `killed(myproc())` + `sleep(&ticks,&tickslock)`, then
+      `release`. That needs an iLöb loop over the proven `SLEEP` interface; the
+      template is `ProofAcquiresleep.v`'s sleep-retry loop (824 lines), and
+      `TicksInv`'s tick cell is already used by `sys_uptime`. Budget it like
+      acquiresleep, not like sys_getpid.
 - [ ] **S3 — `p_ofile` loop lemmas.** `fdalloc` scans the array, so it needs a
       successor lemma and injectivity on `fd < NOFILE`, in the style of
       `ProcGeom.proc_addr_succ` / `p_context_proc_addr_inj`. (`ArrCursor.acur`
@@ -221,27 +251,32 @@ the evidence for every offset. This file is only the worklist.
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates.
 
-## The unlinked chain: what `argraw` now blocks
+## The unlinked chain: what is left after `argraw`
 
-Four functions are now *proven* but report as `assumed` in
-`tools/proof_coverage.py`, and all four are blocked on the same two things.
-Worth knowing before reading the report:
+**`argraw` is no longer the blocker — `fileclose` is the only one left.**
+S3a landed `LinkArgraw.v` and `LinkArgint.v`, both of which build, and
+`Print Assumptions Argraw.wp_argraw_sconf` shows only Sail primitives +
+functional extensionality. Current state:
 
 ```
 sys_close  --proof over-->  ARGFD, MYPROC, FILECLOSE
-argfd      --proof over-->  ARGINT, MYPROC
-argint     --proof over-->  ARGRAW            (parked: S3a, 74 GB as written)
-fileclose  --no proof-->    needs pipeclose / begin_op / iput / end_op
+argfd      --proof over-->  ARGINT, MYPROC     (no LinkArgfd yet: needs FILECLOSE's sibling)
+argint     --LINKED-->      real (LinkArgint.v)
+argraw     --LINKED-->      real (LinkArgraw.v)
+fileclose  --no proof-->    needs begin_op / iput / end_op (pipeclose: DONE, LinkPipeclose.v)
 myproc     --LINKED-->      real
 ```
 
-`Print Assumptions` on `SysCloseProof Argfd Myproc AxFileclose` (with
-`Argfd := ArgfdProof (ArgintProof AxArgraw) Myproc`) shows **exactly two**
-kernel-level axioms — `argraw` and `fileclose` — plus the Sail model's
-declared primitives and functional extensionality. So the whole
-sys_close/argfd/argint cone is one `argraw` rewrite (S3a) and one `fileclose`
-proof away from being linked end to end; nothing else is missing, and no
-`Link*.v` can exist for any of them until then.
+So the sys_close/argfd cone is ONE `fileclose` proof away from being linked
+end to end; nothing else is missing.
+
+**Reading the tree: `.vo` staleness will lie to you about this.** A checkout
+whose `.vo`s predate the "move `tf_page` to the VA tier" merge makes
+`ProofArgraw.v` fail at arm 0's `iExact "Hw"` with `a_tf_word … ↦ₚ₈ v` — the
+OLD physical-tier `tf_page_word`, not a real breakage. Check `.v -nt .vo`
+across `iris/` and `make` the dependency cone before concluding a proof is
+broken (durable-notes.md's stale-`.vo` trap; this one cost a full
+misdiagnosis).
 
 ## What `sys_close` needed (reusable)
 
