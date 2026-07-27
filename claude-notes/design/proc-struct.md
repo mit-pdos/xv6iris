@@ -467,6 +467,60 @@ them in re-proves yield/sched/sleep/wakeup. Nothing in `ProcInv.v` depends on
 that swap, so it can land on its own; see
 [`projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
 
+## The trapframe page, and where the page table lives
+
+`p_trapframe` owns only the *pointer*. The page it names is `tf_page tfp ws`
+(`ProcInv.v`): all 36 `struct trapframe` words with their **values**, plus the
+3808-byte tail owned anonymously so a `kfree` can hand the whole page back.
+The nth syscall argument is word `tf_arg_idx n = 14 + n` — which is exactly the
+immediate field `argraw`'s `c.ld a0,<112+8n>(a5)` encodes.
+
+That page used to be `ProcPtOwn.proc_tf_own`, a contents-**existential**
+`phys_page_own` inside `proc_pt_own`. Two independent reasons it had to move:
+
+- **Ownership.** `mem_pointsto` is *defined* in terms of `↦ₚ`
+  (`phys_to_mem_map`'s proof: `rewrite /mem_pointsto. iExists ppn. iFrame`), so
+  a VA-tier `↦₈` on a trapframe word and `phys_page_own` over the same page are
+  the *same* resource. Holding both would have made `proc_priv` provably
+  `False` — and every spec taking it vacuously true, which compiles.
+- **Values.** `phys_byte_any = ∃ b, a ↦ₚ b` forgets the contents, but
+  `argint`'s whole contract is the *value* of `tf->aN`.
+
+So mapping and cells stay in `proc_pt_at` (`upt_tree_spec` still maps
+TRAPFRAME, `proc_pt_wf` still demands `page_valid`, and both `p->pagetable` and
+`p->trapframe` cells are still owned there); only the bytes left. This is the
+evolution `ProcPtOwn`'s own comment anticipated — "precisely so it can later
+gain STRUCTURE … without disturbing anything else."
+
+`tf_page` is stated at the **physical** tier, indexed by the ppn, because the
+page is reached from both sides — the kernel's identity map (`argraw`'s
+`ld a0,112(a5)`) and the user table's TRAPFRAME va (uservec/userret). Each
+access site converts with `RiscvPtsto.phys_to_mem_claim` / `mem_to_phys_claim`,
+the same idiom the software page-table walks use for PT slots.
+
+`pprivate` therefore has no `pv_pagetable`/`pv_trapframe`: `proc_pt_at` pins
+both cells to `page_base (ud_root …)` / `page_base (ud_tfp …)`, so the
+descriptor `pv_upt : uptd` determines them and a separate value field could
+only be dead weight or disagree.
+
+**`proc_dormant` is indexed by `st`.** The address-space cells are keyed on
+`bool_decide (st = ZOMBIE)`: a ZOMBIE still owns a live table and trapframe
+page, which is exactly what `wait()`/`freeproc` reclaim, while at UNUSED
+`freeproc` has freed both and zeroed the cells. The disjunction is tied to the
+state rather than free — and consequently `proc_slots_recast` is restricted to
+the **live** class (`inv_dormant st = false`), because ZOMBIE → UNUSED
+genuinely moves resources and is `freeproc`'s job, not a recast.
+
+> **Performance landmine.** `iFrame` must not be allowed to search inside
+> these predicates. `proc_pt` reaches `pt_frame` and a big-op over the page
+> footprint; with the `Frame` instances free to unfold it, the two one-line
+> `proc_priv` projections took **300 s and 15.7 GB** (definitions alone: 2 s).
+> `Typeclasses Opaque proc_pt proc_pt_at` (ProcPtOwn) and
+> `Typeclasses Opaque tf_words tf_tail tf_page` (ProcInv) bring the file to
+> **8 s** — about 158×. `ProcPtOwn` already did this for `phys_page_own` /
+> `upt_pages_own`; the outer predicates need it just as much. Lemmas that must
+> see inside now say `rewrite /tf_page` explicitly.
+
 ## Holes to be honest about
 
 - **`cwd` has no `inode_ref`.** There is no inode model in the tree

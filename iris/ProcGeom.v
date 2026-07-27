@@ -128,6 +128,23 @@ Definition PNAMELEN : nat := 16%nat.
 Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
   add_vec pa (mword_of_int (344 + Z.of_nat i)).
 
+(* ---- struct trapframe (the page p->trapframe points at) ----------------
+   36 saved 64-bit words at offsets 0..280, i.e. [8*i] for field index i:
+     0 kernel_satp  1 kernel_sp  2 kernel_trap  3 epc  4 kernel_hartid
+     5 ra  6 sp  7 gp  8 tp  9 t0 10 t1 11 t2 12 s0 13 s1
+    14 a0 15 a1 16 a2 17 a3 18 a4 19 a5 20 a6 21 a7
+    22 s2 .. 31 s11  32 t3 33 t4 34 t5 35 t6
+   so the nth SYSCALL ARGUMENT (a0..a5) is field [14 + n] -- which is exactly
+   the imm field the [c.ld a0,<112+8n>(a5)] in argraw encodes.  The struct is
+   288 bytes; the page it sits in is 4096. *)
+Definition TFWORDS : nat := 36%nat.
+Definition TFBYTES : Z := 288.
+Definition tf_word_off (i : nat) : Z := 8 * Z.of_nat i.
+(* the nth syscall argument's field index *)
+Definition tf_arg_idx (n : nat) : nat := (14 + n)%nat.
+(* argraw serves a0..a5 *)
+Definition NARG : nat := 6%nat.
+
 (* p->ofile[fd].  NOFILE lives HERE rather than in FdSlots.v: it is
    [struct proc]'s array length, and FdSlots already imports this file. *)
 Definition NOFILE : nat := 16%nat.
