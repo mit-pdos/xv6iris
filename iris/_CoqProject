@@ -393,3 +393,5 @@ WpProcPagetableInstr.v
 ProofProcPagetable.v
 LinkProcPagetable.v
 ProcPtOwn.v
+WpPipecloseDecode.v
+SpecPipeclose.v

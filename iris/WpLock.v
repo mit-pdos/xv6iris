@@ -390,8 +390,9 @@ Section Lock.
       R -∗
       |={E ∖ ↑lockN, E}=> Out)%I.
 
-  (* put it back: today's release. *)
-  Lemma lock_finisher_close γ lk R E : ⊢ lock_finisher γ lk R False emp E.
+  (* put it back: today's release, and equally the release of an object that
+     merely still has other holders -- [D] is not used, only not taken. *)
+  Lemma lock_finisher_close γ lk R D E : ⊢ lock_finisher γ lk R D emp E.
   Proof.
     iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].

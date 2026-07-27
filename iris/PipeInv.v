@@ -301,18 +301,24 @@ Section PipeInv.
     iExFalso. iApply (pipe_shut_openmark with "Hs Hm").
   Qed.
 
-  (* pipeclose reading the OTHER end's flag as 0: that end is shut, and the
-     receipt is persistent, so the invariant keeps its copy and the closer
-     walks away with one. *)
-  Lemma pipe_endstate_closed γp w :
-    pipe_endstate γp w (mword_of_int 0 : mword 32) -∗
-    pipe_endstate γp w (mword_of_int 0 : mword 32) ∗ pipe_shut γp w.
+  (* pipeclose reading the OTHER end's flag and finding it shut: the receipt
+     is persistent, so the invariant keeps its copy and the closer walks away
+     with one, leaving the endstate exactly as it found it. *)
+  Lemma pipe_endstate_closed γp w v :
+    ~ pflag_open v ->
+    pipe_endstate γp w v -∗ pipe_endstate γp w v ∗ pipe_shut γp w.
   Proof.
-    iIntros "[[%Hop _]|(_ & Hfull & #Hs)]".
-    { exfalso. exact (pflag_zero_not_open Hop). }
+    intro Hclosed.
+    iIntros "[[%Hop _]|(-> & Hfull & #Hs)]"; [ done | ].
     iSplitL "Hfull"; [| iExact "Hs" ].
     iRight. iFrame "Hfull". iSplit; [done | iExact "Hs"].
   Qed.
+
+  (* the two receipts, in the order [pipe_res_dead] wants them. *)
+  Lemma pipe_shut_both γp w :
+    pipe_shut γp w -∗ pipe_shut γp (negb w) -∗
+    pipe_shut γp false ∗ pipe_shut γp true.
+  Proof. destruct w; iIntros "H1 H2"; iFrame. Qed.
 
   (* ---- the page bytes ---- *)
 
