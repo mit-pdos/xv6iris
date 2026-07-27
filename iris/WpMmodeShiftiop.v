@@ -313,3 +313,26 @@ Proof.
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
   apply exec_returnm.
 Qed.
+
+(* ---- RTYPEW SUBW exec leaf (mirror ADDW): the 32-bit [subw] whose
+   sign-extended result is what C's [int] subtraction leaves in the
+   register.  sys_pause's [ticks - ticks0] is the first user. ---- *)
+Definition gpr_subw_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  sign_extend' 64 (sub_vec (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32)
+                           (subrange_vec_dec (gpr_src rs2 s) 31 0 : mword 32)).
+
+Lemma exec_execute_RTYPEW_SUBW_gpr (rs2 rs1 rd : mword 5) s :
+  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (gpr_subw_val rs2 rs1 s))).
+Proof.
+  unfold gpr_subw_val, gpr_src.
+  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)))
+    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) SUBW).
+  unfold execute_RTYPEW. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnm.
+Qed.

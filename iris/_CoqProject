@@ -384,6 +384,9 @@ SpecKilled.v
 ProofKilled.v
 LinkKilled.v
 SpecSysPause.v
+WpSysPauseDecode.v
+ProofSysPause.v
+LinkSysPause.v
 SpecArgfd.v
 WpArgfdDecode.v
 ProofArgfd.v

@@ -55,11 +55,12 @@ Lemma sldec_addi_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   = Some (C_ADDI (mword_of_int 8, Regidx (mword_of_int 10)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x409c  c.lw a5,0(s1) *)
+(* 0x409c  c.lw a5,0(s1) -- the bit-keyed decode now lives in the shared base
+   (sys_pause steps the same word); kept under its old name for the call sites. *)
 Lemma sldec_lw_locked s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x409c : mword 16)) s
   = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (cdec_409c s). Qed.
 
 (* 0x591c  c.lw a5,48(a0) *)
 Lemma sldec_lw_pid_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->

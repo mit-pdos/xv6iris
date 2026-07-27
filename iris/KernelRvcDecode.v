@@ -937,3 +937,35 @@ Lemma cdec_6b02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
     = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 22)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
 
+
+(* ---- sys_pause's compressed words (the tick-wait loop's test/branches) ---- *)
+
+(* 0x409c  c.lw a5,0(s1)  -- shared by acquiresleep/holdingsleep and sys_pause *)
+Lemma cdec_409c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x409c : mword 16)) s
+    = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xc3b9  c.beqz a5,+0x46  -- [n == 0] skips the wait loop entirely *)
+Lemma cdec_c3b9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xc3b9 : mword 16)) s
+    = Some (C_BEQZ (mword_of_int 35, Cregidx (mword_of_int 7)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xed0d  c.bnez a0,+0x3a  -- killed(myproc()) took the -1 exit *)
+Lemma cdec_ed0d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xed0d : mword 16)) s
+    = Some (C_BNEZ (mword_of_int 29, Cregidx (mword_of_int 2)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xbf41  c.j -0x70  -- the [n < 0] fixup's back edge *)
+Lemma cdec_bf41 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xbf41 : mword 16)) s
+    = Some (C_J (mword_of_int 1992 : mword 11), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xbff9  c.j -0x22  -- the killed exit rejoins the shared epilogue *)
+Lemma cdec_bff9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xbff9 : mword 16)) s
+    = Some (C_J (mword_of_int 2031 : mword 11), s).
+  Proof. intro H. rvc_oneshot s H. Qed.

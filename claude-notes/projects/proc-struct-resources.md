@@ -195,14 +195,52 @@ the evidence for every offset. This file is only the worklist.
       with all four slots used (no gap); `p` parks in s1 across acquire and the
       value in s2 across release. `panic_wp` is threaded because the reworked
       `acquire` takes it.
-- [ ] **S3b — `sys_pause`.** All callees are now proven: `argint` ✓ `acquire` ✓
-      `myproc` ✓ `sleep` ✓ `release` ✓ `killed` ✓. What remains is sys_pause's
-      own shape — `acquire(&tickslock)`, then a `while (ticks - ticks0 < n)`
-      loop whose body is `killed(myproc())` + `sleep(&ticks,&tickslock)`, then
-      `release`. That needs an iLöb loop over the proven `SLEEP` interface; the
-      template is `ProofAcquiresleep.v`'s sleep-retry loop (824 lines), and
-      `TicksInv`'s tick cell is already used by `sys_uptime`. Budget it like
-      acquiresleep, not like sys_getpid.
+- [x] **S3b — `sys_pause` PROVEN and LINKED** (`WpSysPauseDecode.v` /
+      `ProofSysPause.v` / `LinkSysPause.v`, over ARGINT / ACQUIRE / RELEASE /
+      MYPROC / KILLED / SLEEP; **42 s / 1.4 GB**, axiom-clean, `proof_coverage`
+      reads it `proven`).  Fifty instructions, five joins, one iLöb loop.
+      What is worth reusing:
+
+      * **A frame whose callee-saved set depends on the path taken.** gcc
+        spills s1/s2/s3 at +0x2c, i.e. only AFTER the `c.beqz` that skips the
+        loop, so slots 3/4/5 are scratch on the `n == 0` path and hold the
+        caller's registers on the loop path. Both paths reach the same
+        `release; return 0` block, so state that block's precondition with the
+        three slots EXISTENTIALLY (`sp_free`) and with s1/s2/s3 back at the
+        caller's values — the loop path weakens its concrete slots into the
+        existential right after the `c.ldsp`s. Don't try to make one predicate
+        cover both slot states concretely.
+      * **Split the register invariant into `sp_base` (sp/tp/s0/s4..s11, holds
+        at EVERY join) + a small path-specific part** (`sp_saved`: s1/s2/s3 =
+        the caller's; `sp_lregs`: s1 = &ticks, s2 = &tickslock, s3 = ticks0),
+        each with its own one-line `callee_saved` transport lemma. Every call
+        hop is then `sp_base_cs` / `sp_lregs_cs` on the callee's
+        `callee_saved`, and `CalleeSaved.callee_saved_insert_r` chains cover
+        the straight-line hops — **no hand-written `upd_ne` peel is needed for
+        the invariant at all**, only for the two or three specific register
+        values a call site reads (a0, ra).
+      * **Carry the right to re-join a split frame slot as a WAND, not as a
+        half plus an alignment fact.** `&n` is the upper word of slot 7, so
+        `word_pointsto_split4` leaves a lower half and a pure 8-alignment
+        obligation that every join predicate would otherwise have to thread.
+        Package them once as `sp_join7 sp0 := ∀ nv, <upper> ↦₄ nv -∗ ∃ w,
+        <slot> ↦₈ w`; each exit cashes it in one `iDestruct`.
+      * **`trap_csrs_pay` must NOT appear in the spec of a push/pop-balanced
+        function, even one that calls `sleep`.** The first draft of
+        `SpecSysPause` took `trap_csrs_pay 0 eb` in and gave it back, reasoning
+        that sleep needs it. It does — but sys_pause's own `acquire` produces
+        it and its `release` consumes it. Taking a second one is not merely
+        redundant: `trap_csrs` is exclusive register ownership, so at `eb =
+        true` the precondition is unsatisfiable and the spec is vacuous exactly
+        where interrupts are on. Removed; see the note in `SpecSysPause.v`.
+      * **`wp_subw_s_sconf`** (WpSconfAlu.v, over `exec_execute_RTYPEW_SUBW_gpr`
+        in WpMmodeShiftiop.v) is new — the 4-byte 3-operand twin of the
+        compressed `wp_addw_s_sconf`. `ticks - ticks0` was the first `subw` in
+        the tree.
+      * Stack budget: `30 <= av` (8 for this frame, 22 for sleep's).
+      * The loop's exit test is a plain boolean case split
+        (`destruct (zopz0zI_u …) eqn:`) — nothing is known about the tick
+        counter, which is exactly why the return value is existential.
 - [ ] **S3 — `p_ofile` loop lemmas.** `fdalloc` scans the array, so it needs a
       successor lemma and injectivity on `fd < NOFILE`, in the style of
       `ProcGeom.proc_addr_succ` / `p_context_proc_addr_inj`. (`ArrCursor.acur`

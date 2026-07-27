@@ -44,6 +44,14 @@
      - the running-thread bundle sleep needs: [procs_inv], [own_ctx],
        the ▷-guarded parked scheduler, and [panic_wp].
 
+   NOT here: [trap_csrs_pay].  sleep is not push/pop-balanced and does want
+   the level-0 pay, but sys_pause's OWN acquire(&tickslock) is what produces
+   it (acquire's post) and its release is what consumes it -- sys_pause as a
+   whole IS balanced, so it must not also ask the caller for one.  Asking
+   would be worse than redundant: [trap_csrs] is exclusive register
+   ownership, so a second copy makes the eb = true precondition
+   unsatisfiable and the spec vacuous exactly where interrupts are on.
+
    [killed(myproc())] needs nothing extra: it reads [p_killed] off the
    always-resident row of THIS process's own [proc_lock_res], reached
    through [procs_inv].
@@ -95,9 +103,8 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* 8 slots for this frame, 18 for argint's, 22 for sleep's *)
   (30 <= av)%nat ->
   sie_cap_gpr γ m av -∗
-  (* entered with no lock held; sleep needs the level-0 trap-CSR pay *)
+  (* entered with no lock held *)
   cpu_own γ 0 eb pj C -∗
-  trap_csrs_pay 0 eb -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
   p_trapframe pj ↦₈{dqt} page_base tfp -∗
@@ -116,7 +123,6 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
         (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
       sie_cap_gpr γ mf av -∗
       cpu_own γ 0 eb pj C -∗
-      trap_csrs_pay 0 eb -∗
       pc_is ret_tgt -∗
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
