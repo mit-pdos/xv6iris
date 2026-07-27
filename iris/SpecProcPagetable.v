@@ -26,12 +26,9 @@ From Kernel Require KernelSyms.
 
 Notation PPGT := KernelSyms.proc_pagetable.
 
-(* [p->trapframe] (proc.h: offset 88 in struct proc; the [ld a3,88(s2)] at
-   proc_pagetable+0x34).  The only field of the process this function reads --
-   if a second proc.c function ever needs proc field addresses, move this to
-   ProcGeom.v beside [p_context]. *)
-Definition p_trapframe (pa : mword 64) : mword 64 :=
-  add_vec pa (sign_extend' 64 (mword_of_int 88 : mword 12)).
+(* [p->trapframe] -- the only field of the process this function reads -- is
+   [ProcGeom.p_trapframe] (proc.h offset 88; the [ld a3,88(s2)] at
+   proc_pagetable+0x34), beside [p_pagetable]/[p_sz]/[p_context]. *)
 
 (* the table pages proc_pagetable allocates: the root, plus the l1 and l0
    tables the TRAMPOLINE walk builds (TRAPFRAME shares both -- see

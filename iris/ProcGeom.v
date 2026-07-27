@@ -94,6 +94,22 @@ Definition p_context (pa : mword 64) : mword 64 := add_vec pa (mword_of_int cont
 Definition p_pid (pa : mword 64) : mword 64 :=
   add_vec pa (sign_extend' 64 (mword_of_int 48 : mword 12)).
 
+(* The three private (p->lock-free) address-space fields -- sz (+72),
+   pagetable (+80), trapframe (+88) -- packed between kstack (+64) and
+   context (+96).  [proc_size = 360] pins the whole layout: 96 + context
+   (14 words = 112) + ofile[16] (128) + cwd (8) + name[16] (16) = 360.
+
+   Spelled in the exact address form of the [ld/sd rd,off(rs)] that reach
+   them (the [p_pid] shape, NOT the [mword_of_int] shape above) --
+   proc_pagetable's [ld a3,88(s2)] is the first consumer.  ONE definition
+   each: [p_trapframe] used to be a local in SpecProcPagetable.v. *)
+Definition p_sz (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 72 : mword 12)).
+Definition p_pagetable (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 80 : mword 12)).
+Definition p_trapframe (pa : mword 64) : mword 64 :=
+  add_vec pa (sign_extend' 64 (mword_of_int 88 : mword 12)).
+
 (* enum procstate codes (kernel/proc.h): UNUSED=0 USED=1 SLEEPING=2
    RUNNABLE=3 RUNNING=4 ZOMBIE=5. *)
 Definition SLEEPING : mword 32 := mword_of_int 2.

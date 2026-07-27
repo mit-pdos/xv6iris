@@ -72,6 +72,14 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
+- **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
+  the process page table's OWNERSHIP side (`ProcPtOwn.v`): `proc_pt`, one
+  predicate for a valid parked user table — trampoline + trapframe + the pages
+  it OWNS — the footprint derived from `um` (retiring `uptd`'s `ud_data`
+  field), the physical-tier decision, the `page_own ⇄ udata_own` bridges, and
+  the worklist for folding `UserPtTree.user_pt_inv` onto it. The CONSTRUCTION
+  side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md); they
+  meet at `ProcPtOwn.proc_pt_intro_ppt`.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
