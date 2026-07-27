@@ -735,7 +735,7 @@ Section ProofWakeup.
             (* reassemble proc_lock_res via the wakeup transition. *)
             (* SLEEPING -> RUNNABLE stays in one guard class: the slots cross
                untouched, so no guard is opened (proc_slots_recast). *)
-            iDestruct (proc_lock_res_wakeup γ Φ γs γk (proc_addr k) ch with "Hpst Hpch Hctx") as "HR".
+            iDestruct (proc_lock_res_wakeup γ Φ γs γk (proc_addr k) st ch Hst_sl with "Hpst Hpch Hpub Hctx") as "HR".
             (* ---- 0x56 c.j release ---- *)
             iPoseProof (wki_56 with "Htext") as "Hi56".
             assert (H56tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64)

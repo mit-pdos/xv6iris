@@ -321,7 +321,7 @@ Section ProofYield.
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
     iApply (Sched.wp_sched_sconf γ Φ γs j γl RUNNABLE ch0 C1 (av - 4)%nat eb
               HtpC1 Hj Hgl (needs_ctx_RUNNABLE) ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan] Hcpuemp Hown Hvc [-]").
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hpub] Hcpuemp Hown Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     iIntros (msch ch') "%Hcs_sch Hcg Hpc Hheld' Hcpuemp Hown' Hvc'".
     iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub)".

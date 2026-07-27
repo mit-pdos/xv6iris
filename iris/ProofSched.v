@@ -849,7 +849,7 @@ Section ProofSched.
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs j γl st ch Hj Hgl Hneeds
-                  with "[Hlocked Hstate Hchan]") as "HP".
+                  with "[Hlocked Hstate Hchan Hpub]") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     (* apply swtch. *)
     iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
