@@ -641,7 +641,11 @@ Section ProofPipealloc.
         iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k1 1%Qp Cf1 U4 n eb p C (K - 6)%nat
                   ltac:(unfold fileclose_stack; lia) HU4tp Hnoffpos HU4a0
                   with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [-]").
-        iIntros (mr) "Hcg Hcnt Hpc %Hfcpins".
+        (* fileclose returns the fd slot the reference was holding; on this
+           error path pipealloc has nothing left to install it in, and its own
+           postcondition does not (yet) hand the two units back to the caller,
+           so it is dropped here. *)
+        iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hfdslot". iClear "Hfdslot".
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (PA + 0xb6))
           by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpcb6) in "Hpc".
@@ -702,7 +706,7 @@ Section ProofPipealloc.
       iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k0 1%Qp Cf0 V1 n eb p C (K - 6)%nat
                 ltac:(unfold fileclose_stack; lia) HV1tp Hnoffpos HV1a0
                 with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [-]").
-      iIntros (mr) "Hcg Hcnt Hpc %Hfcpins".
+      iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hfdslot". iClear "Hfdslot".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (PA + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".

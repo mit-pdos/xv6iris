@@ -83,6 +83,16 @@ Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
 
+(* writing back what was already there is a no-op -- what a caller that only
+   READS a descriptor (argfd) needs to close [proc_priv_ofile]'s accessor
+   without its [V] drifting. *)
+Lemma upd_ofile_id (V : pprivate) (fd : nat) (v : mword 64) :
+  pv_ofile V !! fd = Some v -> upd_ofile V fd v = V.
+Proof.
+  intro Hlk. unfold upd_ofile. rewrite (list_insert_id _ _ _ Hlk).
+  by destruct V.
+Qed.
+
 Lemma upd_ofile_length (V : pprivate) (fd : nat) (v : mword 64) :
   length (pv_ofile (upd_ofile V fd v)) = length (pv_ofile V).
 Proof. simpl. apply length_insert. Qed.
@@ -259,6 +269,31 @@ Section ProcInv.
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iSplitL "Hq1"; [iExact "Hq1"|].
     iIntros "Hq1". rewrite /proc_priv /proc_pt_at.
+    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc". iFrame.
+  Qed.
+
+  (* The array's length, which a caller needs BEFORE it knows which
+     descriptor it wants: an fd below NOFILE always has a slot to look up. *)
+  Lemma proc_priv_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜length (pv_ofile V) = NOFILE⌝.
+  Proof. iIntros "(_ & _ & _ & _ & [%Hlen _] & _)". done. Qed.
+
+  (* What a syscall-argument read needs, TOGETHER: the trapframe pointer
+     fraction and the page it names.  [proc_priv_trapframe] alone cannot
+     serve -- its wand swallows the [proc_priv] the page is still inside --
+     so the pair is one accessor.  This is argfd's premise to argint. *)
+  Lemma proc_priv_tf (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V) -∗ proc_priv γf pa pid V).
+  Proof.
+    iIntros "(Hpid & Hf & Hpt & Htfp & Ho & Hc)".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
+    iFrame "Hq1 Htfp".
+    iIntros "Hq1 Htfp". rewrite /proc_priv /proc_pt_at.
     iDestruct (word_join14 with "Hq1 Hq2") as "Htfc". iFrame.
   Qed.
 

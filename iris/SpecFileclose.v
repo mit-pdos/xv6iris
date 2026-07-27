@@ -42,6 +42,15 @@
    The [f->ref < 1] panic arm is dead for the same reason as filedup's: the
    caller's [file_ref] puts slot k in the authority's domain.
 
+   WHAT COMES BACK: one [fd_slot].  That is not a decoration -- it is the
+   return leg of the conservation law that makes filedup's unchecked
+   [f->ref++] safe (FdSlots.v / design/file-table.md).  [ftable_res] holds one
+   unit per outstanding reference, so destroying a reference releases exactly
+   one, whichever arm ran: at [n >= 2] the slot's [fd_slots n] shrinks to
+   [fd_slots (n-1)], and at [n = 1] the whole entry leaves the authority.  The
+   caller needs it: sys_close's descriptor is empty afterwards, and an empty
+   [ProcInv.ofile_slot] owns its unit itself.
+
    TWO PROVISIONAL BITS, both flagged rather than hidden:
    * the stack bound below is fileclose's own 8-slot frame plus acquire /
      release; it will GROW once pipeclose / begin_op / iput / end_op have
@@ -103,6 +112,7 @@ Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
     cpu_own γ n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
+    fd_slot -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

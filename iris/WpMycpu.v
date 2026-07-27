@@ -74,13 +74,7 @@ Local Ltac my_close2 s HmisaC :=
    to live here too and was imported by three decode files -- from a file that
    holds a WEAKEST PRECONDITION; it is now [cdec_8792]/[cdec_2781]/[cdec_079e]
    in KernelRvcDecode.v. ---- *)
-(* +0x16  953e  c.add a0,a0,a5 *)
-Lemma mydec_add s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x953e : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 10), Regidx (mword_of_int 15)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
+(* +0x16  953e  c.add a0,a0,a5 -- [cdec_953e] (KernelRvcDecode.v) *)
 
 (* +0x0e  00011517  auipc a0,0x11 *)
 Lemma mydec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -171,7 +165,7 @@ Section WpMycpu.
 
   Lemma myi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x16)%Z (mword_of_int 0x953e : mword 16)
-    (mword_of_int (KernelSyms.mycpu + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)) mydec_add exec_execute_C_ADD. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)) cdec_953e exec_execute_C_ADD. Qed.
 
   Lemma myi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x18) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x18)%Z (mword_of_int 0x60a2 : mword 16)

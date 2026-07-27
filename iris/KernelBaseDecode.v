@@ -91,3 +91,10 @@ Lemma bdec_16848493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     = Some (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
   Proof. decode_bridge_ms. Qed.
 
+(* 0x0d078793  addi a5,a5,208 -- the [p->ofile] array offset in [struct proc];
+   shared by sys_close and argfd, which index that array the same way. *)
+Lemma bdec_0d078793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0d078793 : mword 32)) s
+  = Some (ITYPE (mword_of_int 208 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+

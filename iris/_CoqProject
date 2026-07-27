@@ -374,6 +374,12 @@ LinkSysGetpid.v
 SpecArgraw.v
 SpecArgint.v
 ProofArgint.v
+SpecArgfd.v
+WpArgfdDecode.v
+ProofArgfd.v
+WpSysCloseDecode.v
+SpecSysClose.v
+ProofSysClose.v
 TimerCap.v
 WpSconfTimer.v
 WpClockintrDecode.v

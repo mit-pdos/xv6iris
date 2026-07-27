@@ -123,10 +123,6 @@ Section WalkInstrs.
     exec (ext_decode_compressed (mword_of_int 0x8b32 : mword 16)) s
     = Some (C_MV (Regidx (mword_of_int 22), Regidx (mword_of_int 12)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma wdec_1a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0x57fd : mword 16)) s
-    = Some (C_LI (mword_of_int 63, Regidx (mword_of_int 15)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
   Lemma wdec_1c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0x83e9 : mword 16)) s
     = Some (C_SRLI (mword_of_int 26, Cregidx (mword_of_int 7)), s).
@@ -265,7 +261,7 @@ Section WalkInstrs.
   Lemma wi_18 : WLK 0x18 true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 22), ADD)).
   Proof. mk_rvc (KernelSyms.walk + 0x18)%Z (mword_of_int 0x8b32 : mword 16) (mword_of_int (KernelSyms.walk + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 22), ADD)) wdec_18 exec_execute_C_MV. Qed.
   Lemma wi_1a : WLK 0x1a true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_rvc (KernelSyms.walk + 0x1a)%Z (mword_of_int 0x57fd : mword 16) (mword_of_int (KernelSyms.walk + 0x1a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)) wdec_1a exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.walk + 0x1a)%Z (mword_of_int 0x57fd : mword 16) (mword_of_int (KernelSyms.walk + 0x1a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)) cdec_57fd exec_execute_C_LI. Qed.
   Lemma wi_1c : WLK 0x1c true (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
   Proof. mk_rvc (KernelSyms.walk + 0x1c)%Z (mword_of_int 0x83e9 : mword 16) (mword_of_int (KernelSyms.walk + 0x1c) : mword 64) (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) wdec_1c exec_execute_C_SRLI. Qed.
   Lemma wi_1e : WLK 0x1e true (ITYPE (sign_extend' 12 (mword_of_int 30 : mword 6), zreg, Regidx (mword_of_int 20), ADDI)).

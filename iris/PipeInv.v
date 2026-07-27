@@ -102,6 +102,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import RiscvPtsto.
+Require Import InstrBytes.
 Require Import KallocInv.
 Require Import PageFields.
 Require Import WpLock.

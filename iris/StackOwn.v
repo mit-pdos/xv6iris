@@ -67,6 +67,12 @@ Proof.
   apply bv_wrap_bv_wrap. lia.
 Qed.
 
+Lemma stk_moi_unsigned (z : Z) : bv_unsigned (mword_of_int z : mword 64) = bv_wrap 64 z.
+Proof.
+  unfold mword_of_int, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. reflexivity.
+Qed.
+
 Lemma stk_mword_of_int_uint (w : mword 64) : mword_of_int (uint w) = w.
 Proof.
   unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
@@ -247,6 +253,156 @@ Section stack_own.
   Qed.
 
 
+  (* ---- the four-slot frame (a 32-byte C frame saving ra + s0 and holding
+     two locals), the twin of the two-slot pair above. ---- *)
+  Lemma stack_own_4_elim (sp : Arch.pa) :
+    stack_own sp 4 ⊢ ∃ w1 w2 w3 w4 : bv 64,
+      word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 ∗
+      word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 ∗
+      word_pointsto (pa_stk sp 3) (DfracOwn 1) w3 ∗
+      word_pointsto (pa_stk sp 4) (DfracOwn 1) w4.
+  Proof.
+    assert (E3 : pa_stk (pa_stk sp 2) 1 = pa_stk sp 3) by (rewrite pa_stk_assoc; reflexivity).
+    assert (E4 : pa_stk (pa_stk sp 2) 2 = pa_stk sp 4) by (rewrite pa_stk_assoc; reflexivity).
+    rewrite (stack_own_split sp 2 4 ltac:(lia)).
+    iIntros "[H12 H34]".
+    iDestruct (stack_own_2_elim with "H12") as (w1 w2) "[H1 H2]".
+    change (4 - 2)%nat with 2%nat.
+    iDestruct (stack_own_2_elim with "H34") as (w3 w4) "[H3 H4]".
+    iEval (rewrite E3) in "H3". iEval (rewrite E4) in "H4".
+    iExists w1, w2, w3, w4. iFrame.
+  Qed.
+
+  Lemma stack_own_4_intro (sp : Arch.pa) (w1 w2 w3 w4 : bv 64) :
+    word_pointsto (pa_stk sp 1) (DfracOwn 1) w1 -∗
+    word_pointsto (pa_stk sp 2) (DfracOwn 1) w2 -∗
+    word_pointsto (pa_stk sp 3) (DfracOwn 1) w3 -∗
+    word_pointsto (pa_stk sp 4) (DfracOwn 1) w4 -∗
+    stack_own sp 4.
+  Proof.
+    assert (E3 : pa_stk (pa_stk sp 2) 1 = pa_stk sp 3) by (rewrite pa_stk_assoc; reflexivity).
+    assert (E4 : pa_stk (pa_stk sp 2) 2 = pa_stk sp 4) by (rewrite pa_stk_assoc; reflexivity).
+    iIntros "H1 H2 H3 H4".
+    rewrite (stack_own_split sp 2 4 ltac:(lia)).
+    iSplitL "H1 H2".
+    - iApply (stack_own_2_intro sp with "H1 H2").
+    - change (4 - 2)%nat with 2%nat.
+      iEval (rewrite -E3) in "H3". iEval (rewrite -E4) in "H4".
+      iApply (stack_own_2_intro (pa_stk sp 2) with "H3 H4").
+  Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* WHERE the stack IS: an owned frame pins sp away from 0.             *)
+  (* ------------------------------------------------------------------ *)
+  (* A C function that passes [&local] to a callee which null-checks the
+     pointer (argfd's [if (pfd)]) owes the callee a disequality, and the
+     caller must be able to DISCHARGE it rather than assume it (the
+     "caller obligation" rule in durable-notes).  It can: every address in
+     an owned frame is CANONICAL (< 2^38, [mem_canonical]), and an sp below
+     8 would put the very next slot at ~2^64 -- so owning one slot already
+     forces [8 <= sp], and the canonical bound caps it from above.  Nothing
+     about the kernel's stack layout is assumed. *)
+  Local Lemma z_stk_bounds (u v : Z) :
+    (0 <= u < 18446744073709551616)%Z ->
+    v = bv_wrap 64 (u - 8) ->
+    (v < 274877906944)%Z ->
+    (8 <= u < 274877906944 + 8)%Z.
+  Proof.
+    intros Hu Hv Hlt. unfold bv_wrap, bv_modulus in Hv.
+    change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z in Hv.
+    destruct (Z_lt_le_dec u 8) as [Hsm | Hge].
+    - exfalso.
+      assert (Hmod : ((u - 8) mod 18446744073709551616)%Z = (u - 8 + 18446744073709551616)%Z).
+      { rewrite <- (Z.mod_add (u - 8) 1 18446744073709551616); [| lia].
+        apply Z.mod_small. lia. }
+      lia.
+    - assert (Hmod : ((u - 8) mod 18446744073709551616)%Z = (u - 8)%Z)
+        by (apply Z.mod_small; lia).
+      lia.
+  Qed.
+
+  Lemma stack_own_sp_bounds (sp : Arch.pa) (n : nat) :
+    (0 < n)%nat -> stack_own sp n ⊢ ⌜(8 <= uint sp < 274877906944 + 8)%Z⌝.
+  Proof.
+    intro Hn. rewrite (stack_own_split_1 sp 1 n ltac:(lia)).
+    iIntros "[H1 _]". rewrite stack_own_1. iDestruct "H1" as (w) "H1".
+    rewrite word_pointsto_unfold. iDestruct "H1" as "[_ Hbs]".
+    assert (Hs : seq 0 8 = (0%nat :: seq 1 7)%list) by reflexivity.
+    rewrite Hs. iDestruct "Hbs" as "[Hb0 _]".
+    rewrite pa_add_0.
+    iDestruct (mem_canonical with "Hb0") as %Hc.
+    iPureIntro.
+    rewrite uint_unsigned. rewrite uint_unsigned in Hc.
+    pose proof (bv_unsigned_in_range _ sp) as [Hlo Hhi'].
+    (* [Arch.pa]'s width is an unreduced [if]; both bounds are convertible to
+       the width-64 ones, so [exact] (which converts) crosses the gap. *)
+    assert (Hhi : (bv_unsigned sp < 18446744073709551616)%Z)
+      by (unfold bv_modulus in Hhi'; exact Hhi').
+    apply (z_stk_bounds (bv_unsigned sp) (bv_unsigned (pa_stk sp 1)));
+      [ split; [exact Hlo | exact Hhi] | | exact Hc ].
+    unfold pa_stk, add_vec_int, add_vec, Operators_mwords.word_binop,
+      Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
+      MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned.
+    assert (H8 : bv_unsigned (mword_of_int (- (8 * Z.of_nat 1)) : mword 64)
+                 = 18446744073709551608%Z) by (vm_compute; reflexivity).
+    rewrite H8.
+    match goal with |- context [bv_wrap ?W _] => change (bv_wrap W) with (bv_wrap 64) end.
+    unfold bv_wrap, bv_modulus.
+    change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z.
+    rewrite <- (Z.mod_add (bv_unsigned sp - 8) 1 18446744073709551616); [| lia].
+    generalize (bv_unsigned sp); intro u. f_equal. lia.
+  Qed.
+
+End stack_own.
+
+(* [zero_reg] is the null pointer a C null test compares against. *)
+Lemma uint_zero_reg : uint (zero_reg : mword 64) = 0%Z.
+Proof. vm_compute. reflexivity. Qed.
+
+(* an address at a NON-NEGATIVE, canonical offset from a sound sp is non-null:
+   the sum cannot wrap, and it is at least 8.  Stated at [mword 64] rather
+   than [Arch.pa] so every rewrite below sees the reduced width (Arch.pa's is
+   an unreduced [if], and [bv_unsigned] then elaborates at THAT width -- see
+   durable-notes); call sites cross the gap by conversion. *)
+Lemma stack_off_nonzero (sp : SailStdpp.Values.mword 64) (c : Z) :
+  (8 <= uint sp < 274877906944 + 8)%Z -> (0 <= c < 274877906944)%Z ->
+  add_vec_int sp c <> (zero_reg : mword 64).
+Proof.
+  intros Hsp Hc Heq.
+  assert (Hu : uint (add_vec_int sp c) = 0%Z) by (rewrite Heq; apply uint_zero_reg).
+  rewrite uint_unsigned in Hu. rewrite uint_unsigned in Hsp.
+  unfold add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
+    MachineWord.MachineWord.add in Hu.
+  rewrite bv_add_unsigned in Hu.
+  rewrite (stk_moi_unsigned c) in Hu.
+  rewrite (bv_wrap_small 64 c) in Hu;
+    [| unfold bv_modulus; change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z; lia].
+  unfold bv_wrap, bv_modulus in Hu.
+  change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z in Hu.
+  revert Hu Hsp. generalize (bv_unsigned sp); intros u Hu Hsp.
+  rewrite (Z.mod_small (u + c) 18446744073709551616) in Hu; lia.
+Qed.
+
+(* the degenerate offset-0 case of [stack_off_nonzero], stated on the bound
+   alone so a caller that already has it need not re-open the capability. *)
+Lemma sp_bounds_nonzero (x : SailStdpp.Values.mword 64) :
+  (8 <= uint x < 274877906944 + 8)%Z -> x <> (zero_reg : mword 64).
+Proof. intros Hb He. rewrite He uint_zero_reg in Hb. lia. Qed.
+
+Lemma stack_own_sp_nonzero `{!riscvGS Σ} (sp : Arch.pa) (n : nat) :
+  (0 < n)%nat -> stack_own sp n ⊢ ⌜sp <> (zero_reg : mword 64)⌝.
+Proof.
+  intro Hn. iIntros "H".
+  iDestruct (stack_own_sp_bounds sp n Hn with "H") as %Hb.
+  iPureIntro. intro Heq. rewrite Heq uint_zero_reg in Hb. lia.
+Qed.
+
+Section stack_own_phys.
+  Context `{!riscvGS Σ}.
+
   (* ===== PHYSICAL-tier stack ownership (M-mode boot owns ↦ₚ, uniform-
      claims): the [↦ₚ₈] mirror of [stack_own], same lemma suite. ===== *)
   Definition stack_own_phys (sp : Arch.pa) (n : nat) : iProp Σ :=
@@ -341,4 +497,4 @@ Section stack_own.
     - rewrite -(pa_stk_assoc sp 1 1). by iApply stack_own_phys_1_intro.
   Qed.
 
-End stack_own.
+End stack_own_phys.
