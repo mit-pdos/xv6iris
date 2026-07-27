@@ -275,27 +275,50 @@ definition rather than every caller.
 
 ## Open items
 
-- **`ref` overflow — a bug in the C, being fixed upstream.** `filedup` does
-  `f->ref++` with no check. The invariant needs every count to stay a faithful
-  `int` (`< 2^31`) — that is what makes `ref == 0` mean "free" and what the
-  sign-extended branch tests read — and **no unconditional increment can
-  preserve a finite bound**, so `filedup` cannot re-establish it. This is not
-  a modelling artifact: it is a real (astronomically unreachable) bug.
+## Why `f->ref++` cannot overflow: the fd-slot resource
 
-  Do **not** bridge the gap with an axiom. The missing step is
-  `∀ n, Z.pos n < 2^31 → Z.pos (Pos.succ n) < 2^31`, which is *false* at
-  `n = 2^31 - 1`; asserting it makes every proof in every file that
-  transitively requires it vacuous. A ghost "dup budget" token (a pool in
-  `ftable_res`, spent by `filedup`) was considered and rejected as
-  over-engineering for a bug that is about to disappear.
+`filedup` increments `f->ref` with no check, and the invariant needs every
+count to stay a faithful `int` (`< 2^31`) — that is what makes `ref == 0` mean
+"free" and what the sign-extended branch tests read. **No unconditional
+increment preserves a finite bound**, so this is not something `filedup` can
+re-establish on its own, and it is not a pure fact about the table either.
 
-  **When the check lands:** regenerate `KernelInstrs.v`/`KernelSyms.v` (the
-  instruction sequence changes, so any proof written against today's
-  disassembly is void), and expect `SpecFiledup.v` to change shape — a
-  `panic` on the bound makes today's dead panic arm *live*, so either the
-  caller gains a premise bounding the count or `filedup` gains a failing
-  return. `SpecFileclose.v` is unaffected.
-- **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
+It is a *whole-kernel conservation law*, and a slightly subtle one:
+
+> every holder of a reference is a file descriptor of some process; there are
+> at most `NPROC` processes with at most `NOFILE` descriptors each; that
+> product is ~1000, nowhere near 2^31.
+
+Nothing in `file.c` enforces it, so it is carried as a resource — `FdSlots.v`:
+
+- `fd_slot γs` is one unit of "somewhere to put a file reference". The supply
+  is fixed at `FDSLOTS = NPROC * (NOFILE + 4)` and minted once at boot by
+  `fd_slots_alloc`; the `+4` is the per-process allowance for references a
+  syscall holds in *locals* before installing them in a descriptor (`sys_open`
+  one, `pipealloc` two).
+- `ftable_res` holds `fd_slots_auth γs` **and**, per referenced slot,
+  `fd_slots γs (Pos.to_nat n)` — one unit per outstanding reference. A
+  descriptor naming a file has given its slot away and gets it back on close.
+- The bound then needs no arithmetic and no ghost update at all: the units for
+  one slot are literally `◯ n`, `◯ n ⋅ ◯ 1 = ◯ (S n)`, and auth validity
+  against `● FDSLOTS` gives `n ≤ FDSLOTS`. `fd_slots_no_overflow` packages
+  that as `Z.pos n < 2^31 ∧ Z.pos (n+1) < 2^31`.
+
+So `filedup` **requires** an `fd_slot` and `fileclose` **returns** one;
+`filealloc` consumes one too (it creates the first reference), and
+`pipealloc` two. The `⌜Z.pos n < 2^31⌝` conjunct inside `fslot` is the *local
+projection* of the bound — what a consumer walking the table actually needs,
+so it does not have to reach for the authority at every slot. It is not an
+independent assumption: every operation that changes a count re-derives it.
+
+**Do not shortcut this with an axiom.** The missing step,
+`∀ n, Z.pos n < 2^31 → Z.pos (Pos.succ n) < 2^31`, is *false* at
+`n = 2^31 - 1`; asserting it makes every proof in every file that transitively
+requires it vacuous. (A "dup budget" pool with a lifetime cap and no returns
+was also tried and is strictly worse — it bounds calls rather than live
+references, and its supply has no principled source.)
+
+ **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
 - **The next function.** `filealloc` is proven (`ProofFilealloc.v` /
   `LinkFilealloc.v`); `filedup` and `fileclose` are the natural next two —

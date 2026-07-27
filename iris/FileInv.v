@@ -37,6 +37,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import ArrCursor.
+Require Import FdSlots.
 Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -170,7 +171,7 @@ Lemma pos_succ_1_add (b : positive) : Pos.succ (1 + b) = (2 + b)%positive.
 Proof. lia. Qed.
 
 Section FileInv.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
 
   (* ---- the content cells, at an arbitrary dfrac ---- *)
   Definition file_fields (k : nat) (dq : dfrac) (C : fcontent) : iProp Σ :=
@@ -217,7 +218,17 @@ Section FileInv.
     rewrite Hs. reflexivity.
   Qed.
 
-  Definition fslot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+  (* A referenced slot holds ONE fd slot per outstanding reference: every
+     holder of a reference is a file descriptor, and a descriptor that names
+     a file has given its [fd_slot] away (FdSlots.v).  That is what bounds
+     the count, and hence what makes [f->ref++] safe.
+
+     The [< 2^31] conjunct is the LOCAL PROJECTION of that bound -- it is
+     what a consumer walking the table actually needs, and reaching for the
+     authority at every slot would infect every consumer.  It is not an
+     independent assumption: every operation that changes a count re-derives
+     it from [fd_slots_no_overflow]. *)
+  Definition fslot (γs : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
     match M !! k with
     | None =>
         (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
@@ -225,21 +236,25 @@ Section FileInv.
     | Some (q, n) =>
         (⌜Z.pos n < 2 ^ 31⌝ ∗
          a_fref k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
-         file_rest k q)%I
+         file_rest k q ∗
+         fd_slots γs (Pos.to_nat n))%I
     end.
 
-  Definition ftable_res (γ : gname) : iProp Σ :=
+  Definition ftable_res (γ γs : gname) : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
        own γ (● M) ∗
+       (* the fd-slot supply: the table is where the conservation law is
+          checked, because the table is what holds one unit per reference. *)
+       fd_slots_auth γs ∗
        ⌜∀ k, is_Some (M !! k) -> (k < NFILE)%nat⌝ ∗
-       [∗ list] k ∈ seq 0 NFILE, fslot M k)%I.
+       [∗ list] k ∈ seq 0 NFILE, fslot γs M k)%I.
 
   (* the whole table: the spinlock named "ftable" over that resource.
      Persistent, so every core shares it. *)
-  Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string (ftable_res γ).
+  Definition is_ftable (γl γ γs : gname) : iProp Σ :=
+    is_lock γl ftable_addr "ftable"%string (ftable_res γ γs).
 
-  Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
+  Global Instance is_ftable_persistent γl γ γs : Persistent (is_ftable γl γ γs).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -297,21 +312,21 @@ Section FileInv.
      scan borrows slot after slot unchanged (M' := M), and the slot it takes
      is given back at [<[i := (1,1)]> M].  Since [fslot M k] reads only
      [M !! k], every other slot is untouched by the update. *)
-  Lemma ftable_slots_acc (M : gmap nat (Qp * positive)) (i : nat) :
+  Lemma ftable_slots_acc (γs : gname) (M : gmap nat (Qp * positive)) (i : nat) :
     (i < NFILE)%nat ->
-    ([∗ list] k ∈ seq 0 NFILE, fslot M k) -∗
-    fslot M i ∗
+    ([∗ list] k ∈ seq 0 NFILE, fslot γs M k) -∗
+    fslot γs M i ∗
     (∀ M' : gmap nat (Qp * positive),
-       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot M' i -∗
-       [∗ list] k ∈ seq 0 NFILE, fslot M' k).
+       ⌜∀ k, k ≠ i -> M' !! k = M !! k⌝ -∗ fslot γs M' i -∗
+       [∗ list] k ∈ seq 0 NFILE, fslot γs M' k).
   Proof.
     iIntros (Hi) "H".
     assert (Hlk : seq 0 NFILE !! i = Some i).
     { apply lookup_seq. lia. }
-    rewrite (big_sepL_delete (fun _ k => fslot M k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot γs M k) (seq 0 NFILE) i i Hlk).
     iDestruct "H" as "[$ Hrest]".
     iIntros (M' HM') "Hi".
-    rewrite (big_sepL_delete (fun _ k => fslot M' k) (seq 0 NFILE) i i Hlk).
+    rewrite (big_sepL_delete (fun _ k => fslot γs M' k) (seq 0 NFILE) i i Hlk).
     iFrame "Hi".
     iApply (big_sepL_mono with "Hrest").
     intros idx y Hy. destruct (decide (idx = i)) as [->|Hne]; [done|].

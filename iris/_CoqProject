@@ -336,6 +336,7 @@ ProofAcquiresleep.v
 LinkAcquiresleep.v
 ArrCursor.v
 BcacheInv.v
+FdSlots.v
 FileInv.v
 WpFileallocDecode.v
 SpecFilealloc.v

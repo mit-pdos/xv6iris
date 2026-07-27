@@ -60,7 +60,7 @@ Require Import KernelText KernelDataInv.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import FileInv.
+Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import PipeInv.
 Require Import WpLock.
@@ -78,7 +78,7 @@ Notation PA := KernelSyms.pipealloc.
 Definition pipe_name_str : Z := 0x80007598%Z.
 
 Section SpecPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !kallocG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ}.
 
   (* the four content fields pipealloc writes into each [struct file]: it makes
      the [w = false] file the READ end and the [w = true] file the WRITE end,
@@ -120,9 +120,9 @@ Section SpecPipealloc.
 End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
-    (γfl γf : gname)                       (* ftable.lock, and the file refcount ghost *)
+    (γfl γf γs : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
@@ -145,11 +145,16 @@ Definition wp_pipealloc_sconf_body
   cpu_own γ n eb p C -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
-  is_ftable γfl γf -∗
+  is_ftable γfl γf γs -∗
   is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
   panic_wp -∗
+  (* pipealloc creates TWO references, so it needs two fd slots -- one per
+     end of the pipe.  Both come back from the fileclose calls on the error
+     paths. *)
+  fd_slot γs -∗
+  fd_slot γs -∗
   (* the caller's two [struct file *] cells; both are overwritten on entry, so
      their incoming contents are arbitrary *)
   pf0 ↦₈ v0 -∗
@@ -165,10 +170,10 @@ Definition wp_pipealloc_sconf_body
 
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
-      (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+      (γfl γf γs : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_pipealloc_sconf_body γ Φ γfl γf γkl γk fl m v0 v1 on n eb p C K.
+      wp_pipealloc_sconf_body γ Φ γfl γf γs γkl γk fl m v0 v1 on n eb p C K.
 End PIPEALLOC.

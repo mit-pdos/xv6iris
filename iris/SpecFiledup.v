@@ -36,7 +36,7 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import FileInv.
+Require Import FdSlots FileInv.
 Require Import WpMycpu WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
@@ -72,8 +72,8 @@ Notation FD := KernelSyms.filedup.
 
 (* ------------------------------------------------------------------ *)
 
-Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname)
+Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname)
     (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filedup in
@@ -89,8 +89,11 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ} 
   sie_cap_gpr γ m K -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  is_ftable γl γf -∗
+  is_ftable γl γf γs -∗
   panic_wp -∗
+  (* THE precondition that makes [f->ref++] safe: the duplicate needs a
+     descriptor to live in, and there are only FDSLOTS of those. *)
+  fd_slot γs -∗
   file_ref γf k q Cf -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
@@ -105,9 +108,9 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ} 
 
 Module Type FILEDUP.
   Parameter wp_filedup_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+      (γ : gname) (Φ : mval -> iProp Σ) (γl γf γs : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_filedup_sconf_body γ Φ γl γf k q Cf m n eb p C K.
+      wp_filedup_sconf_body γ Φ γl γf γs k q Cf m n eb p C K.
 End FILEDUP.
