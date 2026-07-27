@@ -93,9 +93,10 @@ are working on that effort — the relevant `projects/` file.
   side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md); they
   meet at `ProcPtOwn.proc_pt_intro_ppt`.
 - **[`lock-cancel-pipeclose.md`](projects/lock-cancel-pipeclose.md)** — making a
-  lock's storage reclaimable (`lock_openable`, the `cinv` flavour, release
-  instantiated twice) so that `pipeclose` can `kfree` its page; the worklist
-  from the landed accessor through to pipeclose.
+  lock's storage reclaimable (`lock_openable`/`lock_finisher`, the `cinv`
+  flavour, release proved once and instantiated twice) so that `pipeclose` can
+  `kfree` its page. The lock and pipe sides have landed; `pipeclose` itself is
+  what is left.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode

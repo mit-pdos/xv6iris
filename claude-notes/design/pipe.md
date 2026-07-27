@@ -38,19 +38,24 @@ member, so `&pi->lock = pi` — which is literally the `a0` pipealloc passes to
 ## The predicate
 
 ```coq
-is_pipe γl γp pi := ⌜page_valid pi⌝ ∗ is_lock γl pi "pipe" (pipe_res γp pi)
+is_pipe γl γp pi := ⌜page_valid pi⌝ ∗
+                    cinv lockN (pn_cancel γp) (lock_inv γl pi (pipe_res γp pi))
 ```
 
 Persistent, so every holder of either end shares it. `page_valid` is kalloc's
 guarantee riding along with the object — it is what makes the page re-freeable,
-so it has to survive to `pipeclose`.
+so it has to survive to `pipeclose`. The lock is **cancellable** (`WpLock`'s
+`lock_openable` over `cinv`, `claude-notes/projects/lock-cancel-pipeclose.md`)
+because the page goes back to `kfree`.
 
-`pipe_res` owns **every remaining byte of the page**: the four counter/flag
-words, `pipe_data pi bs` (the 512-byte buffer with its contents tracked, so
-piperead/pipewrite can say *which* bytes are in the pipe), and `pipe_slack pi`
-— the 4 padding bytes inside `struct spinlock` plus everything past offset 552.
-Nothing reads the slack; it is held only so the whole page can go back to
-`kfree`, which memsets all 4096 bytes.
+`pipe_res` owns **every remaining byte of the page** except the lock's two
+words, which belong to `lock_inv`: the lock's 8-byte **name field** (held raw,
+not sealed into a persistent `lock_name` — nothing reads it and `kfree` memsets
+it), the four counter/flag words, `pipe_data pi bs` (the 512-byte buffer with
+its contents tracked, so piperead/pipewrite can say *which* bytes are in the
+pipe), and `pipe_slack pi` — the 4 padding bytes inside `struct spinlock` plus
+everything past offset 552. Nothing reads the slack; it is held only so the
+whole page can go back to `kfree`, which memsets all 4096 bytes.
 
 The queue coupling (live bytes are those at indices `[nread, nwrite)` mod
 PIPESIZE, `nwrite - nread ≤ PIPESIZE`) is deliberately **not** imposed yet: it
@@ -65,7 +70,7 @@ and frees the page when both have reached 0. The number of outstanding
 references *is* `readopen + writeopen`, so the ghost mirrors the **ends**:
 
 ```coq
-pipe_ref γp w q := own (pn_end γp w) q        (* fracR, one gname per end *)
+pipe_ref γp w q := own (pn_end γp w) q ∗ cinv_own (pn_cancel γp) (q/2)
 ```
 
 `w` is the `struct file`'s `writable` flag — the same bool pipeclose receives.
@@ -94,6 +99,46 @@ apart from one close of each end.
 `pflag_open v := neq_vec (sign_extend' 64 v) zero_reg = true` — the shape the
 `c.beqz`/`c.bnez` tests consume, as in `SleepLock.v`.
 
+## The cancel token: where the halves have to sit
+
+A reference also carries half the lock's cancel token, so **any** share of an
+end is the licence to open `pi->lock` (a hart with no reference to a pipe
+cannot even take its lock) and the two ends together are the licence to destroy
+it. Where the halves live is *forced*, and getting it wrong is the trap:
+
+| state | end0 | end1 | `pipe_bank` | total |
+|---|---|---|---|---|
+| both open | 1/2 | 1/2 | 0 | 1 |
+| one closed | — | 1/2 | 1/2 | 1 |
+| both closed | — | 1/2 (kept) | 1/2 | 1 |
+
+Release must be handed `pipe_res` **intact** — its word clear reassembles
+`lock_inv` on the branch it does not take — and still needs a positive share
+*outside* `pipe_res` to open the lock with. So `pipe_res` can hold at most half
+the token. `pipe_bank` is that conjunct: the invariant banks half as soon as
+**either** end closes, and no more. The closer of the *first* end banks its
+half and walks away with nothing; the closer of the *second* finds the bank
+already full, banks nothing, and keeps its own half — which is exactly the
+share it needs to open the lock one instruction before freeing it. Banking
+both halves leaves the last closer unable to open the lock it is about to
+free; banking neither loses the first closer's half for good.
+
+Nobody else can observe the both-closed row: seeing it requires holding the
+lock, acquiring requires a reference, and both references are home.
+
+**The receipt.** `pipe_res` hides its flag words behind existentials, so inside
+release's finisher the last closer cannot re-read them to show the bank is
+full. It carries a witness instead: `pipe_endstate`'s OPEN side holds an
+exclusive per-end marker (`pipe_openmark`), which whoever shuts that end takes
+and keeps. `PipeInv.pipe_res_cancel` is the whole argument in one lemma —
+marker + own half + `pipe_res` gives `cinv_own 1` and the bare bytes — and it
+is precisely the wand `RELEASE_CANCEL` asks for.
+
+**Allocation order.** `pipe_res` mentions `pn_cancel γp`, i.e. the gname of the
+invariant it lives in, so `cinv_alloc` (which fixes the body before the gname)
+cannot build a pipe at all. `WpLock.newlock_c_delayed` chooses the cancel gname
+first and takes the resource afterwards; `new_pipe` allocates in that order.
+
 ## Wiring to `struct file`
 
 `pipe_held pi w q := ∃ γl γp, is_pipe γl γp pi ∗ pipe_ref γp w q` is the
@@ -108,25 +153,8 @@ and recombined across holders), pin the identity — either an `agree` component
 on the ftable authority's per-slot entry, or a global address-keyed pipe
 registry.
 
-## Open item: reclaiming the page (blocks `pipeclose`, not `pipealloc`)
-
-With `is_lock` built on a plain Iris `inv`, a pipe's page **can never actually
-be freed**:
-
-- the invariant is permanent, so `pipe_res` can never be taken back out;
-- worse, `lock_name` *discards* the 8-byte name field forever (`↦₈□`), and
-  `kfree` memsets all 4096 bytes, so even the lock's own fields cannot be
-  reassembled into `page_own pi`.
-
-So `pipeclose` will need (a) a cancellable form of `is_lock` — WpLock over
-`cinv`, with a fractional cancel token that the two end references carry, so
-holding both ends fully means holding the whole cancel token — and (b) a name
-field that is reclaimable rather than discarded. Decide this before proving
-`pipeclose`; the resource layout above is arranged so the switch touches
-`is_pipe` and `WpLock` only.
-
-`pipealloc` needs none of it: gcc proved its `if (pi) kfree(pi)` arm dead
-(every path reaching `bad` has `pi == 0`), so pipealloc never frees a pipe.
+`pipealloc` never frees a pipe: gcc proved its `if (pi) kfree(pi)` arm dead
+(every path reaching `bad` has `pi == 0`).
 
 ## Carving the page: `PageFields.v`
 
