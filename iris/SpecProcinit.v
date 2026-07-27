@@ -49,6 +49,8 @@ Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInv.
 Require Import ProcInv.
+Require Import SwtchCtx.
+Require Import SchedCtx.
 Require Import KvmMap.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -138,6 +140,40 @@ Section SpecProcinit.
      proc_dormant (proc_addr i) UNUSED)%I.
 
 End SpecProcinit.
+
+(* [proc_lock_res] is generalized over the scheduler's section parameters, so
+   this composition check takes them; nothing in procinit's own contract
+   does. *)
+Section ProcinitSeals.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{CID : CpuId}.
+  Context (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname).
+
+  (* ---- what the postcondition is FOR ----
+     One [proc_ready i], plus the two public cells procinit does not touch,
+     IS the body of [SchedCtx.proc_lock_res] at UNUSED.  So the caller's
+     remaining ghost step really is just "allocate the invariant over this"
+     -- there is no gap between what procinit hands back and what the proc
+     lock has to protect.  Stated and checked here because an unproven
+     contract is otherwise only as good as my reading of SchedCtx. *)
+  Lemma proc_ready_lock_res (γl : gname) (i : nat) (ch : mword 64) :
+    proc_ready i -∗
+    p_chan (proc_addr i) ↦₈ ch -∗
+    proc_pub (proc_addr i) -∗
+    lk_fresh (proc_addr i) "proc"%string ∗
+    p_kstack (proc_addr i) ↦₈ kstack_va i ∗
+    proc_lock_res γ Φ γs γl (proc_addr i).
+  Proof.
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub".
+    iFrame "Hlk Hks".
+    iExists UNUSED, ch. iFrame "Hst Hch Hpub".
+    rewrite /proc_slots.
+    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
+    rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
+    iSplitR; [done | iExact "Hdorm"].
+  Qed.
+
+End ProcinitSeals.
 
 Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) :=

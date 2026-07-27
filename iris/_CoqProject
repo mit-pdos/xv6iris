@@ -378,6 +378,9 @@ LinkArgraw.v
 SpecArgint.v
 ProofArgint.v
 LinkArgint.v
+SpecKilled.v
+ProofKilled.v
+LinkKilled.v
 SpecArgfd.v
 WpArgfdDecode.v
 ProofArgfd.v
@@ -406,3 +409,5 @@ LinkProcPagetable.v
 ProcPtOwn.v
 WpPipecloseDecode.v
 SpecPipeclose.v
+ProofPipeclose.v
+LinkPipeclose.v
