@@ -229,6 +229,79 @@ Section WpSconfLock.
     iApply ("Hcont" with "HTc Hcg Hpc").
   Qed.
 
+  (* The word clear with the fate of the invariant left to the CALLER.  At
+     this instant the store has happened and [lock_give] has pinned the state
+     to [None], so the zeroed lock word, the cleared cpu word, the ghost state
+     and [R] are all in hand at once.  The finisher is handed the credential,
+     the close-or-destroy choice, and the contents in both shapes it might
+     want them -- reassembled as [lock_inv] (to put back) or raw (to keep) --
+     and decides.  [wp_sw_zero_lockopen] and [wp_sw_zero_lockcancel] are the
+     two instantiations; release is proved once over this and instantiated
+     twice. *)
+  Lemma wp_sw_zero_lockfin_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (γl : gname) (lk : mword 64) (R Tc Dc Out : iProp Σ)
+      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (n : nat) :
+    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    pa = lk ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
+    lock_openable γl lk R Tc Dc -∗
+    Tc -∗
+    locked_pre γl cpu_id -∗
+    R -∗
+    ( Tc -∗
+      ((▷ lock_inv γl lk R ={⊤ ∖ ↑minstretN ∖ ↑lockN, ⊤ ∖ ↑minstretN}=∗ True)
+       ∧ (Dc ={⊤ ∖ ↑minstretN ∖ ↑lockN, ⊤ ∖ ↑minstretN}=∗ True)) -∗
+      (▷ lock_inv γl lk R
+       ∧ (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R)) -∗
+      |={⊤ ∖ ↑minstretN ∖ ↑lockN, ⊤ ∖ ↑minstretN}=> Out ) -∗
+    ( Out -∗
+      sie_cap_gpr γ m n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros pa Hpalk.
+    iIntros "Hcg Hpc Hinstr #Hlock HTc Htok HRes Hfin Hcont".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (gpr_file_x0 m (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
+                 with "Hfile") as "[%Hz Hfile]".
+    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    assert (Hzero : trunc32 (m !!! Regidx (mword_of_int 0 : mword 5))
+                    = (mword_of_int 0 : mword 32))
+      by (rewrite Hz; apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_store_s_sconf_au 4 false γ Φ pc (mword_of_int 0 : mword 5) rs1 imm m n
+              (trunc32 (m !!! Regidx (mword_of_int 0 : mword 5)))
+              Out
+              (⊤ ∖ ↑minstretN ∖ ↑lockN)
+              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_4 (store_ext_4 (m !!! Regidx (mword_of_int 0 : mword 5)))
+              with "Hcg Hpc Hinstr [Htok HRes HTc Hfin] [Hcont]").
+    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) with "[%] HTc")
+        as "(Hbody & HTc & Hchoice)"; [solve_ndisj|].
+      iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
+      iMod (lock_give γl st cpu_id with "Hg Htok") as "(%Hst & Hg & Hfrag)".
+      iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
+      subst st.
+      iModIntro. iExists w.
+      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+      iIntros "Hword".
+      iApply ("Hfin" with "HTc Hchoice [Hword Hcpu Hg Hfrag HRes]").
+      iSplit.
+      - iNext. iExists (trunc32 (m !!! Regidx (mword_of_int 0 : mword 5))), None.
+        iFrame "Hg".
+        iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+        iSplitL "Hcpu"; [ iExact "Hcpu" | ].
+        iLeft. iFrame "Hfrag HRes". iSplit; [done | iPureIntro; exact Hzero ].
+      - iFrame "HRes".
+        iSplitL "Hword"; [ rewrite -Hzero -Hpalk; iExact "Hword" | ].
+        iExact "Hcpu". }
+    iIntros "Hcg Hpc HOut".
+    iApply ("Hcont" with "HOut Hcg Hpc").
+  Qed.
+
   (* The same store, but the caller DESTROYS the invariant instead of
      closing it.  This is the whole point of the cancellable flavour: the
      store IS the linearization point, and [lock_give] has just pinned the
