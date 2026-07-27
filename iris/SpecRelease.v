@@ -18,14 +18,15 @@
      RELEASE         -- the static kernel lock: no credential, no disposal,
                         nothing comes back out.  Verbatim what the thirteen
                         ordinary consumers were written against.
-     RELEASE_CANCEL  -- the kalloc'd object's lock, over [cinv]: release
-                        RECLAIMS the lock's own two words along with [R],
-                        which is what lets pipeclose [kfree] the page. *)
+     RELEASE_CANCEL  -- the kalloc'd object's lock: release RECLAIMS the
+                        lock's own two words along with whatever the caller
+                        makes of [R], which is what lets pipeclose [kfree]
+                        the page. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
-From iris.base_logic.lib Require Import ghost_var invariants cancelable_invariants gen_heap.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
@@ -42,14 +43,18 @@ Import Defs.
 
 Notation RL := KernelSyms.release.
 
-(* The generic form.  [Tc] is the right to touch the lock at all -- presented
-   on the way in, threaded through holding()'s two reads and the [lk->cpu]
-   clear, and finally handed to the finisher, which spends it (or does not) as
-   it likes.  The finisher's mask is the step engine's [⊤ ∖ ↑minstretN]: the
-   choice is made INSIDE the atomic store, so no other hart can see the window
-   in which the lock is free but its storage already spoken for. *)
+(* The generic form.  release opens the lock invariant at four instructions
+   and presents, at each, the very token it is already holding -- [locked] for
+   the first three and [locked_pre] for the word clear.  That is not a
+   convenience: by the time release runs, the object's last REFERENCE has
+   necessarily gone home, and the lock is all its closer has left.  So what
+   the caller owes is a refutation of the dead state [Dc] from each token.
+
+   The finisher's mask is the step engine's [⊤ ∖ ↑minstretN]: the choice is
+   made INSIDE the atomic store, so no other hart can see the window in which
+   the lock is free but its storage already spoken for. *)
 Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -57,13 +62,14 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
+  (⊢ locked γl cpu_id -∗ Dc -∗ False) ->
+  (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
   sie_cap_gpr γ m av -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lka R Tc Dc -∗
-  Tc -∗
+  lock_openable γl lka R Dc -∗
   locked γl cpu_id -∗
   R -∗
-  lock_finisher γl lka R Tc Dc Out (⊤ ∖ ↑minstretN) -∗
+  lock_finisher γl lka R Dc Out (⊤ ∖ ↑minstretN) -∗
   cpu_own γ (S n) eb p C -∗
   trap_csrs_pay n eb -∗
   ( ∀ mr,
@@ -99,38 +105,35 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-(* The cancelling instance, stated directly over the [cinv] flavour so a
-   caller never has to build a finisher: release gives back the lock's own two
-   words along with whatever the caller makes of [R] -- the whole object,
-   ready to be reassembled into a page and freed.  The invariant is GONE
-   afterwards, so [cinv] does not reappear in the post.
+(* The cancelling instance: release DESTROYS the lock at its word clear and
+   walks off with the storage.  The caller brings the dead state [D] it wants
+   the invariant to degenerate into, refutations of it from the two holder
+   tokens, and a wand that BUILDS [D] out of the lock's own spent state
+   fragment plus whatever it finds in [R].
 
-   The caller brings a share [q] of the cancel token -- enough to OPEN -- and
-   a wand that completes it to the whole token out of [R].  That indirection
-   is not decoration: for a two-ended object the last closer necessarily has
-   already surrendered part of the certificate INTO the resource (the other
-   end closed before it did), and [R] must be handed in intact because
-   release's word clear reassembles [lock_inv] on the branch it does not
-   take.  So the certificate can only be completed inside the finisher, with
-   [R] in hand.  A caller that really does hold every share instantiates
-   [q := 1] and the wand with [iIntros "$ $"]. *)
-Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !cinvG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γc : gname) (lka : mword 64) (R Out : iProp Σ) (q : Qp) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+   That indirection is not decoration: for a multiply-owned object the last
+   closer has necessarily already surrendered part of the certificate INTO
+   [R] (the other end closed before it did), and [R] must be handed in intact
+   because release's word clear reassembles the invariant on the branch it
+   does not take.  So the certificate can only be completed inside the
+   finisher, with [R] in hand.  See PipeInv.pipe_res_dead. *)
+Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
+  (⊢ locked γl cpu_id -∗ D -∗ False) ->
+  (⊢ locked_pre γl cpu_id -∗ D -∗ False) ->
   sie_cap_gpr γ m av -∗
   kernel_text -∗ pc_is pcE -∗
-  cinv lockN γc (lock_inv γl lka R) -∗
-  cinv_own γc q -∗
+  lock_openable γl lka R D -∗
   locked γl cpu_id -∗
   R -∗
-  (* the licence to destroy: with the credential back and the lock's resource
-     in hand, produce the WHOLE cancel token, and keep [Out]. *)
-  (cinv_own γc q -∗ R ==∗ cinv_own γc 1 ∗ Out) -∗
+  (* the licence to destroy, cashed inside the store *)
+  (lock_frag γl None -∗ R ==∗ D ∗ Out) -∗
   cpu_own γ (S n) eb p C -∗
   trap_csrs_pay n eb -∗
   ( ∀ mr,
@@ -147,8 +150,8 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !cin
 Module Type RELEASE_GEN.
   Parameter wp_release_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_release_gen_sconf_body γ Φ γl lka R Tc Dc Out m n eb p C av.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_release_gen_sconf_body γ Φ γl lka R Dc Out m n eb p C av.
 End RELEASE_GEN.
 
 Module Type RELEASE.
@@ -160,7 +163,7 @@ End RELEASE.
 
 Module Type RELEASE_CANCEL.
   Parameter wp_release_cancel_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !cinvG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γc : gname) (lka : mword 64) (R Out : iProp Σ) (q : Qp) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_release_cancel_sconf_body γ Φ γl γc lka R Out q m n eb p C av.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_release_cancel_sconf_body γ Φ γl lka R D Out m n eb p C av.
 End RELEASE_CANCEL.

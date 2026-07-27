@@ -15,7 +15,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
-From iris.base_logic.lib Require Import ghost_var invariants cancelable_invariants gen_heap.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
@@ -52,15 +52,15 @@ Section ProofRelease.
   Context `{CID : CpuId}.
 
   Lemma wp_release_gen_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl : gname) (lka : mword 64) (R Tc Dc Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_gen_sconf_body γ Φ γl lka R Tc Dc Out m n eb p C av.
+    : wp_release_gen_sconf_body γ Φ γl lka R Dc Out m n eb p C av.
   Proof.
     cbv beta delta [wp_release_gen_sconf_body].
-    intros pcE lk0 ret_tgt Hlka Htp Hav.
+    intros pcE lk0 ret_tgt Hlka Htp Hav Href Hrefpre.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock HTc Htoken HR Hfin Hown Hpay Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hfin Hown Hpay Hcont".
     iPoseProof (rli_00 with "Htext") as "Hi00".
     iPoseProof (rli_02 with "Htext") as "Hi02".
     iPoseProof (rli_04 with "Htext") as "Hi04".
@@ -183,10 +183,10 @@ Section ProofRelease.
       by (rewrite Ha0R3; exact Hlka).
     assert (HtpR3c : R3 !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
       by (rewrite HtpR3; exact Htp).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka R Tc Dc R3 (av - 4)%nat
-              HlkaR3 HtpR3c ltac:(lia)
-              with "Hcg Htext Hpc Hlock HTc Htoken [-]").
-    iIntros (mh) "HTc Hcg Hpc %Hmh Htoken".
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γ Φ γl lka R Dc R3 (av - 4)%nat
+              HlkaR3 HtpR3c ltac:(lia) Href
+              with "Hcg Htext Hpc Hlock Htoken [-]").
+    iIntros (mh) "Hcg Hpc %Hmh Htoken".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Htph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
     iEval (rewrite upd_eq) in "Hpc".
@@ -217,11 +217,11 @@ Section ProofRelease.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite kv_addv_zero. reflexivity. }
-    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf γ Φ γl lka R Tc Dc (mword_of_int (RL + 0x12))
+    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf γ Φ γl lka R Dc (mword_of_int (RL + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (av - 4)%nat
-              Hacpu
-              with "Hcg Hpc Hi12 Hlock HTc Htoken [-]").
-    iIntros "HTc Hcg Hpc Htoken".
+              Hacpu Href
+              with "Hcg Hpc Hi12 Hlock Htoken [-]").
+    iIntros "Hcg Hpc Htoken".
     assert (Hpc16 : add_vec_int (mword_of_int (RL + 0x12) : mword 64) 4 = mword_of_int (RL + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc16) in "Hpc".
     (* ---- 0x16: fence rw,w ---- *)
@@ -233,10 +233,10 @@ Section ProofRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iPoseProof (rli_1a with "Htext") as "Hi1a".
-    iApply (wp_sw_zero_lockfin_s_sconf γ Φ γl lka R Tc Dc Out (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
+    iApply (wp_sw_zero_lockfin_s_sconf γ Φ γl lka R Dc Out (mword_of_int (RL + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh (av - 4)%nat
-              ltac:(rewrite Hs1mh; exact Hlka)
-              with "Hcg Hpc Hi1a Hlock HTc Htoken HR Hfin [-]").
+              ltac:(rewrite Hs1mh; exact Hlka) Hrefpre
+              with "Hcg Hpc Hi1a Hlock Htoken HR Hfin [-]").
     iIntros "HOut Hcg Hpc".
     assert (Hpc1e : add_vec_int (mword_of_int (RL + 0x1a) : mword 64) 4 = mword_of_int (RL + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
@@ -477,11 +477,10 @@ Section OfGen.
     cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 ret_tgt Hlka Htp Hav.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γ Φ γl lka R emp%I False%I emp%I m n eb p C av
-              Hlka Htp Hav
-              with "Hcg Htext Hpc [] [] Htoken HR [] Hown Hpay [-]").
+    iApply (G.wp_release_gen_sconf γ Φ γl lka R False%I emp%I m n eb p C av
+              Hlka Htp Hav (lock_refute_False _) (lock_refute_False _)
+              with "Hcg Htext Hpc [] Htoken HR [] Hown Hpay [-]").
     { iApply (is_lock_openable with "Hlock"). }
-    { done. }
     { iApply lock_finisher_close. }
     iIntros (mr) "_ Hcg Hpc %Hcs Hown".
     iApply ("Hcont" $! mr with "Hcg Hpc [//] Hown").
@@ -499,25 +498,24 @@ End ReleaseOfGen.
 Module ReleaseCancelOfGen (G : RELEASE_GEN) : RELEASE_CANCEL.
 
 Section CancelOfGen.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !cinvG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
 
   Lemma wp_release_cancel_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl γc : gname) (lka : mword 64) (R Out : iProp Σ) (q : Qp)
+      (γl : gname) (lka : mword 64) (R D Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_cancel_sconf_body γ Φ γl γc lka R Out q m n eb p C av.
+    : wp_release_cancel_sconf_body γ Φ γl lka R D Out m n eb p C av.
   Proof.
     cbv beta delta [wp_release_cancel_sconf_body].
-    intros pcE lk0 ret_tgt Hlka Htp Hav.
-    iIntros "Hcg #Htext Hpc #Hcinv Hown_c Htoken HR Hfull Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γ Φ γl lka R (cinv_own γc q) (cinv_own γc 1)
+    intros pcE lk0 ret_tgt Hlka Htp Hav Href Hrefpre.
+    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
+    iApply (G.wp_release_gen_sconf γ Φ γl lka R D
               (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
               m n eb p C av
-              Hlka Htp Hav
-              with "Hcg Htext Hpc [] Hown_c Htoken HR [Hfull] Hown Hpay [-]").
-    { iApply (lock_openable_cinv with "Hcinv"). }
-    { iApply (lock_finisher_destroy with "Hfull"). }
+              Hlka Htp Hav Href Hrefpre
+              with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay [-]").
+    { iApply (lock_finisher_destroy with "Hbuild"). }
     iIntros (mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").
   Qed.

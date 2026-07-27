@@ -12,13 +12,14 @@
        pins [lk->cpu] at this hart's [struct cpu]); the token comes back out.
        That is release's check.
 
-   Both are stated over [lock_openable] (WpLock.v) rather than [is_lock]: the
-   right to open the lock is a RESOURCE [Tc], presented on the way in and
-   handed straight back.  A caller of a static kernel lock instantiates it at
-   [Tc := emp], [Dc := False] and supplies the accessor with
-   [is_lock_openable]; a caller of a kalloc'd object's lock passes its
-   [cinv_own] share, which is what keeps the storage reclaimable.  holding()
-   itself never disposes of anything, so [Dc] only rides along. *)
+   Both are stated over [lock_openable] (WpLock.v) rather than [is_lock], so
+   they work for a lock whose storage can be reclaimed.  What each open
+   presents is a credential that refutes the dead state [Dc]: for the
+   evidence-free form that is the caller's own [Tc] (a reference to the
+   object), and for the [locked] form it is the holder token itself -- which
+   is all a caller has left once the object's last reference has gone home.
+   holding() never disposes of anything, so [Dc] only rides along; a static
+   kernel lock takes [Dc := False] and [lock_refute_False]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -49,9 +50,10 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
   (* the tp register holds THIS cpu's id (the mycpu convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (6 <= n)%nat ->
+  (⊢ Tc -∗ Dc -∗ False) ->
   sie_cap_gpr γ m n -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lka R Tc Dc -∗
+  lock_openable γl lka R Dc -∗
   Tc -∗
   ( ∀ mh,
     Tc -∗
@@ -64,20 +66,19 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) :=
+    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (6 <= n)%nat ->
+  (⊢ locked γl cpu_id -∗ Dc -∗ False) ->
   sie_cap_gpr γ m n -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lka R Tc Dc -∗
-  Tc -∗
+  lock_openable γl lka R Dc -∗
   locked γl cpu_id -∗
   ( ∀ mh,
-    Tc -∗
     sie_cap_gpr γ mh n -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
@@ -93,6 +94,6 @@ Module Type HOLDING.
       wp_holding_lockinv_s_sconf_body γ Φ γl lka R Tc Dc m n.
   Parameter wp_holding_lockinv_locked_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat),
-      wp_holding_lockinv_locked_s_sconf_body γ Φ γl lka R Tc Dc m n.
+      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat),
+      wp_holding_lockinv_locked_s_sconf_body γ Φ γl lka R Dc m n.
 End HOLDING.

@@ -252,4 +252,46 @@ Section PageFields.
       [ exists 512; reflexivity | exact Hdvd ].
   Qed.
 
+  (* ---- and back: a word cell IS anonymous bytes ----
+
+     The converse direction, for reclaiming a page: an object being torn down
+     hands its typed fields back and they have to become the 4096 anonymous
+     bytes kfree wants.  [bwin_split] / [bwin_rebase] above are already
+     equivalences, so only the leaves need a backward twin. *)
+  Lemma word4_bwin (a : mword 64) (w : mword 32) :
+    a ↦₄ w ⊢ [∗ list] j ∈ seq 0 4, byte_any (pa_add a j).
+  Proof.
+    rewrite word4_pointsto_bytes. apply big_sepL_mono.
+    intros k j _. iIntros "H". by iExists (nth_byte w j).
+  Qed.
+
+  Lemma word8_bwin (a : mword 64) (w : mword 64) :
+    a ↦₈ w ⊢ [∗ list] j ∈ seq 0 8, byte_any (pa_add a j).
+  Proof.
+    rewrite word_pointsto_bytes. apply big_sepL_mono.
+    intros k j _. iIntros "H". by iExists (nth_byte w j).
+  Qed.
+
+  Lemma page_field4_back (p : mword 64) (o : nat) (w : mword 32) :
+    pa_add p o ↦₄ w ⊢ [∗ list] j ∈ seq o 4, byte_any (pa_add p j).
+  Proof. rewrite bwin_rebase. apply word4_bwin. Qed.
+
+  Lemma page_field8_back (p : mword 64) (o : nat) (w : mword 64) :
+    pa_add p o ↦₈ w ⊢ [∗ list] j ∈ seq o 8, byte_any (pa_add p j).
+  Proof. rewrite bwin_rebase. apply word8_bwin. Qed.
+
+  (* the converse of [bwin_bytes_list]: a tracked byte list forgets its
+     contents and becomes a window again. *)
+  Lemma bytes_list_bwin (a : mword 64) (bs : list (bv 8)) :
+    ([∗ list] j ↦ b ∈ bs, pa_add a j ↦ₘ b) ⊢
+    [∗ list] j ∈ seq 0 (length bs), byte_any (pa_add a j).
+  Proof.
+    induction bs as [|b bs IH] using rev_ind; [ by iIntros "_" | ].
+    rewrite length_app /= Nat.add_1_r seq_S big_sepL_app big_sepL_singleton.
+    rewrite big_sepL_app big_sepL_singleton.
+    iIntros "[Hpre Hlast]".
+    iSplitL "Hpre"; [ by iApply IH | ].
+    rewrite Nat.add_0_r. by iExists b.
+  Qed.
+
 End PageFields.

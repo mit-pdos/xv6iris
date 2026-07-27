@@ -281,7 +281,7 @@ Section Lock.
   (* ---- THE OPENING INTERFACE ------------------------------------------
 
      WpSconfLock.v is the only file in the tree that ever opens a lock, and
-     all ten of its leaves do the same three things: open [lock_inv], take one
+     all its leaves do the same three things: open [lock_inv], take one
      machine step, put it back.  [lock_openable] is that pattern named, with
      two parameters that decide WHOSE lock it is:
 
@@ -291,91 +291,131 @@ Section Lock.
 
      Two instances, and they are the whole point:
 
-       inv  lockN    (lock_inv γ lk R)  --  T := emp,  D := False
+       inv lockN (lock_inv γ lk R)              -- any T, D := False
             anyone may open, nobody may destroy: a static kernel lock, and
             exactly today's behaviour
-       cinv lockN γc (lock_inv γ lk R)  --  T := cinv_own γc q,  D := cinv_own γc 1
-            only a share-holder may open, and whoever collects every share may
-            destroy it and walk off with the memory
+       inv lockN (lock_inv γ lk R ∨ D)          -- any T that REFUTES D
+            the object may die: the invariant degenerates into a husk holding
+            [D], and whoever can produce [D] puts it there and walks off with
+            the memory.  [T] is whatever proves the object is not dead yet.
 
-     So a lock's storage is reclaimable exactly when the right to touch it is
-     a resource rather than free knowledge -- which is the real xv6 rule for a
+     A lock's storage is reclaimable exactly when the right to touch it is a
+     resource rather than free knowledge -- which is the real xv6 rule for a
      kalloc'd object: you may take [pi->lock] only while you hold a reference
-     to the pipe.  The mask is universally quantified so this file needs no
-     [minstretN]; the leaves instantiate it at [⊤ ∖ ↑minstretN]. *)
-  Definition lock_openable (γ : gname) (lk : mword 64) (R T D : iProp Σ) : iProp Σ :=
-    (□ ∀ E : coPset, ⌜↑lockN ⊆ E⌝ -∗ T ={E, E ∖ ↑lockN}=∗
+     to it, OR while you hold the lock.  Both are legitimate credentials, and
+     BOTH are needed: the last holder to let go of a reference has already
+     given it back by the time it calls release, and what licenses release's
+     own three opens is the lock it is still holding.  That is why [T] is a
+     parameter and not a fixed token -- see [lock_openable_holder].
+
+     The mask is universally quantified so this file needs no [minstretN]; the
+     leaves instantiate it at [⊤ ∖ ↑minstretN]. *)
+  Definition lock_openable (γ : gname) (lk : mword 64) (R D : iProp Σ) : iProp Σ :=
+    (□ ∀ (E : coPset) (T : iProp Σ),
+         ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
          ▷ lock_inv γ lk R ∗ T ∗
          ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)      (* put it back *)
           ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
 
-  Global Instance lock_openable_persistent γ lk R T D :
-    Persistent (lock_openable γ lk R T D).
+  Global Instance lock_openable_persistent γ lk R D :
+    Persistent (lock_openable γ lk R D).
   Proof. apply _. Qed.
+
+  (* a permanent [inv]: nothing has to be refuted, and no disposal is
+     possible. *)
+  Lemma lock_openable_inv γ lk R :
+    inv lockN (lock_inv γ lk R) ⊢ lock_openable γ lk R False.
+  Proof.
+    iIntros "#Hi !>" (E T HE) "_ HT".
+    iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
+    iModIntro. iFrame "Hbody HT".
+    iSplit; [iExact "Hclose" | iIntros "%Hf"; destruct Hf].
+  Qed.
+
+  (* the bridge every existing lock user rides: today's lock IS the permanent
+     instance of the generic one. *)
+  Lemma is_lock_openable γ lk s R : is_lock γ lk s R ⊢ lock_openable γ lk R False.
+  Proof. iIntros "H". iApply lock_openable_inv. by iApply is_lock_inv. Qed.
+
+  (* the refutation obligation is vacuous for a lock that cannot die. *)
+  Lemma lock_refute_False (T : iProp Σ) : ⊢ T -∗ False -∗ False.
+  Proof. iIntros "_ []". Qed.
+
+  (* ---- the CANCELLABLE flavour ----------------------------------------
+
+     One invariant with a dead branch, and any credential that refutes it.
+     This is what a [cinv] would be if its accessor did not insist on a share
+     of the very token that has to be WHOLE in order to cancel -- and that
+     insistence is exactly what a multiply-owned object cannot satisfy: the
+     last holder to let go of a reference has already given it back by the
+     time it calls release, and what licenses release's own opens is the LOCK
+     it is still holding, a different resource entirely.  Quantifying [T]
+     inside the accessor is what lets the two coexist.
+
+     [D] must be timeless: the dead branch is refuted UNDER a later, and there
+     is no step to take there. *)
+  Lemma lock_openable_of_dead γ lk R D `{!Timeless D} :
+    inv lockN (lock_inv γ lk R ∨ D) ⊢ lock_openable γ lk R D.
+  Proof.
+    iIntros "#Hi !>" (E T HE) "Hrefute HT".
+    iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
+    rewrite bi.later_or. iDestruct "Hbody" as "[Hlive | >Hdead]".
+    2:{ iExFalso. iApply ("Hrefute" with "HT Hdead"). }
+    iModIntro. iFrame "Hlive HT".
+    iSplit.
+    - iIntros "Hb". iApply "Hclose". by iLeft.
+    - iIntros "Hd". iApply "Hclose". iRight. by iNext.
+  Qed.
 
   (* ---- THE FINISHING INTERFACE ---------------------------------------
 
      The other half: what the CALLER of release's word clear supplies to
      decide the invariant's fate.  At that instant the store has happened and
-     the state ghost is back at [None], so the zeroed lock word, the cleared
-     cpu word, the ghost state and [R] are all in hand at once -- which is why
-     the choice has to be made HERE and not one instruction later.  The
-     finisher is handed the credential [T], the close-or-destroy choice at
-     mask [E], and the contents in BOTH shapes it might want them --
-     reassembled as [lock_inv] (to put back) or raw (to keep) -- and produces
-     the leaf's output resource [Out].
+     the state ghost is back at [None], so the two zeroed words, the ghost
+     state and [R] are all in hand at once -- which is why the choice has to
+     be made HERE and not one instruction later.  The finisher is handed the
+     close-or-destroy choice at mask [E] and the contents in PIECES, and
+     produces the leaf's output resource [Out].
 
-     The two canonical instances are below: close, and [Out := emp]; or
-     surrender [D] and walk off with the lock's own two words and [R] -- i.e.
-     with the memory.                                                       *)
-  Definition lock_finisher (γ : gname) (lk : mword 64) (R T D Out : iProp Σ)
+     Pieces, not a reassembled [lock_inv]: a destroying caller needs the ghost
+     state (that is what it turns into a certificate) and a closing one can
+     rebuild the body from them.  The two canonical instances are below. *)
+  Definition lock_finisher (γ : gname) (lk : mword 64) (R D Out : iProp Σ)
       (E : coPset) : iProp Σ :=
-    ( T -∗
-      ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)
+    ( ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)
        ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
-      (▷ lock_inv γ lk R
-       ∧ (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R)) -∗
+      lock_auth γ None -∗ lock_frag γ None -∗
+      lk ↦₄ (mword_of_int 0 : mword 32) -∗
+      lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+      R -∗
       |={E ∖ ↑lockN, E}=> Out)%I.
 
   (* put it back: today's release. *)
-  Lemma lock_finisher_close γ lk R E : ⊢ lock_finisher γ lk R emp False emp E.
+  Lemma lock_finisher_close γ lk R E : ⊢ lock_finisher γ lk R False emp E.
   Proof.
-    iIntros "_ [Hclose _] [Hbody _]".
-    iMod ("Hclose" with "Hbody") as "_". by iModIntro.
+    iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
+    iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
+    iNext. iExists (mword_of_int 0 : mword 32), None.
+    rewrite /lock_word. iFrame "Hword Hcpu Hauth".
+    iLeft. by iFrame "Hfrag HR".
   Qed.
 
   (* destroy it and keep the storage.  The certificate [D] is assembled HERE,
-     from the credential [T] that opened plus the lock's own resource [R] --
-     not brought along ready-made.  That generality is what a multiply-owned
-     object needs: the last holder to let go has necessarily already
-     surrendered part of the certificate into [R] (see PipeInv.v), and [R] is
-     only in hand at this instant.  A caller that really does arrive holding
-     the whole certificate takes [T := D] and the identity wand. *)
-  Lemma lock_finisher_destroy γ lk R T D Out E :
-    (T -∗ R ==∗ D ∗ Out) -∗
-    lock_finisher γ lk R T D
+     out of the ghost state the lock just gave up plus whatever the caller
+     finds in [R] -- not brought along ready-made.  That generality is what a
+     multiply-owned object needs: the last holder to let go has necessarily
+     already surrendered its share of the certificate into [R], and [R] is
+     only in hand at this instant (see PipeInv.pipe_res_dead). *)
+  Lemma lock_finisher_destroy γ lk R D Out E :
+    (lock_frag γ None -∗ R ==∗ D ∗ Out) -∗
+    lock_finisher γ lk R D
       (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ Out) E.
   Proof.
-    iIntros "Hcomplete HT [_ Hdispose] [_ (Hword & Hcpu & HR)]".
-    iMod ("Hcomplete" with "HT HR") as "[HD HOut]".
+    iIntros "Hcomplete [_ Hdispose] Hauth Hfrag Hword Hcpu HR".
+    iMod ("Hcomplete" with "Hfrag HR") as "[HD HOut]".
     iMod ("Hdispose" with "HD") as "_".
     iModIntro. by iFrame "Hword Hcpu HOut".
   Qed.
-
-  (* a permanent [inv]: no credential needed, no disposal possible. *)
-  Lemma lock_openable_inv γ lk R :
-    inv lockN (lock_inv γ lk R) ⊢ lock_openable γ lk R emp False.
-  Proof.
-    iIntros "#Hi !>" (E HE) "_".
-    iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
-    iModIntro. iFrame "Hbody". iSplitR; [done|].
-    iSplit; [iExact "Hclose" | iIntros "%Hf"; destruct Hf].
-  Qed.
-
-  (* the bridge every existing lock user rides: today's lock IS the
-     [emp]/[False] instance of the generic one. *)
-  Lemma is_lock_openable γ lk s R : is_lock γ lk s R ⊢ lock_openable γ lk R emp False.
-  Proof. iIntros "H". iApply lock_openable_inv. by iApply is_lock_inv. Qed.
 
   Global Instance mem_pointsto_timeless a dq b : Timeless (mem_pointsto a dq b).
   Proof. rewrite /mem_pointsto. apply _. Qed.
@@ -406,6 +446,28 @@ Section Lock.
     iLeft. iFrame "Hf HR". done.
   Qed.
 
+  (* a FREE physical lock plus its resource become a lock that can DIE: the
+     body carries the dead branch from the start, and the ghost name of the
+     lock state is chosen FIRST, so [R] and [D] may both mention it -- which
+     they do for any object whose dead state parks the lock's own state
+     fragment (PipeInv.pipe_dead). *)
+  Lemma newlock_d E (lk : mword 64) :
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_cpu lk ↦₈ (zero_reg : mword 64) ==∗
+    ∃ γ : gname, ∀ (R D : iProp Σ),
+      R ={E}=∗ inv lockN (lock_inv γ lk R ∨ D).
+  Proof.
+    iIntros "Hword Hcpu".
+    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
+                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iDestruct (own_op with "H") as "[Ha Hf]".
+    iModIntro. iExists γ. iIntros (R D) "HR".
+    iApply (inv_alloc lockN E (lock_inv γ lk R ∨ D)).
+    iNext. iLeft. iExists (mword_of_int 0 : mword 32), None.
+    rewrite /lock_word. iFrame "Hword Hcpu Ha".
+    iLeft. iFrame "Hf HR". done.
+  Qed.
+
   (* a FREE physical lock plus the resource it protects and its name become a
      (permanent) lock. *)
   Lemma newlock E (lk : mword 64) (s : string) (R : iProp Σ) :
@@ -423,53 +485,3 @@ Section Lock.
   Qed.
 
 End Lock.
-
-(* ---- the cancellable flavour -----------------------------------------
-
-   Kept in its own section so that [cinvG] is required only of the proofs
-   that actually free a lock (pipes today); every existing lock user's
-   context is untouched. *)
-Section LockCancel.
-  Context `{!riscvGS Σ, !lockG Σ, !cinvG Σ}.
-
-  Lemma lock_openable_cinv γ γc lk R q :
-    cinv lockN γc (lock_inv γ lk R) ⊢
-    lock_openable γ lk R (cinv_own γc q) (cinv_own γc 1).
-  Proof.
-    iIntros "#Hc !>" (E HE) "Htok".
-    iMod (cinv_acc_strong E lockN with "Hc Htok") as "(Hbody & Htok & Hclose)"; [done|].
-    iSpecialize ("Hclose" $! (E ∖ ↑lockN)).
-    replace (↑lockN ∪ (E ∖ ↑lockN)) with E
-      by (apply union_difference_L; done).
-    iModIntro. iFrame "Hbody Htok".
-    iSplit.
-    - iIntros "Hb". iApply "Hclose". by iLeft.
-    - iIntros "Ht". iApply "Hclose". by iRight.
-  Qed.
-
-  (* a FREE physical lock plus its resource become a CANCELLABLE lock: the
-     whole disposal certificate comes out with it, for the creator to split
-     among whatever will hold references to the object.
-
-     DELAYED, and it has to be: the cancel gname is chosen FIRST and the
-     resource [R] is supplied afterwards, so that [R] may mention it.  That is
-     not a refinement -- it is the only order that works for an object whose
-     references CARRY shares of its cancel token, since then the resource the
-     lock protects mentions the gname of the invariant it lives in.  [cinv_alloc],
-     which fixes the body before the gname, cannot build such an object at all. *)
-  Lemma newlock_c_delayed E (lk : mword 64) :
-    ⊢ |={E}=> ∃ γc : gname, cinv_own γc 1 ∗
-        (∀ R : iProp Σ,
-           lk ↦₄ (mword_of_int 0 : mword 32) -∗
-           lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-           R ={E}=∗ ∃ γ : gname, cinv lockN γc (lock_inv γ lk R)).
-  Proof.
-    iMod (cinv_alloc_cofinite ∅ E lockN) as (γc _) "[Hown Hmake]".
-    iModIntro. iExists γc. iFrame "Hown".
-    iIntros (R) "Hword Hcpu HR".
-    iMod (lock_inv_alloc lk R with "Hword Hcpu HR") as (γ) "Hbody".
-    iMod ("Hmake" $! (lock_inv γ lk R) with "[Hbody]") as "#Hc"; [ by iNext | ].
-    iModIntro. iExists γ. iExact "Hc".
-  Qed.
-
-End LockCancel.
