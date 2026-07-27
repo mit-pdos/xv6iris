@@ -1,5 +1,6 @@
-(* WpSconfCsr.v -- stage-7 building blocks: the sstatus CSR leaves over
-   [sconf]+[sie_cap].
+(* WpSconfCsr.v -- the S-mode CSR leaves over [sconf]+[sie_cap]: the
+   sstatus reads/flips, and [wp_csrw_stvec_s_sconf] (the trap-vector
+   install).
 
    [wp_csrr_sstatus_s_sconf] (push_off's intr_get) works at EITHER SIE
    value: the read needs no SIE side condition, and the continuation
@@ -24,9 +25,9 @@ From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RegFile.
-Require Import MinstretInv InstrBytes WpGpr WpGprCsrwCommon.
+Require Import MinstretInv InstrBytes WpGpr ExecCommon WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
 (* exec_execute_csrr_sstatus: the exported copy lives in WpPopOff.v (the
    WpSmodePtCtl one is Local); the csr-write reduction chain
@@ -41,6 +42,65 @@ Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)
 Local Definition csr_sstatus : mword 12 := Ox"100".
+
+(* ===================================================================== *)
+(* exec layer: [csrw stvec,rs1] at Supervisor.  The per-CSR pieces        *)
+(* ([exec_write_CSR_stvec] & co.) are privilege-free and live in          *)
+(* WpGprCsrwB.v; what is S-mode-specific is the accessibility check and   *)
+(* the [execute] instance of the privilege-generic framework.            *)
+(* ===================================================================== *)
+
+(* stvec is an S-level CSR whose only accessibility gate is Ext_S. *)
+Lemma exec_check_CSR_result_csrw_stvec_S s :
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_result csr_stvec Supervisor CSRWrite) s = Some (CSR_Check_OK tt, s).
+Proof.
+  intro HS.
+  apply exec_check_CSR_result_csrw_p. apply exec_check_CSR_csrw_p.
+  - assert (H : check_CSR_priv csr_stvec Supervisor = returnM true)
+      by (vm_compute; reflexivity).
+    rewrite H. apply exec_returnm.
+  - vm_compute; reflexivity.
+  - assert (Hred : is_CSR_accessible csr_stvec Supervisor CSRWrite
+                   = currentlyEnabled Ext_S) by csr_dispatch_eq.
+    rewrite Hred. rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
+  - assert (H : stateen_allows_CSR_access csr_stvec Supervisor CSRWrite = returnM true)
+      by (vm_compute; reflexivity).
+    rewrite H. apply exec_returnm.
+Qed.
+
+Lemma exec_execute_csrw_stvec_S (rs1 : mword 5) s :
+  uint rs1 <> 0 ->
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  trapVectorMode_forwards
+    (_get_Mtvec_Mode (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))
+    <> TV_Reserved ->
+  exec (execute (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s stvec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
+Proof.
+  intros Hrs1 Hpriv HS Hm.
+  change (execute (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)))
+    with (execute_CSRReg csr_stvec (Regidx rs1) zreg CSRRW).
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false
+          by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  apply (exec_execute_csrw_gpr_p Supervisor csr_stvec rs1 s _
+           (if Z.eqb (uint rs1) 0 then zero_reg
+            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))).
+  - exact Hpriv.
+  - apply exec_check_CSR_result_csrw_stvec_S; assumption.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - apply exec_write_CSR_stvec.
+    replace (Z.eqb (uint rs1) 0) with false
+      by (symmetry; apply Z.eqb_neq; exact Hrs1). exact Hm.
+  - apply exec_csr_id_write_callback_stvec.
+Qed.
 
 Section WpSconfCsr.
   Context `{!riscvGS Σ}.
@@ -561,6 +621,77 @@ Section WpSconfCsr.
     iApply ("Hcont" $! ms0 with "[%] Hcg [Hqcnt] [$Hpc' $Hnpc]").
     { exact Hmsf. }
     { iExact "Hqcnt". }
+  Qed.
+
+  (* ---- csrw stvec,rs1 -- installs the trap vector.  The [stvec] cell is
+     threaded EXPLICITLY: only the Bare arm of the translation slot owns it,
+     so between kvminithart and trapinithart it rides client-side.  The
+     written word lands VERBATIM; the one premise on it is that its MODE
+     field is not the reserved encoding, which is exactly what
+     [legalize_tvec] would otherwise silently rewrite.  Taking the value as
+     an explicit [wval] (rather than leaving [m !!! Regidx rs1] in the
+     post) keeps the stored term closed at the call site. ---- *)
+  Lemma wp_csrw_stvec_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (tv0 wval : mword 64) :
+    uint rs1 <> 0 ->
+    m !!! Regidx rs1 = wval ->
+    trapVectorMode_forwards (_get_Mtvec_Mode wval) <> TV_Reserved ->
+    sie_cap_gpr γ m n -∗
+    stvec ↦ᵣ tv0 -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
+    ( sie_cap_gpr γ m n -∗
+      stvec ↦ᵣ wval -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
+              (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
+    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid    with "Hreg Hstv")  as %Lstv.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
+      by (unfold s_pc; tmig; exact Lmisa).
+    (* the rs1 value: the gpr file pins it in the step state *)
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
+    iDestruct ("Hfb" with "Hr1c") as "Hfile".
+    assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
+                   = wval).
+    { rewrite -Hwval rf_lookup -Lva.
+      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
+      reflexivity. }
+    iMod (reg_update _ stvec _ wval with "Hreg Hstv") as "[Hreg Hstv]".
+    iModIntro.
+    iExists (set_reg s_pc stvec wval).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      rewrite <- Lrs1.
+      apply (exec_execute_csrw_stvec_S rs1 s_pc Hrs1 Lpriv_spc
+               ltac:(rewrite Lmisa_spc; exact HmisaS)).
+      rewrite Lrs1. exact Hmode. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC (set_reg s_pc stvec wval).(sregs)
+                   = add_vec_int pc 4).
+    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hmsx $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg Hstv [$Hpc' $Hnpc]").
   Qed.
 
 End WpSconfCsr.

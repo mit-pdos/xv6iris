@@ -358,3 +358,7 @@ WpClockintrDecode.v
 SpecClockintr.v
 ProofClockintr.v
 LinkClockintr.v
+WpTrapinithartDecode.v
+SpecTrapinithart.v
+ProofTrapinithart.v
+LinkTrapinithart.v

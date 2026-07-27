@@ -135,8 +135,9 @@ their durable design notes, gotchas, and reusable recipes.
   on the sie-cap-avail interface. Keeps the `sconf`/`sie_cap`/`intr_count`
   architecture, the avail-param push/pop conventions, and the reusable recipes.
   Two consumer-side items are PARKED there with no owner: the boot wiring that
-  would drive the sconf layer (`main`→`trapinithart`) and wiring
-  `wp_vc_block_s_sconf` into the whole-function proofs.
+  would drive the sconf layer (`main`; `trapinithart` and the `csrw stvec` leaf
+  it needed are done) and wiring `wp_vc_block_s_sconf` into the whole-function
+  proofs.
 
 When a project is fully finished — no remaining work and no cleanup — move its
 file from `projects/` to `completed/` (rather than deleting it), so its durable

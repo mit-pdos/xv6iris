@@ -99,6 +99,14 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   a `Link*.v` instantiates a functor sealed by its `Module Type`. **So keeping
   a new proof in that shape is what keeps it visible to the report** — nothing
   needs to be registered.
+- **Spell the entry pc so the report can SEE the symbol.** The script matches
+  `KernelSyms.<f>` textually, either as `pc_is (mword_of_int KernelSyms.<f>)` or
+  — the form to prefer — a `let pcE : mword 64 := mword_of_int KernelSyms.<f> in`
+  binding used as `pc_is pcE`. A `Notation F := KernelSyms.<f>` alias written
+  into the `pc_is` hides the symbol, and the function is silently under-reported
+  as *partial* even though it is fully proven and linked. `SpecKvminithart.v` is
+  in exactly that state today (`pc_is (mword_of_int KVMIH)`); keep the notation
+  for the decode/proof files' addresses, but not for the spec's entry pc.
 - The whole-function proofs that predate the shape (M-mode boot and the
   assembly: `_entry`, `start`, `timerinit`, `spin`, `swtch`, `kernelvec`,
   `userret`) name their entry pc through a local `Definition`, so they are
