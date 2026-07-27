@@ -197,6 +197,7 @@ LinkMappages.v
 SpecKvmmap.v
 ProofKvmmap.v
 LinkKvmmap.v
+WpProcinitDecode.v
 SpecProcMapstacks.v
 ProofProcMapstacks.v
 LinkProcMapstacks.v

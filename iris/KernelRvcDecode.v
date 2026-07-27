@@ -815,3 +815,38 @@ Lemma frame_cancel_80 (X : mword 64) :
   add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))
           (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = X.
 Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
+(* ---- words shared by proc_mapstacks / walk and procinit ----
+   procinit computes KSTACK(i) with the same instruction sequence
+   proc_mapstacks uses, and saves the same s6/s7 frame walk does, so these
+   stopped being single-user the moment procinit was written. *)
+Lemma cdec_e05a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xe05a : mword 16)) s
+    = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 22)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_07b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x07b2 : mword 16)) s
+    = Some (C_SLLI (mword_of_int 12, Regidx (mword_of_int 15)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_1902 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x1902 : mword 16)) s
+    = Some (C_SLLI (mword_of_int 32, Regidx (mword_of_int 18)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_19fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x19fd : mword 16)) s
+    = Some (C_ADDI (mword_of_int 63, Regidx (mword_of_int 19)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_09b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x09b2 : mword 16)) s
+    = Some (C_SLLI (mword_of_int 12, Regidx (mword_of_int 19)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma cdec_6b02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0x6b02 : mword 16)) s
+    = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 22)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
