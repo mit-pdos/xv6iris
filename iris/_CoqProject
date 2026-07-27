@@ -351,11 +351,8 @@ SpecSysGetpid.v
 ProofSysGetpid.v
 LinkSysGetpid.v
 SpecArgraw.v
-ProofArgraw.v
-LinkArgraw.v
 SpecArgint.v
 ProofArgint.v
-LinkArgint.v
 TimerCap.v
 WpSconfTimer.v
 WpClockintrDecode.v
