@@ -28,10 +28,13 @@
    what makes [myproc()->pid] / [->sz] / [->cwd] / [->ofile[fd]] readable
    with no lock in hand.
 
-   NOTE (staging): the rewired [proc_lock_res] that consumes [proc_dormant]
-   and [inv_dormant] lives in SchedCtx.v, since it also mentions [proc_ctx];
-   that swap is a separate change (it re-proves yield/sched/sleep/wakeup).
-   Everything in THIS file is independent of it. *)
+   The lock invariant that consumes [proc_dormant] / [inv_dormant] lives in
+   SchedCtx.v, since it also mentions [proc_ctx]: [proc_pub] (the
+   always-resident killed/xstate/pid-half row) + [proc_slots] (the two flat
+   guards) + [proc_lock_res].  This file stays below it and mentions neither.
+
+   Also here: [tf_args], the syscall-argument slice of the trapframe PAGE
+   that [p_trapframe]'s pointer names -- what argraw() reads. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -156,6 +159,39 @@ Section ProcInv.
     iIntros "Hq1". rewrite /proc_priv Hq word4_pointsto_frac_split. iFrame.
   Qed.
 
+  (* The read-only trapframe-POINTER fraction: what [p->trapframe->aN] reads
+     first.  Same discipline as [proc_priv_pid] and for the same reason --
+     argraw should take the weakest premise (a bare fraction of one cell),
+     not the whole [proc_priv] with its [fileG]/[γf] baggage. *)
+  (* a 1/4 read-share of a full word cell, in proofmode form: a goal-level
+     [rewrite] would hit every [DfracOwn 1] cell of [proc_fields] at once. *)
+  Local Lemma word_frac14 (a w : mword 64) :
+    a ↦₈ w ⊣⊢ a ↦₈{DfracOwn (1/4)} w ∗ a ↦₈{DfracOwn (3/4)} w.
+  Proof.
+    assert (Hq : DfracOwn 1 = DfracOwn (1/4 + 3/4)) by (f_equal; compute_done).
+    rewrite {1}Hq. apply word_pointsto_frac_split.
+  Qed.
+
+  Local Lemma word_split14 (a w : mword 64) :
+    a ↦₈ w -∗ a ↦₈{DfracOwn (1/4)} w ∗ a ↦₈{DfracOwn (3/4)} w.
+  Proof. rewrite word_frac14. iIntros "$". Qed.
+
+  Local Lemma word_join14 (a w : mword 64) :
+    a ↦₈{DfracOwn (1/4)} w -∗ a ↦₈{DfracOwn (3/4)} w -∗ a ↦₈ w.
+  Proof. rewrite word_frac14. iIntros "H1 H2". iFrame. Qed.
+
+  Lemma proc_priv_trapframe (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_trapframe pa ↦₈{DfracOwn (1/4)} pv_trapframe V ∗
+    (p_trapframe pa ↦₈{DfracOwn (1/4)} pv_trapframe V -∗ proc_priv γf pa pid V).
+  Proof.
+    iIntros "(Hpid & (Hsz & Hpt & Htf & Hcwd & Hnl & Hnm) & Ho & Hc)".
+    iDestruct (word_split14 with "Htf") as "[Hq1 Hq2]".
+    iSplitL "Hq1"; [iExact "Hq1"|].
+    iIntros "Hq1". rewrite /proc_priv /proc_fields.
+    iDestruct (word_join14 with "Hq1 Hq2") as "Htf". iFrame.
+  Qed.
+
   (* Borrow one fd slot and hand back a (possibly different) one. *)
   Lemma proc_priv_ofile (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) (fd : nat) (v : mword 64) :
@@ -179,6 +215,42 @@ Section ProcInv.
   Proof.
     iIntros "(Hpid & _) Hother".
     iApply (word4_pointsto_agree with "Hpid Hother").
+  Qed.
+
+  (* =================================================================== *)
+  (* The trapframe page's syscall-argument slice.                        *)
+  (* =================================================================== *)
+  (* [p_trapframe] owns only the POINTER; the 35-word page it points at is a
+     separate resource, keyed by that pointer's value.  Only the six
+     argument registers are modelled here -- a0..a5 at 112..152, exactly the
+     ones argraw() reads.  The rest of the page (epc, kernel_sp,
+     kernel_satp, the saved user callee-saved registers) is untouched by the
+     syscall-argument path and stays unmodelled; see the "holes" section of
+     claude-notes/design/proc-struct.md.
+
+     Deliberately NOT folded into [proc_priv]: the page's ownership crosses
+     to user mode through uservec/userret, and at ZOMBIE freeproc has
+     already kfree'd it (so [proc_dormant] could not carry it).  Callers tie
+     the two together with [pv_trapframe V = tf]. *)
+  Definition NARG : nat := 6%nat.
+  Definition arg_off (i : nat) : Z := 112 + 8 * Z.of_nat i.
+  Definition a_tf_arg (tf : mword 64) (i : nat) : mword 64 :=
+    add_vec tf (mword_of_int (arg_off i)).
+
+  Definition tf_args (tf : mword 64) (dq : dfrac) (args : list (mword 64)) : iProp Σ :=
+    (⌜length args = NARG⌝ ∗
+     [∗ list] i ↦ v ∈ args, a_tf_arg tf i ↦₈{dq} v)%I.
+
+  (* borrow one argument cell and put it back *)
+  Lemma tf_args_lookup (tf : mword 64) (dq : dfrac) (args : list (mword 64))
+      (i : nat) (v : mword 64) :
+    args !! i = Some v ->
+    tf_args tf dq args -∗
+    a_tf_arg tf i ↦₈{dq} v ∗ (a_tf_arg tf i ↦₈{dq} v -∗ tf_args tf dq args).
+  Proof.
+    iIntros (Hi) "[%Hlen Hargs]".
+    iDestruct (big_sepL_lookup_acc _ _ i v Hi with "Hargs") as "[$ Hback]".
+    iIntros "Hcell". iSplit; [done|]. by iApply "Hback".
   Qed.
 
   (* =================================================================== *)
