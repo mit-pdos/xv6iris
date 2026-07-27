@@ -92,11 +92,8 @@ are working on that effort — the relevant `projects/` file.
   the worklist for folding `UserPtTree.user_pt_inv` onto it. The CONSTRUCTION
   side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md); they
   meet at `ProcPtOwn.proc_pt_intro_ppt`.
-- **[`lock-cancel-pipeclose.md`](projects/lock-cancel-pipeclose.md)** — making a
-  lock's storage reclaimable (`lock_openable`/`lock_finisher`, the `cinv`
-  flavour, release proved once and instantiated twice) so that `pipeclose` can
-  `kfree` its page. The lock and pipe sides have landed; `pipeclose` itself is
-  what is left.
+- **[`lock-cancel-pipeclose.md`](completed/lock-cancel-pipeclose.md)** — moved
+  to `completed/`.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
@@ -107,6 +104,12 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`lock-cancel-pipeclose.md`](completed/lock-cancel-pipeclose.md)** — making
+  a lock's storage reclaimable (`lock_openable` with the credential quantified
+  inside the accessor, `lock_finisher`, release proved once and instantiated
+  twice) and proving `pipeclose`, which frees a pipe's page. Keeps the argument
+  for why `cinv` cannot lock a multiply-owned object, and the join structure a
+  whole-function proof with rejoining arms needs.
 - **[`rwx-kmap.md`](completed/rwx-kmap.md)** — the R/W/X-accurate kernel page
   table and the kernel mapping model: one claim ghost for identity AND
   non-identity mappings, VA-based `↦ₘ`/`↦ₓ` (a store to kernel text is
