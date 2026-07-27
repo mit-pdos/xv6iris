@@ -489,7 +489,8 @@ Section ProofIinit.
     { iEval (rewrite HR7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
     iEval (rewrite HR7a0) in "Hlock".
-    iEval (rewrite HR7a0) in "Hlname".
+    iEval (rewrite HR7a0 HR7a1) in "Hlname".
+    iMod (lock_name_intro with "Hstr_itable Hlname") as "#Hlnm".
     iEval (rewrite HR7a0) in "Hcpu".
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (II + 0x22)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
@@ -586,9 +587,9 @@ Section ProofIinit.
               sie_cap_gpr γ mr K -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
               ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
               WP (Loop : expr riscv_lang) {{ Φ }})%I
-      with "[Hcont Hlock Hlname Hcpu]" as "Hpost".
+      with "[Hcont Hlock Hcpu]" as "Hpost".
     { iIntros (mr) "Hcg Hpc %Hcs Hfresh".
-      iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlname Hcpu Hfresh"). }
+      iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh"). }
     (* ================================================================= *)
     (* THE LOOP.  Fuel induction on the number of inodes left.            *)
     (* ================================================================= *)

@@ -217,7 +217,8 @@ Section ProofKinit.
     { iEval (rewrite HR7a0). iExact "Hname". }
     { iEval (rewrite HR7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlock Hlname Hcpu".
-    iEval (rewrite HR7a0) in "Hlock". iEval (rewrite HR7a0) in "Hlname". iEval (rewrite HR7a0) in "Hcpu".
+    iEval (rewrite HR7a0) in "Hlock". iEval (rewrite HR7a0 HR7a1) in "Hlname". iEval (rewrite HR7a0) in "Hcpu".
+    iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KI + 0x1c)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
@@ -230,7 +231,7 @@ Section ProofKinit.
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
     iMod (newlock ⊤ lk "kmem"%string (kmem_res γk fl)
-            with "Hlname Hlock Hcpu HR") as (γl) "#Hkmem".
+            with "Hlnm Hlock Hcpu HR") as (γl) "#Hkmem".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
     destruct Hilcs as (Hilsp & Hiltp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).

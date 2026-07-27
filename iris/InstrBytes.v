@@ -1019,3 +1019,201 @@ Section InstrBytes.
   Qed.
 
 End InstrBytes.
+
+(* ====================================================================== *)
+(* A DOUBLEWORD IS ITS TWO WORDS.                                          *)
+(* ====================================================================== *)
+(* A C function whose caller takes the address of a 4-byte local needs the
+   [↦₄] view of a cell the stack hands out as [↦₈]: sys_close's [int fd]
+   lives at s0-20, the upper half of one 8-byte frame slot, and nothing else
+   lets an [int *] out-parameter point into a frame.  So a doubleword splits
+   into its two words and joins back, at the SAME dfrac (both directions
+   therefore compose with the fractional splits in RiscvPtsto).
+
+   The three little-endian projections are spelled with [assemble_bytes] --
+   the byte view both points-to bundles are already built from -- so that
+   every obligation is one [nth_byte_assemble_len] and no bit-shifting. *)
+(* stepping a byte cursor twice adds the offsets. *)
+Lemma pa_add_add (a : mword 64) (i j : nat) :
+  pa_add (pa_add a i) j = pa_add a (i + j).
+Proof. unfold pa_add. rewrite avi_assoc. f_equal. lia. Qed.
+
+Definition word_lo (w : bv 64) : bv 32 :=
+  Z_to_bv 32 (assemble_bytes [nth_byte w 0; nth_byte w 1; nth_byte w 2; nth_byte w 3]).
+Definition word_hi (w : bv 64) : bv 32 :=
+  Z_to_bv 32 (assemble_bytes [nth_byte w 4; nth_byte w 5; nth_byte w 6; nth_byte w 7]).
+Definition word_of_words (lo hi : bv 32) : bv 64 :=
+  Z_to_bv 64 (assemble_bytes [nth_byte lo 0; nth_byte lo 1; nth_byte lo 2; nth_byte lo 3;
+                              nth_byte hi 0; nth_byte hi 1; nth_byte hi 2; nth_byte hi 3]).
+
+Local Lemma nb_assemble4 (bs : list (bv 8)) (j : nat) :
+  length bs = 4%nat -> (j < 4)%nat ->
+  nth_byte (Z_to_bv 32 (assemble_bytes bs) : bv 32) j = bs !!! j.
+Proof.
+  intros Hlen Hj. apply nth_byte_assemble_len; rewrite Hlen; [| exact Hj].
+  change (Z.of_N 32) with 32%Z. change (Z.of_nat 4) with 4%Z. lia.
+Qed.
+
+Local Lemma nb_assemble8 (bs : list (bv 8)) (j : nat) :
+  length bs = 8%nat -> (j < 8)%nat ->
+  nth_byte (Z_to_bv 64 (assemble_bytes bs) : bv 64) j = bs !!! j.
+Proof.
+  intros Hlen Hj. apply nth_byte_assemble_len; rewrite Hlen; [| exact Hj].
+  change (Z.of_N 64) with 64%Z. change (Z.of_nat 8) with 8%Z. lia.
+Qed.
+
+Lemma nth_byte_word_lo (w : bv 64) (j : nat) :
+  (j < 4)%nat -> nth_byte (word_lo w) j = nth_byte w j.
+Proof.
+  intro Hj. unfold word_lo. rewrite nb_assemble4; [| reflexivity | exact Hj].
+  destruct j as [|[|[|[|]]]]; cbn; first [reflexivity | lia].
+Qed.
+
+Lemma nth_byte_word_hi (w : bv 64) (j : nat) :
+  (j < 4)%nat -> nth_byte (word_hi w) j = nth_byte w (4 + j).
+Proof.
+  intro Hj. unfold word_hi. rewrite nb_assemble4; [| reflexivity | exact Hj].
+  destruct j as [|[|[|[|]]]]; cbn; first [reflexivity | lia].
+Qed.
+
+Lemma nth_byte_word_of_words_lo (lo hi : bv 32) (j : nat) :
+  (j < 4)%nat -> nth_byte (word_of_words lo hi) j = nth_byte lo j.
+Proof.
+  intro Hj. unfold word_of_words.
+  rewrite nb_assemble8; [| reflexivity | lia].
+  destruct j as [|[|[|[|]]]]; cbn; first [reflexivity | lia].
+Qed.
+
+Lemma nth_byte_word_of_words_hi (lo hi : bv 32) (j : nat) :
+  (j < 4)%nat -> nth_byte (word_of_words lo hi) (4 + j) = nth_byte hi j.
+Proof.
+  intro Hj. unfold word_of_words.
+  rewrite nb_assemble8; [| reflexivity | lia].
+  destruct j as [|[|[|[|]]]]; cbn; first [reflexivity | lia].
+Qed.
+
+(* the two alignment obligations: 8 divides the address, so 4 divides it and
+   4 divides it + 4 (and the +4 cannot wrap, an 8-aligned address being at
+   most 2^64 - 8).  The arithmetic is factored into plain-[Z] helpers: under
+   the bitvector zify hook [lia] fails on any goal mentioning [bv_unsigned]
+   (durable-notes). *)
+Local Lemma z_rem8_rem4 (u : Z) : (0 <= u)%Z -> Z.rem u 8 = 0%Z -> Z.rem u 4 = 0%Z.
+Proof.
+  intros H0 H8.
+  rewrite (Z.rem_mod_nonneg u 8 H0 ltac:(lia)) in H8.
+  rewrite (Z.rem_mod_nonneg u 4 H0 ltac:(lia)).
+  apply Z.mod_divide in H8; [| lia]. apply Z.mod_divide; [lia|].
+  destruct H8 as [k Hk]. exists (2 * k)%Z. lia.
+Qed.
+
+Local Lemma z_rem8_rem4_hi (u : Z) : (0 <= u)%Z -> Z.rem u 8 = 0%Z -> Z.rem (u + 4) 4 = 0%Z.
+Proof.
+  intros H0 H8.
+  rewrite (Z.rem_mod_nonneg u 8 H0 ltac:(lia)) in H8.
+  rewrite (Z.rem_mod_nonneg (u + 4) 4 ltac:(lia) ltac:(lia)).
+  apply Z.mod_divide in H8; [| lia]. apply Z.mod_divide; [lia|].
+  destruct H8 as [k Hk]. exists (2 * k + 1)%Z. lia.
+Qed.
+
+(* an 8-aligned address is at most 2^64 - 8, so [+4] does not wrap. *)
+Local Lemma z_rem8_no_wrap (u : Z) :
+  (0 <= u < 18446744073709551616)%Z -> Z.rem u 8 = 0%Z ->
+  (u + 4 < 18446744073709551616)%Z.
+Proof.
+  intros H0 H8.
+  rewrite (Z.rem_mod_nonneg u 8 ltac:(lia) ltac:(lia)) in H8.
+  apply Z.mod_divide in H8; [| lia]. destruct H8 as [k Hk]. lia.
+Qed.
+
+Lemma aligned8_aligned4 (a : Arch.pa) :
+  is_aligned_paddr (Physaddr a) 8 = true -> is_aligned_paddr (Physaddr a) 4 = true.
+Proof.
+  unfold is_aligned_paddr. rewrite !uint_unsigned.
+  pose proof (bv_unsigned_in_range _ a) as [Hlo _].
+  intro H8. apply Z.eqb_eq in H8. apply Z.eqb_eq.
+  apply (z_rem8_rem4 _ Hlo H8).
+Qed.
+
+(* [pa_add a 4]'s numeric value, given the 8-alignment that rules out wrap. *)
+Lemma pa_add_4_unsigned (a : Arch.pa) :
+  is_aligned_paddr (Physaddr a) 8 = true ->
+  bv_unsigned (pa_add a 4) = (bv_unsigned a + 4)%Z.
+Proof.
+  unfold is_aligned_paddr. rewrite uint_unsigned. intro H8.
+  apply Z.eqb_eq in H8.
+  pose proof (bv_unsigned_in_range _ a) as [Hlo Hhi].
+  unfold bv_modulus in Hhi. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z in Hhi.
+  pose proof (z_rem8_no_wrap _ (conj Hlo Hhi) H8) as Hnw.
+  unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
+    MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (H4 : bv_unsigned (mword_of_int (Z.of_nat 4) : mword 64) = 4%Z)
+    by (vm_compute; reflexivity).
+  rewrite H4. apply bv_wrap_small. unfold bv_modulus.
+  change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z.
+  split; [apply Z.add_nonneg_nonneg; [exact Hlo | discriminate] | exact Hnw].
+Qed.
+
+Lemma aligned8_aligned4_hi (a : Arch.pa) :
+  is_aligned_paddr (Physaddr a) 8 = true ->
+  is_aligned_paddr (Physaddr (pa_add a 4)) 4 = true.
+Proof.
+  intro H8. pose proof (pa_add_4_unsigned a H8) as Hpa.
+  revert H8. unfold is_aligned_paddr. rewrite !uint_unsigned. rewrite Hpa.
+  pose proof (bv_unsigned_in_range _ a) as [Hlo _].
+  intro H8. apply Z.eqb_eq in H8. apply Z.eqb_eq.
+  apply (z_rem8_rem4_hi _ Hlo H8).
+Qed.
+
+Section WordHalves.
+  Context `{!riscvGS Σ}.
+
+  (* re-anchor a byte window at its own base: the [seq o n] window of [P] is
+     the [seq 0 n] window of [P] shifted by [o]. *)
+  Local Lemma big_sepL_seq_shift (P : nat -> iProp Σ) (o n : nat) :
+    ([∗ list] j ∈ seq o n, P j) ⊣⊢ ([∗ list] j ∈ seq 0 n, P ((o + j)%nat)).
+  Proof.
+    assert (Hf : seq o n = (Nat.add o) <$> seq 0 n).
+    { rewrite fmap_add_seq. by rewrite Nat.add_0_r. }
+    rewrite Hf big_sepL_fmap. reflexivity.
+  Qed.
+
+  Lemma word_pointsto_split4 (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+    a ↦₈{dq} w ⊢ a ↦₄{dq} word_lo w ∗ (pa_add a 4) ↦₄{dq} word_hi w.
+  Proof.
+    iIntros "[%Hal Hbs]".
+    assert (Hs : seq 0 8 = (seq 0 4 ++ seq 4 4)%list) by reflexivity.
+    rewrite Hs big_sepL_app.
+    iDestruct "Hbs" as "[Hlo Hhi]".
+    iSplitL "Hlo".
+    - iSplit; [iPureIntro; by apply aligned8_aligned4|].
+      iApply (big_sepL_mono with "Hlo").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite nth_byte_word_lo; [reflexivity | lia].
+    - iSplit; [iPureIntro; by apply aligned8_aligned4_hi|].
+      iEval (rewrite (big_sepL_seq_shift _ 4 4)) in "Hhi".
+      iApply (big_sepL_mono with "Hhi").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite pa_add_add. rewrite nth_byte_word_hi; [reflexivity | lia].
+  Qed.
+
+  Lemma word_pointsto_join4 (a : Arch.pa) (dq : dfrac) (lo hi : bv 32) :
+    is_aligned_paddr (Physaddr a) 8 = true ->
+    a ↦₄{dq} lo -∗ (pa_add a 4) ↦₄{dq} hi -∗ a ↦₈{dq} word_of_words lo hi.
+  Proof.
+    iIntros (Hal) "[_ Hlo] [_ Hhi]".
+    iSplit; [done|].
+    assert (Hs : seq 0 8 = (seq 0 4 ++ seq 4 4)%list) by reflexivity.
+    rewrite Hs big_sepL_app.
+    iSplitL "Hlo".
+    - iApply (big_sepL_mono with "Hlo").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite nth_byte_word_of_words_lo; [reflexivity | lia].
+    - rewrite (big_sepL_seq_shift _ 4 4).
+      iApply (big_sepL_mono with "Hhi").
+      intros k j Hk. apply lookup_seq in Hk as [-> Hlt].
+      rewrite pa_add_add. rewrite nth_byte_word_of_words_hi; [reflexivity | lia].
+  Qed.
+
+End WordHalves.

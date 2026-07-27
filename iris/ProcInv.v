@@ -46,7 +46,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import ProcGeom.
-Require Import KallocInv KMap KptPt PageFields.
+Require Import InstrBytes KallocInv KMap KptPt PageFields.
 Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
@@ -83,6 +83,16 @@ Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
+
+(* writing back what was already there is a no-op -- what a caller that only
+   READS a descriptor (argfd) needs to close [proc_priv_ofile]'s accessor
+   without its [V] drifting. *)
+Lemma upd_ofile_id (V : pprivate) (fd : nat) (v : mword 64) :
+  pv_ofile V !! fd = Some v -> upd_ofile V fd v = V.
+Proof.
+  intro Hlk. unfold upd_ofile. rewrite (list_insert_id _ _ _ Hlk).
+  by destruct V.
+Qed.
 
 Lemma upd_ofile_length (V : pprivate) (fd : nat) (v : mword 64) :
   length (pv_ofile (upd_ofile V fd v)) = length (pv_ofile V).
@@ -165,12 +175,12 @@ Section ProcInv.
     pa_add (page_base tfp) (8 * i).
 
   Definition tf_words (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
-    ([∗ list] i ↦ w ∈ ws, a_tf_word tfp i ↦ₚ₈ w)%I.
+    ([∗ list] i ↦ w ∈ ws, a_tf_word tfp i ↦₈ w)%I.
 
   (* the page beyond the struct: 288 .. 4095, contents irrelevant *)
   Definition tf_tail (tfp : mword 44) : iProp Σ :=
     ([∗ list] j ∈ seq (Z.to_nat TFBYTES) (4096 - Z.to_nat TFBYTES),
-       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₚ b)%I.
+       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₘ b)%I.
 
   Definition tf_page (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
     (⌜length ws = TFWORDS⌝ ∗ tf_words tfp ws ∗ tf_tail tfp)%I.
@@ -181,55 +191,24 @@ Section ProcInv.
   Lemma tf_page_word (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->
     tf_page tfp ws -∗
-    a_tf_word tfp i ↦ₚ₈ w ∗ (a_tf_word tfp i ↦ₚ₈ w -∗ tf_page tfp ws).
+    a_tf_word tfp i ↦₈ w ∗ (a_tf_word tfp i ↦₈ w -∗ tf_page tfp ws).
   Proof.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hws") as "[$ Hback]".
     iIntros "Hc". iSplit; [done|]. iSplitL "Hc Hback"; [rewrite /tf_words; iApply ("Hback" with "Hc") | iExact "Htail"].
   Qed.
 
-  (* ---- the tier bridge for ONE trapframe word ------------------------
-     [tf_page] is physical -- kalloc's tier, and tier-neutral for the
-     trampoline -- but the kernel reads [tf->aN] with an ordinary [ld]
-     through the identity map, i.e. at the VA tier.  A kalloc page's bytes
-     are kernel data and hence STATICALLY claimed KP_rw
-     ([ProcPtOwn.page_valid_kmap_static]), so the crossing costs only the
-     persistent [kmap_static_claims] -- the same idiom the software
-     page-table walks use for PT slots. *)
-  Lemma tf_word_to_mem (tfp : mword 44) (i : nat) (w : mword 64) (dq : dfrac) :
-    page_valid (page_base tfp) -> (i < TFWORDS)%nat ->
-    kmap_static_claims -∗ a_tf_word tfp i ↦ₚ₈{dq} w -∗ a_tf_word tfp i ↦₈{dq} w.
-  Proof.
-    intros Hv Hi. iIntros "#Hb [%Hal Hbs]".
-    rewrite /word_pointsto. iSplit; [done|].
-    iApply (big_sepL_impl with "Hbs"). iIntros "!>" (k j Hk) "H".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    rewrite /a_tf_word pa_add_add.
-    unfold TFWORDS in Hi.
-    assert (Ho : (8 * i + (0 + k) < 4096)%nat) by lia.
-    iDestruct (kmap_static_claims_at
-                 (svpn_of (pa_add (page_base tfp) (8 * i + (0 + k))%nat)) KP_rw
-                 (page_valid_kmap_static tfp _ Hv Ho) with "Hb") as "#Hk".
-    iApply (phys_to_mem_claim _ _ dq _
-              (pa_of_id _ (page_valid_canon tfp _ Hv Ho))
-              (page_valid_ram tfp _ Hv Ho)
-              (page_valid_canon tfp _ Hv Ho) with "Hk H").
-  Qed.
-
-  Lemma tf_word_to_phys (tfp : mword 44) (i : nat) (w : mword 64) (dq : dfrac) :
-    page_valid (page_base tfp) -> (i < TFWORDS)%nat ->
-    kmap_static_claims -∗ a_tf_word tfp i ↦₈{dq} w -∗ a_tf_word tfp i ↦ₚ₈{dq} w.
-  Proof.
-    intros Hv Hi. iIntros "#Hb [%Hal Hbs]".
-    rewrite /phys_word_pointsto. iSplit; [done|].
-    iApply (big_sepL_impl with "Hbs"). iIntros "!>" (k j Hk) "H".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    rewrite /a_tf_word pa_add_add.
-    unfold TFWORDS in Hi.
-    assert (Ho : (8 * i + (0 + k) < 4096)%nat) by lia.
-    iApply (mem_ident_phys _ dq _
-              (page_valid_kmap_static tfp _ Hv Ho) with "Hb H").
-  Qed.
+  (* STATED AT THE VA TIER.  Every kernel reader of this page -- argraw's
+     [ld a0,112(a5)], syscall.c's [p->trapframe->a0 = ...], usertrap's
+     [p->trapframe->epc] -- is an ordinary load/store through the identity
+     map, so putting the page at the VA tier costs those sites nothing.  The
+     ONE crossing that remains is at construction: allocproc gets physical
+     bytes from kalloc and converts once (ProcPtOwn.phys_to_page_own is the
+     page-level lemma for exactly that), and the trampoline side converts
+     back with [RiscvPtsto.mem_to_phys_claim].  The alternative -- a physical
+     [tf_page] with a per-read crossing -- needs [kmap_static_claims] at every
+     reader, and that bundle is only reachable by opening [hw_config] inside
+     a LEAF, so no whole-function caller can supply it. *)
 
   (* =================================================================== *)
   (* THE resource that rides alongside [cur_proc p].                      *)
@@ -303,6 +282,31 @@ Section ProcInv.
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iSplitL "Hq1"; [iExact "Hq1"|].
     iIntros "Hq1". rewrite /proc_priv /proc_pt_at.
+    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc". iFrame.
+  Qed.
+
+  (* The array's length, which a caller needs BEFORE it knows which
+     descriptor it wants: an fd below NOFILE always has a slot to look up. *)
+  Lemma proc_priv_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜length (pv_ofile V) = NOFILE⌝.
+  Proof. iIntros "(_ & _ & _ & _ & [%Hlen _] & _)". done. Qed.
+
+  (* What a syscall-argument read needs, TOGETHER: the trapframe pointer
+     fraction and the page it names.  [proc_priv_trapframe] alone cannot
+     serve -- its wand swallows the [proc_priv] the page is still inside --
+     so the pair is one accessor.  This is argfd's premise to argint. *)
+  Lemma proc_priv_tf (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V) -∗ proc_priv γf pa pid V).
+  Proof.
+    iIntros "(Hpid & Hf & Hpt & Htfp & Ho & Hc)".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
+    iFrame "Hq1 Htfp".
+    iIntros "Hq1 Htfp". rewrite /proc_priv /proc_pt_at.
     iDestruct (word_join14 with "Hq1 Hq2") as "Htfc". iFrame.
   Qed.
 

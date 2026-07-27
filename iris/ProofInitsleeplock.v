@@ -305,7 +305,8 @@ Section ProofInitsleeplock.
     { iEval (rewrite HA7a0). iExact "Hlkname". }
     { iEval (rewrite HA7a0). iExact "Hcpu". }
     iIntros (mil) "Hcg Hpc %Hilcs Hlk Hlname Hcpu".
-    iEval (rewrite HA7a0) in "Hlk". iEval (rewrite HA7a0) in "Hlname". iEval (rewrite HA7a0) in "Hcpu".
+    iEval (rewrite HA7a0) in "Hlk". iEval (rewrite HA7a0 HA7a1) in "Hlname". iEval (rewrite HA7a0) in "Hcpu".
+    iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
     assert (Hpcil : ret_pc (A7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (ISL + 0x1e)).
     { rewrite HA7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
@@ -451,7 +452,7 @@ Section ProofInitsleeplock.
       by (rewrite HE5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
     (* ===== hand everything back to the caller ===== *)
-    iApply ("Hcont" $! E5 with "Hcg Hpc [%] Hlocked Hlk Hlname Hcpu Hslname Hpid").
+    iApply ("Hcont" $! E5 with "Hcg Hpc [%] Hlocked Hlk Hlnm Hcpu Hslname Hpid").
     (* callee_saved m E5 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> mword_of_int 1 -> c <> csp_rs1 ->

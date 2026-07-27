@@ -14,109 +14,35 @@ version of the key idea, because it is not obvious:
 > kalloc'd object: you may take `pi->lock` only while you hold a reference to
 > the pipe.
 
-## Done (landed on main, tree green at each)
+## Done (landed on main, full clean build green at each)
 
 | commit | what |
 |---|---|
-| `c053872` | `lock_openable γ lk R Tc Dc` in `WpLock.v`; `lock_openable_inv` (`inv` → `emp`/`False`), `lock_openable_cinv` (`cinv` → `cinv_own γc q`/`cinv_own γc 1`), `is_lock_openable`, `newlock_c`. `lock_inv`, `is_lock`, `lock_name`, `newlock` unchanged. |
-| `5d98998` | the ten leaves in `WpSconfLock.v` restated over `lock_openable`; the eight call sites in `ProofAcquire`/`ProofRelease`/`ProofHolding` converted. `SpecAcquire`/`SpecRelease`/`SpecHolding` untouched. |
-| `ae7a255` | `wp_sw_zero_lockcancel_s_sconf` — the word clear that destroys the invariant instead of closing it. |
-| `0f93891` | `wp_sw_zero_lockfin_s_sconf` — the same store with the invariant's fate left to a caller-supplied finisher. This is the pivot for proving release once and instantiating it twice. |
+| `c053872` | `lock_openable γ lk R Tc Dc` in `WpLock.v`; `lock_openable_inv`, `lock_openable_cinv`, `is_lock_openable`. |
+| `5d98998` | the ten leaves in `WpSconfLock.v` restated over `lock_openable`; the eight call sites converted. |
+| `ae7a255`, `0f93891` | the word-clear leaves; `wp_sw_zero_lockfin_s_sconf` is the one that survives. |
+| `efd7c15` | **Tasks 1 + 2.** `HOLDING` generic outright; `ACQUIRE_GEN`/`ACQUIRE`; `RELEASE_GEN`/`RELEASE`/`RELEASE_CANCEL`, one proof instantiated twice. `lock_finisher` + `lock_finisher_close`/`_destroy` in `WpLock.v`. The close-only and destroy-only word-clear leaves deleted. |
+| `d00cc1e` | **Task 3.** `SpecInitlock` hands the name field back OWNED (`c_name ↦₈ name`); `lock_name_intro` seals it, and all seven callers do so. |
+| `a84dd8c` | **Task 4.** `is_pipe` over `cinv`; `pipe_ref` carries half the cancel token; `pipe_bank`; `pipe_openmark`; `pipe_res_cancel`; `newlock_c_delayed`. |
 
 Verified facts worth not re-deriving:
 
 - **`WpSconfLock.v` is the only file in the tree that ever opens a lock.**
-  Everything else merely holds `is_lock` and passes it down. Checked by
-  grepping for `is_lock_inv` and for `lockN`.
-- The ten leaves are used **only** by `ProofAcquire.v`, `ProofHolding.v`,
-  `ProofRelease.v` (eight call sites). Earlier greps for the string
-  `lockinv` gave false hits — `ProofSched` uses the whole-function
-  `Holding.wp_holding_lockinv_*`, `ProofReleasesleep` has a *hypothesis named*
-  `"Hlockinv"`, `WpAmo` has a comment. Grep per lemma name, not for the
-  substring.
-- `ACQUIRE`/`RELEASE`/`HOLDING` are instantiated by thirteen proofs
-  (`ProofKalloc`, `ProofKfree`, `ProofFilealloc`, `ProofFiledup`, `ProofSleep`,
-  `ProofWakeup`, `ProofYield`, `ProofSched`, `ProofClockintr`,
-  `ProofSysUptime`, `ProofAcquiresleep`, `ProofReleasesleep`,
-  `ProofHoldingsleep`). Keep their statements restated so none of these move.
+  Everything else merely holds the accessor and passes it down.
+- `HOLDING`'s consumers are exactly `ProofAcquire`, `ProofRelease`,
+  `ProofSched` — three call sites, which is why it was generalized in place
+  rather than restated. `ACQUIRE`/`RELEASE` have thirteen, which is why they
+  were restated. Grep per lemma name, never for a substring (`lockinv` gives
+  false hits).
+- ``Context `{!cinvG Σ}` `` in a file that has not `Require Import`ed
+  `iris.base_logic.lib.cancelable_invariants` **silently auto-generalizes
+  `cinvG` as a fresh variable**, and the failure surfaces much later as
+  "cannot infer the implicit parameter cinvG0". Require it.
+- A lemma named in a file that only gets it *transitively* is not in scope:
+  `Require Import` for `WpLock` had to be added to `WpInitlockWrapper` and
+  `ProofUartinit`, which had been using `lock_name` only as a term.
 
-## Task 1 — `RELEASE_CANCEL`
-
-Prove release **once** over `wp_sw_zero_lockfin_s_sconf` and instantiate it
-twice. Do NOT branch inside the proof and do not duplicate its 229-line tail.
-
-1. `ProofRelease.v`: the single call to `wp_sw_zero_lockopen_s_sconf`
-   (currently around line 236, `0x1a: sw zero,0(s1)`) moves to
-   `wp_sw_zero_lockfin_s_sconf`, threading the finisher through from the
-   spec's premises. Everything before and after is unchanged.
-2. `SpecRelease.v`: `wp_release_sconf_body` gains `(Tc Dc Out : iProp Σ)`,
-   takes `lock_openable γl lka R Tc Dc` and `Tc` in place of
-   `is_lock γl lka s R`, takes the finisher premise, and its continuation
-   gains `Out -∗`. Name it `wp_release_gen_sconf_body`.
-3. Two module types from the one proof:
-   - `RELEASE` — the **verbatim current statement**, instantiated at
-     `Tc := emp`, `Dc := False`, `Out := emp`, with the finisher discharged by
-     closing (left conjunct of both `∧`s) and `is_lock_openable` supplying the
-     accessor. The thirteen consumers must not change.
-   - `RELEASE_CANCEL` — `Tc := Dc := cinv_own γc 1`,
-     `Out := lka ↦₄ 0 ∗ lock_cpu lka ↦₈ zero_reg ∗ R`, finisher discharged by
-     taking the raw contents and surrendering `Dc`.
-4. Delete `wp_sw_zero_lockopen_s_sconf` and `wp_sw_zero_lockcancel_s_sconf`
-   once nothing uses them — they are near-duplicates of the finisher leaf and
-   should not linger as a family.
-
-Note `Tc` and `Dc` must be the *same* resource for the cancelling instance:
-`cinv_own γc q ∗ cinv_own γc 1` is invalid, so you cannot hold a separate
-credential and certificate. `lock_openable_cinv` at `q := 1` is the shape
-wanted, and it is exactly what a caller holding every share of the object has.
-
-## Task 2 — an acquirable cancellable lock
-
-`pipeclose` calls `acquire` before it calls `release`, so `ACQUIRE` needs the
-same treatment: `wp_acquire_sconf_body` over `lock_openable γl lk0 R Tc Dc` +
-`Tc`, returning `Tc`, with the current statement restated at `emp`/`False` as
-`ACQUIRE`. `ProofAcquire`'s two leaf call sites already pass `R emp False`;
-they become `R Tc Dc` and thread the returned credential instead of dropping
-it as `_`.
-
-Check whether `HOLDING` needs it too — `release` calls `holding()` internally,
-so probably yes; `ProofRelease` applies `Holding.wp_holding_lockinv_locked_s_sconf`.
-**Unverified.**
-
-## Task 3 — `SpecInitlock` returns the name field owned
-
-The 8 bytes at `lk+8` are inside the page and `kfree` memsets them, so
-`lock_name`'s `↦₈□` makes the page unreclaimable. Change `SpecInitlock`'s
-postcondition to hand back `c_name ↦₈ vname` instead of `lock_name lk s`
-(strictly stronger), and have each caller re-derive `lock_name` with the
-existing `RiscvPtsto.word_pointsto_persist`.
-
-Callers of `wp_initlock_sconf` (verified): `ProofKinit`, `ProofBinit`,
-`ProofIinit`, `ProofUartinit`, `ProofInitsleeplock`, `ProofPipealloc`,
-`WpInitlockWrapper`. Seven, plus `SpecInitlock.v` and `ProofInitlock.v`
-themselves.
-
-For a pipe the field must end up inside `pipe_res`, not discarded, so that
-`lock_cancel`/the finisher returns it with the rest.
-
-## Task 4 — `PipeInv` over `cinv`
-
-- `is_pipe` holds `cinv lockN γc (lock_inv γl pi (pipe_res γp pi))` instead of
-  `is_lock`, plus `⌜page_valid pi⌝`.
-- `pipe_ref γp w q := own (pn_end γp w) q ∗ cinv_own (pn_cancel γp) (q/2)`,
-  so that **both ends at 1** gives `cinv_own γc 1`, which is the licence to
-  destroy; and any positive share gives a positive credential, which is the
-  licence to acquire. Both components are fractional, so splitting and
-  recombining still work.
-- `pipe_res` grows the lock's name field (Task 3) and keeps everything else it
-  has. It does **not** need a "dead" disjunct: the finisher design means the
-  last closer keeps `pipe_res` rather than handing it back, so lock lifetime
-  never leaks into the pipe layer.
-- `new_pipe` moves from `newlock` to `newlock_c` and additionally hands out the
-  cancel shares; `ProofPipealloc` follows (its `new_pipe` call site, and the
-  `is_pipe` in `pipealloc_post`).
-
-## Task 5 — pipeclose
+## Task 5 — pipeclose (the remaining work)
 
 34 instructions at `0x80004440`, straight-line with two branches; callees
 `acquire`, `wakeup`, `release`, `kfree`, all with existing specs.
@@ -131,29 +57,82 @@ void pipeclose(struct pipe *pi, int writable) {
 }
 ```
 
-Shape of the proof:
+Everything it needs now exists. The shape:
 
 - precondition takes `pipe_ref γp w 1` for the end `writable` selects
   (`fileclose` passes `f->writable`), plus `is_pipe`;
-- clearing the flag deposits that end's token via `pipe_endstate_close`;
-- reading the other flag as 0 extracts the other end's full token
-  (`pipe_endstate_closed`) — now both ends are held, i.e. `cinv_own γc 1`;
-- the freeing arm uses `RELEASE_CANCEL`, which returns the two lock words and
-  `pipe_res`; `PageFields`' lemmas run backwards reassemble `page_own pi`
-  (`bwin_split`/`bwin_rebase` are equivalences; `word{4,8}_pointsto_bytes`
-  exists in `RiscvPtsto`), then `kfree`;
-- the non-freeing arm uses ordinary `RELEASE` after re-closing `pipe_res`.
+- `ACQUIRE_GEN` at `Tc := cinv_own (pn_cancel γp) (1/2)`, the accessor from
+  `PipeInv.is_pipe_openable`. The credential comes back out;
+- clearing the flag: `pipe_endstate_take` yields the end ghost, the closer's
+  half of the cancel token, **and the marker** (`pipe_openmark`), then
+  `pipe_endstate_close` puts the end ghost back;
+- the branch on the other flag decides which release runs:
+  - other end still open → deposit the half with `pipe_bank_deposit`,
+    reassemble `pipe_res`, ordinary `RELEASE`;
+  - other end closed → `pipe_bank_keep` (the bank is already full), keep the
+    half, reassemble `pipe_res`, and call `RELEASE_CANCEL` at `q := 1/2` with
+    `PipeInv.pipe_res_cancel γp pi w` as the completion wand and
+    `Out := pipe_bytes pi`;
+- release then hands back `pi ↦₄ 0`, `lock_cpu pi ↦₈ 0` and `pipe_bytes pi`;
+  run `PageFields`' lemmas backwards (`bwin_split`/`bwin_rebase` are
+  equivalences, `word{4,8}_pointsto_bytes` is in `RiscvPtsto`; the forward
+  direction is `PipeInv.page_own_pipe_raw`) to rebuild `page_own pi`, then
+  `kfree`.
 
-`wakeup`'s spec (`SpecWakeup`) is available; check what it demands of
-`cpu_own`/`procs_inv` — **unverified**.
+Two things still **unverified**:
+
+- `wakeup`'s spec (`SpecWakeup`) — what it demands of `cpu_own`/`procs_inv`,
+  and whether it can be called while holding `pi->lock` (it takes the proc
+  locks, so the lock order matters to nothing in the logic, but check the
+  `av`/stack budget);
+- the frame/stack budget for the whole function, and hence its `K`.
+
+`LinkPipeclose` cannot exist before `fileclose`, same as `LinkPipealloc` —
+see [`../design/pipe.md`](../design/pipe.md).
+
+## Task 6 — `pipealloc` leaks the two `fd_slot`s on its error paths
+
+Small, purely additive, and worth doing while the pipe files are open.
+
+`SpecPipealloc` takes two `fd_slot`s (one per end of the pipe — filealloc
+consumes one per reference it creates) and its error paths call `fileclose`
+to undo the allocations. `SpecFileclose` now RETURNS an `fd_slot` — it has to,
+because an emptied `ProcInv.ofile_slot` owns its unit itself, which is what
+makes `sys_close`'s postcondition provable — so both units genuinely come
+back inside `pipealloc`. But `pipealloc_post`'s error disjunct does not
+mention them, so `ProofPipealloc.v` `iClear`s them at the two `fileclose`
+call sites (+0xb2 and +0xa4).
+
+The caller therefore hands over two units of a CONSERVED resource and gets
+nothing back. That is a leak, not a soundness hole: nothing is unsound about
+dropping an affine resource, and the `● FDSLOTS` authority is unaffected. It
+only bites the eventual `sys_pipe` proof, which will hold two empty
+descriptors it cannot fill without conjuring units from nowhere.
+
+The fix:
+
+- add `fd_slot ∗ fd_slot` to the ERROR disjunct of `pipealloc_post`
+  (`SpecPipealloc.v`) — the success disjunct must NOT have them: there the
+  units are inside the table, against the two live references;
+- in `ProofPipealloc.v`, replace the two `iClear "Hfdslot"` with framing the
+  unit through to the epilogue, and thread the still-unspent unit on the
+  error paths that fail BEFORE `filealloc` (those never gave theirs away);
+- the arms to check are the kalloc-failure arm, the two filealloc-failure
+  arms, and the two fileclose arms — five in all, and they must agree on
+  holding exactly two units at the join.
+
+Do it before `sys_pipe`, not after: retrofitting a postcondition through a
+proof that already depends on it is the expensive order.
 
 ## Conventions to follow
 
 - Wrapper recipe (`../durable-notes.md`): the generic lemma gets the NEW name;
   the old name becomes a restatement with the VERBATIM original statement.
-  Getting this backwards is what broke 8 call sites needlessly once already.
+  Worth it at thirteen call sites, not at three.
 - Spec-module shape (`../design/spec-modules.md`): `SpecF.v` / sealed functor /
-  `LinkF.v`, and keep whole-function proofs in that shape so
-  `tools/proof_coverage.py` sees them.
+  `LinkF.v`. A generic proof plus two instances is three module types and
+  three functors — `RELEASE_GEN` is proved once and `ReleaseOfGen` /
+  `ReleaseCancelOfGen` derive the two public ones; `LinkRelease.v` applies all
+  three.
 - Verify "these files depend on X" by grepping the actual lemma names, never a
   substring of them.

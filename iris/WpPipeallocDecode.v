@@ -189,10 +189,7 @@ Lemma padc_c10d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x557d  c.li a0,-1 *)
-Lemma padc_557d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x557d : mword 16)) s
-  = Some (C_LI (mword_of_int 63, Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+
 
 (* 0xc789  c.beqz a5,+0x0a *)
 Lemma padc_c789 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -200,17 +197,10 @@ Lemma padc_c789 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 5, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x853e  c.mv a0,a5 *)
-Lemma padc_853e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x853e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x853e  c.mv a0,a5 -- [cdec_853e] (KernelRvcDecode.v) *)
 
 (* 0xbfcd  c.j -0x0e *)
-Lemma padc_bfcd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfcd : mword 16)) s
-  = Some (C_J (mword_of_int 2041), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+
 
 (* the three compressed reg-base memory ops, in the leaf-friendly (Regidx /
    literal-immediate) form: instances of WpMmodeLeafBase's
@@ -672,7 +662,7 @@ Section PipeallocInstrs.
   (* +0xac  557d  c.li a0,-1 *)
   Lemma pai_ac : kernel_text -∗ instr (mword_of_int (PA + 0xac) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (PA + 0xac)%Z (mword_of_int 0x557d : mword 16)
-    (mword_of_int (PA + 0xac) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) padc_557d exec_execute_C_LI. Qed.
+    (mword_of_int (PA + 0xac) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_557d exec_execute_C_LI. Qed.
 
   (* +0xae  c789  c.beqz a5,+0x0a *)
   Lemma pai_ae : kernel_text -∗ instr (mword_of_int (PA + 0xae) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 15), BEQ)).
@@ -682,7 +672,7 @@ Section PipeallocInstrs.
   (* +0xb0  853e  c.mv a0,a5 *)
   Lemma pai_b0 : kernel_text -∗ instr (mword_of_int (PA + 0xb0) : mword 64) true (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PA + 0xb0)%Z (mword_of_int 0x853e : mword 16)
-    (mword_of_int (PA + 0xb0) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 10), ADD)) padc_853e exec_execute_C_MV. Qed.
+    (mword_of_int (PA + 0xb0) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 10), ADD)) cdec_853e exec_execute_C_MV. Qed.
 
   (* +0xb2  c33ff0ef  jal ra,fileclose *)
   Lemma pai_b2 : kernel_text -∗ instr (mword_of_int (PA + 0xb2) : mword 64) false (JAL (mword_of_int 0x1ffc32 : mword 21, Regidx (mword_of_int 1))).
@@ -692,7 +682,7 @@ Section PipeallocInstrs.
   (* +0xb6  557d  c.li a0,-1 *)
   Lemma pai_b6 : kernel_text -∗ instr (mword_of_int (PA + 0xb6) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (PA + 0xb6)%Z (mword_of_int 0x557d : mword 16)
-    (mword_of_int (PA + 0xb6) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) padc_557d exec_execute_C_LI. Qed.
+    (mword_of_int (PA + 0xb6) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_557d exec_execute_C_LI. Qed.
 
   (* +0xb8  70a2  c.ldsp ra,40(sp) *)
   Lemma pai_b8 : kernel_text -∗ instr (mword_of_int (PA + 0xb8) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
@@ -727,11 +717,11 @@ Section PipeallocInstrs.
   (* +0xc4  557d  c.li a0,-1 *)
   Lemma pai_c4 : kernel_text -∗ instr (mword_of_int (PA + 0xc4) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (PA + 0xc4)%Z (mword_of_int 0x557d : mword 16)
-    (mword_of_int (PA + 0xc4) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) padc_557d exec_execute_C_LI. Qed.
+    (mword_of_int (PA + 0xc4) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_557d exec_execute_C_LI. Qed.
 
   (* +0xc6  bfcd  c.j -0x0e *)
   Lemma pai_c6 : kernel_text -∗ instr (mword_of_int (PA + 0xc6) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PA + 0xc6)%Z (mword_of_int 0xbfcd : mword 16)
-    (mword_of_int (PA + 0xc6) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) padc_bfcd exec_execute_C_J. Qed.
+    (mword_of_int (PA + 0xc6) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) cdec_bfcd exec_execute_C_J. Qed.
 
 End PipeallocInstrs.

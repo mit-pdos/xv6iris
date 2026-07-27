@@ -96,6 +96,7 @@ Pt4kWalk.v
 KptPt.v
 KMap.v
 PtTree.v
+KstackArith.v
 KvmMap.v
 UserBits.v
 SmodeCore.v
@@ -196,6 +197,7 @@ LinkMappages.v
 SpecKvmmap.v
 ProofKvmmap.v
 LinkKvmmap.v
+WpProcinitDecode.v
 SpecProcMapstacks.v
 ProofProcMapstacks.v
 LinkProcMapstacks.v
@@ -375,6 +377,12 @@ LinkArgraw.v
 SpecArgint.v
 ProofArgint.v
 LinkArgint.v
+SpecArgfd.v
+WpArgfdDecode.v
+ProofArgfd.v
+WpSysCloseDecode.v
+SpecSysClose.v
+ProofSysClose.v
 TimerCap.v
 WpSconfTimer.v
 WpClockintrDecode.v

@@ -13,9 +13,14 @@
    without holding [pi->lock].  So the predicate is exactly what the shape of
    the C code says it should be:
 
-     is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗ is_lock γl pi "pipe" (pipe_res γp pi)
+     is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗
+                           cinv lockN (pn_cancel γp) (lock_inv γl pi (pipe_res γp pi))
 
-   persistent, and [pipe_res] owns every remaining byte of the page.
+   persistent, and [pipe_res] owns every remaining byte of the page -- the
+   lock's own name field included, since kfree memsets all 4096.  The lock is
+   CANCELLABLE (WpLock.v's [lock_openable] over [cinv]) because a pipe's page
+   goes back to kfree: the right to touch [pi->lock] is a resource, and it is
+   exactly a reference to the pipe.
 
    ---- the reference count ----
 
@@ -43,6 +48,36 @@
    A single counter would not do any of this: it could not tell pipeclose(pi,1)
    twice apart from one close of each end.
 
+   ---- the cancel token, and where its halves live ----
+
+   A reference also carries half the lock's cancel token:
+
+     pipe_ref γp w q  :=  own (pn_end γp w) q  ∗  cinv_own (pn_cancel γp) (q/2)
+
+   so ANY positive share of an end is a licence to OPEN [pi->lock], and the
+   two full ends between them make up the whole token, the licence to DESTROY
+   it.  The halves have to be accounted to exactly 1, and where they sit is
+   forced by what release needs:
+
+     both ends open      end0: 1/2   end1: 1/2   bank: 0
+     one end closed        --        1/2         1/2      (its closer banked it)
+     both ends closed      --        1/2 (!)     1/2
+
+   [pipe_bank] is that third conjunct of [pipe_res]: the invariant holds half
+   the token as soon as EITHER end is closed, and no more.  So the closer of
+   the FIRST end banks its half and walks away with nothing; the closer of the
+   SECOND finds the bank already full, banks nothing, and keeps its own half --
+   which is precisely the positive share it still needs in order to open the
+   lock inside release, one instruction before destroying it.  Its other half
+   is inside [pipe_res], and release's finisher (WpLock's [lock_finisher_destroy])
+   is where the two meet, because [pipe_res] has to be handed in INTACT and
+   is only in hand at that instant.  Banking both halves would leave the last
+   closer unable to open the lock it is about to free; banking neither would
+   lose the first closer's half for good.
+
+   Nobody else can observe the both-closed row: seeing it requires holding the
+   lock, and acquiring requires a reference, and both references are home.
+
    ---- the page, and reclaiming it ----
 
    [pipe_res] holds the data buffer, the four counter/flag words, AND every
@@ -51,15 +86,9 @@
    [pipe_slack].  Nothing ever reads those; they are held only so that the
    page can be handed back to kfree, which memsets all 4096 bytes.
 
-   NOTE (blocks pipeclose, not pipealloc): with [is_lock] built on a plain
-   Iris [inv], the page can never actually be reclaimed -- the invariant is
-   permanent, so [pipe_res] can never be taken back out, and worse,
-   [lock_name] DISCARDS the 8-byte name field forever.  Freeing a pipe will
-   therefore need (a) a cancellable form of [is_lock] (WpLock over [cinv],
-   with a fractional cancel token that the two end references carry), and
-   (b) a name field that is reclaimable rather than [↦₈□].  pipealloc needs
-   none of this -- gcc proved its [kfree(pi)] arm dead (pi is 0 on every path
-   reaching [bad]) -- so the decision belongs with pipeclose.
+   The lock's NAME field is [pipe_res]'s too, held raw rather than sealed into
+   a persistent [lock_name]: it is 8 bytes inside the page, and kfree memsets
+   all of them.  Nothing reads it, so nothing loses by that.
 
    Design: claude-notes/design/pipe.md. *)
 From Stdlib Require Import ZArith Lia List.
@@ -67,12 +96,13 @@ From stdpp Require Import list bitvector.definitions.
 From iris.algebra Require Import frac.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own.
+From iris.base_logic.lib Require Import gen_heap invariants cancelable_invariants own.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import RiscvPtsto.
+Require Import InstrBytes.
 Require Import KallocInv.
 Require Import PageFields.
 Require Import WpLock.
@@ -125,14 +155,21 @@ Definition pipeΣ : gFunctors := #[GFunctor fracR].
 Global Instance subG_pipeΣ {Σ} : subG pipeΣ Σ -> pipeG Σ.
 Proof. solve_inG. Qed.
 
-(* a pipe's ghost identity: one gname per end. *)
-Record pipe_names := MkPipeNames { pn_read : gname; pn_write : gname }.
+(* a pipe's ghost identity: per end, the reference fraction and the
+   "still open" marker, plus the lock's cancel gname (which the ends carry
+   shares of, so it belongs with them). *)
+Record pipe_names := MkPipeNames
+  { pn_read : gname; pn_write : gname;
+    pn_mread : gname; pn_mwrite : gname;
+    pn_cancel : gname }.
 
 Definition pn_end (γp : pipe_names) (w : bool) : gname :=
   if w then pn_write γp else pn_read γp.
+Definition pn_mark (γp : pipe_names) (w : bool) : gname :=
+  if w then pn_mwrite γp else pn_mread γp.
 
 Section PipeInv.
-  Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ, !cinvG Σ}.
 
   (* ---- THE reference: a share of one END of the pipe ----
 
@@ -140,46 +177,120 @@ Section PipeInv.
      [file_payload]); split by filedup along with the file's own content
      fraction, and recombined by the last fileclose, which then hands the full
      [pipe_ref γp w 1] to pipeclose.  q = 1 is "I am the only holder of this
-     end", which is precisely the right to close it. *)
+     end", which is precisely the right to close it.
+
+     The [cinv_own] half is the licence to TOUCH the object at all: acquire
+     opens [pi->lock] against it (WpLock's [lock_openable] over [cinv]), so a
+     hart with no reference to a pipe cannot even take its lock -- which is
+     what makes the page reclaimable.  See the header for how the halves are
+     accounted. *)
   Definition pipe_ref (γp : pipe_names) (w : bool) (q : Qp) : iProp Σ :=
-    own (pn_end γp w) q.
+    (own (pn_end γp w) q ∗ cinv_own (pn_cancel γp) (q/2))%I.
+
+  (* the end ghost on its own: what the INVARIANT holds for a closed end.  It
+     is all that [pipe_endstate_holder] needs, and deliberately not the cancel
+     half -- see the header's accounting table. *)
+  Definition pipe_end_full (γp : pipe_names) (w : bool) : iProp Σ :=
+    own (pn_end γp w) 1%Qp.
 
   Global Instance pipe_ref_timeless γp w q : Timeless (pipe_ref γp w q).
   Proof. apply _. Qed.
-  Global Instance pipe_ref_fractional γp w :
-    Fractional (fun q => pipe_ref γp w q).
-  Proof. intros q1 q2. by rewrite /pipe_ref -own_op frac_op. Qed.
+  Global Instance pipe_end_full_timeless γp w : Timeless (pipe_end_full γp w).
+  Proof. apply _. Qed.
+
+  Local Lemma qp_half_add (q1 q2 : Qp) : ((q1 + q2) / 2 = q1/2 + q2/2)%Qp.
+  Proof. by rewrite Qp.div_add_distr. Qed.
+
+  Local Lemma end_own_split (γ : gname) (q1 q2 : Qp) :
+    own γ ((q1 + q2)%Qp : fracR) ⊣⊢ (own γ (q1 : fracR) ∗ own γ (q2 : fracR) : iProp Σ).
+  Proof. by rewrite -own_op frac_op. Qed.
+
+  Local Lemma cancel_split (γ : gname) :
+    cinv_own γ 1 ⊣⊢ cinv_own γ (1/2) ∗ cinv_own γ (1/2).
+  Proof. by rewrite -(fractional (Φ := cinv_own γ)) Qp.div_2. Qed.
 
   Lemma pipe_ref_split γp w q1 q2 :
     pipe_ref γp w (q1 + q2) ⊣⊢ pipe_ref γp w q1 ∗ pipe_ref γp w q2.
-  Proof. by rewrite /pipe_ref -own_op frac_op. Qed.
+  Proof.
+    rewrite /pipe_ref qp_half_add end_own_split (fractional (Φ := cinv_own _)).
+    iSplit; iIntros "[[$ $] [$ $]]".
+  Qed.
+
+  Global Instance pipe_ref_fractional γp w :
+    Fractional (fun q => pipe_ref γp w q).
+  Proof. intros q1 q2. apply pipe_ref_split. Qed.
 
   Lemma pipe_ref_valid γp w q : pipe_ref γp w q -∗ ⌜(q ≤ 1)%Qp⌝.
-  Proof. iIntros "H". by iDestruct (own_valid with "H") as %?%frac_valid. Qed.
+  Proof. iIntros "[H _]". by iDestruct (own_valid with "H") as %?%frac_valid. Qed.
 
   (* the whole point of the [q = 1] state: nobody else holds any of this end. *)
-  Lemma pipe_ref_full_excl γp w q :
-    pipe_ref γp w 1 -∗ pipe_ref γp w q -∗ False.
+  Lemma pipe_end_full_excl γp w q :
+    pipe_end_full γp w -∗ pipe_ref γp w q -∗ False.
   Proof.
-    iIntros "H1 H2".
+    iIntros "H1 [H2 _]".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     rewrite frac_op in Hv. apply frac_valid in Hv.
     iPureIntro. exact (Qp.not_add_le_l 1 q Hv).
   Qed.
 
-  (* ---- the per-end coupling between the flag and the ghost ---- *)
+  Lemma pipe_ref_full_excl γp w q :
+    pipe_ref γp w 1 -∗ pipe_ref γp w q -∗ False.
+  Proof. iIntros "[H1 _]". iApply (pipe_end_full_excl with "H1"). Qed.
+
+  (* the two halves of the cancel token, and how a reference gives one up. *)
+  Lemma pipe_ref_split_cancel γp w :
+    pipe_ref γp w 1 ⊣⊢ pipe_end_full γp w ∗ cinv_own (pn_cancel γp) (1/2).
+  Proof. by rewrite /pipe_ref /pipe_end_full. Qed.
+
+  Lemma pipe_cancel_halves γp :
+    cinv_own (pn_cancel γp) (1/2) -∗ cinv_own (pn_cancel γp) (1/2) -∗
+    cinv_own (pn_cancel γp) 1.
+  Proof. rewrite cancel_split. iIntros "H1 H2". iFrame. Qed.
+
+  (* ---- the per-end coupling between the flag and the ghost ----
+
+     The OPEN side carries a marker, exclusive and created with the pipe.
+     Whoever closes an end takes it out and keeps it, so it is a RECEIPT: "I
+     shut this end".  That receipt is what makes the page reclaimable, because
+     [pipe_res] hides its flag words behind existentials and the last closer
+     has to be able to say which state it is in without reading them again --
+     see [pipe_res_cancel], and the accounting in the header. *)
+  Definition pipe_openmark (γp : pipe_names) (w : bool) : iProp Σ :=
+    own (pn_mark γp w) 1%Qp.
+
+  Global Instance pipe_openmark_timeless γp w : Timeless (pipe_openmark γp w).
+  Proof. apply _. Qed.
+
+  Lemma pipe_openmark_excl γp w :
+    pipe_openmark γp w -∗ pipe_openmark γp w -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite frac_op in Hv. apply frac_valid in Hv.
+    iPureIntro. exact (Qp.not_add_le_l 1 1 Hv).
+  Qed.
 
   Definition pipe_endstate (γp : pipe_names) (w : bool) (v : mword 32) : iProp Σ :=
-    (⌜pflag_open v⌝                                   (* the end is still open *)
-     ∨ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ pipe_ref γp w 1)%I.
+    (⌜pflag_open v⌝ ∗ pipe_openmark γp w          (* the end is still open *)
+     ∨ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ pipe_end_full γp w)%I.
                                             (* closed: the reference came home *)
 
   Global Instance pipe_endstate_timeless γp w v : Timeless (pipe_endstate γp w v).
   Proof. apply _. Qed.
 
   Lemma pipe_endstate_open_intro γp w v :
-    pflag_open v -> ⊢ pipe_endstate γp w v.
-  Proof. iIntros (H). by iLeft. Qed.
+    pflag_open v -> pipe_openmark γp w -∗ pipe_endstate γp w v.
+  Proof. iIntros (H) "Hm". iLeft. by iFrame "Hm". Qed.
+
+  (* THE receipt in action: holding the marker of end [w] proves that end is
+     already closed, and yields its reference ghost. *)
+  Lemma pipe_endstate_marked γp w v :
+    pipe_openmark γp w -∗ pipe_endstate γp w v -∗
+    ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ pipe_end_full γp w.
+  Proof.
+    iIntros "Hm [[_ Hm'] | [$ $]]".
+    iExFalso. iApply (pipe_openmark_excl with "Hm Hm'").
+  Qed.
 
   (* holding ANY share of an end proves its flag is nonzero.  The conclusion is
      pure, so [iDestruct ... as %H] keeps both inputs. *)
@@ -187,24 +298,90 @@ Section PipeInv.
     pipe_endstate γp w v -∗ pipe_ref γp w q -∗ ⌜pflag_open v⌝.
   Proof.
     iIntros "Hst Hq".
-    iDestruct "Hst" as "[%Hop|[-> Hfull]]"; [done|].
-    iExFalso. iApply (pipe_ref_full_excl with "Hfull Hq").
+    iDestruct "Hst" as "[[%Hop _]|[-> Hfull]]"; [done|].
+    iExFalso. iApply (pipe_end_full_excl with "Hfull Hq").
   Qed.
 
-  (* pipeclose's own end, after its [pi->{read,write}open = 0] store. *)
+  (* pipeclose's own end, after its [pi->{read,write}open = 0] store: the end
+     ghost goes home; what becomes of the cancel half is [pipe_bank]'s
+     business, and depends on whether this is the first end to close. *)
   Lemma pipe_endstate_close γp w :
-    pipe_ref γp w 1 -∗ pipe_endstate γp w (mword_of_int 0 : mword 32).
+    pipe_end_full γp w -∗ pipe_endstate γp w (mword_of_int 0 : mword 32).
   Proof. iIntros "H". iRight. by iFrame "H". Qed.
 
-  (* pipeclose reading the OTHER end's flag as 0: the whole of that end comes
-     out of the invariant, so the closer ends up owning both ends outright --
-     the licence to reclaim the page. *)
-  Lemma pipe_endstate_closed γp w :
-    pipe_endstate γp w (mword_of_int 0 : mword 32) -∗ pipe_ref γp w 1.
+  (* pipeclose flipping its own end's flag: the open state comes apart, and
+     the marker it yields is the receipt above. *)
+  Lemma pipe_endstate_take γp w v :
+    pipe_endstate γp w v -∗ pipe_ref γp w 1 -∗
+    pipe_openmark γp w ∗ pipe_end_full γp w ∗ cinv_own (pn_cancel γp) (1/2).
   Proof.
-    iIntros "[%Hop|[_ $]]".
+    iIntros "Hst Href".
+    iDestruct (pipe_endstate_holder with "Hst Href") as %Hop.
+    iDestruct "Hst" as "[[_ $] | [-> Hfull]]".
+    - by rewrite pipe_ref_split_cancel.
+    - iExFalso. iApply (pipe_end_full_excl with "Hfull Href").
+  Qed.
+
+  (* pipeclose reading the OTHER end's flag as 0. *)
+  Lemma pipe_endstate_closed γp w :
+    pipe_endstate γp w (mword_of_int 0 : mword 32) -∗ pipe_end_full γp w.
+  Proof.
+    iIntros "[[%Hop _]|[_ $]]".
     exfalso. exact (pflag_zero_not_open Hop).
   Qed.
+
+  (* ---- the bank: the invariant's half of the cancel token ----
+
+     Half the token as soon as EITHER end is closed, and never more.  See the
+     header for why this, and not "one half per closed end". *)
+  Definition pflag_closedb (v : mword 32) : bool :=
+    negb (neq_vec (sign_extend' 64 v) zero_reg).
+
+  Lemma pflag_closedb_open v : pflag_open v -> pflag_closedb v = false.
+  Proof. unfold pflag_open, pflag_closedb. intro H. by rewrite H. Qed.
+
+  Lemma pflag_closedb_zero : pflag_closedb (mword_of_int 0 : mword 32) = true.
+  Proof. reflexivity. Qed.
+
+  Definition pipe_bank (γp : pipe_names) (ro wo : mword 32) : iProp Σ :=
+    (if pflag_closedb ro || pflag_closedb wo
+     then cinv_own (pn_cancel γp) (1/2) else emp)%I.
+
+  Global Instance pipe_bank_timeless γp ro wo : Timeless (pipe_bank γp ro wo).
+  Proof. rewrite /pipe_bank. case (_ || _); apply _. Qed.
+
+  (* both ends open: the bank is empty. *)
+  Lemma pipe_bank_fresh γp ro wo :
+    pflag_open ro -> pflag_open wo -> ⊢ pipe_bank γp ro wo.
+  Proof.
+    intros Hro Hwo. rewrite /pipe_bank (pflag_closedb_open _ Hro) (pflag_closedb_open _ Hwo).
+    done.
+  Qed.
+
+  (* closing the FIRST end: the bank was empty, and this closer's half fills
+     it.  (Stated for the [ro] side and the [wo] side by the same lemma, via
+     the [w]-indexed pair.) *)
+  Lemma pipe_bank_deposit γp (ro wo : mword 32) :
+    cinv_own (pn_cancel γp) (1/2) -∗ pipe_bank γp ro wo.
+  Proof.
+    iIntros "H". rewrite /pipe_bank. case (_ || _); [ iExact "H" | done ].
+  Qed.
+
+  (* closing the SECOND end: the bank is ALREADY full, so it survives the flag
+     change untouched and the closer keeps its own half. *)
+  Lemma pipe_bank_keep γp (ro wo ro' wo' : mword 32) :
+    (pflag_closedb ro || pflag_closedb wo) = true ->
+    pipe_bank γp ro wo -∗ pipe_bank γp ro' wo' ∗ True.
+  Proof.
+    intro Hfull. rewrite /pipe_bank Hfull.
+    iIntros "H". iSplitL "H"; [ case (_ || _); [ iExact "H" | done ] | done ].
+  Qed.
+
+  (* what the last closer takes out of a both-ends-closed bank. *)
+  Lemma pipe_bank_closed γp (ro wo : mword 32) :
+    (pflag_closedb ro || pflag_closedb wo) = true ->
+    pipe_bank γp ro wo -∗ cinv_own (pn_cancel γp) (1/2).
+  Proof. intro Hfull. rewrite /pipe_bank Hfull. by iIntros "$". Qed.
 
   (* ---- the page bytes ---- *)
 
@@ -228,17 +405,64 @@ Section PipeInv.
 
   Typeclasses Opaque pipe_data pipe_slack.
 
-  (* ---- the resource pi->lock protects: EVERY field but the lock itself ---- *)
+  (* ---- the resource pi->lock protects: every byte of the page except the
+     lock's own two WORDS (which belong to [lock_inv]).  The lock's NAME field
+     is here: nothing reads it, and kfree memsets it, so holding it raw is
+     what keeps the page reassemblable. ---- *)
   Definition pipe_res (γp : pipe_names) (pi : mword 64) : iProp Σ :=
-    (∃ (nr nw ro wo : mword 32) (bs : list (bv 8)),
+    (∃ (nr nw ro wo : mword 32) (vname : mword 64) (bs : list (bv 8)),
+       lock_name_field pi ↦₈ vname ∗
        a_pnread pi      ↦₄ nr ∗
        a_pnwrite pi     ↦₄ nw ∗
        a_popen pi false ↦₄ ro ∗
        a_popen pi true  ↦₄ wo ∗
        pipe_endstate γp false ro ∗
        pipe_endstate γp true wo ∗
+       pipe_bank γp ro wo ∗
        ⌜length bs = PIPESIZE⌝ ∗ pipe_data pi bs ∗
        pipe_slack pi)%I.
+
+  (* every byte of the page except the lock's two WORDS, which release hands
+     back separately: what [pipe_res] is once its ghosts are spent, and what
+     pipeclose reassembles into [page_own] for kfree. *)
+  Definition pipe_bytes (pi : mword 64) : iProp Σ :=
+    (∃ (vname : mword 64) (nr nw ro wo : mword 32) (bs : list (bv 8)),
+       lock_name_field pi ↦₈ vname ∗
+       a_pnread pi      ↦₄ nr ∗
+       a_pnwrite pi     ↦₄ nw ∗
+       a_popen pi false ↦₄ ro ∗
+       a_popen pi true  ↦₄ wo ∗
+       ⌜length bs = PIPESIZE⌝ ∗ pipe_data pi bs ∗
+       pipe_slack pi)%I.
+
+  (* ---- THE reclamation step ----
+
+     This is the wand RELEASE_CANCEL asks for, and the reason the whole
+     construction hangs together.  The last closer arrives with the receipt
+     for the end it just shut and with its own half of the cancel token; the
+     receipt says that end's flag is 0, hence the bank inside [pipe_res] is
+     full, hence the two halves make the whole token -- and [pipe_res] falls
+     apart into bare bytes.  Note it needs to know nothing about the OTHER
+     end: whichever way that one went, the bank is full once either is. *)
+  Lemma pipe_res_cancel γp pi w :
+    pipe_openmark γp w -∗
+    cinv_own (pn_cancel γp) (1/2) -∗
+    pipe_res γp pi -∗
+    cinv_own (pn_cancel γp) 1 ∗ pipe_bytes pi.
+  Proof.
+    iIntros "Hmark Hhalf Hres".
+    iDestruct "Hres" as (nr nw ro wo vname bs)
+      "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & Hbank & %Hlen & Hdat & Hslack)".
+    iAssert (⌜pflag_closedb ro || pflag_closedb wo = true⌝)%I as %Hfull.
+    { destruct w.
+      - iDestruct (pipe_endstate_marked with "Hmark Hst1") as "[-> _]".
+        iPureIntro. rewrite pflag_closedb_zero. by rewrite orb_true_r.
+      - iDestruct (pipe_endstate_marked with "Hmark Hst0") as "[-> _]".
+        iPureIntro. by rewrite pflag_closedb_zero. }
+    iDestruct (pipe_bank_closed _ ro wo Hfull with "Hbank") as "Hother".
+    iDestruct (pipe_cancel_halves with "Hhalf Hother") as "$".
+    iExists vname, nr, nw, ro, wo, bs. by iFrame.
+  Qed.
 
   (* ---- THE predicate: a well-formed [struct pipe] ----
 
@@ -246,16 +470,25 @@ Section PipeInv.
      kalloc's guarantee travelling with the object: it is what makes the page
      re-freeable, so it has to survive to pipeclose. *)
   Definition is_pipe (γl : gname) (γp : pipe_names) (pi : mword 64) : iProp Σ :=
-    (⌜page_valid pi⌝ ∗ is_lock γl pi "pipe"%string (pipe_res γp pi))%I.
+    (⌜page_valid pi⌝ ∗
+     cinv lockN (pn_cancel γp) (lock_inv γl pi (pipe_res γp pi)))%I.
 
   Global Instance is_pipe_persistent γl γp pi : Persistent (is_pipe γl γp pi).
   Proof. apply _. Qed.
 
   Lemma is_pipe_valid γl γp pi : is_pipe γl γp pi -∗ ⌜page_valid pi⌝.
   Proof. by iIntros "[$ _]". Qed.
-  Lemma is_pipe_lock γl γp pi :
-    is_pipe γl γp pi -∗ is_lock γl pi "pipe"%string (pipe_res γp pi).
+  Lemma is_pipe_cinv γl γp pi :
+    is_pipe γl γp pi -∗ cinv lockN (pn_cancel γp) (lock_inv γl pi (pipe_res γp pi)).
   Proof. by iIntros "[_ $]". Qed.
+
+  (* what acquire/holding/release take: the right to open, at whatever share
+     of the cancel token the caller's reference carries. *)
+  Lemma is_pipe_openable γl γp pi q :
+    is_pipe γl γp pi -∗
+    lock_openable γl pi (pipe_res γp pi)
+      (cinv_own (pn_cancel γp) q) (cinv_own (pn_cancel γp) 1).
+  Proof. iIntros "H". iApply lock_openable_cinv. by iApply is_pipe_cinv. Qed.
 
   (* ---- what a [struct file] of type FD_PIPE carries ----
 
@@ -403,12 +636,20 @@ Section PipeInv.
   (*  Construction: pipealloc's ghost step                               *)
   (* ------------------------------------------------------------------ *)
 
-  Lemma pipe_names_alloc :
-    ⊢ |==> ∃ γp : pipe_names, pipe_ref γp false 1 ∗ pipe_ref γp true 1.
+  (* the two end ghosts.  The cancel gname is NOT allocated here -- it comes
+     from the lock construction, which has to choose it before [pipe_res] (and
+     hence [pipe_names]) can even be written down; see [newlock_c_delayed]. *)
+  Lemma pipe_ends_alloc (γc : gname) :
+    ⊢ |==> ∃ γp : pipe_names, ⌜pn_cancel γp = γc⌝ ∗
+             pipe_end_full γp false ∗ pipe_end_full γp true ∗
+             pipe_openmark γp false ∗ pipe_openmark γp true.
   Proof.
     iMod (own_alloc (1%Qp : fracR)) as (γr) "Hr"; [done|].
     iMod (own_alloc (1%Qp : fracR)) as (γw) "Hw"; [done|].
-    iModIntro. iExists (MkPipeNames γr γw). by iFrame "Hr Hw".
+    iMod (own_alloc (1%Qp : fracR)) as (γmr) "Hmr"; [done|].
+    iMod (own_alloc (1%Qp : fracR)) as (γmw) "Hmw"; [done|].
+    iModIntro. iExists (MkPipeNames γr γw γmr γmw γc).
+    by iFrame "Hr Hw Hmr Hmw".
   Qed.
 
   (* The state pipealloc has in hand once initlock returns: the four fields it
@@ -419,10 +660,10 @@ Section PipeInv.
      Note the data buffer is NOT zeroed by pipealloc -- [bs] is whatever kalloc
      handed over -- which is exactly right: no byte of it is readable until
      nwrite has passed it. *)
-  Lemma new_pipe E (pi : mword 64) (bs : list (bv 8)) :
+  Lemma new_pipe E (pi : mword 64) (vname : mword 64) (bs : list (bv 8)) :
     page_valid pi ->
     length bs = PIPESIZE ->
-    lock_name pi "pipe"%string -∗
+    lock_name_field pi ↦₈ vname -∗
     pi ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu pi ↦₈ (zero_reg : mword 64) -∗
     a_pnread pi ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -434,17 +675,26 @@ Section PipeInv.
     ={E}=∗ ∃ (γl : gname) (γp : pipe_names),
              is_pipe γl γp pi ∗ pipe_ref γp false 1 ∗ pipe_ref γp true 1.
   Proof.
-    iIntros (Hpv Hlen) "#Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack".
-    iMod pipe_names_alloc as (γp) "[Hrd Hwr]".
-    iMod (newlock E pi "pipe"%string (pipe_res γp pi)
-            with "Hnm Hword Hcpu [Hnr Hnw Hro Hwo Hdata Hslack]") as (γl) "#Hlk".
+    iIntros (Hpv Hlen) "Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack".
+    (* the cancel gname FIRST: [pipe_res] mentions it. *)
+    iMod (newlock_c_delayed E pi) as (γc) "[Hcancel Hmake]".
+    iMod (pipe_ends_alloc γc) as (γp Hγc) "(Hrd & Hwr & Hm0 & Hm1)".
+    iMod ("Hmake" $! (pipe_res γp pi)
+            with "Hword Hcpu [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as (γl) "#Hlk".
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
-              (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), bs.
-      iFrame "Hnr Hnw Hro Hwo Hdata Hslack".
-      iSplitR; [by iApply pipe_endstate_open_intro; apply pflag_one_open|].
-      iSplitR; [by iApply pipe_endstate_open_intro; apply pflag_one_open|].
+              (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.
+      iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".
+      iSplitL "Hm0"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm0")|].
+      iSplitL "Hm1"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm1")|].
+      iSplitR; [by iApply pipe_bank_fresh; apply pflag_one_open|].
       done. }
-    iModIntro. iExists γl, γp. iFrame "Hrd Hwr". by iSplit.
+    iModIntro. iExists γl, γp.
+    (* the cancel token splits in half, one half per end reference. *)
+    rewrite -Hγc.
+    rewrite cancel_split. iDestruct "Hcancel" as "[Hc1 Hc2]".
+    rewrite /is_pipe /pipe_ref /pipe_end_full.
+    iFrame "Hrd Hc1 Hwr Hc2".
+    iSplit; [done|]. iExact "Hlk".
   Qed.
 
 End PipeInv.

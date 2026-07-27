@@ -44,7 +44,7 @@ Require Import IntrDefs WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecMyproc.
-Require Import RiscvModelBytes KallocInv KMap PageFields.
+Require Import RiscvModelBytes InstrBytes KallocInv KMap PageFields.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecArgraw.
 From Kernel Require KernelInstrs KernelData.
@@ -709,12 +709,11 @@ Section ProofArgraw.
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) : Prop :=
     (k < NARG)%nat ->
     ws !! tf_arg_idx k = Some v ->
-    page_valid (page_base tfp) ->
     M !!! Regidx ar_s1 = mword_of_int (ar_tbl + 4 * Z.of_nat k) ->
     M !!! Regidx ar_a4 = mword_of_int ar_tbl ->
     M !!! Regidx ar_a0 = p ->
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
-    kernel_text -∗ kernel_data -∗ kmap_static_claims -∗
+    kernel_text -∗ kernel_data -∗
     sie_cap_gpr γ M av' -∗
     pc_is (mword_of_int (AR + 0x22) : mword 64) -∗
     p_trapframe p ↦₈{dqt} page_base tfp -∗
@@ -744,8 +743,8 @@ Section ProofArgraw.
     ar_arm_body γ Φ M 0%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws Hpv HMs1 HMa4 HMa0 HMsp.
-    iIntros "#Htext #Hdata #Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
     iPoseProof (ar_table_word 0%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -808,11 +807,7 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<0%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    assert (Hidx : (tf_arg_idx 0%nat < TFWORDS)%nat)
-      by (unfold tf_arg_idx, TFWORDS; unfold NARG in Hk; lia).
     iDestruct (tf_page_word tfp ws (tf_arg_idx 0%nat) v Hws with "Htf") as "[Hw Hwback]".
-    iDestruct (tf_word_to_mem tfp (tf_arg_idx 0%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iPoseProof (ar_i_ld 0%nat Hk with "Htext") as "Hild".
     iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
@@ -825,8 +820,6 @@ Section ProofArgraw.
               with "Hcg Hpc Hild [Hw] [-]").
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
-    iDestruct (tf_word_to_phys tfp (tf_arg_idx 0%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -864,8 +857,8 @@ Section ProofArgraw.
     ar_arm_body γ Φ M 1%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws Hpv HMs1 HMa4 HMa0 HMsp.
-    iIntros "#Htext #Hdata #Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
     iPoseProof (ar_table_word 1%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -928,11 +921,7 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<1%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    assert (Hidx : (tf_arg_idx 1%nat < TFWORDS)%nat)
-      by (unfold tf_arg_idx, TFWORDS; unfold NARG in Hk; lia).
     iDestruct (tf_page_word tfp ws (tf_arg_idx 1%nat) v Hws with "Htf") as "[Hw Hwback]".
-    iDestruct (tf_word_to_mem tfp (tf_arg_idx 1%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iPoseProof (ar_i_ld 1%nat Hk with "Htext") as "Hild".
     iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
@@ -945,8 +934,6 @@ Section ProofArgraw.
               with "Hcg Hpc Hild [Hw] [-]").
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
-    iDestruct (tf_word_to_phys tfp (tf_arg_idx 1%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -984,8 +971,8 @@ Section ProofArgraw.
     ar_arm_body γ Φ M 2%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws Hpv HMs1 HMa4 HMa0 HMsp.
-    iIntros "#Htext #Hdata #Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
     iPoseProof (ar_table_word 2%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -1048,11 +1035,7 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<2%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    assert (Hidx : (tf_arg_idx 2%nat < TFWORDS)%nat)
-      by (unfold tf_arg_idx, TFWORDS; unfold NARG in Hk; lia).
     iDestruct (tf_page_word tfp ws (tf_arg_idx 2%nat) v Hws with "Htf") as "[Hw Hwback]".
-    iDestruct (tf_word_to_mem tfp (tf_arg_idx 2%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iPoseProof (ar_i_ld 2%nat Hk with "Htext") as "Hild".
     iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
@@ -1065,8 +1048,6 @@ Section ProofArgraw.
               with "Hcg Hpc Hild [Hw] [-]").
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
-    iDestruct (tf_word_to_phys tfp (tf_arg_idx 2%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1104,8 +1085,8 @@ Section ProofArgraw.
     ar_arm_body γ Φ M 3%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws Hpv HMs1 HMa4 HMa0 HMsp.
-    iIntros "#Htext #Hdata #Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
     iPoseProof (ar_table_word 3%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -1168,11 +1149,7 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<3%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    assert (Hidx : (tf_arg_idx 3%nat < TFWORDS)%nat)
-      by (unfold tf_arg_idx, TFWORDS; unfold NARG in Hk; lia).
     iDestruct (tf_page_word tfp ws (tf_arg_idx 3%nat) v Hws with "Htf") as "[Hw Hwback]".
-    iDestruct (tf_word_to_mem tfp (tf_arg_idx 3%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iPoseProof (ar_i_ld 3%nat Hk with "Htext") as "Hild".
     iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
@@ -1185,8 +1162,6 @@ Section ProofArgraw.
               with "Hcg Hpc Hild [Hw] [-]").
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
-    iDestruct (tf_word_to_phys tfp (tf_arg_idx 3%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1224,8 +1199,8 @@ Section ProofArgraw.
     ar_arm_body γ Φ M 4%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws Hpv HMs1 HMa4 HMa0 HMsp.
-    iIntros "#Htext #Hdata #Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
     iPoseProof (ar_table_word 4%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -1288,11 +1263,7 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<4%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    assert (Hidx : (tf_arg_idx 4%nat < TFWORDS)%nat)
-      by (unfold tf_arg_idx, TFWORDS; unfold NARG in Hk; lia).
     iDestruct (tf_page_word tfp ws (tf_arg_idx 4%nat) v Hws with "Htf") as "[Hw Hwback]".
-    iDestruct (tf_word_to_mem tfp (tf_arg_idx 4%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iPoseProof (ar_i_ld 4%nat Hk with "Htext") as "Hild".
     iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
@@ -1305,8 +1276,6 @@ Section ProofArgraw.
               with "Hcg Hpc Hild [Hw] [-]").
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
-    iDestruct (tf_word_to_phys tfp (tf_arg_idx 4%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1344,8 +1313,8 @@ Section ProofArgraw.
     ar_arm_body γ Φ M 5%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws Hpv HMs1 HMa4 HMa0 HMsp.
-    iIntros "#Htext #Hdata #Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
     iPoseProof (ar_table_word 5%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -1408,11 +1377,7 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<5%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    assert (Hidx : (tf_arg_idx 5%nat < TFWORDS)%nat)
-      by (unfold tf_arg_idx, TFWORDS; unfold NARG in Hk; lia).
     iDestruct (tf_page_word tfp ws (tf_arg_idx 5%nat) v Hws with "Htf") as "[Hw Hwback]".
-    iDestruct (tf_word_to_mem tfp (tf_arg_idx 5%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iPoseProof (ar_i_ld 5%nat Hk with "Htext") as "Hild".
     iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
@@ -1425,8 +1390,6 @@ Section ProofArgraw.
               with "Hcg Hpc Hild [Hw] [-]").
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
-    iDestruct (tf_word_to_phys tfp (tf_arg_idx 5%nat) v (DfracOwn 1) Hpv Hidx
-                 with "Hkmap Hw") as "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
     set (C1 := <[Regidx ar_a0 := regval_into_reg v]> C0).
     change (<[Regidx ar_a0 := regval_into_reg v]> C0) with C1.
@@ -1482,9 +1445,9 @@ Section ProofArgraw.
     : wp_argraw_sconf_body γ Φ m av n eb p C i tfp ws v dqt.
   Proof.
     cbv beta delta [wp_argraw_sconf_body].
-    intros pcE ret_tgt Htp Hi Ha0 Hargs Hpv Hn Hav.
+    intros pcE ret_tgt Htp Hi Ha0 Hargs Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata #Hkmap Hpc Htfp Htf Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc Htfp Htf Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (ari_00 with "Htext") as "Hi00".
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -1726,8 +1689,8 @@ Section ProofArgraw.
     (* ================= the arm, applied ONCE at a symbolic index ======= *)
     iApply (ar_arm γ Φ B4 i (av - 4)%nat sp0 (m !!! Regidx ar_ra) (m !!! Regidx ar_s0)
                    (m !!! Regidx ar_s1) vgap p tfp ws v dqt
-              Hi Hargs Hpv HB4s1 HB4a4 HB4a0 HB4sp
-              with "Htext Hdata Hkmap Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap [-]").
+              Hi Hargs HB4s1 HB4a4 HB4a0 HB4sp
+              with "Htext Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap [-]").
     iIntros (Mf) "%HMf Hcg Hpc Htfp Htf".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.

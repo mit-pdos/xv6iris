@@ -28,7 +28,7 @@ From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl auth gmap frac numbers.
-From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
+From iris.base_logic.lib Require Import cancelable_invariants ghost_var gen_heap invariants.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -86,7 +86,7 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
                       (Initlock : INITLOCK) (Fileclose : FILECLOSE) : PIPEALLOC.
 
 Section ProofPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ, !cinvG Σ}.
   Context `{CID : CpuId}.
 
   Notation PA := KernelSyms.pipealloc.
@@ -641,7 +641,11 @@ Section ProofPipealloc.
         iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k1 1%Qp Cf1 U4 n eb p C (K - 6)%nat
                   ltac:(unfold fileclose_stack; lia) HU4tp Hnoffpos HU4a0
                   with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [-]").
-        iIntros (mr) "Hcg Hcnt Hpc %Hfcpins".
+        (* fileclose returns the fd slot the reference was holding; on this
+           error path pipealloc has nothing left to install it in, and its own
+           postcondition does not (yet) hand the two units back to the caller,
+           so it is dropped here. *)
+        iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hfdslot". iClear "Hfdslot".
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (PA + 0xb6))
           by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpcb6) in "Hpc".
@@ -702,7 +706,7 @@ Section ProofPipealloc.
       iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k0 1%Qp Cf0 V1 n eb p C (K - 6)%nat
                 ltac:(unfold fileclose_stack; lia) HV1tp Hnoffpos HV1a0
                 with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [-]").
-      iIntros (mr) "Hcg Hcnt Hpc %Hfcpins".
+      iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hfdslot". iClear "Hfdslot".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (PA + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".
@@ -1349,9 +1353,10 @@ Section ProofPipealloc.
     iEval (rewrite Hpc54) in "Hpc".
     iEval (rewrite HG5a0) in "Hlkw". iEval (rewrite HG5a0) in "Hlkn".
     iEval (rewrite HG5a0) in "Hlkc".
-    (* the pipe is born *)
+    (* the pipe is born.  The lock's name field goes INTO the pipe rather than
+       being sealed away: it is 8 bytes of the page pipeclose has to free. *)
     iApply fupd_wp.
-    iMod (new_pipe ⊤ pi bs Hpv Hbslen
+    iMod (new_pipe ⊤ pi _ bs Hpv Hbslen
             with "Hlkn Hlkw Hlkc Hnr Hnw Hro Hwo Hdat Hslack") as (γpl γp) "(#Hpipe & Hrd & Hwr)".
     iModIntro.
 

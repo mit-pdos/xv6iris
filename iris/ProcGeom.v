@@ -24,7 +24,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import WpMycpu.
 From Kernel Require KernelSyms.
@@ -43,7 +43,7 @@ Proof.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 
-Local Lemma pg_moi_unsigned (k : Z) :
+Lemma pg_moi_unsigned (k : Z) :
   bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
 Proof.
   unfold mword_of_int, Values.to_word, get_word. cbn.
@@ -150,6 +150,54 @@ Definition NARG : nat := 6%nat.
 Definition NOFILE : nat := 16%nat.
 Definition p_ofile (pa : mword 64) (fd : nat) : mword 64 :=
   add_vec pa (mword_of_int (208 + 8 * Z.of_nat fd)).
+
+(* The arithmetic gcc emits to index [p->ofile[fd]] at a RUNTIME fd:
+   [slli rd,rs,3] then [addi rd,rd,208] then [add a0,a0,rd].  Both sys_close
+   and argfd do exactly this (with different register pairs, hence the shift
+   stated over a symbolic value rather than a register), and the sum is
+   [p_ofile] by definition.  Proving the shift once over a symbolic [z] is
+   what keeps either proof from casing on the sixteen descriptors. *)
+Local Lemma pg_moi64_uns (z : Z) : 0 <= z < 18446744073709551616 ->
+  bv_unsigned (mword_of_int z : mword 64) = z.
+Proof.
+  intro Hz. rewrite pg_moi_unsigned. apply bv_wrap_small.
+  unfold bv_modulus. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. lia.
+Qed.
+
+Lemma ofile_slli3 (z : Z) : 0 <= z -> z * 8 < 18446744073709551616 ->
+  shift_bits_left (mword_of_int z : mword 64)
+                  (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0)
+  = mword_of_int (z * 8).
+Proof.
+  intros Hz0 Hz. apply bv_eq.
+  unfold shift_bits_left, shiftl, with_word, get_word,
+         MachineWord.MachineWord.logical_shift_left.
+  rewrite bv_shiftl_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
+             (MachineWord.MachineWord.Z_idx (int_of_mword false
+                (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))))) with 3
+    by (vm_compute; reflexivity).
+  assert (Hzlt : z < 18446744073709551616) by nia.
+  rewrite (pg_moi64_uns z ltac:(lia)).
+  rewrite Z.shiftl_mul_pow2; [| lia]. change (2^3) with 8.
+  rewrite (pg_moi64_uns (z * 8) ltac:(nia)).
+  apply bv_wrap_small. unfold bv_modulus.
+  change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z.
+  split; [apply Z.mul_nonneg_nonneg; lia | exact Hz].
+Qed.
+
+Lemma ofile_addi208 (z : Z) : 0 <= z -> z + 208 < 18446744073709551616 ->
+  add_vec (mword_of_int z : mword 64) (sign_extend' 64 (mword_of_int 208 : mword 12))
+  = mword_of_int (208 + z).
+Proof.
+  intros Hz0 Hz.
+  assert (H208 : (sign_extend' 64 (mword_of_int 208 : mword 12) : mword 64) = mword_of_int 208)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite H208.
+  change (add_vec (mword_of_int z : mword 64) (mword_of_int 208))
+    with (add_vec_int (mword_of_int z : mword 64) 208).
+  rewrite avi_mword. f_equal. lia.
+Qed.
 
 (* enum procstate codes (kernel/proc.h): UNUSED=0 USED=1 SLEEPING=2
    RUNNABLE=3 RUNNING=4 ZOMBIE=5. *)

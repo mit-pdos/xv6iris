@@ -219,22 +219,11 @@ Section Kalloc.
     unfold addr_is_kdata. rewrite (kalloc_uint_pa_add p j Hno). lia.
   Qed.
 
-  (* the little-endian 64-bit word built from 8 bytes reproduces those bytes *)
+  (* the width-8 instance of [RiscvModelBytes.nth_byte_assemble_len]. *)
   Lemma nth_byte_assemble8 (bs : list (bv 8)) (j : nat) :
     length bs = 8%nat -> (j < 8)%nat ->
     nth_byte (Z_to_bv 64 (assemble_bytes bs) : mword 64) j = bs !!! j.
-  Proof.
-    intros Hlen Hj. apply bv_eq. rewrite nth_byte_unsigned.
-    rewrite Z_to_bv_unsigned.
-    pose proof (assemble_bytes_bound bs) as [Hlo Hhi]. rewrite Hlen in Hhi. simpl in Hhi.
-    assert (Hws : bv_wrap 64 (assemble_bytes bs) = assemble_bytes bs).
-    { apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
-    rewrite Hws.
-    assert (Hab : (assemble_bytes bs ≫ Z.of_nat (8 * j)) `mod` 2 ^ 8 = bv_unsigned (bs !!! j))
-      by (apply assemble_bytes_byte; lia).
-    rewrite <- Hab.
-    f_equal. f_equal. lia.
-  Qed.
+  Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
 
   Definition byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₘ b)%I.
   (* an 8-byte little-endian word, now expressed via the [word_pointsto]

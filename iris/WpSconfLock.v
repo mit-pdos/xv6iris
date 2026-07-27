@@ -11,7 +11,9 @@
                                        provably nonzero (free branch refuted)
      wp_amoswap_lockopen_s_sconf     -- acquire's test-and-set: yields the
                                        holder token + R on success
-     wp_sw_zero_lockopen_s_sconf     -- release's clear: token + R go back in
+     wp_sw_zero_lockfin_s_sconf      -- release's clear: the caller's
+                                       [lock_finisher] decides whether the
+                                       invariant closes or is destroyed
    The CPU WORD (+16) -- owned by the invariant, never by a caller:
      wp_cld_lkcpu_lockopen_s_sconf        -- holding's read with no evidence:
                                             the value is whatever it is
@@ -170,74 +172,16 @@ Section WpSconfLock.
     iApply ("Hcont" with "HTc [//] Htok Hcg Hpc").
   Qed.
 
-  (* release's [sw zero,0(lk)]: the token and R go back into the invariant
-     with the zeroed word. *)
-  Lemma wp_sw_zero_lockopen_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk : mword 64) (R Tc Dc : iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) :
-    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    pa = lk ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗
-    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
-    lock_openable γl lk R Tc Dc -∗
-    Tc -∗
-    locked_pre γl cpu_id -∗
-    R -∗
-    ( Tc -∗
-      sie_cap_gpr γ m n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    intros pa Hpalk.
-    iIntros "Hcg Hpc Hinstr #Hlock HTc Htok HRes Hcont".
-    (* x0 reads as zero, so the stored word is the literal 0 the free
-       branch of the invariant demands *)
-    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (gpr_file_x0 m (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
-                 with "Hfile") as "[%Hz Hfile]".
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
-    assert (Hzero : trunc32 (m !!! Regidx (mword_of_int 0 : mword 5))
-                    = (mword_of_int 0 : mword 32))
-      by (rewrite Hz; apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_store_s_sconf_au 4 false γ Φ pc (mword_of_int 0 : mword 5) rs1 imm m n
-              (trunc32 (m !!! Regidx (mword_of_int 0 : mword 5)))
-              Tc
-              (⊤ ∖ ↑minstretN ∖ ↑lockN)
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (m !!! Regidx (mword_of_int 0 : mword 5)))
-              with "Hcg Hpc Hinstr [Htok HRes HTc] [Hcont]").
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) with "[%] HTc")
-        as "(Hbody & HTc & [Hclose _])"; [solve_ndisj|].
-      iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
-      iMod (lock_give γl st cpu_id with "Hg Htok") as "(%Hst & Hg & Hfrag)".
-      iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
-      subst st.
-      iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
-      iIntros "Hword".
-      iMod ("Hclose" with "[Hword Hcpu Hg Hfrag HRes]") as "_".
-      { iNext. iExists (trunc32 (m !!! Regidx (mword_of_int 0 : mword 5))), None.
-        iFrame "Hg".
-        iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
-        iSplitL "Hcpu"; [ iExact "Hcpu" | ].
-        iLeft. iFrame "Hfrag HRes". iSplit; [done | iPureIntro; exact Hzero ]. }
-      iModIntro. iExact "HTc". }
-    iIntros "Hcg Hpc HTc".
-    iApply ("Hcont" with "HTc Hcg Hpc").
-  Qed.
-
   (* The word clear with the fate of the invariant left to the CALLER.  At
      this instant the store has happened and [lock_give] has pinned the state
      to [None], so the zeroed lock word, the cleared cpu word, the ghost state
      and [R] are all in hand at once.  The finisher is handed the credential,
      the close-or-destroy choice, and the contents in both shapes it might
      want them -- reassembled as [lock_inv] (to put back) or raw (to keep) --
-     and decides.  [wp_sw_zero_lockopen] and [wp_sw_zero_lockcancel] are the
-     two instantiations; release is proved once over this and instantiated
-     twice. *)
+     and decides ([lock_finisher], WpLock.v; [lock_finisher_close] and
+     [lock_finisher_destroy] are its two canonical instances).  Release is
+     proved ONCE over this leaf and instantiated twice -- there is deliberately
+     no close-only and no destroy-only twin of this lemma. *)
   Lemma wp_sw_zero_lockfin_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γl : gname) (lk : mword 64) (R Tc Dc Out : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
@@ -251,12 +195,7 @@ Section WpSconfLock.
     Tc -∗
     locked_pre γl cpu_id -∗
     R -∗
-    ( Tc -∗
-      ((▷ lock_inv γl lk R ={⊤ ∖ ↑minstretN ∖ ↑lockN, ⊤ ∖ ↑minstretN}=∗ True)
-       ∧ (Dc ={⊤ ∖ ↑minstretN ∖ ↑lockN, ⊤ ∖ ↑minstretN}=∗ True)) -∗
-      (▷ lock_inv γl lk R
-       ∧ (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R)) -∗
-      |={⊤ ∖ ↑minstretN ∖ ↑lockN, ⊤ ∖ ↑minstretN}=> Out ) -∗
+    lock_finisher γl lk R Tc Dc Out (⊤ ∖ ↑minstretN) -∗
     ( Out -∗
       sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc 4) -∗
@@ -265,6 +204,7 @@ Section WpSconfLock.
   Proof.
     intros pa Hpalk.
     iIntros "Hcg Hpc Hinstr #Hlock HTc Htok HRes Hfin Hcont".
+    rewrite /lock_finisher.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (gpr_file_x0 m (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hz Hfile]".
@@ -300,74 +240,6 @@ Section WpSconfLock.
         iExact "Hcpu". }
     iIntros "Hcg Hpc HOut".
     iApply ("Hcont" with "HOut Hcg Hpc").
-  Qed.
-
-  (* The same store, but the caller DESTROYS the invariant instead of
-     closing it.  This is the whole point of the cancellable flavour: the
-     store IS the linearization point, and [lock_give] has just pinned the
-     state to [None], so at this instant -- inside one atomic step, with no
-     window in which anyone could re-acquire -- the zeroed lock word, the
-     cleared cpu word and [R] are all in hand together and the caller simply
-     walks away with them.  Cancelling any LATER would have to case-split on
-     a lock state it no longer knows anything about, and the held branch
-     carries no [R].
-
-     [Dc] plays both roles: it is the credential that opens (handed straight
-     back) and then the certificate that disposes.  For a [cinv] that is
-     [cinv_own γc 1] -- which is exactly what a caller holding every share of
-     the object has. *)
-  Lemma wp_sw_zero_lockcancel_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) :
-    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    pa = lk ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗
-    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
-    lock_openable γl lk R Dc Dc -∗
-    Dc -∗
-    locked_pre γl cpu_id -∗
-    R -∗
-    ( sie_cap_gpr γ m n -∗
-      pc_is (add_vec_int pc 4) -∗
-      lk ↦₄ (mword_of_int 0 : mword 32) -∗
-      lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-      R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    intros pa Hpalk.
-    iIntros "Hcg Hpc Hinstr #Hlock HDc Htok HRes Hcont".
-    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (gpr_file_x0 m (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
-                 with "Hfile") as "[%Hz Hfile]".
-    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
-    assert (Hzero : trunc32 (m !!! Regidx (mword_of_int 0 : mword 5))
-                    = (mword_of_int 0 : mword 32))
-      by (rewrite Hz; apply bv_eq; vm_compute; reflexivity).
-    iApply (wp_store_s_sconf_au 4 false γ Φ pc (mword_of_int 0 : mword 5) rs1 imm m n
-              (trunc32 (m !!! Regidx (mword_of_int 0 : mword 5)))
-              (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ R)%I
-              (⊤ ∖ ↑minstretN ∖ ↑lockN)
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (m !!! Regidx (mword_of_int 0 : mword 5)))
-              with "Hcg Hpc Hinstr [Htok HRes HDc] [Hcont]").
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) with "[%] HDc")
-        as "(Hbody & HDc & [_ Hdispose])"; [solve_ndisj|].
-      iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
-      iMod (lock_give γl st cpu_id with "Hg Htok") as "(%Hst & Hg & Hfrag)".
-      iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
-      subst st.
-      iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
-      iIntros "Hword".
-      iMod ("Hdispose" with "HDc") as "_".
-      iModIntro. iFrame "HRes".
-      iSplitL "Hword"; [ rewrite -Hzero -Hpalk; iExact "Hword" | ].
-      iExact "Hcpu". }
-    iIntros "Hcg Hpc (Hw & Hcpu & HR)".
-    iApply ("Hcont" with "Hcg Hpc Hw Hcpu HR").
   Qed.
 
   (* ------------------------------------------------------------------- *)

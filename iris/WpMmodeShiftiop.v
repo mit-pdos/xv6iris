@@ -255,3 +255,61 @@ Section Wp_srli.
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
   Qed.
 End Wp_srli.
+
+(* ===================================================================== *)
+(* SRAI / MUL / ADDW: the exec bridges.  Lifted out of ProofProcMapstacks *)
+(* -- a Proof file must not be imported -- so any function stepping these *)
+(* opcodes can reach them; procinit's KSTACK(i) computation is the next.  *)
+(* They live HERE rather than in WpMmodeLeafBase because they are stated  *)
+(* over [gpr_src], which this file owns.  See code-organization.md.       *)
+(* ===================================================================== *)
+
+(* ---- SRAI exec leaf (mirror SRLI) ---- *)
+Lemma exec_execute_SHIFTIOP_SRAI (shamt : mword 6) (rs1 rd : regidx) (a : mword 64) s s' :
+  exec (rX_bits rs1) s = Some (a, s) ->
+  exec (wX_bits rd (shift_bits_right_arith a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))) s = Some (tt, s') ->
+  exec (execute (SHIFTIOP (shamt, rs1, rd, SRAI))) s = Some (RETIRE_SUCCESS, s').
+Proof.
+  intros Ha Hw.
+  change (execute (SHIFTIOP (shamt, rs1, rd, SRAI))) with (execute_SHIFTIOP shamt rs1 rd SRAI).
+  unfold execute_SHIFTIOP. cbn match.
+  rewrite (exec_bind_Some _ _ _ (shift_bits_right_arith a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0)) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). apply exec_returnm. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm.
+Qed.
+
+Definition gpr_srai_val (rs1 : mword 5) (shamt : mword 6) (s : mstate) : mword 64 :=
+  shift_bits_right_arith (gpr_src rs1 s) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0).
+
+Lemma exec_execute_SHIFTIOP_SRAI_gpr (rs1 rd : mword 5) (shamt : mword 6) s :
+  exec (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRAI))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (gpr_srai_val rs1 shamt s))).
+Proof.
+  unfold gpr_srai_val, gpr_src.
+  eapply exec_execute_SHIFTIOP_SRAI.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_wX_bits_gpr rd _ s).
+Qed.
+
+(* ---- RTYPEW ADDW exec leaf ---- *)
+Definition gpr_addw_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  sign_extend' 64 (add_vec (subrange_vec_dec (gpr_src rs1 s) 31 0 : mword 32)
+                           (subrange_vec_dec (gpr_src rs2 s) 31 0 : mword 32)).
+
+Lemma exec_execute_RTYPEW_ADDW_gpr (rs2 rs1 rd : mword 5) s :
+  exec (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (gpr_addw_val rs2 rs1 s))).
+Proof.
+  unfold gpr_addw_val, gpr_src.
+  change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW)))
+    with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) ADDW).
+  unfold execute_RTYPEW. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  apply exec_returnm.
+Qed.

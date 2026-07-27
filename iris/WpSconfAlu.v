@@ -29,7 +29,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
-Require Import RegFile WpGpr InstrBytes WpMmodeLeafBase WpMmodeShiftiop StackOwn.
+Require Import RegFile WpGpr InstrBytes WpMmodeLeafBase WpMmodeShiftiop WpMmodeMul ExecCommon StackOwn.
 Require Import SmodeCore WpAuipc.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
@@ -1019,4 +1019,79 @@ Section WpSconfAlu.
     unfold gpr_or_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
+
+  (* ---- SRAI / MUL / ADDW ----
+     Lifted out of ProofProcMapstacks, which needed them for its KSTACK(i)
+     computation and had nowhere shared to put them.  procinit computes the
+     same address, so these are now two-user leaves; the exec bridges they
+     rest on are in WpMmodeLeafBase beside the others. *)
+
+  Lemma wp_srai_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (shamt : mword 6) (m : regfile) (n : nat) :
+    uint rd <> 0 -> rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc true (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRAI)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
+        (shift_bits_right_arith (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) n -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf γ Φ pc rd rd rd
+              (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRAI))
+              (shift_bits_right_arith (m !!! Regidx rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
+              m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva _.
+      rewrite (exec_execute_SHIFTIOP_SRAI_gpr rd rd shamt s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_srai_val, gpr_src. rewrite Hva. reflexivity.
+  Qed.
+
+  Lemma wp_mul_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) :
+    uint rd <> 0 -> rd <> csp_rs1 ->
+    mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
+      (m !!! Regidx rs1) (m !!! Regidx rs2) (mulop_mul.(mul_op_result_part)) = wval ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs2
+              (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) wval m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      rewrite (exec_execute_MUL_gpr rs2 rs1 rd s_pc Hrd).
+      unfold gpr_mul_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_addw_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs2 : mword 5) (m : regfile) (n : nat) :
+    uint rd <> 0 -> rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
+        (sign_extend' 64 (add_vec (subrange_vec_dec (m !!! Regidx rd) 31 0 : mword 32)
+                                  (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)))]> m) n -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf γ Φ pc rd rd rs2
+              (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW))
+              (sign_extend' 64 (add_vec (subrange_vec_dec (m !!! Regidx rd) 31 0 : mword 32)
+                                        (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)))
+              m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      rewrite (exec_execute_RTYPEW_ADDW_gpr rs2 rd rd s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_addw_val, gpr_src. rewrite Hva Hvb. reflexivity.
+  Qed.
 End WpSconfAlu.

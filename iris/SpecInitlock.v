@@ -45,9 +45,13 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    (* the name field is written once and then DISCARDED: what comes back is
-       the persistent [lock_name], ready to be sealed into [is_lock]. *)
-    lock_name lk s -∗
+    (* the name field comes back OWNED, holding the string pointer initlock
+       wrote.  It is inside the object's storage -- for a kalloc'd object,
+       inside the page [kfree] memsets -- so handing back the persistent
+       [lock_name] instead would make that storage unreclaimable.  A caller
+       whose lock is static seals it with [lock_name_intro] and forgets it;
+       one that will free the object keeps it. *)
+    c_name ↦₈ name -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
