@@ -35,7 +35,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvPtsto.
+Require Import RiscvPtsto RiscvExtras.
 Require Import ArrCursor.
 Require Import FdSlots.
 Require Import WpLock.
@@ -161,6 +161,21 @@ Proof.
   rewrite bv_sign_extend_unsigned. rewrite Hs.
   unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
   rewrite E64. rewrite Z.mod_small; [lia|]. lia.
+Qed.
+
+(* the signed [f->ref < 1] test: a positive in-range count is signed-positive,
+   so [bge x0,a5] falls through.  This is what makes filedup's and
+   fileclose's panic arms dead for a caller that holds a reference. *)
+Lemma fref_word_spos (n : positive) :
+  Z.pos n < 2 ^ 31 ->
+  zopz0zKzJ_s (zero_reg : mword 64)
+              (sign_extend' 64 (mword_of_int (Z.pos n) : mword 32)) = false.
+Proof.
+  intro Hn.
+  unfold zopz0zKzJ_s.
+  rewrite Z.geb_leb. apply Z.leb_gt.
+  assert (Hz0 : sint (zero_reg : mword 64) = 0%Z) by reflexivity. rewrite Hz0.
+  rewrite sint64_moi32; lia.
 Qed.
 
 (* the count component's [⋅] IS [Pos.add]; naming it lets [lia] see the

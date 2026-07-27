@@ -304,6 +304,13 @@ Nothing in `file.c` enforces it, so it is carried as a resource — `FdSlots.v`:
   against `● FDSLOTS` gives `n ≤ FDSLOTS`. `fd_slots_no_overflow` packages
   that as `Z.pos n < 2^31 ∧ Z.pos (n+1) < 2^31`.
 
+`filedup` is **proven** on this footing (`ProofFiledup.v`), axiom-clean: the
+overflow freedom is a theorem, and the `f->ref < 1` panic arm is dead (the
+caller's `file_ref` puts the slot in the domain with a `positive` count, and
+`fref_word_spos` turns that into "the sign-extended load is signed-positive",
+which is exactly what `bge x0,a5` tests) — so the panic tail gets no `instr`
+fact at all.
+
 So `filedup` **requires** an `fd_slot` and `fileclose` **returns** one;
 `filealloc` consumes one too (it creates the first reference), and
 `pipealloc` two. The `⌜Z.pos n < 2^31⌝` conjunct inside `fslot` is the *local
@@ -320,10 +327,17 @@ references, and its supply has no principled source.)
 
  **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
-- **The next function.** `filealloc` is proven (`ProofFilealloc.v` /
-  `LinkFilealloc.v`); `filedup` and `fileclose` are the natural next two —
-  their ghost steps already exist and are proved, so the work is the
-  instruction-level proof plus, for `filedup`, the overflow premise above.
+- **The next function is `fileclose`.** Its ghost steps
+  (`file_close_step` / `file_close_last_step`) are already proved and its
+  contract is written; what is missing is the instruction-level proof, and
+  that needs the last-reference arm's callees — `pipeclose`, `begin_op`,
+  `iput`, `end_op` — to have specs first. `fileclose_stack` in
+  `SpecFileclose.v` will grow when they do.
+- **Where the fd slots come from.** `fd_slots_alloc` mints the supply and
+  `fd_slots_to_list` parcels it out, but nothing distributes them yet: that
+  is the proc-side model of `p->ofile[]`, which is the other end of the
+  conservation law. Until it exists, `filedup`'s `fd_slot` premise has no
+  producer, so the spec is provable but not yet *usable* from `sys_dup`.
 - **Generalize the pool.** `bcache` (`b->refcnt` under `bcache.lock`), `itable`
   (`ip->ref` under `itable.lock`) and `ftable` are the *same* object: an array
   of slots with an int refcount under one spinlock, contents shared read-only

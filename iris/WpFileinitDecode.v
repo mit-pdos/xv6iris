@@ -24,6 +24,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
+Require Import KernelBaseDecode.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
 Require Import SpecInitlockWrapper.
@@ -49,11 +50,6 @@ Lemma fidb_5bc58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* auipc a0,0x1e *)
-Lemma fidb_0001e517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 (* addi a0,a0,1212  -- a0 := &ftable *)
 Lemma fidb_4bc50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x4bc50513 : mword 32)) s
@@ -98,7 +94,7 @@ Section WpFileinitDecode.
 
   Lemma fii_10 : kernel_text -∗ instr (mword_of_int (FI + 0x10) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (FI + 0x10)%Z (mword_of_int 0x0001e517 : mword 32)
-    (mword_of_int (FI + 0x10) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) fidb_0001e517. Qed.
+    (mword_of_int (FI + 0x10) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_0001e517. Qed.
 
   Lemma fii_14 : kernel_text -∗ instr (mword_of_int (FI + 0x14) : mword 64) false (ITYPE (mword_of_int 1212 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (FI + 0x14)%Z (mword_of_int 0x4bc50513 : mword 32)

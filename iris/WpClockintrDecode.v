@@ -115,11 +115,8 @@ Lemma cidec_exec_clw s :
   = Some (ExecuteAs (LOAD (mword_of_int 0, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)), s).
 Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
-(* +0x3e  0x2785  c.addiw a5,1  -- ticks + 1, as an [int] *)
-Lemma cidec_caddiw_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x2785 : mword 16)) s
-  = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x2785 (c.addiw a5,1) is shared with push_off and filedup -- now
+   cdec_2785 in KernelRvcDecode. *)
 
 (* +0x40  0xc31c  c.sw a5,0(a4) *)
 Lemma cidec_csw_ticks s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -258,7 +255,7 @@ Section WpClockintrDecode.
 
   Lemma cii_3e : kernel_text -∗ instr (mword_of_int (CI + 0x3e) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (CI + 0x3e)%Z (mword_of_int 0x2785 : mword 16)
-    (mword_of_int (CI + 0x3e) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cidec_caddiw_a5 exec_execute_C_ADDIW. Qed.
+    (mword_of_int (CI + 0x3e) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_2785 exec_execute_C_ADDIW. Qed.
 
   Lemma cii_40 : kernel_text -∗ instr (mword_of_int (CI + 0x40) : mword 64) true (STORE (mword_of_int 0, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 4)).
   Proof. mk_rvc (CI + 0x40)%Z (mword_of_int 0xc31c : mword 16)

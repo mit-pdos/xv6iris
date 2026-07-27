@@ -218,8 +218,8 @@ WpSconfCsr.v
 WpPushOffCsr.v
 WpMycpu.v
 ProcGeom.v
-KernelRvcDecode.v
 KernelBaseDecode.v
+KernelRvcDecode.v
 WpPushOffTop.v
 WpAmo.v
 WpHolding.v
@@ -341,7 +341,10 @@ FileInv.v
 WpFileallocDecode.v
 SpecFilealloc.v
 ProofFilealloc.v
+WpFiledupDecode.v
 SpecFiledup.v
+ProofFiledup.v
+LinkFiledup.v
 SpecFileclose.v
 LinkFilealloc.v
 PageFields.v

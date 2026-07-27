@@ -29,6 +29,55 @@ Proof. apply autocast_refl. Qed.
 Definition trunc32 (w : mword 64) : mword 32 :=
   autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 4 8) 1) 0).
 
+(* ---- [mword_of_int] at width 32, and its sign extension to 64 ----
+   Generic bitvector facts about a small non-negative literal stored in a
+   4-byte cell: its unsigned value survives, and so does its signed value
+   once sign-extended.  Every proof that reads an [int] field out of a
+   kernel struct (push_off's noff, filedup's f->ref) needs them, so they
+   live here rather than in whichever proof happened to want them first. *)
+Lemma bvw32_small (z : Z) : (0 <= z < 2^32)%Z -> bv_wrap 32 z = z.
+Proof. intro. apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 32)%Z with (2^32)%Z. lia. Qed.
+
+Lemma bvw64_small (z : Z) : (0 <= z < 2^64)%Z -> bv_wrap 64 z = z.
+Proof. intro. apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 64)%Z with (2^64)%Z. lia. Qed.
+
+Lemma moi32_unsigned (z : Z) : bv_unsigned (mword_of_int z : mword 32) = bv_wrap 32 z.
+Proof.
+  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned.
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N. reflexivity.
+Qed.
+
+Lemma moi32_small (z : Z) : (0 <= z < 2^32)%Z -> bv_unsigned (mword_of_int z : mword 32) = z.
+Proof. intro. rewrite moi32_unsigned. apply bvw32_small. lia. Qed.
+
+Lemma sext64_moi32_unsigned (z : Z) : (0 <= z < 2^31)%Z ->
+  bv_unsigned (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
+Proof.
+  intro Hz.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  unfold bv_signed. rewrite moi32_unsigned.
+  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
+  rewrite (bvw32_small z ltac:(change (2^32) with (2*2^31); lia)).
+  assert (Hhm32 : bv_half_modulus 32 = 2^31) by reflexivity;
+  rewrite (bv_swrap_small 32 z ltac:(rewrite Hhm32; lia)).
+  apply bvw64_small. lia.
+Qed.
+
+Lemma sint64_moi32 (z : Z) : (0 <= z < 2^31)%Z ->
+  sint (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
+Proof.
+  intro Hz.
+  change (sint ?x) with (bv_swrap 64 (bv_unsigned x)).
+  rewrite (sext64_moi32_unsigned z ltac:(lia)).
+  apply bv_swrap_small.
+  assert (Hhm : bv_half_modulus 64 = 2^63) by reflexivity. rewrite Hhm. lia.
+Qed.
+
+
 (* sign-extending a 9-bit value to 12 bits then to 64 is the same as
    zero-extending it to 64 directly: the 12-bit zero-extension's sign bit
    (bit 11) is always 0 since a 9-bit value's magnitude is well below 2^11,

@@ -12,47 +12,6 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 
-Lemma bvw32_small (z : Z) : (0 <= z < 2^32)%Z -> bv_wrap 32 z = z.
-Proof. intro. apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 32)%Z with (2^32)%Z. lia. Qed.
-
-Lemma bvw64_small (z : Z) : (0 <= z < 2^64)%Z -> bv_wrap 64 z = z.
-Proof. intro. apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 64)%Z with (2^64)%Z. lia. Qed.
-
-Lemma moi32_unsigned (z : Z) : bv_unsigned (mword_of_int z : mword 32) = bv_wrap 32 z.
-Proof.
-  unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned.
-  change (MachineWord.MachineWord.Z_idx 32) with 32%N. reflexivity.
-Qed.
-
-Lemma moi32_small (z : Z) : (0 <= z < 2^32)%Z -> bv_unsigned (mword_of_int z : mword 32) = z.
-Proof. intro. rewrite moi32_unsigned. apply bvw32_small. lia. Qed.
-
-Lemma sext64_moi32_unsigned (z : Z) : (0 <= z < 2^31)%Z ->
-  bv_unsigned (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
-Proof.
-  intro Hz.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
-  rewrite bv_sign_extend_unsigned.
-  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
-  unfold bv_signed. rewrite moi32_unsigned.
-  change (MachineWord.MachineWord.Z_idx 32) with 32%N.
-  rewrite (bvw32_small z) by (change (2^32) with (2*2^31); lia).
-  rewrite bv_swrap_small by (assert (Hhm : bv_half_modulus 32 = 2^31) by reflexivity; rewrite Hhm; lia).
-  apply bvw64_small. lia.
-Qed.
-
-Lemma sint64_moi32 (z : Z) : (0 <= z < 2^31)%Z ->
-  sint (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
-Proof.
-  intro Hz.
-  change (sint ?x) with (bv_swrap 64 (bv_unsigned x)).
-  rewrite sext64_moi32_unsigned by lia.
-  apply bv_swrap_small.
-  assert (Hhm : bv_half_modulus 64 = 2^63) by reflexivity. rewrite Hhm. lia.
-Qed.
-
 Lemma push_storeval_succ (n : nat) : (Z.of_nat n + 1 < 2^31)%Z ->
   (autocast (T := mword)
     (subrange_vec_dec
@@ -61,34 +20,10 @@ Lemma push_storeval_succ (n : nat) : (Z.of_nat n + 1 < 2^31)%Z ->
                    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
        (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S n).
 Proof.
-  intro Hb.
-  change (autocast (T := mword)
-    (subrange_vec_dec
-       (sign_extend' 64 (subrange_vec_dec
-          (add_vec (sign_extend' 64 (noff_val n))
-                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
-       (Z.sub (Z.mul 4 8) 1) 0) : mword 32)
-    with (trunc32 (sign_extend' 64 (subrange_vec_dec
-          (add_vec (sign_extend' 64 (noff_val n))
-                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))).
-  rewrite <- trunc32_subrange.
-  rewrite trunc32_sext.
-  rewrite trunc32_add.
-  rewrite trunc32_sext.
-  assert (HK : trunc32 (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) = (mword_of_int 1 : mword 32))
-    by (apply bv_eq; vm_compute; reflexivity).
-  rewrite HK.
-  apply bv_eq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned.
-  unfold noff_val.
-  rewrite (moi32_small (Z.of_nat n)) by (change (2^32) with (2*2^31); lia).
-  rewrite (moi32_small 1) by lia.
-  rewrite moi32_unsigned.
-  rewrite Nat2Z.inj_succ.
-  rewrite !bvw32_small by (change (2^32) with (2*2^31); lia).
-  lia.
+  intro Hb. unfold noff_val. rewrite Nat2Z.inj_succ. rewrite <- Z.add_1_r.
+  change (autocast (T := mword) (subrange_vec_dec ?w (Z.sub (Z.mul 4 8) 1) 0) : mword 32)
+    with (trunc32 w).
+  apply moi32_storeval_succ; lia.
 Qed.
 
 Lemma noff_val_zero (n : nat) : (Z.of_nat n < 2^31)%Z ->

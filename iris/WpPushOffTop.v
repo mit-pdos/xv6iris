@@ -70,13 +70,8 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x1e  0x2785  c.addiw a5,a5,1 *)
-Lemma podec_1e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x2785 : mword 16)) s
-  = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
+(* 0x2785 (c.addiw a5,a5,1) is shared with clockintr and filedup -- now
+   cdec_2785 in KernelRvcDecode. *)
 
 (* cdec_dd3c (c.sw a5,120(a0)) is shared with pop_off — now in KernelRvcDecode. *)
 
@@ -227,7 +222,7 @@ Section WpPushOffTop.
 
   Lemma poi_1e : kernel_text -∗ instr (mword_of_int (PO + 0x1e) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (PO + 0x1e)%Z (mword_of_int 0x2785 : mword 16)
-    (mword_of_int (PO + 0x1e) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) podec_1e exec_execute_C_ADDIW. Qed.
+    (mword_of_int (PO + 0x1e) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_2785 exec_execute_C_ADDIW. Qed.
 
   Lemma poi_20 : kernel_text -∗ instr (mword_of_int (PO + 0x20) : mword 64) true (STORE (mword_of_int 120, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)).
   Proof. mk_rvc (PO + 0x20)%Z (mword_of_int 0xdd3c : mword 16)

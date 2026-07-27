@@ -732,6 +732,36 @@ Lemma cdec_97ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+(* 0x2785  c.addiw a5,a5,1 -- shared by clockintr, push_off, filedup *)
+Lemma cdec_2785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x2785 : mword 16)) s
+  = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x40dc  c.lw a5,4(s1) -- the [f->ref] read, shared by filealloc and filedup *)
+Lemma cdec_40dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x40dc : mword 16)) s
+  = Some (C_LW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xc0dc  c.sw a5,4(s1) -- the [f->ref] write, likewise *)
+Lemma cdec_c0dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xc0dc : mword 16)) s
+  = Some (C_SW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* their leaf-form expansions, one instance each of WpMmodeLeafBase's
+   [exec_execute_C_{LW,SW}_leaf] at offset 4 / s1 / a5. *)
+Lemma cexec_40dc s :
+  exec (execute (C_LW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+Lemma cexec_c0dc s :
+  exec (execute (C_SW (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 (* c.add a5,a5,a0 *)
 Lemma cdec_97aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x97aa : mword 16)) s
