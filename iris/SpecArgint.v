@@ -41,6 +41,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FileInv ProcInv.
+Require Import UserPtTree ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -55,31 +56,31 @@ Notation arg_int32 := trunc32.
 Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (i : nat) (tf : mword 64) (args : list (mword 64)) (v : mword 64)
-    (old : mword 32) (dqt dqa : dfrac) :=
+    (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
+    (old : mword 32) (dqt : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argint in
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (i < NARG)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (Z.of_nat i) ->
-  args !! i = Some v ->
+  ws !! tf_arg_idx i = Some v ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 14 for argraw's *)
   (18 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  p_trapframe p ↦₈{dqt} tf -∗
-  tf_args tf dqa args -∗
+  p_trapframe p ↦₈{dqt} page_base tfp -∗
+  tf_page tfp ws -∗
   ip ↦₄ old -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr γ mf av -∗
       cpu_own γ n eb p C -∗
       pc_is ret_tgt -∗
-      p_trapframe p ↦₈{dqt} tf -∗
-      tf_args tf dqa args -∗
+      p_trapframe p ↦₈{dqt} page_base tfp -∗
+      tf_page tfp ws -∗
       ip ↦₄ arg_int32 v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -89,7 +90,7 @@ Module Type ARGINT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (i : nat) (tf : mword 64) (args : list (mword 64)) (v : mword 64)
-      (old : mword 32) (dqt dqa : dfrac),
-      wp_argint_sconf_body γ Φ m av n eb p C i tf args v old dqt dqa.
+      (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
+      (old : mword 32) (dqt : dfrac),
+      wp_argint_sconf_body γ Φ m av n eb p C i tfp ws v old dqt.
 End ARGINT.

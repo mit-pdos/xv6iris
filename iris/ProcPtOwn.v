@@ -67,12 +67,16 @@
    pure side conditions is the same technique as memmove's non-overlap
    hypothesis (claude-notes/completed/memmove.md).
 
-   The trapframe page is a SEPARATE named conjunct ([proc_tf_own]) rather
-   than another entry in the page footprint, precisely so it can later gain
-   STRUCTURE (the saved user registers, [kernel_satp], [kernel_sp], [epc]
-   -- uservec and usertrapret read those back) without disturbing anything
-   else.  Today its contents are existential, which is all
-   [wp_userret_pt] needs. *)
+   The trapframe PAGE's bytes are NOT owned here.  They used to be, as a
+   contents-existential [proc_tf_own] conjunct kept separate "precisely so
+   it can later gain STRUCTURE".  That day came: the syscall-argument path
+   needs the VALUE of [tf->aN], which a contents-existential page cannot
+   supply, so the page moved out to [ProcInv.tf_page], which carries all 36
+   [struct trapframe] words with their values plus the rest of the 4K as
+   anonymous bytes.  What stays here is the table's *description* of it --
+   [upt_tree_spec] still maps TRAPFRAME to [ud_tfp], and [proc_pt_wf] still
+   demands [page_valid (page_base P.(ud_tfp))] -- and the [p->trapframe]
+   CELL in [proc_pt_at].  Mapping and cell stay; bytes leave. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap sets bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -423,14 +427,12 @@ Section ProcPt.
 
   (* the trapframe page.  Deliberately its own conjunct so it can later
      gain structure -- see the header. *)
-  Definition proc_tf_own (tfp : mword 44) : iProp Σ := phys_page_own tfp.
-
   (* everything the table OWNS.  Identical in the parked and the installed
      form -- the pages do not change hands at the satp switch. *)
   Definition proc_pt_own (P : uptd) : iProp Σ :=
-    (proc_tf_own P.(ud_tfp) ∗ upt_pages_own P.(ud_um))%I.
+    upt_pages_own P.(ud_um).
 
-  Typeclasses Opaque phys_page_own upt_pages_own proc_tf_own.
+  Typeclasses Opaque phys_page_own upt_pages_own.
 
   (* ------------------------------------------------------------------ *)
   (* THE SHAPE BRIDGE.  [UserPtTree.udata_own] -- the aggregated byte map *)
@@ -507,7 +509,7 @@ Section ProcPt.
   Qed.
 
   Lemma proc_pt_own_udata (P : uptd) :
-    proc_pt_own P ⊣⊢ proc_tf_own P.(ud_tfp) ∗ udata_own (ud_pas P).
+    proc_pt_own P ⊣⊢ udata_own (ud_pas P).
   Proof. rewrite /proc_pt_own /ud_pas upt_pages_udata. reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -576,6 +578,13 @@ Section ProcPt.
      p_trapframe pa ↦₈ page_base P.(ud_tfp) ∗
      proc_pt P)%I.
 
+  (* [iFrame] must NOT search inside these.  [proc_pt] contains [pt_frame]
+     and a big-op over the page footprint; letting the Frame instances unfold
+     it turns a one-line projection into minutes and gigabytes (measured: a
+     [proc_priv] projection went 2 s -> 300 s / 15.7 GB without this).  Same
+     reason [phys_page_own]/[upt_pages_own] are already opaque above. *)
+  Typeclasses Opaque proc_pt proc_pt_at.
+
   (* ------------------------------------------------------------------ *)
   (* INTRO AT THE EMPTY MAP -- the join with the CONSTRUCTION side.       *)
   (* [wp_proc_pagetable] (SpecProcPagetable.v) delivers                   *)
@@ -602,9 +611,9 @@ Section ProcPt.
   Lemma proc_pt_intro_empty (root tfp : mword 44) (t : ptree) :
     upt_tree_spec root tfp ∅ t ->
     page_valid (page_base tfp) ->
-    ptree_own 2 (DfracOwn 1) t -∗ proc_tf_own tfp -∗ proc_pt (upt_desc root tfp).
+    ptree_own 2 (DfracOwn 1) t -∗ proc_pt (upt_desc root tfp).
   Proof.
-    intros Hspec Hvtf. iIntros "Ht Htf".
+    intros Hspec Hvtf. iIntros "Ht".
     rewrite /proc_pt /proc_pt_own /upt_desc.
     cbn [ud_root ud_tfp ud_um].
     iSplitR.
@@ -613,16 +622,14 @@ Section ProcPt.
       split; [exact um_pages_valid_empty | exact Hvtf]. }
     iSplitL "Ht".
     { iExists t. iFrame "Ht". iPureIntro. exact Hspec. }
-    rewrite /upt_pages_own um_ppns_empty big_sepS_empty.
-    iFrame "Htf".
+    rewrite /upt_pages_own um_ppns_empty big_sepS_empty. done.
   Qed.
 
   (* the instance at proc_pagetable's post, through [ProcPt.ppt_bridge] *)
   Lemma proc_pt_intro_ppt (t : ptree) (tfp : mword 44) :
     pt_rep0 t (ppt_map tfp) ->
     page_valid (page_base tfp) ->
-    ptree_own 2 (DfracOwn 1) t -∗ proc_tf_own tfp -∗
-    proc_pt (upt_desc (pt_base t) tfp).
+    ptree_own 2 (DfracOwn 1) t -∗ proc_pt (upt_desc (pt_base t) tfp).
   Proof.
     intros Hrep Hvtf.
     exact (proc_pt_intro_empty (pt_base t) tfp t (ppt_bridge t tfp Hrep) Hvtf).

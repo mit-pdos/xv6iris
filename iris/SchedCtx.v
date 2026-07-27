@@ -215,7 +215,7 @@ Section SchedCtx.
   (* ------------------------------------------------------------------ *)
   Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
     ((if needs_ctx st   then ▷ proc_ctx pa   else emp) ∗
-     (if inv_dormant st then proc_dormant pa else emp))%I.
+     (if inv_dormant st then proc_dormant pa st else emp))%I.
 
   Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
     (∃ (st : mword 32) (ch : mword 64),
@@ -228,10 +228,15 @@ Section SchedCtx.
      allocation/parking ones.  Both side conditions are [vm_compute], and
      because neither [proc_ctx] nor [proc_dormant] is indexed by [st], this
      holds in BOTH directions within a guard class. *)
+  (* A state change that moves NO resource.  Restricted to the LIVE class:
+     the dormant slot is keyed on [st] (a ZOMBIE owns a user table the
+     UNUSED slot has had freed), so ZOMBIE -> UNUSED genuinely moves
+     resources and is freeproc's job, not a recast. *)
   Lemma proc_slots_recast (pa : mword 64) (st st' : mword 32) :
-    needs_ctx st' = needs_ctx st -> inv_dormant st' = inv_dormant st ->
+    needs_ctx st' = needs_ctx st ->
+    inv_dormant st = false -> inv_dormant st' = false ->
     proc_slots pa st -∗ proc_slots pa st'.
-  Proof. intros Hn Hd. rewrite /proc_slots Hn Hd. iIntros "$". Qed.
+  Proof. intros Hn Hd Hd'. rewrite /proc_slots Hn Hd Hd'. iIntros "$". Qed.
 
   (* the global proc-array invariant: an [is_lock] over every proc's
      [proc_lock_res]. *)
@@ -282,7 +287,8 @@ Section SchedCtx.
   Proof.
     intros ->. iIntros "Hs Hc Hpub Hsl". iExists RUNNABLE, ch. iFrame "Hs Hc Hpub".
     iApply (proc_slots_recast pa SLEEPING RUNNABLE
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity) with "Hsl").
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity) with "Hsl").
   Qed.
 
 End SchedCtx.

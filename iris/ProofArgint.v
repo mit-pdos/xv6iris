@@ -30,6 +30,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FileInv ProcInv.
+Require Import UserPtTree ProcPtOwn.
 Require Import SpecArgraw.
 Require Import SpecArgint.
 From Kernel Require KernelInstrs.
@@ -166,9 +167,9 @@ Section ProofArgint.
 
   Lemma wp_argint_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (i : nat) (tf : mword 64) (args : list (mword 64)) (v : mword 64)
-      (old : mword 32) (dqt dqa : dfrac)
-    : wp_argint_sconf_body γ Φ m av n eb p C i tf args v old dqt dqa.
+      (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
+      (old : mword 32) (dqt : dfrac)
+    : wp_argint_sconf_body γ Φ m av n eb p C i tfp ws v old dqt.
   Proof.
     cbv beta delta [wp_argint_sconf_body].
     intros pcE ip ret_tgt Htp Hi Ha0 Hargs Hn Hav.
@@ -297,7 +298,7 @@ Section ProofArgint.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     (* ===================== argraw() ===================== *)
-    iApply (Argraw.wp_argraw_sconf γ Φ A3 (av - 4)%nat n eb p C i tf args v dqt dqa
+    iApply (Argraw.wp_argraw_sconf γ Φ A3 (av - 4)%nat n eb p C i tfp ws v dqt
               HA3tp Hi HA3a0 Hargs Hn ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa [-]").
     iIntros (MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
