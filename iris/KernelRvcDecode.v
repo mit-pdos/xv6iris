@@ -768,6 +768,12 @@ Lemma frame_cancel_32 (X : mword 64) :
           (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
 Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
 
+(* -48/+48, both [c.addi16sp] (61 is -3 in a 6-bit field, scaled by 16). *)
+Lemma frame_cancel_48 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
 (* -64/+64, both [c.addi16sp] (60 is -4 in a 6-bit field, scaled by 16). *)
 Lemma frame_cancel_64 (X : mword 64) :
   add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))

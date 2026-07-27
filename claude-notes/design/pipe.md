@@ -128,9 +128,36 @@ field that is reclaimable rather than discarded. Decide this before proving
 `pipealloc` needs none of it: gcc proved its `if (pi) kfree(pi)` arm dead
 (every path reaching `bad` has `pi == 0`), so pipealloc never frees a pipe.
 
+## Carving the page: `PageFields.v`
+
+`kalloc` hands back `page_own p` — 4096 anonymous bytes — and every object
+built on a page has to turn that into the field cells its code loads and
+stores. `PageFields.v` is that bridge, once: `bwin_split` (chop a byte
+window), `bwin_rebase` (a window at offset `o` of `p` is a window at offset 0
+of `pa_add p o`, so every field lemma is stated at 0), `bwin_bytes_list`
+(anonymous bytes are *some* concrete byte list — what a content-tracking
+buffer wants), `bytes_word4`/`bytes_word8` and their offset forms
+`page_field4`/`page_field8`, plus `page_off_aligned` (the alignment side
+condition, from `page_valid` + divisibility of the offset).
+
+`PipeInv.page_own_pipe_raw` is the pipe's instantiation: `page_own pi ⊢
+pipe_raw pi`, the ten windows (lock word, 4 padding bytes, name, cpu, the
+512-byte buffer, the four counter/flag words, the 3544-byte tail) in the exact
+shapes the instructions produce. Only the forward direction is built; the
+converse (fields → page, for `kfree`) is the same lemmas run backwards, since
+`bwin_split`/`bwin_rebase` are equivalences and `RiscvPtsto` already has
+`word{4,8}_pointsto_bytes`.
+
+Gotcha the arithmetic hit: `lia` returns "Cannot find witness" as soon as
+`bv_unsigned` is anywhere in the goal *or the context*, so `page_off_arith`
+packages the reasoning over plain `Z` variables and is fed the bitvector
+values — the recipe in `durable-notes.md`.
+
 ## `pipealloc`
 
-`SpecPipealloc.v`. It is where the two halves of the model meet: the two
+`SpecPipealloc.v` (contract), `WpPipeallocDecode.v` (72 instruction facts),
+`ProofPipealloc.v` (the whole-function proof, a functor over `FILEALLOC`,
+`KALLOC`, `INITLOCK` and `FILECLOSE`). It is where the two halves of the model meet: the two
 *exclusive* `file_ref γf k 1 C` that filealloc hands back (which is what
 licenses the eight unlocked stores into the two `struct file`s) and the fresh
 page from kalloc, which becomes the pipe. Out come one `is_pipe` and its two
@@ -152,9 +179,40 @@ Read off the disassembly rather than the C:
   `fileclose` on files whose `type` is still `FD_NONE` — no payload, no
   `pipeclose`/`iput`.
 
-Frame: `addi sp,sp,-48` (6 slots) over filealloc/kalloc's 14, hence `20 ≤ K`.
-The `"pipe"` string literal is at `0x80007598`.
+Frame: `c.addi16sp sp,-48` (6 slots) over the deepest callee, fileclose's
+`fileclose_stack` = 18, hence `24 ≤ K`. The `"pipe"` string literal is at
+`0x80007598`.
 
-The proof is a functor over `FILEALLOC` (proven), `KALLOC` (proven),
-`INITLOCK` (proven) and `FILECLOSE`; check the last one's `K` requirement when
-it lands, since `20 ≤ K` assumes callees top out at 14.
+### How the proof is organised
+
+Three things carry `ProofPipealloc.v`:
+
+- **The branches read the cells, not the registers.** Every `c.beqz` after a
+  call re-loads `*f0` / `*f1` from memory, so the control flow is decided by
+  what was last *stored* into `pf0`/`pf1`. That is also why the two dead arms
+  (`+0x96` and `+0xa2`, "`*f0 == 0` although filealloc succeeded") close:
+  `fnode_nonzero` — a file slot's address `acur file_base 40 k` is never null.
+- **The page is carved once** (`page_own_pipe_raw`), the four counter stores
+  and `initlock` run on the pieces, and `new_pipe` turns them into the pipe
+  plus its two end references. `new_pipe` allocates an invariant, so it needs
+  `iApply fupd_wp` first — `iMod` of a *fancy* update does not eliminate
+  straight into a `WP` goal the way a basic update does.
+- **Four exits, three join points.** The epilogue (`+0xb8`), the "close `*f1`
+  if it exists" tail (`+0xa8`) and the "close `*f0` first" tail (`+0xa4`) are
+  `iAssert`ed continuations, offered to the arms as a **conjunction**
+  (`EPI ∧ T8 ∧ T4C`) because exactly one is taken and they must therefore
+  *share* the frame slots and the caller's continuation rather than split
+  them. Building them takes two nested `iAssert`s (`EPI`, then `EPI ∧ T8`,
+  then the three-way one), since each new component's proof needs the previous
+  one in hand.
+
+pipealloc takes **two** `fd_slot γs` (`FdSlots.v`), one per end — it creates
+two references, and the `+4` per-process allowance in `FDSLOTS` is exactly the
+locals a syscall may hold before installing them in descriptors. On the
+first-filealloc-failure path only one slot is spent; the other is simply
+dropped (the logic is affine).
+
+`LinkPipealloc.v` does not exist yet: the functor cannot be instantiated until
+`fileclose` is proven, so `tools/proof_coverage.py` will not count pipealloc
+as proven before then. That is honest — the proof rests on the assumed
+`FILECLOSE` contract.

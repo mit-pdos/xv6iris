@@ -344,8 +344,11 @@ ProofFilealloc.v
 SpecFiledup.v
 SpecFileclose.v
 LinkFilealloc.v
+PageFields.v
 PipeInv.v
+WpPipeallocDecode.v
 SpecPipealloc.v
+ProofPipealloc.v
 WpBinitDecode.v
 SpecBinit.v
 ProofBinit.v

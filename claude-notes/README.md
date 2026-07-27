@@ -59,8 +59,10 @@ are working on that effort — the relevant `projects/` file.
 - **[`pipe.md`](design/pipe.md)** — pipes: `struct pipe`'s geometry, the
   well-formedness predicate (`is_pipe` = `is_lock` over a `pipe_res` owning
   every other byte of the page), the two-ended fractional reference algebra
-  that mirrors `readopen`/`writeopen`, the `pipealloc` spec, and the
-  page-reclamation problem that `pipeclose` must solve first.
+  that mirrors `readopen`/`writeopen`, `PageFields.v` (carving a kalloc'd page
+  into typed struct fields — reusable for any page-backed object), the
+  `pipealloc` spec and proof, and the page-reclamation problem that
+  `pipeclose` must solve first.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel

@@ -134,9 +134,9 @@ Definition wp_pipealloc_sconf_body
   let pf0 : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pf1 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
-  (* pipealloc's own frame is 6 slots (addi sp,sp,-48); filealloc and kalloc
-     want 14 below that. *)
-  (20 <= K)%nat ->
+  (* pipealloc's own frame is 6 slots (c.addi16sp sp,-48); of its four callees
+     fileclose is the deepest, wanting [fileclose_stack] = 18 below that. *)
+  (24 <= K)%nat ->
   (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
