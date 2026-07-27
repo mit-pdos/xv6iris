@@ -31,7 +31,7 @@
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl gmap.
 From iris.algebra.lib Require Import excl_auth.
-From iris.base_logic.lib Require Import invariants own.
+From iris.base_logic.lib Require Import invariants cancelable_invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
@@ -265,6 +265,56 @@ Section Lock.
     lock_name lk s -∗ inv lockN (lock_inv γ lk R) -∗ is_lock γ lk s R.
   Proof. iIntros "#Hn #Hi". by iFrame "Hn Hi". Qed.
 
+  (* ---- THE OPENING INTERFACE ------------------------------------------
+
+     WpSconfLock.v is the only file in the tree that ever opens a lock, and
+     all ten of its leaves do the same three things: open [lock_inv], take one
+     machine step, put it back.  [lock_openable] is that pattern named, with
+     two parameters that decide WHOSE lock it is:
+
+       T -- the OPENING CREDENTIAL.  Presented to open, handed straight back.
+       D -- the DISPOSAL certificate.  Surrendering it destroys the invariant
+            instead of closing it, and the opener keeps the contents.
+
+     Two instances, and they are the whole point:
+
+       inv  lockN    (lock_inv γ lk R)  --  T := emp,  D := False
+            anyone may open, nobody may destroy: a static kernel lock, and
+            exactly today's behaviour
+       cinv lockN γc (lock_inv γ lk R)  --  T := cinv_own γc q,  D := cinv_own γc 1
+            only a share-holder may open, and whoever collects every share may
+            destroy it and walk off with the memory
+
+     So a lock's storage is reclaimable exactly when the right to touch it is
+     a resource rather than free knowledge -- which is the real xv6 rule for a
+     kalloc'd object: you may take [pi->lock] only while you hold a reference
+     to the pipe.  The mask is universally quantified so this file needs no
+     [minstretN]; the leaves instantiate it at [⊤ ∖ ↑minstretN]. *)
+  Definition lock_openable (γ : gname) (lk : mword 64) (R T D : iProp Σ) : iProp Σ :=
+    (□ ∀ E : coPset, ⌜↑lockN ⊆ E⌝ -∗ T ={E, E ∖ ↑lockN}=∗
+         ▷ lock_inv γ lk R ∗ T ∗
+         ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)      (* put it back *)
+          ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
+
+  Global Instance lock_openable_persistent γ lk R T D :
+    Persistent (lock_openable γ lk R T D).
+  Proof. apply _. Qed.
+
+  (* a permanent [inv]: no credential needed, no disposal possible. *)
+  Lemma lock_openable_inv γ lk R :
+    inv lockN (lock_inv γ lk R) ⊢ lock_openable γ lk R emp False.
+  Proof.
+    iIntros "#Hi !>" (E HE) "_".
+    iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
+    iModIntro. iFrame "Hbody". iSplitR; [done|].
+    iSplit; [iExact "Hclose" | iIntros "%Hf"; destruct Hf].
+  Qed.
+
+  (* the bridge every existing lock user rides: today's lock IS the
+     [emp]/[False] instance of the generic one. *)
+  Lemma is_lock_openable γ lk s R : is_lock γ lk s R ⊢ lock_openable γ lk R emp False.
+  Proof. iIntros "H". iApply lock_openable_inv. by iApply is_lock_inv. Qed.
+
   Global Instance mem_pointsto_timeless a dq b : Timeless (mem_pointsto a dq b).
   Proof. rewrite /mem_pointsto. apply _. Qed.
 
@@ -294,3 +344,48 @@ Section Lock.
   Qed.
 
 End Lock.
+
+(* ---- the cancellable flavour -----------------------------------------
+
+   Kept in its own section so that [cinvG] is required only of the proofs
+   that actually free a lock (pipes today); every existing lock user's
+   context is untouched. *)
+Section LockCancel.
+  Context `{!riscvGS Σ, !lockG Σ, !cinvG Σ}.
+
+  Lemma lock_openable_cinv γ γc lk R q :
+    cinv lockN γc (lock_inv γ lk R) ⊢
+    lock_openable γ lk R (cinv_own γc q) (cinv_own γc 1).
+  Proof.
+    iIntros "#Hc !>" (E HE) "Htok".
+    iMod (cinv_acc_strong E lockN with "Hc Htok") as "(Hbody & Htok & Hclose)"; [done|].
+    iSpecialize ("Hclose" $! (E ∖ ↑lockN)).
+    replace (↑lockN ∪ (E ∖ ↑lockN)) with E
+      by (apply union_difference_L; done).
+    iModIntro. iFrame "Hbody Htok".
+    iSplit.
+    - iIntros "Hb". iApply "Hclose". by iLeft.
+    - iIntros "Ht". iApply "Hclose". by iRight.
+  Qed.
+
+  (* a FREE physical lock plus its resource become a CANCELLABLE lock: the
+     whole disposal certificate comes out with it, for the creator to split
+     among whatever will hold references to the object. *)
+  Lemma newlock_c E (lk : mword 64) (R : iProp Σ) :
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+    R ={E}=∗ ∃ (γ γc : gname), cinv lockN γc (lock_inv γ lk R) ∗ cinv_own γc 1.
+  Proof.
+    iIntros "Hword Hcpu HR".
+    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
+                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iDestruct (own_op with "H") as "[Ha Hf]".
+    iMod (cinv_alloc E lockN (lock_inv γ lk R) with "[Hword Hcpu Ha Hf HR]")
+      as (γc) "[#Hc Hown]".
+    { iNext. iExists (mword_of_int 0 : mword 32), None.
+      rewrite /lock_word. iFrame "Hword Hcpu Ha".
+      iLeft. iFrame "Hf HR". done. }
+    iModIntro. iExists γ, γc. by iFrame "Hc Hown".
+  Qed.
+
+End LockCancel.
