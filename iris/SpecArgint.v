@@ -42,6 +42,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import FdSlots FileInv ProcInv.
+Require Import KallocInv KMap.
 Require Import UserPtTree ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -66,12 +67,15 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (i < NARG)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (Z.of_nat i) ->
   ws !! tf_arg_idx i = Some v ->
+  (* the trapframe page is a kalloc page, so its bytes are statically
+     claimed KP_rw and [ProcInv.tf_word_to_mem] can cross to the VA tier *)
+  page_valid (page_base tfp) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 14 for argraw's *)
   (18 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ n eb p C -∗
-  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ kmap_static_claims -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
   ip ↦₄ old -∗

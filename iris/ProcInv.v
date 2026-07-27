@@ -46,6 +46,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang.
 Require Import ProcGeom.
+Require Import KallocInv KMap KptPt PageFields.
 Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
@@ -161,7 +162,7 @@ Section ProcInv.
      [RiscvPtsto.phys_to_mem_claim] / [mem_to_phys_claim], the same idiom
      the software page-table walks already use for PT slots. *)
   Definition a_tf_word (tfp : mword 44) (i : nat) : Arch.pa :=
-    pa_add (page_base tfp) (Z.to_nat (tf_word_off i)).
+    pa_add (page_base tfp) (8 * i).
 
   Definition tf_words (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
     ([∗ list] i ↦ w ∈ ws, a_tf_word tfp i ↦ₚ₈ w)%I.
@@ -185,6 +186,49 @@ Section ProcInv.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hws") as "[$ Hback]".
     iIntros "Hc". iSplit; [done|]. iSplitL "Hc Hback"; [rewrite /tf_words; iApply ("Hback" with "Hc") | iExact "Htail"].
+  Qed.
+
+  (* ---- the tier bridge for ONE trapframe word ------------------------
+     [tf_page] is physical -- kalloc's tier, and tier-neutral for the
+     trampoline -- but the kernel reads [tf->aN] with an ordinary [ld]
+     through the identity map, i.e. at the VA tier.  A kalloc page's bytes
+     are kernel data and hence STATICALLY claimed KP_rw
+     ([ProcPtOwn.page_valid_kmap_static]), so the crossing costs only the
+     persistent [kmap_static_claims] -- the same idiom the software
+     page-table walks use for PT slots. *)
+  Lemma tf_word_to_mem (tfp : mword 44) (i : nat) (w : mword 64) (dq : dfrac) :
+    page_valid (page_base tfp) -> (i < TFWORDS)%nat ->
+    kmap_static_claims -∗ a_tf_word tfp i ↦ₚ₈{dq} w -∗ a_tf_word tfp i ↦₈{dq} w.
+  Proof.
+    intros Hv Hi. iIntros "#Hb [%Hal Hbs]".
+    rewrite /word_pointsto. iSplit; [done|].
+    iApply (big_sepL_impl with "Hbs"). iIntros "!>" (k j Hk) "H".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    rewrite /a_tf_word pa_add_add.
+    unfold TFWORDS in Hi.
+    assert (Ho : (8 * i + (0 + k) < 4096)%nat) by lia.
+    iDestruct (kmap_static_claims_at
+                 (svpn_of (pa_add (page_base tfp) (8 * i + (0 + k))%nat)) KP_rw
+                 (page_valid_kmap_static tfp _ Hv Ho) with "Hb") as "#Hk".
+    iApply (phys_to_mem_claim _ _ dq _
+              (pa_of_id _ (page_valid_canon tfp _ Hv Ho))
+              (page_valid_ram tfp _ Hv Ho)
+              (page_valid_canon tfp _ Hv Ho) with "Hk H").
+  Qed.
+
+  Lemma tf_word_to_phys (tfp : mword 44) (i : nat) (w : mword 64) (dq : dfrac) :
+    page_valid (page_base tfp) -> (i < TFWORDS)%nat ->
+    kmap_static_claims -∗ a_tf_word tfp i ↦₈{dq} w -∗ a_tf_word tfp i ↦ₚ₈{dq} w.
+  Proof.
+    intros Hv Hi. iIntros "#Hb [%Hal Hbs]".
+    rewrite /phys_word_pointsto. iSplit; [done|].
+    iApply (big_sepL_impl with "Hbs"). iIntros "!>" (k j Hk) "H".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    rewrite /a_tf_word pa_add_add.
+    unfold TFWORDS in Hi.
+    assert (Ho : (8 * i + (0 + k) < 4096)%nat) by lia.
+    iApply (mem_ident_phys _ dq _
+              (page_valid_kmap_static tfp _ Hv Ho) with "Hb H").
   Qed.
 
   (* =================================================================== *)

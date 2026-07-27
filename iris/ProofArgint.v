@@ -31,6 +31,7 @@ Require Import IntrDefs WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import FileInv ProcInv.
+Require Import KallocInv KMap.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecArgraw.
 Require Import SpecArgint.
@@ -173,9 +174,9 @@ Section ProofArgint.
     : wp_argint_sconf_body γ Φ m av n eb p C i tfp ws v old dqt.
   Proof.
     cbv beta delta [wp_argint_sconf_body].
-    intros pcE ip ret_tgt Htp Hi Ha0 Hargs Hn Hav.
+    intros pcE ip ret_tgt Htp Hi Ha0 Hargs Hpv Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc Htfp Htfa Hip Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata #Hkmap Hpc Htfp Htfa Hip Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (ai_00 with "Htext") as "Hi00".
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -300,8 +301,8 @@ Section ProofArgint.
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     (* ===================== argraw() ===================== *)
     iApply (Argraw.wp_argraw_sconf γ Φ A3 (av - 4)%nat n eb p C i tfp ws v dqt
-              HA3tp Hi HA3a0 Hargs Hn ltac:(lia)
-              with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa [-]").
+              HA3tp Hi HA3a0 Hargs Hpv Hn ltac:(lia)
+              with "Hcg Hcpu Htext Hdata Hkmap Hpc Htfp Htfa [-]").
     iIntros (MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hpc10 : ret_pc (A3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (AI + 0x10))
