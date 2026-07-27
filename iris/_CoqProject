@@ -199,6 +199,8 @@ ProofKvmmap.v
 LinkKvmmap.v
 WpProcinitDecode.v
 SpecProcinit.v
+ProofProcinit.v
+LinkProcinit.v
 SpecProcMapstacks.v
 ProofProcMapstacks.v
 LinkProcMapstacks.v

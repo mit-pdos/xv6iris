@@ -27,6 +27,56 @@ the evidence for every offset. This file is only the worklist.
       first, so no `LinkSysClose.v` exists yet and `proof_coverage.py` still
       reads `sys_close` as unproven. See "What sys_close needed" below.
 
+- [x] `procinit` proven and LINKED (`WpProcinitDecode.v` / `SpecProcinit.v` /
+      `ProofProcinit.v` / `LinkProcinit.v`, over `INITLOCK`; **47 s / 1.6 GB**,
+      axiom-clean, `proof_coverage` reads it `proven`). This is the function
+      that ROUTES the fd-slot supply — see
+      [`design/file-table.md`](../design/file-table.md) — and the first proof
+      over a loop whose body makes a CALL, so `callee_saved` is threaded per
+      iteration. Five things worth reusing:
+
+      * **Route the ghost supply OUTSIDE the loop.** procinit's code never
+        touches an fd, so `fd_slots_split_n` + `ProcInv.proc_dormant_seal` run
+        once, before the loop, turning each `proc_raw` into a local
+        `proc_seal` whose block is already a real `proc_dormant`. The loop
+        invariant then mentions no fd algebra at all. State the pre-loop step
+        over an arbitrary LIST (`proc_seal_list`), not over `seq 0 n`: the
+        induction is then a plain cons peel (`iDestruct "H" as "[Hx H]"`) with
+        no `seq_S`/`big_sepL_app` juggling.
+      * **A hoisted constant needs the EXPLICIT `upd_ne` chain, not
+        `peel_reg_step`** — the interior-stop hazard in
+        [`optimization.md`](../optimization.md), hit head-on. procinit's
+        prologue is an 18-layer chain that writes s1, s2, s3, s4, s5, s6 and
+        a5, so for every one of the six loop constants the fact lives at an
+        INTERIOR layer (the `upd_eq` that wrote it), and `peel_reg_step` peels
+        straight past it into a residual (`add_vec (U12 !!! s2i) (U12 !!! a5i)
+        = …`) that no closer can discharge — the inner lookups are still
+        folded behind `set`. Prove the fact where the write happens, then spell
+        out `rewrite /Uk upd_ne; [| reg_neq].` for the layers above, one line
+        per instruction. `peel_reg_step` is right only for a register nothing
+        in the chain wrote (here: `sp`), where the maximal peel lands on the
+        base variable.
+      * **Discharge a KstackArith step with `exact`, never `rewrite`.** The
+        leaf's output says `subrange_vec_dec shamt (Z.sub log2_xlen 1) 0` while
+        the arithmetic lemma says `… 5 0`; `exact` closes that by conversion,
+        whereas `rewrite` has to match the pattern and is fragile. So the four
+        chain steps are `exact (pi_srai j Hj)`, `exact (kstack_mul_step j …)`,
+        `exact (pi_slli j Hj)`, `exact (addw_step j Hj)`. The `pi_*` wrappers
+        instantiate `KstackArith` at procinit's own operand shapes and live at
+        the TOP of the file, outside the Iris section, so their `lia`s run with
+        no mword in context.
+      * **The loop's end pointer is the next linker symbol.** `&proc[NPROC]` is
+        `KernelSyms.tickslock`; `SpecProcinit.proc_end_is_tickslock` records
+        that as a `vm_compute` fact so the `bne` test reduces to
+        `ArrCursor.acur_neq` on the index, and `ProcGeom.proc_addr_succ` is the
+        `addi s1,s1,360` bump. No new cursor machinery was needed.
+      * **Three `initlock` call sites, three `lock_name_intro`s.** The name
+        field comes back OWNED (see `SpecInitlock`), so each site seals it with
+        its own `iMod` — including one *inside* the loop, which is fine: a WP
+        goal absorbs a basic update. The `lk_raw`/`lk_fresh` pair in
+        `SpecProcinit.v` is exactly initlock's pre/post at offset 0 of a
+        `struct proc`, so the composition is a straight `iFrame`.
+
 ## Next
 
 - [x] **S1 — the `proc_lock_res` swap** (done). `SchedCtx.v` gained
