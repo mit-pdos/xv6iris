@@ -344,6 +344,15 @@ twin of `wp_load_s_sconf_gen`, twenty lines) now serves both, and
 DELETED about 165 lines while adding a width -- the shape to reach for
 whenever a "we only have the signed one" gap turns up.
 
+The three consputc arms are proven too: **`%c`** (va_arg, then the low half of
+the slot straight to consputc -- the value-arm shape without a `(base, sign)`
+pair), **`%%`** and the **unknown-directive** case (no vararg at all; `s5`
+holds c0 and the code prints it either way, so the two differ only in whether
+a `'%'` goes out first).
+
+That leaves `%p` and `%s` -- the two arms with inner loops -- plus the
+dispatch chain and the loop induction.
+
 ### printk: what the arms still need
 
 Each arm ends by jumping to 0x78 with `s1 = (next index) - 1`, so the shape of
