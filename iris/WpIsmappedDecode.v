@@ -8,10 +8,8 @@
    (c.li a2,0 / c.beqz a0 / c.ld a0,0(a0) / c.andi a0,1) and the jal to walk
    are decoded here.
 
-   NOTE: 0xc119 (c.beqz a0,+0x06) is also decoded in WpPipeallocDecode.v as
-   [padc_c119]; per design/code-organization.md a word two functions need
-   belongs in KernelRvcDecode.v as [cdec_c119].  It is kept local here to
-   avoid a tree-wide rebuild; move both down in the next decode sweep. *)
+   0xc119 (c.beqz a0,+0x06) is shared with pipealloc, so it is decoded in
+   KernelRvcDecode.v as [cdec_c119] like every other multi-function word. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -44,11 +42,7 @@ Lemma imdc_4601 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 12)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xc119  c.beqz a0,+0x06 *)
-Lemma imdc_c119 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc119 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 3, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0xc119  c.beqz a0,+0x06 -- [cdec_c119] (KernelRvcDecode.v) *)
 
 (* 0x6108  c.ld a0,0(a0) *)
 Lemma imdc_6108 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -120,7 +114,7 @@ Section WpIsmappedDecode.
 
   (* ---- +0x0e: c.beqz a0,+0x14 (pte == 0 -> return 0) ---- *)
   Lemma imi_0e : IMP 0x0e true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
-  Proof. mk_rvc (IM + 0x0e)%Z (mword_of_int 0xc119 : mword 16) (mword_of_int (IM + 0x0e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) imdc_c119 exec_execute_C_BEQZ. Qed.
+  Proof. mk_rvc (IM + 0x0e)%Z (mword_of_int 0xc119 : mword 16) (mword_of_int (IM + 0x0e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c119 exec_execute_C_BEQZ. Qed.
 
   (* ---- +0x10: c.ld a0,0(a0) (read the L0 slot word) ---- *)
   Lemma imi_10 : IMP 0x10 true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), false, 8)).

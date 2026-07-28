@@ -281,6 +281,32 @@ Section WpSconfAlu.
       unfold gpr_and_val. rewrite Hva Hvb. reflexivity.
   Qed.
 
+  (* the base (4-byte) [and rd,rs1,rs2] with rd <> rs1 (vmfault's
+     [and s4,s2,a5] page-align step), which the compressed [wp_cand_s_sconf]
+     above cannot express. *)
+  Lemma wp_and_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    and_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) wval m n
+              Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      rewrite (exec_execute_RTYPE_AND_gpr rs2 rs1 rd s_pc Hrd).
+      unfold gpr_and_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
   Lemma wp_sub_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) :

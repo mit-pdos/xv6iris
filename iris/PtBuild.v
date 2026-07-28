@@ -1547,6 +1547,40 @@ Section PtBuildIris.
     iSplitL "Hpg0 Hs0"; [(iApply "Hpg0"; iExact "Hs0") | iExact "Hemp"].
   Qed.
 
+  (* The READ-ONLY twin of [ptree_own_level0_upd] (ismapped's slot read):
+     same [ptree_level0] path over the [_ro] node/kid accessors, so the
+     closing wand restores the SAME tree -- no [ptree_set_leaf].  Since both
+     [ptree_own 2 dq t] occurrences are then IDENTICAL, do NOT introduce a
+     bare [rewrite ptree_own_S] here (it would hit the goal's copy too); the
+     [iSplitL] chain below closes the tree back up as it stands. *)
+  Lemma ptree_own_level0_ro (dq : dfrac) (t : ptree) (vpn : mword 27)
+      (p2 p1 w0 : mword 64) :
+    ptree_level0 t vpn p2 p1 w0 ->
+    ptree_own 2 dq t ⊢
+      pt_node_claim (u_next_base p1) ∗
+      pt_addr0 p1 vpn ↦ₚ₈{dq} w0 ∗
+      (pt_addr0 p1 vpn ↦ₚ₈{dq} w0 -∗ ptree_own 2 dq t).
+  Proof.
+    intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
+    iIntros "[Hpg Hks]".
+    iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks") as "[Hc1 Hks]".
+    iDestruct "Hc1" as "[Hpg1 Hks1]".
+    iDestruct (pt_kids_own_acc_ro 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1") as "[Hc0 Hks1]".
+    iDestruct "Hc0" as "[Hpg0 Hemp]".
+    iDestruct (pt_page_own_claim with "Hpg0") as "[#Hcl0 Hpg0]".
+    iSplitR; [rewrite Hb0; iExact "Hcl0" |].
+    iDestruct (pt_page_own_acc_ro dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 Hpg0]".
+    rewrite He0.
+    unfold pt_addr0. rewrite Hb0.
+    iFrame "Hs0".
+    iIntros "Hs0".
+    iSplitL "Hpg"; [iExact "Hpg" |].
+    iApply "Hks".
+    iSplitL "Hpg1"; [iExact "Hpg1" |].
+    iApply "Hks1".
+    iSplitL "Hpg0 Hs0"; [(iApply "Hpg0"; iExact "Hs0") | iExact "Hemp"].
+  Qed.
+
   (* ===================================================================== *)
   (* LEVEL-GENERIC single-step descent accessors -- the reusable layer the  *)
   (* fuel-inducted walk loop needs.  [ptree_own_slot2_ro]/[slot1_ro],        *)
@@ -2081,24 +2115,32 @@ Proof.
   - exfalso. lia.
 Qed.
 
+(* [andi w,1] keeps exactly bit 0 of [w] -- the VALUE the C source's
+   [( *pte & PTE_V) ? 1 : 0] returns, and the ingredient of the walk's
+   zero/nonzero verdict below. *)
+Lemma andi1_unsigned (w : mword 64) :
+  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)) : mword 64)
+  = Z.b2z (Z.odd (bv_unsigned w)).
+Proof.
+  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 1 by (vm_compute; reflexivity) end.
+  change 1 with (Z.ones 1) at 1.
+  rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
+  change (2 ^ 1) with 2.
+  apply Zmod_odd.
+Qed.
+
 (* the C walk's V-bit test: [andi a5, w, 1; beqz a5] branches exactly on
    bit 0 of the slot word *)
 Lemma walk_vbit_eq (w : mword 64) :
   eq_vec (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12))) zero_reg
   = negb (Z.testbit (bv_unsigned w) 0).
 Proof.
-  assert (Hand : bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)))
-                 = Z.b2z (Z.odd (bv_unsigned w))).
-  { unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      to_word, get_word, SailStdpp.Values.with_word.
-    unfold MachineWord.MachineWord.and.
-    rewrite bv_and_unsigned.
-    match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
-      replace (bv_unsigned mm) with 1 by (vm_compute; reflexivity) end.
-    change 1 with (Z.ones 1) at 1.
-    rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
-    change (2 ^ 1) with 2.
-    apply Zmod_odd. }
+  pose proof (andi1_unsigned w) as Hand.
   rewrite Z.bit0_odd.
   destruct (Z.odd (bv_unsigned w)) eqn:E; cbn [Z.b2z] in Hand.
   - cbn [negb]. apply eq_vec_false_iff.
@@ -2111,6 +2153,29 @@ Proof.
     apply bv_eq. rewrite Hand.
     vm_compute. reflexivity.
 Qed.
+
+(* the VALUE side of the same test (ismapped RETURNS the masked word, where
+   the walk only needs [walk_vbit_eq]'s zero/nonzero verdict): V IS bit 0, so
+   [andi w,1] on a model-valid PTE is exactly 1.  [pte_invalid_bit0] +
+   [pte_valid_invalid_excl] turn "valid" into "bit 0 is set". *)
+Lemma pte_valid_bit0 (w : mword 64) :
+  pte_valid w ->
+  and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)) = mword_of_int 1.
+Proof.
+  intros Hv.
+  assert (Hb : Z.testbit (bv_unsigned w) 0 = true).
+  { destruct (Z.testbit (bv_unsigned w) 0) eqn:E; [reflexivity | exfalso].
+    exact (pte_valid_invalid_excl w Hv (pte_invalid_bit0 _ E)). }
+  rewrite Z.bit0_odd in Hb.
+  apply bv_eq. rewrite andi1_unsigned. rewrite Hb.
+  vm_compute; reflexivity.
+Qed.
+
+(* the c.andi immediate, in the shape [walk_vbit_eq]/[pte_valid_bit0] use *)
+Lemma candi1_imm :
+  (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)) : mword 64)
+  = sign_extend' 64 (mword_of_int 1 : mword 12).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* ===================================================================== *)
 (* §8 mappages bridges: the pure facts wp_mappages' loop body needs.      *)

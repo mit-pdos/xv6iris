@@ -37,10 +37,9 @@
       sp/s0/s2/s3 (which the epilogue reloads).  s1/s4 fall under that clause --
       the long paths reloaded them, the short path never touched them.
 
-   One leaf lemma is local: [wp_and_s_sconf], the base (4-byte) [RTYPE AND]
-   with rd <> rs1 (WpSconfAlu.v has only the compressed [c.and rd,rd,rs2]
-   form).  It belongs in WpSconfAlu.v next to [wp_cand_s_sconf]; move it there
-   in the next sweep. *)
+   The base (4-byte) [RTYPE AND] leaf this proof needs -- [wp_and_s_sconf],
+   with rd <> rs1, which the compressed [c.and rd,rd,rs2] form cannot
+   express -- lives in WpSconfAlu.v next to [wp_cand_s_sconf]. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -71,38 +70,6 @@ Require Import SpecVmfault.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-
-(* ===================================================================== *)
-(* The missing leaf: base [and rd,rs1,rs2] with rd <> rs1.                 *)
-(* (Home: WpSconfAlu.v, next to [wp_cand_s_sconf].)                       *)
-(* ===================================================================== *)
-Section VfAndLeaf.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
-
-  Lemma wp_and_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    and_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs2
-              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) wval m n
-              Hrd Hrdsp _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva Hvb.
-      rewrite (exec_execute_RTYPE_AND_gpr rs2 rs1 rd s_pc Hrd).
-      unfold gpr_and_val. rewrite Hva Hvb Hwval. reflexivity.
-  Qed.
-End VfAndLeaf.
 
 (* ===================================================================== *)
 (* Pure bridges.                                                          *)

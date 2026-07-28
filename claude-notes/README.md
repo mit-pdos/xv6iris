@@ -95,12 +95,6 @@ are working on that effort — the relevant `projects/` file.
   meet at `ProcPtOwn.proc_pt_intro_ppt`.
 - **[`lock-cancel-pipeclose.md`](completed/lock-cancel-pipeclose.md)** — moved
   to `completed/`.
-- **[`vmfault.md`](projects/vmfault.md)** — vmfault + ismapped (+ the no-alloc
-  walk spec): the lazy-allocation page-fault handler, stated at the `proc_pt`
-  altitude so it PRESERVES the valid-user-page-table invariant — including the
-  `upt_tree_spec` blocks0 strengthening and the `pt_rep0 ⇄ upt_tree_spec`
-  bridge (`upt_ad_view`) that dovetail the runtime mappages/walk specs with
-  the user-table invariant.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
@@ -111,6 +105,14 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`vmfault.md`](completed/vmfault.md)** — vmfault + ismapped (+ the no-alloc
+  walk spec), all proven: the lazy-allocation page-fault handler, stated at the
+  `proc_pt` altitude so it PRESERVES the valid-user-page-table invariant.
+  Keeps the `upt_tree_spec` blocks0 strengthening, the `pt_rep0 ⇄
+  upt_tree_spec` bridge (`upt_ad_view`) that dovetails the runtime
+  mappages/walk specs with the user-table invariant, the shrink-wrapped
+  five-arm epilogue-join recipe, and the MAXVA vpn-bound correction
+  (tf_vpn = 2^26−2, not 2^27−2).
 - **[`lock-cancel-pipeclose.md`](completed/lock-cancel-pipeclose.md)** — making
   a lock's storage reclaimable (`lock_openable` with the credential quantified
   inside the accessor, `lock_finisher`, release proved once and instantiated

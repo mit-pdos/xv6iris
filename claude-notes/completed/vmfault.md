@@ -220,11 +220,12 @@ intermediate wand. Reusable facts worth knowing for item D:
   `ptree_own (S lvl) dq t` occurrences are IDENTICAL, so a bare
   `rewrite ptree_own_S` rewrites the conclusion's too — scope the first one with
   `iEval (rewrite ptree_own_S) in "H"`.
-- **The +0x96/+0x98 instruction facts do not exist in WpWalkInstr.v** (which only
-  covers the alloc=1 path), so ProofWalkNoalloc defines `wi_96` (`cdec_4501`,
-  C_LI a0,0) and `wi_98` + its `wnd_98` decode locally. **WpWalkInstr's comment
-  header mis-states the +0x98 branch as `j -0x92`; it is `-0x46` (70 bytes back
-  to +0x52), i.e. `C_J (mword_of_int 2013 : mword 11)`.**
+- The +0x96/+0x98 instruction facts (the alloc=0 arm, dead on the alloc=1 path)
+  live in `WpWalkInstr.v` with the rest of the `wi_*` catalog: `wi_96`
+  (`cdec_4501`, C_LI a0,0) and `wi_98` over the local `wdec_98`. The +0x98
+  branch is `j -0x46` (70 bytes back to +0x52), i.e.
+  `C_J (mword_of_int 2013 : mword 11)` — not `-0x92`, as that file's header
+  comment used to claim.
 - `wkn_dec9_30`/`wkn_dec9_21` are the two concrete `addiw s4,-9` steps
   (30→21→12); the level-generic `walk_caddiw_dec9` is not needed when the loop is
   unrolled, and `walk_slot_addr2`/`walk_slot_addr1`/`walk_slot_addr0` apply
@@ -400,13 +401,10 @@ kalloc/kfree find their `is_lock`/`kalloc_avail None`/`panic_wp` inside the
           `pt_kids_own_acc_ro` / `pt_page_own_claim`.  It closes by plain
           `iSplitL` (as `ptree_own_path_ro` does) — do NOT `rewrite
           ptree_own_S` on the intermediate `ptree_own 1 dq c1` goal, it does
-          not match there.  Home: PtBuild.v next to `_upd`.
-      - **Decode duplication to clean up:** `0xc119` (c.beqz a0,+0x06) now has
-        two proofs — `WpPipeallocDecode.padc_c119` and
-        `WpIsmappedDecode.imdc_c119`.  Per design/code-organization.md a word
-        two functions need belongs in `KernelRvcDecode.v` as `cdec_c119`;
-        adding it there was deliberately deferred (tree-wide rebuild while
-        other agents were compiling).
+          not match there.  It lives in PtBuild.v next to `_upd`.
+      - `0xc119` (c.beqz a0,+0x06) is shared by pipealloc (+0x96) and ismapped
+        (+0x0e), so it is `KernelRvcDecode.cdec_c119` — one proof, per
+        design/code-organization.md.
       - Proof shape: prologue (2-slot push, `wp_caddi_sp_push_s_sconf` +
         two `wp_csdsp_s_sconf` + `wp_caddi4spn_s_sconf`) → `c.li a2,0` →
         `jal walk` (`WalkNoalloc.wp_walk_noalloc_sconf` at `(K-2)`, `8 <= K-2`
@@ -494,22 +492,11 @@ kalloc/kfree find their `is_lock`/`kalloc_avail None`/`panic_wp` inside the
       ismapped 28B + vmfault 132B both **proven**, walk NOT double-counted,
       no manifest errors; committed.  `LinkWalkNoalloc.v` was KEPT (it is
       what `LinkIsmapped` links through, per the uniform link-name rule).
-
-## Cleanup sweep (parked — do these together on the next PtBuild-touching change)
-
-Each was deliberately deferred mid-project because its home file's rebuild
-cone is large and agents were compiling concurrently; none is load-bearing:
-
-- Move to `PtBuild.v` (from the top of `ProofIsmapped.v`): `andi1_unsigned`,
-  `pte_valid_bit0` (+ its `pte_invalid_bit0`/`pte_valid_invalid_excl` glue),
-  `candi1_imm`, `ptree_own_level0_ro` (next to `ptree_own_level0_upd`).
-- Move `wp_and_s_sconf` (base 4-byte RTYPE AND, rd <> rs1) from
-  `ProofVmfault.v` to `WpSconfAlu.v` next to `wp_cand_s_sconf`.
-- Deduplicate `0xc119`: `WpPipeallocDecode.padc_c119` +
-  `WpIsmappedDecode.imdc_c119` -> one `KernelRvcDecode.cdec_c119`.
-- Fold `wi_96`/`wi_98` (ProofWalkNoalloc's two local walk-instruction facts)
-  into `WpWalkInstr.v`, and fix that file's header comment mis-stating +0x98
-  as `j -0x92` (the byte-verified target is -0x46, back to +0x52).
+      The deferred altitude cleanup sweep has since landed: `andi1_unsigned`
+      / `pte_valid_bit0` / `candi1_imm` / `ptree_own_level0_ro` are in
+      `PtBuild.v`, `wp_and_s_sconf` in `WpSconfAlu.v`, `cdec_c119` in
+      `KernelRvcDecode.v`, and `wi_96`/`wi_98` (+ `wdec_98`) in
+      `WpWalkInstr.v`.
 
 ## Open questions / parked
 
