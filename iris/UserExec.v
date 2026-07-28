@@ -136,13 +136,20 @@ Definition user_hart_ok (hs : HartState) : Prop :=
 
 (* in the user phase: SXL fixed 64-bit, no M-mode memory-privilege override,
    MXR off (so a load's permission check is a pure function of the leaf's
-   R bit -- no executable-implies-readable special case to track) *)
+   R bit -- no executable-implies-readable special case to track).
+   TVM/TSR = 0 ride along even though user execution never consults them:
+   they are M-mode bits xv6 never sets and sstatus writes cannot touch, and
+   the kernel needs them across the round trip -- uservec's sfence.vma /
+   csrw satp demand TVM=0, and userret's sret demands TSR=0.  Without the
+   pins the values would be existentially lost inside [user_inv]. *)
 Definition user_mstatus_ok (ms : mword 64) : Prop :=
   _get_Mstatus_SXL ms = 'b"10" /\
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
   eq_vec (_get_Mstatus_FS ms) ('b"00") = true /\
-  eq_vec (_get_Mstatus_VS ms) ('b"00") = true.
+  eq_vec (_get_Mstatus_VS ms) ('b"00") = true /\
+  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false /\
+  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false.
 
 (* after the trap: same pins, plus what the trap transform wrote --
    SPP = User (we trapped FROM user) and SIE = 0 (interrupts masked,
@@ -190,7 +197,9 @@ Definition trap_mstatus_ok (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
   eq_vec (_get_Mstatus_SPP ms) ('b"1") = false /\
-  eq_vec (_get_Mstatus_SIE ms) ('b"1") = false.
+  eq_vec (_get_Mstatus_SIE ms) ('b"1") = false /\
+  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false /\
+  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false.
 
 (* The post-fetch config facts an execute totality assumes at the fetched
    state [σf].  Relocated here from the pruned UserExecProducer.v and EXTENDED:

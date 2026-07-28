@@ -63,6 +63,14 @@ Lemma utrap_ms_SXL (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_SXL (utrap_ms elp_v ms) = _get_Mstatus_SXL ms.
 Proof. unfold utrap_ms, _get_Mstatus_SXL; cbn zeta; mw_prep; tb2. Qed.
 
+Lemma utrap_ms_TVM (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_TVM (utrap_ms elp_v ms) = _get_Mstatus_TVM ms.
+Proof. unfold utrap_ms, _get_Mstatus_TVM; cbn zeta; mw_prep; tb1. Qed.
+
+Lemma utrap_ms_TSR (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_TSR (utrap_ms elp_v ms) = _get_Mstatus_TSR ms.
+Proof. unfold utrap_ms, _get_Mstatus_TSR; cbn zeta; mw_prep; tb1. Qed.
+
 (* ===================================================================== *)
 (* §2 Exception delegation at User: with the cause's medeleg bit set (and  *)
 (* S present), a synchronous exception from U delegates to Supervisor.     *)
@@ -496,12 +504,14 @@ Definition utrap_state (s_x : mstate) (c : TrapCause) (info : option (mword 64))
 Lemma utrap_ms_ok (elp0 : mword 1) (ms_v : mword 64) :
   user_mstatus_ok ms_v -> trap_mstatus_ok (utrap_ms elp0 ms_v).
 Proof.
-  intros (HSXL & HMPRV & HMXR & HFS & HVS).
+  intros (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
   split; [ rewrite utrap_ms_SXL; exact HSXL | ].
   split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
   split; [ rewrite utrap_ms_MXR; exact HMXR | ].
   split; [ rewrite utrap_ms_SPP; reflexivity | ].
-  rewrite utrap_ms_SIE; reflexivity.
+  split; [ rewrite utrap_ms_SIE; reflexivity | ].
+  split; [ rewrite utrap_ms_TVM; exact HTVM | ].
+  rewrite utrap_ms_TSR; exact HTSR.
 Qed.
 
 Section UTrapGhost.

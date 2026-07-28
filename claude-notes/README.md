@@ -95,6 +95,13 @@ are working on that effort — the relevant `projects/` file.
   meet at `ProcPtOwn.proc_pt_intro_ppt`.
 - **[`lock-cancel-pipeclose.md`](completed/lock-cancel-pipeclose.md)** — moved
   to `completed/`.
+- **[`uservec.md`](projects/uservec.md)** — uservec (the user-mode trap
+  handler), PROVEN — trampoline.S is 100% covered: the boundary specs
+  (SpecUserret/SpecUservec/SpecUsertrap, the userret→user-exec dovetail
+  `UserretUser.v`), the TVM/TSR mstatus-pin extension, the proof's file
+  split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
+  reusable lessons, and the remaining work: prove usertrap(), then the
+  whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
