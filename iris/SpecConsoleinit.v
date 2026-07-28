@@ -1,0 +1,121 @@
+(* SpecConsoleinit.v -- the public interface of Consoleinit, stated
+   independently of its proof.  Requires only the definitional layer -- never a
+   whole-function proof file -- so every function proof can be checked in
+   parallel.
+
+     void consoleinit(void) {
+       initlock(&cons.lock, "cons");
+       uartinit();
+       devsw[CONSOLE].read  = consoleread;
+       devsw[CONSOLE].write = consolewrite;
+     }
+
+   consoleinit is the first thing main() calls, and it is a pure composition:
+   its contract is exactly initlock's on [cons.lock] (which sits at offset 0 of
+   the [cons] global, so [&cons.lock = &cons]) + uartinit's, plus the two
+   function-pointer stores.  It therefore inherits uartinit's raw [uart_frag]
+   ownership -- consoleinit runs before [dev_inv] is allocated, and uartinit
+   RESETS the device, which no invariant could tolerate; the caller allocates
+   [dev_inv] over the returned [uartinit_post u0], whose DLAB is off
+   ([uartinit_post_dlab_off]).
+
+   The devsw[] slots are handed back as the raw 8-byte cells holding the two
+   function addresses.  Nothing yet says what a [struct devsw] entry MEANS --
+   consoleread/consolewrite are unproven and the fs-side dispatch that reads
+   these slots does not exist -- so anything richer would be a predicate with no
+   consumer.  When one arrives it is built at the caller from these cells. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia List.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl.
+From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile.
+Require Import InstrBytes.
+Require Import SmodeCore.
+Require Import CalleeSaved.
+Require Import KernelText KernelDataInv.
+Require Import IntrDefs.
+Require Import WpLock.
+Require Import DevModel.
+Require Import SpecUartinit.
+From Kernel Require KernelSyms.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+
+Notation CI := KernelSyms.consoleinit.
+
+(* The address of the string literal "cons" that consoleinit passes as
+   initlock's [name] argument.  It is the first word of .rodata, at [etext]
+   itself, and has no ELF symbol of its own, so it is spelled out here (see
+   kernel.asm: 80007000 <etext>). *)
+Definition cons_name_str : Z := 0x80007000%Z.
+
+(* devsw[CONSOLE].  CONSOLE = 1 and a [struct devsw] is two function pointers,
+   so the entry starts at devsw + 16, its [.read] field at +0 and [.write] at
+   +8 -- the two offsets the code's [c.sd a4,16(a5)] / [c.sd a4,24(a5)] pair
+   writes. *)
+Definition devsw_console_read : mword 64 := mword_of_int (KernelSyms.devsw + 16).
+Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24).
+
+Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
+    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state)
+    (vclock : bv 32) (vcname vccpu : bv 64)
+    (vtlock : bv 32) (vtname vtcpu : bv 64)
+    (dread0 dwrite0 : mword 64) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+  (* &cons.lock = &cons: the spinlock is the first field of the [cons] struct *)
+  let clk : mword 64 := mword_of_int KernelSyms.cons in
+  let c_cname := lock_name_field clk in
+  let c_ccpu := add_vec clk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
+  let tlk : mword 64 := mword_of_int KernelSyms.tx_lock in
+  let c_tname := lock_name_field tlk in
+  let c_tcpu := add_vec tlk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
+  (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
+     which needs 4. *)
+  (6 <= K)%nat ->
+  sie_cap_gpr γ m K -∗
+  (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
+     addi a1] points at -- the name it hands to initlock -- and, through
+     uartinit's own spec, the "uart" one. *)
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  uart_frag u0 -∗
+  clk ↦₄ vclock -∗
+  c_cname ↦₈ vcname -∗
+  c_ccpu ↦₈ vccpu -∗
+  tlk ↦₄ vtlock -∗
+  c_tname ↦₈ vtname -∗
+  c_tcpu ↦₈ vtcpu -∗
+  devsw_console_read ↦₈ dread0 -∗
+  devsw_console_write ↦₈ dwrite0 -∗
+  ( ∀ mr,
+    sie_cap_gpr γ mr K -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    uart_frag (uartinit_post u0) -∗
+    (* both locks come back initialized; both are static globals that are never
+       freed, so both name fields are DISCARDED for the persistent
+       [lock_name], ready to be sealed into an [is_lock]. *)
+    clk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_name clk "cons"%string -∗
+    c_ccpu ↦₈ (zero_reg : mword 64) -∗
+    tlk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_name tlk "uart"%string -∗
+    c_tcpu ↦₈ (zero_reg : mword 64) -∗
+    devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
+    devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type CONSOLEINIT.
+  Parameter wp_consoleinit_sconf :
+    forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
+      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state)
+      (vclock : bv 32) (vcname vccpu : bv 64)
+      (vtlock : bv 32) (vtname vtcpu : bv 64)
+      (dread0 dwrite0 : mword 64),
+      wp_consoleinit_sconf_body γ Φ m K u0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0.
+End CONSOLEINIT.
