@@ -11,14 +11,11 @@
    join at the epilogue (+0x14).  The tree rides through READ-ONLY at the
    caller's generic dfrac.  Spec of record: SpecIsmapped.v.
 
-   Two helpers live here that belong at a lower altitude (both would force a
-   tree-wide rebuild today; move them down in the next sweep):
-     * [pte_valid_bit0] -- V is bit 0, so [andi w,1] on a valid PTE is 1.
-       Home: PtBuild.v, next to [pte_invalid_bit0] / [walk_vbit_eq], whose
-       local [Hand] computation this reproves.
-     * [ptree_own_level0_ro] -- the read-only twin of PtBuild's
-       [ptree_own_level0_upd] (same [ptree_level0] path, restoring the SAME
-       tree).  Home: PtBuild.v, next to that lemma. *)
+   The pure and separation-logic pieces this proof rests on live in PtBuild.v:
+   [andi1_unsigned] / [pte_valid_bit0] / [candi1_imm] (V is bit 0, so
+   [andi w,1] on a valid PTE is exactly 1 -- next to [walk_vbit_eq], which
+   proves only the zero/nonzero verdict the walk's [beqz] needs) and
+   [ptree_own_level0_ro] (the read-only twin of [ptree_own_level0_upd]). *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -44,88 +41,6 @@ Require Import SpecIsmapped.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
-
-(* ===================================================================== *)
-(* Helper 1 (belongs in PtBuild.v): the V bit IS bit 0, so the C source's *)
-(* [( *pte & PTE_V) ? 1 : 0] compiles to an [andi] whose result is exactly  *)
-(* 1 on a model-valid PTE.  [PtBuild.walk_vbit_eq] proves only the        *)
-(* zero/nonzero verdict the walk's [beqz] needs; ismapped RETURNS the     *)
-(* masked word, so it needs the value.                                    *)
-(* ===================================================================== *)
-
-Lemma andi1_unsigned (w : mword 64) :
-  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)) : mword 64)
-  = Z.b2z (Z.odd (bv_unsigned w)).
-Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
-  unfold MachineWord.MachineWord.and.
-  rewrite bv_and_unsigned.
-  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
-    replace (bv_unsigned mm) with 1 by (vm_compute; reflexivity) end.
-  change 1 with (Z.ones 1) at 1.
-  rewrite Z.land_ones; [| apply Z.leb_le; reflexivity].
-  change (2 ^ 1) with 2.
-  apply Zmod_odd.
-Qed.
-
-Lemma pte_valid_bit0 (w : mword 64) :
-  pte_valid w ->
-  and_vec w (sign_extend' 64 (mword_of_int 1 : mword 12)) = mword_of_int 1.
-Proof.
-  intros Hv.
-  assert (Hb : Z.testbit (bv_unsigned w) 0 = true).
-  { destruct (Z.testbit (bv_unsigned w) 0) eqn:E; [reflexivity | exfalso].
-    exact (pte_valid_invalid_excl w Hv (pte_invalid_bit0 _ E)). }
-  rewrite Z.bit0_odd in Hb.
-  apply bv_eq. rewrite andi1_unsigned. rewrite Hb.
-  vm_compute; reflexivity.
-Qed.
-
-(* the c.andi immediate, in the shape [walk_vbit_eq]/[pte_valid_bit0] use *)
-Lemma candi1_imm :
-  (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)) : mword 64)
-  = sign_extend' 64 (mword_of_int 1 : mword 12).
-Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* ===================================================================== *)
-(* Helper 2 (belongs in PtBuild.v): the READ-ONLY L0-slot accessor.       *)
-(* Mirrors [PtBuild.ptree_own_level0_upd] over the [_ro] node/kid         *)
-(* accessors, so the closing wand restores the SAME tree.                 *)
-(* ===================================================================== *)
-
-Section PtLevel0Ro.
-  Context `{!riscvGS Σ}.
-
-  Lemma ptree_own_level0_ro (dq : dfrac) (t : ptree) (vpn : mword 27)
-      (p2 p1 w0 : mword 64) :
-    ptree_level0 t vpn p2 p1 w0 ->
-    ptree_own 2 dq t ⊢
-      pt_node_claim (u_next_base p1) ∗
-      pt_addr0 p1 vpn ↦ₚ₈{dq} w0 ∗
-      (pt_addr0 p1 vpn ↦ₚ₈{dq} w0 -∗ ptree_own 2 dq t).
-  Proof.
-    intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 & _).
-    iIntros "[Hpg Hks]".
-    iDestruct (pt_kids_own_acc_ro 1 dq t (vpn_idx 2 vpn) c1 Hk2 with "Hks") as "[Hc1 Hks]".
-    iDestruct "Hc1" as "[Hpg1 Hks1]".
-    iDestruct (pt_kids_own_acc_ro 0 dq c1 (vpn_idx 1 vpn) c0 Hk1 with "Hks1") as "[Hc0 Hks1]".
-    iDestruct "Hc0" as "[Hpg0 Hemp]".
-    iDestruct (pt_page_own_claim with "Hpg0") as "[#Hcl0 Hpg0]".
-    iSplitR; [rewrite Hb0; iExact "Hcl0" |].
-    iDestruct (pt_page_own_acc_ro dq c0 (vpn_idx 0 vpn) with "Hpg0") as "[Hs0 Hpg0]".
-    rewrite He0.
-    unfold pt_addr0. rewrite Hb0.
-    iFrame "Hs0".
-    iIntros "Hs0".
-    iSplitL "Hpg"; [iExact "Hpg" |].
-    iApply "Hks".
-    iSplitL "Hpg1"; [iExact "Hpg1" |].
-    iApply "Hks1".
-    iSplitL "Hpg0 Hs0"; [(iApply "Hpg0"; iExact "Hs0") | iExact "Hemp"].
-  Qed.
-
-End PtLevel0Ro.
 
 (* ===================================================================== *)
 (* THE WHOLE FUNCTION.                                                    *)

@@ -337,6 +337,10 @@ SpecUartinit.v
 SpecVirtioDiskInit.v
 ProofUartinit.v
 LinkUartinit.v
+WpConsoleinitDecode.v
+SpecConsoleinit.v
+ProofConsoleinit.v
+LinkConsoleinit.v
 SpecCpuid.v
 SpecPlicinit.v
 SpecPlicinithart.v

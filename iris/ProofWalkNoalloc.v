@@ -153,24 +153,6 @@ Section ProofWalkNoalloc.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ];
     reflexivity.
 
-  (* ================================================================= *)
-  (* The two instruction facts for the alloc = 0 arm (+0x96, +0x98) --   *)
-  (* not in WpWalkInstr.v, which only covers the alloc = 1 path.        *)
-  (* ================================================================= *)
-  Local Notation WLK off rvc ast :=
-    (kernel_text -∗ instr (mword_of_int (KernelSyms.walk + off) : mword 64) rvc ast).
-
-  Lemma wnd_98 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0xbf6d : mword 16)) s
-    = Some (C_J (mword_of_int 2013 : mword 11), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
-
-  Lemma wi_96 : WLK 0x96 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_rvc (KernelSyms.walk + 0x96)%Z (mword_of_int 0x4501 : mword 16) (mword_of_int (KernelSyms.walk + 0x96) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
-
-  Lemma wi_98 : WLK 0x98 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.walk + 0x98)%Z (mword_of_int 0xbf6d : mword 16) (mword_of_int (KernelSyms.walk + 0x98) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)) wnd_98 exec_execute_C_J. Qed.
-
   (* A READ-ONLY single-step descent: [ptree_own_descend]'s frame wand hands
      back [pt_upd_kid t i (Some c')], and turning that back into [t] would need
      funext on the node's [kids] function.  The alloc = 0 walk never modifies a

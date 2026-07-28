@@ -78,9 +78,9 @@
      +0x94 C b775      j     -0x0c          (-> +0x40 rejoin loop
                         decrement; C_J back edge)
      +0x96 C 4501      li    a0,0           (C_LI; alloc=0 arm --
-                        UNREACHABLE under the alloc=1 premise)
-     +0x98 C bf6d      j     -0x92          (-> +0x52 epilogue;
-                        unreachable likewise)
+                        UNREACHABLE under the alloc=1 premise, but the
+     +0x98 C bf6d      j     -0x46           LIVE path of walk called with
+                        alloc = 0; -> +0x52 epilogue)
 
    Loop structure: two iterations of +0x26..+0x44 (s4 = 30 then 21; the
    bne at +0x42 compares against s5 = 12).  Each iteration either
@@ -174,6 +174,10 @@ Section WalkInstrs.
   Lemma wdec_94 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0xb775 : mword 16)) s
     = Some (C_J (mword_of_int 2006 : mword 11), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+  Lemma wdec_98 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xbf6d : mword 16)) s
+    = Some (C_J (mword_of_int 2013 : mword 11), s).
   Proof. intro H. rvc_oneshot s H. Qed.
   (* ---- base decode facts (concrete-state bridge) ---- *)
   Lemma wdec_22 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -313,6 +317,12 @@ Section WalkInstrs.
   Proof. mk_rvc (KernelSyms.walk + 0x8a)%Z (mword_of_int 0x07aa : mword 16) (mword_of_int (KernelSyms.walk + 0x8a) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) cdec_07aa exec_execute_C_SLLI. Qed.
   Lemma wi_94 : WLK 0x94 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.walk + 0x94)%Z (mword_of_int 0xb775 : mword 16) (mword_of_int (KernelSyms.walk + 0x94) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)) wdec_94 exec_execute_C_J. Qed.
+  (* the alloc = 0 arm (+0x96/+0x98): dead under the alloc = 1 premise, live
+     for walk(_,_,0) -- ProofWalkNoalloc's path. *)
+  Lemma wi_96 : WLK 0x96 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_rvc (KernelSyms.walk + 0x96)%Z (mword_of_int 0x4501 : mword 16) (mword_of_int (KernelSyms.walk + 0x96) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
+  Lemma wi_98 : WLK 0x98 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)).
+  Proof. mk_rvc (KernelSyms.walk + 0x98)%Z (mword_of_int 0xbf6d : mword 16) (mword_of_int (KernelSyms.walk + 0x98) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)) wdec_98 exec_execute_C_J. Qed.
   Lemma wi_7a : WLK 0x7a true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.walk + 0x7a)%Z (mword_of_int 0x84aa : mword 16) (mword_of_int (KernelSyms.walk + 0x7a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
   Lemma wi_22 : WLK 0x22 false (BTYPE (mword_of_int 68 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 15), BLTU)).

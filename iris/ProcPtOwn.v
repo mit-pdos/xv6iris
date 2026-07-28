@@ -1164,7 +1164,7 @@ Section ProcPt.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE DOVETAIL WITH walk / mappages (claude-notes/projects/vmfault.md) *)
+  (* THE DOVETAIL WITH walk / mappages (claude-notes/completed/vmfault.md) *)
   (*                                                                     *)
   (* [proc_pt] carries the modulo-A/D mapping SPEC; walk and mappages     *)
   (* consume the EXACT vpn -> word map [pt_rep0].  These three lemmas are *)

@@ -969,3 +969,10 @@ Lemma cdec_bff9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
     exec (ext_decode_compressed (mword_of_int 0xbff9 : mword 16)) s
     = Some (C_J (mword_of_int 2031 : mword 11), s).
   Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xc119  c.beqz a0,+0x06  -- shared by pipealloc (+0x96) and ismapped
+   (+0x0e), each testing a just-returned pointer against 0 *)
+Lemma cdec_c119 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+    exec (ext_decode_compressed (mword_of_int 0xc119 : mword 16)) s
+    = Some (C_BEQZ (mword_of_int 3, Cregidx (mword_of_int 2)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.

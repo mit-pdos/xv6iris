@@ -170,11 +170,7 @@ Lemma padc_6088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xc119  c.beqz a0,+0x06 *)
-Lemma padc_c119 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc119 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 3, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0xc119  c.beqz a0,+0x06 -- [cdec_c119] (KernelRvcDecode.v) *)
 
 (* 0xa029  c.j +0x0a *)
 Lemma padc_a029 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -617,7 +613,7 @@ Section PipeallocInstrs.
   (* +0x96  c119  c.beqz a0,+0x06 *)
   Lemma pai_96 : kernel_text -∗ instr (mword_of_int (PA + 0x96) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)).
   Proof. mk_rvc (PA + 0x96)%Z (mword_of_int 0xc119 : mword 16)
-    (mword_of_int (PA + 0x96) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)) padc_c119 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (PA + 0x96) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)) cdec_c119 exec_execute_C_BEQZ. Qed.
 
   (* +0x98  6942  c.ldsp s2,16(sp) *)
   Lemma pai_98 : kernel_text -∗ instr (mword_of_int (PA + 0x98) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).

@@ -173,12 +173,17 @@ the straight-line script. **All three are proved and the family is closed** —
 there is no fourth member to add, so a new function needing this shape would
 have to come from an upstream source change.
 
-`consoleinit` is a near-miss worth not chasing: its first nine instructions are
-this pattern, but it continues into `uartinit` and the `devsw[]` writes. The
-wrapper owns the epilogue and returns, so sharing with `consoleinit` would mean
-splitting prologue-through-jal into a separate piece — not what this shape is.
-The other nine callers of `initlock` (kinit, procinit, binit, iinit, initlog,
-initsleeplock, uartinit, pipealloc, virtio_disk_init) are unrelated.
+`consoleinit` is a near-miss that is deliberately NOT a member: its first nine
+instructions are this pattern, but it continues into `uartinit` and the
+`devsw[]` writes. The wrapper owns the epilogue and returns, so sharing with
+`consoleinit` would mean splitting prologue-through-jal into a separate piece —
+not what this shape is. It is proved standalone instead
+(`WpConsoleinitDecode` / `SpecConsoleinit` / `ProofConsoleinit` /
+`LinkConsoleinit`, a functor over `INITLOCK` and `UARTINIT`), running the same
+script over CONCRETE addresses, so every pc step and relocation is a
+`vm_compute` rather than the wrapper's symbolic `pc_step`. The other nine
+callers of `initlock` (kinit, procinit, binit, iinit, initlog, initsleeplock,
+uartinit, pipealloc, virtio_disk_init) are unrelated.
 
 - **`SpecInitlockWrapper.v`** — `ilw_code F uname ulk iname ilk j` is that
   thirteen-instruction pattern at entry `F`; `wp_initlock_wrapper_sconf_body` is

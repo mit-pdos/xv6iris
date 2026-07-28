@@ -25,7 +25,7 @@
 
    [uint szv <= 2^38] is the one fact the caller must know about p->sz
    (MAXVA); where the canonical sz well-formedness lives is settled by the
-   usertrap/sbrk work (see claude-notes/projects/vmfault.md). *)
+   usertrap/sbrk work (see claude-notes/completed/vmfault.md). *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
