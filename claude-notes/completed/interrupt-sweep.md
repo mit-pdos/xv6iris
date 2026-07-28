@@ -201,7 +201,8 @@ so the analysis is not lost.
 ## Boot wiring — REMAINING (item 8)
 
 Bigger than "just allocate + plumb"; there is a real execution gap.  Current
-state (mapped): `wp_kernel` (WpKernelNew.v:36) composes `_entry`→`start()` and
+state (mapped): `ENTRY.wp_entry_boot` (SpecEntry.v, proven in ProofEntry.v,
+linked in LinkEntry.v) composes `_entry`→`start()` and
 STOPS at `<main>` (0x80000e82, Supervisor) handing back RAW cells (hart_state,
 cur_privilege, mstatus, mie, mideleg, menvcfg, satp, stack_own …) — NO γ, NO
 bundle.  The stvec handler is installed by `csrw stvec,a5` inside

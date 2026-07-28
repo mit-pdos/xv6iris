@@ -287,7 +287,7 @@ def main():
         print_unimported(d, module_set(d, only_mods))
 
 TOPLEVEL_RE = re.compile(
-    r"^(wp_acquire$|wp_holding|wp_kernel$|wp_kernelvec$|wp_spin$|wp_start$|wp_memset_s|"
+    r"^(wp_acquire$|wp_holding|wp_entry_boot$|wp_kernelvec$|wp_spin$|wp_start$|wp_memset_s|"
     r"wp_push_off$|wp_step_|wp_.*_intr$|kernelvec_handler_spec$|intr_inv|kernel_window$|"
     r"fetch_from_pts$|wp_add_real|.*_handler_spec$|wp_csrw_.*_gpr$)")
 SMOKE_RE = re.compile(r"(_x\d+|^Unnamed_thm$|^wp_[a-z]+_x\d)")
