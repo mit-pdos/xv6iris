@@ -477,3 +477,4 @@ StackBytes.v
 ProofPrintint.v
 LinkPrintint.v
 WpPrintkDecode.v
+ProofPrintk.v

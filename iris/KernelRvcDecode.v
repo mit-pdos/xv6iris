@@ -903,6 +903,13 @@ Lemma frame_cancel_80 (X : mword 64) :
           (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = X.
 Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
 
+(* -192/+192, both [c.addi16sp] (52 is -12 in a 6-bit field, scaled by 16) --
+   printk's frame, the deepest in the kernel. *)
+Lemma frame_cancel_192 (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))))
+          (sign_extend' 64 (caddi16sp_imm (mword_of_int 12 : mword 6))) = X.
+Proof. apply frame_cancel. apply bv_eq. vm_compute. reflexivity. Qed.
+
 (* ---- words shared by proc_mapstacks / walk and procinit ----
    procinit computes KSTACK(i) with the same instruction sequence
    proc_mapstacks uses, and saves the same s6/s7 frame walk does, so these

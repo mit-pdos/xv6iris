@@ -181,7 +181,7 @@ half the frame-address lemmas -- write `f_equal; try (apply bv_eq; vm_compute;
 reflexivity)`.  And a value bound out of an existential resource arrives as
 `bv 8`, so ascribe `(b : mword 8)` at every leaf that wants an `mword`.
 
-### printk -- decode layer DONE, proof not started
+### printk -- decode layer and epilogue DONE, the body not started
 
 `WpPrintkDecode.v` proves all **264** instruction facts (offsets 0x00..0x328)
 plus the 188 distinct decode words they rest on.  It was GENERATED from the
@@ -194,17 +194,68 @@ the objdump mnemonic + operands (NOT from the instruction bits), render every
 immediate as its positive residue, and let `rvc_oneshot` / `decode_bridge_ms`
 check it.
 
+`ProofPrintk.v` holds, so far, the frame abstraction and the epilogue:
+
+- **`pk_frame sp0 ra0 s00 s20`** -- printk's 24 slots split the way the code
+  uses them: ra/s0/s2 named (the epilogue reloads exactly those three), every
+  other slot as "some word".  `pk_frame_stack_own` turns it back into the
+  `stack_own sp0 24` the pop wants.  Keeping that split in ONE definition is
+  what stops every lemma in the file from taking twenty-four points-to
+  arguments; add a named field to it when a slot's contents start to matter
+  (the varargs and `ap` will).
+- **`wp_printk_epi`** (0x260..0x274) -- reads `panicking`, falls through the
+  `beqz` (that IS the panic path, so the `release` at 0x28a is dead), returns
+  0, restores ra/s0/s2 and pops.  Its post is the spec's, including
+  `mf !!! a0 = 0`.  `frame_cancel_192` was added to KernelRvcDecode.v for it.
+
 810 bytes / 264 instructions, ~15 dispatch arms. The pieces still to do:
 
+- the two restore blocks (0x24e and 0x276), nine `ld`s each, both falling into
+  the epilogue -- the same shape as consputc's rejoining arms, but the block
+  itself is identical at two addresses, so state it once over the nine `instr`
+  facts rather than twice over the tactics;
 - the 24-slot frame, whose full map is: slots 1..7 = the varargs (a1..a7
   spilled at `56(s0)..8(s0)`, s0 = sp0-64), 8 unused, 9 = ra, 10 = s0,
   11 = s1, 12 = s2, 13..18 = s3..s8, 19 = s9, 20 = s10, 21 = s11, 22 unused,
   23 = `ap` (at `-120(s0)`), 24 unused.  s1/s3..s8/s10/s11 are saved LAZILY at
   0x38..0x48 and restored at two different points (0x24a / 0x272) -- two more
   rejoining arms -- and s9 is saved/restored INSIDE the `%p` arm alone;
-- the format loop is a recursion on the format string, following `pk_kinds`'s
-  structure exactly: at each `%`, `pk_dir c0 c1 c2` picks the arm and how far
-  the index advances. The loop measure is the remaining suffix;
+- **the loop invariant** (the piece to get right before writing any tactic).
+  At the loop's increment point (0x78) the state is described by two indices
+  and nothing else:
+
+      i  : how far into the format string the scan is  (register s4, and s1 =
+           i again just before the bump)
+      k  : how many varargs have been consumed so far
+
+  and the invariant is
+
+      s2 = fmt                          (never changes)
+      s4 = i                            (the C `i`)
+      ap-slot (slot 23) holds  s0 + 8 + 8*k
+      fmt ↦ₛ{dqf} f  with  i <= |f|
+      the REMAINING descriptors are  drop k descs, and
+        pk_kinds (substring i f) = map pk_desc_kind (drop k descs)
+      the va slots 1..7 still hold the spilled a1..a7
+      s3 = '%', s6 = 10, s7 = 'd', s8 = 'u', s10 = 'x', s11 = 'p'
+        (the six constants hoisted out of the loop at 0x4a..0x5e)
+
+  The recursion is on the SUFFIX `substring i f`, structurally exactly as
+  `pk_kinds` recurses, so each arm re-establishes the invariant at the index
+  `pk_dir` says it advances to.  `pk_kinds` was written to make this work: its
+  recursive calls are on syntactic tails, so the arm's obligation after
+  `%<c0>` is literally the equation the invariant states one level down.
+
+- **the va_list is in MEMORY, not a register**: `ap` lives in slot 23 and every
+  arm does the same three instructions -- `ld a5,-120(s0)` / `addi a4,a5,8` /
+  `sd a4,-120(s0)` -- then reads the argument at `0(a5)`.  So "consume one
+  vararg" is: slot 23 goes from `s0+8+8k` to `s0+8+8(k+1)`, and the read at
+  `0(a5)` is the read of va slot `7-k` (the a(k+1) spill).  That is where
+  `length descs <= 7` is spent: at `k = 7` the address `s0+8+56 = sp0` is the
+  CALLER's frame and is not owned.  Factor those three instructions plus the
+  argument read as ONE lemma parameterised by the load width (`ld` for the
+  64-bit arms, `lw` for `%d`/`%c`, `lwu` for `%u`/`%x`) -- ten of the fifteen
+  arms differ in nothing else;
 - ten of the arms are the same shape (load the vararg from the va_list, bump
   `ap`, call printint with a base/sign pair) and should be one parametric lemma,
   not ten copies;
