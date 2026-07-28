@@ -31,6 +31,16 @@ jobs:
   build:
     runs-on: coqdev
 
+    # WITHOUT THIS, a `run:` step gets GitHub's *default* shell, `bash -e {0}` --
+    # which does NOT set pipefail.  Every `make … | tee log` below would then
+    # exit with tee's status, i.e. always 0, and a failed proof build would sail
+    # through as green.  Naming `bash` explicitly selects
+    # `bash --noprofile --norc -eo pipefail {0}` instead, so the left-hand side
+    # of a pipe fails the step.
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - uses: actions/checkout@v5
 
@@ -109,7 +119,8 @@ jobs:
           # line; TIMING=1 writes a per-sentence `<file>.v.timing` next to each
           # .v.  Both add negligible overhead but let the next step report where
           # the wall-clock goes.  `tee` keeps the per-file log for the profiler;
-          # the shell is `bash -eo pipefail`, so a make failure still fails here.
+          # the job sets `shell: bash` (-eo pipefail), so a make failure still
+          # fails here rather than being masked by tee's exit status.
           opam exec -- make -C iris -f CoqMakefile -j"$(nproc)" TIMED=1 TIMING=1 \
             2>&1 | tee "$RUNNER_TEMP/iris-build.log"
 

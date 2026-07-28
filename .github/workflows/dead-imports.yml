@@ -52,6 +52,14 @@ jobs:
     # ~700 build-confirm compiles worst case, on top of two full builds.
     timeout-minutes: 600
 
+    # Required for the `… | tee` steps below to fail the job when their
+    # left-hand side fails: GitHub's default shell is `bash -e {0}` (NO
+    # pipefail), so a piped make would exit with tee's status.  Naming `bash`
+    # selects `bash --noprofile --norc -eo pipefail {0}`.
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -122,7 +130,7 @@ jobs:
             --apply-rewrites --report "$RUNNER_TEMP/report.md" \
             2>&1 | tee "$RUNNER_TEMP/apply.log"
 
-          # `|| true`: the runner's shell is `bash -eo pipefail`, so a grep that
+          # `|| true`: the job's shell is `bash -eo pipefail`, so a grep that
           # matches nothing would kill the step before the :- default is used.
           removed=$(grep -oE 'removed [0-9]+ import\(s\) across [0-9]+ file\(s\)' \
             "$RUNNER_TEMP/apply.log" | tail -1 || true)
