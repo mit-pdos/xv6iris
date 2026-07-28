@@ -66,16 +66,13 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import KernelRvcDecode WpAuipc.
+Require Import WpAuipc.
 Require Import WpSmodeIntr.
-Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots FileInv.
 Require Import SwtchCtx SchedCtx.
-Require Import UserPtTree ProcPtOwn.
 Require Import TicksInv.
-Require Import KvmSpec.
 Require Import WpSysPauseDecode.
 Require Import SpecArgint SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSleep.
 Require Import SpecSysPause.

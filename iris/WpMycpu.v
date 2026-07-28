@@ -32,7 +32,6 @@ Require Import InstrBytes.
 Require Import WpDecode ExecCommon KernelText WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.

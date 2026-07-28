@@ -22,7 +22,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvLang RiscvExtras.
+Require Import RiscvModelBytes.
 Local Open Scope Z_scope.
 
 (* the two bitvector identities everything below runs on, restated here (as

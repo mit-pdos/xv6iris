@@ -44,9 +44,9 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
-Require Import SwtchCtx SchedCtx.
-Require Import KvmSpec.
+Require Import FdSlots FileInv.
+Require Import SchedCtx.
+Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

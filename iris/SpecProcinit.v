@@ -49,7 +49,6 @@ Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInv.
 Require Import ProcInv.
-Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import KvmMap.
 From Kernel Require KernelSyms.

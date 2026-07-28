@@ -77,9 +77,9 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SwtchCtx SchedCtx.
-Require Import UserPtTree ProcPtOwn.
+Require Import ProcPtOwn.
 Require Import TicksInv.
-Require Import KvmSpec.
+Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

@@ -99,7 +99,6 @@ Require Import InstrBytes KernelText.
 Require Import WpDecode WpDecodeBridge WpRvcBridge.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelSyms.
-Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 Import Defs.
 

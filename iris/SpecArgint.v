@@ -42,8 +42,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import FdSlots FileInv ProcInv.
-Require Import KallocInv KMap.
-Require Import UserPtTree ProcPtOwn.
+Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
