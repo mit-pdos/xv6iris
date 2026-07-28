@@ -220,10 +220,10 @@ Section ProofVirtioDiskRwE.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) : iProp Σ :=
+      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) : iProp Σ :=
     (∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
-       ⌜vdrw_regs M sp0 b wr sector⌝ -∗
+       ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜tri_ok (h, m2, t)⌝ -∗
        ⌜pk !! q = Some (DClaim b (vdrwd_slot b h wr sector
                                     (vdrwd_sldata wr bs_buf bs_disk))
@@ -259,11 +259,13 @@ Section ProofVirtioDiskRwE.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) (h m2 t : nat) (q : nat) (pin : _) : iProp Σ :=
+      (bs_buf bs_disk : list (bv 8)) (h m2 t : nat) (q : nat) (pin : _)
+      (m0 : regfile) : iProp Σ :=
     (∀ M : regfile,
        ⌜vdrw_regs M sp0 b wr sector
         /\ M !!! Regidx Rs1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
-        /\ M !!! Regidx Rs2 = (d_lock : SailStdpp.Values.mword 64)⌝ -∗
+        /\ M !!! Regidx Rs2 = (d_lock : SailStdpp.Values.mword 64)
+        /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr γ M (K - 12)%nat -∗
        cpu_own γ 1 eb (proc_addr j) C -∗
        trap_csrs_pay 0 eb -∗
@@ -287,7 +289,7 @@ Section ProofVirtioDiskRwE.
                             (vdrwd_bufwin b wr bs_buf))
         /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
-       vdrw_p5_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk -∗
+       vdrw_p5_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* ------------------------------------------------------------------- *)
@@ -360,7 +362,7 @@ Section ProofVirtioDiskRwE.
       (γu : uart_names) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) :
+      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) :
     (K_virtio_disk_rw <= K)%nat ->
     (j < NPROC)%nat -> γs !! j = Some γl ->
     kernel_text -∗
@@ -368,14 +370,15 @@ Section ProofVirtioDiskRwE.
     procs_inv γ Φ γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    vdrw_p5_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk -∗
-    P4.vdrw_p4_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk.
+    vdrw_p5_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 -∗
+    P4.vdrw_p4_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0.
   Proof.
     intros HK Hj Hjl.
     iIntros "#Htext #Hpanic #Hpinv #Hdinv #Hlk Hexit".
     rewrite /P4.vdrw_p4_exit.
     iIntros (M q np nr fl pk tr fr h m2 t pin)
-            "%Hregs %Ha1 %Hok %Hpinr %Hal Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody Hclaim Hrm Hrt Hidx".
+            "%Hrh %Ha1 %Hok %Hpinr %Hal Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody Hclaim Hrm Hrt Hidx".
+    destruct Hrh as (Hregs & Hhi).
     set (V := DClaim b (vdrwd_slot b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
                      (h, m2, t) pin).
     pose proof Hregs as Hregs'.
@@ -389,11 +392,11 @@ Section ProofVirtioDiskRwE.
     iPoseProof (rwi_19c with "Htext") as "Hi19c".
     (* ================= THE LOOP, first (it is used by both arms) ======= *)
     iAssert (vdrw_p5_loop γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector
-               bs_buf bs_disk h m2 t q pin)%I with "[]" as "Hloop".
+               bs_buf bs_disk h m2 t q pin m0)%I with "[]" as "Hloop".
     { iLöb as "IH". rewrite {2}/vdrw_p5_loop.
       iIntros (M') "%Hinv Hcg Hown Hpay Hpc Hctx Hsched Htok HR Hclaim Hrm Hrt Hidx
                     %HokL %HalL %HpinrL HexitL".
-      destruct Hinv as (HregsL & Hs1L & Hs2L).
+      destruct Hinv as (HregsL & Hs1L & Hs2L & HhiL).
       pose proof HregsL as HregsL'.
       destruct HregsL' as (HspL & Hs0L & Hs3L & Hs6L & Hs7L & HtpL).
       iPoseProof (rwi_1a0 with "Htext") as "Hi1a0".
@@ -534,7 +537,8 @@ Section ProofVirtioDiskRwE.
         iApply ("IH" $! L4 with
                   "[%] Hcg Hown Hpay Hpc Hctx Hsched Htok HR Hclaim Hrm Hrt Hidx
                    [%] [%] [%] HexitL").
-        * split_and!; [| exact HL4s1 |].
+        * assert (HhiL3 : vdrw_hi L3 m0) by (vdrw_hi_peel; exact HhiL).
+          split_and!; [| exact HL4s1 | |].
           -- unfold vdrw_regs. destruct HMfregs as (F1 & F2 & F3 & F4 & F5 & F6).
              split_and!;
                [ rewrite /L4 upd_ne; [exact F1 | reg_neq]
@@ -544,6 +548,7 @@ Section ProofVirtioDiskRwE.
                | rewrite /L4 upd_ne; [exact F5 | reg_neq]
                | rewrite /L4 upd_ne; [exact F6 | reg_neq] ].
           -- rewrite /L4 upd_ne; [exact HMfs2 | reg_neq].
+          -- vdrw_hi_peel. exact (vdrw_hi_cs L3 Mf m0 Hcsf HhiL3).
         * exact HokL.
         * exact HalL.
         * exact HpinrL.
@@ -560,7 +565,9 @@ Section ProofVirtioDiskRwE.
         iApply ("HexitL" $! L4 q np' nr' fl' pk' tr' fr' h m2 t pin with
                   "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody Hclaim
                    Hrm Hrt Hidx").
-        * unfold vdrw_regs. destruct HMfregs as (F1 & F2 & F3 & F4 & F5 & F6).
+        * split; [| vdrw_hi_peel; exact (vdrw_hi_cs L3 Mf m0 Hcsf
+                       ltac:(vdrw_hi_peel; exact HhiL))].
+          unfold vdrw_regs. destruct HMfregs as (F1 & F2 & F3 & F4 & F5 & F6).
           split_and!;
             [ rewrite /L4 upd_ne; [exact F1 | reg_neq]
             | rewrite /L4 upd_ne; [exact F2 | reg_neq]
@@ -744,7 +751,8 @@ Section ProofVirtioDiskRwE.
       iApply ("Hloop" $! N5 with
                 "[%] Hcg Hown Hpay Hpc Hctx Hsched Htok HR Hclaim Hrm Hrt Hidx
                  [%] [%] [%] Hexit").
-      + split_and!; [ exact HN5regs | exact HN5s1 | exact HN5s2 ].
+      + split_and!; [ exact HN5regs | exact HN5s1 | exact HN5s2
+                    | vdrw_hi_peel; exact Hhi ].
       + exact Hok.
       + exact Hal.
       + exact Hpinr.
@@ -762,7 +770,7 @@ Section ProofVirtioDiskRwE.
       iApply ("Hexit" $! N5 q np nr fl pk tr fr h m2 t pin with
                 "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody Hclaim
                  Hrm Hrt Hidx").
-      + exact HN5regs.
+      + split; [exact HN5regs | vdrw_hi_peel; exact Hhi].
       + exact Hok.
       + exact Hpq.
       + exact Hpinr.

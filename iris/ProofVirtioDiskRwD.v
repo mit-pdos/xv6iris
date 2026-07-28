@@ -1905,10 +1905,10 @@ Section ProofVirtioDiskRwDSeam.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) : iProp Σ :=
+      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) : iProp Σ :=
     (∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
-       ⌜vdrw_regs M sp0 b wr sector⌝ -∗
+       ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜M !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)⌝ -∗
        ⌜tri_ok (h, m2, t)⌝ -∗
        (* THE PIN'S STRUCTURE, for P6's [free_chain]: what the interrupt
@@ -1942,10 +1942,11 @@ Section ProofVirtioDiskRwDSeam.
   Definition vdrw_p3_exit_x (γ γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64) : iProp Σ :=
+      (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
+      (m0 : regfile) : iProp Σ :=
     (∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
-       ⌜vdrw_regs M sp0 b wr sector⌝ -∗
+       ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜M !!! Regidx Ra0 = (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
@@ -1972,7 +1973,8 @@ Section ProofVirtioDiskRwDSeam.
       (γs : list gname) (jp : nat) (γu : uart_names) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr : SailStdpp.Values.mword 64)
-      (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8)) :
+      (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
+      (m0 : regfile) :
     (uint bno < 2147483648)%Z ->
     length bs_buf = 1024%nat ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
@@ -1982,14 +1984,15 @@ Section ProofVirtioDiskRwDSeam.
     ([∗ list] k ↦ x ∈ bs_buf, pa_add (b_data b) k ↦ₘ x) -∗
     disk_block γd (uint bno) bs_disk -∗
     vdrw_p4_exit γ γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
-                 bs_buf bs_disk -∗
-    vdrw_p3_exit_x γ γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno).
+                 bs_buf bs_disk m0 -∗
+    vdrw_p3_exit_x γ γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0.
   Proof.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hexit".
     rewrite /vdrw_p3_exit_x.
-    iIntros (M np nr fl pk tr fr h m2 t) "%Hregs %Hpin %Hfacts %Hdisj0 %Hal
+    iIntros (M np nr fl pk tr fr h m2 t) "%Hrh %Hpin %Hfacts %Hdisj0 %Hal
              Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody Hchain Hidx".
+    destruct Hrh as (Hregs & Hhi).
     destruct Hpin as (Ha0 & Ha1 & Ha5).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
     pose proof Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hhm, Hht, Hmt.
@@ -2021,7 +2024,8 @@ Section ProofVirtioDiskRwDSeam.
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) h m2 t pin
               with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody
                     Hclaim Hrm Hrt Hidx").
-    - destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7 & Htp).
+    - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
+      destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7 & Htp).
       unfold vdrw_regs. split_and!.
       + rewrite (Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
       + rewrite (Hcs (mword_of_int 8 : mword 5) ltac:(vm_compute; reflexivity)). exact Hs0.

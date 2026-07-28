@@ -414,10 +414,10 @@ Section ProofVirtioDiskRwB.
   Definition vdrw_p2_exit (γ γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 b : Arch.pa) (wr sector : mword 64) : iProp Σ :=
+      (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) : iProp Σ :=
     (∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
-       ⌜vdrw_regs M sp0 b wr sector⌝ -∗
+       ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜tri_ok (h, m2, t) /\ fr h = true /\ fr m2 = true /\ fr t = true⌝ -∗
        (* the publisher's own triple is disjoint from every RECORDED one.
           Only P2.3 can state this: it holds [disk_res] at the ORIGINAL [fr],
@@ -447,12 +447,13 @@ Section ProofVirtioDiskRwB.
   Definition vdrw_p2_loop (γ γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 b : Arch.pa) (wr sector : mword 64) : iProp Σ :=
+      (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) : iProp Σ :=
     (∀ M : regfile,
        ⌜vdrw_regs M sp0 b wr sector
         /\ M !!! Regidx Rs1 = (mword_of_int 8 : mword 64)
         /\ M !!! Regidx Rs4 = (mword_of_int (Z.of_nat 3) : mword 64)
-        /\ M !!! Regidx Rs5 = (disk_base : mword 64)⌝ -∗
+        /\ M !!! Regidx Rs5 = (disk_base : mword 64)
+        /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr γ M (K - 12)%nat -∗
        cpu_own γ 1 eb (proc_addr j) C -∗
        trap_csrs_pay 0 eb -∗
@@ -462,16 +463,16 @@ Section ProofVirtioDiskRwB.
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
        vdrw_scratch sp0 -∗
-       vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector -∗
+       vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   Lemma wp_vdrw_p2 (γ γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (γd : disk_names)
       (pd pav pu : mword 64) (M0 : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 b : Arch.pa) (wr sector : mword 64) :
+      (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) :
     (K_virtio_disk_rw <= K)%nat ->
     (j < NPROC)%nat -> γs !! j = Some γl -> length γs = NPROC ->
-    vdrw_regs M0 sp0 b wr sector ->
+    vdrw_regs M0 sp0 b wr sector -> vdrw_hi M0 m0 ->
     sie_cap_gpr γ M0 (K - 12)%nat -∗
     cpu_own γ 1 eb (proc_addr j) C -∗
     trap_csrs_pay 0 eb -∗
@@ -484,10 +485,10 @@ Section ProofVirtioDiskRwB.
     locked γk cpu_id -∗
     disk_res γd pd pav pu -∗
     vdrw_scratch sp0 -∗
-    vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector -∗
+    vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hj Hjl Hlen Hregs.
+    intros HK Hj Hjl Hlen Hregs Hhi0.
     iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv Hctx Hsched
              #Hgeom #Hlk Htok HR Hscr Hexit".
     iPoseProof (rwi_036 with "Htext") as "Hi036".
@@ -597,11 +598,11 @@ Section ProofVirtioDiskRwB.
         rewrite /A3 upd_ne; [| reg_neq]. rewrite /A2 upd_ne; [| reg_neq].
         rewrite /A1 upd_ne; [| reg_neq]. exact Htp. }
     (* ================= THE LOOP (iLoeb) ================= *)
-    iAssert (vdrw_p2_loop γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector)
+    iAssert (vdrw_p2_loop γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0)
       with "[]" as "Hloop".
     { iLöb as "IH". rewrite /vdrw_p2_loop.
       iIntros (M) "%Hinv Hcg Hown Hpay Hpc Hctx Hsched Htok HR Hscr Hexit".
-      destruct Hinv as (Hregs' & Hs1 & Hs4 & Hs5).
+      destruct Hinv as (Hregs' & Hs1 & Hs4 & Hs5 & Hhi).
       iPoseProof (rwi_07a with "Htext") as "Hi07a".
       iPoseProof (rwi_07e with "Htext") as "Hi07e".
       iPoseProof (rwi_082 with "Htext") as "Hi082".
@@ -641,7 +642,9 @@ Section ProofVirtioDiskRwB.
         iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t with
                   "[%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hsched Htok
                    [Hpub Hlb Hcl Huidx Hflight Hparked Hbun Hring] Hbh Hbm Hbt Hidx").
-        - unfold vdrw_regs. split_and!.
+        - split;
+            [| exact (vdrw_hi_frame1 M M1 m0 Rs2 ltac:(vm_compute; reflexivity) Hcs1 Hhi)].
+          unfold vdrw_regs. split_and!.
           + rewrite (Hcs1 csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hsp.
           + rewrite (Hcs1 Rs0 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs0.
           + rewrite (Hcs1 Rs3 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs3.
@@ -702,10 +705,14 @@ Section ProofVirtioDiskRwB.
                   locked γk cpu_id -∗
                   free_bundles pd fr -∗
                   vdrw_scratch sp0 -∗
-                  vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector -∗
+                  vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
                   WP (Loop : expr riscv_lang) {{ Φ }})%I
         with "[Hpub Hlb Hcl Huidx Hflight Hparked Hring IH]" as "Hsleep".
       { iIntros (Mz) "%Hcsz Hcg Hown Hpay Hpc Hctx Hsched Htok Hbun Hscr Hexit".
+        assert (Hhiz : vdrw_hi Mz m0)
+          by (exact (vdrw_hi_frame M1 Mz m0 Hcsz
+                       (vdrw_hi_frame1 M M1 m0 Rs2 ltac:(vm_compute; reflexivity)
+                          Hcs1 Hhi))).
         (* the register facts at Mz *)
         assert (Hspz : Mz !!! Regidx csp_rs1 = pa_stk sp0 12)
           by (rewrite (Hcsz csp_rs1 ltac:(vm_compute; reflexivity)); exact Hsp1).
@@ -870,7 +877,8 @@ Section ProofVirtioDiskRwB.
         - rewrite (callee_saved_lookup Hcsf Rs5 ltac:(vm_compute; reflexivity)).
           rewrite /B5 upd_ne; [| reg_neq]. rewrite /B4 upd_ne; [| reg_neq].
           rewrite /B3 upd_ne; [| reg_neq]. rewrite /B2 upd_ne; [| reg_neq].
-          rewrite /B1 upd_ne; [| reg_neq]. exact Hs5z. }
+          rewrite /B1 upd_ne; [| reg_neq]. exact Hs5z.
+        - exact (vdrw_hi_cs B5 Mf m0 Hcsf ltac:(vdrw_hi_peel; exact Hhiz)). }
       (* ---- +0x07a  bge x0,s2 : nothing allocated? ---- *)
       rewrite /P1.vdrw_alloc_fail.
       iDestruct "Hfail" as "[H0|[H1|H2]]".
@@ -1083,7 +1091,8 @@ Section ProofVirtioDiskRwB.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hj0a8) in "Hpc".
     iApply ("Hloop" $! A5 with "[%] Hcg Hown Hpay Hpc Hctx Hsched Htok HR Hscr Hexit").
-    split_and!; [ exact HA5regs | exact HA5s1 | exact HA5s4 | exact HA5s5 ].
+    split_and!; [ exact HA5regs | exact HA5s1 | exact HA5s4 | exact HA5s5
+                | vdrw_hi_peel; exact Hhi0 ].
   Qed.
 
 End ProofVirtioDiskRwB.

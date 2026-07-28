@@ -18,7 +18,7 @@ remaining virtio-effort cleanups (see [`virtio-disk.md`](virtio-disk.md)) land.
 | `iris/ProofVirtioDiskRwC.v` | P3 (five chunk lemmas + composition + the P2→P3 glue) | ~20 s |
 | `iris/ProofVirtioDiskRwD.v` | P4 (fence/AU leaves, the pin builder, `wp_vdrw_p4`, the P3→P4 glue) | ~7 min |
 | `iris/ProofVirtioDiskRwE.v` | P5 (QUEUE_NOTIFY, `vdrw_p5_peek`, the completion-wait iLöb, the P4→P5 glue) | ~12 s |
-| `iris/ProofVirtioDiskRwF.v` | P6, the whole-function composition, `Module VirtioDiskRwProof … : VIRTIODISKRW` | ~15 min |
+| `iris/ProofVirtioDiskRwF.v` | P6, the whole-function composition, `Module VirtioDiskRwProof … : VIRTIODISKRW` | ~62 s |
 | `iris/LinkVirtioDiskRw.v` | `Module VirtioDiskRw := VirtioDiskRwProof Acquire Release Sleep FreeDesc` | — |
 
 **Why one file per phase.** Each phase re-pays its predecessors' `coqc` cost if
@@ -121,6 +121,24 @@ inverses of D's `vdrwd_w2/_w4/_w8`).
    `vs_sector_off sl`, which `vdrwd_slot_off` + `vdrwd_sector_raw_val` equate
    to `1024 * uint bno`.
 
+## THE THREE REGISTERS THE FRAME DOES NOT SAVE
+
+rw pushes ten slots (ra, s0..s8) and the epilogue restores them, so the
+whole-function `callee_saved m mf` is immediate for sp, tp and s0..s8.  It is
+**not** immediate for **s9/s10/s11 (x25/x26/x27)**: nothing saves them, and
+they are preserved only because no phase ever writes them — a fact about the
+WHOLE function that no single phase's seam states.  So it travels as one pure
+conjunct, `vdrw_hi M m` (`ProofVirtioDiskRw.v`), threaded from P1's exit
+through `vdrw_p2_exit` / `vdrw_p3_exit` / `vdrw_p4_exit` / `vdrw_p5_exit` to
+P6's epilogue.  Three helper lemmas discharge it everywhere it has to move:
+`vdrw_hi_cs` (across a callee's `callee_saved`), `vdrw_hi_frame` /
+`vdrw_hi_frame1` (across a phase that exports an `is_cs_idx` frame condition,
+optionally with one written register excepted) and `vdrw_hi_upd` + the
+`vdrw_hi_peel` tactic (across rw's own `set`-chain of writes, one layer at a
+time per the `peel_reg` discipline).  **If you add a phase, thread this
+conjunct through its seam — forgetting it is invisible until P6's
+`callee_saved` obligation, at the very end of the whole proof.**
+
 ## THE ONE SPEC CHANGE P6 FORCED — `vs_data` for READ requests
 
 `parked_res` used to give the woken publisher `disk_bytes γ (vs_sector_off sl)
@@ -173,6 +191,19 @@ silent hole that only surfaces at the far end of the proof.
   and end with `done.`.
 * `lookup_union_Some_raw` is the right lemma for reading a `ghost_map_lookup`
   against an auth over a union.
+
+### The 60-minute non-`Qed` (read this before you wait on a slow file)
+
+`ProofVirtioDiskRwF.v` appeared to hang for >60 minutes with a 0-byte log and
+one `rocqworker` at 99 % CPU / 2 GB RSS — the exact signature of a pathological
+async `Qed`.  It was **four `set_solver` calls** in `wp_vdrw_p6_seam` burning
+~20 min of MAIN-process tactic time (272 s each), with a genuine type error
+sitting behind them in unflushed stderr.  `coqc -time -async-proofs off` named
+the culprit sentence in five minutes; pure top-level lemmas
+(`vdrwf_tri_mem`, `vdrwf_dom_delete`) took the file to **36 s**.  In Rocq 9
+`coqc` is a wrapper and the process doing the work is named `rocqworker`, so
+"a rocqworker is running" does NOT mean "an async Qed is running".  Full write-up
+in `optimization.md`.
 
 ### `lia`, and where it stops working
 

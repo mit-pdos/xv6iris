@@ -434,6 +434,24 @@ Lemma vdrwf_below_seq (q nr np : nat) :
   (q < nr)%nat -> q ∉ set_seq (C := gset nat) nr (np - nr).
 Proof. intros Hq Hin. apply elem_of_set_seq in Hin. lia. Qed.
 
+(* THE TRIPLE-MEMBERSHIP AND DOMAIN FACTS, AS PURE LEMMAS.
+   [set_solver] costs 100-270 s PER CALL inside a large Iris WP context (it
+   rescans the whole hypothesis context -- optimization.md); proved here, in a
+   context of three set variables, each is instant.  Never call [set_solver]
+   from inside a phase proof. *)
+Lemma vdrwf_tri_mem (h m2 t : nat) :
+  h ∈ tri_set (h, m2, t) /\ m2 ∈ tri_set (h, m2, t) /\ t ∈ tri_set (h, m2, t).
+Proof.
+  unfold tri_set. cbn. split_and!.
+  - apply elem_of_union_l, elem_of_union_l, elem_of_singleton. reflexivity.
+  - apply elem_of_union_l, elem_of_union_r, elem_of_singleton. reflexivity.
+  - apply elem_of_union_r, elem_of_singleton. reflexivity.
+Qed.
+
+Lemma vdrwf_dom_delete (q : nat) (F P T : gset nat) :
+  T = F ∪ P -> q ∉ F -> T ∖ {[ q ]} = F ∪ (P ∖ {[ q ]}).
+Proof. intros -> Hq. set_solver. Qed.
+
 (* free_desc's argument bound, off the NORMALISED index word *)
 Lemma vdrwf_uint_small (i : nat) : (i < 8)%nat ->
   uint (mword_of_int (Z.of_nat i) : SailStdpp.Values.mword 64) = Z.of_nat i.
@@ -464,6 +482,7 @@ Section ProofVirtioDiskRwF.
   Notation Rs0 := (mword_of_int 8  : mword 5).
   Notation Rs1 := (mword_of_int 9  : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
+  Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
   Notation Rs2 := (mword_of_int 18 : mword 5).
@@ -722,6 +741,10 @@ Section ProofVirtioDiskRwF.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     vdrw_saved sp0 m -∗
     b_blockno b ↦₄ bno -∗
+    (* the CALLER's own [trap_csrs_pay]: acquire mints a second one that
+       release consumes, so this one is simply framed through the function
+       and handed back with the postcondition. *)
+    trap_csrs_pay 0 eb -∗
     ( ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr γ mf K -∗
@@ -734,14 +757,15 @@ Section ProofVirtioDiskRwF.
                 (vdrwd_sldata wr bs_buf bs_disk) -∗
         disk_block γd (uint bno) (vdrwd_sldata wr bs_buf bs_disk) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    P5.vdrw_p5_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk.
+    P5.vdrw_p5_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m.
   Proof.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Htpm.
-    iIntros "#Htext #Hpanic #Hpinv #Hgeom #Hlk Hsaved Hbno Hcont".
+    iIntros "#Htext #Hpanic #Hpinv #Hgeom #Hlk Hsaved Hbno Hpay0 Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (M q np nr fl pk tr fr h m2 t pin)
-            "%Hregs %Hok %Hpq %Hpinr %Hal Hcg Hown Hpay Hpc Hctx Hsched Htok
+            "%Hrh %Hok %Hpq %Hpinr %Hal Hcg Hown Hpay Hpc Hctx Hsched Htok
              Hbody Hclaim Hrm Hrt Hidx".
+    destruct Hrh as (Hregs & Hhi).
     destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7 & Htp).
     pose proof Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hhm, Hht, Hmt.
     destruct Hpinr as (Hpineq & Hpmok).
@@ -775,9 +799,7 @@ Section ProofVirtioDiskRwF.
     assert (Huq : (fl ∪ pk) !! q = Some (DClaim b (vdrwd_slot b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))
       by (rewrite (lookup_union_r fl pk q Hflq); exact Hpq).
     assert (Htrq : tr !! q = Some (h, m2, t)) by exact (Hcoh q _ Huq).
-    assert (Hinh : h ∈ tri_set (h, m2, t)) by (unfold tri_set; cbn; set_solver).
-    assert (Hinm : m2 ∈ tri_set (h, m2, t)) by (unfold tri_set; cbn; set_solver).
-    assert (Hint : t ∈ tri_set (h, m2, t)) by (unfold tri_set; cbn; set_solver).
+    destruct (vdrwf_tri_mem h m2 t) as (Hinh & Hinm & Hint).
     assert (Hfrh : fr h = false) by exact (Htrfr q _ h Htrq Hinh).
     assert (Hfrm : fr m2 = false) by exact (Htrfr q _ m2 Htrq Hinm).
     assert (Hfrt : fr t = false) by exact (Htrfr q _ t Htrq Hint).
@@ -1263,19 +1285,20 @@ Section ProofVirtioDiskRwF.
       { iPureIntro. intros p Hp. apply Hpkb.
         rewrite dom_delete_L in Hp. apply elem_of_difference in Hp as [Hp _]. exact Hp. }
       iSplitR.
-      { iPureIntro. rewrite !dom_delete_L Hdtr. set_solver. }
+      { iPureIntro. rewrite !dom_delete_L.
+        exact (vdrwf_dom_delete q (dom fl) (dom pk) (dom tr) Hdtr Hnflq). }
       iSplitR.
       { iPureIntro. intros p v Hp.
         assert (Hpq' : p <> q).
         { intro Hc. subst p. rewrite (lookup_union_r fl (delete q pk) q Hflq) in Hp.
           rewrite lookup_delete in Hp. discriminate. }
-        rewrite (lookup_delete_ne tr q p Hpq'). apply Hcoh.
+        rewrite (lookup_delete_ne tr q p (not_eq_sym Hpq')). apply Hcoh.
         destruct (fl !! p) as [w|] eqn:Hfp.
         - rewrite (lookup_union_Some_l fl pk p w Hfp).
           rewrite (lookup_union_Some_l fl (delete q pk) p w Hfp) in Hp. exact Hp.
         - rewrite (lookup_union_r fl pk p Hfp).
           rewrite (lookup_union_r fl (delete q pk) p Hfp) in Hp.
-          rewrite (lookup_delete_ne pk q p Hpq') in Hp. exact Hp. }
+          rewrite (lookup_delete_ne pk q p (not_eq_sym Hpq')) in Hp. exact Hp. }
       iSplitR.
       { iPureIntro. intros p T Hp.
         apply lookup_delete_Some in Hp as [_ Hp]. exact (Htrok p T Hp). }
@@ -1287,7 +1310,7 @@ Section ProofVirtioDiskRwF.
       iSplitR.
       { iPureIntro. intros p T i Hp Hi.
         apply lookup_delete_Some in Hp as [Hpne Hp].
-        pose proof (Htrdj p q T (h, m2, t) Hpne Hp Htrq) as Hdj.
+        pose proof (Htrdj p q T (h, m2, t) (not_eq_sym Hpne) Hp Htrq) as Hdj.
         assert (Hnh : i <> h)
           by (intro Hc; subst i; exact (proj1 (elem_of_disjoint _ _) Hdj h Hi Hinh)).
         assert (Hnm : i <> m2)
@@ -1628,7 +1651,7 @@ Section ProofVirtioDiskRwF.
     assert (Hthr : forall r : mword 5, is_cs_idx r = true ->
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 ->
               r <> Rs4 -> r <> Rs5 -> r <> Rs6 -> r <> Rs7 -> r <> Rs8 ->
-              R11 !!! Regidx r = m !!! Regidx r).
+              R11 !!! Regidx r = M !!! Regidx r).
     { intros r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8.
       assert (Nra : r <> Rra)
         by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
@@ -1661,7 +1684,8 @@ Section ProofVirtioDiskRwF.
     assert (Hcs : callee_saved m R11).
     { unfold callee_saved. split_and!.
       - rewrite /R11 upd_eq HR10sp Hspup. symmetry. exact Hsp0m.
-      - rewrite (Hthr Rtp ltac:(vm_compute; reflexivity)); try reg_neq. reflexivity.
+      - rewrite (Hthr Rtp ltac:(vm_compute; reflexivity)); try reg_neq.
+        rewrite Htp Htpm. reflexivity.
       - rewrite /R11 upd_ne; [| reg_neq]. rewrite /R10 upd_ne; [| reg_neq].
         rewrite /R9 upd_ne; [| reg_neq]. rewrite /R8 upd_ne; [| reg_neq].
         rewrite /R7 upd_ne; [| reg_neq]. rewrite /R6 upd_ne; [| reg_neq].
@@ -1692,30 +1716,33 @@ Section ProofVirtioDiskRwF.
         rewrite /R9; apply upd_eq.
       - rewrite /R11 upd_ne; [| reg_neq]. rewrite /R10; apply upd_eq.
       - rewrite (Hthr (mword_of_int 25 : mword 5) ltac:(vm_compute; reflexivity));
-          try reg_neq. reflexivity.
+          try reg_neq.
+        exact (Hhi (mword_of_int 25 : mword 5) ltac:(vm_compute; reflexivity)).
       - rewrite (Hthr (mword_of_int 26 : mword 5) ltac:(vm_compute; reflexivity));
-          try reg_neq. reflexivity.
+          try reg_neq.
+        exact (Hhi (mword_of_int 26 : mword 5) ltac:(vm_compute; reflexivity)).
       - rewrite (Hthr (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity));
-          try reg_neq. reflexivity. }
+          try reg_neq.
+        exact (Hhi (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity)). }
     iAssert ([∗ list] k ↦ x ∈ vdrwd_sldata wr bs_buf bs_disk,
                pa_add (b_data b) k ↦ₘ x)%I with "[Wbuf Hbufp]" as "Hbufm".
     { destruct (vdrwd_out wr) eqn:Hout.
-      - rewrite (Hsl_out Hout).
-        iEval (rewrite (Hbufwin_out Hout)) in "Wbuf".
+      - rewrite (Hsl_out eq_refl).
+        iEval (rewrite (Hbufwin_out eq_refl)) in "Wbuf".
         iEval (rewrite -Hlenbuf) in "Wbuf".
         iDestruct (vdrwf_map_plist (b_data b) bs_buf
                      ltac:(rewrite Hlenbuf; exact vdrwf_1024_lt) with "Wbuf") as "Wbuf".
         iApply (vdrwf_plist_mem (b_data b) bs_buf
                   ltac:(rewrite Hlenbuf; exact Hsbuf)
                   ltac:(rewrite Hlenbuf; exact Hcbuf) with "Hkm Wbuf").
-      - rewrite (Hsl_in Hout).
-        iEval (rewrite Hout) in "Hbufp".
-        iEval (rewrite Hbs (Hsl_in Hout)) in "Hbufp".
-        iApply (vdrwf_plist_mem (b_data b) bs_disk
-                  ltac:(rewrite Hlendisk; exact Hsbuf)
-                  ltac:(rewrite Hlendisk; exact Hcbuf) with "Hkm Hbufp"). }
+      - assert (Hbsd : bs = bs_disk)
+          by (rewrite Hbs; exact (Hsl_in eq_refl)).
+        rewrite (Hsl_in eq_refl) -Hbsd.
+        iApply (vdrwf_plist_mem (b_data b) bs
+                  ltac:(rewrite Hbsd Hlendisk; exact Hsbuf)
+                  ltac:(rewrite Hbsd Hlendisk; exact Hcbuf) with "Hkm Hbufp"). }
     iApply ("Hcont" $! R11 with
-              "[%] Hcg Hown Hpay Hpc Hctx Hsched [Hbno Hbdisk Hbufm] [Hdbytes]").
+              "[%] Hcg Hown Hpay0 Hpc Hctx Hsched [Hbno Hbdisk Hbufm] [Hdbytes]").
     - exact Hcs.
     - rewrite /buf_own. iFrame "Hbno Hbdisk Hbufm".
       iPureIntro. exact Hlensl.
@@ -1743,7 +1770,7 @@ Section ProofVirtioDiskRwF.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
     intros HK Hbnolt Hbufkd Htpm Hj Hjl.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv Hctx Hsched
+    iIntros "Hcg Hown Hpay0 #Htext Hpc #Hpanic #Hpinv Hctx Hsched
              #Hdinv #Hgeom #Hlk Hbuf Hdisk Hcont".
     iPoseProof "Hpinv" as "Hpinv2".
     iDestruct "Hpinv2" as "[%Hglen _]".
@@ -1767,33 +1794,34 @@ Section ProofVirtioDiskRwF.
     (* ---- P1: prologue + acquire ---- *)
     iApply (P1.wp_vdrw_p1 γ Φ γd γk pd pav pu m K eb (proc_addr j) C bno HK Htpm
               with "Hcg Hown Htext Hpc Hpanic Hlk Hbno [-]").
-    iIntros (M) "%Hregs Hcg Hown Hpay Hpc Htok HR Hsaved Hscr Hbno".
+    iIntros (M) "%Hrh Hcg Hown Hpay Hpc Htok HR Hsaved Hscr Hbno".
+    destruct Hrh as (Hregs & Hhi).
     (* ---- P2: the descriptor allocator (with its sleep-retry loop) ---- *)
     iApply (P2.wp_vdrw_p2 γ γk Φ γs j γl γd pd pav pu M K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) HK Hj Hjl Hglen Hregs
+              (vdrw_sector_raw bno) m HK Hj Hjl Hglen Hregs Hhi
               with "Hcg Hown Hpay Htext Hpc Hpanic Hpinv Hctx Hsched Hgeom Hlk
                     Htok HR Hscr [-]").
     (* ---- P3: the chain formatting ---- *)
     iApply (P3.wp_vdrw_p3_seam γ γk Φ γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) dsk0 with "Htext Hgeom Hbdisk [-]").
+              (vdrw_sector_raw bno) dsk0 m with "Htext Hgeom Hbdisk [-]").
     (* ---- P4: the ring write and THE PUBLISH ---- *)
     iApply (P4.wp_vdrw_p4_seam γ γk Φ γs j γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk Hbnolt Hlenbuf Hbufkd
+              bno bs_buf bs_disk m Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk [-]").
     (* ---- P5: the device kick and the completion wait ---- *)
     iApply (P5.wp_vdrw_p5_seam γ γk Φ γs j γl γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bs_buf bs_disk HK Hj Hjl
+              (vdrw_sector_raw bno) bs_buf bs_disk m HK Hj Hjl
               with "Htext Hpanic Hpinv Hdinv Hlk [-]").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
     iApply (wp_vdrw_p6_seam γ γk Φ γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bno bs_buf bs_disk
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl Htpm
-              with "Htext Hpanic Hpinv Hgeom Hlk Hsaved Hbno [-]").
+              with "Htext Hpanic Hpinv Hgeom Hlk Hsaved Hbno Hpay0 [-]").
     iIntros (mf) "%Hcsf Hcg Hown Hpay Hpc Hctx Hsched Hbufo Hdisko".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".

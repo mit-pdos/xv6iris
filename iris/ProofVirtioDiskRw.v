@@ -218,6 +218,84 @@ Lemma vdrw_bnez_clear :
   neq_vec (zero_extend' 64 (byte_zero : mword 8) : mword 64) (zero_reg : mword 64) = false.
 Proof. vm_compute; reflexivity. Qed.
 
+(* ===================================================================== *)
+(* THE THREE CALLEE-SAVED REGISTERS rw's FRAME DOES NOT SAVE.             *)
+(*                                                                       *)
+(* rw pushes ten slots (ra, s0..s8) and never touches s9/s10/s11, so the  *)
+(* whole-function [callee_saved m mf] holds for x25/x26/x27 only because  *)
+(* NO phase writes them -- a fact about the whole function that no single *)
+(* phase's seam states.  It therefore travels as one pure conjunct from   *)
+(* P1's exit all the way to P6's epilogue.  [vdrw_hi_cs] discharges it    *)
+(* across any callee, [vdrw_hi_frame] across a phase that exports the     *)
+(* [is_cs_idx] frame condition, and [vdrw_hi_upd] across rw's own writes. *)
+(* ===================================================================== *)
+Definition is_hi_cs (r : mword 5) : bool :=
+  existsb (fun c => bool_decide (r = (mword_of_int c : mword 5))) [25;26;27]%Z.
+
+Definition vdrw_hi (M m0 : regfile) : Prop :=
+  forall r : mword 5, is_hi_cs r = true -> M !!! Regidx r = m0 !!! Regidx r.
+
+Lemma is_hi_cs_cs (r : mword 5) : is_hi_cs r = true -> is_cs_idx r = true.
+Proof.
+  unfold is_hi_cs. cbn [existsb]. intro H.
+  destruct (bool_decide (r = (mword_of_int 25 : mword 5))) eqn:H25.
+  { apply bool_decide_eq_true in H25. subst r. vm_compute. reflexivity. }
+  destruct (bool_decide (r = (mword_of_int 26 : mword 5))) eqn:H26.
+  { apply bool_decide_eq_true in H26. subst r. vm_compute. reflexivity. }
+  destruct (bool_decide (r = (mword_of_int 27 : mword 5))) eqn:H27.
+  { apply bool_decide_eq_true in H27. subst r. vm_compute. reflexivity. }
+  cbn in H. discriminate.
+Qed.
+
+Lemma is_hi_cs_neq (k c : mword 5) :
+  is_hi_cs k = false -> is_hi_cs c = true -> Regidx k <> Regidx c.
+Proof. intros Hk Hc Heq. injection Heq as Heq'. subst c. rewrite Hc in Hk. discriminate. Qed.
+
+Lemma vdrw_hi_cs (M M' m0 : regfile) :
+  callee_saved M M' -> vdrw_hi M m0 -> vdrw_hi M' m0.
+Proof.
+  intros Hcs Hhi r Hr.
+  rewrite (callee_saved_lookup Hcs r (is_hi_cs_cs r Hr)). exact (Hhi r Hr).
+Qed.
+
+Lemma vdrw_hi_frame (M M' m0 : regfile) :
+  (forall r : mword 5, is_cs_idx r = true -> M' !!! Regidx r = M !!! Regidx r) ->
+  vdrw_hi M m0 -> vdrw_hi M' m0.
+Proof. intros Hf Hhi r Hr. rewrite (Hf r (is_hi_cs_cs r Hr)). exact (Hhi r Hr). Qed.
+
+Lemma vdrw_hi_upd (M m0 : regfile) (k : mword 5) (v : mword 64) :
+  is_hi_cs k = false -> vdrw_hi M m0 -> vdrw_hi (<[Regidx k := v]> M) m0.
+Proof.
+  intros Hk Hhi r Hr. rewrite upd_ne; [ exact (Hhi r Hr) |].
+  apply not_eq_sym, (is_hi_cs_neq k r Hk Hr).
+Qed.
+
+Lemma is_hi_cs_ne (r k : mword 5) : is_hi_cs r = true -> is_hi_cs k = false -> r <> k.
+Proof. intros Hr Hk He. subst k. rewrite Hr in Hk. discriminate. Qed.
+
+(* the frame condition a phase that writes ONE extra register exports *)
+Lemma vdrw_hi_frame1 (M M' m0 : regfile) (k : mword 5) :
+  is_hi_cs k = false ->
+  (forall r : mword 5, is_cs_idx r = true -> r <> k ->
+     M' !!! Regidx r = M !!! Regidx r) ->
+  vdrw_hi M m0 -> vdrw_hi M' m0.
+Proof.
+  intros Hk Hf Hhi r Hr.
+  rewrite (Hf r (is_hi_cs_cs r Hr) (is_hi_cs_ne r k Hr Hk)). exact (Hhi r Hr).
+Qed.
+
+Lemma vdrw_hi_refl (M : regfile) : vdrw_hi M M.
+Proof. intros r _. reflexivity. Qed.
+
+(* peel rw's own [set]-chain of register writes, one layer at a time (the
+   [peel_reg] discipline of optimization.md: never unfold the whole chain) *)
+Ltac vdrw_hi_peel :=
+  repeat first
+    [ apply vdrw_hi_upd; [ vm_compute; reflexivity | ]
+    | lazymatch goal with
+      | |- vdrw_hi ?M _ => is_var M; progress unfold M
+      end ].
+
 Section VdrwDefs.
   Context `{!riscvGS Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
@@ -401,7 +479,7 @@ Section ProofVirtioDiskRw.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     b_blockno b ↦₄ bno -∗
     ( ∀ M : regfile,
-        ⌜vdrw_regs M sp0 b wr (vdrw_sector_raw bno)⌝ -∗
+        ⌜vdrw_regs M sp0 b wr (vdrw_sector_raw bno) /\ vdrw_hi M m⌝ -∗
         sie_cap_gpr γ M (K - 12)%nat -∗
         cpu_own γ 1 eb pj C -∗
         trap_csrs_pay 0 eb -∗
@@ -830,8 +908,12 @@ Section ProofVirtioDiskRw.
     (* NB: [callee_saved m M] is NOT available here and must not be claimed --
        rw's prologue CLOBBERS s0..s8 and only the epilogue (P6) restores them
        out of [vdrw_saved].  What travels is the frame, not the registers. *)
+    assert (HR11hi : vdrw_hi R11 m).
+    { vdrw_hi_peel. apply vdrw_hi_refl. }
     iApply ("Hcont" $! M with "[%] Hcg Hown Hpay Hpc Htok HR [Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10] [Hk11 Hk12] Hbno").
-    - exact (vdrw_regs_cs R11 M sp0 b wr (vdrw_sector_raw bno) HcsM HR11).
+    - split.
+      + exact (vdrw_regs_cs R11 M sp0 b wr (vdrw_sector_raw bno) HcsM HR11).
+      + exact (vdrw_hi_cs R11 M m HcsM HR11hi).
     - rewrite /vdrw_saved.
       (* the ten cells come back at the RAW sp-relative address the leaf
          computes; fold each into its [pa_stk] slot *)

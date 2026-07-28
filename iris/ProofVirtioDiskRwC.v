@@ -2032,10 +2032,11 @@ Section ProofVirtioDiskRwCSeam.
   Definition vdrw_p3_exit (γ γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64) : iProp Σ :=
+      (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
+      (m0 : regfile) : iProp Σ :=
     (∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
-       ⌜vdrw_regs M sp0 b wr sector⌝ -∗
+       ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜M !!! Regidx Ra0 = (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Ra1 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ M !!! Regidx Ra5 = (disk_base : SailStdpp.Values.mword 64)⌝ -∗
@@ -2062,17 +2063,18 @@ Section ProofVirtioDiskRwCSeam.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (dsk0 : SailStdpp.Values.mword 32) :
+      (dsk0 : SailStdpp.Values.mword 32) (m0 : regfile) :
     kernel_text -∗
     disk_geom γd pd pav pu -∗
     b_disk b ↦₄ dsk0 -∗
-    vdrw_p3_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector -∗
-    P2.vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector.
+    vdrw_p3_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
+    P2.vdrw_p2_exit γ γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0.
   Proof.
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
-    iIntros (M np nr fl pk tr fr h m2 t) "%Hregs %Hfacts %Hdisj0 %Hal
+    iIntros (M np nr fl pk tr fr h m2 t) "%Hrh %Hfacts %Hdisj0 %Hal
              Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody Hbh Hbm Hbt Hidx".
+    destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
     cbn in Hh8, Hm8, Ht8.
@@ -2085,7 +2087,8 @@ Section ProofVirtioDiskRwCSeam.
     iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t
               with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hsched Htok Hbody
                     Hchain Hidx").
-    - destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7 & Htp).
+    - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
+      destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7 & Htp).
       unfold vdrw_regs. split_and!.
       + rewrite (Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp.
       + rewrite (Hcs (mword_of_int 8 : mword 5) ltac:(vm_compute; reflexivity)).
