@@ -528,9 +528,36 @@ Left, in order:
    `eq_vec v zero_reg = false`.  `v ↦ₛ{dq} s` does not imply it -- nothing in
    the points-to rules out address 0 -- and the arm needs the `beqz` at 0x21e
    to fall through.
-2. the loop induction on the format index, carrying `pk_kinds (str_drop p f) =
-   map pk_desc_kind (drop k descs)` and splitting the descriptor `big_sepL`
-   at `k`.
+2. **the loop induction.**  Everything it calls is now proven; what is left is
+   the threading.  The invariant, stated at 0x78 with `p` = the index of the
+   last character consumed and `k` = the varargs consumed:
+
+       s1 = p,  s2 = fmt,  ap = pk_ap s0v k,  pk_consts,
+       pk_kinds (str_drop (S p) f) = map pk_desc_kind (drop k descs)
+
+   so the NEXT character to look at is `f[S p]`.  One turn, and which proven
+   lemma covers it:
+
+       0x78  wp_printk_advance          two outcomes
+             (a) f[S p] = 0   -> 0x24e  = EXIT
+             (b) else         -> 0x86 with a0 = f[S p]
+       0x86  bne a0,s3
+             f[S p] <> '%'    -> wp_printk_char, s1 := S p, k unchanged
+             f[S p]  = '%'    -> 0x8a
+       0x8a  wp_printk_dispatch         -> PK + pk_entry c0 c1 c2
+             fst (pk_dir ..) = Some PkNum -> wp_printk_arm_num,  k := S k
+             fst (pk_dir ..) = Some PkStr -> wp_printk_arm_str,  k := S k
+             fst (pk_dir ..) = None, c0 <> NUL -> wp_printk_arm_none, k kept
+             c0 = NUL         -> pk_entry = 0x276 = EXIT
+
+   Both exits are `wp_printk_exit`, which is already parameterised by the
+   restore-block base `B` (`pk_restore_at_24e` / `pk_restore_at_276`) -- that
+   is what makes the two exits one case rather than two.
+
+   Termination: `p` strictly increases (by 1, or by `2 + snd d`), so induct on
+   the fuel `String.length f - p`.  `pk_kinds_step` rewrites the invariant's
+   equation across the turn, and the descriptor `big_sepL` splits at `k` --
+   the arms need only the k-th, and only `%s` needs it at all.
 3. the top-level statement (prologue + setup + loop + exit), which is also
    where `uart_sent γd l` has to join the spec's precondition.
 4. the sealed functor over CONSPUTC/PRINTINT, and LinkPrintk.v.
