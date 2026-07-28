@@ -97,9 +97,17 @@ Section SpecPipealloc.
     ((* FAILURE (a0 = -1): the ftable was full, or kalloc found no page.  Every
         file reference taken on the way was given back (fileclose), the page
         count is untouched, and the caller's two pointer cells come back with
-        unspecified contents. *)
+        unspecified contents.
+
+        BOTH fd UNITS COME BACK.  Whichever of the three bad paths ran, the
+        two units the caller supplied are accounted for: an unspent one is
+        returned by filealloc's own failure arm, and a spent one comes back
+        out of the fileclose that undoes it.  Without this the caller could
+        not balance its books -- sys_pipe's postcondition returns its whole
+        allowance on all four of its exits, and this is the only arm that
+        could break that. *)
      ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
-     kalloc_avail γk on ∗
+     kalloc_avail γk on ∗ fd_slot ∗ fd_slot ∗
      (∃ w0 w1 : mword 64, pf0 ↦₈ w0 ∗ pf1 ↦₈ w1)
      ∨
      (* SUCCESS (a0 = 0): a live pipe, plus the two files naming it.  Each

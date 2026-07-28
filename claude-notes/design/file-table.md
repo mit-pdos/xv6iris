@@ -337,6 +337,15 @@ requires it vacuous. (A "dup budget" pool with a lifetime cap and no returns
 was also tried and is strictly worse — it bounds calls rather than live
 references, and its supply has no principled source.)
 
+- **`fdalloc` is the other half of the descriptor story** (`SpecFdalloc.v`,
+  specified, not yet proven): it takes a `file_ref`, installs it in the LEAST
+  free descriptor, and hands back the `fd_slot` that the emptied descriptor
+  used to own. Which descriptor is not a choice — `fd_frees fs` names the free
+  ones in order, and `fd_frees_insert` ("filling the head pops it") is what
+  makes two successive calls compose without re-deriving anything. That pure
+  layer is what `sys_pipe`'s postcondition is stated over.
+- **`sys_pipe` is the worked example of the whole model at once** and is
+  proven: [`../projects/sys-pipe.md`](../projects/sys-pipe.md).
  **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
 - **The next function is `fileclose`.** Its ghost steps
@@ -348,14 +357,16 @@ references, and its supply has no principled source.)
   `fileclose_stack` in `SpecFileclose.v` will grow when they do. Because it
   is unproven there is no `LinkFileclose.v`, hence no `LinkSysClose.v`
   either: `sys_close` is proved but not yet linked.
-- **`pipealloc` drops the two `fd_slot`s fileclose hands back** on its error
-  paths (`ProofPipealloc.v` `iClear`s them), because `pipealloc_post`'s error
-  disjunct does not return them: the caller supplied two units and gets
-  nothing back. A leak of a conserved resource, not a soundness hole;
-  returning them is a purely additive change to `SpecPipealloc`, spelled out
-  as Task 6 of
-  [`../projects/lock-cancel-pipeclose.md`](../projects/lock-cancel-pipeclose.md).
-  Do it before `sys_pipe`, not after.
+- **Every failure arm returns its `fd_slot`s, and that is load-bearing.**
+  `filealloc`'s failure arm (the scan found no free entry, so no reference was
+  created) hands its unit straight back, and `pipealloc`'s failure disjunct
+  returns both — in `ProofPipealloc.v` the unit rides WITH the cell, exactly as
+  `ProcInv.ofile_slot` does it (`PF1` is "either `*f1` is null and its unit is
+  banked, or `*f1` names a live file whose reference we hold"). Without this
+  `sys_pipe` could not promise its whole allowance back on all four exits, and
+  the `+4` supply would drain; see
+  [`../projects/sys-pipe.md`](../projects/sys-pipe.md) for the balance sheet.
+  **When a new allocator gets a failure arm, ask where its unit went.**
 - **`sys_close` is the worked example of a descriptor giving up its
   reference** (`ProofSysClose.v`): `ProcInv.proc_priv_ofile` borrows the
   slot, the `sd x0,0(a0)` nulls it, `fileclose` eats the `file_ref` and

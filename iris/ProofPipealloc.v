@@ -65,20 +65,9 @@ Lemma addv_sext0 (x : mword 64) :
   add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
 Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
-(* a file slot's address is never null -- what kills pipealloc's two dead
-   "*f0 == 0" arms.  [file_base] is 0x80022478. *)
-Lemma fnode_nonzero (k : nat) :
-  (k < NFILE)%nat -> eq_vec (fnode k : mword 64) (zero_reg : mword 64) = false.
-Proof.
-  intro Hk. apply eq_vec_false_iff. intro Hc.
-  apply (f_equal bv_unsigned) in Hc.
-  rewrite (acur_unsigned file_base file_stride k NFILE
-             file_base_nonneg file_stride_pos file_end_fits ltac:(lia)) in Hc.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by reflexivity.
-  rewrite Hz in Hc.
-  unfold file_base, file_stride, KernelSyms.ftable in Hc.
-  lia.
-Qed.
+(* [fnode_nonzero] -- a file slot's address is never null, which is what
+   kills pipealloc's two dead "*f0 == 0" arms -- is FileInv's, at the
+   geometry's own altitude. *)
 
 Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
                       (Initlock : INITLOCK) (Fileclose : FILECLOSE) : PIPEALLOC.
@@ -470,7 +459,13 @@ Section ProofPipealloc.
     (*  and +0xa8 (nothing to close).  Offered as a CONJUNCTION with the   *)
     (*  epilogue -- exactly one is taken, so they share the resources.     *)
     (* ================================================================= *)
-    set (PF1 := ((pf1 ↦₈ (zero_reg : mword 64))
+    (* THE fd UNIT RIDES WITH THE CELL, exactly as [ProcInv.ofile_slot] does
+       it: either *f1 is null and the unit that would have paid for its
+       reference is already banked, or *f1 names a live file whose reference
+       we still hold -- and the fileclose that consumes it hands the unit
+       back.  Either way the tail leaves with one unit for THIS end, which is
+       what lets the epilogue pay [pipealloc_post]'s two. *)
+    set (PF1 := ((pf1 ↦₈ (zero_reg : mword 64) ∗ fd_slot)
                  ∨ (∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat⌝ ∗ pf1 ↦₈ fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
     set (T8 := (∀ (Mt : regfile),
@@ -484,6 +479,10 @@ Section ProofPipealloc.
         cpu_own γ n eb p C -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
         (∃ w : mword 64, pf0 ↦₈ w) -∗
+        (* the READ end's unit: banked by the time control reaches +0xa8,
+           either because filealloc gave it straight back or because the
+           fileclose at +0xa4 did *)
+        fd_slot -∗
         PF1 -∗
         kalloc_avail γk on -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
@@ -512,15 +511,15 @@ Section ProofPipealloc.
     iPoseProof (pai_b6 with "Htext") as "Hib6".
     iAssert (EPI ∧ T8)%I with "[Hepi]" as "HK1".
     { iSplit; [iExact "Hepi"|]. rewrite /T8.
-      iIntros (Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hslots Hcell0 Hcell1 Hav".
+      iIntros (Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hslots Hcell0 Hunit0 Hcell1 Hav".
       (* the value sitting in *f1 is what the last branch tests *)
       iAssert (∃ x : mword 64, pf1 ↦₈ x ∗
-                 (⌜x = (zero_reg : mword 64)⌝
+                 (⌜x = (zero_reg : mword 64)⌝ ∗ fd_slot
                   ∨ ∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat /\ x = fnode k1⌝ ∗ file_ref γf k1 1 Cf1))%I
         with "[Hcell1]" as (x) "[Hcell1 Hx]".
-      { rewrite /PF1. iDestruct "Hcell1" as "[H|H]".
-        - iExists (zero_reg : mword 64). iFrame "H". by iLeft.
+      { rewrite /PF1. iDestruct "Hcell1" as "[[H Hu]|H]".
+        - iExists (zero_reg : mword 64). iFrame "H". iLeft. by iFrame "Hu".
         - iDestruct "H" as (k1 Cf1) "(%Hk1 & Hc & Href)".
           iExists (fnode k1). iFrame "Hc". iRight. iExists k1, Cf1. iFrame "Href".
           iPureIntro. split; [exact Hk1 | reflexivity]. }
@@ -565,7 +564,7 @@ Section ProofPipealloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpaae) in "Hpc".
       (* +0xae c.beqz a5 *)
-      iDestruct "Hx" as "[%Hx0 | Hx]".
+      iDestruct "Hx" as "[[%Hx0 Hunit1] | Hx]".
       - (* *f1 holds 0: nothing else to close, straight to the epilogue *)
         iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (PA + 0xae)) (mword_of_int 5 : mword 8)
                   (Cregidx (mword_of_int 7)) Ra5 U2 (K - 6)%nat
@@ -579,9 +578,10 @@ Section ProofPipealloc.
                         = mword_of_int (PA + 0xb8))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt8) in "Hpc".
-        iApply ("Hepi" $! U2 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hslots [Hav Hcell0 Hcell1]").
+        iApply ("Hepi" $! U2 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hslots [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
         { split; [exact HU2sp|]. split; [exact HU2a0 | exact HU2thr]. }
-        rewrite /pipealloc_post. iLeft. iSplitR; [done|]. iFrame "Hav".
+        rewrite /pipealloc_post. iLeft. iSplitR; [done|].
+        iFrame "Hav Hunit0 Hunit1".
         iDestruct "Hcell0" as (w) "Hc0". iExists w, x. iFrame "Hc0 Hcell1".
       - (* *f1 holds a live file: close it too *)
         iDestruct "Hx" as (k1 Cf1) "[%Hk1x Href1]".
@@ -639,11 +639,10 @@ Section ProofPipealloc.
         iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k1 1%Qp Cf1 U4 n eb p C (K - 6)%nat
                   ltac:(unfold fileclose_stack; lia) HU4tp Hnoffpos HU4a0
                   with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [-]").
-        (* fileclose returns the fd slot the reference was holding; on this
-           error path pipealloc has nothing left to install it in, and its own
-           postcondition does not (yet) hand the two units back to the caller,
-           so it is dropped here. *)
-        iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hfdslot". iClear "Hfdslot".
+        (* fileclose hands back the unit the reference was holding: it is
+           the WRITE end's, and together with [Hunit0] it pays the two
+           [pipealloc_post]'s failure arm promises. *)
+        iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hunit1".
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (PA + 0xb6))
           by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpcb6) in "Hpc".
@@ -659,7 +658,7 @@ Section ProofPipealloc.
         assert (Hpab8 : add_vec_int (mword_of_int (PA + 0xb6) : mword 64) 2 = mword_of_int (PA + 0xb8))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpab8) in "Hpc".
-        iApply ("Hepi" $! U5 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hslots [Hav Hcell0 Hcell1]").
+        iApply ("Hepi" $! U5 (mword_of_int (-1) : mword 64) with "[%] Hcg Hpc Hcnt Hslots [Hav Hunit0 Hunit1 Hcell0 Hcell1]").
         { split.
           { rewrite /U5 upd_ne; [| vm_compute; discriminate].
             rewrite (callee_saved_lookup Hfcpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -669,7 +668,8 @@ Section ProofPipealloc.
           rewrite /U5 upd_ne; [| regne].
           rewrite (callee_saved_lookup Hfcpins_cs c Hcs).
           apply HU4thr; assumption. }
-        rewrite /pipealloc_post. iLeft. iSplitR; [done|]. iFrame "Hav".
+        rewrite /pipealloc_post. iLeft. iSplitR; [done|].
+        iFrame "Hav Hunit0 Hunit1".
         iDestruct "Hcell0" as (w) "Hc0". iExists w, x. iFrame "Hc0 Hcell1". }
     (* ---- the +0xa4 entry: close *f0 first, then fall into T8 ---- *)
     iAssert (EPI ∧ T8 ∧ T4C)%I with "[HK1]" as "HK".
@@ -704,12 +704,13 @@ Section ProofPipealloc.
       iApply (Fileclose.wp_fileclose_sconf γ Φ γfl γf k0 1%Qp Cf0 V1 n eb p C (K - 6)%nat
                 ltac:(unfold fileclose_stack; lia) HV1tp Hnoffpos HV1a0
                 with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [-]").
-      iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hfdslot". iClear "Hfdslot".
+      (* the READ end's unit, banked for T8 *)
+      iIntros (mr) "Hcg Hcnt Hpc %Hfcpins Hunit0".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (PA + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".
       pose proof Hfcpins as Hfcpins_cs.
-      iApply ("Ht8" $! mr with "[%] Hcg Hpc Hcnt Hslots Hcell0 Hcell1 Hav").
+      iApply ("Ht8" $! mr with "[%] Hcg Hpc Hcnt Hslots Hcell0 Hunit0 Hcell1 Hav").
       split.
       { rewrite (callee_saved_lookup Hfcpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
         rewrite /V1 upd_ne; [exact Htsp | vm_compute; discriminate]. }
@@ -797,7 +798,7 @@ Section ProofPipealloc.
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e c.beqz a0 -- the table was full? *)
     rewrite /filealloc_post.
-    iDestruct "Hpost0" as "[%Hz0 | Hpost0]".
+    iDestruct "Hpost0" as "[[%Hz0 Hslota'] | Hpost0]".
     { (* PATH A: no file at all.  Both cells hold 0; jump to +0xa8. *)
       iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (PA + 0x1e)) (mword_of_int 69 : mword 8)
                 (Cregidx (mword_of_int 2)) Ra0 mB (K - 6)%nat
@@ -813,11 +814,11 @@ Section ProofPipealloc.
       iEval (rewrite HtgtA) in "Hpc".
       iEval (rewrite Hb4) in "Hr16". iEval (rewrite Hb5) in "Hr8".
       iDestruct "HK" as "[_ [Ht8 _]]".
-      iApply ("Ht8" $! mB with "[%] Hcg Hpc Hcnt [Hr16 Hr8] [Hc0] [Hc1] Hav").
+      iApply ("Ht8" $! mB with "[%] Hcg Hpc Hcnt [Hr16 Hr8] [Hc0] Hslota' [Hc1 Hslotb] Hav").
       { split; [exact HmBsp|]. split; [exact HmBs4 | exact HmBthr]. }
       { iExists u16, u8. iFrame "Hr16 Hr8". }
       { iExists (mB !!! Regidx Ra0). iExact "Hc0". }
-      { rewrite /PF1. iLeft. iExact "Hc1". } }
+      { rewrite /PF1. iLeft. iFrame "Hc1 Hslotb". } }
     iDestruct "Hpost0" as (k0 Cf0) "[%Hk0 Href0]".
     destruct Hk0 as (Hk0lt & Hk0eq & Hk0ty).
     iApply (wp_cbeqz_fall_s_sconf γ Φ (mword_of_int (PA + 0x1e)) (mword_of_int 69 : mword 8)
@@ -892,7 +893,7 @@ Section ProofPipealloc.
     iEval (rewrite Hpp28) in "Hpc".
     (* +0x28 c.beqz a0 *)
     rewrite /filealloc_post.
-    iDestruct "Hpost1" as "[%Hz1 | Hpost1]".
+    iDestruct "Hpost1" as "[[%Hz1 Hslotb'] | Hpost1]".
     { (* PATH B: only the first file was taken.  Close it: jump to +0xa0. *)
       iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (PA + 0x28)) (mword_of_int 60 : mword 8)
                 (Cregidx (mword_of_int 2)) Ra0 mD (K - 6)%nat
@@ -942,11 +943,11 @@ Section ProofPipealloc.
       iEval (rewrite Hppa4) in "Hpc".
       iEval (rewrite Hb4) in "Hr16". iEval (rewrite Hb5) in "Hr8".
       iDestruct "HK" as "[_ [_ Ht4]]".
-      iApply ("Ht4" $! B1 k0 Cf0 with "[%] Hcg Hpc Hcnt Href0 [Hr16 Hr8] [Hc0] [Hc1] Hav").
+      iApply ("Ht4" $! B1 k0 Cf0 with "[%] Hcg Hpc Hcnt Href0 [Hr16 Hr8] [Hc0] [Hc1 Hslotb'] Hav").
       { split; [exact HB1sp|]. split; [exact HB1s4|]. split; [exact HB1a0 | exact HB1thr]. }
       { iExists u16, u8. iFrame "Hr16 Hr8". }
       { iExists (fnode k0). iExact "Hc0". }
-      { rewrite /PF1. iLeft. iExact "Hc1". } }
+      { rewrite /PF1. iLeft. iFrame "Hc1 Hslotb'". } }
     iDestruct "Hpost1" as (k1 Cf1) "[%Hk1 Href1]".
     destruct Hk1 as (Hk1lt & Hk1eq & Hk1ty).
     iApply (wp_cbeqz_fall_s_sconf γ Φ (mword_of_int (PA + 0x28)) (mword_of_int 60 : mword 8)

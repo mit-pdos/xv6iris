@@ -113,6 +113,13 @@ are working on that effort — the relevant `projects/` file.
   digit loop inside `buf[20]` — and printk is specified, including
   `PrintkFmt.v`, the pure model of which varargs a format string consumes,
   which is what makes printk's variadic precondition statable.
+- **[`sys-pipe.md`](projects/sys-pipe.md)** — sys_pipe, PROVEN (unlinked): the
+  syscall where the file/proc model has to balance — two `fd_slot`s in, two out
+  on all four exits, which is what forced filealloc's and pipealloc's failure
+  arms to start returning their units. Keeps `SpecFdalloc.v`'s `fd_frees` pure
+  layer (what makes two successive fdalloc calls compose), the two
+  shared-block lemmas, what the contract deliberately does not say, and the
+  remaining work (proving argaddr and fdalloc).
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode

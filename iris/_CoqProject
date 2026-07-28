@@ -482,3 +482,8 @@ ProofPrintint.v
 LinkPrintint.v
 WpPrintkDecode.v
 ProofPrintk.v
+SpecArgaddr.v
+SpecFdalloc.v
+SpecSysPipe.v
+WpSysPipeDecode.v
+ProofSysPipe.v

@@ -260,3 +260,20 @@ dropped (the logic is affine).
 `fileclose` is proven, so `tools/proof_coverage.py` will not count pipealloc
 as proven before then. That is honest — the proof rests on the assumed
 `FILECLOSE` contract.
+
+## `sys_pipe`
+
+`sys_pipe` — pipealloc's only caller — is proven
+([`../projects/sys-pipe.md`](../projects/sys-pipe.md)). Two things it settles
+that belong here:
+
+- **pipealloc's failure arm now returns both `fd_slot`s.** sys_pipe promises
+  its whole allowance back on all four exits, and this is the only arm that
+  could break that.
+- **The two pipe-end references are DROPPED by sys_pipe.** Stage-1 `file_ref`
+  carries no `file_payload`, so once the two files enter the fd table the ends
+  pipealloc handed back have nowhere to live. A leak of the pipe's page in the
+  model, not a soundness hole — and it disappears the moment `file_payload`
+  lands, because pipealloc will fold the ends INTO the two `file_ref`s and
+  sys_pipe will not mention them at all. This is the concrete cost of leaving
+  `file_payload` for stage 2.

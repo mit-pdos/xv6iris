@@ -87,6 +87,33 @@ Proof.
   rewrite H. lia.
 Qed.
 
+(* A FILE SLOT'S ADDRESS IS NEVER NULL.  The geometry alone says so
+   ([file_base] is 0x80022478), and several proofs need it: it is what kills
+   pipealloc's two dead "*f0 == 0" arms, and what tells sys_pipe that
+   installing a file pointer in a descriptor really does fill it. *)
+Lemma fnode_nonzero (k : nat) :
+  (k < NFILE)%nat -> eq_vec (fnode k : mword 64) (zero_reg : mword 64) = false.
+Proof.
+  intro Hk. apply eq_vec_false_iff. intro Hc.
+  apply (f_equal bv_unsigned) in Hc.
+  rewrite (acur_unsigned file_base file_stride k NFILE
+             file_base_nonneg file_stride_pos file_end_fits ltac:(lia)) in Hc.
+  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by reflexivity.
+  rewrite Hz in Hc.
+  unfold file_base, file_stride, KernelSyms.ftable in Hc.
+  lia.
+Qed.
+
+(* the same, as a plain disequality -- what a caller reasoning about the
+   VALUE stored in a descriptor wants. *)
+Lemma fnode_ne_zero (k : nat) :
+  (k < NFILE)%nat -> (fnode k : mword 64) <> (zero_reg : mword 64).
+Proof.
+  intros Hk Hc.
+  pose proof (fnode_nonzero k Hk) as Hf.
+  apply eq_vec_false_iff in Hf. exact (Hf Hc).
+Qed.
+
 (* the four [type] codes (file.h's anonymous enum). *)
 Definition FD_NONE   : mword 32 := mword_of_int 0.
 Definition FD_PIPE   : mword 32 := mword_of_int 1.

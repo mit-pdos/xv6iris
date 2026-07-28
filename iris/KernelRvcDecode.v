@@ -1262,3 +1262,55 @@ Proof.
     by (vm_compute; reflexivity).
   reflexivity.
 Qed.
+
+(* ---- sys_pipe's five compressed words that no earlier function had.
+   Four of them are the syscall layer's own idioms one register over
+   ([c.li a3,4] is copyout's [sizeof(int)] argument, [c.add a1,a1,a3] is the
+   [fdarray + sizeof(fd0)] the second copyout wants), one is the
+   [p->pagetable] load, and one is the [c.j] to the shared epilogue. ---- *)
+
+(* 0x4691  c.li a3,4          -- sys_pipe: the len argument of both copyouts *)
+Lemma cdec_4691 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4691 : mword 16)) s
+  = Some (C_LI (mword_of_int 4, Regidx (mword_of_int 13)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x68a8  c.ld a0,80(s1)     -- sys_pipe: p->pagetable *)
+Lemma cdec_68a8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x68a8 : mword 16)) s
+  = Some (C_LD (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_68a8]'s AST in the shape a WP load leaf takes. *)
+Lemma cshape_68a8 :
+  LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),
+        creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)
+  = LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 9 : mword 5),
+          Regidx (mword_of_int 10 : mword 5), false, 8).
+Proof.
+  replace (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")) : mword 12)
+    with (mword_of_int 80 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
+  replace (creg2reg_idx (Cregidx (mword_of_int 1))) with (Regidx (mword_of_int 9 : mword 5))
+    by (vm_compute; reflexivity).
+  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
+    by (vm_compute; reflexivity).
+  reflexivity.
+Qed.
+
+(* 0x95b6  c.add a1,a1,a3     -- sys_pipe: fdarray + sizeof(fd0) *)
+Lemma cdec_95b6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x95b6 : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 11), Regidx (mword_of_int 13)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x97a6  c.add a5,a5,s1     -- sys_pipe: &p->ofile[fd] *)
+Lemma cdec_97a6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x97a6 : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 9)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xa025  c.j +0x28          -- sys_pipe +0xae, into the shared epilogue *)
+Lemma cdec_a025 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa025 : mword 16)) s
+  = Some (C_J (mword_of_int 20), s).
+  Proof. intro H. rvc_oneshot s H. Qed.

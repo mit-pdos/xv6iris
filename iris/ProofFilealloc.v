@@ -891,7 +891,7 @@ Section ProofFilealloc.
                       = mword_of_int (FA + 0x52))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".
-      iApply ("Hepi" $! G4 (zero_reg : mword 64) with "[%] Hcg Hpc Hcnt []").
+      iApply ("Hepi" $! G4 (zero_reg : mword 64) with "[%] Hcg Hpc Hcnt [Hfdslot]").
       { split.
         { rewrite /G4 upd_ne; [| vm_compute; discriminate].
           rewrite (callee_saved_lookup Hrelpins_cs csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -908,7 +908,10 @@ Section ProofFilealloc.
         rewrite /R3 upd_ne; [| regne].
         rewrite /R2 upd_ne; [| regne].
         rewrite /R1 upd_ne; [reflexivity | regne]. }
-      { rewrite /filealloc_post. iLeft. done. } }
+      { rewrite /filealloc_post. iLeft. iSplitR; [done|].
+        (* the scan created no reference, so the unit the caller supplied is
+           still untouched -- it goes straight back out. *)
+        iExact "Hfdslot". } }
   Qed.
 
 End ProofFilealloc.

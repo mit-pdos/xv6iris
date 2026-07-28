@@ -49,12 +49,20 @@ Local Open Scope Z_scope.
 Notation FA := KernelSyms.filealloc.
 
 Section SpecFilealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
 
   (* filealloc's return value: either the table was full (a0 = 0), or a0 points
-     at entry [k] and the caller owns it exclusively and uninitialized. *)
+     at entry [k] and the caller owns it exclusively and uninitialized.
+
+     THE FAILURE ARM GIVES THE fd_slot BACK.  The unit below pays for a
+     reference, and on this arm no reference was created -- the scan ran off
+     the end of the table and nothing entered the authority -- so keeping it
+     would burn a unit of a CONSERVED supply on a call that did nothing
+     (FdSlots.v).  A caller that retries, or that allocates two files and
+     must return its whole allowance whichever way the calls went (pipealloc,
+     hence sys_pipe), cannot balance its books without this. *)
   Definition filealloc_post (γf : gname) (r : mword 64) : iProp Σ :=
-    (⌜r = (zero_reg : mword 64)⌝
+    (⌜r = (zero_reg : mword 64)⌝ ∗ fd_slot
      ∨ ∃ (k : nat) (Cf : fcontent),
          ⌜(k < NFILE)%nat /\ r = fnode k /\ fc_type Cf = FD_NONE⌝ ∗
          file_ref γf k 1 Cf)%I.
