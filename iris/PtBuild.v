@@ -2178,6 +2178,90 @@ Lemma candi1_imm :
   = sign_extend' 64 (mword_of_int 1 : mword 12).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE V&U BIT TEST -- the same bridge one field wider.                    *)
+(*                                                                         *)
+(*   walkaddr merges C's two flag tests into a single                      *)
+(*   [andi a3,a5,17] / [li a4,17] / [beq], i.e. it tests bits 0 (V) and 4  *)
+(*   (U) at once.  [pte_vu_bits] is that test's verdict, in the form        *)
+(*   [PtTree.pte_vu] states it -- over the model's flag accessors.  Only    *)
+(*   the direction the TAKEN [beq] needs is proved: the fall-through arm    *)
+(*   returns 0 and needs nothing.                                          *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma andi17_unsigned (w : mword 64) :
+  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 17 : mword 12)) : mword 64)
+  = Z.land (bv_unsigned w) 17.
+Proof.
+  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 17 by (vm_compute; reflexivity) end.
+  reflexivity.
+Qed.
+
+Local Lemma pb_z_land_17 (x : Z) :
+  Z.land x 17 = 17 -> Z.testbit x 0 = true /\ Z.testbit x 4 = true.
+Proof.
+  intros H. split.
+  - apply (f_equal (fun z => Z.testbit z 0)) in H.
+    rewrite Z.land_spec in H.
+    assert (T : Z.testbit 17 0 = true) by (vm_compute; reflexivity).
+    rewrite T in H. rewrite andb_true_r in H. exact H.
+  - apply (f_equal (fun z => Z.testbit z 4)) in H.
+    rewrite Z.land_spec in H.
+    assert (T : Z.testbit 17 4 = true) by (vm_compute; reflexivity).
+    rewrite T in H. rewrite andb_true_r in H. exact H.
+Qed.
+
+Local Lemma pb_z_bit_to_mod (y : Z) : Z.testbit y 0 = true -> y mod 2 = 1.
+Proof. intros H. rewrite Z.bit0_odd in H. rewrite Zmod_odd. rewrite H. reflexivity. Qed.
+
+Local Lemma pb_z_bit0_of (x : Z) : Z.testbit x 0 = true -> (x mod 256) mod 2 = 1.
+Proof.
+  intros H. apply pb_z_bit_to_mod.
+  change 256 with (2 ^ 8). rewrite Z.mod_pow2_bits_low; [exact H | lia].
+Qed.
+
+Local Lemma pb_z_bit4_of (x : Z) : Z.testbit x 4 = true -> (x mod 256) / 16 mod 2 = 1.
+Proof.
+  intros H. apply pb_z_bit_to_mod.
+  change 16 with (2 ^ 4). rewrite Z.div_pow2_bits; [| lia | lia].
+  change 256 with (2 ^ 8). rewrite Z.mod_pow2_bits_low; [| lia].
+  replace (0 + 4) with 4 by lia. exact H.
+Qed.
+
+(* the flag-byte field extractions, off the width-generic
+   [RiscvExtras.subrange_dec_unsigned] *)
+Local Lemma pb_sub_7_0 (v : mword 64) :
+  bv_unsigned (subrange_vec_dec v 7 0 : mword 8) = bv_unsigned v mod 256.
+Proof. apply (subrange_dec_unsigned_lo0 v 7 256); [lia | reflexivity]. Qed.
+Local Lemma pb_sub_0_0 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 0 0 : mword 1) = bv_unsigned v mod 2.
+Proof. apply (subrange_dec_unsigned_lo0 v 0 2); [lia | reflexivity]. Qed.
+Local Lemma pb_sub_4_4 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 4 4 : mword 1) = bv_unsigned v / 16 mod 2.
+Proof. apply (subrange_dec_unsigned v 4 4 16 2); [lia | lia | reflexivity | reflexivity]. Qed.
+
+Lemma pte_vu_bits (w : mword 64) :
+  and_vec w (sign_extend' 64 (mword_of_int 17 : mword 12)) = (mword_of_int 17 : mword 64) ->
+  pte_vu w.
+Proof.
+  intros Hand.
+  apply (f_equal bv_unsigned) in Hand.
+  rewrite andi17_unsigned in Hand.
+  assert (H17 : bv_unsigned (mword_of_int 17 : mword 64) = 17) by (vm_compute; reflexivity).
+  rewrite H17 in Hand.
+  destruct (pb_z_land_17 _ Hand) as [Hb0 Hb4].
+  unfold pte_vu, _get_PTE_Flags_V, _get_PTE_Flags_U, Mk_PTE_Flags.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  split; apply bv_eq; rewrite H1.
+  - rewrite pb_sub_0_0. rewrite pb_sub_7_0. apply pb_z_bit0_of. exact Hb0.
+  - rewrite pb_sub_4_4. rewrite pb_sub_7_0. apply pb_z_bit4_of. exact Hb4.
+Qed.
+
 (* ===================================================================== *)
 (* §8 mappages bridges: the pure facts wp_mappages' loop body needs.      *)
 (* ===================================================================== *)
@@ -2185,18 +2269,11 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* local unsigned-arithmetic helpers *)
 Local Lemma pb_add_vec_unsigned (x y : mword 64) :
   bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
+Proof. exact (add_vec64_unsigned x y). Qed.
 
 Local Lemma pb_moi_unsigned (k : Z) :
   bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof.
-  unfold mword_of_int, Values.to_word, get_word. cbn.
-  rewrite Z_to_bv_unsigned. reflexivity.
-Qed.
+Proof. exact (moi64_unsigned k). Qed.
 
 Local Lemma pb_add_vec_int27_wrap (a : mword 27) (j : Z) :
   0 <= j < 134217728 ->

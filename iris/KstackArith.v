@@ -185,9 +185,7 @@ Lemma subvec_moi (x y : Z) : (0 <= y)%Z -> (y <= x)%Z -> (x < 184467440737095516
 Proof.
   intros Hy Hyx Hx. apply bv_eq.
   assert (Hxy : (0 <= x - y < 18446744073709551616)%Z) by lia.
-  unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
-  rewrite bv_sub_unsigned.
+  rewrite sub_vec64_unsigned.
   rewrite (moi64_uns x ltac:(lia)). rewrite (moi64_uns y ltac:(lia)).
   rewrite (moi64_uns (x - y) ltac:(exact Hxy)).
   apply bv_wrap_small. unfold bv_modulus.

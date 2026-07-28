@@ -110,11 +110,7 @@ Import Defs.
 (* Compressed decode facts for the words no other function uses.          *)
 (* ===================================================================== *)
 
-(* 0x8a2e  c.mv s4,a1 *)
-Lemma padc_8a2e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8a2e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x8a2e  c.mv s4,a1 -- [cdec_8a2e] (KernelRvcDecode.v) *)
 
 (* 0xe088  c.sd a0,0(s1) *)
 Lemma padc_e088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -186,7 +182,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x557d  c.li a0,-1 *)
 
-
 (* 0xc789  c.beqz a5,+0x0a *)
 Lemma padc_c789 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xc789 : mword 16)) s
@@ -196,7 +191,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* 0x853e  c.mv a0,a5 -- [cdec_853e] (KernelRvcDecode.v) *)
 
 (* 0xbfcd  c.j -0x0e *)
-
 
 (* the three compressed reg-base memory ops, in the leaf-friendly (Regidx /
    literal-immediate) form: instances of WpMmodeLeafBase's
@@ -398,7 +392,7 @@ Section PipeallocInstrs.
   (* +0x0e  8a2e  c.mv s4,a1 *)
   Lemma pai_0e : kernel_text -∗ instr (mword_of_int (PA + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 20), ADD)).
   Proof. mk_rvc (PA + 0x0e)%Z (mword_of_int 0x8a2e : mword 16)
-    (mword_of_int (PA + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 20), ADD)) padc_8a2e exec_execute_C_MV. Qed.
+    (mword_of_int (PA + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 20), ADD)) cdec_8a2e exec_execute_C_MV. Qed.
 
   (* +0x10  0005b023  sd zero,0(a1) *)
   Lemma pai_10 : kernel_text -∗ instr (mword_of_int (PA + 0x10) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), 8)).

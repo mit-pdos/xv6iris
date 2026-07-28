@@ -36,11 +36,7 @@ Notation IM := KernelSyms.ismapped.
 (* Fresh compressed decode templates.                                     *)
 (* ===================================================================== *)
 
-(* 0x4601  c.li a2,0 *)
-Lemma imdc_4601 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4601 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x4601  c.li a2,0 -- [cdec_4601] (KernelRvcDecode.v) *)
 
 (* 0xc119  c.beqz a0,+0x06 -- [cdec_c119] (KernelRvcDecode.v) *)
 
@@ -106,7 +102,7 @@ Section WpIsmappedDecode.
 
   (* ---- +0x08: c.li a2,0 (walk's alloc = 0) ---- *)
   Lemma imi_08 : IMP 0x08 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
-  Proof. mk_rvc (IM + 0x08)%Z (mword_of_int 0x4601 : mword 16) (mword_of_int (IM + 0x08) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) imdc_4601 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (IM + 0x08)%Z (mword_of_int 0x4601 : mword 16) (mword_of_int (IM + 0x08) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   (* ---- +0x0a: jal walk ---- *)
   Lemma imi_0a : IMP 0x0a false (JAL (mword_of_int 2095566 : mword 21, Regidx (mword_of_int 1))).

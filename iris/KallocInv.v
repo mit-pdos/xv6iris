@@ -138,6 +138,20 @@ Section Kalloc.
     rewrite H0 in Hlo. unfold kmem_lo in Hlo. lia.
   Qed.
 
+  (* ...which is what decides the [bnez a0] every caller of a page-returning
+     routine (walkaddr, vmfault, kalloc) branches on: a page it handed back is
+     never NULL, so the branch is not a case split. *)
+  Lemma page_valid_neq_zero (q : mword 64) : page_valid q -> neq_vec q zero_reg = true.
+  Proof.
+    intro Hv. unfold neq_vec.
+    assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite Hzr.
+    destruct (eq_vec q (mword_of_int 0)) eqn:E; [| reflexivity].
+    apply eq_vec_true_iff in E.
+    destruct (page_valid_ne_null q Hv E).
+  Qed.
+
   (* PGSIZE(4096)-alignment implies doubleword(8)-alignment, in the exact
      [is_aligned_paddr] shape [word_pointsto]/[word_at] demand. *)
   Lemma page_valid_aligned8 p : page_valid p -> is_aligned_paddr (Physaddr p) 8 = true.

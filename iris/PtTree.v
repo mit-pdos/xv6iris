@@ -53,7 +53,7 @@
 
    Instances: the kernel S-mode table (KptTree.v) and, eventually, the
    user table (UserPt.v -- worklist).                                    *)
-From Stdlib Require Import ZArith Bool.
+From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
@@ -98,9 +98,7 @@ Definition pte_leaf (w : mword 64) : Prop :=
    -- for a table described by [UptTree.upt_tree_spec] -- the verdict that
    places its vpn in the user MAP rather than at the trampoline or the
    trapframe, whose leaves both have U = 0.  Stated over the model's flag
-   accessors; the [andi] bit-test bridge is [ProofWalkaddr.wa_pte_vu_bits]
-   (which belongs in PtBuild.v next to [pte_valid_bit0] -- see the cleanup
-   sweep in claude-notes/projects/copy-inout.md). *)
+   accessors; the [andi] bit-test bridge is [PtBuild.pte_vu_bits]. *)
 Definition pte_vu (w : mword 64) : Prop :=
   _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1) /\
   _get_PTE_Flags_U (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1).
@@ -126,6 +124,169 @@ Definition pte_check_denied (acc : MemoryAccessType mem_payload) (p : Privilege)
                     (Mk_PTE_Flags (subrange_vec_dec w 7 0))
                     (ext_bits_of_PTE w) tt) s
             = Some (PTE_Check_Failure (tt, f), s).
+
+(* ---------------------------------------------------------------------- *)
+(* WHAT [pte_valid] PINS ABOVE THE PPN.                                    *)
+(*                                                                         *)
+(*   A model-VALID PTE has all ten extension bits (63:54) clear, so its     *)
+(*   word is below 2^54.  That is what makes the machine's PTE2PA --        *)
+(*   [(w >> 10) << 12], which keeps bits 61:54 and lands them at 63:56 --   *)
+(*   agree with [page_base (pte_ppn w)], which is bits 53:10 and is zero    *)
+(*   above bit 55.  (Counterexample without it: [w = 2^54 + 19] passes the  *)
+(*   V&U test, the machine gives 2^56 and the spec asks 0.)                 *)
+(*                                                                         *)
+(*   Bit 63 (N) and bits 62:61 (PBMT) come from the [pte_no_napot] /        *)
+(*   [pte_pbmt0] conjuncts; bits 60:59 (RSW_60t59b) and 58:54 (reserved)    *)
+(*   come from [pte_valid] ITSELF, read at a state where no extension is    *)
+(*   enabled -- [pte_valid] quantifies over ALL states, and with misa = 0   *)
+(*   the Sv39-gated Svrsw60t59b probe reads false, so the RSW/reserved      *)
+(*   disjuncts of [pte_is_invalid] degenerate to their raw field-is-nonzero *)
+(*   tests.                                                                 *)
+(* ---------------------------------------------------------------------- *)
+
+(* the extension-bit field extractions, as instances of the one width-generic
+   [RiscvExtras.subrange_dec_unsigned] *)
+Local Lemma pte_sub_4_0 (v : mword 10) :
+  bv_unsigned (subrange_vec_dec v 4 0 : mword 5) = bv_unsigned v mod 32.
+Proof. apply (subrange_dec_unsigned_lo0 v 4 32); [lia | reflexivity]. Qed.
+Local Lemma pte_sub_6_5 (v : mword 10) :
+  bv_unsigned (subrange_vec_dec v 6 5 : mword 2) = bv_unsigned v / 32 mod 4.
+Proof. apply (subrange_dec_unsigned v 6 5 32 4); [lia | lia | reflexivity | reflexivity]. Qed.
+Local Lemma pte_sub_8_7 (v : mword 10) :
+  bv_unsigned (subrange_vec_dec v 8 7 : mword 2) = bv_unsigned v / 128 mod 4.
+Proof. apply (subrange_dec_unsigned v 8 7 128 4); [lia | lia | reflexivity | reflexivity]. Qed.
+Local Lemma pte_sub_9_9 (v : mword 10) :
+  bv_unsigned (subrange_vec_dec v 9 9 : mword 1) = bv_unsigned v / 512 mod 2.
+Proof. apply (subrange_dec_unsigned v 9 9 512 2); [lia | lia | reflexivity | reflexivity]. Qed.
+Local Lemma pte_sub_63_54 (v : mword 64) :
+  bv_unsigned (subrange_vec_dec v 63 54 : mword 10)
+  = bv_unsigned v / 18014398509481984 mod 1024.
+Proof.
+  apply (subrange_dec_unsigned v 63 54 _ _);
+    [lia | lia | vm_compute; reflexivity | vm_compute; reflexivity].
+Qed.
+
+(* the arithmetic, mword-free (the zify-hook rule): four nested divisibility
+   facts collapse the whole 10-bit field to zero.  [lia] has no theory of
+   iterated division, so the chain is staged by hand. *)
+Local Lemma pte_z_ext_zero (E : Z) :
+  0 <= E < 1024 -> E mod 32 = 0 -> E / 32 mod 4 = 0 ->
+  E / 128 mod 4 = 0 -> E / 512 mod 2 = 0 -> E = 0.
+Proof.
+  intros Hr H1 H2 H3 H4.
+  assert (D1 : E = 32 * (E / 32)) by (apply Z_div_exact_2; [lia | exact H1]).
+  assert (Q1 : E / 32 / 4 = E / 128)
+    by (rewrite (Z.div_div E 32 4 ltac:(lia) ltac:(lia)); reflexivity).
+  assert (D2 : E / 32 = 4 * (E / 128))
+    by (rewrite <- Q1; apply Z_div_exact_2; [lia | exact H2]).
+  assert (Q2 : E / 128 / 4 = E / 512)
+    by (rewrite (Z.div_div E 128 4 ltac:(lia) ltac:(lia)); reflexivity).
+  assert (D3 : E / 128 = 4 * (E / 512))
+    by (rewrite <- Q2; apply Z_div_exact_2; [lia | exact H3]).
+  assert (Q3 : E / 512 / 2 = E / 1024)
+    by (rewrite (Z.div_div E 512 2 ltac:(lia) ltac:(lia)); reflexivity).
+  assert (D4 : E / 512 = 2 * (E / 1024))
+    by (rewrite <- Q3; apply Z_div_exact_2; [lia | exact H4]).
+  lia.
+Qed.
+
+Local Lemma pte_z_hi_zero (x : Z) :
+  0 <= x < 18446744073709551616 ->
+  x / 18014398509481984 mod 1024 = 0 -> x < 18014398509481984.
+Proof.
+  intros Hr H.
+  assert (Hq : 0 <= x / 18014398509481984 < 1024).
+  { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
+  rewrite (Z.mod_small _ _ Hq) in H.
+  pose proof (Z_div_mod_eq_full x 18014398509481984) as Hd.
+  pose proof (Z.mod_pos_bound x 18014398509481984 ltac:(lia)) as Hm.
+  lia.
+Qed.
+
+(* a state in which NO extension is currently enabled (misa = 0) and
+   menvcfg = 0: the Sv39-gated Svnapot/Svrsw60t59b probes and the PBMTE gate
+   all read false there. *)
+Local Definition pte_s0 : mstate := MState init_regstate ∅ dev0_state.
+
+Local Lemma pte_piv_split (f : mword 8) (e : mword 10) :
+  exists b1 b2 b3 b4 b5 b6,
+    exec (pte_is_invalid f e) pte_s0
+    = Some (orb b1 (orb b2 (orb b3 (orb b4 (orb b5 (orb b6
+              (orb (andb (neq_vec (_get_PTE_Ext_RSW_60t59b e) (zeros' 2)) true)
+                   (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))), pte_s0).
+Proof.
+  do 6 eexists.
+  unfold pte_is_invalid.
+  eapply exec_or_v; [ apply exec_returnM | ].
+  eapply exec_or_v;
+    [ eapply exec_and_v; [ apply exec_returnM |
+        eapply exec_and_v; [ apply exec_returnM |
+          eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] ] ] | ].
+  eapply exec_or_v; [ apply exec_returnM | ].
+  eapply exec_or_v; [ apply exec_returnM | ].
+  eapply exec_or_v;
+    [ eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
+  eapply exec_or_v;
+    [ eapply exec_and_v; [ apply exec_returnM |
+        eapply exec_or_v; [ vm_compute; reflexivity | apply exec_returnM ] ] | ].
+  eapply exec_or_v; [ | apply exec_returnM ].
+  eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ].
+Qed.
+
+Local Lemma pte_valid_rsw_res (w : mword 64) :
+  pte_valid w ->
+  _get_PTE_Ext_RSW_60t59b (ext_bits_of_PTE w) = zeros' 2 /\
+  _get_PTE_Ext_reserved (ext_bits_of_PTE w) = zeros' 5.
+Proof.
+  intros Hv.
+  destruct (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0)) (ext_bits_of_PTE w))
+    as (b1 & b2 & b3 & b4 & b5 & b6 & Hex).
+  specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
+  do 6 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  apply orb_false_iff in Hb. destruct Hb as [Hrsw Hres].
+  rewrite andb_true_r in Hrsw.
+  unfold neq_vec in Hrsw. unfold neq_vec in Hres.
+  apply negb_false_iff in Hrsw. apply negb_false_iff in Hres.
+  split; apply eq_vec_true_iff; assumption.
+Qed.
+
+Lemma pte_hi_zero (w : mword 64) :
+  pte_valid w -> pte_no_napot w -> pte_pbmt0 w ->
+  bv_unsigned w < 18014398509481984.
+Proof.
+  intros Hv Hn Hp.
+  destruct (pte_valid_rsw_res w Hv) as [Hrsw Hres].
+  assert (HN : _get_PTE_Ext_N (ext_bits_of_PTE w) = ('b"0" : mword 1)).
+  { destruct (mword1_cases (_get_PTE_Ext_N (ext_bits_of_PTE w))) as [H0 | H1].
+    - rewrite H0. apply bv_eq; vm_compute; reflexivity.
+    - unfold pte_no_napot in Hn. rewrite H1 in Hn. vm_compute in Hn. discriminate. }
+  assert (Hext : ext_bits_of_PTE w = (subrange_vec_dec w 63 54 : mword 10)) by reflexivity.
+  unfold pte_pbmt0 in Hp.
+  rewrite Hext in HN. rewrite Hext in Hp. rewrite Hext in Hrsw. rewrite Hext in Hres.
+  unfold _get_PTE_Ext_N in HN. unfold _get_PTE_Ext_PBMT in Hp.
+  unfold _get_PTE_Ext_RSW_60t59b in Hrsw. unfold _get_PTE_Ext_reserved in Hres.
+  apply (f_equal bv_unsigned) in HN. apply (f_equal bv_unsigned) in Hp.
+  apply (f_equal bv_unsigned) in Hrsw. apply (f_equal bv_unsigned) in Hres.
+  rewrite pte_sub_9_9 in HN. rewrite pte_sub_8_7 in Hp.
+  rewrite pte_sub_6_5 in Hrsw. rewrite pte_sub_4_0 in Hres.
+  assert (Z0a : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
+  assert (Z0b : bv_unsigned ('b"00" : mword 2) = 0) by (vm_compute; reflexivity).
+  assert (Z0c : bv_unsigned (zeros' 2 : mword 2) = 0) by (vm_compute; reflexivity).
+  assert (Z0d : bv_unsigned (zeros' 5 : mword 5) = 0) by (vm_compute; reflexivity).
+  rewrite Z0a in HN. rewrite Z0b in Hp. rewrite Z0c in Hrsw. rewrite Z0d in Hres.
+  assert (HE0 : bv_unsigned (subrange_vec_dec w 63 54 : mword 10) = 0).
+  { apply pte_z_ext_zero; [ | exact Hres | exact Hrsw | exact Hp | exact HN ].
+    pose proof (bv_unsigned_in_range _ (subrange_vec_dec w 63 54 : mword 10)) as Hr.
+    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 10) = 1024)
+      by (vm_compute; reflexivity).
+    rewrite Hm in Hr. exact Hr. }
+  rewrite pte_sub_63_54 in HE0.
+  apply pte_z_hi_zero; [ | exact HE0 ].
+  pose proof (bv_unsigned_in_range _ w) as Hr.
+  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
+    by (vm_compute; reflexivity).
+  rewrite Hm in Hr. exact Hr.
+Qed.
 
 (* ===================================================================== *)
 (* §2 The description.  One node = one PT page: its base ppn, its 512     *)

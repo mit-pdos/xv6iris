@@ -102,11 +102,7 @@ Import Defs.
 (* Compressed decode facts for vmfault's own words.                       *)
 (* ===================================================================== *)
 
-(* 0x0c / 0x50  c.mv s3,a0 *)
-Lemma vfdc_89aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x89aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x0c / 0x50  c.mv s3,a0 -- [cdec_89aa] (KernelRvcDecode.v) *)
 
 (* 0x14  c.ld a5,72(a0) *)
 Lemma vfdc_653c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -287,7 +283,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_0c : kernel_text -∗ instr (mword_of_int (VF + 0x0c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)).
   Proof. mk_rvc (VF + 0x0c)%Z (mword_of_int 0x89aa : mword 16)
-    (mword_of_int (VF + 0x0c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) vfdc_89aa exec_execute_C_MV. Qed.
+    (mword_of_int (VF + 0x0c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) cdec_89aa exec_execute_C_MV. Qed.
 
   Lemma vfi_0e : kernel_text -∗ instr (mword_of_int (VF + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (VF + 0x0e)%Z (mword_of_int 0x892e : mword 16)
@@ -413,7 +409,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_50 : kernel_text -∗ instr (mword_of_int (VF + 0x50) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)).
   Proof. mk_rvc (VF + 0x50)%Z (mword_of_int 0x89aa : mword 16)
-    (mword_of_int (VF + 0x50) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) vfdc_89aa exec_execute_C_MV. Qed.
+    (mword_of_int (VF + 0x50) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) cdec_89aa exec_execute_C_MV. Qed.
 
   Lemma vfi_52 : kernel_text -∗ instr (mword_of_int (VF + 0x52) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 12), LUI)).
   Proof. mk_rvc (VF + 0x52)%Z (mword_of_int 0x6605 : mword 16)

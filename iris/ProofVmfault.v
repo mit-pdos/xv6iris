@@ -106,11 +106,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* [lui a5,0xfffff] is the PGROUNDDOWN mask, spelled as the spec's [-4096]. *)
-Lemma vf_lui_m4096 :
-  luival (sign_extend' 20 (mword_of_int 63 : mword 6)) = mword_of_int (-4096).
-Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-
 (* a kalloc page is page-aligned, in mappages' [subrange] spelling *)
 Lemma vf_page_align12 (r : mword 64) :
   page_valid r -> subrange_vec_dec r 11 0 = (zeros' 12 : mword 12).
@@ -756,7 +751,7 @@ Section ProofVmfault.
     iApply (wp_clui_s_sconf γ Φ (mword_of_int (VF + 0x30)) Ra5
               (sign_extend' 20 (mword_of_int 63 : mword 6)) (mword_of_int (-4096) : mword 64)
               L1 (K - 6)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              vf_lui_m4096
+              lui_m4096
               with "Hcg Hpc Hi30 [-]").
     iIntros "Hcg Hpc".
     set (L2 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-4096) : mword 64)]> L1).

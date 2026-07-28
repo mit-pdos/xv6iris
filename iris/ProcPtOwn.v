@@ -84,6 +84,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
+Require Import ByteCursor.   (* the add/sub/mword_of_int unsigned laws *)
 Require Import SmodePte.
 Require Import Pt4kWalk.
 Require Import CommonWalk.
@@ -101,7 +102,7 @@ Require Import UserPtTree.
 Require Import ProcPt.
 Require Import KallocInv.
 Require Import ProcGeom.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -147,6 +148,71 @@ Proof.
   rewrite (uint_pa_add (page_base ppn) j);
     [| rewrite uint_unsigned; exact (page_base_no_wrap ppn j Hj)].
   rewrite uint_unsigned page_base_ppn_unsigned. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* PTE2PA, i.e. [srli 10; slli 12] -- how the MACHINE computes the same    *)
+(* page base out of a leaf word.                                          *)
+(*                                                                        *)
+(*   THIS IS NOT UNCONDITIONAL.  The shift pair keeps bits 61:54 of the    *)
+(*   word (they land at 63:56 of the result) while [pte_ppn] is bits       *)
+(*   53:10, so the two agree exactly when [uint w < 2^54] -- which is what *)
+(*   [PtTree.pte_hi_zero] gets out of a model-VALID leaf.                  *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma ppn_unsigned (w : mword 64) :
+  bv_unsigned (pte_ppn w) = bv_unsigned w / 1024 mod 17592186044416.
+Proof.
+  unfold pte_ppn. rewrite !autocast_id.
+  unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota.
+  rewrite autocast_id.
+  apply (subrange_dec_unsigned w 53 10 _ _);
+    [lia | lia | vm_compute; reflexivity | vm_compute; reflexivity].
+Qed.
+
+Local Lemma ppo_shiftr10 (v : mword 64) : bv_unsigned (shiftr v 10) = bv_unsigned v / 1024.
+Proof.
+  unfold shiftr, with_word, get_word, MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftr_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
+             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 10))) with 10
+    by (vm_compute; reflexivity).
+  rewrite Z.shiftr_div_pow2; [reflexivity | lia].
+Qed.
+
+Local Lemma ppo_shiftl12 (v : mword 64) :
+  bv_unsigned (shiftl v 12) = bv_unsigned v * 4096 mod 18446744073709551616.
+Proof.
+  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
+  rewrite bv_shiftl_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
+             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
+    by (vm_compute; reflexivity).
+  rewrite Z.shiftl_mul_pow2; [reflexivity | lia].
+Qed.
+
+Local Lemma z_pte2pa (x : Z) :
+  0 <= x -> x < 18014398509481984 ->
+  x / 1024 * 4096 mod 18446744073709551616 = x / 1024 mod 17592186044416 * 4096.
+Proof.
+  intros H0 H1.
+  assert (Hq : 0 <= x / 1024 < 17592186044416).
+  { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
+  rewrite (Z.mod_small (x / 1024) 17592186044416 Hq).
+  apply Z.mod_small. lia.
+Qed.
+
+Lemma pte2pa (w : mword 64) (n m : Z) (s10 : mword n) (s12 : mword m) :
+  int_of_mword false s10 = 10 -> int_of_mword false s12 = 12 ->
+  bv_unsigned w < 18014398509481984 ->
+  shift_bits_left (shift_bits_right w s10) s12 = page_base (pte_ppn w).
+Proof.
+  intros H10 H12 Hlt.
+  apply bv_eq.
+  unfold shift_bits_left, shift_bits_right. rewrite H10. rewrite H12.
+  rewrite ppo_shiftl12. rewrite ppo_shiftr10.
+  rewrite page_base_ppn_unsigned. rewrite ppn_unsigned.
+  apply z_pte2pa; [ exact (proj1 (bv_unsigned_in_range _ w)) | exact Hlt ].
 Qed.
 
 (* ===================================================================== *)
@@ -503,25 +569,25 @@ Proof. rewrite vmfault_pte_mk. apply pte_ppn_mk_pte. lia. Qed.
 Local Lemma z_lt_4096_mul (x : Z) : x < 72057594037927936 -> x < 4096 * 17592186044416.
 Proof. lia. Qed.
 
-(* [PtBuild.pb_subrange_55_12_unsigned] is [Local] there; same one-liner. *)
+(* bits 55:12 of a below-2^56 word ARE its page number: one instance of
+   [RiscvExtras.subrange_dec_unsigned] plus the observation that the [mod]
+   is vacuous in range. *)
+Local Lemma ppo_subrange_55_12 (a : mword 64) :
+  bv_unsigned (subrange_vec_dec a 55 12 : mword 44)
+  = bv_unsigned a / 4096 mod 17592186044416.
+Proof.
+  apply (subrange_dec_unsigned a 55 12 _ _);
+    [lia | lia | vm_compute; reflexivity | vm_compute; reflexivity].
+Qed.
+
 Local Lemma ppo_subrange_55_12_unsigned (a : mword 64) :
   bv_unsigned a < 72057594037927936 ->
   bv_unsigned (autocast (T := mword) (subrange_vec_dec a 55 12) : mword 44)
   = bv_unsigned a / 4096.
 Proof.
   intros Hlt.
-  rewrite autocast_id.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word.
-  rewrite bv_extract_unsigned.
-  change (Z.of_N (MachineWord.MachineWord.Z_idx 12)) with 12.
-  change (MachineWord.MachineWord.Z_idx (55 - 12 + 1)) with 44%N.
-  rewrite Z.shiftr_div_pow2; [| lia].
-  change (2 ^ 12) with 4096.
-  apply bv_wrap_small.
-  unfold bv_modulus.
-  change (2 ^ Z.of_N 44) with 17592186044416.
+  rewrite autocast_id. rewrite ppo_subrange_55_12.
+  apply Z.mod_small.
   split.
   - apply Z.div_pos; [exact (proj1 (bv_unsigned_in_range _ a)) | reflexivity].
   - apply Z.div_lt_upper_bound; [reflexivity | exact (z_lt_4096_mul _ Hlt)].
@@ -553,11 +619,7 @@ Qed.
 
 Local Lemma ppo_and_vec_unsigned (a b : mword 64) :
   bv_unsigned (and_vec a b) = Z.land (bv_unsigned a) (bv_unsigned b).
-Proof.
-  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word to_word get_word].
-  unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
-Qed.
+Proof. exact (and_vec64_unsigned a b). Qed.
 
 Local Lemma z_bits_high_64 (x j : Z) :
   0 <= x < 18446744073709551616 -> 64 <= j -> Z.testbit x j = false.
@@ -618,17 +680,13 @@ Qed.
 
 Local Lemma ppo_subrange_11_0_unsigned (a : mword 64) :
   bv_unsigned (subrange_vec_dec a 11 0 : mword 12) = bv_unsigned a mod 4096.
-Proof.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  rewrite bv_extract_0_unsigned.
-  change (MachineWord.MachineWord.Z_idx (11 - 0 + 1)) with 12%N.
-  unfold bv_wrap. change (bv_modulus 12) with 4096. reflexivity.
-Qed.
+Proof. apply (subrange_dec_unsigned_lo0 a 11 4096); [lia | reflexivity]. Qed.
 
-Local Lemma z_pgd_mod (x : Z) : (x - x mod 4096) mod 4096 = 0.
+(* a PGROUNDDOWNed value is a multiple of the page size.  Not [Local]: both
+   copy loops need it to see that re-masking an already-masked va is the
+   identity ([pgd_idem] below), which is what lets them match vmfault's
+   postcondition (stated at the RE-masked value). *)
+Lemma z_pgd_mod (x : Z) : (x - x mod 4096) mod 4096 = 0.
 Proof.
   pose proof (Z_div_mod_eq_full x 4096) as H.
   replace (x - x mod 4096) with (x / 4096 * 4096) by lia.
@@ -670,13 +728,8 @@ Qed.
 Local Lemma ppo_subrange_38_0_unsigned (a : mword 64) :
   bv_unsigned (subrange_vec_dec a (Z.sub 39 1) 0) = bv_unsigned a mod 549755813888.
 Proof.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  rewrite bv_extract_0_unsigned.
-  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - 0 + 1)) with 39%N.
-  unfold bv_wrap. change (bv_modulus 39) with 549755813888. reflexivity.
+  apply (subrange_dec_unsigned_lo0 a (Z.sub 39 1) 549755813888);
+    [lia | vm_compute; reflexivity].
 Qed.
 
 Local Lemma z_wrap39_shift (x : Z) :
@@ -724,6 +777,41 @@ Proof.
   rewrite !svpn_of_unsigned_gen.
   rewrite pgd_unsigned.
   rewrite z_pgd_div. reflexivity.
+Qed.
+
+(* ---- the three PGROUNDDOWN facts a chunked copy loop lives on ------- *)
+
+(* PGROUNDDOWN is IDEMPOTENT.  vmfault re-masks the already-masked va it is
+   handed and states its postcondition at THAT re-masked value, so both copy
+   loops must see the two as the same address. *)
+Lemma pgd_idem (va : mword 64) :
+  and_vec (and_vec va (mword_of_int (-4096))) (mword_of_int (-4096))
+  = and_vec va (mword_of_int (-4096)).
+Proof.
+  apply bv_eq. rewrite !pgd_unsigned. rewrite (z_pgd_mod (bv_unsigned va)).
+  apply Z.sub_0_r.
+Qed.
+
+(* [sub rd,va,va0]: the OFFSET of the cursor inside its page (copyin's
+   +0x38, copyout's +0x32). *)
+Lemma pgd_off (va : mword 64) :
+  sub_vec va (and_vec va (mword_of_int (-4096)))
+  = (mword_of_int (bv_unsigned va mod 4096) : mword 64).
+Proof.
+  apply bv_eq. rewrite bc_sub_vec_unsigned !bc_moi_unsigned pgd_unsigned.
+  f_equal. ring.
+Qed.
+
+(* [sub rd,va0,va] then [add rd,rd,PGSIZE]: the bytes left in that page
+   above the cursor (copyin's +0x2c, copyout's +0x82). *)
+Lemma pgd_room (va : mword 64) :
+  add_vec (sub_vec (and_vec va (mword_of_int (-4096))) va) (mword_of_int 4096)
+  = (mword_of_int (4096 - bv_unsigned va mod 4096) : mword 64).
+Proof.
+  apply bv_eq.
+  rewrite bc_add_vec_unsigned bc_sub_vec_unsigned !bc_moi_unsigned.
+  rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r.
+  rewrite pgd_unsigned. f_equal. ring.
 Qed.
 
 Local Lemma z_svpn_lt_maxva (x : Z) :
@@ -821,6 +909,17 @@ Definition proc_pt_wf (P : uptd) : Prop :=
   um_pages_valid P.(ud_um) /\       (* every user page is a kalloc page    *)
   page_valid (page_base P.(ud_tfp)).
   (* ... and so is the trapframe page *)
+
+(* the step from "the map has a leaf here" to "the page it names is a kalloc
+   page": [elem_of_um_ppns] then the [um_pages_valid] conjunct.  Used by the
+   page accessor (§6) and by every caller that must decide a [bnez] on a page
+   pointer ([KallocInv.page_valid_neq_zero]). *)
+Lemma um_page_valid (P : uptd) (vpn : mword 27) (w : mword 64) :
+  proc_pt_wf P -> P.(ud_um) !! vpn = Some w -> page_valid (page_base (pte_ppn w)).
+Proof.
+  intros (_ & _ & Hpv & _) Hl. apply Hpv.
+  apply elem_of_um_ppns. exists vpn, w. split; [exact Hl | reflexivity].
+Qed.
 
 (* A kalloc page's bytes are kernel data bytes, hence statically claimed at
    KP_rw -- this is what makes the [↦ₚ ⇄ ↦ₘ] tier bridge available on every
@@ -1362,7 +1461,7 @@ Section ProcPt.
              (big_sepS_delete (fun q => phys_page_own q)
                 (um_ppns P.(ud_um)) (pte_ppn w) Hin)) in "H".
     iDestruct "H" as "(%Hwf & Ht & Hp & Hrest)".
-    pose proof (proj1 (proj2 (proj2 Hwf)) _ Hin) as Hval.
+    pose proof (um_page_valid P vpn w Hwf Hl) as Hval.
     iDestruct (phys_to_page_own (pte_ppn w) Hval with "Hb Hp") as "Hpg".
     iSplitL "Hpg"; [iExact "Hpg" |].
     iIntros "Hpg".

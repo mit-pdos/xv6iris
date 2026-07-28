@@ -16,31 +16,37 @@
    the address space is fine, since the cursor wraps exactly as [pa_add] does --
    so a new byte-walking loop reuses these instead of re-deriving the bitvector
    arithmetic.  This is the byte-granularity, symbolic-base counterpart of
-   [ArrCursor.v] (strided elements at a CONCRETE base). *)
+   [ArrCursor.v] (strided elements at a CONCRETE base).
+
+   The second half of the file is the LOOP-COUNTER arithmetic the same loops
+   need: a byte count lives in a register as [mword_of_int (Z.of_nat k)], and
+   every branch/bump the compiler emits on it -- the zero test, the unsigned
+   compare, the [sub], the pointer bump -- has to be read back as the
+   corresponding fact about [k].  copyin and copyout each proved that block
+   for themselves before it was collected here; do not re-derive it. *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes.
+Require Import RiscvModelBytes RiscvExtras.
 Local Open Scope Z_scope.
 
-(* the two bitvector identities everything below runs on, restated here (as
-   [ArrCursor] does) so this file sits in the definitional layer and needs no
-   function's WP file. *)
+(* the three bitvector identities everything below runs on, restated off
+   [RiscvExtras] (as [ArrCursor] does) so callers need only this file. *)
 Lemma bc_add_vec_unsigned (x y : mword 64) :
   bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
+Proof. exact (add_vec64_unsigned x y). Qed.
+
+(* ...and its [sub_vec] counterpart, which the tree had under no name at all
+   before this (it was inlined in [WpHolding] and [KstackArith] and proved
+   twice more inside the two copy proofs). *)
+Lemma bc_sub_vec_unsigned (x y : mword 64) :
+  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
+Proof. exact (sub_vec64_unsigned x y). Qed.
 
 Lemma bc_moi_unsigned (k : Z) : bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof.
-  unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. reflexivity.
-Qed.
+Proof. exact (moi64_unsigned k). Qed.
 
 (* [add_vec] is commutative -- the end pointer is [base + len] or [len + base]
    depending on which operand register the [add] put in rs1. *)
@@ -59,6 +65,24 @@ Proof.
   rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
   f_equal. lia.
 Qed.
+
+(* the same bump by an arbitrary count held in a register -- a CHUNK-at-a-time
+   loop (copyin's [add s5,s5,s1], copyout's [add s6,s6,s2]) moves the cursor by
+   the chunk length, not by 1. *)
+Lemma pa_add_bump (p : mword 64) (d n : nat) :
+  add_vec (pa_add p d) (mword_of_int (Z.of_nat n)) = pa_add p (d + n).
+Proof.
+  unfold pa_add, add_vec_int. apply bv_eq.
+  rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite !bv_wrap_add_idemp_r, !bv_wrap_add_idemp_l. f_equal.
+  rewrite Nat2Z.inj_add. ring.
+Qed.
+
+(* ...with the operands the other way round, which is how the encoder spells it
+   when the count register is rs1 (copyin's [add a1,a1,a0] at +0x38). *)
+Lemma pa_add_comm (p : mword 64) (k : nat) :
+  add_vec (mword_of_int (Z.of_nat k) : mword 64) p = pa_add p k.
+Proof. unfold pa_add, add_vec_int. apply add_vec_comm. Qed.
 
 (* ...and its dual: gcc bumps the pointer FIRST and then accesses [-1(reg)], so
    the access address is the cursor one below the bumped one. *)
@@ -159,4 +183,92 @@ Proof.
   rewrite bv_wrap_small; [| rewrite Hmod; split; [ exact Hmul_nonneg | exact Hmul_lt ] ].
   rewrite Z.shiftr_div_pow2; [| lia].
   rewrite Z.div_mul; [ reflexivity | rewrite E32; lia ].
+Qed.
+
+(* ===================================================================== *)
+(*  THE LOOP COUNTER.                                                     *)
+(*                                                                        *)
+(*  A byte count / remaining length lives in a register as                *)
+(*  [mword_of_int (Z.of_nat k)].  These are the reads-back of every        *)
+(*  instruction a chunked copy loop applies to it: the zero test the       *)
+(*  [beqz] decides, the unsigned compare the [bgeu] decides, the [sub]     *)
+(*  that decrements it, and the [uint] a caller's premise mentions.        *)
+(* ===================================================================== *)
+
+Lemma bc_bvmod64 : bv_modulus 64 = 18446744073709551616.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma bc_wrap_small (z : Z) : 0 <= z -> z < 18446744073709551616 -> bv_wrap 64 z = z.
+Proof.
+  intros H0 H1. unfold bv_wrap. rewrite bc_bvmod64. apply Z.mod_small. split; assumption.
+Qed.
+
+Lemma bc_moi_small (z : Z) : 0 <= z < 18446744073709551616 ->
+  bv_unsigned (mword_of_int z : mword 64) = z.
+Proof. intros [H0 H1]. rewrite bc_moi_unsigned. apply bc_wrap_small; assumption. Qed.
+
+Lemma bc_zero_reg_unsigned : bv_unsigned (zero_reg : mword 64) = 0.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma bc_uint_moi_nat (k : nat) :
+  (Z.of_nat k < 18446744073709551616)%Z ->
+  uint (mword_of_int (Z.of_nat k) : mword 64) = Z.of_nat k.
+Proof.
+  intro Hk. rewrite uint_unsigned. apply bc_moi_small.
+  split; [apply Nat2Z.is_nonneg | exact Hk].
+Qed.
+
+(* the zero test a [beqz]/[bnez] on the counter decides *)
+Lemma bc_eqz_moi (k : nat) : (Z.of_nat k < 18446744073709551616)%Z ->
+  eq_vec (mword_of_int (Z.of_nat k) : mword 64) zero_reg = Nat.eqb k 0.
+Proof.
+  intro Hk.
+  assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hzr.
+  destruct (Nat.eqb_spec k 0) as [-> | Hne].
+  - apply eq_vec_true_iff. reflexivity.
+  - apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
+    rewrite (bc_moi_small (Z.of_nat k) ltac:(lia)) in Hc.
+    rewrite (bc_moi_small 0 ltac:(lia)) in Hc. lia.
+Qed.
+
+(* the two one-sided readings of it that the branch arms want directly *)
+Lemma bc_moi_iszero : eq_vec (mword_of_int 0 : mword 64) zero_reg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma bc_moi_nonzero (k : nat) :
+  (Z.of_nat k < 18446744073709551616)%Z -> (k <> 0)%nat ->
+  eq_vec (mword_of_int (Z.of_nat k) : mword 64) zero_reg = false.
+Proof.
+  intros Hk Hne. rewrite (bc_eqz_moi k Hk). apply Nat.eqb_neq. exact Hne.
+Qed.
+
+(* the unsigned compare a [bgeu] on two counters decides *)
+Lemma bc_ge_moi (a b : nat) :
+  (Z.of_nat a < 18446744073709551616)%Z -> (Z.of_nat b < 18446744073709551616)%Z ->
+  zopz0zKzJ_u (mword_of_int (Z.of_nat a) : mword 64) (mword_of_int (Z.of_nat b))
+  = Nat.leb b a.
+Proof.
+  intros Ha Hb. unfold zopz0zKzJ_u. rewrite !uint_unsigned.
+  rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
+  rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)).
+  rewrite Z.geb_leb.
+  destruct (Nat.leb_spec b a) as [Hle | Hlt].
+  - apply Z.leb_le. lia.
+  - apply Z.leb_gt. lia.
+Qed.
+
+(* the decrement *)
+Lemma bc_sub_nat (a b : nat) :
+  (b <= a)%nat -> (Z.of_nat a < 18446744073709551616)%Z ->
+  sub_vec (mword_of_int (Z.of_nat a) : mword 64) (mword_of_int (Z.of_nat b))
+  = (mword_of_int (Z.of_nat (a - b)) : mword 64).
+Proof.
+  intros Hle Ha. apply bv_eq.
+  rewrite bc_sub_vec_unsigned.
+  rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
+  rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)).
+  rewrite bc_moi_unsigned. f_equal.
+  rewrite Nat2Z.inj_sub; [reflexivity | exact Hle].
 Qed.

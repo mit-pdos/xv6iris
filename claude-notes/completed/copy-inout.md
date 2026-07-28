@@ -3,7 +3,7 @@
 Specify and prove `copyin` (vm.c, 0x800016e2, 148 B) and `copyout` (0x80001624,
 190 B) — the kernel↔user byte-copy pair — together with the callee neither had
 yet, `walkaddr` (0x80000ff6, 58 B).  Stated at the **`proc_pt` altitude**, like
-[`vmfault`](../completed/vmfault.md): both PRESERVE the valid-user-page-table predicate, and
+[`vmfault`](vmfault.md): both PRESERVE the valid-user-page-table predicate, and
 because both may fault pages in on the way they hand back a descriptor
 **extending** the one they were given.
 
@@ -27,7 +27,7 @@ survives a return to user mode.  Consequently:
 
 Making copyout's effect visible needs a contents-indexed refinement of
 `proc_pt` plus a weakening `proc_pt_at P f ⊢ proc_pt P`; nothing produces the
-refined form today.  Noted, not built (same conclusion as ../completed/vmfault.md).
+refined form today.  Noted, not built (same conclusion as vmfault.md).
 
 ## `uptd_ext` — the descriptor relation both loops need
 
@@ -213,7 +213,7 @@ Per-iteration resource moves:
 
 Exits: `len = 0` at +0x90 (no frame), `-1` at +0x70, `0` at +0x74 — the latter
 two join the 12-slot epilogue at +0x76.  Use the EPI-`iAssert` join recipe from
-ProofVmfault (completed/vmfault.md item F); here every exit that reaches +0x76 has pushed,
+ProofVmfault (vmfault.md item F); here every exit that reaches +0x76 has pushed,
 so nothing is shrink-wrapped and the join takes no `∃`-slot arguments.
 
 ### copyout
@@ -395,55 +395,75 @@ Two things specific to copyout:
       Assumptions` on all three: only the five Sail reservation/platform
       axioms.
 
-## Cleanup sweep (inherited from completed/vmfault.md — do it on the next PtBuild change)
+## Cleanup sweep — DONE
 
-The four items vmfault.md parked are now DONE — the `ProofIsmapped.v` helper
-block and `wp_and_s_sconf` moved down, and `0xc119` was deduplicated (this
-project and the uservec branch landed the same moves independently).  What is
-listed below is what THIS project newly parked:
+Both halves of the sweep landed, and the second one paid for itself in build
+time, which is the argument for doing these promptly rather than letting them
+accrete:
 
-- Move `ProofWalkaddr.v`'s helper block down: `wa_pte_vu_bits` (rename to
-  `pte_vu_bits` — `PtTree.pte_vu`'s comment already forward-references
-  `PtBuild.pte_vu_bits`, which does not exist until this move happens) +
-  `wa_andi17_unsigned` + `wa_pte2pa` → `PtBuild.v`; `wa_pte_hi_zero` →
-  `PtTree.v` next to `pte_valid`; `wa_exec_or_v`/`wa_exec_and_v` →
-  `RiscvTryStep.v`; the nine `wa_sub_*` → one width-generic lemma in
-  `RiscvExtras.v` (also retiring the `Local`
-  `ProcPtOwn.ppo_subrange_55_12_unsigned`).
-- Deduplicate the compressed words that are now wanted by two functions each,
-  all into `KernelRvcDecode.v` (which already has `cdec_c119`): `0x83e9`
-  (`WpWalkInstr.wdec_1c` + `WpWalkaddrDecode.wadc_83e9`), `0x4601`
-  (`WpIsmappedDecode.imdc_4601` + `WpWalkaddrDecode.wadc_4601` +
-  `WpCopyoutDecode.codc_4601` — three copies), `0x6b05`
-  (`WpProcMapstacksInstr.pmsdec_48` + `WpCopyinDecode.cidc_6b05`), and the
-  `8a2e`/`8b32`/`85da`/`85a6`/`89aa` movs that `WpCopyoutDecode` re-proved.
-- **The 96-byte-frame push/pop word set** (`711d ec86 e8a2 e4a6 e0ca fc4e f852
-  f456 f05a ec5e e862 e466 1080 60e6 6446 64a6 6906 79e2 7a42 7aa2 7b02 6be2
-  6c42 6ca2 6125`) had no proof in the tree before copyin — copyin is the
-  first proved function with a 96-byte frame, and copyout is the second, so it
-  is now proved twice (`WpCopyinDecode` / `WpCopyoutDecode`).  That set belongs
-  in `KernelRvcDecode.v`; it is the largest single duplication left.
-- Fold `wi_96`/`wi_98` into `WpWalkInstr.v` and fix that file's header comment
-  (+0x98 is `j -0x46`, not `j -0x92`).
-- Retire `ProofKvmmake.kmk_bytes_choose` in favour of `ByteBuf.bb_choose`.
-- Move `ProofCopyout.v`'s helper block down: `co_buf_split3`/`co_buf_join3` →
-  `ByteBuf.v` (and demote `bb_split`/`bb_join` to their special cases);
-  `co_frame_cancel_96` (the family stops at `frame_cancel_80`), `co_lui_m4096`
-  (duplicated as `ProofVmfault.vf_lui_m4096`), `co_lui_4096` and `co_zreg0` →
-  `KernelRvcDecode.v`; the bitvector arithmetic block (`co_sub_vec_unsigned` —
-  the `sub_vec` unsigned law, currently inlined in `WpHolding` and
-  `KstackArith` and nowhere named — plus `co_bvmod64`, `co_wrap_small`,
-  `co_zero_reg_unsigned`, `co_moi_*`, `co_uint_moi_nat`, `co_sub_nat`,
-  `co_pa_add_bump`, `co_subrange_31_0_unsigned`, `co_sextw_moi`) →
-  `ByteCursor.v`; `co_sub_off`/`co_sub_add_room` → `ProcPtOwn.v` next to
-  `pgd_unsigned`; `co_um_page_valid` → `ProcPtOwn.v` (it is the
-  `elem_of_um_ppns` + `um_pages_valid` step already inlined inside
-  `proc_pt_page_acc`).  `co_srli_maxva` is copyout-specific and stays.
+| file | before | after |
+|---|---|---|
+| `ProofCopyout.v` | 75.3 s | **49.2 s** |
+| `ProofCopyin.v`  | 55.4 s | **42.0 s** |
+| `ProofWalkaddr.v`| 13.0 s | **11.9 s** |
+
+**Decode-word dedup.**  35 words collapsed into `KernelRvcDecode.v`, 72 local
+decode lemmas deleted (net −37 proofs): the 25-word 96-byte-frame push/pop set
+(copyin and copyout are the tree's first two functions with one), plus
+`83e9 4601 6b05 8a2e 8b32 85da 85a6 89aa` and two the worklist had missed,
+`8baa` / `855e`.  **Four of the old homes were OFFSET-named, not word-named**
+(`WpWalkInstr.wdec_1c`/`wdec_18`, `WpProcMapstacksInstr.pmsdec_48`,
+`WpMappagesInstr.mdec_40`) — a word-keyed grep does not find those, so grep the
+STATEMENT.  Every `*_<off>` instruction fact was mechanically diffed against
+HEAD across the 11 touched files (578 statements, 0 mismatches): only the
+decode lemma each is proved FROM changed.  (`wi_96`/`wi_98` and the +0x98
+header comment turned out to have been done already by the vmfault sweep.)
+
+**Helper-lemma relocation.**  The three proofs' helper blocks went down to
+their altitude, deduplicated against each other on the way:
+
+- `RiscvExtras.subrange_dec_unsigned` — ONE width-generic subrange→unsigned
+  lemma replacing walkaddr's nine `wa_sub_*`.  **Instances must be stated at
+  the REDUCED width and closed with `apply`, never `rewrite`**: `bv_unsigned`'s
+  width argument is `Z_idx (hi-lo+1)`, only *convertible* to the literal.
+  Also `sextw_moi`, `subrange_31_0_unsigned`, and the four 64-bit unsigned
+  readings `moi64_unsigned` / `add_vec64_unsigned` / `sub_vec64_unsigned` /
+  `and_vec64_unsigned` — which also retired the inlined `sub_vec` unfold chains
+  in `KstackArith.subvec_moi` and `WpHolding.seqz_sub_neq`.
+- `ByteBuf.bb_split3` / `bb_join3` are now PRIMARY (proved off a `Local
+  bb_cut`), with `bb_split`/`bb_join` as their `c = 0` special cases — the
+  2-way form was the abstraction mistake both proof agents independently
+  worked around.  Copyin's shape won: the `a+b+c = L` premise is strictly more
+  general (without it copyout needed two extra `iEval (rewrite ±Hsplit)` per
+  iteration).
+- `ByteCursor`: `bc_sub_vec_unsigned`, `pa_add_bump` (generalises
+  `pa_add_step` +1→+n), `pa_add_comm`, and the loop-counter block.
+- `KernelRvcDecode`: `frame_cancel_96`, `lui_m4096` (THREE copies collapsed —
+  copyin, copyout, `ProofVmfault.vf_lui_m4096`), `lui_4096`, `zreg0`.
+- `PtBuild.pte_vu_bits` (+ `andi17_unsigned`); `PtTree.pte_hi_zero`;
+  `KallocInv.page_valid_neq_zero`; `RiscvTryStep.exec_or_v`/`exec_and_v`;
+  `ProcPtOwn` gained `pte2pa`, `ppn_unsigned`, `pgd_idem`, `pgd_off`,
+  `pgd_room`, an un-`Local`ed `z_pgd_mod`, and `um_page_valid` (with
+  `proc_pt_page_acc` refactored to go through it).
+- `ProofKvmmake.kmk_bytes_choose` retired in favour of `ByteBuf.bb_choose`.
+
+**Two destinations moved from the plan, both for the same reason — altitude
+runs the other way.**  `pte2pa` went to `ProcPtOwn`, not `PtBuild`, because it
+mentions `page_base`/`pte_ppn`, which are defined in `ProcPtOwn` §1 and
+`PtBuild` sits BELOW it.  Likewise the page-offset pair `pgd_off`/`pgd_room`
+went to `ProcPtOwn` rather than `ByteCursor`, because they rest on
+`pgd_unsigned`.  When routing a lemma "down", check which file can actually
+SEE its vocabulary.
+
+Genuinely function-specific helpers stayed put: each proof's MAXVA constant
+(`wa_z_maxva`, `co_srli_maxva`) and copyin's `ci_off_id`/`ci_off_lt` (glue for
+its `off : nat`; copyout keeps the offset as a `Z`, so there is nothing to
+share).
 
 ## Open questions / parked
 
 - `p->sz` well-formedness (`uint szv <= 2^38`) is still a spec premise, now in
   three places (vmfault, copyin, copyout).  When usertrap/sbrk land it should
-  move into `proc_priv`; see completed/vmfault.md.
+  move into `proc_priv`; see vmfault.md.
 - `copyinstr` (0x800014c8) is the third member of this family and reuses
   `walkaddr` + `ByteBuf` unchanged.  Not attempted here.

@@ -34,11 +34,7 @@ Notation SL := KernelSyms.sleep.
 (* Fresh compressed decode templates.                                     *)
 (* ===================================================================== *)
 
-(* +0x0e  0x89aa  c.mv s3,a0 *)
-Lemma sldec_mv_s3_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x89aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* +0x0e  0x89aa  c.mv s3,a0 -- [cdec_89aa] (KernelRvcDecode.v) *)
 
 (* +0x26  0x4789  c.li a5,2 *)
 Lemma sldec_li_a5_2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -134,7 +130,7 @@ Section WpSleepDecode.
   (* ---- +0x0e: c.mv s3,a0 ---- *)
   Lemma sli_0e : kernel_text -∗ instr (mword_of_int (SL + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)).
   Proof. mk_rvc (SL + 0x0e)%Z (mword_of_int 0x89aa : mword 16)
-    (mword_of_int (SL + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) sldec_mv_s3_a0 exec_execute_C_MV. Qed.
+    (mword_of_int (SL + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)) cdec_89aa exec_execute_C_MV. Qed.
 
   (* ---- +0x10: c.mv s2,a1 ---- *)
   Lemma sli_10 : kernel_text -∗ instr (mword_of_int (SL + 0x10) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)).

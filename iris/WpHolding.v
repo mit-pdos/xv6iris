@@ -151,9 +151,7 @@ Proof.
     pose proof (bv_unsigned_in_range _ (sub_vec a b)) as [Hlo _].
     assert (H0 : bv_unsigned (sub_vec a b) = 0) by lia.
     apply bv_eq.
-    unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub in H0.
-    rewrite bv_sub_unsigned in H0.
+    rewrite sub_vec64_unsigned in H0.
     pose proof (bv_unsigned_in_range _ a) as Ha.
     pose proof (bv_unsigned_in_range _ b) as Hb.
     unfold bv_wrap in H0.

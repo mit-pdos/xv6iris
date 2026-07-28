@@ -10,8 +10,16 @@
    three things this file provides, all of them independent of what is being
    copied:
 
-     SPLIT / JOIN at an offset ([bb_split]), so the next chunk can be handed
-       to memmove re-anchored at its own base;
+     SPLIT / JOIN a buffer into PREFIX / CHUNK / SUFFIX ([bb_split3],
+       [bb_join3]), so the chunk can be handed to memmove re-anchored at its
+       own base and put back afterwards.  The THREE-way form is the primary
+       one and the one a copy loop should call: the two-way [bb_split] leaves
+       the caller to unify [f (k + j)] against a metavariable [?f j], which is
+       higher-order and fragile at a SYMBOLIC offset, whereas [bb_split3]
+       spells all three windows and their naming functions explicitly.  The
+       total length is a PREMISE ([a + b + c = L]) rather than the literal
+       shape of the goal, so no [rewrite]-the-index dance is needed either.
+       [bb_split]/[bb_join] remain as the two-way special cases ([c = 0]);
      NAME the bytes of an anonymous region ([bb_any_named]) -- kalloc's
        [page_own] and [ProcPtOwn]'s user pages are contents-EXISTENTIAL, and
        memmove wants a named source; and the converse ([bb_named_any]), used
@@ -49,9 +57,10 @@ Section ByteBuf.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* SPLIT / JOIN.                                                       *)
+  (* SPLIT / JOIN.  The two-way CUT is the induction step; everything     *)
+  (* callers use is the three-way form below it.                          *)
   (* ------------------------------------------------------------------ *)
-  Lemma bb_split (p : mword 64) (k n : nat) (f : nat -> bv 8) :
+  Local Lemma bb_cut (p : mword 64) (k n : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 (k + n), pa_add p j ↦ₘ f j)
     ⊣⊢ ([∗ list] j ∈ seq 0 k, pa_add p j ↦ₘ f j) ∗
        ([∗ list] j ∈ seq 0 n, pa_add (pa_add p k) j ↦ₘ f (k + j)%nat).
@@ -61,6 +70,34 @@ Section ByteBuf.
     apply bi.sep_proper; [reflexivity |].
     apply big_sepL_proper. intros i j Hj.
     rewrite Nat.add_0_l. rewrite pa_add_add. reflexivity.
+  Qed.
+
+  (* PREFIX / CHUNK / SUFFIX, with every window, base and naming function
+     spelled out and the total length given as a premise.  This is what a
+     page-at-a-time copy loop calls, once per buffer per iteration. *)
+  Lemma bb_split3 (p : mword 64) (a b c L : nat) (f : nat -> bv 8) :
+    (a + b + c = L)%nat ->
+    ([∗ list] j ∈ seq 0 L, pa_add p j ↦ₘ f j)
+    ⊣⊢ ([∗ list] j ∈ seq 0 a, pa_add p j ↦ₘ f j)
+      ∗ ([∗ list] j ∈ seq 0 b, pa_add (pa_add p a) j ↦ₘ f (a + j)%nat)
+      ∗ ([∗ list] j ∈ seq 0 c, pa_add (pa_add (pa_add p a) b) j ↦ₘ f (a + (b + j))%nat).
+  Proof.
+    intros <-.
+    replace (a + b + c)%nat with (a + (b + c))%nat by lia.
+    rewrite (bb_cut p a (b + c) f).
+    apply bi.sep_proper; [reflexivity |].
+    rewrite (bb_cut (pa_add p a) b c (fun j => f (a + j)%nat)).
+    reflexivity.
+  Qed.
+
+  (* the two-way form, as the [c = 0] special case *)
+  Lemma bb_split (p : mword 64) (k n : nat) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 (k + n), pa_add p j ↦ₘ f j)
+    ⊣⊢ ([∗ list] j ∈ seq 0 k, pa_add p j ↦ₘ f j) ∗
+       ([∗ list] j ∈ seq 0 n, pa_add (pa_add p k) j ↦ₘ f (k + j)%nat).
+  Proof.
+    rewrite (bb_split3 p k n 0 (k + n) f ltac:(lia)).
+    rewrite big_sepL_nil bi.sep_emp. reflexivity.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -75,23 +112,47 @@ Section ByteBuf.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Hfg; [reflexivity | lia].
   Qed.
 
-  (* the two halves, named separately, become one buffer named by one
-     function -- the shape a caller's postcondition wants *)
+  (* the inverse of [bb_split3]: three separately-named windows become one
+     buffer named by one function -- the shape a caller's postcondition
+     wants.  The three pieces need NOT be named by restrictions of a common
+     function (memmove hands the middle one back named by the SOURCE's
+     naming), which is exactly why the result is an existential. *)
+  Lemma bb_join3 (p : mword 64) (a b c L : nat) (f g h : nat -> bv 8) :
+    (a + b + c = L)%nat ->
+    ([∗ list] j ∈ seq 0 a, pa_add p j ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 b, pa_add (pa_add p a) j ↦ₘ g j) -∗
+    ([∗ list] j ∈ seq 0 c, pa_add (pa_add (pa_add p a) b) j ↦ₘ h j) -∗
+    ∃ u : nat -> bv 8, [∗ list] j ∈ seq 0 L, pa_add p j ↦ₘ u j.
+  Proof.
+    intros <-. iIntros "HA HB HC".
+    iExists (fun j => if decide (j < a)%nat then f j
+                      else if decide (j < a + b)%nat then g (j - a)%nat
+                      else h (j - a - b)%nat).
+    rewrite (bb_split3 p a b c (a + b + c) _ ltac:(lia)).
+    iSplitL "HA"; [| iSplitL "HB"].
+    - iApply (big_sepL_mono with "HA"). intros i j Hj.
+      apply lookup_seq in Hj as [Heq Hlt].
+      rewrite decide_True; [reflexivity | lia].
+    - iApply (big_sepL_mono with "HB"). intros i j Hj.
+      apply lookup_seq in Hj as [Heq Hlt].
+      rewrite decide_False; [| lia]. rewrite decide_True; [| lia].
+      replace (a + j - a)%nat with j by lia. reflexivity.
+    - iApply (big_sepL_mono with "HC"). intros i j Hj.
+      apply lookup_seq in Hj as [Heq Hlt].
+      rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+      replace (a + (b + j) - a - b)%nat with j by lia. reflexivity.
+  Qed.
+
+  (* the two-way form, again as the [c = 0] special case *)
   Lemma bb_join (p : mword 64) (k n : nat) (f g : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 k, pa_add p j ↦ₘ f j) -∗
     ([∗ list] j ∈ seq 0 n, pa_add (pa_add p k) j ↦ₘ g j) -∗
     ∃ h : nat -> bv 8, [∗ list] j ∈ seq 0 (k + n), pa_add p j ↦ₘ h j.
   Proof.
     iIntros "Hlo Hhi".
-    iExists (fun j => if decide (j < k)%nat then f j else g (j - k)%nat).
-    rewrite bb_split. iSplitL "Hlo".
-    - iApply (big_sepL_mono with "Hlo"). intros i j Hj.
-      apply lookup_seq in Hj as [Heq Hlt].
-      rewrite decide_True; [reflexivity | lia].
-    - iApply (big_sepL_mono with "Hhi"). intros i j Hj.
-      apply lookup_seq in Hj as [Heq Hlt].
-      rewrite decide_False; [| lia].
-      replace (k + j - k)%nat with j by lia. reflexivity.
+    iApply (bb_join3 p k n 0 (k + n) f g (fun _ => bv_0 8) ltac:(lia)
+              with "Hlo Hhi []").
+    done.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -106,8 +167,8 @@ Section ByteBuf.
   Qed.
 
   (* CHOICE over a [seq] window: a window of existentials is an existential
-     FUNCTION over the window.  (ProofKvmmake.v has this as a local
-     [kmk_bytes_choose]; that copy can be retired in favour of this one.) *)
+     FUNCTION over the window.  (This is also what kvmmake needs to name the
+     bytes of the freshly-kalloc'ed root page before memset-ing it.) *)
   Lemma bb_choose (n : nat) :
     forall (start : nat) (P : nat -> bv 8 -> iProp Σ),
       ([∗ list] k ∈ seq start n, ∃ b : bv 8, P k b)

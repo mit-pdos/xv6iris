@@ -42,10 +42,6 @@ Lemma pidc_8aa6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0x8aa6 : mword 16)) s = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 9)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma pidc_85da s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85da : mword 16)) s = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 Lemma pidc_878d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x878d : mword 16)) s = Some (C_SRAI (mword_of_int 3, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
@@ -312,7 +308,7 @@ Section ProcinitInstrs.
 
   Lemma pii_78 : kernel_text -∗ instr (mword_of_int (PI + 0x78) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (PI + 0x78)%Z (mword_of_int 0x85da : mword 16)
-    (mword_of_int (PI + 0x78) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) pidc_85da exec_execute_C_MV. Qed.
+    (mword_of_int (PI + 0x78) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) cdec_85da exec_execute_C_MV. Qed.
 
   Lemma pii_7a : kernel_text -∗ instr (mword_of_int (PI + 0x7a) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PI + 0x7a)%Z (mword_of_int 0x8526 : mword 16)

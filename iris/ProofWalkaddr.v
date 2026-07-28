@@ -22,31 +22,11 @@
      [beq], and the return value is [PTE2PA] = [srli 10; slli 12].
 
    ===================================================================
-   LEMMAS AT THE WRONG ALTITUDE.  Everything above the functor is pure and
-   belongs in PtBuild.v (next to [pte_valid_bit0] / [walk_vbit_eq]) or, for
-   the [pte_valid] fact, in PtTree.v next to [pte_valid] itself.  They are
-   here only so this file can be checked without a tree-wide rebuild; move
-   them down on the next PtBuild sweep.  Three groups:
-
-   1. [wa_pte_vu_bits] -- the [andi a3,a5,17] bit-test bridge PtTree.v's
-      header already advertises under the name [PtBuild.pte_vu_bits].
-      Only the direction the TAKEN [beq] needs is proved (the fall-through
-      arm returns 0 and needs nothing).
-
-   2. [wa_pte2pa] -- [srli 10; slli 12] equals [page_base (pte_ppn w)].
-      THIS IS NOT UNCONDITIONAL: the shift pair keeps bits 61:54 of the
-      word (they land at bits 63:56 of the result) while [PPN_of_PTE] is
-      bits 53:10, so the two agree exactly when [uint w < 2^54].
-
-   3. [wa_pte_hi_zero] -- which is where that bound comes from: a
-      model-VALID PTE has all ten extension bits (63:54) clear.  Bit 63
-      (N) and 62:61 (PBMT) are the [pte_no_napot] / [pte_pbmt0] conjuncts
-      of [ptree_maps]; bits 60:59 (RSW_60t59b) and 58:54 (reserved) come
-      from [pte_valid] itself, read at a state where no extension is
-      enabled -- [pte_valid] quantifies over ALL states, and with misa = 0
-      the Sv39-gated [Svrsw60t59b] probe is false, so the RSW disjunct of
-      [pte_is_invalid] fires.  All three conjuncts are handed over by
-      [pt_rep0] in exactly the arm that needs them. *)
+   The pure content this proof needs -- the [andi ...,17] V&U bit test
+   ([PtBuild.pte_vu_bits]), the [srli 10; slli 12] PTE2PA identity
+   ([ProcPtOwn.pte2pa]) and the [uint w < 2^54] bound a model-valid leaf
+   carries ([PtTree.pte_hi_zero]) -- all lives at its own altitude now; only
+   the MAXVA literal below is walkaddr's own.  *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List Bool.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -77,308 +57,15 @@ Local Open Scope Z_scope.
 
 
 (* ===================================================================== *)
-(* PURE LEMMAS (see the header: all of these belong in PtBuild/PtTree).    *)
+(* THE ONE PURE FACT THAT IS WALKADDR'S OWN: the MAXVA test.              *)
+(*   [li a5,-1; srli a5,26] materializes 2^38-1, and the [bgeu a5,a1] that *)
+(*   follows takes the fall-through arm exactly when [va < MAXVA].         *)
 (* ===================================================================== *)
-
-(* ---- subrange -> unsigned, at the widths this file needs ------------- *)
-Local Ltac sub_u := unfold subrange_vec_dec; rewrite autocast_id;
-  unfold to_word_idx; rewrite MachineWord.MachineWord.cast_idx_refl;
-  unfold get_word, MachineWord.MachineWord.slice, Values.to_word;
-  rewrite bv_extract_unsigned;
-  first [ reflexivity
-        | rewrite Z.shiftr_div_pow2; [ reflexivity | apply N2Z.is_nonneg ] ].
-
-Lemma wa_sub_4_0 (v : mword 10) :
-  bv_unsigned (subrange_vec_dec v 4 0 : mword 5) = bv_unsigned v mod 32.
-Proof. sub_u. Qed.
-Lemma wa_sub_6_5 (v : mword 10) :
-  bv_unsigned (subrange_vec_dec v 6 5 : mword 2) = bv_unsigned v / 32 mod 4.
-Proof. sub_u. Qed.
-Lemma wa_sub_8_7 (v : mword 10) :
-  bv_unsigned (subrange_vec_dec v 8 7 : mword 2) = bv_unsigned v / 128 mod 4.
-Proof. sub_u. Qed.
-Lemma wa_sub_9_9 (v : mword 10) :
-  bv_unsigned (subrange_vec_dec v 9 9 : mword 1) = bv_unsigned v / 512 mod 2.
-Proof. sub_u. Qed.
-Lemma wa_sub_63_54 (v : mword 64) :
-  bv_unsigned (subrange_vec_dec v 63 54 : mword 10)
-  = bv_unsigned v / 18014398509481984 mod 1024.
-Proof. sub_u. Qed.
-Lemma wa_sub_53_10 (v : mword 64) :
-  bv_unsigned (subrange_vec_dec v 53 10 : mword 44)
-  = bv_unsigned v / 1024 mod 17592186044416.
-Proof. sub_u. Qed.
-Lemma wa_sub_7_0 (v : mword 64) :
-  bv_unsigned (subrange_vec_dec v 7 0 : mword 8) = bv_unsigned v mod 256.
-Proof. sub_u. Qed.
-Lemma wa_sub_0_0 (v : mword 8) :
-  bv_unsigned (subrange_vec_dec v 0 0 : mword 1) = bv_unsigned v mod 2.
-Proof. sub_u. Qed.
-Lemma wa_sub_4_4 (v : mword 8) :
-  bv_unsigned (subrange_vec_dec v 4 4 : mword 1) = bv_unsigned v / 16 mod 2.
-Proof. sub_u. Qed.
-
-(* ---- the two shifts PTE2PA is made of -------------------------------- *)
-Lemma wa_shiftr10 (v : mword 64) : bv_unsigned (shiftr v 10) = bv_unsigned v / 1024.
-Proof.
-  unfold shiftr, with_word, get_word, MachineWord.MachineWord.logical_shift_right.
-  rewrite bv_shiftr_unsigned.
-  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
-             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 10))) with 10
-    by (vm_compute; reflexivity).
-  rewrite Z.shiftr_div_pow2; [reflexivity | lia].
-Qed.
-
-Lemma wa_shiftl12 (v : mword 64) :
-  bv_unsigned (shiftl v 12) = bv_unsigned v * 4096 mod 18446744073709551616.
-Proof.
-  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
-  rewrite bv_shiftl_unsigned.
-  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
-             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
-    by (vm_compute; reflexivity).
-  rewrite Z.shiftl_mul_pow2; [reflexivity | lia].
-Qed.
-
-Lemma wa_ppn_unsigned (w : mword 64) :
-  bv_unsigned (pte_ppn w) = bv_unsigned w / 1024 mod 17592186044416.
-Proof.
-  unfold pte_ppn. rewrite !autocast_id.
-  unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota.
-  rewrite autocast_id. apply wa_sub_53_10.
-Qed.
-
-(* ---- mword-FREE Z arithmetic (the zify-hook rule) -------------------- *)
-Lemma wa_z_ext_zero (E : Z) :
-  0 <= E < 1024 -> E mod 32 = 0 -> E / 32 mod 4 = 0 ->
-  E / 128 mod 4 = 0 -> E / 512 mod 2 = 0 -> E = 0.
-Proof.
-  intros Hr H1 H2 H3 H4.
-  assert (D1 : E = 32 * (E / 32)) by (apply Z_div_exact_2; [lia | exact H1]).
-  assert (Q1 : E / 32 / 4 = E / 128)
-    by (rewrite (Z.div_div E 32 4 ltac:(lia) ltac:(lia)); reflexivity).
-  assert (D2 : E / 32 = 4 * (E / 128))
-    by (rewrite <- Q1; apply Z_div_exact_2; [lia | exact H2]).
-  assert (Q2 : E / 128 / 4 = E / 512)
-    by (rewrite (Z.div_div E 128 4 ltac:(lia) ltac:(lia)); reflexivity).
-  assert (D3 : E / 128 = 4 * (E / 512))
-    by (rewrite <- Q2; apply Z_div_exact_2; [lia | exact H3]).
-  assert (Q3 : E / 512 / 2 = E / 1024)
-    by (rewrite (Z.div_div E 512 2 ltac:(lia) ltac:(lia)); reflexivity).
-  assert (D4 : E / 512 = 2 * (E / 1024))
-    by (rewrite <- Q3; apply Z_div_exact_2; [lia | exact H4]).
-  lia.
-Qed.
-
-Lemma wa_z_hi_zero (x : Z) :
-  0 <= x < 18446744073709551616 ->
-  x / 18014398509481984 mod 1024 = 0 -> x < 18014398509481984.
-Proof.
-  intros Hr H.
-  assert (Hq : 0 <= x / 18014398509481984 < 1024).
-  { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
-  rewrite (Z.mod_small _ _ Hq) in H.
-  pose proof (Z_div_mod_eq_full x 18014398509481984) as Hd.
-  pose proof (Z.mod_pos_bound x 18014398509481984 ltac:(lia)) as Hm.
-  lia.
-Qed.
-
-Lemma wa_z_pte2pa (x : Z) :
-  0 <= x -> x < 18014398509481984 ->
-  x / 1024 * 4096 mod 18446744073709551616 = x / 1024 mod 17592186044416 * 4096.
-Proof.
-  intros H0 H1.
-  assert (Hq : 0 <= x / 1024 < 17592186044416).
-  { split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
-  rewrite (Z.mod_small (x / 1024) 17592186044416 Hq).
-  apply Z.mod_small. lia.
-Qed.
-
 Lemma wa_z_maxva (x : Z) : Z.geb 274877906943 x = true -> x < 2 ^ 38.
 Proof.
   intros H. apply Z.geb_le in H.
   assert (P : 2 ^ 38 = 274877906944) by (vm_compute; reflexivity).
   rewrite P. lia.
-Qed.
-
-(* ---- [pte_valid] pins the extension bits ----------------------------- *)
-
-(* a state in which NO extension is currently enabled (misa = 0) and
-   menvcfg = 0: the Sv39-gated Svnapot/Svrsw60t59b probes and the PBMTE
-   gate all read false there, so every extension-bit disjunct of
-   [pte_is_invalid] degenerates to its raw "field is nonzero" test. *)
-Definition wa_s0 : mstate := MState init_regstate ∅ dev0_state.
-
-Lemma wa_exec_or_v (l r : M bool) (s : mstate) (bl br : bool) :
-  exec l s = Some (bl, s) -> exec r s = Some (br, s) ->
-  exec (Defs.or_boolM l r) s = Some (orb bl br, s).
-Proof.
-  intros Hl Hr. rewrite (exec_or_boolM_Some _ _ _ _ _ Hl).
-  destruct bl; [reflexivity | exact Hr].
-Qed.
-
-Lemma wa_exec_and_v (l r : M bool) (s : mstate) (bl br : bool) :
-  exec l s = Some (bl, s) -> exec r s = Some (br, s) ->
-  exec (Defs.and_boolM l r) s = Some (andb bl br, s).
-Proof.
-  intros Hl Hr. rewrite (exec_and_boolM_Some _ _ _ _ _ Hl).
-  destruct bl; [exact Hr | reflexivity].
-Qed.
-
-Lemma wa_piv_split (f : mword 8) (e : mword 10) :
-  exists b1 b2 b3 b4 b5 b6,
-    exec (pte_is_invalid f e) wa_s0
-    = Some (orb b1 (orb b2 (orb b3 (orb b4 (orb b5 (orb b6
-              (orb (andb (neq_vec (_get_PTE_Ext_RSW_60t59b e) (zeros' 2)) true)
-                   (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))), wa_s0).
-Proof.
-  do 6 eexists.
-  unfold pte_is_invalid.
-  eapply wa_exec_or_v; [ apply exec_returnM | ].
-  eapply wa_exec_or_v;
-    [ eapply wa_exec_and_v; [ apply exec_returnM |
-        eapply wa_exec_and_v; [ apply exec_returnM |
-          eapply wa_exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] ] ] | ].
-  eapply wa_exec_or_v; [ apply exec_returnM | ].
-  eapply wa_exec_or_v; [ apply exec_returnM | ].
-  eapply wa_exec_or_v;
-    [ eapply wa_exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
-  eapply wa_exec_or_v;
-    [ eapply wa_exec_and_v; [ apply exec_returnM |
-        eapply wa_exec_or_v; [ vm_compute; reflexivity | apply exec_returnM ] ] | ].
-  eapply wa_exec_or_v; [ | apply exec_returnM ].
-  eapply wa_exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ].
-Qed.
-
-Lemma wa_valid_rsw_res (w : mword 64) :
-  pte_valid w ->
-  _get_PTE_Ext_RSW_60t59b (ext_bits_of_PTE w) = zeros' 2 /\
-  _get_PTE_Ext_reserved (ext_bits_of_PTE w) = zeros' 5.
-Proof.
-  intros Hv.
-  destruct (wa_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0)) (ext_bits_of_PTE w))
-    as (b1 & b2 & b3 & b4 & b5 & b6 & Hex).
-  specialize (Hv wa_s0). rewrite Hex in Hv. injection Hv as Hb.
-  do 6 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
-  apply orb_false_iff in Hb. destruct Hb as [Hrsw Hres].
-  rewrite andb_true_r in Hrsw.
-  unfold neq_vec in Hrsw. unfold neq_vec in Hres.
-  apply negb_false_iff in Hrsw. apply negb_false_iff in Hres.
-  split; apply eq_vec_true_iff; assumption.
-Qed.
-
-Lemma wa_pte_hi_zero (w : mword 64) :
-  pte_valid w -> pte_no_napot w -> pte_pbmt0 w ->
-  bv_unsigned w < 18014398509481984.
-Proof.
-  intros Hv Hn Hp.
-  destruct (wa_valid_rsw_res w Hv) as [Hrsw Hres].
-  assert (HN : _get_PTE_Ext_N (ext_bits_of_PTE w) = ('b"0" : mword 1)).
-  { destruct (mword1_cases (_get_PTE_Ext_N (ext_bits_of_PTE w))) as [H0 | H1].
-    - rewrite H0. apply bv_eq; vm_compute; reflexivity.
-    - unfold pte_no_napot in Hn. rewrite H1 in Hn. vm_compute in Hn. discriminate. }
-  assert (Hext : ext_bits_of_PTE w = (subrange_vec_dec w 63 54 : mword 10)) by reflexivity.
-  unfold pte_pbmt0 in Hp.
-  rewrite Hext in HN. rewrite Hext in Hp. rewrite Hext in Hrsw. rewrite Hext in Hres.
-  unfold _get_PTE_Ext_N in HN. unfold _get_PTE_Ext_PBMT in Hp.
-  unfold _get_PTE_Ext_RSW_60t59b in Hrsw. unfold _get_PTE_Ext_reserved in Hres.
-  apply (f_equal bv_unsigned) in HN. apply (f_equal bv_unsigned) in Hp.
-  apply (f_equal bv_unsigned) in Hrsw. apply (f_equal bv_unsigned) in Hres.
-  rewrite wa_sub_9_9 in HN. rewrite wa_sub_8_7 in Hp.
-  rewrite wa_sub_6_5 in Hrsw. rewrite wa_sub_4_0 in Hres.
-  assert (Z0a : bv_unsigned ('b"0" : mword 1) = 0) by (vm_compute; reflexivity).
-  assert (Z0b : bv_unsigned ('b"00" : mword 2) = 0) by (vm_compute; reflexivity).
-  assert (Z0c : bv_unsigned (zeros' 2 : mword 2) = 0) by (vm_compute; reflexivity).
-  assert (Z0d : bv_unsigned (zeros' 5 : mword 5) = 0) by (vm_compute; reflexivity).
-  rewrite Z0a in HN. rewrite Z0b in Hp. rewrite Z0c in Hrsw. rewrite Z0d in Hres.
-  assert (HE0 : bv_unsigned (subrange_vec_dec w 63 54 : mword 10) = 0).
-  { apply wa_z_ext_zero; [ | exact Hres | exact Hrsw | exact Hp | exact HN ].
-    pose proof (bv_unsigned_in_range _ (subrange_vec_dec w 63 54 : mword 10)) as Hr.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 10) = 1024)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hr. exact Hr. }
-  rewrite wa_sub_63_54 in HE0.
-  apply wa_z_hi_zero; [ | exact HE0 ].
-  pose proof (bv_unsigned_in_range _ w) as Hr.
-  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
-    by (vm_compute; reflexivity).
-  rewrite Hm in Hr. exact Hr.
-Qed.
-
-(* ---- PTE2PA ---------------------------------------------------------- *)
-Lemma wa_pte2pa (w : mword 64) (n m : Z) (s10 : mword n) (s12 : mword m) :
-  int_of_mword false s10 = 10 -> int_of_mword false s12 = 12 ->
-  bv_unsigned w < 18014398509481984 ->
-  shift_bits_left (shift_bits_right w s10) s12 = page_base (pte_ppn w).
-Proof.
-  intros H10 H12 Hlt.
-  apply bv_eq.
-  unfold shift_bits_left, shift_bits_right. rewrite H10. rewrite H12.
-  rewrite wa_shiftl12. rewrite wa_shiftr10.
-  rewrite page_base_ppn_unsigned. rewrite wa_ppn_unsigned.
-  apply wa_z_pte2pa; [ exact (proj1 (bv_unsigned_in_range _ w)) | exact Hlt ].
-Qed.
-
-(* ---- the V&U bit test ([PtBuild.pte_vu_bits], per PtTree.v's header) --- *)
-Lemma wa_andi17_unsigned (w : mword 64) :
-  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 17 : mword 12)) : mword 64)
-  = Z.land (bv_unsigned w) 17.
-Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
-  unfold MachineWord.MachineWord.and.
-  rewrite bv_and_unsigned.
-  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
-    replace (bv_unsigned mm) with 17 by (vm_compute; reflexivity) end.
-  reflexivity.
-Qed.
-
-Lemma wa_z_land_17 (x : Z) :
-  Z.land x 17 = 17 -> Z.testbit x 0 = true /\ Z.testbit x 4 = true.
-Proof.
-  intros H. split.
-  - apply (f_equal (fun z => Z.testbit z 0)) in H.
-    rewrite Z.land_spec in H.
-    assert (T : Z.testbit 17 0 = true) by (vm_compute; reflexivity).
-    rewrite T in H. rewrite andb_true_r in H. exact H.
-  - apply (f_equal (fun z => Z.testbit z 4)) in H.
-    rewrite Z.land_spec in H.
-    assert (T : Z.testbit 17 4 = true) by (vm_compute; reflexivity).
-    rewrite T in H. rewrite andb_true_r in H. exact H.
-Qed.
-
-Lemma wa_z_bit_to_mod (y : Z) : Z.testbit y 0 = true -> y mod 2 = 1.
-Proof. intros H. rewrite Z.bit0_odd in H. rewrite Zmod_odd. rewrite H. reflexivity. Qed.
-
-Lemma wa_z_bit0_of (x : Z) : Z.testbit x 0 = true -> (x mod 256) mod 2 = 1.
-Proof.
-  intros H. apply wa_z_bit_to_mod.
-  change 256 with (2 ^ 8). rewrite Z.mod_pow2_bits_low; [exact H | lia].
-Qed.
-
-Lemma wa_z_bit4_of (x : Z) : Z.testbit x 4 = true -> (x mod 256) / 16 mod 2 = 1.
-Proof.
-  intros H. apply wa_z_bit_to_mod.
-  change 16 with (2 ^ 4). rewrite Z.div_pow2_bits; [| lia | lia].
-  change 256 with (2 ^ 8). rewrite Z.mod_pow2_bits_low; [| lia].
-  replace (0 + 4) with 4 by lia. exact H.
-Qed.
-
-Lemma wa_pte_vu_bits (w : mword 64) :
-  and_vec w (sign_extend' 64 (mword_of_int 17 : mword 12)) = (mword_of_int 17 : mword 64) ->
-  pte_vu w.
-Proof.
-  intros Hand.
-  apply (f_equal bv_unsigned) in Hand.
-  rewrite wa_andi17_unsigned in Hand.
-  assert (H17 : bv_unsigned (mword_of_int 17 : mword 64) = 17) by (vm_compute; reflexivity).
-  rewrite H17 in Hand.
-  destruct (wa_z_land_17 _ Hand) as [Hb0 Hb4].
-  unfold pte_vu, _get_PTE_Flags_V, _get_PTE_Flags_U, Mk_PTE_Flags.
-  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
-  split; apply bv_eq; rewrite H1.
-  - rewrite wa_sub_0_0. rewrite wa_sub_7_0. apply wa_z_bit0_of. exact Hb0.
-  - rewrite wa_sub_4_4. rewrite wa_sub_7_0. apply wa_z_bit4_of. exact Hb4.
 Qed.
 
 
@@ -938,7 +625,7 @@ Section ProofWalkaddr.
     assert (Hand : and_vec w0 (sign_extend' 64 (mword_of_int 17 : mword 12))
                    = (mword_of_int 17 : mword 64)).
     { apply eq_vec_true_iff in Hbeq. rewrite HB4a3 HB4a4 in Hbeq. exact Hbeq. }
-    assert (Hvu : pte_vu w0) by (apply wa_pte_vu_bits; exact Hand).
+    assert (Hvu : pte_vu w0) by (apply pte_vu_bits; exact Hand).
     assert (Hsome : m !! vpn = Some w0).
     { destruct Hverd as [Hs | (Hw0z & _)]; [exact Hs | exfalso].
       rewrite Hw0z in Hand. apply (f_equal bv_unsigned) in Hand.
@@ -950,7 +637,7 @@ Section ProofWalkaddr.
       destruct (Hmaps vpn w0 Hsome) as (q2 & q1 & Hmp).
       destruct Hmp as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
                         & Hv0 & _ & Hnn & Hpb).
-      exact (wa_pte_hi_zero w0 Hv0 Hnn Hpb). }
+      exact (pte_hi_zero w0 Hv0 Hnn Hpb). }
     iPoseProof (wai_32 with "Htext") as "Hi32".
     iPoseProof (wai_34 with "Htext") as "Hi34".
     iPoseProof (wai_38 with "Htext") as "Hi38".
@@ -991,7 +678,7 @@ Section ProofWalkaddr.
     assert (Hpte2pa : shift_bits_left (B5 !!! Regidx (mword_of_int 15 : mword 5))
               (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
             = page_base (pte_ppn w0)).
-    { rewrite HB5a5. apply wa_pte2pa; [ exact Hs10 | exact Hs12 | exact Hlt54 ]. }
+    { rewrite HB5a5. apply pte2pa; [ exact Hs10 | exact Hs12 | exact Hlt54 ]. }
     iApply (wp_slli_s_sconf γ Φ (mword_of_int (WA + 0x34)) (mword_of_int 10 : mword 5)
               (mword_of_int 15 : mword 5) (mword_of_int 12 : mword 6)
               (page_base (pte_ppn w0)) B5 (K - 2)%nat

@@ -51,6 +51,43 @@ Qed.
 Lemma moi32_small (z : Z) : (0 <= z < 2^32)%Z -> bv_unsigned (mword_of_int z : mword 32) = z.
 Proof. intro. rewrite moi32_unsigned. apply bvw32_small. lia. Qed.
 
+(* ---- the four 64-bit UNSIGNED READINGS everything else is built on ----
+   A literal, and the three [word_binop]s an address computation is made of,
+   read through [bv_unsigned].  Each is one [unfold] chain that used to be
+   re-derived (or inlined) in a dozen places; state them once here, where
+   every consumer already has this file in its import closure.
+   [ByteCursor.bc_{moi,add_vec,sub_vec}_unsigned] are restatements of these;
+   [ArrCursor] and [WpMemsetS] still carry their own copies. *)
+Lemma moi64_unsigned (z : Z) : bv_unsigned (mword_of_int z : mword 64) = bv_wrap 64 z.
+Proof.
+  unfold mword_of_int, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. reflexivity.
+Qed.
+
+Lemma add_vec64_unsigned (x y : mword 64) :
+  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned. reflexivity.
+Qed.
+
+Lemma sub_vec64_unsigned (x y : mword 64) :
+  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
+Proof.
+  unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
+  rewrite bv_sub_unsigned. reflexivity.
+Qed.
+
+Lemma and_vec64_unsigned (x y : mword 64) :
+  bv_unsigned (and_vec x y) = Z.land (bv_unsigned x) (bv_unsigned y).
+Proof.
+  cbv [and_vec Operators_mwords.word_binop Operators_mwords.with_word'
+       SailStdpp.Values.with_word to_word get_word].
+  unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
+Qed.
+
 Lemma sext64_moi32_unsigned (z : Z) : (0 <= z < 2^31)%Z ->
   bv_unsigned (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
 Proof.
@@ -119,6 +156,74 @@ Proof.
   apply bv_swrap_small.
   assert (Hhm : bv_half_modulus 64 = 2^63) by reflexivity. rewrite Hhm. lia.
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* SUBRANGE -> UNSIGNED, ONCE, AT EVERY WIDTH.                             *)
+(*                                                                         *)
+(*   [subrange_vec_dec v hi lo] is bits hi..lo of [v]; read through         *)
+(*   [bv_unsigned] it is the plain integer [uint v / 2^lo mod 2^(hi-lo+1)]. *)
+(*   That identity does not depend on the widths, so ONE lemma serves       *)
+(*   every extraction in the tree -- the PTE flag/extension fields, the     *)
+(*   ppn, the [sext.w] low half, the page offset.  Instantiate it (by       *)
+(*   [apply], NOT [rewrite] -- see below); do NOT re-derive the             *)
+(*   [autocast]/[cast_idx]/[bv_extract] peel.                               *)
+(*                                                                         *)
+(*   The divisor and modulus are taken as PREMISES so a call site gives     *)
+(*   them as closed literals and discharges [d = 2^lo] by [vm_compute];     *)
+(*   writing [2 ^ 54] into a goal would leave a term [lia] cannot evaluate. *)
+(*                                                                         *)
+(*   Instances must be stated at the REDUCED width ([: mword 44], not       *)
+(*   [: mword (53 - 10 + 1)]) and closed with [apply]: [bv_unsigned]'s      *)
+(*   width argument is [MachineWord.Z_idx (hi - lo + 1)] here, which is     *)
+(*   only CONVERTIBLE to the reduced literal, and [rewrite] matches         *)
+(*   syntactically.                                                         *)
+(* ---------------------------------------------------------------------- *)
+
+(* [autocast]/[cast_idx] are transports between provably-equal widths, so
+   they are invisible to [bv_unsigned]. *)
+Lemma autocast_unsigned (m n : Z) (x : mword m) :
+  m = n -> bv_unsigned (autocast x : mword n) = bv_unsigned x.
+Proof. intros ->. rewrite autocast_refl. reflexivity. Qed.
+
+Lemma cast_idx_unsigned (m n : N) (x : MachineWord.MachineWord.word m) (e : m = n) :
+  bv_unsigned (MachineWord.MachineWord.cast_idx x e) = bv_unsigned x.
+Proof. destruct e. rewrite MachineWord.MachineWord.cast_idx_refl. reflexivity. Qed.
+
+Lemma subrange_dec_unsigned {n : Z} (v : mword n) (hi lo d m : Z) :
+  0 <= lo -> lo <= hi -> d = 2 ^ lo -> m = 2 ^ (hi - lo + 1) ->
+  bv_unsigned (subrange_vec_dec v hi lo : mword (hi - lo + 1))
+  = bv_unsigned v / d mod m.
+Proof.
+  intros Hlo Hhi -> ->.
+  unfold subrange_vec_dec.
+  rewrite (autocast_unsigned _ _ _ (MachineWord.MachineWord.idx_Z_idx (hi - lo + 1) ltac:(lia))).
+  unfold to_word_idx, Values.to_word, get_word, MachineWord.MachineWord.slice.
+  rewrite cast_idx_unsigned.
+  rewrite bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  rewrite Z.shiftr_div_pow2; [| apply N2Z.is_nonneg].
+  f_equal.
+  - f_equal. f_equal. cbn. rewrite Z2N.id; lia.
+  - f_equal. cbn. rewrite Z2N.id; lia.
+Qed.
+
+(* the [lo = 0] case, where the division drops out (a low-field extraction is
+   just a truncation) -- the commonest instance by far *)
+Lemma subrange_dec_unsigned_lo0 {n : Z} (v : mword n) (hi m : Z) :
+  0 <= hi -> m = 2 ^ (hi + 1) ->
+  bv_unsigned (subrange_vec_dec v hi 0 : mword (hi - 0 + 1)) = bv_unsigned v mod m.
+Proof.
+  intros Hhi Hm.
+  rewrite (subrange_dec_unsigned v hi 0 1 m ltac:(lia) ltac:(lia) eq_refl
+             ltac:(rewrite Hm; f_equal; lia)).
+  rewrite Z.div_1_r. reflexivity.
+Qed.
+
+(* the one instance that is wanted tree-wide: the low half of a register, as
+   [sext.w rd,rs1] (= ADDIW at immediate 0) reads it *)
+Lemma subrange_31_0_unsigned (a : mword 64) :
+  bv_unsigned (subrange_vec_dec a 31 0 : mword 32) = bv_unsigned a mod 4294967296.
+Proof. apply (subrange_dec_unsigned_lo0 a 31 4294967296); [lia | vm_compute; reflexivity]. Qed.
 
 
 (* sign-extending a 9-bit value to 12 bits then to 64 is the same as
@@ -246,6 +351,36 @@ Proof.
   assert (H0 : (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) = mword_of_int 0)
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite H0. apply kv_addv_zero.
+Qed.
+
+(* [sext.w rd,rs1] is ADDIW at immediate 0, and on a value that already fits
+   in 31 bits the 32-bit truncate-and-sign-extend round trip is the identity.
+   Both copy loops narrow their chunk length this way at a SYMBOLIC count, so
+   the enumerating [PlicHart.sext32_id_hart] is no use; this is the general
+   fact.  (Recipe: KstackArith's [addw_step] -- reduce [sign_extend'] to
+   [bv_sign_extend] and read both sides off through [bv_unsigned].) *)
+Lemma sextw_moi (k : Z) : 0 <= k -> k < 2147483648 ->
+  sign_extend' 64 (subrange_vec_dec
+     (add_vec (mword_of_int k : mword 64) (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0)
+  = (mword_of_int k : mword 64).
+Proof.
+  intros H0 H1.
+  rewrite addv_sext0.
+  apply bv_eq.
+  set (w := subrange_vec_dec (mword_of_int k : mword 64) 31 0).
+  assert (Hw : bv_unsigned w = k).
+  { unfold w. rewrite subrange_31_0_unsigned moi64_unsigned.
+    rewrite (bvw64_small k ltac:(change (2^64)%Z with 18446744073709551616%Z; lia)).
+    apply Z.mod_small. lia. }
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  unfold bv_signed. rewrite Hw.
+  assert (Hhm : bv_half_modulus (MachineWord.MachineWord.Z_idx 32) = 2147483648)
+    by (vm_compute; reflexivity).
+  rewrite bv_swrap_small; [| rewrite Hhm; lia].
+  rewrite moi64_unsigned. reflexivity.
 Qed.
 
 Lemma avi0_mul8 (a : mword 64) : add_vec_int a (0 * 8) = a.

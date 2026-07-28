@@ -24,6 +24,7 @@ Require Import CalleeSaved StackOwn.
 Require Import InstrBytes KernelText.
 Require Import ProcGeom.
 Require Import KallocInv.
+Require Import ByteBuf.   (* bb_choose: a window of existentials is an existential function *)
 Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.
 Require Import WpKvmmakeInstr.
 Require Import SpecKalloc SpecMemset SpecKvmmap SpecProcMapstacks SpecKvmmake.
@@ -917,25 +918,6 @@ Section KvmmakeBody.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
   Ltac peel_reg := peel_reg_step; reflexivity.
 
-  Local Lemma kmk_bytes_choose (n : nat) :
-    forall (start : nat) (P : nat -> bv 8 -> iProp Σ),
-    ([∗ list] k ∈ seq start n, ∃ b : bv 8, P k b) ⊢
-    ∃ f : nat -> bv 8, [∗ list] k ∈ seq start n, P k (f k).
-  Proof.
-    induction n as [|n IH]; intros start P.
-    - iIntros "_". iExists (fun _ => bv_0 8). done.
-    - cbn [seq]. rewrite big_sepL_cons.
-      iIntros "[Hh Ht]". iDestruct "Hh" as (b) "Hh".
-      iDestruct (IH (S start) P with "Ht") as (f) "Ht".
-      iExists (fun k => if Nat.eq_dec k start then b else f k).
-      rewrite big_sepL_cons. iSplitL "Hh".
-      + destruct (Nat.eq_dec start start) as [_|Hne]; [ iExact "Hh" | done ].
-      + iApply (big_sepL_impl with "Ht"). iIntros "!>" (k y Hy) "H".
-        destruct (Nat.eq_dec y start) as [He|_].
-        * exfalso. apply elem_of_list_lookup_2 in Hy. apply elem_of_seq in Hy. lia.
-        * iExact "H".
-  Qed.
-
   Lemma wp_kmk_prologue_node
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (K : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) :
@@ -1124,7 +1106,7 @@ Section KvmmakeBody.
     assert (HM4a2 : M4 !!! Regidx (mword_of_int 12 : mword 5) = mword_of_int (Z.of_nat 4096)).
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
-    iDestruct (kmk_bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
+    iDestruct (bb_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
     iApply (wp_memset γ Φ M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf] [-]").

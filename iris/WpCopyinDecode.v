@@ -6,16 +6,11 @@
    fact ([cii_<off>]) plus the per-instruction decode facts they consume --
    [mk_rvc] for the compressed words, [mk_base] for the eleven 4-byte ones.
    Words the rest of the tree already decodes come from KernelRvcDecode as
-   [cdec_<word>]; copyin's own words are local, named [cidc_<word>]
-   (compressed) / [cidb_<word>] (base).  copyin is the first proved function
-   with a 96-byte frame, so its whole prologue/epilogue push-pop set is new
-   here -- only 0x557d / 0x4501 / 0x8082 come from KernelRvcDecode.
-
-   NOTE: 0x6b05 (c.lui s6,0x1) is also decoded in WpProcMapstacksInstr.v as
-   [pmsdec_48]; per design/code-organization.md a word two functions need
-   belongs in KernelRvcDecode.v as [cdec_6b05].  It is re-proved here rather
-   than aliased (aliasing would put a whole function proof on this file's
-   critical path); move both down in the next decode sweep.
+   [cdec_<word>] -- including the whole 96-byte-frame push/pop set (0x711d ..
+   0x1080 and 0x60e6 .. 0x6125), which copyin shares verbatim with copyout,
+   plus 0x6b05 (also proc_mapstacks +0x48), 0x8baa / 0x855e (also copyout) and
+   0x557d / 0x4501 / 0x8082.  copyin's own words are local, named
+   [cidc_<word>] (compressed) / [cidb_<word>] (base).
 
    Body (all instruction bytes read out of the tracked KernelInstrs.v, never
    kernel.asm -- which is stale by 14 bytes; the C is kernel/vm.c's
@@ -126,90 +121,6 @@ Lemma cidc_cac1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 72, Cregidx (mword_of_int 5)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x02  c.addi16sp sp,-96 *)
-Lemma cidc_711d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x711d : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 58 : mword 6), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x04  c.sdsp ra,88(sp) *)
-Lemma cidc_ec86 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xec86 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 11, Regidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x06  c.sdsp s0,80(sp) *)
-Lemma cidc_e8a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe8a2 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 10, Regidx (mword_of_int 8)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x08  c.sdsp s1,72(sp) *)
-Lemma cidc_e4a6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe4a6 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 9, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x0a  c.sdsp s2,64(sp) *)
-Lemma cidc_e0ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe0ca : mword 16)) s
-  = Some (C_SDSP (mword_of_int 8, Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x0c  c.sdsp s3,56(sp) *)
-Lemma cidc_fc4e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xfc4e : mword 16)) s
-  = Some (C_SDSP (mword_of_int 7, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x0e  c.sdsp s4,48(sp) *)
-Lemma cidc_f852 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf852 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 6, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x10  c.sdsp s5,40(sp) *)
-Lemma cidc_f456 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf456 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 21)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x12  c.sdsp s6,32(sp) *)
-Lemma cidc_f05a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xf05a : mword 16)) s
-  = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x14  c.sdsp s7,24(sp) *)
-Lemma cidc_ec5e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xec5e : mword 16)) s
-  = Some (C_SDSP (mword_of_int 3, Regidx (mword_of_int 23)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x16  c.sdsp s8,16(sp) *)
-Lemma cidc_e862 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe862 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 24)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x18  c.sdsp s9,8(sp) *)
-Lemma cidc_e466 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe466 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 1, Regidx (mword_of_int 25)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x1a  c.addi4spn s0,sp,96 *)
-Lemma cidc_1080 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x1080 : mword 16)) s
-  = Some (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 24 : mword 8), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x1c  c.mv s7,a0 *)
-Lemma cidc_8baa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8baa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* 0x1e  c.mv s5,a1 *)
 Lemma cidc_8aae s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x8aae : mword 16)) s
@@ -238,12 +149,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma cidc_4c85 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4c85 : mword 16)) s
   = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 25)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x28  c.lui s6,0x1 *)
-Lemma cidc_6b05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6b05 : mword 16)) s
-  = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 22)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x2a  c.j +0x56 *)
@@ -288,12 +193,6 @@ Lemma cidc_85ce s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 19)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x5c / 0x68  c.mv a0,s7 *)
-Lemma cidc_855e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x855e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 23)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* 0x62  c.bnez a0,-0x36 *)
 Lemma cidc_f569 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xf569 : mword 16)) s
@@ -316,78 +215,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma cidc_a011 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xa011 : mword 16)) s
   = Some (C_J (mword_of_int 2), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x76  c.ldsp ra,88(sp) *)
-Lemma cidc_60e6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x60e6 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 11, Regidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x78  c.ldsp s0,80(sp) *)
-Lemma cidc_6446 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6446 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 10, Regidx (mword_of_int 8)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x7a  c.ldsp s1,72(sp) *)
-Lemma cidc_64a6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x64a6 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 9, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x7c  c.ldsp s2,64(sp) *)
-Lemma cidc_6906 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6906 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 8, Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x7e  c.ldsp s3,56(sp) *)
-Lemma cidc_79e2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x79e2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 7, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x80  c.ldsp s4,48(sp) *)
-Lemma cidc_7a42 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7a42 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 6, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x82  c.ldsp s5,40(sp) *)
-Lemma cidc_7aa2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7aa2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 5, Regidx (mword_of_int 21)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x84  c.ldsp s6,32(sp) *)
-Lemma cidc_7b02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x7b02 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 4, Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x86  c.ldsp s7,24(sp) *)
-Lemma cidc_6be2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6be2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 3, Regidx (mword_of_int 23)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x88  c.ldsp s8,16(sp) *)
-Lemma cidc_6c42 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6c42 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 2, Regidx (mword_of_int 24)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x8a  c.ldsp s9,8(sp) *)
-Lemma cidc_6ca2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6ca2 : mword 16)) s
-  = Some (C_LDSP (mword_of_int 1, Regidx (mword_of_int 25)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x8c  c.addi16sp sp,96 *)
-Lemma cidc_6125 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6125 : mword 16)) s
-  = Some (C_ADDI16SP (mword_of_int 6 : mword 6), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
@@ -477,61 +304,61 @@ Section CopyinInstrs.
 
   Lemma cii_02 : kernel_text -∗ instr (mword_of_int (CI + 0x02) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 58 : mword 6), sp, sp, ADDI)).  (* c.addi16sp sp,-96  # 96-byte frame: ra/s0/s1/s2..s9 *)
   Proof. mk_rvc (CI + 0x02)%Z (mword_of_int 0x711d : mword 16)
-    (mword_of_int (CI + 0x02) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 58 : mword 6), sp, sp, ADDI)) cidc_711d exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (CI + 0x02) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 58 : mword 6), sp, sp, ADDI)) cdec_711d exec_execute_C_ADDI16SP. Qed.
 
   Lemma cii_04 : kernel_text -∗ instr (mword_of_int (CI + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).  (* c.sdsp ra,88(sp) *)
   Proof. mk_rvc (CI + 0x04)%Z (mword_of_int 0xec86 : mword 16)
-    (mword_of_int (CI + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cidc_ec86 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_ec86 exec_execute_C_SDSP. Qed.
 
   Lemma cii_06 : kernel_text -∗ instr (mword_of_int (CI + 0x06) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).  (* c.sdsp s0,80(sp) *)
   Proof. mk_rvc (CI + 0x06)%Z (mword_of_int 0xe8a2 : mword 16)
-    (mword_of_int (CI + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cidc_e8a2 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e8a2 exec_execute_C_SDSP. Qed.
 
   Lemma cii_08 : kernel_text -∗ instr (mword_of_int (CI + 0x08) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).  (* c.sdsp s1,72(sp) *)
   Proof. mk_rvc (CI + 0x08)%Z (mword_of_int 0xe4a6 : mword 16)
-    (mword_of_int (CI + 0x08) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cidc_e4a6 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x08) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cdec_e4a6 exec_execute_C_SDSP. Qed.
 
   Lemma cii_0a : kernel_text -∗ instr (mword_of_int (CI + 0x0a) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)).  (* c.sdsp s2,64(sp) *)
   Proof. mk_rvc (CI + 0x0a)%Z (mword_of_int 0xe0ca : mword 16)
-    (mword_of_int (CI + 0x0a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) cidc_e0ca exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x0a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) cdec_e0ca exec_execute_C_SDSP. Qed.
 
   Lemma cii_0c : kernel_text -∗ instr (mword_of_int (CI + 0x0c) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)).  (* c.sdsp s3,56(sp) *)
   Proof. mk_rvc (CI + 0x0c)%Z (mword_of_int 0xfc4e : mword 16)
-    (mword_of_int (CI + 0x0c) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) cidc_fc4e exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x0c) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), Regidx (mword_of_int 19), sp, 8)) cdec_fc4e exec_execute_C_SDSP. Qed.
 
   Lemma cii_0e : kernel_text -∗ instr (mword_of_int (CI + 0x0e) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)).  (* c.sdsp s4,48(sp) *)
   Proof. mk_rvc (CI + 0x0e)%Z (mword_of_int 0xf852 : mword 16)
-    (mword_of_int (CI + 0x0e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)) cidc_f852 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x0e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), Regidx (mword_of_int 20), sp, 8)) cdec_f852 exec_execute_C_SDSP. Qed.
 
   Lemma cii_10 : kernel_text -∗ instr (mword_of_int (CI + 0x10) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 21), sp, 8)).  (* c.sdsp s5,40(sp) *)
   Proof. mk_rvc (CI + 0x10)%Z (mword_of_int 0xf456 : mword 16)
-    (mword_of_int (CI + 0x10) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 21), sp, 8)) cidc_f456 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x10) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), Regidx (mword_of_int 21), sp, 8)) cdec_f456 exec_execute_C_SDSP. Qed.
 
   Lemma cii_12 : kernel_text -∗ instr (mword_of_int (CI + 0x12) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 22), sp, 8)).  (* c.sdsp s6,32(sp) *)
   Proof. mk_rvc (CI + 0x12)%Z (mword_of_int 0xf05a : mword 16)
-    (mword_of_int (CI + 0x12) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 22), sp, 8)) cidc_f05a exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x12) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), Regidx (mword_of_int 22), sp, 8)) cdec_f05a exec_execute_C_SDSP. Qed.
 
   Lemma cii_14 : kernel_text -∗ instr (mword_of_int (CI + 0x14) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 23), sp, 8)).  (* c.sdsp s7,24(sp) *)
   Proof. mk_rvc (CI + 0x14)%Z (mword_of_int 0xec5e : mword 16)
-    (mword_of_int (CI + 0x14) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 23), sp, 8)) cidc_ec5e exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x14) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 23), sp, 8)) cdec_ec5e exec_execute_C_SDSP. Qed.
 
   Lemma cii_16 : kernel_text -∗ instr (mword_of_int (CI + 0x16) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)).  (* c.sdsp s8,16(sp) *)
   Proof. mk_rvc (CI + 0x16)%Z (mword_of_int 0xe862 : mword 16)
-    (mword_of_int (CI + 0x16) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)) cidc_e862 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x16) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)) cdec_e862 exec_execute_C_SDSP. Qed.
 
   Lemma cii_18 : kernel_text -∗ instr (mword_of_int (CI + 0x18) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 25), sp, 8)).  (* c.sdsp s9,8(sp) *)
   Proof. mk_rvc (CI + 0x18)%Z (mword_of_int 0xe466 : mword 16)
-    (mword_of_int (CI + 0x18) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 25), sp, 8)) cidc_e466 exec_execute_C_SDSP. Qed.
+    (mword_of_int (CI + 0x18) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 25), sp, 8)) cdec_e466 exec_execute_C_SDSP. Qed.
 
   Lemma cii_1a : kernel_text -∗ instr (mword_of_int (CI + 0x1a) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 24 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).  (* c.addi4spn s0,sp,96 *)
   Proof. mk_rvc (CI + 0x1a)%Z (mword_of_int 0x1080 : mword 16)
-    (mword_of_int (CI + 0x1a) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 24 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cidc_1080 exec_execute_C_ADDI4SPN. Qed.
+    (mword_of_int (CI + 0x1a) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 24 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_1080 exec_execute_C_ADDI4SPN. Qed.
 
   (* --- the loop-invariant registers ---------------------------------- *)
 
   Lemma cii_1c : kernel_text -∗ instr (mword_of_int (CI + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 23), ADD)).  (* c.mv s7,a0         # s7 := pagetable *)
   Proof. mk_rvc (CI + 0x1c)%Z (mword_of_int 0x8baa : mword 16)
-    (mword_of_int (CI + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 23), ADD)) cidc_8baa exec_execute_C_MV. Qed.
+    (mword_of_int (CI + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 23), ADD)) cdec_8baa exec_execute_C_MV. Qed.
 
   Lemma cii_1e : kernel_text -∗ instr (mword_of_int (CI + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 21), ADD)).  (* c.mv s5,a1         # s5 := dst *)
   Proof. mk_rvc (CI + 0x1e)%Z (mword_of_int 0x8aae : mword 16)
@@ -555,7 +382,7 @@ Section CopyinInstrs.
 
   Lemma cii_28 : kernel_text -∗ instr (mword_of_int (CI + 0x28) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 22), LUI)).  (* c.lui s6,0x1       # s6 := PGSIZE *)
   Proof. mk_rvc (CI + 0x28)%Z (mword_of_int 0x6b05 : mword 16)
-    (mword_of_int (CI + 0x28) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 22), LUI)) cidc_6b05 exec_execute_C_LUI. Qed.
+    (mword_of_int (CI + 0x28) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 22), LUI)) cdec_6b05 exec_execute_C_LUI. Qed.
 
   Lemma cii_2a : kernel_text -∗ instr (mword_of_int (CI + 0x2a) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 22 : mword 11) ('b"0")), zreg)).  (* c.j +0x56          # enter the loop at the walkaddr probe *)
   Proof. mk_rvc (CI + 0x2a)%Z (mword_of_int 0xa035 : mword 16)
@@ -627,7 +454,7 @@ Section CopyinInstrs.
 
   Lemma cii_5c : kernel_text -∗ instr (mword_of_int (CI + 0x5c) : mword 64) true (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)).  (* c.mv a0,s7 *)
   Proof. mk_rvc (CI + 0x5c)%Z (mword_of_int 0x855e : mword 16)
-    (mword_of_int (CI + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) cidc_855e exec_execute_C_MV. Qed.
+    (mword_of_int (CI + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) cdec_855e exec_execute_C_MV. Qed.
 
   Lemma cii_5e : kernel_text -∗ instr (mword_of_int (CI + 0x5e) : mword 64) false (JAL (mword_of_int 2095286 : mword 21, Regidx (mword_of_int 1))).  (* jal ra,walkaddr    # -1866 -> 0x80000ff6 *)
   Proof. mk_base (CI + 0x5e)%Z (mword_of_int 0x8b7ff0ef : mword 32)
@@ -647,7 +474,7 @@ Section CopyinInstrs.
 
   Lemma cii_68 : kernel_text -∗ instr (mword_of_int (CI + 0x68) : mword 64) true (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)).  (* c.mv a0,s7 *)
   Proof. mk_rvc (CI + 0x68)%Z (mword_of_int 0x855e : mword 16)
-    (mword_of_int (CI + 0x68) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) cidc_855e exec_execute_C_MV. Qed.
+    (mword_of_int (CI + 0x68) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 10), ADD)) cdec_855e exec_execute_C_MV. Qed.
 
   Lemma cii_6a : kernel_text -∗ instr (mword_of_int (CI + 0x6a) : mword 64) false (JAL (mword_of_int 2096724 : mword 21, Regidx (mword_of_int 1))).  (* jal ra,vmfault     # -428 -> 0x800015a0 *)
   Proof. mk_base (CI + 0x6a)%Z (mword_of_int 0xe55ff0ef : mword 32)
@@ -673,51 +500,51 @@ Section CopyinInstrs.
 
   Lemma cii_76 : kernel_text -∗ instr (mword_of_int (CI + 0x76) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).  (* c.ldsp ra,88(sp) *)
   Proof. mk_rvc (CI + 0x76)%Z (mword_of_int 0x60e6 : mword 16)
-    (mword_of_int (CI + 0x76) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cidc_60e6 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x76) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60e6 exec_execute_C_LDSP. Qed.
 
   Lemma cii_78 : kernel_text -∗ instr (mword_of_int (CI + 0x78) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).  (* c.ldsp s0,80(sp) *)
   Proof. mk_rvc (CI + 0x78)%Z (mword_of_int 0x6446 : mword 16)
-    (mword_of_int (CI + 0x78) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cidc_6446 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x78) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6446 exec_execute_C_LDSP. Qed.
 
   Lemma cii_7a : kernel_text -∗ instr (mword_of_int (CI + 0x7a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).  (* c.ldsp s1,72(sp) *)
   Proof. mk_rvc (CI + 0x7a)%Z (mword_of_int 0x64a6 : mword 16)
-    (mword_of_int (CI + 0x7a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cidc_64a6 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x7a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cdec_64a6 exec_execute_C_LDSP. Qed.
 
   Lemma cii_7c : kernel_text -∗ instr (mword_of_int (CI + 0x7c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).  (* c.ldsp s2,64(sp) *)
   Proof. mk_rvc (CI + 0x7c)%Z (mword_of_int 0x6906 : mword 16)
-    (mword_of_int (CI + 0x7c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) cidc_6906 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x7c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 8 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)) cdec_6906 exec_execute_C_LDSP. Qed.
 
   Lemma cii_7e : kernel_text -∗ instr (mword_of_int (CI + 0x7e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)).  (* c.ldsp s3,56(sp) *)
   Proof. mk_rvc (CI + 0x7e)%Z (mword_of_int 0x79e2 : mword 16)
-    (mword_of_int (CI + 0x7e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) cidc_79e2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x7e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 7 : mword 6) ('b"000")), sp, Regidx (mword_of_int 19), false, 8)) cdec_79e2 exec_execute_C_LDSP. Qed.
 
   Lemma cii_80 : kernel_text -∗ instr (mword_of_int (CI + 0x80) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)).  (* c.ldsp s4,48(sp) *)
   Proof. mk_rvc (CI + 0x80)%Z (mword_of_int 0x7a42 : mword 16)
-    (mword_of_int (CI + 0x80) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) cidc_7a42 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x80) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 20), false, 8)) cdec_7a42 exec_execute_C_LDSP. Qed.
 
   Lemma cii_82 : kernel_text -∗ instr (mword_of_int (CI + 0x82) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)).  (* c.ldsp s5,40(sp) *)
   Proof. mk_rvc (CI + 0x82)%Z (mword_of_int 0x7aa2 : mword 16)
-    (mword_of_int (CI + 0x82) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)) cidc_7aa2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x82) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 21), false, 8)) cdec_7aa2 exec_execute_C_LDSP. Qed.
 
   Lemma cii_84 : kernel_text -∗ instr (mword_of_int (CI + 0x84) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)).  (* c.ldsp s6,32(sp) *)
   Proof. mk_rvc (CI + 0x84)%Z (mword_of_int 0x7b02 : mword 16)
-    (mword_of_int (CI + 0x84) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)) cidc_7b02 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x84) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 6) ('b"000")), sp, Regidx (mword_of_int 22), false, 8)) cdec_7b02 exec_execute_C_LDSP. Qed.
 
   Lemma cii_86 : kernel_text -∗ instr (mword_of_int (CI + 0x86) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)).  (* c.ldsp s7,24(sp) *)
   Proof. mk_rvc (CI + 0x86)%Z (mword_of_int 0x6be2 : mword 16)
-    (mword_of_int (CI + 0x86) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)) cidc_6be2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x86) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 23), false, 8)) cdec_6be2 exec_execute_C_LDSP. Qed.
 
   Lemma cii_88 : kernel_text -∗ instr (mword_of_int (CI + 0x88) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)).  (* c.ldsp s8,16(sp) *)
   Proof. mk_rvc (CI + 0x88)%Z (mword_of_int 0x6c42 : mword 16)
-    (mword_of_int (CI + 0x88) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)) cidc_6c42 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x88) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 24), false, 8)) cdec_6c42 exec_execute_C_LDSP. Qed.
 
   Lemma cii_8a : kernel_text -∗ instr (mword_of_int (CI + 0x8a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 25), false, 8)).  (* c.ldsp s9,8(sp) *)
   Proof. mk_rvc (CI + 0x8a)%Z (mword_of_int 0x6ca2 : mword 16)
-    (mword_of_int (CI + 0x8a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 25), false, 8)) cidc_6ca2 exec_execute_C_LDSP. Qed.
+    (mword_of_int (CI + 0x8a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 25), false, 8)) cdec_6ca2 exec_execute_C_LDSP. Qed.
 
   Lemma cii_8c : kernel_text -∗ instr (mword_of_int (CI + 0x8c) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)).  (* c.addi16sp sp,96 *)
   Proof. mk_rvc (CI + 0x8c)%Z (mword_of_int 0x6125 : mword 16)
-    (mword_of_int (CI + 0x8c) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)) cidc_6125 exec_execute_C_ADDI16SP. Qed.
+    (mword_of_int (CI + 0x8c) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 6 : mword 6), sp, sp, ADDI)) cdec_6125 exec_execute_C_ADDI16SP. Qed.
 
   Lemma cii_8e : kernel_text -∗ instr (mword_of_int (CI + 0x8e) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).  (* c.ret *)
   Proof. mk_rvc (CI + 0x8e)%Z (mword_of_int 0x8082 : mword 16)

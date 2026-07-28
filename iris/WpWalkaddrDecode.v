@@ -68,17 +68,8 @@ Import Defs.
 (* Compressed decode facts for walkaddr's own words.                      *)
 (* ===================================================================== *)
 
-(* 0x02  c.srli a5,a5,0x1a *)
-Lemma wadc_83e9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x83e9 : mword 16)) s
-  = Some (C_SRLI (mword_of_int 26, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x14  c.li a2,0 *)
-Lemma wadc_4601 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4601 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x02  c.srli a5,a5,0x1a -- [cdec_83e9] (KernelRvcDecode.v) *)
+(* 0x14  c.li a2,0        -- [cdec_4601] (KernelRvcDecode.v) *)
 
 (* 0x1a  c.beqz a0,+0x10 *)
 Lemma wadc_c901 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -152,7 +143,7 @@ Section WalkaddrInstrs.
 
   Lemma wai_02 : WAP 0x02 true (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
   Proof. mk_rvc (WA + 0x02)%Z (mword_of_int 0x83e9 : mword 16)
-    (mword_of_int (WA + 0x02) : mword 64) (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) wadc_83e9 exec_execute_C_SRLI. Qed.
+    (mword_of_int (WA + 0x02) : mword 64) (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83e9 exec_execute_C_SRLI. Qed.
 
   Lemma wai_04 : WAP 0x04 false (BTYPE (mword_of_int 8 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 15), BGEU)).
   Proof. mk_base (WA + 0x04)%Z (mword_of_int 0x00b7f463 : mword 32)
@@ -188,7 +179,7 @@ Section WalkaddrInstrs.
 
   Lemma wai_14 : WAP 0x14 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (WA + 0x14)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (WA + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) wadc_4601 exec_execute_C_LI. Qed.
+    (mword_of_int (WA + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma wai_16 : WAP 0x16 false (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (WA + 0x16)%Z (mword_of_int 0xf51ff0ef : mword 32)

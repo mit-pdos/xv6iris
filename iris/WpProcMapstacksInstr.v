@@ -74,10 +74,6 @@ Section ProcMapstacksInstrs.
     exec (ext_decode_compressed (mword_of_int 0x4b99 : mword 16)) s
     = Some (C_LI (mword_of_int 6, Regidx (mword_of_int 23)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma pmsdec_48 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0x6b05 : mword 16)) s
-    = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 22)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
   Lemma pmsdec_4a s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x00017a97 : mword 32)) s
     = Some (UTYPE (mword_of_int 23 : mword 20, Regidx (mword_of_int 21), AUIPC), s).
@@ -218,7 +214,7 @@ Section ProcMapstacksInstrs.
   Lemma pmsi_46 : PMS 0x46 true (ITYPE (sign_extend' 12 (mword_of_int 6 : mword 6), zreg, Regidx (mword_of_int 23), ADDI)).  (* li s7,6 *)
   Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x46)%Z (mword_of_int 0x4b99 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x46) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 6 : mword 6), zreg, Regidx (mword_of_int 23), ADDI)) pmsdec_46 exec_execute_C_LI. Qed.
   Lemma pmsi_48 : PMS 0x48 true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 22), LUI)).  (* lui s6,0x1 *)
-  Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x48)%Z (mword_of_int 0x6b05 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x48) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 22), LUI)) pmsdec_48 exec_execute_C_LUI. Qed.
+  Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x48)%Z (mword_of_int 0x6b05 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x48) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 22), LUI)) cdec_6b05 exec_execute_C_LUI. Qed.
   Lemma pmsi_4a : PMS 0x4a false (UTYPE (mword_of_int 23 : mword 20, Regidx (mword_of_int 21), AUIPC)).  (* auipc s5,0x17 *)
   Proof. mk_base (KernelSyms.proc_mapstacks + 0x4a)%Z (mword_of_int 0x00017a97 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x4a) : mword 64) (UTYPE (mword_of_int 23 : mword 20, Regidx (mword_of_int 21), AUIPC)) pmsdec_4a. Qed.
   Lemma pmsi_4e : PMS 0x4e false (ITYPE (mword_of_int 2488 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADDI)).  (* addi s5,s5,-1608 # 80018178 <tickslock> *)

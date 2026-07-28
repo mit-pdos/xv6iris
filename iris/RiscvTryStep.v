@@ -869,6 +869,28 @@ Proof.
   destruct bl; [apply exec_returnm | reflexivity].
 Qed.
 
+(* ...and the STATE-PRESERVING specialisations: when both operands run in the
+   same state (the case for every pure predicate the model builds out of
+   [and_boolM]/[or_boolM] -- [pte_is_invalid], the extension probes), the
+   short-circuit disappears and the connective is just the boolean one.  These
+   are what lets a caller peel such a predicate operand by operand with
+   [eapply] instead of case-splitting on each left operand. *)
+Lemma exec_and_v (l r : M bool) (s : mstate) (bl br : bool) :
+  exec l s = Some (bl, s) -> exec r s = Some (br, s) ->
+  exec (and_boolM l r) s = Some (andb bl br, s).
+Proof.
+  intros Hl Hr. rewrite (exec_and_boolM_Some _ _ _ _ _ Hl).
+  destruct bl; [exact Hr | reflexivity].
+Qed.
+
+Lemma exec_or_v (l r : M bool) (s : mstate) (bl br : bool) :
+  exec l s = Some (bl, s) -> exec r s = Some (br, s) ->
+  exec (or_boolM l r) s = Some (orb bl br, s).
+Proof.
+  intros Hl Hr. rewrite (exec_or_boolM_Some _ _ _ _ _ Hl).
+  destruct bl; [reflexivity | exact Hr].
+Qed.
+
 Section ExecPending.
   Context (s : mstate) (cES : bool).
   Hypothesis HecES : exec (currentlyEnabled Ext_S) s = Some (cES, s).

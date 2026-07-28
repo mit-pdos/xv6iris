@@ -102,13 +102,6 @@ are working on that effort — the relevant `projects/` file.
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
-- **[`copy-inout.md`](projects/copy-inout.md)** — copyin / copyout (+ the
-  `walkaddr` callee): the kernel↔user byte-copy pair, stated at the `proc_pt`
-  altitude so both PRESERVE the user-page-table invariant and hand back a
-  descriptor EXTENDING the one they were given (`uptd_ext`) — including the
-  per-page accessor (`proc_pt_page_acc`, the `↦ₚ ⇄ ↦ₘ` move a memmove through
-  a user page needs), `ByteBuf.v`'s buffer algebra, and why the contracts
-  deliberately say nothing about the bytes that crossed.
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
   printint → consputc → uartputc_sync), verified on the PANIC path
   (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it): consputc and
@@ -127,6 +120,15 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`copy-inout.md`](completed/copy-inout.md)** — copyin / copyout (+ the
+  `walkaddr` callee), all three proven: the kernel↔user byte-copy pair at the
+  `proc_pt` altitude, so both PRESERVE the user-page-table invariant and hand
+  back a descriptor EXTENDING the one they were given (`uptd_ext`).  Keeps the
+  per-page accessor (`proc_pt_page_acc`, the `↦ₚ ⇄ ↦ₘ` move a memmove through
+  a user page needs), `ByteBuf.v`'s buffer algebra, why the contracts
+  deliberately say nothing about the bytes that crossed, the walkaddr PTE2PA
+  high-bit correction, copyout's un-null-checked `walk` result, the fuel-not-
+  count loop induction, and the cleanup sweep's measured payoff.
 - **[`vmfault.md`](completed/vmfault.md)** — vmfault + ismapped (+ the no-alloc
   walk spec), all proven: the lazy-allocation page-fault handler, stated at the
   `proc_pt` altitude so it PRESERVES the valid-user-page-table invariant.

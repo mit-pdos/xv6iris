@@ -143,10 +143,6 @@ Section MappagesInstrs.
     exec (ext_decode_compressed (mword_of_int 0x865a : mword 16)) s
     = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 22)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma mdec_40 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0x85a6 : mword 16)) s
-    = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 9)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
   Lemma mdec_44 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0xee9ff0ef : mword 32)) s
     = Some (JAL (mword_of_int 2096872 : mword 21, Regidx (mword_of_int 1)), s).
@@ -239,7 +235,7 @@ Section MappagesInstrs.
   Lemma mi_3e : MPP 0x3e true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (KernelSyms.mappages + 0x3e)%Z (mword_of_int 0x865a : mword 16) (mword_of_int (KernelSyms.mappages + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 12), ADD)) mdec_3e exec_execute_C_MV. Qed.
   Lemma mi_40 : MPP 0x40 true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 11), ADD)).
-  Proof. mk_rvc (KernelSyms.mappages + 0x40)%Z (mword_of_int 0x85a6 : mword 16) (mword_of_int (KernelSyms.mappages + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 11), ADD)) mdec_40 exec_execute_C_MV. Qed.
+  Proof. mk_rvc (KernelSyms.mappages + 0x40)%Z (mword_of_int 0x85a6 : mword 16) (mword_of_int (KernelSyms.mappages + 0x40) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 11), ADD)) cdec_85a6 exec_execute_C_MV. Qed.
   Lemma mi_42 : MPP 0x42 true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.mappages + 0x42)%Z (mword_of_int 0x8552 : mword 16) (mword_of_int (KernelSyms.mappages + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) cdec_8552 exec_execute_C_MV. Qed.
   Lemma mi_44 : MPP 0x44 false (JAL (mword_of_int 2096872 : mword 21, Regidx (mword_of_int 1))).
