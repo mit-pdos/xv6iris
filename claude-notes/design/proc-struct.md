@@ -384,6 +384,8 @@ Definition proc_dormant (pa : mword 64) : iProp Σ :=
      p_pid pa ↦₄{#(1/2)} pid ∗                (* reunites with the invariant's half *)
      proc_fields pa (DfracOwn 1) V ∗
      ofile_cells pa (pv_ofile V) ∗            (* bare cells: no file_ref clause *)
+     ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗     (* the NOFILE per-descriptor units *)
+     fd_slots FDSPARE ∗                       (* ... and the process's allowance *)
      own_ctx (p_context pa))%I.
 
 Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
@@ -492,6 +494,15 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
 ## What is built
 
 Landed and compiling:
+
+The two fd-slot conjuncts are what make `FDSLOTS` add up exactly: procinit
+routes `NPROC * (NOFILE + FDSPARE)` — the WHOLE minted supply — and each
+dormant block parks one process's share. `proc_dormant_unused` hands the
+`FDSPARE` allowance out as its own conjunct, because for a live process it
+travels *beside* `proc_priv` rather than inside it (see
+[`file-table.md`](file-table.md) for why: `proc_priv`'s accessors all swallow
+the block, so a syscall could not hold its allowance and still pass
+`proc_priv` to a callee).
 
 - **`ProcGeom.v`** — all 15 field addresses, `NOFILE`/`PNAMELEN`, the three
   missing state codes, `inv_dormant` + its six `vm_compute` facts, and the

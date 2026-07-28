@@ -38,12 +38,23 @@ Local Open Scope Z_scope.
 (* param.h: open files per process.  (NPROC comes from ProcGeom.) *)
 (* NOFILE now lives in ProcGeom.v with the rest of struct proc geometry. *)
 
-(* The supply.  NOFILE descriptors per process, plus a small per-process
-   allowance for the references a syscall holds in LOCALS while it has not
-   yet installed them in a descriptor -- sys_open holds one between
-   filealloc and fdalloc, pipealloc holds two.  Any comfortable constant
-   below 2^31 would do; this one is the honest count. *)
-Definition FDSLOTS : nat := (NPROC * (NOFILE + 4))%nat.
+(* The per-process ALLOWANCE: units for the references a syscall holds in
+   LOCALS while they have not yet reached a descriptor.  sys_open holds one
+   between filealloc and fdalloc; sys_pipe holds two (SpecSysPipe.v takes them
+   as premises and returns both on every one of its four exits).  Any
+   comfortable constant would do; this one is the honest count.
+
+   It is routed exactly like the per-descriptor units: procinit parks it in
+   each process's [ProcInv.proc_dormant], allocproc takes it out with the
+   block, and it travels ALONGSIDE [proc_priv] for a live process -- not
+   inside it.  Beside rather than inside because [proc_priv]'s accessors all
+   have the borrow-and-return shape, whose wand swallows the block: a syscall
+   that held its allowance *out* of [proc_priv] could not then pass
+   [proc_priv] to a callee, which is precisely what sys_pipe does. *)
+Definition FDSPARE : nat := 4%nat.
+
+(* The supply: NOFILE descriptors plus the allowance, per process. *)
+Definition FDSLOTS : nat := (NPROC * (NOFILE + FDSPARE))%nat.
 
 Definition fdslotUR : ucmra := authUR natUR.
 

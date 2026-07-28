@@ -16,12 +16,14 @@
    procinit is where the fd-slot supply is ROUTED.  Every other holder of an
    [fd_slot] got it from a process (FdSlots.v): an empty descriptor holds its
    own unit, a descriptor naming a file has given it to the ftable.  Boot
-   mints [FDSLOTS] units with [fd_slots_alloc]; procinit takes
-   [NPROC * NOFILE] of them and hands each process its NOFILE, which is what
-   turns the fd-slot-free [proc_dormant_nofd] blocks it is given into real
-   [proc_dormant]s ([ProcInv.proc_dormant_seal]).  The remaining units stay
-   with the caller as the per-process allowance for references a syscall
-   holds in locals (see FDSLOTS).
+   mints [FDSLOTS] units with [fd_slots_alloc]; procinit takes ALL of them --
+   [NPROC * (NOFILE + FDSPARE)] -- and hands each process its NOFILE
+   per-descriptor units plus its [FDSPARE] allowance, which is what turns the
+   fd-slot-free [proc_dormant_nofd] blocks it is given into real
+   [proc_dormant]s ([ProcInv.proc_dormant_seal]).  Nothing is left with the
+   caller: the allowance a syscall borrows for a reference in flight
+   (sys_open's one, sys_pipe's two) comes out of the process's own dormant
+   block via allocproc, not from a pile boot kept back.
 
    Everything else procinit does to a process is the three writes the C
    shows.  It touches none of the private cells -- the BSS is already zero --
@@ -188,8 +190,9 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
   lk_raw wait_lock_addr -∗
   (* ... and the 64 processes, each with its fd-slot-free dormant block *)
   ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
-  (* THE supply being routed: NOFILE units per process. *)
-  fd_slots (NPROC * NOFILE) -∗
+  (* THE supply being routed: NOFILE + FDSPARE units per process, i.e. the
+     WHOLE of [FDSLOTS] -- nothing is left over. *)
+  fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
   ( ∀ mr,
     sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗

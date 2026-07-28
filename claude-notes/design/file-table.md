@@ -227,16 +227,64 @@ frac component tracks *outstanding* fraction rather than being pinned at 1.
   window is unobservable); the problem is that nothing can currently *state*
   it.
 
-  **It is not an fd-slot shortage, and the spare allowance does not help.**
-  `FDSLOTS = NPROC * (NOFILE + 4)` does budget four spare units per process,
-  for exactly this family of situations — a reference held in a syscall's local
-  before it reaches a descriptor. But sys_dup's missing resource is a
-  **`file_ref`**, not an `fd_slot`, and no amount of slot capability produces
-  one: only `filealloc` mints a reference, under `ftable.lock`, for a *free*
-  slot. So the spare units are irrelevant here. (They *are* what sys_open and
-  pipealloc need, and sys_dup's own ledger already balances without them: the
-  `fd_slot` fdalloc releases when it fills a descriptor is precisely the one
-  `filedup` then consumes.)
+  **It is not an fd-slot shortage, and the allowance does not help.** Each
+  process does own `fd_slots FDSPARE` (routed by procinit, above) for exactly
+  this family of situations. But sys_dup's missing resource is a `file_ref`,
+  and **a unit cannot become a reference.** Spelled out, because it is the
+  crux and it is worth having written down — a `file_ref γ k q C` is three
+  things at once:
+
+  1. `fref_tok γ k q = own γ (◯ {[k := (q, 1%positive)]})` — a fragment of the
+     auth whose authoritative element lives in the **ftable lock's** resource;
+  2. `file_fields k (DfracOwn q) C` — an actual **fraction `q` of the seven
+     content points-tos**;
+  3. `file_payload q C` — fraction `q` of the pipe/inode reference the file
+     holds.
+
+  (2) is the one that settles it, and it needs no ghost reasoning at all:
+  points-to fractions are conserved by separation logic itself. The total
+  fraction of `a_ftype k ↦₄ …` in the system is 1 — `q` with the holders,
+  `1 - q` in `file_rest` inside the lock — so a *second, disjoint* share has to
+  come either from halving an existing holder's `q` or out of `file_rest`, and
+  both mean opening `ftable.lock`. An `fd_slot` is `own fdslot_name (◯ n)`: a
+  natural-number token in a **different ghost location**, carrying no fraction
+  of anything. Nothing turns a token into a points-to fraction.
+
+  (1) is the ghost-level statement of the same thing, and it is where the
+  counting lives: `positiveR` has **no unit**, so `◯ {[k := (q,1)]}` is not
+  framed in from `◯ ∅` — producing one requires a frame-preserving update on
+  `● M` that bumps the recorded count `n → n+1`. Only the lock holder can do
+  that, and doing it *is* `filedup`'s ghost step
+  (`(qt,n),(q,1) ⇝ (qt,n+1),(q/2,1)·(q/2,1)` in the table above) — note it
+  halves the caller's fraction, which is (2) being conserved in the same
+  breath.
+
+  And the strictness is not incidental: `f->ref` in memory equals the ghost
+  count `n`. If a reference could be created without bumping the authority the
+  two would drift, and `fileclose`'s `--ref == 0 → free the slot` would be
+  unsound — you could free a file another descriptor still names.
+
+  So the two ledgers run in opposite directions and do not convert: a unit is
+  *permission for the count to be one higher* (which is what bounds it by
+  `FDSLOTS` and makes `f->ref++` overflow-free), while a `file_ref` is *one of
+  the counted references, with its share of the content*. `filedup` consumes a
+  unit **and** splits a reference: the unit pays for the count, the halving
+  pays for the fraction. A unit alone cannot pay for the fraction, which is
+  precisely why sys_dup cannot manufacture the second reference itself and has
+  to call `filedup` — which wants the first reference in hand.
+
+  Note also that sys_dup's ledger balances with **zero** allowance: the
+  `fd_slot` fdalloc releases when it fills the destination descriptor is
+  exactly the one `filedup` then consumes.
+
+  **The tempting fix, and why it is wrong.** Plug the source descriptor's hole
+  with a spare unit — it is the right *shape*, since an empty descriptor's
+  payload IS a unit. But `ofile_slot`'s unit-disjunct is guarded by
+  `⌜v = zero_reg⌝`, and dropping that guard would let *any* non-null
+  descriptor be backed by a unit instead of a reference. Every consumer of a
+  non-null descriptor (argfd's callers, `sys_close`) would then have to refute
+  the new case, and none of them can from `v ≠ 0` alone. So the deficit must be
+  tracked **outside** `ofile_slot`, where only the holder of the block sees it.
 
   **What forces the window is `filedup`'s interface, not `fdalloc`'s.**
   `filedup` needs `file_ref γf k q Cf` in hand to split, and at that point the
@@ -336,10 +384,11 @@ It is a *whole-kernel conservation law*, and a slightly subtle one:
 Nothing in `file.c` enforces it, so it is carried as a resource — `FdSlots.v`:
 
 - `fd_slot` is one unit of "somewhere to put a file reference". The supply is
-  fixed at `FDSLOTS = NPROC * (NOFILE + 4)` and minted once at boot by
-  `fd_slots_alloc`; the `+4` is the per-process allowance for references a
-  syscall holds in *locals* before installing them in a descriptor (`sys_open`
-  one, `pipealloc` two). The ghost **name lives in the `fdslotG` class**, not
+  fixed at `FDSLOTS = NPROC * (NOFILE + FDSPARE)`, `FDSPARE = 4`, and minted
+  once at boot by `fd_slots_alloc`; the `FDSPARE` part is the per-process
+  allowance for references a syscall holds in *locals* before installing them
+  in a descriptor (`sys_open` one, `sys_pipe` two). The ghost **name lives in
+  the `fdslotG` class**, not
   in a `γs` parameter: there is one supply per system, and threading a
   parameter would drag a filesystem gname through `proc_dormant`, hence
   `proc_slots`, `proc_lock_res` and all 18 scheduler files, purely so an empty
@@ -349,9 +398,20 @@ Nothing in `file.c` enforces it, so it is carried as a resource — `FdSlots.v`:
 - **The other end of the law is `ProcInv.ofile_slot`**: an *empty* descriptor
   (`v = 0`) holds its unit itself; a descriptor naming a file has given it
   away, and the ftable holds it against that file's count. `proc_dormant`
-  holds all NOFILE units (every descriptor there is null), so the supply is
-  conserved across the whole UNUSED → live → ZOMBIE cycle and `allocproc` has
-  to conjure nothing.
+  holds all NOFILE units (every descriptor there is null) **plus that
+  process's `fd_slots FDSPARE` allowance**, so the supply is conserved across
+  the whole UNUSED → live → ZOMBIE cycle and `allocproc` has to conjure
+  nothing. `FDSLOTS` is therefore *exactly* what the NPROC dormant blocks hold
+  between them: boot routes the whole supply and keeps nothing back.
+
+  The allowance sits **beside** `proc_priv` for a live process rather than
+  inside it, and that is forced by the accessor shape: every `proc_priv`
+  projection is borrow-and-return, and its wand swallows the block, so a
+  syscall holding its allowance *out* of `proc_priv` could no longer pass
+  `proc_priv` to a callee — which is exactly what `sys_pipe` does between its
+  two `fdalloc`s. `SpecSysPipe.v` already takes its two units as premises;
+  that is the convention, and `proc_dormant_unused` hands `fd_slots FDSPARE`
+  out as its own conjunct so `allocproc` can start it on that path.
 - The bound then needs no arithmetic and no ghost update at all: the units for
   one slot are literally `◯ n`, `◯ n ⋅ ◯ 1 = ◯ (S n)`, and auth validity
   against `● FDSLOTS` gives `n ≤ FDSLOTS`. `fd_slots_no_overflow` packages

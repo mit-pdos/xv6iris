@@ -337,13 +337,34 @@ the evidence for every offset. This file is only the worklist.
       `SpecArgfd`'s both-non-null shape does not cover, so they want a second
       interface or a `pf`-optional generalization of this one.
 
-- [ ] **S4b — `proc_priv_owe`, the payload deficit set.** This is what
+- [x] **S4b — the whole fd-slot supply is routed** (done). `FdSlots.FDSPARE`
+      (= 4) names the per-process allowance that `FDSLOTS`'s `+4` always
+      meant, `ProcInv.proc_dormant` now parks `fd_slots FDSPARE` beside its
+      NOFILE per-descriptor units, and `SpecProcinit` takes
+      `fd_slots (NPROC * (NOFILE + FDSPARE))` — i.e. **all** of `FDSLOTS`.
+      Before this, `NPROC * 4` units were minted by `fd_slots_alloc` and
+      never handed to anyone; that was an oversight, not a design choice.
+      `proc_dormant_unused` returns the allowance as its own conjunct, so for
+      a live process it travels ALONGSIDE `proc_priv`, not inside it — every
+      `proc_priv` accessor is borrow-and-return and its wand swallows the
+      block, so a syscall holding its allowance out of `proc_priv` could not
+      then pass `proc_priv` to a callee, which is exactly what `sys_pipe`
+      does between its two `fdalloc`s. `SpecSysPipe` already takes its two
+      units as premises; that stays the convention, and no landed spec
+      restated.
+
+- [ ] **S4c — `proc_priv_owe`, the payload deficit set.** This is what
       `sys_dup` needs, and the analysis is in the `sys_dup` bullet of
       [`design/file-table.md`](../design/file-table.md) — read it before
       starting. Short version: sys_dup must hold TWO descriptors payload-less
       at once (the source, whose reference `filedup` needs in hand; the
-      destination, written but not yet backed), and no fd-slot capability
-      substitutes for a `file_ref`. The fix is one new predicate beside
+      destination, written but not yet backed), and **no fd-slot capability
+      substitutes for a `file_ref`** — the file-table note spells out why (a
+      reference carries a points-to *fraction* of the file's content cells and
+      a count contribution in an auth the ftable lock owns; a unit carries
+      neither). sys_dup's ledger in fact balances with zero allowance:
+      fdalloc's released unit is the one `filedup` consumes. The fix is one
+      new predicate beside
       `proc_priv` — `proc_priv_owe γf pa pid V D`, where every `fd ∈ D`
       contributes only its cell — with `proc_priv_owe … ∅ ⊣⊢ proc_priv …` plus
       a lend/repay pair.

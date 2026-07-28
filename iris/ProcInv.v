@@ -475,6 +475,12 @@ Section ProcInv.
           than making allocproc conjure them is what keeps the supply
           conserved across the whole UNUSED -> live -> ZOMBIE cycle. *)
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
+       (* ... and its ALLOWANCE, the FDSPARE units a syscall borrows for a
+          reference in flight (FdSlots.v).  Parked here for the same reason
+          and with the same effect: [FDSLOTS] is now exactly what the NPROC
+          dormant blocks hold between them, so boot routes the WHOLE supply
+          and nothing is left over. *)
+       fd_slots FDSPARE ∗
        own_ctx (p_context pa) ∗
        (* The address-space cells, keyed on WHICH dormant state -- tied to
           [st], not a free disjunction.  A ZOMBIE still owns a live user
@@ -506,10 +512,11 @@ Section ProcInv.
        p_trapframe pa ↦₈ (zero_reg : mword 64))%I.
 
   Lemma proc_dormant_seal (pa : mword 64) :
-    proc_dormant_nofd pa -∗ fd_slots NOFILE -∗ proc_dormant pa UNUSED.
+    proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗ proc_dormant pa UNUSED.
   Proof.
     iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs".
-    iExists V, pid. iFrame "Hpid Hf Ho Hctx". iSplit; [done|].
+    iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
+    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hctx". iSplit; [done|].
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
@@ -521,19 +528,23 @@ Section ProcInv.
      proc_pagetable) -- which is exactly what allocproc's C does.  The
      null-ofile fact is what discharges every [ofile_slot]'s left disjunct
      with no [file_ref] to conjure from nowhere. *)
+  (* The allowance comes out too, and separately: it is not part of the
+     private field block, it is what the RUNNING THREAD carries beside
+     [proc_priv] (FdSlots.v's [FDSPARE] note). *)
   Lemma proc_dormant_unused (γf : gname) (pa : mword 64) :
     proc_dormant pa UNUSED -∗
     own_ctx (p_context pa) ∗
     p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
     p_trapframe pa ↦₈ (zero_reg : mword 64) ∗
+    fd_slots FDSPARE ∗
     ∃ (V : pprivate) (pid : mword 32),
       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64)⌝ ∗
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hs & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
-    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf".
+    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp".
     iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),

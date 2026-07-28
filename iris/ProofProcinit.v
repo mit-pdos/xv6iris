@@ -216,13 +216,14 @@ Section ProofProcinit.
      the list's elements never matter, only how many there are. *)
   Lemma proc_seal_list (l : list nat) :
     ([∗ list] i ∈ l, proc_raw (proc_addr i)) -∗
-    fd_slots (length l * NOFILE) -∗
+    fd_slots (length l * (NOFILE + FDSPARE)) -∗
     [∗ list] i ∈ l, proc_seal (proc_addr i).
   Proof.
     induction l as [|x l IH]; iIntros "Hraw Hsl"; [done|].
     iDestruct "Hraw" as "[Hx Hraw]".
     cbn [length].
-    replace (S (length l) * NOFILE)%nat with (NOFILE + length l * NOFILE)%nat by lia.
+    replace (S (length l) * (NOFILE + FDSPARE))%nat
+      with ((NOFILE + FDSPARE) + length l * (NOFILE + FDSPARE))%nat by lia.
     iDestruct (fd_slots_split with "Hsl") as "[Hs1 Hsl]".
     iSplitL "Hx Hs1".
     - iDestruct "Hx" as (vst vks) "(Hlk & Hst & Hks & Hdorm)".
