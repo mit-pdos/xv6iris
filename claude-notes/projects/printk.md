@@ -181,14 +181,27 @@ half the frame-address lemmas -- write `f_equal; try (apply bv_eq; vm_compute;
 reflexivity)`.  And a value bound out of an existential resource arrives as
 `bv 8`, so ascribe `(b : mword 8)` at every leaf that wants an `mword`.
 
-### printk (nothing but the spec)
+### printk -- decode layer DONE, proof not started
 
-810 bytes / ~200 instructions, ~15 dispatch arms. The pieces:
+`WpPrintkDecode.v` proves all **264** instruction facts (offsets 0x00..0x328)
+plus the 188 distinct decode words they rest on.  It was GENERATED from the
+image (`tools`-less, a throwaway script over the objdump listing) and checked
+by the kernel -- which is the only reason a 264-instruction decode layer is
+affordable at all.  The generator is not in the tree: every fact it produced is
+verified by `coqc`, so it does not have to be trusted or kept.  If a future
+function needs the same treatment, the recipe is: emit the C_* / base AST from
+the objdump mnemonic + operands (NOT from the instruction bits), render every
+immediate as its positive residue, and let `rvc_oneshot` / `decode_bridge_ms`
+check it.
 
-- the 24-slot frame; the va_list area is slots 1..7 (a1..a7 spilled at
-  `8(s0)..56(s0)`, s0 = sp0-64), `ap` itself lives at `-120(s0)` (slot 23), and
-  s1/s3..s11 are saved LAZILY at 0x34 and restored at two different points
-  (0x74a/0x772) -- two more rejoining arms;
+810 bytes / 264 instructions, ~15 dispatch arms. The pieces still to do:
+
+- the 24-slot frame, whose full map is: slots 1..7 = the varargs (a1..a7
+  spilled at `56(s0)..8(s0)`, s0 = sp0-64), 8 unused, 9 = ra, 10 = s0,
+  11 = s1, 12 = s2, 13..18 = s3..s8, 19 = s9, 20 = s10, 21 = s11, 22 unused,
+  23 = `ap` (at `-120(s0)`), 24 unused.  s1/s3..s8/s10/s11 are saved LAZILY at
+  0x38..0x48 and restored at two different points (0x24a / 0x272) -- two more
+  rejoining arms -- and s9 is saved/restored INSIDE the `%p` arm alone;
 - the format loop is a recursion on the format string, following `pk_kinds`'s
   structure exactly: at each `%`, `pk_dir c0 c1 c2` picks the arm and how far
   the index advances. The loop measure is the remaining suffix;

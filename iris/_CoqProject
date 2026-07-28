@@ -476,3 +476,4 @@ PrintintArith.v
 StackBytes.v
 ProofPrintint.v
 LinkPrintint.v
+WpPrintkDecode.v
