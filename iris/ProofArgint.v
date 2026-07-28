@@ -40,11 +40,8 @@ Local Open Scope Z_scope.
 
 (* ---- the three decodes not shared with the sys_uptime-shaped frame ---- *)
 
-(* +0x0a  0x84ae  c.mv s1,a1 *)
-Lemma aidec_mv_s1_a1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84ae : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* +0x0a  0x84ae  c.mv s1,a1 -- shared with argaddr, so [cdec_84ae]
+   (KernelRvcDecode.v) *)
 
 (* +0x0c  0xf0bff0ef  jal ra,argraw
    (0x80002810 -> 0x8000271a is -246; the 21-bit field is 2^21 - 246) *)
@@ -134,7 +131,7 @@ Section ProofArgint.
 
   Lemma ai_0a : kernel_text -∗ instr (mword_of_int (AI + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (AI + 0x0a)%Z (mword_of_int 0x84ae : mword 16)
-    (mword_of_int (AI + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)) aidec_mv_s1_a1 exec_execute_C_MV. Qed.
+    (mword_of_int (AI + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)) cdec_84ae exec_execute_C_MV. Qed.
 
   Lemma ai_0c : kernel_text -∗ instr (mword_of_int (AI + 0x0c) : mword 64) false (JAL (mword_of_int 2096906 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (AI + 0x0c)%Z (mword_of_int 0xf0bff0ef : mword 32)

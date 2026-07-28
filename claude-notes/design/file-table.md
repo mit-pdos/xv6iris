@@ -220,12 +220,56 @@ frac component tracks *outstanding* fraction rather than being pinned at 1.
   file_ref γ k q C)`.
 - **`fork`.** One `filedup` per open fd halves the parent's fraction and bumps
   the count; parent and child each end with a genuine `file_ref`.
-- **`sys_dup`.** `fdalloc(f)` stores the pointer *before* `filedup(f)` runs, so
-  there is a window with two `ofile` entries and one reference. This is not a
-  hole: the fd table is thread-local (no lock, only the running thread reaches
-  it), so `sys_dup` is proved as one unit whose intermediate state holds a bare
-  `ofile[fd] ↦₈ fnode k` and whose `filedup` restores the invariant before the
-  syscall returns.
+- **`sys_dup` — the one pattern the landed resources do NOT cover.**
+  `fdalloc(f)` stores the pointer *before* `filedup(f)` runs, so there is a
+  window in which two `ofile` entries name one file and only one reference
+  exists. Soundness is not the problem (the fd table is thread-local, so the
+  window is unobservable); the problem is that nothing can currently *state*
+  it.
+
+  **It is not an fd-slot shortage, and the spare allowance does not help.**
+  `FDSLOTS = NPROC * (NOFILE + 4)` does budget four spare units per process,
+  for exactly this family of situations — a reference held in a syscall's local
+  before it reaches a descriptor. But sys_dup's missing resource is a
+  **`file_ref`**, not an `fd_slot`, and no amount of slot capability produces
+  one: only `filealloc` mints a reference, under `ftable.lock`, for a *free*
+  slot. So the spare units are irrelevant here. (They *are* what sys_open and
+  pipealloc need, and sys_dup's own ledger already balances without them: the
+  `fd_slot` fdalloc releases when it fills a descriptor is precisely the one
+  `filedup` then consumes.)
+
+  **What forces the window is `filedup`'s interface, not `fdalloc`'s.**
+  `filedup` needs `file_ref γf k q Cf` in hand to split, and at that point the
+  only reference for `k` is inside the *source* descriptor. So sys_dup must
+  hold one descriptor's payload out of the block, whatever fdalloc's spec says
+  — and `ProcInv.proc_priv_ofile` cannot lend just a payload: its wand demands
+  a complete `ofile_slot` back before `proc_priv` is restored, and the source
+  cell still holds `fnode k`, so the hole cannot be closed with a spare unit
+  either. Worse, sys_dup ends up needing **two** descriptors payload-less at
+  once (the source, loaned out; the destination, written but not yet backed),
+  which `filedup`'s two halves then settle together.
+
+  **So the shape to build is a payload DEFICIT SET, and it is cheap.** Add one
+  predicate beside `proc_priv` — `proc_priv_owe γf pa pid V D`, the private
+  block in which every `fd ∈ D` contributes only its cell — with
+  `proc_priv_owe … ∅ ⊣⊢ proc_priv …`, a lend lemma (`fd ∉ D`, the slot
+  non-null → `file_ref` out, `D ∪ {fd}` back) and its inverse. Then:
+
+  - **`fdalloc`'s spec loses its `file_ref` premise entirely** and is stated
+    over `proc_priv_owe … D` → `proc_priv_owe … (D ∪ {fd})` plus the
+    `fd_slot`. That is honest — fdalloc's code only writes a pointer; the
+    reference was never what it consumed, only what its *caller* needed to
+    restore the invariant — and it is strictly weaker, so it is a better spec
+    than the current one on its own merits. Its loop is unaffected: the scan
+    reads cells only (`proc_priv_ofile_read`), so a payload-less descriptor
+    costs it nothing.
+  - **Nothing else changes.** Every other function keeps `proc_priv`; no
+    consumer of a non-null descriptor has to refute a new disjunct, which is
+    what rules out the tempting alternative of a third `ofile_slot` case. Only
+    `sys_pipe`'s two call sites move: each settles its deficit from the
+    `file_ref` it is already holding, immediately after the call.
+
+  `fork`, which `filedup`s *before* installing, needs none of this.
 - **`argfd` / a syscall using a file.** No reference is taken: the syscall
   borrows the process's own `file_ref` out of the (thread-local) fd table for
   the duration. `fileread`/`filewrite`/`filestat` therefore take

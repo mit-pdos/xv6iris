@@ -112,11 +112,8 @@ Import Defs.
 
 (* 0x8a2e  c.mv s4,a1 -- [cdec_8a2e] (KernelRvcDecode.v) *)
 
-(* 0xe088  c.sd a0,0(s1) *)
-Lemma padc_e088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe088 : mword 16)) s
-  = Some (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0xe088  c.sd a0,0(s1) -- shared with argaddr, so [cdec_e088] /
+   [cexec_sd0_s1_a0] (KernelRvcDecode.v) *)
 
 (* 0xc549  c.beqz a0,+0x8a *)
 Lemma padc_c549 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -205,10 +202,6 @@ Lemma paexec_ld0_a0 s :
   = Some (ExecuteAs (LOAD (mword_of_int 0, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)), s).
 Proof. apply exec_execute_C_LD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
-Lemma paexec_sd0_a0 s :
-  exec (execute (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)))) s
-  = Some (ExecuteAs (STORE (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)), s).
-Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -412,7 +405,7 @@ Section PipeallocInstrs.
   (* +0x1c  e088  c.sd a0,0(s1) *)
   Lemma pai_1c : kernel_text -∗ instr (mword_of_int (PA + 0x1c) : mword 64) true (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (PA + 0x1c)%Z (mword_of_int 0xe088 : mword 16)
-    (mword_of_int (PA + 0x1c) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) padc_e088 paexec_sd0_a0. Qed.
+    (mword_of_int (PA + 0x1c) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) cdec_e088 cexec_sd0_s1_a0. Qed.
 
   (* +0x1e  c549  c.beqz a0,+0x8a *)
   Lemma pai_1e : kernel_text -∗ instr (mword_of_int (PA + 0x1e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 69 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)).

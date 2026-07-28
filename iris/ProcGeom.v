@@ -199,6 +199,48 @@ Proof.
   rewrite avi_mword. f_equal. lia.
 Qed.
 
+(* ---- the three forms a SCAN of [p->ofile[]] meets (fdalloc, kexit) ----
+   [ArrCursor.acur] does not apply: it takes a [Z] base, which suits a fixed
+   global, whereas [p_ofile] hangs off a per-slot [mword] base.  So the
+   walking-pointer arithmetic is stated directly here, in the shape each
+   instruction's WP leaf produces it. *)
+
+(* [addi rd,p,208] -- the cursor's initial value, &p->ofile[0] *)
+Lemma p_ofile_zero (pa : mword 64) :
+  add_vec pa (sign_extend' 64 (mword_of_int 208 : mword 12)) = p_ofile pa 0%nat.
+Proof.
+  unfold p_ofile.
+  replace (sign_extend' 64 (mword_of_int 208 : mword 12) : mword 64)
+    with (mword_of_int (208 + 8 * Z.of_nat 0%nat) : mword 64)
+    by (apply bv_eq; vm_compute; reflexivity).
+  reflexivity.
+Qed.
+
+(* [c.addi rd,rd,8] -- the cursor's bump, fd -> fd+1 *)
+Lemma p_ofile_succ (pa : mword 64) (fd : nat) :
+  add_vec (p_ofile pa fd) (sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6)))
+  = p_ofile pa (S fd).
+Proof.
+  unfold p_ofile. rewrite pg_addv_assoc.
+  assert (Hsx : sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6))
+                = (mword_of_int 8 : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hsx. f_equal.
+  change (add_vec (mword_of_int (208 + 8 * Z.of_nat fd) : mword 64) (mword_of_int 8))
+    with (add_vec_int (mword_of_int (208 + 8 * Z.of_nat fd) : mword 64) 8).
+  rewrite avi_mword. f_equal. rewrite Nat2Z.inj_succ. ring.
+Qed.
+
+(* the address the [slli]/[addi 208]/[add] recomputation lands on: what
+   [ofile_slli3] then [ofile_addi208] produce, folded back into [p_ofile]. *)
+Lemma p_ofile_shift_form (pa : mword 64) (fd : nat) :
+  add_vec pa (mword_of_int (208 + Z.of_nat fd * 8)) = p_ofile pa fd.
+Proof.
+  unfold p_ofile.
+  replace (208 + Z.of_nat fd * 8)%Z with (208 + 8 * Z.of_nat fd)%Z by ring.
+  reflexivity.
+Qed.
+
 (* enum procstate codes (kernel/proc.h): UNUSED=0 USED=1 SLEEPING=2
    RUNNABLE=3 RUNNING=4 ZOMBIE=5. *)
 Definition UNUSED : mword 32 := mword_of_int 0.

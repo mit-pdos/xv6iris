@@ -79,13 +79,16 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
-  `argraw`/`argint`, `argfd`, `killed`, `sys_getpid`, `sys_close`, `sys_pause`,
-  `fetchaddr`) and what is next (`p_ofile` loop lemmas for `fdalloc`, the
-  remaining syscalls, and `cwd_ref`). Keeps the measured account of why
+  `argraw`/`argint`/`argaddr`, `argfd`, `killed`, `sys_getpid`, `sys_close`,
+  `sys_pause`, `fetchaddr`, `fdalloc`) and what is next (the remaining
+  syscalls, and `cwd_ref`). Keeps the measured account of why
   `argraw`'s six-arm proof cost 74 GB, sys_pause's path-dependent-frame
-  recipe, and — from fetchaddr, the first function spanning the `proc_priv`
+  recipe, — from fetchaddr, the first function spanning the `proc_priv`
   and bare-cell tiers — the `proc_priv_copy` accessor and the x0-as-source
-  (`snez`/`negw`) recipe.
+  (`snez`/`negw`) recipe, and, from fdalloc, the fuel-induction descriptor
+  scan and why the loop's continuation must be a premise of the loop
+  statement rather than a resource in its context.  Its worklist now leads
+  with `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —

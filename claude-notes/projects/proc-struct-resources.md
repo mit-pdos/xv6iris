@@ -241,18 +241,131 @@ the evidence for every offset. This file is only the worklist.
       * The loop's exit test is a plain boolean case split
         (`destruct (zopz0zI_u …) eqn:`) — nothing is known about the tick
         counter, which is exactly why the return value is existential.
-- [ ] **S3 — `p_ofile` loop lemmas.** `fdalloc` scans the array, so it needs a
-      successor lemma and injectivity on `fd < NOFILE`, in the style of
-      `ProcGeom.proc_addr_succ` / `p_context_proc_addr_inj`. (`ArrCursor.acur`
-      does NOT apply — it takes a `Z` base; see the design note.)
-- [ ] **S4 — the next syscalls.** `sys_dup` (exercises `proc_priv_ofile` +
-      `filedup`) and `sys_sbrk` (the unlocked `p->sz` write that is the whole
-      reason the private block cannot be fractionally shared). `sys_close` is
-      done; `sys_read`/`sys_write`/`sys_fstat` are the other `argfd` callers
-      and are cheap once `argfd` itself is proven — but note they pass a NULL
-      out-parameter (`sys_read` passes `pf = 0`), which `SpecArgfd`'s
-      both-non-null shape does not cover, so they want a second interface or
-      a `pf`-optional generalization of this one.
+- [x] **S3 — `p_ofile` cursor lemmas** (done, in `ProcGeom.v`, landed with
+      `fdalloc`). Three, one per instruction shape the scan uses, and NO
+      injectivity lemma was needed — the loop touches one descriptor at a time
+      through `ProcInv.proc_priv_ofile_read`, so nothing ever has to know that
+      two indices name different cells:
+      * `p_ofile_zero` — `addi a5,p,208` = `&p->ofile[0]`;
+      * `p_ofile_succ` — `c.addi a5,a5,8`, fd → fd+1;
+      * `p_ofile_shift_form` — folds the install arm's recomputed
+        `slli`/`addi 208` sum (which arrives as `208 + fd*8`, not
+        `208 + 8*fd`) back into `p_ofile`.
+      The pre-existing `ofile_slli3` / `ofile_addi208` still do the two
+      arithmetic steps; only the `ring`-normalising last hop was missing.
+
+- [x] **S3c — `argaddr` PROVEN and LINKED** (`SpecArgaddr.v` /
+      `WpArgaddrDecode.v` / `ProofArgaddr.v` / `LinkArgaddr.v`, over ARGRAW;
+      **7 s**, axiom-clean, `proof_coverage` reads it `proven`).  It is
+      argint with ONE instruction changed — `c.sd a0,0(s1)` for `c.sw` —
+      because the destination is a `uint64 *`, so the postcondition is
+      `ip ↦₈ v` with no `trunc32` anywhere.  Nothing else about the two
+      differs (same frame, same `c.mv s1,a1` park, same epilogue), and the
+      proof is argint's script with `wp_csd_s_sconf` in place of
+      `wp_csw_s_sconf`.  Worth knowing: this is the second member of a
+      would-be family, and it was NOT worth factoring — the shared part is
+      the generic 32-byte frame the whole tree already shares through
+      `KernelRvcDecode`, and the two bodies differ in the one instruction
+      that carries the whole contract.  The dedup that WAS worth doing is
+      the decode: `0x84ae` (`c.mv s1,a1`) moved to `KernelRvcDecode` as
+      `cdec_84ae`, and `0xe088` (`c.sd a0,0(s1)`, shared with pipealloc) as
+      `cdec_e088` + its leaf-shape restatement `cexec_sd0_s1_a0`.
+
+- [x] **S3d — `fdalloc` PROVEN and LINKED** (`SpecFdalloc.v` /
+      `WpFdallocDecode.v` / `ProofFdalloc.v` / `LinkFdalloc.v`, over MYPROC;
+      **18 s / 0.9 GB**, axiom-clean, `proof_coverage` reads it `proven` — the
+      first proven function in `sysfile.c`).  Thirty-two instructions: a
+      32-byte ra/s0/s1 frame, one call, one counted loop, two returns joining
+      at one epilogue.  What is worth reusing:
+
+      * **The spec is the one the sys_pipe effort landed** (`SpecFdalloc.v`,
+        upstream): it takes `file_ref γf k q Cf` with `a0 = fnode k`, and its
+        result is the whole SEQUENCE of free descriptors (`fd_frees`), not
+        just the head — which is what makes two successive fdalloc calls
+        compose, and is why sys_pipe can name both of its descriptors.  This
+        proof was written against a narrower spec of my own (payload-valued,
+        head-only) and retargeted; the sequence form is the better one and
+        the one to build on.  What the retarget needed was the CONVERSE
+        direction of `fd_frees`, which the spec file does not have because no
+        caller states it: `fda_frees_found` / `fda_frees_none` in
+        `ProofFdalloc.v` turn a scan's "slot `fd` is null and every earlier
+        one is not" into `fd_frees fs = fd :: l` / `= []`.
+      * **The install arm is two accessors** (`ProcInv.ofile_slot_null` /
+        `ofile_slot_file`, new): opening the null slot yields its cell AND the
+        `fd_slot` unit it owned — the file disjunct is refuted by
+        `FileInv.fnode_ne_zero` — and installing the caller's `file_ref`
+        rebuilds the slot.  The unit goes to the caller, which is how the
+        fd-slot ledger balances per syscall: `sys_open`'s unit goes into
+        `filealloc` and comes back out of `fdalloc`.
+      * **The loop is a FUEL induction, and the invariant carries the WHOLE
+        `proc_priv`.** Only `ProcInv.proc_priv_ofile_read` (new: borrow the
+        CELL, put it straight back, `upd_ofile_id` closing the accessor) is
+        used per iteration, so no descriptor's payload disjunction is ever
+        opened inside the loop and the invariant mentions no fd algebra. The
+        pure part is one implication (`∀ j < fd, ofile[j] ≠ 0`), which the two
+        `fda_frees_*` lemmas turn into the spec's `fd_frees` result at the two
+        exits.
+      * **The continuation must be a PREMISE of the loop statement, not a
+        resource in its context.** `iAssert (∀ fuel fd M, …) with "[Hcont]"`
+        makes `iInduction` revert `Hcont` into the goal, and the IH then
+        starts with a wand instead of the `∀ fd` — the error is a baffling
+        "`S fd` has type nat while it is expected to have type `⊢ ∀ mf …`"
+        pointing at the `iApply ("IHf" $! (S fd) …)`. Use `with "[]"` and put
+        the continuation in as the last `-∗` of the statement (procinit's
+        `Hpost` shape), threading it through the back edge.
+      * **The install arm RECOMPUTES the address from the counter.** a5 is a
+        running pointer, but gcc reloads it as `a0 << 3` + 208 and adds it to
+        a2 — which is why a2 (= `p`, set once at +0x10 and never touched by
+        the loop) has to be in the loop invariant even though the loop body
+        never reads it.
+      * **`fda_addiw1`** is the `c.addiw` counter step (`fd → fd+1` through a
+        32-bit truncation and re-sign-extension), the `addiw` twin of
+        `KstackArith.addw_step`; `fda_neq16` is the `bne a0,a3` exit test as
+        `negb (S fd =? NOFILE)`. Both are stated at the top of the proof file
+        with only `nat`/`Z` in context, per the zify-hook rule.
+      * Stack budget: `14 <= av` (4 for this frame, 10 for myproc's).
+      * Decode dedup: `0x862a` (`c.mv a2,a0`, shared with proc_mapstacks)
+        moved into `KernelRvcDecode` as `cdec_862a`; `0x0d078793`
+        (`addi a5,a5,208`) was already `KernelBaseDecode.bdec_0d078793`.
+        Nine words are fdalloc's own — the loop body and the install arm.
+
+- [ ] **S4 — the next syscalls.** `sys_sbrk` (the unlocked `p->sz` write that
+      is the whole reason the private block cannot be fractionally shared).
+      `sys_close` is done; `sys_read`/`sys_write`/`sys_fstat` are the other
+      `argfd` callers and are cheap once `argfd` itself is linked — but note
+      they pass a NULL out-parameter (`sys_read` passes `pf = 0`), which
+      `SpecArgfd`'s both-non-null shape does not cover, so they want a second
+      interface or a `pf`-optional generalization of this one.
+
+- [ ] **S4b — `proc_priv_owe`, the payload deficit set.** This is what
+      `sys_dup` needs, and the analysis is in the `sys_dup` bullet of
+      [`design/file-table.md`](../design/file-table.md) — read it before
+      starting. Short version: sys_dup must hold TWO descriptors payload-less
+      at once (the source, whose reference `filedup` needs in hand; the
+      destination, written but not yet backed), and no fd-slot capability
+      substitutes for a `file_ref`. The fix is one new predicate beside
+      `proc_priv` — `proc_priv_owe γf pa pid V D`, where every `fd ∈ D`
+      contributes only its cell — with `proc_priv_owe … ∅ ⊣⊢ proc_priv …` plus
+      a lend/repay pair.
+
+      Two things make it worth doing before more syscalls rather than after:
+
+      * **`fdalloc`'s spec gets STRICTLY WEAKER and more honest.** Restated
+        over `proc_priv_owe … D → proc_priv_owe … (D ∪ {fd})`, it drops the
+        `file_ref` premise entirely — fdalloc's code only writes a pointer;
+        the reference was never what it consumed, only what its caller needed
+        in order to restore the invariant. The loop is unaffected
+        (`proc_priv_ofile_read` reads cells, so a payload-less descriptor
+        costs it nothing), so this is a spec edit plus a small change to the
+        install arm, not a re-proof.
+      * **Nothing else restates.** Every other function keeps `proc_priv`.
+        The tempting alternative — a third `ofile_slot` disjunct for a
+        loaned-out descriptor — is what to AVOID: it would force every
+        consumer of a non-null descriptor (argfd's callers, sys_close) to
+        refute the new case, which none of them can do from `v ≠ 0`.
+
+      Fallout: `sys_pipe`'s two fdalloc call sites each settle their deficit
+      from the `file_ref` they already hold, immediately after the call.
 
 - [x] **S4a — `argfd` proven** (`WpArgfdDecode.v` / `ProofArgfd.v`), over
       `ARGINT` + `MYPROC`, 33 instructions. Like sys_close it is NOT linked:

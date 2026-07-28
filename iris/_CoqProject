@@ -411,6 +411,9 @@ LinkArgraw.v
 SpecArgint.v
 ProofArgint.v
 LinkArgint.v
+WpArgaddrDecode.v
+ProofArgaddr.v
+LinkArgaddr.v
 SpecKilled.v
 ProofKilled.v
 LinkKilled.v
@@ -424,6 +427,9 @@ ProofArgfd.v
 WpSysCloseDecode.v
 SpecSysClose.v
 ProofSysClose.v
+WpFdallocDecode.v
+ProofFdalloc.v
+LinkFdalloc.v
 TimerCap.v
 WpSconfTimer.v
 WpClockintrDecode.v

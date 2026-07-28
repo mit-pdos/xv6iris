@@ -149,6 +149,29 @@ Section ProcInv.
       ∃ (k : nat) (q : Qp) (C : fcontent),
         ⌜v = fnode k /\ (k < NFILE)%nat⌝ ∗ file_ref γf k q C))%I.
 
+  (* ---- the two ends of "filling a descriptor", as accessors ----
+     An EMPTY descriptor owns the fd-slot unit itself, so opening one YIELDS
+     that unit; installing a file consumes a reference and gives the slot
+     back.  Both directions are what fdalloc's install arm is made of, and in
+     the null direction the file disjunct is REFUTED rather than assumed --
+     a [struct file *] out of the global table is never NULL
+     ([FileInv.fnode_ne_zero]). *)
+  Lemma ofile_slot_null (γf : gname) (pa : mword 64) (fd : nat) :
+    ofile_slot γf pa fd (zero_reg : mword 64) -∗
+    p_ofile pa fd ↦₈ (zero_reg : mword 64) ∗ fd_slot.
+  Proof.
+    iIntros "[$ [[_ $] | (%k & %q & %C & [%Hfn %Hk] & _)]]".
+    exfalso. apply (fnode_ne_zero k Hk). symmetry. exact Hfn.
+  Qed.
+
+  Lemma ofile_slot_file (γf : gname) (pa : mword 64) (fd k : nat) (q : Qp) (C : fcontent) :
+    (k < NFILE)%nat ->
+    p_ofile pa fd ↦₈ fnode k -∗ file_ref γf k q C -∗ ofile_slot γf pa fd (fnode k).
+  Proof.
+    iIntros (Hk) "Hc Href". iFrame "Hc". iRight.
+    iExists k, q, C. iFrame "Href". iPureIntro. split; [reflexivity | exact Hk].
+  Qed.
+
   Definition proc_ofiles (γf : gname) (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     (⌜length fs = NOFILE⌝ ∗ [∗ list] fd ↦ v ∈ fs, ofile_slot γf pa fd v)%I.
 
@@ -393,6 +416,23 @@ Section ProcInv.
     iSplitL "Ho".
     { iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen. }
     iFrame "Hc".
+  Qed.
+
+  (* READ one fd slot's cell and put it straight back.  What a SCAN of the
+     array wants (fdalloc's loop): it only needs to know whether the stored
+     pointer is null, and touching the payload disjunction per iteration would
+     put a case split inside a loop invariant for no reason. *)
+  Lemma proc_priv_ofile_read (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (fd : nat) (v : mword 64) :
+    pv_ofile V !! fd = Some v ->
+    proc_priv γf pa pid V -∗
+    p_ofile pa fd ↦₈ v ∗ (p_ofile pa fd ↦₈ v -∗ proc_priv γf pa pid V).
+  Proof.
+    iIntros (Hfd) "Hpv".
+    iDestruct (proc_priv_ofile _ _ _ _ fd v Hfd with "Hpv") as "[[Hc Hval] Hback]".
+    iFrame "Hc". iIntros "Hc".
+    iDestruct ("Hback" $! v with "[Hc Hval]") as "Hpv"; [rewrite /ofile_slot; iFrame "Hc Hval"|].
+    rewrite (upd_ofile_id _ _ _ Hfd). iExact "Hpv".
   Qed.
 
   (* The whole point of the fractional pid: another core reading p->pid under

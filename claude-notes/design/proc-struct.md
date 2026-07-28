@@ -179,9 +179,13 @@ Note this is *not* `ArrCursor.acur`, despite `ofile` being scanned by
 `fdalloc`/`kexit` the way `ftable.file[]` is scanned by `filealloc`. `acur`
 takes a **`Z` base**, which suits a fixed global (`fnode`, `bnode`); `p_ofile`
 hangs off a per-slot `mword` base, so it takes `proc_addr`'s own `add_vec`
-shape instead. The loop lemmas `fdalloc` will want (successor, injectivity on
-the range) have to be proven directly, in the style of
-`ProcGeom.proc_addr_succ` / `p_context_proc_addr_inj`.
+shape instead. The cursor lemmas a scan needs are proven directly, in the style
+of `ProcGeom.proc_addr_succ`: `p_ofile_zero` (`addi rd,p,208`),
+`p_ofile_succ` (`c.addi rd,rd,8`) and `p_ofile_shift_form` (the
+`slli`/`addi 208` recomputation from a runtime fd). **No injectivity lemma is
+needed** — a scan borrows one descriptor at a time through
+`ProcInv.proc_priv_ofile_read`, so nothing has to know that two indices name
+different cells.
 
 Also add the two missing state codes (`UNUSED := 0`, `USED := 1`,
 `ZOMBIE := 5`) alongside the existing `SLEEPING`/`RUNNABLE`/`RUNNING`, and
@@ -221,13 +225,21 @@ names `p->ofile[fd]` as one of its three intended holders:
 ```coq
 Definition ofile_slot (γf : gname) (pa : mword 64) (fd : nat) (v : mword 64) : iProp Σ :=
   (p_ofile pa fd ↦₈ v ∗
-   (⌜v = zero_reg⌝ ∨
+   (⌜v = zero_reg⌝ ∗ fd_slot ∨
     ∃ (k : nat) (q : Qp) (C : fcontent),
       ⌜v = fnode k ∧ (k < NFILE)%nat⌝ ∗ file_ref γf k q C))%I.
 
 Definition proc_ofiles (γf : gname) (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
   (⌜length fs = NOFILE⌝ ∗ [∗ list] fd ↦ v ∈ fs, ofile_slot γf pa fd v)%I.
 ```
+
+Both directions of the disjunction get *refuted*, never assumed: `sys_close`
+knows `v ≠ 0` from argfd and so kills the left disjunct, and `fdalloc` knows
+`v = 0` and kills the right one with `FileInv.fnode_ne_zero` (a `struct file *`
+out of the global table is never NULL). The two ends of "filling a descriptor"
+are `ProcInv.ofile_slot_null` (open a null slot → the cell plus the fd-slot
+unit it owned) and `ofile_slot_file` (a cell holding `fnode k` plus a
+`file_ref` → a slot), which together are what fdalloc's install arm is made of.
 
 `file_ref` is deliberately **not** persistent and not duplicable, which is
 exactly right: `sys_dup` duplicating an fd *is* `filedup`, which must bump the
@@ -276,7 +288,17 @@ Lemma proc_priv_ofile γf pa pid V fd v :        (* one fd slot, borrow-and-retu
   (fd < NOFILE)%nat -> pv_ofile V !! fd = Some v ->
   proc_priv γf pa pid V -∗ ofile_slot γf pa fd v ∗
     (∀ v', ofile_slot γf pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
+Lemma proc_priv_ofile_read γf pa pid V fd v :    (* just the CELL, unchanged *)
+  pv_ofile V !! fd = Some v ->
+  proc_priv γf pa pid V -∗
+  p_ofile pa fd ↦₈ v ∗ (p_ofile pa fd ↦₈ v -∗ proc_priv γf pa pid V).
 ```
+
+`proc_priv_ofile_read` is what a SCAN wants (`fdalloc`, `kexit`): the scan only
+tests the stored pointer against 0, and going through the full accessor would
+put `ofile_val`'s disjunction inside a loop invariant for nothing. It is
+`proc_priv_ofile` closed at the same `v`, with `upd_ofile_id` collapsing the
+descriptor update.
 
 A third covers the whole address-space side at once:
 
@@ -472,12 +494,14 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
 Landed and compiling:
 
 - **`ProcGeom.v`** — all 15 field addresses, `NOFILE`/`PNAMELEN`, the three
-  missing state codes, `inv_dormant` + its six `vm_compute` facts.
+  missing state codes, `inv_dormant` + its six `vm_compute` facts, and the
+  `p_ofile` cursor lemmas (`p_ofile_zero` / `_succ` / `_shift_form`).
 - **`ProcInv.v`** (new, between `FileInv.v` and the spec files) — `pprivate`
-  and its updaters, `proc_fields`, `pname_cells`, `ofile_cells`, `ofile_slot`,
-  `proc_ofiles`, `cwd_ref`, **`proc_priv`**, its three projections
-  (`proc_priv_pid`, `proc_priv_ofile`, `proc_priv_pid_agree`),
-  **`proc_dormant`** + `proc_dormant_to_priv`, and `is_kstack`.
+  and its updaters, `proc_fields`, `pname_cells`, `ofile_cells`, `ofile_slot`
+  (+ `ofile_slot_null` / `ofile_slot_file`), `proc_ofiles`, `cwd_ref`,
+  **`proc_priv`**, its projections (`proc_priv_pid`, `proc_priv_ofile`,
+  `proc_priv_ofile_read`, `proc_priv_pid_agree`), **`proc_dormant`** +
+  `proc_dormant_to_priv`, and `is_kstack`.
 - **`sys_getpid`** — `SpecSysGetpid.v` / `ProofSysGetpid.v` /
   `LinkSysGetpid.v`, in the standard spec-module shape. The whole function,
   entry to return, over `proc_priv`. `Print Assumptions` shows only the Sail

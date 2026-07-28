@@ -86,10 +86,8 @@ Section ProcMapstacksInstrs.
     exec (ext_decode (mword_of_int 0xb66ff0ef : mword 32)) s
     = Some (JAL (mword_of_int 2093926 : mword 21, Regidx (mword_of_int 1)), s).
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-  Lemma pmsdec_56 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0x862a : mword 16)) s
-    = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 10)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
+  (* 0x862a  c.mv a2,a0 -- shared with fdalloc, so [cdec_862a]
+     (KernelRvcDecode.v) *)
   Lemma pmsdec_58 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0xc121 : mword 16)) s
     = Some (C_BEQZ (mword_of_int 32, Cregidx (mword_of_int 2)), s).
@@ -222,7 +220,7 @@ Section ProcMapstacksInstrs.
   Lemma pmsi_52 : PMS 0x52 false (JAL (mword_of_int 2093926 : mword 21, Regidx (mword_of_int 1))).  (* jal 80000b2e <kalloc> *)
   Proof. mk_base (KernelSyms.proc_mapstacks + 0x52)%Z (mword_of_int 0xb66ff0ef : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) (JAL (mword_of_int 2093926 : mword 21, Regidx (mword_of_int 1))) pmsdec_52. Qed.
   Lemma pmsi_56 : PMS 0x56 true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 12), ADD)).  (* mv a2,a0 *)
-  Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x56)%Z (mword_of_int 0x862a : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x56) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 12), ADD)) pmsdec_56 exec_execute_C_MV. Qed.
+  Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x56)%Z (mword_of_int 0x862a : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x56) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 12), ADD)) cdec_862a exec_execute_C_MV. Qed.
   Lemma pmsi_58 : PMS 0x58 true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 32 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).  (* beqz a0,8000180e <proc_mapstacks+0x98> *)
   Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x58)%Z (mword_of_int 0xc121 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x58) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 32 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) pmsdec_58 exec_execute_C_BEQZ. Qed.
   Lemma pmsi_5a : PMS 0x5a false (RTYPE (Regidx (mword_of_int 24), Regidx (mword_of_int 9), Regidx (mword_of_int 11), SUB)).  (* sub a1,s1,s8 *)

@@ -1246,6 +1246,30 @@ Lemma cdec_b7fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 2039), s).
   Proof. intro H. rvc_oneshot s H. Qed.
 
+(* 0x84ae  c.mv s1,a1         -- argint +0x0a, argaddr +0x0a (park [ip]) *)
+Lemma cdec_84ae s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x84ae : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 11)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x862a  c.mv a2,a0         -- proc_mapstacks +0x56, fdalloc +0x10 *)
+Lemma cdec_862a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x862a : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 10)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xe088  c.sd a0,0(s1)      -- pipealloc +0x1c, argaddr +0x10 *)
+Lemma cdec_e088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe088 : mword 16)) s
+  = Some (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_e088]'s AST in the shape a WP store leaf takes. *)
+Lemma cexec_sd0_s1_a0 s :
+  exec (execute (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)), s).
+Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 (* [cdec_653c]'s AST in the shape a WP load leaf takes: a literal [mword 12]
    displacement and plain [Regidx]es. *)
 Lemma cshape_653c :
