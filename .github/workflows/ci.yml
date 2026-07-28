@@ -8,6 +8,9 @@ name: CI
 #   * regenerate kernel-rocq/KernelInstrs.v (or the sibling KernelData/KernelSyms),
 #   * regenerate the Sail model .v files (needs the `sail` compiler).
 # The .v files for all three are checked in; CI only (re)compiles them to .vo.
+# After the build, it best-effort clones (but never builds) `xv6-riscv/` so the
+# proof-coverage report can attribute functions to source files; see the note
+# on that step below.
 
 on:
   push:
@@ -133,18 +136,37 @@ jobs:
           # steps (checkout wipes them next run regardless, but be explicit).
           rm -f iris/*.v.timing
 
-      # ---- 3c. Proof coverage report (iris/) ----
+      # ---- 3c. Check out xv6-riscv for coverage attribution (best-effort) ----
+      # tools/proof_coverage.py attributes each function to a source file via
+      # `nm` on xv6-riscv/kernel/*.o, falling back to scanning the .c/.S
+      # sources themselves; with no xv6-riscv/ tree at all (it's .gitignored
+      # and CI never builds it, see the note atop this file) every function
+      # comes back "could not attribute". A plain clone -- never built, never
+      # even the target of `make kernel` -- fixes that without going near the
+      # ELF or KernelInstrs.v/KernelSyms.v regen path (those only fire off of
+      # $(KERNEL_ELF), which nothing here builds). Placed after the Iris build
+      # so it can't perturb it, and made fully non-blocking (continue-on-error
+      # *and* `|| true`, belt-and-suspenders) since it depends on this runner
+      # having network egress to GitHub, which isn't guaranteed.
+      - name: Check out xv6-riscv for coverage attribution (best-effort, non-blocking)
+        continue-on-error: true
+        run: |
+          test -d xv6-riscv || timeout 60 git clone --depth 1 \
+            https://github.com/mit-pdos/xv6-riscv xv6-riscv || true
+
+      # ---- 3d. Proof coverage report (iris/) ----
       # "What of the kernel is proved?" — the per-function proven / assumed /
       # partial / none hierarchy, rendered into the step summary next to the
       # build profile.  Plain Python over the checked-in kernel-rocq/ dump and
-      # the iris/ sources (no opam env, no ELF: without xv6-riscv/ the
-      # source-file attribution just degrades, by design).  Unlike the two
-      # informational steps around it, this one CAN fail the build — but only
-      # on MANIFEST errors (a MANIFEST_PROVEN/MANIFEST_ASSUMED entry whose
-      # file or lemma no longer exists): those mean the coverage numbers are
-      # lying, and the fix is a one-line manifest update.  A mere coverage
-      # change never fails CI.  Runs only on a successful build, so the
-      # report describes a green tree.
+      # the iris/ sources (no opam env, no ELF -- the step above best-effort
+      # checks out xv6-riscv/ for source-file attribution, but the coverage
+      # numbers themselves never depend on it).  Unlike the two informational
+      # steps around it, this one CAN fail the build — but only on MANIFEST
+      # errors (a MANIFEST_PROVEN/MANIFEST_ASSUMED entry whose file or lemma
+      # no longer exists): those mean the coverage numbers are lying, and the
+      # fix is a one-line manifest update.  A mere coverage change never fails
+      # CI.  Runs only on a successful build, so the report describes a green
+      # tree.
       - name: Proof coverage report (iris/)
         run: |
           # The report is written (and lands in the summary) even when --check
