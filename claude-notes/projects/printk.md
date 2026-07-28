@@ -251,8 +251,15 @@ check it.
   frame is already in `pk_frame` shape -- OR the nine lazy saves, the six
   hoisted constants (`pk_consts`) and the jump to the loop head at 0x86.
 
-So every instruction of printk outside the loop body and the dispatch arms is
-now proven.  What is left is 0x72..0x24a:
+- **`wp_printk_advance`** (0x78..0x82) -- the loop's `i++`, the `fmt[i]` load
+  and the end-of-string test, with the two outcomes (leave through the restore
+  block at 0x24e, or fall into the `%` test at 0x86).  EVERY arm of the
+  dispatch jumps here, with s1 holding *(the index to continue at) - 1* -- that
+  convention is what makes the fifteen arms differ in nothing but how far they
+  set s1, and it is why this block is a lemma rather than part of the loop.
+
+So every instruction of printk outside the arms and the `%` test is now
+proven.  What is left is 0x72..0x24a:
 
 - (reference) the 24-slot frame map is: slots 1..7 = the varargs (a1..a7
   spilled at `56(s0)..8(s0)`, s0 = sp0-64), 8 unused, 9 = ra, 10 = s0,
@@ -303,6 +310,20 @@ now proven.  What is left is 0x72..0x24a:
   string walk (0x70a..0x740) with the `(null)` literal out of `kernel_data`;
 - `digits` and the `"(null)"` literal both come from `kernel_data`
   (`kernel_data_window` / `kernel_data_string`, both above `text_end`).
+
+### printk: what the arms still need
+
+Each arm ends by jumping to 0x78 with `s1 = (next index) - 1`, so the shape of
+every one is: consume a vararg (the three-instruction `ap` bump), call
+printint/consputc, set s1, jump.  With `wp_printk_advance` proven, an arm's
+obligation is exactly:
+
+  - the `pk_kinds` equation one level down (which is why `pk_kinds` recurses on
+    syntactic tails), and
+  - `s1 = i + <what pk_dir says the arm consumed> ` at the jump.
+
+`%p` and `%s` are the two that are not of this shape: both contain their own
+inner loop, and `%p` additionally saves/restores s9 (slot 19) around it.
 
 ### The general (non-panic) path
 
