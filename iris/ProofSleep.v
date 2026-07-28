@@ -10,7 +10,24 @@
    scheduler-swtch protocol resources exactly as yield does (acquire proc j's
    lock, hand sched the parking-proc payload at SLEEPING, release with the
    process RUNNING), wrapped in the caller condition lock's release/reacquire
-   (noff 1 -> 2 -> 1 around sched, then 1 -> 0 -> 1 around the proc lock). *)
+   (noff 1 -> 2 -> 1 around sched, then 1 -> 0 -> 1 around the proc lock).
+
+   The CONDITION lock is taken generically ([lock_openable] plus a credential
+   [Tk] -- ACQUIRE_GEN / RELEASE_GEN), so a process may sleep on a reclaimable
+   object's lock: [Tk] rides the sleeper's frame through sched(), which is what
+   keeps the object alive under it.  p->lock stays a static [is_lock], so its
+   two call sites want the plain ACQUIRE / RELEASE forms.  Those come in as
+   EXTRA FUNCTOR PARAMETERS rather than from [AcquireOfGen] / [ReleaseOfGen]:
+   a whole-function proof file must never [Require] another one (see
+   claude-notes/design/spec-modules.md -- the module shape exists precisely so
+   a function's proof depends on its callees' SPECS only, and every function
+   proof can be checked in parallel).  Deriving the plain forms in here would
+   have added a ProofSleep -> ProofAcquire/ProofRelease edge; the caller
+   (LinkSleep.v) passes both flavours instead, exactly as ProofPipeclose.v
+   takes ACQUIRE_GEN and RELEASE_CANCEL side by side.
+
+   [SleepOfGen] at the bottom restates the [Tk := emp], [Dk := False] instance
+   for the ordinary [SLEEP] consumers. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -123,7 +140,12 @@ Lemma sl_sleeping :
   = (mword_of_int 2 : mword 32).
 Proof. vm_compute. reflexivity. Qed.
 
-Module SleepProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release : RELEASE) : SLEEP.
+(* p->lock is a STATIC kernel lock, so its two call sites take the plain
+   [Acquire] / [Release]; only the caller's CONDITION lock lk goes through
+   [AcquireGen] / [ReleaseGen].  Both flavours are parameters -- see the
+   header note on why they are not derived in here. *)
+Module SleepGenProof (Myproc : MYPROC) (Acquire : ACQUIRE) (AcquireGen : ACQUIRE_GEN)
+                     (Sched : SCHED) (Release : RELEASE) (ReleaseGen : RELEASE_GEN) : SLEEP_GEN.
 
 Section ProofSleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
@@ -138,16 +160,19 @@ Section ProofSleep.
     rewrite /cpu_own. iSplitR; [iPureIntro; exact Hb|]. iFrame "Hnoff Hint Hcnt Hproc".
   Qed.
 
-  Lemma wp_sleep_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_sleep_gen_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
-      (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
+      (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    : wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av eb C.
+    : wp_sleep_gen_sconf_body γ Φ γs j γl γk lka Rk Tk Dk m av eb C.
   Proof.
-    cbv beta delta [wp_sleep_sconf_body].
-    intros pcE pj chan lk0 ret_tgt Htp Hj Hgl Hlka0 Hav.
+    cbv beta delta [wp_sleep_gen_sconf_body].
+    intros pcE pj chan lk0 ret_tgt Htp Hj Hgl Hlka0 Hav HrefT HrefLk HrefLkp.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk #Hpanic Hown Hvc Hcont".
+    (* "HTk" is PARKED across the whole middle of the proof: the credential
+       rides the sleeping process's frame through sched() and is presented
+       again at the re-acquire of lk. *)
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkopen HTk Hklocked HRk #Hpanic Hown Hvc Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
     (* ------------------------------------------------------------------ *)
@@ -383,12 +408,16 @@ Section ProofSleep.
       by (rewrite /C1 upd_eq; reflexivity).
     assert (Hlka_r1 : add_vec (C1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
       by (rewrite Ha0_C1; exact Hlka0).
-    iApply (Release.wp_release_sconf γ Φ γk lka sk Rk C1 1 eb (proc_addr j) C (av - 6)%nat
+    (* the finisher CLOSES the invariant again (Out = emp): sleep gives the
+       condition lock back, it does not dispose of it. *)
+    iApply (ReleaseGen.wp_release_gen_sconf γ Φ γk lka Rk Dk emp%I C1 1 eb (proc_addr j) C (av - 6)%nat
               Hlka_r1
               HtpC1
               ltac:(lia)
-              with "Hcg Htext Hpc Hkislock Hklocked HRk Hcpu Hpay1 [-]").
-    iIntros (mrel1) "Hcg Hpc %Hcs_rel1 Hcpu".
+              HrefLk HrefLkp
+              with "Hcg Htext Hpc Hkopen Hklocked HRk [] Hcpu Hpay1 [-]").
+    { iApply lock_finisher_close. }
+    iIntros (mrel1) "_ Hcg Hpc %Hcs_rel1 Hcpu".
     assert (Hpc22 : ret_pc (C1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SL + 0x22)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
@@ -602,13 +631,15 @@ Section ProofSleep.
     { rewrite Ha0_F1 -Hlka0. symmetry.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H0. apply kv_addv_zero. }
-    iApply (Acquire.wp_acquire_sconf γ Φ γk sk Rk F1 0 eb (proc_addr j) C (av - 6)%nat
+    (* the parked credential "HTk" is presented here, and handed back. *)
+    iApply (AcquireGen.wp_acquire_gen_sconf γ Φ γk Rk Tk Dk F1 0 eb (proc_addr j) C (av - 6)%nat
               HtpF1
               ltac:(lia)
               ltac:(lia)
-              with "Hcg Hcpu Htext Hpc [Hkislock] Hpanic [-]").
-    { iEval (rewrite Hislk_f). iExact "Hkislock". }
-    iIntros (ms3 macq2) "%Hmsf3 Hcg Hpc %Hcs_acq2 Hklocked HRk Hcpu Hpay0'".
+              HrefT HrefLkp
+              with "Hcg Hcpu Htext Hpc [Hkopen] HTk Hpanic [-]").
+    { iEval (rewrite Hislk_f). iExact "Hkopen". }
+    iIntros (ms3 macq2) "%Hmsf3 HTk Hcg Hpc %Hcs_acq2 Hklocked HRk Hcpu Hpay0'".
     assert (Hpc3e : ret_pc (F1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (SL + 0x3e)) by (rewrite HF1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3e) in "Hpc".
@@ -787,7 +818,7 @@ Section ProofSleep.
       rewrite /A4 upd_ne; [| exact H1]. rewrite /A3 upd_ne; [| exact H18].
       rewrite /A2 upd_ne; [| exact H19]. rewrite /A1 upd_ne; [| exact H8].
       rewrite /A0 upd_ne; [| exact Hsp]. reflexivity. }
-    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc Hklocked HRk Hown' Hvc'").
+    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc HTk Hklocked HRk Hown' Hvc'").
     (* callee_saved m Gf *)
     assert (Csp : Gf !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite /Gf upd_eq HcspG8 Hpopsp; reflexivity).
@@ -827,4 +858,36 @@ Section ProofSleep.
 
 End ProofSleep.
 
-End SleepProof.
+End SleepGenProof.
+
+(* The static-kernel-lock instance: no credential, nothing can die.  Verbatim
+   the statement the ordinary [SLEEP] consumers (acquiresleep, sys_pause) were
+   written against. *)
+Module SleepOfGen (G : SLEEP_GEN) : SLEEP.
+
+Section OfGen.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma wp_sleep_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (γs : list gname) (j : nat) (γl : gname)
+      (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    : wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av eb C.
+  Proof.
+    cbv beta delta [wp_sleep_sconf_body].
+    intros pcE pj chan lk0 ret_tgt Htp Hj Hgl Hlka0 Hav.
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk #Hpanic Hown Hvc Hcont".
+    iApply (G.wp_sleep_gen_sconf γ Φ γs j γl γk lka Rk emp%I False%I m av eb C
+              Htp Hj Hgl Hlka0 Hav
+              (lock_refute_False _) (lock_refute_False _) (lock_refute_False _)
+              with "Hcg Hcpu Hpay0 Htext Hpc Hprocs [] [] Hklocked HRk Hpanic Hown Hvc [-]").
+    { iApply (is_lock_openable with "Hkislock"). }
+    { done. }
+    iIntros (mf) "%Hcs Hcg Hcpu Hpay Hpc _ Hklocked HRk Hown Hvc".
+    iApply ("Hcont" $! mf with "[//] Hcg Hcpu Hpay Hpc Hklocked HRk Hown Hvc").
+  Qed.
+
+End OfGen.
+
+End SleepOfGen.
