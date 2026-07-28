@@ -116,6 +116,19 @@ Two adjustments for this case:
   (`C : ucfg`, `pt : uptd`, `Φ`). Everything else is unchanged, including
   `cbv beta delta [<f>_body]` as the proof's first tactic.
 
+The mirror case is a real kernel function whose *contract* is not
+function-shaped: `kernelvec` (`Spec`/`Proof`/`Link`, over
+[`KERNELTRAP`](#an-assumed-callee-module-type--an-axiom-in-the-link)). Nothing
+calls it — the hardware traps to it — so its public statement is
+`IntrDefs.intr_handler_spec`, and the entry-to-SRET WP it is built from
+(`wp_kernelvec`, with explicit mstatus/menvcfg parameters and their
+well-formedness premises) stays INTERNAL: `Module Type KERNELVEC` exposes only
+`kernelvec_handler_spec`, per the expose-only-what-a-caller-consumes rule. It
+keeps its `Link` file — it *is* a kernel function — but the coverage tool still
+cannot discover the spec textually (its rule keys off the entry `pc_is` being
+`KernelSyms.<sym>` and the continuation being the ra-bound return address), so
+kernelvec stays in `proof_coverage.py`'s MANIFEST.
+
 ## Thin initlock wrappers: one proof, one instance per function
 
 Three functions in the image have a body that is exactly `initlock(&L, "name")`:
@@ -223,18 +236,6 @@ KERNELTRAP) : KERNELVEC`) and proving kerneltrap replaces one file. Two notes:
 `panic` is deliberately NOT in this shape: its contract is persistent and gets
 threaded through callers' *statements* (`SpecPanic.panic_wp`), so a module
 parameter would buy nothing.
-
-## A whole-function proof whose contract is not a callable-function WP
-
-`kernelvec` fits the shape even though nothing ever *calls* it: the hardware
-traps to it, and its public contract is `IntrDefs.intr_handler_spec`, not an
-entry-pc/return-pc WP. Its entry-to-SRET WP (`wp_kernelvec`, with explicit
-mstatus/menvcfg parameters and their well-formedness premises) stays INTERNAL —
-`Module Type KERNELVEC` exposes only `kernelvec_handler_spec`, per the
-expose-only-what-a-caller-consumes rule. The one cost of that choice: the
-coverage tool cannot discover such a spec textually (its rule keys off the
-entry `pc_is` being `KernelSyms.<sym>` and the continuation being the ra-bound
-return address), so kernelvec stays in `proof_coverage.py`'s MANIFEST.
 
 ## Gotchas (all hit in practice)
 
