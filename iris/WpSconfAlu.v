@@ -281,9 +281,10 @@ Section WpSconfAlu.
       unfold gpr_and_val. rewrite Hva Hvb. reflexivity.
   Qed.
 
-  (* the base (4-byte) [and rd,rs1,rs2] with rd <> rs1 (vmfault's
-     [and s4,s2,a5] page-align step), which the compressed [wp_cand_s_sconf]
-     above cannot express. *)
+  (* the base (4-byte) [and rd,rs1,rs2] with rd <> rs1, which the compressed
+     [wp_cand_s_sconf] above cannot express: vmfault's [and s4,s2,a5] and both
+     copy loops' PGROUNDDOWN mask a virtual address with -4096 into a
+     DIFFERENT register. *)
   Lemma wp_and_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) :
@@ -305,6 +306,37 @@ Section WpSconfAlu.
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPE_AND_gpr rs2 rs1 rd s_pc Hrd).
       unfold gpr_and_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  (* the BASE (4-byte) [addiw rd,rs1,imm], with rd and rs1 distinct -- the
+     compressed [wp_caddiw_s_sconf] above only covers [c.addiw rd,rd,imm].
+     [sext.w rd,rs1] is this instruction at imm = 0, which is how both copy
+     loops narrow the chunk length to 32 bits for memmove. *)
+  Lemma wp_addiw_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (ADDIW (imm, Regidx rs1, Regidx rd)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
+        (sign_extend' 64 (subrange_vec_dec
+           (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0))]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs1
+              (ADDIW (imm, Regidx rs1, Regidx rd))
+              (sign_extend' 64 (subrange_vec_dec
+                 (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0))
+              m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva _.
+      rewrite (exec_execute_ADDIW_gpr rs1 rd imm s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_addiw_val. rewrite Hva. reflexivity.
   Qed.
 
   Lemma wp_sub_s_sconf (γ : gname) (Φ : mval -> iProp Σ)

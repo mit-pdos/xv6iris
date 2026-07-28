@@ -259,6 +259,7 @@ ArrCursor.v
 FdSlots.v
 FileInv.v
 KallocInv.v
+ByteBuf.v
 WpHoldingInv.v
 WpPopOff.v
 WpRelease.v
@@ -447,6 +448,18 @@ SpecVmfault.v
 WpVmfaultDecode.v
 ProofVmfault.v
 LinkVmfault.v
+SpecWalkaddr.v
+WpWalkaddrDecode.v
+ProofWalkaddr.v
+LinkWalkaddr.v
+SpecCopyin.v
+WpCopyinDecode.v
+ProofCopyin.v
+LinkCopyin.v
+SpecCopyout.v
+WpCopyoutDecode.v
+ProofCopyout.v
+LinkCopyout.v
 WpPipecloseDecode.v
 SpecPipeclose.v
 ProofPipeclose.v

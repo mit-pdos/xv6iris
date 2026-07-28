@@ -1547,7 +1547,8 @@ Section PtBuildIris.
     iSplitL "Hpg0 Hs0"; [(iApply "Hpg0"; iExact "Hs0") | iExact "Hemp"].
   Qed.
 
-  (* The READ-ONLY twin of [ptree_own_level0_upd] (ismapped's slot read):
+  (* The READ-ONLY twin of [ptree_own_level0_upd] (the slot read of ismapped,
+     walkaddr, and copyout's PTE_W test):
      same [ptree_level0] path over the [_ro] node/kid accessors, so the
      closing wand restores the SAME tree -- no [ptree_set_leaf].  Since both
      [ptree_own 2 dq t] occurrences are then IDENTICAL, do NOT introduce a

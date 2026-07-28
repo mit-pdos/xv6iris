@@ -95,6 +95,7 @@ Require Import PtBuild.
 Require Import PtAdBits.
 Require Import KptExecMap.
 Require Import TrampPt.
+Require Import KptTree.   (* [pte_tramp] and its A/D-variant flag byte *)
 Require Import UptTree.
 Require Import UserPtTree.
 Require Import ProcPt.
@@ -344,6 +345,39 @@ Proof.
       exists v, x. split; [| exact Hq].
       rewrite lookup_insert_ne; [exact Hl |].
       intro He. rewrite <- He in Hl. rewrite Hn in Hl. discriminate.
+Qed.
+
+(* --------------------------------------------------------------------- *)
+(* THE USER MAP ONLY GROWS.  A function that may fault pages in during its *)
+(* run (copyin, copyout, and anything built over them) cannot name the     *)
+(* descriptor it ends with -- how many faults it took depends on the       *)
+(* table it started from.  What it CAN promise is that the descriptor it   *)
+(* hands back extends the one it was given: same root (so [p->pagetable]   *)
+(* still holds [page_base ud_root]), same trapframe, and a user map that   *)
+(* only gained entries.  [ud_data] is deliberately unconstrained -- it is  *)
+(* the derived footprint, and the field is slated for retirement.          *)
+(* --------------------------------------------------------------------- *)
+Definition uptd_ext (P P' : uptd) : Prop :=
+  P'.(ud_root) = P.(ud_root) /\ P'.(ud_tfp) = P.(ud_tfp) /\
+  P.(ud_um) ⊆ P'.(ud_um).
+
+Lemma uptd_ext_refl (P : uptd) : uptd_ext P P.
+Proof. split; [reflexivity |]. split; [reflexivity | reflexivity]. Qed.
+
+Lemma uptd_ext_trans (P Q R : uptd) :
+  uptd_ext P Q -> uptd_ext Q R -> uptd_ext P R.
+Proof.
+  intros (H1 & H2 & H3) (H4 & H5 & H6).
+  split; [rewrite H4; exact H1 |].
+  split; [rewrite H5; exact H2 | exact (transitivity H3 H6)].
+Qed.
+
+Lemma uptd_ext_insert (P : uptd) (vpn : mword 27) (r : mword 64) :
+  P.(ud_um) !! vpn = None -> uptd_ext P (uptd_insert P vpn r).
+Proof.
+  intros Hn. unfold uptd_ext, uptd_insert. cbn [ud_root ud_tfp ud_um].
+  split; [reflexivity |]. split; [reflexivity |].
+  apply insert_subseteq. exact Hn.
 Qed.
 
 (* ===================================================================== *)
@@ -711,6 +745,64 @@ Proof.
   rewrite uint_unsigned in Hlt.
   rewrite svpn_of_unsigned_gen.
   exact (z_svpn_lt_maxva _ (proj1 (bv_unsigned_in_range _ a)) Hlt).
+Qed.
+
+(* ===================================================================== *)
+(* §2f WHICH PAGE A WALKADDR VERDICT NAMES.                                *)
+(*                                                                         *)
+(*     copyin/copyout do not walk the table themselves: they call          *)
+(*     walkaddr, which returns the base of the page a va reaches, and      *)
+(*     then memmove into or out of that page.  What walkaddr actually      *)
+(*     tests is [pte_vu] -- V and U both set -- on the EXACT (A/D-bearing) *)
+(*     word its walk read, i.e. on [m_ad], not on the canonical user map.  *)
+(*     To hand the caller a page of [proc_pt] we must get back from that   *)
+(*     word to an entry of [ud_um]; these three lemmas are that step.      *)
+(*                                                                         *)
+(*     The A/D bits cannot change which page a leaf names                  *)
+(*     ([pte_ppn_set_ad]), and the two non-user leaves of a user table --  *)
+(*     the trampoline and the trapframe -- both have U = 0, so no A/D      *)
+(*     variant of either can pass walkaddr's test.  That leaves exactly    *)
+(*     the [um] case, at the same ppn.                                     *)
+(* ===================================================================== *)
+
+Lemma pte_ppn_set_ad (w : mword 64) (a d : mword 1) :
+  pte_ppn (pte_set_ad w a d) = pte_ppn w.
+Proof.
+  unfold pte_ppn. rewrite !autocast_id. apply pte_set_ad_ppn.
+Qed.
+
+Lemma pte_vu_not_tramp (a d : mword 1) : ~ pte_vu (pte_set_ad pte_tramp a d).
+Proof.
+  intros (_ & HU). unfold Mk_PTE_Flags in HU.
+  rewrite tramp_variant_flags in HU.
+  apply (f_equal bv_unsigned) in HU.
+  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+    vm_compute in HU; discriminate.
+Qed.
+
+Lemma pte_vu_not_tf (tfp : mword 44) (a d : mword 1) :
+  ~ pte_vu (pte_set_ad (pte_tf tfp) a d).
+Proof.
+  intros (_ & HU). unfold Mk_PTE_Flags in HU.
+  rewrite tf_variant_flags in HU.
+  apply (f_equal bv_unsigned) in HU.
+  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
+    vm_compute in HU; discriminate.
+Qed.
+
+(* the step itself: a V|U word of the exact map comes from the user map,
+   and names the same page *)
+Lemma upt_ad_view_vu (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w : mword 64) :
+  upt_ad_view tfp um m_ad -> m_ad !! vpn = Some w -> pte_vu w ->
+  exists w0, um !! vpn = Some w0 /\ pte_ppn w0 = pte_ppn w.
+Proof.
+  intros (_ & Hview) Hl Hvu.
+  destruct (Hview vpn w Hl) as (w0 & a & d & Hleaf & ->).
+  destruct Hleaf as [(_ & ->) | [(_ & ->) | Hl0]].
+  - destruct (pte_vu_not_tramp a d Hvu).
+  - destruct (pte_vu_not_tf tfp a d Hvu).
+  - exists w0. split; [exact Hl0 | symmetry; apply pte_ppn_set_ad].
 Qed.
 
 (* ===================================================================== *)
@@ -1244,6 +1336,62 @@ Section ProcPt.
                Hrep Hbase). }
     iApply (upt_pages_own_insert P.(ud_um) vpn (vmfault_pte r) Hunone with "[Hpg] Hown").
     iApply (page_own_to_phys_vmfault r Hval with "Hb Hpg").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* ONE USER PAGE, BORROWED.  copyin and copyout do not change the       *)
+  (* table at all -- they memmove into or out of a single page walkaddr   *)
+  (* handed them.  So what they need from [proc_pt] is not an open/close  *)
+  (* of the tree but an ACCESSOR: take the page out at the [↦ₘ] tier the  *)
+  (* memmove spec speaks (KallocInv's [page_own]), give it back, and the  *)
+  (* invariant is exactly as it was.  Nothing about the map or the tree   *)
+  (* moves, so the closing wand needs no pure premise -- only             *)
+  (* [kmap_static_claims], which is persistent and so is captured.        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma proc_pt_page_acc (P : uptd) (vpn : mword 27) (w : mword 64) :
+    P.(ud_um) !! vpn = Some w ->
+    kmap_static_claims -∗ proc_pt P -∗
+      page_own (page_base (pte_ppn w)) ∗
+      (page_own (page_base (pte_ppn w)) -∗ proc_pt P).
+  Proof.
+    intros Hl.
+    assert (Hin : pte_ppn w ∈ um_ppns P.(ud_um)).
+    { apply elem_of_um_ppns. exists vpn, w. split; [exact Hl | reflexivity]. }
+    iIntros "#Hb H".
+    iEval (rewrite /proc_pt /proc_pt_own /upt_pages_own
+             (big_sepS_delete (fun q => phys_page_own q)
+                (um_ppns P.(ud_um)) (pte_ppn w) Hin)) in "H".
+    iDestruct "H" as "(%Hwf & Ht & Hp & Hrest)".
+    pose proof (proj1 (proj2 (proj2 Hwf)) _ Hin) as Hval.
+    iDestruct (phys_to_page_own (pte_ppn w) Hval with "Hb Hp") as "Hpg".
+    iSplitL "Hpg"; [iExact "Hpg" |].
+    iIntros "Hpg".
+    iDestruct (page_own_to_phys (pte_ppn w) Hval with "Hb Hpg") as "Hp".
+    rewrite /proc_pt /proc_pt_own /upt_pages_own.
+    rewrite (big_sepS_delete (fun q => phys_page_own q)
+               (um_ppns P.(ud_um)) (pte_ppn w) Hin).
+    iSplitR; [iPureIntro; exact Hwf |].
+    iFrame "Ht Hp Hrest".
+  Qed.
+
+  (* the instance the vmfault-success arm hands on: the page just faulted
+     in is [r] itself, since [page_base] of the leaf's ppn roundtrips
+     through [page_valid]. *)
+  Lemma proc_pt_page_acc_vmfault (P : uptd) (vpn : mword 27) (r : mword 64) :
+    page_valid r ->
+    kmap_static_claims -∗ proc_pt (uptd_insert P vpn r) -∗
+      page_own r ∗ (page_own r -∗ proc_pt (uptd_insert P vpn r)).
+  Proof.
+    intros Hval.
+    assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r)).
+    { unfold uptd_insert. cbn [ud_um]. apply lookup_insert. }
+    assert (Hpb : page_base (pte_ppn (vmfault_pte r)) = r).
+    { rewrite pte_ppn_vmfault. exact (page_base_of_valid r Hval). }
+    (* rewrite FORWARD in the instance -- [rewrite <- Hpb] in the goal would
+       also hit the [r] inside [uptd_insert]. *)
+    pose proof (proc_pt_page_acc (uptd_insert P vpn r) vpn (vmfault_pte r) Hl)
+      as Hacc.
+    rewrite Hpb in Hacc. exact Hacc.
   Qed.
 
   (* the root page itself is owned inside [pt_frame] (every node of

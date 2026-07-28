@@ -102,6 +102,13 @@ are working on that effort — the relevant `projects/` file.
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
+- **[`copy-inout.md`](projects/copy-inout.md)** — copyin / copyout (+ the
+  `walkaddr` callee): the kernel↔user byte-copy pair, stated at the `proc_pt`
+  altitude so both PRESERVE the user-page-table invariant and hand back a
+  descriptor EXTENDING the one they were given (`uptd_ext`) — including the
+  per-page accessor (`proc_pt_page_acc`, the `↦ₚ ⇄ ↦ₘ` move a memmove through
+  a user page needs), `ByteBuf.v`'s buffer algebra, and why the contracts
+  deliberately say nothing about the bytes that crossed.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode

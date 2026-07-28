@@ -92,6 +92,19 @@ Definition pte_ptr (w : mword 64) : Prop :=
 Definition pte_leaf (w : mword 64) : Prop :=
   pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = false.
 
+(* V and U both set -- the pair of bits [walkaddr] tests in one [andi]
+   ([( *pte & (PTE_V|PTE_U)) == PTE_V|PTE_U]).  This is the verdict that
+   makes a slot word a page the process may reach FROM USER MODE, and so
+   -- for a table described by [UptTree.upt_tree_spec] -- the verdict that
+   places its vpn in the user MAP rather than at the trampoline or the
+   trapframe, whose leaves both have U = 0.  Stated over the model's flag
+   accessors; the [andi] bit-test bridge is [ProofWalkaddr.wa_pte_vu_bits]
+   (which belongs in PtBuild.v next to [pte_valid_bit0] -- see the cleanup
+   sweep in claude-notes/projects/copy-inout.md). *)
+Definition pte_vu (w : mword 64) : Prop :=
+  _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1) /\
+  _get_PTE_Flags_U (Mk_PTE_Flags (subrange_vec_dec w 7 0)) = ('b"1" : mword 1).
+
 (* leaf extras consumed by the success walk / TLB-hit path *)
 Definition pte_no_napot (w : mword 64) : Prop :=
   eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE w)) ('b"1") = false.
