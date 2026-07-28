@@ -311,6 +311,27 @@ proven.  What is left is 0x72..0x24a:
 - `digits` and the `"(null)"` literal both come from `kernel_data`
   (`kernel_data_window` / `kernel_data_string`, both above `text_end`).
 
+### printk: the arm pattern, now proven once
+
+`wp_printk_arm_d` (the `%d` arm, 0xd4..0xea) is the shape TEN of the fifteen
+share, and the pieces it needed are the reusable part:
+
+- **`pk_va_acc`** -- `pk_va` is spelled out slot by slot (the prologue needs
+  that), but an arm reaches the k-th vararg for a SYMBOLIC k, so the seven-way
+  case analysis is done once in the accessor and every arm uses it.
+- **`pk_ap` / `pk_ap_slot`** -- the cursor's value after k arguments, and the
+  fact that it points at vararg slot `7 - k`.  The three instructions
+  `ld a5,-120(s0)` / `addi a4,a5,8` / `sd a4,-120(s0)` ARE `va_arg`, and
+  `addv_moi_moi` (PrintintArith) is the one arithmetic fact the bump needs.
+- **`word_of_words_id`** -- `%d`/`%u`/`%x` read their argument with a 4-byte
+  load out of an 8-byte slot, so the slot is split with
+  `word_pointsto_split4` and rejoined; the round trip is the identity.
+  `pk_lo` carries the `mword 32` ascription for the same reason `pk_fbyte`
+  carries the `mword 8` one.
+
+The other nine value arms differ from it in only two places: the load
+(`c.lw` / `lwu` / `c.ld`) and the `(base, sign)` pair.
+
 ### printk: what the arms still need
 
 Each arm ends by jumping to 0x78 with `s1 = (next index) - 1`, so the shape of

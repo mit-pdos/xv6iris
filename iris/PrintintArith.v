@@ -341,3 +341,14 @@ Lemma uint_lt_1020 (x : mword 64) : uint x < 10 ^ (Z.of_nat 20).
 Proof.
   apply (Z.lt_trans _ (2^64)); [ apply pi_uint_lt64 | vm_compute; reflexivity ].
 Qed.
+
+(* two immediate offsets from the same base collapse into one -- the shape a
+   va_list bump ([ap] read, +8, written back) needs. *)
+Lemma addv_moi_moi (x : mword 64) (a b : Z) :
+  add_vec (add_vec x (mword_of_int a)) (mword_of_int b) = add_vec x (mword_of_int (a + b)).
+Proof.
+  apply bv_eq. rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite bv_wrap_add_idemp_l, !bv_wrap_add_idemp_r.
+  (* the surviving inner wrap sits in the middle of the sum: rotate it out *)
+  rewrite wrap_add3'. f_equal. ring.
+Qed.
