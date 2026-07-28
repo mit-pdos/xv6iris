@@ -47,6 +47,25 @@ Proof.
   f_equal. lia.
 Qed.
 
+(* the two ends of that composition, at the offsets a byte-at-a-time WALK
+   uses: index 0 is the base, and [addi p,p,1] steps the index. *)
+Lemma pa_add_0 (p : mword 64) : pa_add p 0 = p.
+Proof.
+  unfold pa_add, add_vec_int. apply bv_eq.
+  rewrite bc_add_vec_unsigned bc_moi_unsigned.
+  change (bv_wrap 64 (Z.of_nat 0)) with 0. rewrite Z.add_0_r.
+  apply bv_wrap_small. apply bv_unsigned_in_range.
+Qed.
+
+Lemma pa_add_S (p : mword 64) (i : nat) :
+  add_vec (pa_add p i) (mword_of_int 1 : mword 64) = pa_add p (S i).
+Proof.
+  unfold pa_add, add_vec_int. apply bv_eq.
+  rewrite !bc_add_vec_unsigned !bc_moi_unsigned.
+  rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
+  f_equal. lia.
+Qed.
+
 (* the eight bytes of the word they assemble into -- the rebuild's only
    arithmetic, instantiated at the one length a frame slot has. *)
 Lemma nth_byte8 (b0 b1 b2 b3 b4 b5 b6 b7 : bv 8) (j : nat) :

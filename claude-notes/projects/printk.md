@@ -350,8 +350,41 @@ pair), **`%%`** and the **unknown-directive** case (no vararg at all; `s5`
 holds c0 and the code prints it either way, so the two differ only in whether
 a `'%'` goes out first).
 
-That leaves `%p` and `%s` -- the two arms with inner loops -- plus the
-dispatch chain and the loop induction.
+`%s` is proven, both halves of it.  It is the first arm with a loop of its
+own -- a byte-at-a-time walk of the argument string, one `consputc` per
+character -- and the shape worth remembering is how the null pointer joins
+it.  gcc does not write a second loop for `"(null)"`: it points s4 at the
+literal, loads `'('` into a0 and jumps to the loop's HEAD, which is the
+`jal consputc`, not the test.  So the walk's invariant is "a0 holds the
+character to print and s4 is the address it came from", and the two entries
+(a real string at index 0, the literal at index 0) satisfy the same one.
+One `wp_printk_str_loop`, two arm lemmas -- two because a real `char*` and a
+null one are two different DESCRIPTORS (`PkAStr` / `PkANull`), not two
+branches a single caller chooses between.
+
+The induction is on FUEL, not on the string: the recursive call moves the
+INDEX while the string points-to has to stay put, so `[∗]`-style structural
+recursion on `s` would have to re-split the resource every step.  Fuel is
+`length (string_bytes s) - i`, and the loop-exit case is decided BEFORE the
+branch by `lt_dec (S i) (length (string_bytes s))` -- at the last index the
+byte read is the NUL, which is exactly what makes `bnez` fall through.  The
+supporting pure lemmas (`pk_fbyte_nonzero` from `nonul`, `pk_fbyte_nul`)
+are what turn that decision into the two `eq_vec ... zero_reg` facts.
+
+`%s` is also the one arm that does not preserve s4 -- s4 IS the walk cursor.
+That is harmless: 0x78 reloads s4 from s1, which is why the arm's
+postcondition can say "every callee-saved register except s4".
+
+**A spec consequence, not yet applied:** the empty string prints NOTHING, so
+that path has to hand back `uart_sent γd (l ++ [])` having called nothing --
+and `uart_sent` is a mono-list lower bound that only the UART invariant can
+mint.  `uart_tx_own γd l` alone does not give it.  So the arm takes
+`uart_sent γd l` as a (persistent, free-to-thread) precondition, and
+`wp_printk_sconf_body` will need the same for the empty-FORMAT path, which
+has the identical problem.  Add it when the top-level proof is assembled.
+
+That leaves `%p` -- the last arm, and the other one with an inner loop --
+plus the dispatch chain and the loop induction.
 
 ### printk: what the arms still need
 
