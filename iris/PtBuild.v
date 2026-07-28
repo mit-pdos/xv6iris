@@ -466,6 +466,54 @@ Proof.
     exact (ptree_set_leaf0_blocks_other t vpn v p2 p1 w0 w Hne Hl0 (Hblk v Hlk)).
 Qed.
 
+(* ---- §3b THE DELETION: uvmunmap's [*pte = 0] ------------------------- *)
+(* The mirror image of the insertion.  Writing the LITERAL ZERO through a
+   level0 path re-blocks that vpn IN THE xv6 SHAPE -- [ptree_blocks0]'s
+   third disjunct, whose every conjunct is a [ptree_level0] conjunct plus
+   the freshly-written zero slot.  So no leaf classification is needed
+   (there is nothing to classify), and the OLD word [w0] is irrelevant:
+   uvmunmap clears a slot whether it held a leaf or not. *)
+
+Lemma ptree_set_leaf0_blocks_self (t : ptree) (vpn : mword 27)
+    (p2 p1 w0 : mword 64) :
+  ptree_level0 t vpn p2 p1 w0 ->
+  ptree_blocks0 (ptree_set_leaf t vpn (mword_of_int 0)) vpn.
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 &
+          Hv2 & Hn2 & Hv1 & Hn1).
+  unfold ptree_set_leaf. rewrite Hk2. rewrite Hk1.
+  right. right.
+  exists (pt_upd_kid c1 (vpn_idx 1 vpn)
+            (Some (pt_upd_ent c0 (vpn_idx 0 vpn) (mword_of_int 0)))),
+         (pt_upd_ent c0 (vpn_idx 0 vpn) (mword_of_int 0)).
+  rewrite !pt_upd_kid_same !pt_upd_kid_ents !pt_upd_kid_base
+          !pt_upd_ent_base !pt_upd_ent_same.
+  rewrite He2 He1.
+  repeat split; try reflexivity; assumption.
+Qed.
+
+Lemma pt_rep0_delete (t : ptree) (m : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (p2 p1 w0 : mword 64) :
+  pt_rep0 t m ->
+  ptree_level0 t vpn p2 p1 w0 ->
+  pt_rep0 (ptree_set_leaf t vpn (mword_of_int 0)) (delete vpn m).
+Proof.
+  intros (Hmap & Hblk) Hl0. split.
+  - intros v wv Hlk.
+    destruct (decide (v = vpn)) as [-> | Hne].
+    { rewrite lookup_delete in Hlk. discriminate. }
+    rewrite lookup_delete_ne in Hlk; [| exact (fun He => Hne (eq_sym He))].
+    destruct (Hmap v wv Hlk) as (q2 & q1 & Hq).
+    exists q2, q1.
+    exact (ptree_set_leaf_maps_other t vpn v q2 q1 wv (mword_of_int 0) Hne Hq).
+  - intros v Hlk.
+    destruct (decide (v = vpn)) as [-> | Hne].
+    { exact (ptree_set_leaf0_blocks_self t vpn p2 p1 w0 Hl0). }
+    rewrite lookup_delete_ne in Hlk; [| exact (fun He => Hne (eq_sym He))].
+    exact (ptree_set_leaf0_blocks_other t vpn v p2 p1 w0 (mword_of_int 0)
+             Hne Hl0 (Hblk v Hlk)).
+Qed.
+
 (* ===================================================================== *)
 (* §4 Grafting: walk's allocation arm.  A blocked-zero slot at level 2    *)
 (*    or 1 receives a pointer PTE to a freshly zeroed page, attached to   *)
@@ -2580,7 +2628,7 @@ Qed.
 
 (* ---- the leaf PTE the loop stores ----------------------------------- *)
 
-Local Lemma pb_lor1_range (perm : Z) :
+Lemma pb_lor1_range (perm : Z) :
   0 <= perm < 1024 -> 0 <= Z.lor perm 1 < 1024.
 Proof.
   intros Hp.

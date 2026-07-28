@@ -402,6 +402,57 @@ Proof.
       rewrite (lookup_insert_ne um vpn v w (not_eq_sym Hne)). exact Hu0.
 Qed.
 
+(* ---- the DELETION side (uvmunmap) ----------------------------------- *)
+
+(* Reading an exact-map entry back into the canonical user map.  A vpn that
+   is neither the trampoline nor the trapframe and that the exact map maps
+   IS in [um], carrying a word the exact one is an A/D variant of.  This is
+   the vpn-disequality twin of [ProcPtOwn.upt_ad_view_vu], which walkaddr's
+   callers get from the U bit instead; uvmunmap knows its vpn is a user vpn
+   from its RANGE, so it needs no flag test. *)
+Lemma upt_ad_view_um (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w' : mword 64) :
+  upt_ad_view tfp um m_ad -> m_ad !! vpn = Some w' ->
+  vpn <> tramp_vpn -> vpn <> tf_vpn ->
+  exists (w : mword 64) (a d : mword 1), um !! vpn = Some w /\ w' = pte_set_ad w a d.
+Proof.
+  intros (_ & Hsome) Hl Hntr Hntf.
+  destruct (Hsome vpn w' Hl) as (w & a & d & Hleaf & Hr).
+  destruct Hleaf as [(Ht & _) | [(Ht & _) | Hu]].
+  - exfalso. exact (Hntr Ht).
+  - exfalso. exact (Hntf Ht).
+  - exists w, a, d. split; [exact Hu | exact Hr].
+Qed.
+
+(* dropping one USER vpn from both views at once.  Deleting the trampoline or
+   the trapframe would break [upt_tree_spec], which is why the disequalities
+   are premises rather than conclusions. *)
+Lemma upt_ad_view_delete (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) :
+  vpn <> tramp_vpn -> vpn <> tf_vpn ->
+  upt_ad_view tfp um m_ad ->
+  upt_ad_view tfp (delete vpn um) (delete vpn m_ad).
+Proof.
+  intros Hntr Hntf (Hnone & Hsome).
+  split.
+  - intros v. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite !lookup_delete. split.
+      * intros _. split; [exact Hntr | split; [exact Hntf | reflexivity]].
+      * intros _. reflexivity.
+    + rewrite (lookup_delete_ne m_ad vpn v (not_eq_sym Hne)).
+      rewrite (lookup_delete_ne um vpn v (not_eq_sym Hne)).
+      exact (Hnone v).
+  - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
+    { rewrite lookup_delete in Hl'. discriminate. }
+    rewrite (lookup_delete_ne m_ad vpn v (not_eq_sym Hne)) in Hl'.
+    destruct (Hsome v w' Hl') as (w0 & a & d & Hleaf & Hr).
+    exists w0, a, d. split; [| exact Hr].
+    destruct Hleaf as [Ht | [Ht | Hu0]];
+      [left; exact Ht | right; left; exact Ht |].
+    right. right.
+    rewrite (lookup_delete_ne um vpn v (not_eq_sym Hne)). exact Hu0.
+Qed.
+
 (* the spec survives the A/D write-back at any mapped vpn *)
 Lemma upt_tree_spec_set_leaf (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
     (t : ptree) (vpn : mword 27) (w p2 p1 : mword 64) (a0 d0 a d : mword 1) :

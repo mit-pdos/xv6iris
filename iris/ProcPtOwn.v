@@ -372,19 +372,31 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §2b The vmfault step: the leaf the lazy-allocation fault handler       *)
-(*     installs, and the descriptor after one page joins the map.         *)
-(*     [vmfault_pte r] is spelled EXACTLY as SpecMappages' [ppn0]/post at  *)
-(*     [perm := 22] (PTE_W|PTE_U|PTE_R), [npages := 1], so ProofVmfault    *)
-(*     meets mappages' postcondition syntactically.                       *)
+(* §2b The one-page mapping step, at an ARBITRARY permission.             *)
+(*                                                                        *)
+(*     [uvm_pte perm r] is the leaf a ONE-PAGE mappages run writes for the *)
+(*     kalloc page [r] -- spelled EXACTLY as SpecMappages' [ppn0]/post at  *)
+(*     [npages := 1], [k := 1], so a caller meets mappages' postcondition  *)
+(*     syntactically.  vmfault is the instance at [perm := 22]             *)
+(*     (PTE_W|PTE_U|PTE_R); uvmalloc's is [perm := xperm | 18] and so is   *)
+(*     not a literal, which is why the whole leaf layer below is stated    *)
+(*     over [perm] with the classification packaged as [uvm_perm_ok]       *)
+(*     (§2c) -- a pure premise a caller discharges by [vm_compute] at its  *)
+(*     own concrete permission.                                            *)
 (* ===================================================================== *)
 
-Definition vmfault_pte (r : mword 64) : mword 64 :=
-  mappages_pte (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44) 22 0.
+Definition uvm_pte (perm : Z) (r : mword 64) : mword 64 :=
+  mappages_pte (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44) perm 0.
+
+(* vmfault's leaf: PTE_R|PTE_W|PTE_U (mappages ors in PTE_V) *)
+Definition vmfault_pte (r : mword 64) : mword 64 := uvm_pte 22 r.
+
+Definition uptd_insert_perm (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64) : uptd :=
+  UPTD P.(ud_root) P.(ud_tfp) (<[vpn := uvm_pte perm r]> P.(ud_um))
+       (um_pas (<[vpn := uvm_pte perm r]> P.(ud_um))).
 
 Definition uptd_insert (P : uptd) (vpn : mword 27) (r : mword 64) : uptd :=
-  UPTD P.(ud_root) P.(ud_tfp) (<[vpn := vmfault_pte r]> P.(ud_um))
-       (um_pas (<[vpn := vmfault_pte r]> P.(ud_um))).
+  uptd_insert_perm P 22 vpn r.
 
 (* one fresh vpn adds exactly one page to the footprint.  (The freshness
    hypothesis is needed: without it the insert would DROP the page the old
@@ -447,110 +459,219 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §2c THE VMFAULT LEAF, CLASSIFIED.  [vmfault_pte r] is [mk_pte] of the   *)
-(*     ppn of [r] at flag byte 23 = V|R|W|U; the A/D variants add bit 6    *)
-(*     and bit 7.  Every variant is a proper 4K leaf; a user LOAD/STORE/   *)
-(*     LR/SC/AMO passes its permission check and a user FETCH is denied    *)
-(*     (X = 0).  Then the two geometry roundtrips (the ppn of the leaf,    *)
-(*     the base of that ppn) and the PGROUNDDOWN bit facts.                *)
+(* §2c THE MAPPED LEAF, CLASSIFIED -- at an arbitrary permission.          *)
+(*                                                                        *)
+(*     [uvm_pte perm r] is [mk_pte] of the ppn of [r] at flag byte         *)
+(*     [Z.lor perm 1]; the A/D variants add bit 6 and bit 7.  What the     *)
+(*     user-page-table invariant needs of such a leaf is exactly           *)
+(*     [uvm_perm_ok perm]:                                                 *)
+(*       - mappages' own [mappages_perm_ok] precondition,                  *)
+(*       - every A/D variant is a proper 4K leaf ([upt_map_wf]'s clause),  *)
+(*       - every user access is decided -- passes or is denied, never      *)
+(*         stuck ([upt_acc_wf]'s clause).                                  *)
+(*     It is a pure, ppn-INDEPENDENT property of the permission, so a      *)
+(*     caller discharges it once by [vm_compute] at its own concrete       *)
+(*     permission; the instances xv6 actually uses are proved below        *)
+(*     (18 = R|U, 22 = R|W|U, 26 = R|X|U, 30 = R|W|X|U).                   *)
 (*                                                                        *)
 (*     The dispatch recipe is UptTree §1's: [pte_set_ad_zext_concat] turns *)
 (*     a variant back into a [mk_pte] at an ADJUSTED flag constant, then   *)
 (*     the flag byte / ext field are read off symbolically in the ppn      *)
-(*     ([mk_pte_flags] / [mk_pte_ext]) and every predicate is one          *)
-(*     [vm_compute] per A/D case.                                          *)
+(*     ([mk_pte_flags1024] / [mk_pte_ext]) and every predicate is one      *)
+(*     [vm_compute] per A/D case.  [mxr]/[do_sum] stay SYMBOLIC (at User   *)
+(*     [do_sum] is never consulted), so each access is 4 A/D cases, not    *)
+(*     16 -- unlike KptPt's Supervisor [kperm_check_*].                    *)
 (* ===================================================================== *)
 
-(* mappages' own precondition at [PTE_W|PTE_U|PTE_R] *)
-Lemma vmf_perm_ok22 : mappages_perm_ok 22.
+(* ---- two generic [Z] range facts (mword-free, so [lia] behaves) ------ *)
+
+(* NOTE: [lia] is never let near a goal mentioning [Z.lor]/[Z.land] here --
+   the zify hook that arrives transitively with [bitvector.tactics] answers
+   "Cannot find witness" on them (durable-notes.md).  Every step below feeds
+   [lia] only numeral/variable goals. *)
+
+Local Lemma z_pos_of_nonzero (z : Z) : 0 <= z -> z <> 0 -> 0 < z.
 Proof.
-  unfold mappages_perm_ok. split; [lia|].
-  split; [intro s; vm_compute; reflexivity|].
-  split; [vm_compute; reflexivity|].
-  split; [vm_compute; reflexivity | vm_compute; reflexivity].
+  intros H1 H2.
+  destruct (proj1 (Z.lt_eq_cases 0 z) H1) as [H | H];
+    [exact H | exfalso; apply H2; symmetry; exact H].
 Qed.
 
-(* the leaf in [mk_pte] shape: [Z.lor 22 1 = 23] *)
+Local Lemma z_log2_lt (n z : Z) : 0 < n -> 0 <= z -> z < 2 ^ n -> Z.log2 z < n.
+Proof.
+  intros Hn Hz0 Hz. destruct (Z.eq_dec z 0) as [-> | Hnz].
+  - rewrite Z.log2_nonpos; [exact Hn | apply Z.le_refl].
+  - exact (proj1 (Z.log2_lt_pow2 z n (z_pos_of_nonzero z Hz0 Hnz)) Hz).
+Qed.
+
+Lemma z_lor_pow2 (n x y : Z) : 0 < n -> 0 <= x < 2 ^ n -> 0 <= y < 2 ^ n ->
+  0 <= Z.lor x y < 2 ^ n.
+Proof.
+  intros Hn (Hx0 & Hx) (Hy0 & Hy).
+  assert (Hge : 0 <= Z.lor x y)
+    by (apply Z.lor_nonneg; split; [exact Hx0 | exact Hy0]).
+  split; [exact Hge |].
+  destruct (Z.eq_dec (Z.lor x y) 0) as [He | Hne].
+  { rewrite He. apply Z.pow_pos_nonneg; lia. }
+  apply (proj2 (Z.log2_lt_pow2 _ n (z_pos_of_nonzero _ Hge Hne))).
+  rewrite Z.log2_lor; [| exact Hx0 | exact Hy0].
+  apply Z.max_lub_lt;
+    [exact (z_log2_lt n x Hn Hx0 Hx) | exact (z_log2_lt n y Hn Hy0 Hy)].
+Qed.
+
+Lemma z_land_pow2 (n x y : Z) : 0 < n -> 0 <= x < 2 ^ n -> 0 <= y ->
+  0 <= Z.land x y < 2 ^ n.
+Proof.
+  intros Hn (Hx0 & Hx) Hy0.
+  assert (Hge : 0 <= Z.land x y)
+    by (apply Z.land_nonneg; left; exact Hx0).
+  split; [exact Hge |].
+  destruct (Z.eq_dec (Z.land x y) 0) as [He | Hne].
+  { rewrite He. apply Z.pow_pos_nonneg; lia. }
+  apply (proj2 (Z.log2_lt_pow2 _ n (z_pos_of_nonzero _ Hge Hne))).
+  apply (Z.le_lt_trans _ (Z.min (Z.log2 x) (Z.log2 y)));
+    [exact (Z.log2_land x y Hx0 Hy0) |].
+  apply (Z.le_lt_trans _ (Z.log2 x));
+    [apply Z.le_min_l | exact (z_log2_lt n x Hn Hx0 Hx)].
+Qed.
+
+(* the flag byte of the [a]/[d] variant *)
+Definition uvm_flags (perm : Z) (a d : mword 1) : Z :=
+  Z.lor (Z.land (Z.lor perm 1) 831)
+        (Z.lor (Z.shiftl (bv_unsigned a) 6) (Z.shiftl (bv_unsigned d) 7)).
+
+Lemma uvm_flags_bound (perm : Z) (a d : mword 1) :
+  (0 <= perm < 1024)%Z -> (0 <= uvm_flags perm a d < 1024)%Z.
+Proof.
+  intros Hp.
+  pose proof (pb_lor1_range perm Hp) as Hf.
+  change 1024 with (2 ^ 10)%Z in *.
+  unfold uvm_flags. apply z_lor_pow2; [lia | |].
+  - apply z_land_pow2; [lia | exact Hf | lia].
+  - apply z_lor_pow2; [lia | |];
+      (destruct (mword1_cases a) as [-> | ->];
+       destruct (mword1_cases d) as [-> | ->]; vm_compute; intuition congruence).
+Qed.
+
+(* the leaf in [mk_pte] shape *)
+Lemma uvm_pte_mk (perm : Z) (r : mword 64) :
+  uvm_pte perm r
+  = mk_pte (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44)
+      (Z.lor perm 1).
+Proof. unfold uvm_pte. rewrite mappages_pte_0. reflexivity. Qed.
+
+Lemma uvm_variant_mk (perm : Z) (r : mword 64) (a d : mword 1) :
+  (0 <= Z.lor perm 1 < 1024)%Z ->
+  pte_set_ad (uvm_pte perm r) a d
+  = mk_pte (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44)
+      (uvm_flags perm a d).
+Proof.
+  intros Hf. rewrite uvm_pte_mk. unfold mk_pte, uvm_flags.
+  apply (pte_set_ad_zext_concat _ (Z.lor perm 1) a d). exact Hf.
+Qed.
+
+Lemma uvm_variant_flags (perm : Z) (r : mword 64) (a d : mword 1) :
+  (0 <= perm < 1024)%Z ->
+  subrange_vec_dec (pte_set_ad (uvm_pte perm r) a d) 7 0
+  = (mword_of_int (uvm_flags perm a d) : mword 8).
+Proof.
+  intros Hp. rewrite (uvm_variant_mk perm r a d (pb_lor1_range perm Hp)).
+  apply mk_pte_flags1024. exact (uvm_flags_bound perm a d Hp).
+Qed.
+
+Lemma uvm_variant_ext (perm : Z) (r : mword 64) (a d : mword 1) :
+  (0 <= perm < 1024)%Z ->
+  ext_bits_of_PTE (pte_set_ad (uvm_pte perm r) a d) = Mk_PTE_Ext (mword_of_int 0).
+Proof.
+  intros Hp. rewrite pte_set_ad_ext. rewrite uvm_pte_mk.
+  unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
+  rewrite mk_pte_ext; [reflexivity | exact (pb_lor1_range perm Hp)].
+Qed.
+
+(* THE PERMISSION CONTRACT.  Everything the user-table invariant asks of a
+   leaf built at [perm], for every page and every A/D variant. *)
+Definition uvm_perm_ok (perm : Z) : Prop :=
+  mappages_perm_ok perm /\
+  (forall (r : mword 64) (a d : mword 1),
+     pte_valid (pte_set_ad (uvm_pte perm r) a d) /\
+     pte_leaf (pte_set_ad (uvm_pte perm r) a d) /\
+     pte_no_napot (pte_set_ad (uvm_pte perm r) a d) /\
+     pte_pbmt0 (pte_set_ad (uvm_pte perm r) a d)) /\
+  (forall (r : mword 64) (acc : MemoryAccessType mem_payload),
+     u_acc acc -> uleaf_ok acc (uvm_pte perm r) \/ uleaf_denied acc (uvm_pte perm r)).
+
+(* At a CONCRETE permission every obligation is closed by computation; the
+   only symbolic data left are the ppn (carried through [mk_pte]) and, in
+   the access clause, [mxr]/[do_sum]/the AMO op.  [Hp] is the permission's
+   range fact, asserted once per instance so the two rewrites never carry an
+   inline [ltac:] premise (the optimization.md rule). *)
+Local Ltac uvm_ad_cases a d :=
+  destruct (mword1_cases a) as [-> | ->];
+  destruct (mword1_cases d) as [-> | ->].
+
+Local Ltac uvm_leaf_tac Hp :=
+  intros r a d; repeat split;
+  [ intros s; unfold Mk_PTE_Flags;
+    rewrite (uvm_variant_flags _ r a d Hp); rewrite (uvm_variant_ext _ r a d Hp);
+    uvm_ad_cases a d; vm_compute; reflexivity
+  | unfold pte_leaf, Mk_PTE_Flags;
+    rewrite (uvm_variant_flags _ r a d Hp);
+    uvm_ad_cases a d; vm_compute; reflexivity
+  | unfold pte_no_napot; rewrite (uvm_variant_ext _ r a d Hp); apply kpt_extN_red
+  | unfold pte_pbmt0; rewrite (uvm_variant_ext _ r a d Hp);
+    vm_compute; reflexivity ].
+
+Local Ltac uvm_acc_one Hp :=
+  intros a d mxr do_sum s; unfold Mk_PTE_Flags;
+  rewrite (uvm_variant_flags _ _ a d Hp); rewrite (uvm_variant_ext _ _ a d Hp);
+  uvm_ad_cases a d; vm_compute; reflexivity.
+
+Local Ltac uvm_perm_tac p :=
+  assert (Hp : (0 <= p < 1024)%Z) by lia;
+  split; [ unfold mappages_perm_ok; split; [lia|];
+           split; [intro s; vm_compute; reflexivity|];
+           split; [vm_compute; reflexivity|];
+           split; [vm_compute; reflexivity | vm_compute; reflexivity]
+         | split; [ uvm_leaf_tac Hp
+                  | intros r acc [-> | [-> | [-> | [-> | [-> | (op & ->)]]]]];
+                    first [ left; uvm_acc_one Hp | right; uvm_acc_one Hp ] ] ].
+
+(* PTE_R|PTE_U -- exec's read-only segments *)
+Lemma uvm_perm_ok_18 : uvm_perm_ok 18.
+Proof. uvm_perm_tac 18. Qed.
+
+(* PTE_R|PTE_W|PTE_U -- vmfault, sbrk/growproc *)
+Lemma uvm_perm_ok_22 : uvm_perm_ok 22.
+Proof. uvm_perm_tac 22. Qed.
+
+(* PTE_R|PTE_X|PTE_U -- exec's text *)
+Lemma uvm_perm_ok_26 : uvm_perm_ok 26.
+Proof. uvm_perm_tac 26. Qed.
+
+(* PTE_R|PTE_W|PTE_X|PTE_U *)
+Lemma uvm_perm_ok_30 : uvm_perm_ok 30.
+Proof. uvm_perm_tac 30. Qed.
+
+(* ---- the vmfault instance, as the tree already names it -------------- *)
+
+Lemma vmf_perm_ok22 : mappages_perm_ok 22.
+Proof. exact (proj1 uvm_perm_ok_22). Qed.
+
 Lemma vmfault_pte_mk (r : mword 64) :
   vmfault_pte r
   = mk_pte (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44) 23.
-Proof. unfold vmfault_pte. rewrite mappages_pte_0. reflexivity. Qed.
+Proof. unfold vmfault_pte. rewrite uvm_pte_mk. reflexivity. Qed.
 
-Lemma vmfault_variant_mk (r : mword 64) (a d : mword 1) :
-  pte_set_ad (vmfault_pte r) a d
-  = mk_pte (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44)
-      (Z.lor (Z.land 23 831)
-         (Z.lor (Z.shiftl (bv_unsigned a) 6) (Z.shiftl (bv_unsigned d) 7))).
-Proof.
-  rewrite vmfault_pte_mk. unfold mk_pte.
-  apply (pte_set_ad_zext_concat _ 23 a d). lia.
-Qed.
-
-Lemma vmfault_variant_flags (r : mword 64) (a d : mword 1) :
-  subrange_vec_dec (pte_set_ad (vmfault_pte r) a d) 7 0
-  = (mword_of_int (Z.lor (Z.land 23 831)
-       (Z.lor (Z.shiftl (bv_unsigned a) 6)
-              (Z.shiftl (bv_unsigned d) 7))) : mword 8).
-Proof.
-  rewrite vmfault_variant_mk.
-  apply mk_pte_flags.
-  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-    vm_compute; intuition congruence.
-Qed.
-
-Lemma vmfault_variant_ext (r : mword 64) (a d : mword 1) :
-  ext_bits_of_PTE (pte_set_ad (vmfault_pte r) a d) = Mk_PTE_Ext (mword_of_int 0).
-Proof.
-  rewrite pte_set_ad_ext. rewrite vmfault_pte_mk.
-  unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
-  rewrite mk_pte_ext; [reflexivity | lia].
-Qed.
-
-(* the 4K-leaf classification, on every A/D variant *)
 Lemma vmfault_variant (r : mword 64) (a d : mword 1) :
   pte_valid (pte_set_ad (vmfault_pte r) a d) /\
   pte_leaf (pte_set_ad (vmfault_pte r) a d) /\
   pte_no_napot (pte_set_ad (vmfault_pte r) a d) /\
   pte_pbmt0 (pte_set_ad (vmfault_pte r) a d).
-Proof.
-  repeat split.
-  - intros s. unfold Mk_PTE_Flags.
-    rewrite vmfault_variant_flags. rewrite vmfault_variant_ext.
-    destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-      vm_compute; reflexivity.
-  - unfold pte_leaf, Mk_PTE_Flags.
-    rewrite vmfault_variant_flags.
-    destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-      vm_compute; reflexivity.
-  - unfold pte_no_napot.
-    rewrite vmfault_variant_ext.
-    apply kpt_extN_red.
-  - unfold pte_pbmt0.
-    rewrite vmfault_variant_ext.
-    vm_compute. reflexivity.
-Qed.
-
-(* the User-access classification [upt_acc_wf] wants: the leaf is R|W|U with
-   X = 0, so data accesses pass and a fetch is denied.  [mxr]/[do_sum] stay
-   SYMBOLIC (at User [do_sum] is never consulted, and [pte_X = 0] kills the
-   [mxr] disjunct), so the dispatch is 4 A/D cases per access, not 16. *)
-Local Ltac vmf_check_tac :=
-  intros a d mxr do_sum s; unfold Mk_PTE_Flags;
-  rewrite vmfault_variant_flags; rewrite vmfault_variant_ext;
-  destruct (mword1_cases a) as [-> | ->]; destruct (mword1_cases d) as [-> | ->];
-  vm_compute; reflexivity.
+Proof. exact (proj1 (proj2 uvm_perm_ok_22) r a d). Qed.
 
 Lemma vmfault_uleaf (r : mword 64) (acc : MemoryAccessType mem_payload) :
   u_acc acc -> uleaf_ok acc (vmfault_pte r) \/ uleaf_denied acc (vmfault_pte r).
-Proof.
-  intros [-> | [-> | [-> | [-> | [-> | (op & ->)]]]]].
-  - right. vmf_check_tac.        (* InstructionFetch: X = 0 *)
-  - left. vmf_check_tac.         (* Load Data *)
-  - left. vmf_check_tac.         (* Store Data *)
-  - left. vmf_check_tac.         (* LoadReserved Data *)
-  - left. vmf_check_tac.         (* StoreConditional Data *)
-  - left. vmf_check_tac.         (* Atomic (op, Data, Data), op symbolic *)
-Qed.
+Proof. exact (proj2 (proj2 uvm_perm_ok_22) r acc). Qed.
 
 (* ---- the geometry roundtrips --------------------------------------- *)
 
@@ -561,6 +682,11 @@ Proof.
   unfold PPN_of_PTE. change (Z.eqb 64 32) with false. cbv iota.
   rewrite autocast_id. apply mk_pte_ppn_field. exact Hf.
 Qed.
+
+Lemma pte_ppn_uvm (perm : Z) (r : mword 64) :
+  (0 <= Z.lor perm 1 < 1024)%Z ->
+  pte_ppn (uvm_pte perm r) = autocast (T := mword) (subrange_vec_dec r 55 12).
+Proof. intros Hf. rewrite uvm_pte_mk. apply pte_ppn_mk_pte. exact Hf. Qed.
 
 Lemma pte_ppn_vmfault (r : mword 64) :
   pte_ppn (vmfault_pte r) = autocast (T := mword) (subrange_vec_dec r 55 12).
@@ -814,6 +940,58 @@ Proof.
   rewrite pgd_unsigned. f_equal. ring.
 Qed.
 
+(* ---- PGROUNDUP, and the two run lengths the uvm* specs quantify over -- *)
+(*                                                                         *)
+(*   [uvm_maxsz] is TRAPFRAME = MAXVA - 2*PGSIZE, the first va ABOVE the    *)
+(*   user region.  A page starting at [a] belongs in a user map exactly     *)
+(*   when [uint a + 4096 <= uvm_maxsz] -- that is what puts its vpn         *)
+(*   strictly below [tf_vpn] ([upt_map_wf]'s clause), so it is the bound    *)
+(*   every uvm* spec carries about its size arguments.                      *)
+
+Definition uvm_maxsz : Z := 2 ^ 38 - 8192.
+
+Definition pgroundup (x : mword 64) : mword 64 :=
+  and_vec (add_vec x (mword_of_int 4095)) (mword_of_int (-4096)).
+
+(* how many pages uvmalloc's loop maps, and uvmdealloc's unmaps.  Both are
+   [Z.to_nat] of a quotient that goes NEGATIVE exactly on the arms where the
+   C code does nothing, so both are 0 there and no case split is needed in
+   the specs. *)
+Definition uvma_np (oldsz newsz : mword 64) : nat :=
+  Z.to_nat ((bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) / 4096).
+
+Definition uvmd_np (oldsz newsz : mword 64) : nat :=
+  Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096).
+
+(* the arithmetic lifted OUT of any goal mentioning [bv_unsigned] -- the
+   zify-hook rule in claude-notes/durable-notes.md *)
+Local Lemma z_pgu_small (v : Z) :
+  (0 <= v)%Z -> (v + 4095 < 18446744073709551616)%Z ->
+  (0 <= v + 4095 < 18446744073709551616)%Z.
+Proof. lia. Qed.
+
+Lemma pgroundup_unsigned (x : mword 64) :
+  (bv_unsigned x + 4095 < 2 ^ 64)%Z ->
+  bv_unsigned (pgroundup x)
+  = ((bv_unsigned x + 4095) - (bv_unsigned x + 4095) mod 4096)%Z.
+Proof.
+  intros Hlt.
+  assert (Hm : bv_modulus 64 = 18446744073709551616%Z)
+    by (vm_compute; reflexivity).
+  change (2 ^ 64)%Z with 18446744073709551616%Z in Hlt.
+  assert (Hsum : bv_unsigned (add_vec x (mword_of_int 4095))
+                 = (bv_unsigned x + 4095)%Z).
+  { rewrite add_vec64_unsigned moi64_unsigned.
+    rewrite (bv_wrap_small 64 4095); [| rewrite Hm; vm_compute; intuition congruence].
+    apply bv_wrap_small. rewrite Hm.
+    exact (z_pgu_small _ (proj1 (bv_unsigned_in_range 64 x)) Hlt). }
+  unfold pgroundup. rewrite pgd_unsigned Hsum. reflexivity.
+Qed.
+
+Lemma pgroundup_low12 (x : mword 64) :
+  subrange_vec_dec (pgroundup x) 11 0 = (zeros' 12 : mword 12).
+Proof. unfold pgroundup. apply pgrounddown_low12. Qed.
+
 Local Lemma z_svpn_lt_maxva (x : Z) :
   0 <= x -> x < 274877906944 -> (x / 4096) mod 134217728 < 67108864.
 Proof.
@@ -903,12 +1081,54 @@ Qed.
 Definition um_pages_valid (um : gmap (mword 27) (mword 64)) : Prop :=
   forall ppn, ppn ∈ um_ppns um -> page_valid (page_base ppn).
 
+(* NO ALIASING: distinct user vpns name distinct pages.
+   [upt_pages_own] is a big-op over the SET of ppns, so without this a table
+   mapping one page at two vpns would carry ONE [phys_page_own] for two
+   entries -- and uvmunmap, which frees the page of every mapped vpn in its
+   range, would then have to free it twice.  So the invariant has to say it.
+   It is never a proof obligation on a caller: an insert re-establishes it
+   from the OWNERSHIP of the page being added ([upt_pages_own_fresh]), which
+   is the same argument that already gave [proc_pt_grow] its freshness. *)
+Definition um_inj (um : gmap (mword 27) (mword 64)) : Prop :=
+  forall v1 v2 w1 w2, um !! v1 = Some w1 -> um !! v2 = Some w2 ->
+    pte_ppn w1 = pte_ppn w2 -> v1 = v2.
+
 Definition proc_pt_wf (P : uptd) : Prop :=
   upt_map_wf P.(ud_um) /\           (* below TRAPFRAME, a proper 4K leaf   *)
   upt_acc_wf P.(ud_um) /\           (* each leaf User-ok or User-denied    *)
   um_pages_valid P.(ud_um) /\       (* every user page is a kalloc page    *)
+  um_inj P.(ud_um) /\               (* distinct vpns, distinct pages       *)
   page_valid (page_base P.(ud_tfp)).
   (* ... and so is the trapframe page *)
+
+Lemma um_inj_empty : um_inj (∅ : gmap (mword 27) (mword 64)).
+Proof. intros v1 v2 w1 w2 Hl. rewrite lookup_empty in Hl. discriminate. Qed.
+
+Lemma um_inj_delete (um : gmap (mword 27) (mword 64)) (vpn : mword 27) :
+  um_inj um -> um_inj (delete vpn um).
+Proof.
+  intros Hinj v1 v2 w1 w2 Hl1 Hl2 Hq.
+  apply lookup_delete_Some in Hl1. apply lookup_delete_Some in Hl2.
+  exact (Hinj v1 v2 w1 w2 (proj2 Hl1) (proj2 Hl2) Hq).
+Qed.
+
+(* the insert case: the new page is not one of the pages already named *)
+Lemma um_inj_insert (um : gmap (mword 27) (mword 64)) (vpn : mword 27)
+    (w : mword 64) :
+  um_inj um -> pte_ppn w ∉ um_ppns um -> um_inj (<[vpn := w]> um).
+Proof.
+  intros Hinj Hfresh v1 v2 w1 w2 Hl1 Hl2 Hq.
+  assert (Hin : forall v x, um !! v = Some x -> pte_ppn x ∈ um_ppns um).
+  { intros v x Hl. apply elem_of_um_ppns. exists v, x.
+    split; [exact Hl | reflexivity]. }
+  apply lookup_insert_Some in Hl1. apply lookup_insert_Some in Hl2.
+  destruct Hl1 as [(Hv1 & Hw1) | (_ & Hl1)];
+    destruct Hl2 as [(Hv2 & Hw2) | (_ & Hl2)].
+  - congruence.
+  - exfalso. apply Hfresh. rewrite Hw1 Hq. exact (Hin v2 w2 Hl2).
+  - exfalso. apply Hfresh. rewrite Hw2. rewrite <- Hq. exact (Hin v1 w1 Hl1).
+  - exact (Hinj v1 v2 w1 w2 Hl1 Hl2 Hq).
+Qed.
 
 (* the step from "the map has a leaf here" to "the page it names is a kalloc
    page": [elem_of_um_ppns] then the [um_pages_valid] conjunct.  Used by the
@@ -917,7 +1137,7 @@ Definition proc_pt_wf (P : uptd) : Prop :=
 Lemma um_page_valid (P : uptd) (vpn : mword 27) (w : mword 64) :
   proc_pt_wf P -> P.(ud_um) !! vpn = Some w -> page_valid (page_base (pte_ppn w)).
 Proof.
-  intros (_ & _ & Hpv & _) Hl. apply Hpv.
+  intros (_ & _ & Hpv & _ & _) Hl. apply Hpv.
   apply elem_of_um_ppns. exists vpn, w. split; [exact Hl | reflexivity].
 Qed.
 
@@ -986,44 +1206,233 @@ Local Lemma z_vpn_lt_tf (v : Z) :
   v < 67108864 -> v <> 67108863 -> v <> 67108862 -> v < 67108862.
 Proof. lia. Qed.
 
-Lemma upt_map_wf_insert_vmfault (um : gmap (mword 27) (mword 64))
+Lemma upt_map_wf_insert_uvm (um : gmap (mword 27) (mword 64)) (perm : Z)
     (vpn : mword 27) (r : mword 64) :
+  uvm_perm_ok perm ->
   upt_map_wf um -> vpn <> tramp_vpn -> vpn <> tf_vpn ->
   (bv_unsigned vpn < 67108864)%Z ->
-  upt_map_wf (<[vpn := vmfault_pte r]> um).
+  upt_map_wf (<[vpn := uvm_pte perm r]> um).
 Proof.
-  intros Hwf Hnt Hntf Hlt v w Hl.
+  intros (_ & Hleaf & _) Hwf Hnt Hntf Hlt v w Hl.
   apply lookup_insert_Some in Hl. destruct Hl as [(Hv & Hw) | (_ & Hl)].
   - subst v. subst w. split.
     + rewrite tf_vpn_unsigned.
       apply z_vpn_lt_tf; [exact Hlt | ..].
       * intro He. apply Hnt. apply bv_eq. rewrite tramp_vpn_unsigned. exact He.
       * intro He. apply Hntf. apply bv_eq. rewrite tf_vpn_unsigned. exact He.
-    + intros a d. exact (vmfault_variant r a d).
+    + intros a d. exact (Hleaf r a d).
   - exact (Hwf v w Hl).
 Qed.
+
+Lemma upt_acc_wf_insert_uvm (um : gmap (mword 27) (mword 64)) (perm : Z)
+    (vpn : mword 27) (r : mword 64) :
+  uvm_perm_ok perm ->
+  upt_acc_wf um -> upt_acc_wf (<[vpn := uvm_pte perm r]> um).
+Proof.
+  intros (_ & _ & Hacc0) Hwf v w Hl acc Hacc.
+  apply lookup_insert_Some in Hl. destruct Hl as [(_ & Hw) | (_ & Hl)].
+  - subst w. exact (Hacc0 r acc Hacc).
+  - exact (Hwf v w Hl acc Hacc).
+Qed.
+
+Lemma um_pages_valid_insert_uvm (um : gmap (mword 27) (mword 64)) (perm : Z)
+    (vpn : mword 27) (r : mword 64) :
+  uvm_perm_ok perm ->
+  um_pages_valid um -> page_valid r ->
+  um_pages_valid (<[vpn := uvm_pte perm r]> um).
+Proof.
+  intros (Hpk & _ & _) Hv Hpv q Hq.
+  apply elem_of_um_ppns in Hq. destruct Hq as (v & x & Hl & Hq).
+  apply lookup_insert_Some in Hl. destruct Hl as [(_ & Hw) | (_ & Hl)].
+  - subst x. rewrite <- Hq. rewrite (pte_ppn_uvm perm r (pb_lor1_range perm (proj1 Hpk))).
+    rewrite (page_base_of_valid r Hpv). exact Hpv.
+  - apply Hv. apply elem_of_um_ppns. exists v, x. split; [exact Hl | exact Hq].
+Qed.
+
+(* the vmfault instances, as ProofVmfault names them *)
+Lemma upt_map_wf_insert_vmfault (um : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (r : mword 64) :
+  upt_map_wf um -> vpn <> tramp_vpn -> vpn <> tf_vpn ->
+  (bv_unsigned vpn < 67108864)%Z ->
+  upt_map_wf (<[vpn := vmfault_pte r]> um).
+Proof. exact (upt_map_wf_insert_uvm um 22 vpn r uvm_perm_ok_22). Qed.
 
 Lemma upt_acc_wf_insert_vmfault (um : gmap (mword 27) (mword 64))
     (vpn : mword 27) (r : mword 64) :
   upt_acc_wf um -> upt_acc_wf (<[vpn := vmfault_pte r]> um).
-Proof.
-  intros Hwf v w Hl acc Hacc.
-  apply lookup_insert_Some in Hl. destruct Hl as [(_ & Hw) | (_ & Hl)].
-  - subst w. exact (vmfault_uleaf r acc Hacc).
-  - exact (Hwf v w Hl acc Hacc).
-Qed.
+Proof. exact (upt_acc_wf_insert_uvm um 22 vpn r uvm_perm_ok_22). Qed.
 
 Lemma um_pages_valid_insert_vmfault (um : gmap (mword 27) (mword 64))
     (vpn : mword 27) (r : mword 64) :
   um_pages_valid um -> page_valid r ->
   um_pages_valid (<[vpn := vmfault_pte r]> um).
+Proof. exact (um_pages_valid_insert_uvm um 22 vpn r uvm_perm_ok_22). Qed.
+
+(* ---- §3c THE UNMAP STEP: deleting one user vpn ---------------------- *)
+(* Each conjunct of [proc_pt_wf] is a per-entry property, so all four
+   survive a [delete] with no side condition at all. *)
+
+Lemma upt_map_wf_delete (um : gmap (mword 27) (mword 64)) (vpn : mword 27) :
+  upt_map_wf um -> upt_map_wf (delete vpn um).
 Proof.
-  intros Hv Hpv q Hq.
-  apply elem_of_um_ppns in Hq. destruct Hq as (v & x & Hl & Hq).
-  apply lookup_insert_Some in Hl. destruct Hl as [(_ & Hw) | (_ & Hl)].
-  - subst x. rewrite <- Hq. rewrite pte_ppn_vmfault.
-    rewrite (page_base_of_valid r Hpv). exact Hpv.
-  - apply Hv. apply elem_of_um_ppns. exists v, x. split; [exact Hl | exact Hq].
+  intros Hwf v w Hl. apply lookup_delete_Some in Hl. exact (Hwf v w (proj2 Hl)).
+Qed.
+
+Lemma upt_acc_wf_delete (um : gmap (mword 27) (mword 64)) (vpn : mword 27) :
+  upt_acc_wf um -> upt_acc_wf (delete vpn um).
+Proof.
+  intros Hwf v w Hl. apply lookup_delete_Some in Hl. exact (Hwf v w (proj2 Hl)).
+Qed.
+
+Lemma um_pages_valid_delete (um : gmap (mword 27) (mword 64)) (vpn : mword 27) :
+  um_pages_valid um -> um_pages_valid (delete vpn um).
+Proof.
+  intros Hv q Hq. apply elem_of_um_ppns in Hq. destruct Hq as (v & x & Hl & Hq).
+  apply lookup_delete_Some in Hl.
+  apply Hv. apply elem_of_um_ppns. exists v, x. split; [exact (proj2 Hl) | exact Hq].
+Qed.
+
+(* THE FOOTPRINT SHRINKS BY EXACTLY ONE PAGE.  This is what [um_inj] buys:
+   without it the deleted vpn's ppn could still be named by another entry
+   and the page could not be handed to kfree. *)
+Lemma um_ppns_delete (um : gmap (mword 27) (mword 64)) (vpn : mword 27)
+    (w : mword 64) :
+  um_inj um -> um !! vpn = Some w ->
+  um_ppns (delete vpn um) = um_ppns um ∖ {[pte_ppn w]}.
+Proof.
+  intros Hinj Hl. apply set_eq. intros q. split.
+  - intros Hq. apply elem_of_um_ppns in Hq. destruct Hq as (v & x & Hlv & Hq).
+    apply lookup_delete_Some in Hlv. destruct Hlv as (Hne & Hlv).
+    apply elem_of_difference. split.
+    + apply elem_of_um_ppns. exists v, x. split; [exact Hlv | exact Hq].
+    + intros Hin. apply elem_of_singleton in Hin.
+      apply Hne. exact (eq_sym (Hinj v vpn x w Hlv Hl (eq_trans Hq Hin))).
+  - intros Hq. apply elem_of_difference in Hq. destruct Hq as (Hin & Hnin).
+    apply elem_of_um_ppns in Hin. destruct Hin as (v & x & Hlv & Hq).
+    apply elem_of_um_ppns. exists v, x.
+    split; [| exact Hq].
+    apply lookup_delete_Some. split; [| exact Hlv].
+    intros ->. apply Hnin. apply elem_of_singleton.
+    rewrite <- Hq. f_equal. congruence.
+Qed.
+
+(* ---- §3d THE RUN: what uvmunmap does to the descriptor --------------- *)
+(* uvmunmap walks [npages] consecutive vpns and clears each.  Both views --
+   the exact [pt_rep0] map and the canonical [ud_um] -- move by the same
+   fold, so ONE definition serves both, and its recursion is written to
+   match the LOOP: [um_del_run _ _ (S k)] deletes the k-th vpn LAST, so the
+   loop invariant after [i] iterations is [um_del_run um vpn0 i]. *)
+Fixpoint um_del_run (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
+    (k : nat) : gmap (mword 27) (mword 64) :=
+  match k with
+  | O => um
+  | S k' => delete (vpn_at vpn0 k') (um_del_run um vpn0 k')
+  end.
+
+Definition vpn_run (vpn0 : mword 27) (k : nat) : gset (mword 27) :=
+  list_to_set (vpn_at vpn0 <$> seq 0 k).
+
+Definition uptd_delete (P : uptd) (vpn : mword 27) : uptd :=
+  UPTD P.(ud_root) P.(ud_tfp) (delete vpn P.(ud_um))
+       (um_pas (delete vpn P.(ud_um))).
+
+Definition uptd_del_run (P : uptd) (vpn0 : mword 27) (k : nat) : uptd :=
+  UPTD P.(ud_root) P.(ud_tfp) (um_del_run P.(ud_um) vpn0 k)
+       (um_pas (um_del_run P.(ud_um) vpn0 k)).
+
+(* the loop step, as the invariant uses it *)
+Lemma uptd_del_run_S (P : uptd) (vpn0 : mword 27) (k : nat) :
+  uptd_del_run P vpn0 (S k) = uptd_delete (uptd_del_run P vpn0 k) (vpn_at vpn0 k).
+Proof. reflexivity. Qed.
+
+Lemma uptd_del_run_0 (P : uptd) (vpn0 : mword 27) :
+  uptd_del_run P vpn0 0 = UPTD P.(ud_root) P.(ud_tfp) P.(ud_um) (um_pas P.(ud_um)).
+Proof. reflexivity. Qed.
+
+Lemma um_del_run_0 (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27) :
+  um_del_run um vpn0 0 = um.
+Proof. reflexivity. Qed.
+
+Lemma elem_of_vpn_run (vpn0 : mword 27) (k : nat) (v : mword 27) :
+  v ∈ vpn_run vpn0 k <-> exists i, (i < k)%nat /\ v = vpn_at vpn0 i.
+Proof.
+  unfold vpn_run. rewrite elem_of_list_to_set elem_of_list_fmap. split.
+  - intros (i & Hv & Hi). apply elem_of_seq in Hi.
+    exists i. split; [lia | exact Hv].
+  - intros (i & Hi & Hv). exists i. split; [exact Hv |].
+    apply elem_of_seq. lia.
+Qed.
+
+(* inside the run: gone.  Outside it: untouched. *)
+Lemma um_del_run_in (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
+    (k : nat) (v : mword 27) :
+  v ∈ vpn_run vpn0 k -> um_del_run um vpn0 k !! v = None.
+Proof.
+  induction k as [| k IH]; intros Hin.
+  { apply elem_of_vpn_run in Hin. destruct Hin as (i & Hi & _). lia. }
+  cbn [um_del_run].
+  destruct (decide (v = vpn_at vpn0 k)) as [-> | Hne].
+  { apply lookup_delete. }
+  rewrite (lookup_delete_ne _ _ _ (not_eq_sym Hne)).
+  apply IH. apply elem_of_vpn_run.
+  apply elem_of_vpn_run in Hin. destruct Hin as (i & Hi & Hv).
+  destruct (decide (i = k)) as [-> | Hik]; [exfalso; exact (Hne Hv) |].
+  exists i. split; [lia | exact Hv].
+Qed.
+
+Lemma um_del_run_out (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
+    (k : nat) (v : mword 27) :
+  v ∉ vpn_run vpn0 k -> um_del_run um vpn0 k !! v = um !! v.
+Proof.
+  induction k as [| k IH]; intros Hnin; [reflexivity |].
+  cbn [um_del_run].
+  assert (Hne : v <> vpn_at vpn0 k).
+  { intros ->. apply Hnin. apply elem_of_vpn_run. exists k. split; [lia | reflexivity]. }
+  rewrite (lookup_delete_ne _ _ _ (not_eq_sym Hne)).
+  apply IH. intros Hin. apply Hnin. apply elem_of_vpn_run.
+  apply elem_of_vpn_run in Hin. destruct Hin as (i & Hi & Hv).
+  exists i. split; [lia | exact Hv].
+Qed.
+
+(* THE RESTORE LAW -- what makes uvmalloc's failure arm give back exactly
+   the descriptor it was called with.  uvmalloc extends [um] over the run
+   (each vpn fresh), then uvmdealloc deletes precisely that run. *)
+Lemma um_del_run_restore (um um' : gmap (mword 27) (mword 64))
+    (vpn0 : mword 27) (k : nat) :
+  um ⊆ um' ->
+  dom um' = dom um ∪ vpn_run vpn0 k ->
+  (forall i, (i < k)%nat -> um !! vpn_at vpn0 i = None) ->
+  um_del_run um' vpn0 k = um.
+Proof.
+  intros Hsub Hdom Hfresh. apply map_eq. intros v.
+  destruct (decide (v ∈ vpn_run vpn0 k)) as [Hin | Hnin].
+  - rewrite (um_del_run_in um' vpn0 k v Hin).
+    apply elem_of_vpn_run in Hin. destruct Hin as (i & Hi & ->).
+    exact (eq_sym (Hfresh i Hi)).
+  - rewrite (um_del_run_out um' vpn0 k v Hnin).
+    destruct (um !! v) as [w |] eqn:Hl.
+    + exact (lookup_weaken um um' v w Hl Hsub).
+    + apply not_elem_of_dom. rewrite Hdom.
+      intros Hin. apply elem_of_union in Hin. destruct Hin as [Hin | Hin].
+      * apply (not_elem_of_dom (D := gset (mword 27)) um v) in Hl.
+        exact (Hl Hin).
+      * exact (Hnin Hin).
+Qed.
+
+(* the wf conjuncts ride across the whole run *)
+Lemma proc_pt_wf_del_run (P : uptd) (vpn0 : mword 27) (k : nat) :
+  proc_pt_wf P -> proc_pt_wf (uptd_del_run P vpn0 k).
+Proof.
+  intros (Hm & Ha & Hp & Hi & Ht).
+  unfold uptd_del_run, proc_pt_wf. cbn [ud_root ud_tfp ud_um].
+  induction k as [| k IH]; [cbn [um_del_run]; split_and!; assumption |].
+  destruct IH as (Hm' & Ha' & Hp' & Hi' & _).
+  cbn [um_del_run]. split_and!.
+  - exact (upt_map_wf_delete _ _ Hm').
+  - exact (upt_acc_wf_delete _ _ Ha').
+  - exact (um_pages_valid_delete _ _ Hp').
+  - exact (um_inj_delete _ _ Hi').
+  - exact Ht.
 Qed.
 
 (* ===================================================================== *)
@@ -1241,6 +1650,21 @@ Section ProcPt.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
+  (* FRESHNESS, EXTRACTED.  Owning a page the table already maps would be
+     owning it twice -- so the pure "this ppn is new" fact that [um_inj]'s
+     insert law wants is a CONSEQUENCE of the resources, never a caller
+     obligation. *)
+  Lemma upt_pages_own_fresh (um : gmap (mword 27) (mword 64)) (ppn : mword 44) :
+    phys_page_own ppn -∗ upt_pages_own um -∗ ⌜ppn ∉ um_ppns um⌝.
+  Proof.
+    iIntros "Hp Hum".
+    destruct (decide (ppn ∈ um_ppns um)) as [Hin | Hnin]; [| by iPureIntro].
+    iEval (rewrite /upt_pages_own
+             (big_sepS_delete (fun q => phys_page_own q) (um_ppns um) ppn Hin)) in "Hum".
+    iDestruct "Hum" as "[Hq _]".
+    iDestruct (phys_page_own_dup ppn with "Hp Hq") as %[].
+  Qed.
+
   (* one page joins the footprint.  If its ppn were already there, the
      [big_sepS] would hand us a second full copy -- refuted above. *)
   Lemma upt_pages_own_insert (um : gmap (mword 27) (mword 64))
@@ -1249,14 +1673,31 @@ Section ProcPt.
     phys_page_own (pte_ppn w) -∗ upt_pages_own um -∗ upt_pages_own (<[vpn := w]> um).
   Proof.
     intros Hn. iIntros "Hp Hum".
+    iDestruct (upt_pages_own_fresh um (pte_ppn w) with "Hp Hum") as %Hnin.
     rewrite /upt_pages_own.
     rewrite (um_ppns_insert um vpn w Hn).
-    destruct (decide (pte_ppn w ∈ um_ppns um)) as [Hin | Hnin].
-    - rewrite (big_sepS_delete (fun q => phys_page_own q) (um_ppns um) (pte_ppn w) Hin).
-      iDestruct "Hum" as "[Hq _]".
-      iDestruct (phys_page_own_dup (pte_ppn w) with "Hp Hq") as %[].
-    - rewrite big_sepS_insert; [| exact Hnin].
-      iFrame "Hp Hum".
+    rewrite big_sepS_insert; [| exact Hnin].
+    iFrame "Hp Hum".
+  Qed.
+
+  (* ...and one page LEAVES it.  The mirror of [upt_pages_own_insert]: what
+     [um_inj] makes possible ([um_ppns_delete]) is handing the page to
+     kfree while the rest of the footprint stays intact. *)
+  Lemma upt_pages_own_take (um : gmap (mword 27) (mword 64))
+      (vpn : mword 27) (w : mword 64) :
+    um_inj um -> um !! vpn = Some w ->
+    upt_pages_own um ⊢ phys_page_own (pte_ppn w) ∗ upt_pages_own (delete vpn um).
+  Proof.
+    intros Hinj Hl.
+    assert (Hin : pte_ppn w ∈ um_ppns um).
+    { apply elem_of_um_ppns. exists vpn, w. split; [exact Hl | reflexivity]. }
+    iIntros "Hum".
+    iEval (rewrite /upt_pages_own
+             (big_sepS_delete (fun q => phys_page_own q) (um_ppns um)
+                (pte_ppn w) Hin)) in "Hum".
+    iDestruct "Hum" as "[Hp Hrest]".
+    rewrite /upt_pages_own (um_ppns_delete um vpn w Hinj Hl).
+    iFrame "Hp Hrest".
   Qed.
 
   (* kalloc's page, at the ppn the vmfault leaf names *)
@@ -1338,7 +1779,8 @@ Section ProcPt.
     iSplitR.
     { iPureIntro. split; [exact upt_map_wf_empty |].
       split; [exact upt_acc_wf_empty |].
-      split; [exact um_pages_valid_empty | exact Hvtf]. }
+      split; [exact um_pages_valid_empty |].
+      split; [exact um_inj_empty | exact Hvtf]. }
     iSplitL "Ht".
     { iExists t. iFrame "Ht". iPureIntro. exact Hspec. }
     rewrite /upt_pages_own um_ppns_empty big_sepS_empty. done.
@@ -1401,6 +1843,58 @@ Section ProcPt.
      user map is not a separate premise; and the page's OWNERSHIP is what
      makes it distinct from the pages already mapped.  The MAXVA bound is
      genuinely needed (see §3b). *)
+  Lemma proc_pt_grow_uvm (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64)
+      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) :
+    uvm_perm_ok perm ->
+    proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
+    m_ad !! vpn = None ->
+    (bv_unsigned vpn < 67108864)%Z ->
+    pt_rep0 t' (<[vpn := uvm_pte perm r]> m_ad) -> pt_base t' = P.(ud_root) ->
+    page_valid r ->
+    kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
+    page_own r -∗ proc_pt_own P -∗
+    proc_pt (uptd_insert_perm P perm vpn r).
+  Proof.
+    intros Hperm (Hmwf & Hawf & Hpwf & Hinj & Htfv) Hview Hnone Hlt Hrep Hbase Hval.
+    destruct (proj1 (proj1 Hview vpn) Hnone) as (Hnt & Hntf & Hunone).
+    pose proof (upt_map_wf_insert_uvm P.(ud_um) perm vpn r Hperm Hmwf Hnt Hntf Hlt)
+      as Hmwf'.
+    assert (Hppn : pte_ppn (uvm_pte perm r) = autocast (T := mword)
+                     (subrange_vec_dec r 55 12))
+      by exact (pte_ppn_uvm perm r (pb_lor1_range perm (proj1 (proj1 Hperm)))).
+    assert (Hpb : page_base (pte_ppn (uvm_pte perm r)) = r)
+      by (rewrite Hppn; exact (page_base_of_valid r Hval)).
+    iIntros "#Hb Ht Hpg Hown".
+    (* the page moves tier FIRST: its ownership is what re-establishes
+       [um_inj], so the pure part cannot be split off before it. *)
+    iAssert (phys_page_own (pte_ppn (uvm_pte perm r))) with "[Hpg]" as "Hph".
+    { assert (Hv' : page_valid (page_base (pte_ppn (uvm_pte perm r))))
+        by (rewrite Hpb; exact Hval).
+      iApply (page_own_to_phys _ Hv' with "Hb"). rewrite Hpb. iExact "Hpg". }
+    iDestruct (upt_pages_own_fresh P.(ud_um) (pte_ppn (uvm_pte perm r))
+                 with "Hph Hown") as %Hfresh.
+    rewrite /proc_pt /proc_pt_own /uptd_insert_perm.
+    cbn [ud_root ud_tfp ud_um].
+    iSplitR.
+    { iPureIntro. unfold proc_pt_wf. cbn [ud_root ud_tfp ud_um].
+      split_and!.
+      - exact Hmwf'.
+      - exact (upt_acc_wf_insert_uvm P.(ud_um) perm vpn r Hperm Hawf).
+      - exact (um_pages_valid_insert_uvm P.(ud_um) perm vpn r Hperm Hpwf Hval).
+      - exact (um_inj_insert P.(ud_um) vpn (uvm_pte perm r) Hinj Hfresh).
+      - exact Htfv. }
+    iSplitL "Ht".
+    { rewrite /pt_frame. iExists t'. iFrame "Ht". iPureIntro.
+      exact (upt_spec_of_rep0 P.(ud_root) P.(ud_tfp)
+               (<[vpn := uvm_pte perm r]> P.(ud_um))
+               (<[vpn := uvm_pte perm r]> m_ad) t' Hmwf'
+               (upt_ad_view_insert P.(ud_tfp) P.(ud_um) m_ad vpn (uvm_pte perm r)
+                  Hview Hnone)
+               Hrep Hbase). }
+    iApply (upt_pages_own_insert P.(ud_um) vpn (uvm_pte perm r) Hunone
+              with "Hph Hown").
+  Qed.
+
   Lemma proc_pt_grow (P : uptd) (vpn : mword 27) (r : mword 64)
       (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) :
     proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
@@ -1411,30 +1905,69 @@ Section ProcPt.
     kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
     page_own r -∗ proc_pt_own P -∗
     proc_pt (uptd_insert P vpn r).
+  Proof. exact (proc_pt_grow_uvm P 22 vpn r t' m_ad uvm_perm_ok_22). Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE UNMAP STEP -- the inverse of [proc_pt_grow].  uvmunmap clears one *)
+  (* leaf and frees its page, so this is the ONE lemma that takes a page   *)
+  (* OUT of the invariant: [ptree_own] comes back over the cleared tree,   *)
+  (* [proc_pt_own] over the shrunk map, and the page is handed over at     *)
+  (* kfree's [↦ₘ] tier together with the [page_valid] kfree also wants.    *)
+  (* Stated at [proc_pt_own] (not [proc_pt]) because uvmunmap's loop keeps *)
+  (* the tree OPEN across iterations -- walk needs [ptree_own].            *)
+  (* ------------------------------------------------------------------ *)
+  Lemma proc_pt_own_shrink (P : uptd) (vpn : mword 27) (w : mword 64) :
+    proc_pt_wf P -> P.(ud_um) !! vpn = Some w ->
+    kmap_static_claims -∗ proc_pt_own P -∗
+      page_own (page_base (pte_ppn w)) ∗ proc_pt_own (uptd_delete P vpn).
   Proof.
-    intros (Hmwf & Hawf & Hpwf & Htfv) Hview Hnone Hlt Hrep Hbase Hval.
-    destruct (proj1 (proj1 Hview vpn) Hnone) as (Hnt & Hntf & Hunone).
-    pose proof (upt_map_wf_insert_vmfault P.(ud_um) vpn r Hmwf Hnt Hntf Hlt) as Hmwf'.
-    iIntros "#Hb Ht Hpg Hown".
-    rewrite /proc_pt /proc_pt_own /uptd_insert.
-    cbn [ud_root ud_tfp ud_um].
-    iSplitR.
-    { iPureIntro. unfold proc_pt_wf. cbn [ud_root ud_tfp ud_um].
-      split_and!.
-      - exact Hmwf'.
-      - exact (upt_acc_wf_insert_vmfault P.(ud_um) vpn r Hawf).
-      - exact (um_pages_valid_insert_vmfault P.(ud_um) vpn r Hpwf Hval).
-      - exact Htfv. }
-    iSplitL "Ht".
-    { rewrite /pt_frame. iExists t'. iFrame "Ht". iPureIntro.
-      exact (upt_spec_of_rep0 P.(ud_root) P.(ud_tfp)
-               (<[vpn := vmfault_pte r]> P.(ud_um))
-               (<[vpn := vmfault_pte r]> m_ad) t' Hmwf'
-               (upt_ad_view_insert P.(ud_tfp) P.(ud_um) m_ad vpn (vmfault_pte r)
-                  Hview Hnone)
-               Hrep Hbase). }
-    iApply (upt_pages_own_insert P.(ud_um) vpn (vmfault_pte r) Hunone with "[Hpg] Hown").
-    iApply (page_own_to_phys_vmfault r Hval with "Hb Hpg").
+    intros Hwf Hl.
+    pose proof (um_page_valid P vpn w Hwf Hl) as Hval.
+    destruct Hwf as (_ & _ & _ & Hinj & _).
+    iIntros "#Hb Hown".
+    iEval (rewrite /proc_pt_own (upt_pages_own_take P.(ud_um) vpn w Hinj Hl)) in "Hown".
+    iDestruct "Hown" as "[Hp Hrest]".
+    iSplitL "Hp".
+    { iApply (phys_to_page_own (pte_ppn w) Hval with "Hb Hp"). }
+    rewrite /proc_pt_own /uptd_delete. cbn [ud_um]. iExact "Hrest".
+  Qed.
+
+  (* the vpn was NOT mapped (walk found no leaf, or the slot is invalid):
+     nothing changes, but the descriptor still steps.  Together with
+     [proc_pt_own_shrink] these are the loop body's two arms. *)
+  Lemma proc_pt_own_skip (P : uptd) (vpn : mword 27) :
+    P.(ud_um) !! vpn = None ->
+    proc_pt_own P ⊢ proc_pt_own (uptd_delete P vpn).
+  Proof.
+    intros Hl. rewrite /proc_pt_own /uptd_delete. cbn [ud_um].
+    rewrite (delete_notin _ _ Hl). reflexivity.
+  Qed.
+
+  Lemma proc_pt_wf_delete (P : uptd) (vpn : mword 27) :
+    proc_pt_wf P -> proc_pt_wf (uptd_delete P vpn).
+  Proof.
+    intros (Hm & Ha & Hp & Hi & Ht).
+    unfold uptd_delete, proc_pt_wf. cbn [ud_root ud_tfp ud_um]. split_and!.
+    - exact (upt_map_wf_delete _ _ Hm).
+    - exact (upt_acc_wf_delete _ _ Ha).
+    - exact (um_pages_valid_delete _ _ Hp).
+    - exact (um_inj_delete _ _ Hi).
+    - exact Ht.
+  Qed.
+
+  (* [proc_pt] does not read [ud_data] (a derived footprint, slated for
+     retirement -- see claude-notes/projects/proc-pagetable-ownership.md
+     step 3), so two descriptors agreeing on the three real fields carry
+     the same predicate.  This is what lets uvmalloc's failure arm hand
+     back [proc_pt P] itself after uvmdealloc deleted its way back to
+     [P]'s map. *)
+  Lemma proc_pt_data_irrel (P Q : uptd) :
+    P.(ud_root) = Q.(ud_root) -> P.(ud_tfp) = Q.(ud_tfp) ->
+    P.(ud_um) = Q.(ud_um) ->
+    proc_pt P ⊣⊢ proc_pt Q.
+  Proof.
+    intros Hr Ht Hu. rewrite /proc_pt /proc_pt_own /proc_pt_wf.
+    rewrite Hr Ht Hu. reflexivity.
   Qed.
 
   (* ------------------------------------------------------------------ *)
