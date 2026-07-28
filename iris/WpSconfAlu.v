@@ -1094,4 +1094,32 @@ Section WpSconfAlu.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       unfold gpr_addw_val, gpr_src. rewrite Hva Hvb. reflexivity.
   Qed.
+
+  (* subw rd,rs1,rs2 -- the 4-byte (base-encoding) 32-bit subtract whose
+     result is sign-extended into rd.  Unlike [wp_addw_s_sconf] (the
+     compressed 2-operand [c.addw]) the three registers are independent. *)
+  Lemma wp_subw_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) :
+    uint rd <> 0 -> rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
+        (sign_extend' 64 (sub_vec (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
+                                  (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)))]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs2
+              (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))
+              (sign_extend' 64 (sub_vec (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
+                                        (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)))
+              m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      rewrite (exec_execute_RTYPEW_SUBW_gpr rs2 rs1 rd s_pc).
+      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_subw_val, gpr_src. rewrite Hva Hvb. reflexivity.
+  Qed.
 End WpSconfAlu.

@@ -19,7 +19,6 @@ Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
-Require Import WpRvcBridge.
 Require Import WpGprCsrwB.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

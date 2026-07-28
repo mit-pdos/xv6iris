@@ -34,18 +34,17 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import WpDecode KernelBaseDecode.
 Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText KernelDataInv.
 Require Import KernelRvcDecode WpRvcBridge WpDecodeBridge WpAuipc.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs WpLock.
-Require Import ProcGeom CpuOwn.
+Require Import ProcGeom.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecMyproc.
-Require Import RiscvModelBytes InstrBytes KallocInv KMap PageFields.
-Require Import UserPtTree ProcPtOwn.
+Require Import RiscvModelBytes InstrBytes.
+Require Import ProcPtOwn.
 Require Import SpecArgraw.
 From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
@@ -393,31 +392,39 @@ Section ProofArgraw.
     zopz0zI_u (mword_of_int 5 : mword 64) (mword_of_int (Z.of_nat i) : mword 64) = false.
   Proof. intro Hi. unfold NARG in Hi. destruct i as [|[|[|[|[|[|i']]]]]]; try lia; vm_compute; reflexivity. Qed.
 
-  (* the [i]th jump-table entry, straight out of the .rodata image *)
+  (* The jump table's .rodata bytes, as ONE PURE lemma over a SYMBOLIC index,
+     outside any Iris goal.  [ar_table_word] then passes it to
+     [kernel_data_window] BY NAME.  This is the optimization.md rule about
+     inline [ltac:(…)] term-args: the six inline byte-premise tactics this
+     replaces were re-elaborated by the proofmode without the [Qed] vm-seal,
+     at ~12 s per call site -- 73.6 s of the file's 93.8 s in ONE sentence.
+     The 24 [kernel_data] lookups themselves are NOT the cost (~0.15 s total:
+     the VM compiles the 18k-entry [list_to_map] once per process and the
+     remaining lookups are ~2 ms each). *)
+  Lemma ar_tbl_bytes (i : nat) : (i < NARG)%nat ->
+    forall j, (j < 4)%nat ->
+      KernelData.kernel_data !! (ar_tbl + 4 * Z.of_nat i + Z.of_nat j)%Z
+        = Some (nth_byte (ar_entry i) j).
+  Proof.
+    unfold NARG. intros Hi j Hj.
+    destruct i as [|[|[|[|[|[|i']]]]]]; try lia;
+      (destruct j as [|[|[|[|j']]]]; try lia;
+       vm_compute; f_equal; apply bv_eq; reflexivity).
+  Qed.
+
+  (* the [i]th jump-table entry, straight out of the .rodata image.  No
+     [destruct i] on the Iris goal: ONE [iApply] over the symbolic index,
+     every premise a named hypothesis. *)
   Lemma ar_table_word (i : nat) : (i < NARG)%nat ->
     kernel_data -∗ (mword_of_int (ar_tbl + 4 * Z.of_nat i) : mword 64) ↦₄□ ar_entry i.
   Proof.
-    intro Hi. unfold NARG in Hi. iIntros "#Hd". rewrite /word4_pointsto. iSplit.
+    intro Hi.
+    assert (Hle : text_end <= ar_tbl + 4 * Z.of_nat i) by (unfold text_end, ar_tbl; lia).
+    pose proof (ar_tbl_bytes i Hi) as Hb.
+    unfold NARG in Hi. iIntros "#Hd". rewrite /word4_pointsto. iSplit.
     { iPureIntro. destruct i as [|[|[|[|[|[|i']]]]]]; try lia; vm_compute; reflexivity. }
-    destruct i as [|[|[|[|[|[|i']]]]]]; try lia;
-      [ iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat 0) (ar_entry 0) 4%nat _ eq_refl
-                  ltac:(unfold text_end, ar_tbl; lia)
-                  ltac:(intros j Hj; destruct j as [|[|[|[|j']]]]; try lia; vm_compute; f_equal; apply bv_eq; reflexivity) with "Hd")
-      | iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat 1) (ar_entry 1) 4%nat _ eq_refl
-                  ltac:(unfold text_end, ar_tbl; lia)
-                  ltac:(intros j Hj; destruct j as [|[|[|[|j']]]]; try lia; vm_compute; f_equal; apply bv_eq; reflexivity) with "Hd")
-      | iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat 2) (ar_entry 2) 4%nat _ eq_refl
-                  ltac:(unfold text_end, ar_tbl; lia)
-                  ltac:(intros j Hj; destruct j as [|[|[|[|j']]]]; try lia; vm_compute; f_equal; apply bv_eq; reflexivity) with "Hd")
-      | iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat 3) (ar_entry 3) 4%nat _ eq_refl
-                  ltac:(unfold text_end, ar_tbl; lia)
-                  ltac:(intros j Hj; destruct j as [|[|[|[|j']]]]; try lia; vm_compute; f_equal; apply bv_eq; reflexivity) with "Hd")
-      | iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat 4) (ar_entry 4) 4%nat _ eq_refl
-                  ltac:(unfold text_end, ar_tbl; lia)
-                  ltac:(intros j Hj; destruct j as [|[|[|[|j']]]]; try lia; vm_compute; f_equal; apply bv_eq; reflexivity) with "Hd")
-      | iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat 5) (ar_entry 5) 4%nat _ eq_refl
-                  ltac:(unfold text_end, ar_tbl; lia)
-                  ltac:(intros j Hj; destruct j as [|[|[|[|j']]]]; try lia; vm_compute; f_equal; apply bv_eq; reflexivity) with "Hd") ].
+    iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat i) (ar_entry i) 4%nat _ eq_refl
+              Hle Hb with "Hd").
   Qed.
 
   (* ================================================================== *)

@@ -22,8 +22,8 @@ From stdpp Require Import gmap list list_numbers bitvector.definitions bitvector
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import SailStdpp.TypeCasts.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvLang RiscvExtras.
-Require Import ExecCommon VcGen.
+Require Import RiscvExtras.
+Require Import VcGen.
 Local Open Scope Z_scope.
 
 (* ================================================================= *)

@@ -78,10 +78,11 @@ are working on that effort — the relevant `projects/` file.
 ### `projects/` — ongoing worklists & plans (one per effort)
 
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
-  `struct proc` resource split: what has landed (`ProcInv.v`, `sys_getpid`,
-  `argint` over an assumed `argraw`) and what is next (`argraw` — parked, with
-  a measured account of why its six-arm proof cost 74 GB — then `killed` and
-  `sys_pause`).
+  `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
+  `argraw`/`argint`, `argfd`, `killed`, `sys_getpid`, `sys_close`, `sys_pause`)
+  and what is next (`p_ofile` loop lemmas for `fdalloc`, the remaining
+  syscalls, and `cwd_ref`). Keeps the measured account of why `argraw`'s
+  six-arm proof cost 74 GB, and sys_pause's path-dependent-frame recipe.
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —

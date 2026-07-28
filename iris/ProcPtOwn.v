@@ -90,7 +90,7 @@ Require Import CommonWalk.
 Require Import PtTree.
 Require Import KptPt.
 Require Import KMap.
-Require Import TrampPt.
+Require Import Pt4kWalk.
 Require Import PtBuild.
 Require Import UptTree.
 Require Import UserPtTree.

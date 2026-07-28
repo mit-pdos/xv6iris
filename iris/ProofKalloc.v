@@ -31,7 +31,6 @@ Require Import VcGen.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMemsetPage SpecAcquire SpecRelease.
-Require Import WpKalloc.
 Require Import SpecKalloc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

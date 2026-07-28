@@ -74,7 +74,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import FdSlots FileInv.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.

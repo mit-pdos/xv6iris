@@ -25,7 +25,7 @@ Require Import KallocInv.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpInitlock SpecInitlock SpecFreerange.
+Require Import SpecInitlock SpecFreerange.
 Require Import WpKinitDecode.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

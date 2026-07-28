@@ -94,6 +94,73 @@ Module Acquire := AcquireProof Mycpu Holding PushOff.
   does delta on that one constant plus beta, leaving the lets intact, so the
   original tactic script runs unchanged.
 
+## The shape also fits a non-function capstone
+
+A `Spec`/`Proof` pair is worth having wherever a big proof tower has ONE
+caller-facing theorem — it does not have to be a kernel C function. The
+arbitrary-user-execution WP is the worked example: `SpecUser.v`
+(`wp_user_exec_closed_body` + `Module Type USER`) is the public face of the
+whole ~24 kLOC `User*.v` development, and `ProofUser.v` (`Module UserProof :
+USER`) is the only file where that interface meets the tower. See
+[`../completed/user-mode-exec-v2.md`](../completed/user-mode-exec-v2.md).
+
+Two adjustments for this case:
+
+- **No callees in module-type shape ⇒ no `Link` file.** `ProofUser` takes no
+  functor arguments, so `Module UserProof : USER.` already *is* the sealed
+  instance; a `LinkUser.v` would only alias it. (Contrast `ProofCpuid`, which
+  also has no callees but keeps `LinkCpuid.v` because every kernel *function*
+  is looked for under its link name by `tools/proof_coverage.py`.)
+- **The `_body` has no entry-pc `let`** — there is no symbol and no return
+  address; the binders are just the objects the statement quantifies over
+  (`C : ucfg`, `pt : uptd`, `Φ`). Everything else is unchanged, including
+  `cbv beta delta [<f>_body]` as the proof's first tactic.
+
+The mirror case is a real kernel function whose *contract* is not
+function-shaped: `kernelvec` (`Spec`/`Proof`/`Link`, over
+[`KERNELTRAP`](#an-assumed-callee-module-type--an-axiom-in-the-link)). Nothing
+calls it — the hardware traps to it — so its public statement is
+`IntrDefs.intr_handler_spec`, and the entry-to-SRET WP it is built from
+(`wp_kernelvec`, with explicit mstatus/menvcfg parameters and their
+well-formedness premises) stays INTERNAL: `Module Type KERNELVEC` exposes only
+`kernelvec_handler_spec`, per the expose-only-what-a-caller-consumes rule. It
+keeps its `Link` file — it *is* a kernel function — but the coverage tool still
+cannot discover the spec textually (its rule keys off the entry `pc_is` being
+`KernelSyms.<sym>`, and kernelvec's public statement has no entry-pc `let` at
+all), so kernelvec stays in `proof_coverage.py`'s MANIFEST.
+
+## The M-mode boot: one spec for a path that never returns
+
+The whole boot — `_entry` (entry.S) → `start()` → `timerinit()` → MRET → `main`
+in Supervisor — is ONE contract, `ENTRY.wp_entry_boot`
+(**`SpecEntry.v`** / **`ProofEntry.v`** / **`LinkEntry.v`**). Clients see a
+single spec: "power up at `_entry`, arrive at `<main>` in S-mode with these
+registers"; the piecewise lemmas it is composed from (`wp_entry`
+WpEntryNew.v, `wp_start` WpStartNew.v, `wp_timerinit` WpTimerinit.v) stay in
+their own files and are NOT part of the interface. `ProofEntry` is only the
+plumbing between them (~40 lines, 3.5 s) and takes no functor arguments,
+because those callees are plain lemmas rather than spec modules.
+
+Three things are specific to a never-returning function, and generalize to any
+other one:
+
+- **The continuation pc is another function's entry, not the ra return
+  address.** So the spec's exit is `let pcMain : mword 64 := mword_of_int
+  KernelSyms.main in … pc_is pcMain`, and `tools/proof_coverage.py`'s
+  `runs_to_end` counts a `let` bound to a DIFFERENT `KernelSyms` symbol as
+  leaving the function — without that rule the boot spec reads as a "fragment
+  at +0x0" even though it covers the function and then some.
+- **The entry/exit pcs are spelled through `KernelSyms`, the M-mode proofs
+  through their own local `Definition`s** (`pc_e0`, `st_main`). They are
+  convertible, not syntactically equal, so the proof meets them with
+  `iEval (change pcE with pc_e0) in "Hpc"` at the head and
+  `iEval (change st_main with pcMain) in "Hpc"` / `… in "Hmepc"` at the tail.
+- **`SpecEntry.v` is the one Spec file not stated over the definitional layer
+  alone.** Its post-state vocabulary (`m_jal`, `entry_ld_ea`, `st_mout`,
+  `st_pmpcfg1`, `ti_deadline`, …) is defined inside the M-mode Wp files, so it
+  requires them. Moving that pure vocabulary into a definitional file is what
+  would decouple it; nothing else depends on that split.
+
 ## Thin initlock wrappers: one proof, one instance per function
 
 Three functions in the image have a body that is exactly `initlock(&L, "name")`:
@@ -174,39 +241,45 @@ forgotten) and walk's `wp_memset_page_zero_sconf` (`page_own p` in, the written
 the ~20 s inline memset composition out of the `ProofWalk` critical-path file
 into the separately-compilable `WpMemsetArray`.
 
-## The M-mode boot: one spec for a path that never returns
+## An ASSUMED callee: `Module Type` + an `Axiom` in the link
 
-The whole boot — `_entry` (entry.S) → `start()` → `timerinit()` → MRET → `main`
-in Supervisor — is ONE contract, `ENTRY.wp_entry_boot`
-(**`SpecEntry.v`** / **`ProofEntry.v`** / **`LinkEntry.v`**). Clients see a
-single spec: "power up at `_entry`, arrive at `<main>` in S-mode with these
-registers"; the piecewise lemmas it is composed from (`wp_entry`
-WpEntryNew.v, `wp_start` WpStartNew.v, `wp_timerinit` WpTimerinit.v) stay in
-their own files and are NOT part of the interface. `ProofEntry` is only the
-plumbing between them (~40 lines, 3.5 s) and takes no functor arguments,
-because those callees are plain lemmas rather than spec modules.
+A callee with no proof still gets the full shape — the interface is what the
+caller's proof should be a functor over, whether or not anyone has discharged
+it. kerneltrap is the worked example: `SpecKerneltrap.v` states
+`wp_kerneltrap_returns_body` and `Module Type KERNELTRAP`, and
+`LinkKerneltrap.v` supplies the only instance:
 
-Three things are specific to a never-returning function, and generalize to any
-other one:
+```coq
+Module Kerneltrap : KERNELTRAP.
+  Axiom kerneltrap_returns : forall …, wp_kerneltrap_returns_body … .
+End Kerneltrap.
+```
 
-- **The continuation pc is another function's entry, not the ra return
-  address.** So the spec's exit is `let pcMain : mword 64 := mword_of_int
-  KernelSyms.main in … pc_is pcMain`, and `tools/proof_coverage.py`'s
-  `runs_to_end` counts a `let` bound to a DIFFERENT `KernelSyms` symbol as
-  leaving the function — without that rule the boot spec reads as a "fragment
-  at +0x0" even though it covers the function and then some.
-- **The entry/exit pcs are spelled through `KernelSyms`, the M-mode proofs
-  through their own local `Definition`s** (`pc_e0`, `st_main`). They are
-  convertible, not syntactically equal, so the proof meets them with
-  `iEval (change pcE with pc_e0) in "Hpc"` at the head and
-  `iEval (change st_main with pcMain) in "Hpc"` / `… in "Hmepc"` at the tail.
-- **`SpecEntry.v` is the one Spec file not stated over the definitional layer
-  alone.** Its post-state vocabulary (`m_jal`, `entry_ld_ea`, `st_mout`,
-  `st_pmpcfg1`, `ti_deadline`, …) is defined inside the M-mode Wp files, so it
-  requires them. Moving that pure vocabulary into a definitional file is what
-  would decouple it; nothing else depends on that split.
+so `ProofKernelvec.v` is axiom-free (it is `KernelvecProof (Kerneltrap :
+KERNELTRAP) : KERNELVEC`) and proving kerneltrap replaces one file. Two notes:
+
+- **Use `Axiom` inside the module, not `Declare Module Kerneltrap :
+  KERNELTRAP.`** The one-liner works and `Print Assumptions` reports it, but
+  `tools/proof_coverage.py` finds axioms by scanning for the keyword, so the
+  short form silently drops the assumption from the coverage report.
+- The link restates the binder list a second time (Module Type + Axiom). Only
+  the binders — the statement itself still lives once, in the `_body`.
+
+`panic` is deliberately NOT in this shape: its contract is persistent and gets
+threaded through callers' *statements* (`SpecPanic.panic_wp`), so a module
+parameter would buy nothing.
 
 ## Gotchas (all hit in practice)
+
+- **A `_body` that is a BARE `iProp` must NOT be annotated `: iProp Σ`.** With
+  the annotation it elaborates in `bi_scope` and the `Module Type`'s `Parameter
+  … : forall …, <body>` is rejected — *"has type iProp ?Σ which should be Set,
+  Prop or Type"*. Iris has no `bi_emp_valid` coercion; what makes the usual
+  `Lemma foo : A -∗ B` work is that a top-level `-∗` parses in `stdpp_scope` as
+  an entailment (a `Prop`). So leave the `Definition` unannotated and it
+  reproduces the original `Lemma` statement exactly. Most `_body`s never hit
+  this because they open with a pure premise or a `let`, which already forces
+  the whole thing into `Type`.
 
 - **The spec's binder list must mirror the proof file's `Context` exactly.** A
   missing class (e.g. `!lockG Σ` for anything mentioning `is_lock`) reports as

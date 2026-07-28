@@ -42,21 +42,19 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelText KernelDataInv.
+Require Import KernelDataInv.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import ArrCursor.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
-Require Import PageFields.
 Require Import PipeInv.
 Require Import WpPipeallocDecode.
-Require Import WpMycpu WpLock.
+Require Import WpLock.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
-Require Import SpecPanic.
 Require Import SpecFilealloc SpecKalloc SpecInitlock SpecFileclose.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.

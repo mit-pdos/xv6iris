@@ -26,7 +26,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
-Require Import WpInitlock SpecInitlock.
+Require Import SpecInitlock.
 Require Import SpecUart.
 Require Import WpUartinitDecode.
 From Kernel Require KernelSyms.

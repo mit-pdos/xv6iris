@@ -30,7 +30,7 @@ From stdpp Require Import gmap list list_numbers bitvector.definitions bitvector
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import PtAdBits Pt4kWalk PtTree PtBuild.
-Require Import KptExecMap KptPt KptTree TrampPt UptTree.
+Require Import KptExecMap KptTree TrampPt UptTree.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

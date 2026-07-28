@@ -95,3 +95,46 @@ Things worth not re-deriving:
   it calls release. The arithmetic is in [`../design/pipe.md`](../design/pipe.md);
   the fix is a plain `inv` with a dead branch and a credential that refutes
   it, which is what `WpLock.lock_openable_of_dead` builds.
+
+## Performance: `ProofPipeclose.v` did not compile at all as landed (fixed 2026-07-27)
+
+As merged, `ProofPipeclose.v` **never finished** — a full clean build reached
+it last and sat there with RSS climbing linearly (6.0 GB @ 126 s, 15.3 GB @
+301 s, 24.5 GB @ 467 s, no plateau) until it was killed. Every other one of
+the 404 `iris/` files built. Two independent instances of already-documented
+traps, both in the `destruct w` arms; **neither is a structural problem with
+the proof**, and the fix is 2 call sites + 5 tactic invocations:
+
+1. **The two `Wakeup.wp_wakeup_sconf` calls passed five premises as inline
+   `ltac:(…)` over `W2`, a map built on acquire's ∀-bound return map `M0`.**
+   Pre-asserted and passed by name → ~0.1 s each. See optimization.md; this is
+   now recorded there as the tree's worst instance of that rule, because
+   `wp_wakeup_sconf_body`'s statement is a `let sp0/spF/rettgt` chain.
+2. **Bare `iFrame` rebuilding `pipe_res` (9 conjuncts) in a context holding
+   `EPI`/`JOIN`/`TAILS` + ~20 `instr` facts.** Naming the nine hypotheses
+   (`iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"`) is instant. Five
+   sites. This is a NEW durable rule, now in optimization.md.
+
+Result: **never finished / >24.5 GB → 22.2 s / 1.03 GB**, axiom-clean
+(`Print Assumptions Pipeclose.wp_pipeclose_sconf` = 5 Sail primitives +
+funext), `LinkPipeclose.v` builds, full 404-file tree green. Profile is now
+flat: one 3.3 s sentence, nothing else over 0.51 s.
+
+**Method worth reusing.** `coqc -time` flushes per sentence *as it goes*, so on
+a build that never finishes the last printed sentence is the one BEFORE the
+culprit — the culprit is the next sentence in the file. That is what located
+the `iFrame`. To decide WHICH block is to blame first, copy the file and
+replace whole `iAssert` bodies / arms with `{ admit. }` + `Admitted.`: here
+prologue+epilogue-only was 8.2 s, so the arms were provably the cost.
+
+**What was NOT done, and why it may still be worth doing.** The proof is one
+monolithic `Qed` over 33 instructions / 37 chained `iApply`s, with its three
+join points held as `iAssert (∀ M, …)` continuations *inside* that one proof
+term. optimization.md's rule ("split long chains into `Qed`-sealed chunk
+lemmas of ~5-6 instructions") says that shape should not scale — and at 22 s it
+now does not need to. The `iAssert (∀ M, …)` statements are already in exactly
+the form a standalone lemma wants, so if this file ever gets slow again,
+extracting `EPI` / the `TAILS` release tail / `JOIN` into `Qed`-sealed
+`Local Lemma`s (the `ar_tail` / `sc_tail` idiom) is mechanical. The two arms
+are also byte-identical modulo the end being closed and the four offsets, so
+they would factor into one lemma the way argraw's six arms did.

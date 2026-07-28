@@ -26,7 +26,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
-Require Import WpInitlock SpecInitlock.
+Require Import SpecInitlock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecInitlockWrapper.

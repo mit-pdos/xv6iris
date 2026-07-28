@@ -35,23 +35,17 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
-Require Import InstrBytes.
 Require Import WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelText.
 Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import ArrCursor.
 Require Import FdSlots FileInv WpFiledupDecode.
-Require Import WpMycpu WpLock.
-Require Import WpSmodeIntr.
+Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
-Require Import SpecPanic SpecAcquire SpecRelease.
+Require Import SpecAcquire SpecRelease.
 Require Import SpecFiledup.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

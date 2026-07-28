@@ -43,7 +43,7 @@ Qed.
 
   (* JAL to a 2-byte-aligned target with the C extension enabled: the
      misalignment check ([bit1] && not Zca) is false (port of
-     WpKernelvecNew.kv_exec_jump_to_zca). *)
+     ProofKernelvec.kv_exec_jump_to_zca). *)
   Lemma sp_exec_jump_to_zca (target : mword 64) s :
     eq_vec (access_vec_dec target 0) ('b"0") = true ->
     exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->

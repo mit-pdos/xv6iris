@@ -22,7 +22,6 @@ From iris.base_logic.lib Require Import ghost_var.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpLock.
 From Kernel Require KernelInstrs.
