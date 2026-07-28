@@ -122,7 +122,7 @@ uservec's return switch reuses TransPt's pt2 window with roles swapped
 
 The port is complete: the AMO-execute reduction and the fault-wrapper /
 UserClassify assembly are done, and the arbitrary user-mode execution WP is
-closed (`wp_user_exec_closed`, UserExecClose.v — axiom-clean, no totality
+closed (`wp_user_exec_closed`, SpecUser.v / ProofUser.v — axiom-clean, no totality
 hypotheses). Its two open hypotheses (the `user_inv` discharge at boot/userret
 and the uservec `stvec_handler_wp` proof) are the remaining execution-side work
 and are tracked in [user-mode-exec-v2.md](user-mode-exec-v2.md).

@@ -94,6 +94,28 @@ Module Acquire := AcquireProof Mycpu Holding PushOff.
   does delta on that one constant plus beta, leaving the lets intact, so the
   original tactic script runs unchanged.
 
+## The shape also fits a non-function capstone
+
+A `Spec`/`Proof` pair is worth having wherever a big proof tower has ONE
+caller-facing theorem — it does not have to be a kernel C function. The
+arbitrary-user-execution WP is the worked example: `SpecUser.v`
+(`wp_user_exec_closed_body` + `Module Type USER`) is the public face of the
+whole ~24 kLOC `User*.v` development, and `ProofUser.v` (`Module UserProof :
+USER`) is the only file where that interface meets the tower. See
+[`../completed/user-mode-exec-v2.md`](../completed/user-mode-exec-v2.md).
+
+Two adjustments for this case:
+
+- **No callees in module-type shape ⇒ no `Link` file.** `ProofUser` takes no
+  functor arguments, so `Module UserProof : USER.` already *is* the sealed
+  instance; a `LinkUser.v` would only alias it. (Contrast `ProofCpuid`, which
+  also has no callees but keeps `LinkCpuid.v` because every kernel *function*
+  is looked for under its link name by `tools/proof_coverage.py`.)
+- **The `_body` has no entry-pc `let`** — there is no symbol and no return
+  address; the binders are just the objects the statement quantifies over
+  (`C : ucfg`, `pt : uptd`, `Φ`). Everything else is unchanged, including
+  `cbv beta delta [<f>_body]` as the proof's first tactic.
+
 ## Thin initlock wrappers: one proof, one instance per function
 
 Three functions in the image have a body that is exactly `initlock(&L, "name")`:

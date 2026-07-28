@@ -137,7 +137,8 @@ UserCsr.v
 UserTotalU.v
 UserActiveClass.v
 UserMemClassify.v
-UserExecClose.v
+SpecUser.v
+ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
 WpIntrInv.v
