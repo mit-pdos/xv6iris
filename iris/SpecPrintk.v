@@ -86,7 +86,10 @@ Definition pk_desc_res `{!riscvGS Σ} `{CID : CpuId} (v : mword 64) (d : pk_arg_
   match d with
   | PkANum => True
   | PkANull => ⌜v = zero_reg⌝
-  | PkAStr dq s => ⌜nonul s = true⌝ ∗ v ↦ₛ{dq} s
+  (* a [char *] to a real string is NOT null -- the caller has to say so.
+     [v ↦ₛ{dq} s] alone does not imply it: nothing in the points-to rules out
+     address 0, and the arm needs the [beqz] at 0x21e to fall through. *)
+  | PkAStr dq s => ⌜nonul s = true⌝ ∗ ⌜eq_vec v zero_reg = false⌝ ∗ v ↦ₛ{dq} s
   end.
 
 (* Vararg [j] is the entry value of a(j+1) = x(11+j): the ABI passes the first

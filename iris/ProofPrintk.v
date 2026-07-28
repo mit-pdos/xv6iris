@@ -6894,4 +6894,215 @@ Section ProofPrintk.
       cbn in Hnum; discriminate Hnum.
   Qed.
 
+
+  (* the '%s' entry: the one directive that consumes a STRING, so the one
+     that needs the caller's descriptor.  Which of the two string arms runs
+     is decided by the descriptor, not by the machine -- [PkANull] is a null
+     char* and takes the "(null)" path. *)
+  Lemma wp_printk_arm_str (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+      (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
+      (dqm dqm2 : dfrac) (c0 c1 c2 : Ascii.ascii) (d : pk_arg_desc) (Rest : iProp Σ) :
+    let sp0 := m !!! Regidx csp_rs1 in
+    let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
+    (30 <= K)%nat ->
+    (k < 7)%nat ->
+    eq_vec (sign_extend' 64 pv) zero_reg = false ->
+    neq_vec (sign_extend' 64 pkv) zero_reg = false ->
+    fst (pk_dir c0 c1 c2) = Some PkStr ->
+    pk_desc_kind d = PkStr ->
+    mc !!! Regidx s0_idx = s0v ->
+    mc !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat i + 1) ->
+    sie_cap_gpr γ mc (K - 24)%nat -∗
+    kernel_text -∗ kernel_data -∗
+    pc_is (mword_of_int (PK + pk_entry c0 c1 c2) : mword 64) -∗
+    (∃ w : mword 64, (pa_stk sp0 19) ↦₈ w) -∗
+    (pa_stk sp0 23) ↦₈ (pk_ap s0v k) -∗
+    pk_va sp0 m -∗
+    pk_desc_res (pk_vararg m k) d -∗
+    (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+    (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
+    Rest -∗
+    ( ∀ (mf : regfile) (bs : list (bv 8)),
+      ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
+           c <> mword_of_int 20 -> c <> mword_of_int 21 ->
+           mf !!! Regidx c = mc !!! Regidx c)
+        /\ mf !!! Regidx (mword_of_int 9 : mword 5)
+           = mword_of_int (Z.of_nat (S i + snd (pk_dir c0 c1 c2))) ⌝ -∗
+      sie_cap_gpr γ mf (K - 24)%nat -∗
+      pc_is (mword_of_int (PK + 0x78) : mword 64) -∗
+      (∃ w : mword 64, (pa_stk sp0 19) ↦₈ w) -∗
+      (pa_stk sp0 23) ↦₈ (pk_ap s0v (S k)) -∗
+      pk_va sp0 m -∗
+      pk_desc_res (pk_vararg m k) d -∗
+      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+      (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+      uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
+      Rest -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros sp0 s0v HK Hk Hpv Hpkv Hstr Hkind Hs0 Hs1.
+    (* only c0 = 's' yields PkStr *)
+    assert (Hs0c : Ascii.eqb c0 "s"%char = true).
+    { case_eq (Ascii.eqb c0 "s"%char); [reflexivity | intro Hn].
+      exfalso. unfold pk_dir in Hstr.
+      case_eq (Ascii.eqb c0 "d"%char); intro E1; rewrite E1 in Hstr; [cbn in Hstr; discriminate | ].
+      case_eq (Ascii.eqb c0 "u"%char); intro E2; rewrite E2 in Hstr; [cbn in Hstr; discriminate | ].
+      case_eq (Ascii.eqb c0 "x"%char); intro E3; rewrite E3 in Hstr; [cbn in Hstr; discriminate | ].
+      case_eq (Ascii.eqb c0 "p"%char); intro E4; rewrite E4 in Hstr; [cbn in Hstr; discriminate | ].
+      case_eq (Ascii.eqb c0 "c"%char); intro E5; rewrite E5 in Hstr; [cbn in Hstr; discriminate | ].
+      rewrite Hn in Hstr.
+      case_eq (Ascii.eqb c0 "l"%char); intro E6; rewrite E6 in Hstr; cbn in Hstr;
+        [ | discriminate ].
+      repeat (match type of Hstr with context [if ?b then _ else _] => destruct b end);
+        cbn in Hstr; discriminate. }
+    assert (Hd0 : Ascii.eqb c0 "d"%char = false)
+      by (apply (ascii_eqb_neq c0 "s"%char "d"%char Hs0c); vm_compute; reflexivity).
+    assert (Hl0 : Ascii.eqb c0 "l"%char = false)
+      by (apply (ascii_eqb_neq c0 "s"%char "l"%char Hs0c); vm_compute; reflexivity).
+    assert (Hu0 : Ascii.eqb c0 "u"%char = false)
+      by (apply (ascii_eqb_neq c0 "s"%char "u"%char Hs0c); vm_compute; reflexivity).
+    assert (Hx0 : Ascii.eqb c0 "x"%char = false)
+      by (apply (ascii_eqb_neq c0 "s"%char "x"%char Hs0c); vm_compute; reflexivity).
+    assert (Hp0 : Ascii.eqb c0 "p"%char = false)
+      by (apply (ascii_eqb_neq c0 "s"%char "p"%char Hs0c); vm_compute; reflexivity).
+    assert (Hc0 : Ascii.eqb c0 "c"%char = false)
+      by (apply (ascii_eqb_neq c0 "s"%char "c"%char Hs0c); vm_compute; reflexivity).
+    assert (Hent : pk_entry c0 c1 c2 = 0x20e)
+      by (unfold pk_entry; rewrite ?Hd0 ?Hu0 ?Hx0 ?Hp0 ?Hc0 ?Hs0c ?Hl0; reflexivity).
+    assert (Hsnd : snd (pk_dir c0 c1 c2) = 0%nat)
+      by (unfold pk_dir; rewrite ?Hd0 ?Hu0 ?Hx0 ?Hp0 ?Hc0 ?Hs0c ?Hl0; reflexivity).
+    iIntros "Hcg #Htext #Hkdata Hpc S19 Hap Hva Hdesc Hpanicking Hpanicked #Hdev Htx #Hsl #Hdlab HR Hcont".
+    iEval (rewrite Hent) in "Hpc".
+    destruct d as [ | | dq str]; [ discriminate Hkind | | ].
+    - (* PkANull: the "(null)" literal *)
+      iDestruct "Hdesc" as "%Hnull".
+      iApply (wp_printk_arm_s_null γ γd γv Φ m mc K k l pv pkv dqm dqm2
+                ((∃ w : mword 64, (pa_stk sp0 19) ↦₈ w) ∗ Rest)%I
+                HK Hk Hpv Hpkv Hnull Hs0
+                with "Hcg Htext Hkdata Hpc Hap Hva Hpanicking Hpanicked Hdev Htx Hdlab [$S19 $HR] [-]").
+      iIntros (mf bs) "%Hcs Hcg Hpc Hap Hva Hpanicking Hpanicked Htx Hsent (S19 & HR)".
+      iApply ("Hcont" $! mf bs with "[%] Hcg Hpc S19 Hap Hva [%] Hpanicking Hpanicked Htx Hsent HR").
+      + rewrite Hsnd. split; [ intros c Hc _ N20 _; apply Hcs; assumption | ].
+        replace (Z.of_nat (S i + 0)) with (Z.of_nat i + 1) by lia.
+        rewrite (Hcs (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity) ltac:(reg_neq)).
+        exact Hs1.
+      + exact Hnull.
+    - (* PkAStr: a real string *)
+      iDestruct "Hdesc" as "(%Hnn & %Hnz & Hstrp)".
+      iApply (wp_printk_arm_s γ γd γv Φ m mc K k l pv pkv dqm dqm2 dq str
+                ((∃ w : mword 64, (pa_stk sp0 19) ↦₈ w) ∗ Rest)%I
+                HK Hk Hpv Hpkv Hnn Hnz Hs0
+                with "Hcg Htext Hpc Hap Hva Hstrp Hpanicking Hpanicked Hdev Htx Hsl Hdlab [$S19 $HR] [-]").
+      iIntros (mf bs) "%Hcs Hcg Hpc Hap Hva Hstrp Hpanicking Hpanicked Htx Hsent (S19 & HR)".
+      iApply ("Hcont" $! mf bs with "[%] Hcg Hpc S19 Hap Hva [$Hstrp] Hpanicking Hpanicked Htx Hsent HR").
+      + rewrite Hsnd. split; [ intros c Hc _ N20 _; apply Hcs; assumption | ].
+        replace (Z.of_nat (S i + 0)) with (Z.of_nat i + 1) by lia.
+        rewrite (Hcs (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity) ltac:(reg_neq)).
+        exact Hs1.
+      + iPureIntro. split; assumption.
+  Qed.
+
+  (* '%%' and an unrecognised directive: two characters out, no vararg. *)
+  Lemma wp_printk_arm_none (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+      (mc : regfile) (K : nat) (i : nat) (l : list (bv 8)) (pv pkv : mword 32)
+      (dqm dqm2 : dfrac) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) :
+    (30 <= K)%nat ->
+    eq_vec (sign_extend' 64 pv) zero_reg = false ->
+    neq_vec (sign_extend' 64 pkv) zero_reg = false ->
+    fst (pk_dir c0 c1 c2) = None ->
+    Ascii.eqb c0 pk_nul = false ->
+    mc !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat i + 1) ->
+    sie_cap_gpr γ mc (K - 24)%nat -∗
+    kernel_text -∗
+    pc_is (mword_of_int (PK + pk_entry c0 c1 c2) : mword 64) -∗
+    (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+    (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    Rest -∗
+    ( ∀ (mf : regfile) (bs : list (bv 8)),
+      ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
+           c <> mword_of_int 20 -> c <> mword_of_int 21 ->
+           mf !!! Regidx c = mc !!! Regidx c)
+        /\ mf !!! Regidx (mword_of_int 9 : mword 5)
+           = mword_of_int (Z.of_nat (S i + snd (pk_dir c0 c1 c2))) ⌝ -∗
+      sie_cap_gpr γ mf (K - 24)%nat -∗
+      pc_is (mword_of_int (PK + 0x78) : mword 64) -∗
+      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+      (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+      uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
+      Rest -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros HK Hpv Hpkv Hnone Hnn Hs1.
+    iIntros "Hcg #Htext Hpc Hpanicking Hpanicked #Hdev Htx #Hdlab HR Hcont".
+    (* [fst = None] rules out every consuming form, so [pk_entry] is either
+       the '%%' arm or the unknown-directive arm. *)
+    assert (Hsnd : snd (pk_dir c0 c1 c2) = 0%nat).
+    { unfold pk_dir in Hnone |- *.
+      repeat (match goal with |- context [if ?b then _ else _] => destruct b end);
+        cbn in Hnone |- *; try reflexivity; discriminate Hnone. }
+    assert (Hd0 : Ascii.eqb c0 "d"%char = false)
+      by (case_eq (Ascii.eqb c0 "d"%char); intro E; [ exfalso; unfold pk_dir in Hnone;
+            rewrite E in Hnone; cbn in Hnone; discriminate | reflexivity ]).
+    assert (Hu0 : Ascii.eqb c0 "u"%char = false)
+      by (case_eq (Ascii.eqb c0 "u"%char); intro E; [ exfalso; unfold pk_dir in Hnone;
+            rewrite Hd0 E in Hnone; cbn in Hnone; discriminate | reflexivity ]).
+    assert (Hx0 : Ascii.eqb c0 "x"%char = false)
+      by (case_eq (Ascii.eqb c0 "x"%char); intro E; [ exfalso; unfold pk_dir in Hnone;
+            rewrite Hd0 Hu0 E in Hnone; cbn in Hnone; discriminate | reflexivity ]).
+    assert (Hp0 : Ascii.eqb c0 "p"%char = false)
+      by (case_eq (Ascii.eqb c0 "p"%char); intro E; [ exfalso; unfold pk_dir in Hnone;
+            rewrite Hd0 Hu0 Hx0 E in Hnone; cbn in Hnone; discriminate | reflexivity ]).
+    assert (Hc0 : Ascii.eqb c0 "c"%char = false)
+      by (case_eq (Ascii.eqb c0 "c"%char); intro E; [ exfalso; unfold pk_dir in Hnone;
+            rewrite Hd0 Hu0 Hx0 Hp0 E in Hnone; cbn in Hnone; discriminate | reflexivity ]).
+    assert (Hs0c : Ascii.eqb c0 "s"%char = false)
+      by (case_eq (Ascii.eqb c0 "s"%char); intro E; [ exfalso; unfold pk_dir in Hnone;
+            rewrite Hd0 Hu0 Hx0 Hp0 Hc0 E in Hnone; cbn in Hnone; discriminate | reflexivity ]).
+    (* the long forms are out too, one test at a time *)
+    assert (Hlk : (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false
+               /\ (Ascii.eqb c0 "l"%char && (Ascii.eqb c1 "l"%char && Ascii.eqb c2 "d"%char))%bool = false
+               /\ (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "u"%char)%bool = false
+               /\ (Ascii.eqb c0 "l"%char && (Ascii.eqb c1 "l"%char && Ascii.eqb c2 "u"%char))%bool = false
+               /\ (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "x"%char)%bool = false
+               /\ (Ascii.eqb c0 "l"%char && (Ascii.eqb c1 "l"%char && Ascii.eqb c2 "x"%char))%bool = false).
+    { unfold pk_dir in Hnone. rewrite Hd0 Hu0 Hx0 Hp0 Hc0 Hs0c in Hnone.
+      (* here [destruct]'s generalisation is what we WANT: it rewrites the
+         scrutinee in the goal as well, so each conjunct collapses. *)
+      destruct (Ascii.eqb c0 "l"%char) eqn:El; [ | split_and!; reflexivity ].
+      destruct (Ascii.eqb c1 "d"%char) eqn:Ed1; [ cbn in Hnone; discriminate | ].
+      destruct (Ascii.eqb c1 "u"%char) eqn:Eu1; [ cbn in Hnone; discriminate | ].
+      destruct (Ascii.eqb c1 "x"%char) eqn:Ex1; [ cbn in Hnone; discriminate | ].
+      destruct (Ascii.eqb c1 "l"%char) eqn:El1; [ | split_and!; reflexivity ].
+      destruct (Ascii.eqb c2 "d"%char) eqn:Ed2; [ cbn in Hnone; discriminate | ].
+      destruct (Ascii.eqb c2 "u"%char) eqn:Eu2; [ cbn in Hnone; discriminate | ].
+      destruct (Ascii.eqb c2 "x"%char) eqn:Ex2; [ cbn in Hnone; discriminate | ].
+      split_and!; reflexivity. }
+    destruct Hlk as (L1 & L2 & L3 & L4 & L5 & L6).
+    case_eq (Ascii.eqb c0 "%"%char); intro Hm0.
+    - assert (Hent : pk_entry c0 c1 c2 = 0x246)
+        by (unfold pk_entry; rewrite Hd0 L1 L2 Hu0 L3 L4 Hx0 L5 L6 Hp0 Hc0 Hs0c Hm0; reflexivity).
+      iEval (rewrite Hent) in "Hpc".
+      iApply (wp_printk_arm_pct γ γd γv Φ mc K l pv pkv dqm dqm2 Rest HK Hpv Hpkv
+                with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab HR [-]").
+      iIntros (mf bs) "%Hcs Hcg Hpc Hpanicking Hpanicked Htx Hsent HR".
+      iApply ("Hcont" $! mf bs with "[%] Hcg Hpc Hpanicking Hpanicked Htx Hsent HR").
+      rewrite Hsnd. split; [ intros c Hc _ _ _; apply Hcs; assumption | ].
+      replace (Z.of_nat (S i + 0)) with (Z.of_nat i + 1) by lia.
+      rewrite (Hcs (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact Hs1.
+    - assert (Hent : pk_entry c0 c1 c2 = 0x31a)
+        by (unfold pk_entry; rewrite Hd0 L1 L2 Hu0 L3 L4 Hx0 L5 L6 Hp0 Hc0 Hs0c Hm0 Hnn; reflexivity).
+      iEval (rewrite Hent) in "Hpc".
+      iApply (wp_printk_arm_unknown γ γd γv Φ mc K l pv pkv dqm dqm2 Rest HK Hpv Hpkv
+                with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab HR [-]").
+      iIntros (mf bs) "%Hcs Hcg Hpc Hpanicking Hpanicked Htx Hsent HR".
+      iApply ("Hcont" $! mf bs with "[%] Hcg Hpc Hpanicking Hpanicked Htx Hsent HR").
+      rewrite Hsnd. split; [ intros c Hc _ _ _; apply Hcs; assumption | ].
+      replace (Z.of_nat (S i + 0)) with (Z.of_nat i + 1) by lia.
+      rewrite (Hcs (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact Hs1.
+  Qed.
+
 End ProofPrintk.

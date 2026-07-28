@@ -515,8 +515,19 @@ Left, in order:
    - reduce `pk_entry`/`pk_dir` with `rewrite ?H1 ?H2 ...` over the WHOLE
      fact set: a plain `rewrite` fails once the term has already collapsed to
      a literal, so a per-leaf exact list is fragile.
-   Still to do: `wp_printk_arm_str` (`%s`, which needs the descriptor) and
-   `wp_printk_arm_none` (`%%` and the unknown directive, no vararg).
+   **`wp_printk_arm_str` and `wp_printk_arm_none` are proven too**, so the
+   arm selection is COMPLETE: from `pc_is (PK + pk_entry c0 c1 c2)` and the
+   directive's kind, the right arm runs to 0x78.  `arm_str` picks between the
+   two string arms by the DESCRIPTOR, not by the machine -- `PkANull` is a
+   null char* and takes the "(null)" path.  Deriving the "not this character"
+   facts from `fst (pk_dir ..) = None` wants `destruct .. eqn:` rather than
+   `case_eq` for once: there the generalisation into the goal is exactly what
+   collapses each conjunct.
+
+   **Spec change made here:** `pk_desc_res` for `PkAStr` now also asserts
+   `eq_vec v zero_reg = false`.  `v ↦ₛ{dq} s` does not imply it -- nothing in
+   the points-to rules out address 0 -- and the arm needs the `beqz` at 0x21e
+   to fall through.
 2. the loop induction on the format index, carrying `pk_kinds (str_drop p f) =
    map pk_desc_kind (drop k descs)` and splitting the descriptor `big_sepL`
    at `k`.
