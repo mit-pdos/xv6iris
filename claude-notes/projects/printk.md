@@ -329,8 +329,18 @@ share, and the pieces it needed are the reusable part:
   `pk_lo` carries the `mword 32` ascription for the same reason `pk_fbyte`
   carries the `mword 8` one.
 
-The other nine value arms differ from it in only two places: the load
-(`c.lw` / `lwu` / `c.ld`) and the `(base, sign)` pair.
+**Seven of the nine value arms are proven** (`%d %ld %lld %lu %llu %lx %llx`),
+all over the shared `wp_printk_vaarg` and generated from a table -- they
+differ only in the `(sign, base)` pair, the load, and the `addiw s1,s4,n`
+that says how many format characters the directive consumed.  `%lx` does not
+even set `a2`, and does not have to: printint's contract is indifferent to
+`sign`.
+
+The two that are NOT proven, `%u` and `%x`, are blocked on one missing leaf:
+they read their argument with **`lwu`** (`LOAD (.., true, 4)`), and only the
+signed `wp_lw_s_sconf` exists.  `wp_lbu_s_sconf` is the width-1 unsigned load
+and its proof is the template -- the honest fix is to generalise that proof
+over the width (it is already `dqm`-parametric) rather than clone it at 4.
 
 ### printk: what the arms still need
 
