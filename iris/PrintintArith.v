@@ -176,6 +176,30 @@ Lemma addiw_lit (k c : Z) (e : mword 64) :
   = mword_of_int (k + c).
 Proof. intros -> H. rewrite moi_add. apply sextw_moi. exact H. Qed.
 
+(* the top nibble of a 64-bit word is a legal index into a sixteen-byte table:
+   what makes printk's [%p] loop read inside [digits] rather than past it.
+   (printint's twin bound is [Hrem] at its call site: a remainder mod a base
+   of at most 16.  Here the bound is structural -- a 4-bit field.) *)
+Lemma srli60_lt16 (x : mword 64) :
+  uint (shift_bits_right x (subrange_vec_dec (mword_of_int 60 : mword 6) (Z.sub log2_xlen 1) 0)) < 16.
+Proof.
+  assert (Hr : shift_bits_right x (subrange_vec_dec (mword_of_int 60 : mword 6) (Z.sub log2_xlen 1) 0)
+             = shiftr x 60)
+    by (unfold shift_bits_right; f_equal; vm_compute; reflexivity).
+  rewrite Hr, pi_uint_unsigned.
+  unfold shiftr, SailStdpp.Values.with_word, get_word,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftr_unsigned.
+  assert (H60 : bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 60)) = 60).
+  { unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
+  rewrite H60.
+  pose proof (bv_unsigned_in_range 64 x) as [Hx0 Hx1].
+  rewrite Z.shiftr_div_pow2; [| lia].
+  apply Z.div_lt_upper_bound; [vm_compute; reflexivity | ].
+  change (16 * 2^60) with (2^64). change (bv_modulus 64) with (2^64) in Hx1. exact Hx1.
+Qed.
+
 (* the do-while's progress: one base-[b] digit falls off [x] each iteration, so
    a bound of [10^f] on the value bounds the remaining digits by [f]. *)
 Lemma digit_step (x b : Z) (f : nat) :

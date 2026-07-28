@@ -383,8 +383,28 @@ mint.  `uart_tx_own γd l` alone does not give it.  So the arm takes
 `wp_printk_sconf_body` will need the same for the empty-FORMAT path, which
 has the identical problem.  Add it when the top-level proof is assembled.
 
-That leaves `%p` -- the last arm, and the other one with an inner loop --
-plus the dispatch chain and the loop induction.
+`%p` is proven, and with it ALL FIFTEEN arms.  gcc does not call printint for
+a pointer: it inlines a fixed sixteen-iteration loop that peels one nibble off
+the top of the value each pass and indexes the same `digits` table printint
+uses (`pk_digits`, the byte-wise existential -- the values are irrelevant
+because the spec does not say what is printed).  Fixed trip count, so the
+induction is on the COUNTER and there is no value bound to carry; that is the
+whole contrast with printint's do-while, where the buffer bound IS the
+difficulty.  The one real arithmetic obligation is that the nibble is a legal
+index -- `srli60_lt16` (PrintintArith.v), a structural 4-bit-field bound.
+
+`%p` is also the only arm with a frame slot of its own: s9 holds the table
+pointer, so it is saved into slot 19 at 0x1b4 and restored at 0x1f6.  It
+clobbers s4 (the counter) and s5 (the value), so its postcondition excludes
+both -- 0x78 reloads s4 from s1 and the dispatch recomputes s5.
+
+Two leaves were missing and are now in WpSconfBtype.v: `wp_bnez_x0_taken` /
+`wp_bnez_x0_fall`.  With rs2 = x0 the model reads no second register, so the
+`uint rs2 <> 0` side condition of the ordinary `wp_bne_*` cannot be met --
+the same reason the `beqz` twins exist.
+
+That leaves the dispatch chain (0x8a..0x2c6), the `c0 = 0` exit, and the
+loop induction that ties the arms together.
 
 ### printk: what the arms still need
 
