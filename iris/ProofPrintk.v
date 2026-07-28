@@ -56,6 +56,14 @@ Proof. lia. Qed.
 Lemma pk_nk (K : nat) : (24 <= K)%nat -> ((K - 24) + 24)%nat = K.
 Proof. lia. Qed.
 
+(* Frame assembly compares dozens of [pa_stk sp0 j] cells against one another;
+   left transparent, every FAILED comparison makes the unifier unfold through
+   [add_vec_int] down to the bitvector records.  Keeping it opaque makes those
+   failures first-order (the slot indices are literals).  Proofs that need the
+   arithmetic still say [unfold pa_stk] explicitly, which Opaque does not
+   block. *)
+Local Strategy 1000 [pa_stk].
+
 Section ProofPrintk.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ}.
@@ -616,7 +624,7 @@ Section ProofPrintk.
       {rewrite /M27 upd_ne; [| reg_neq]. rewrite /M26 upd_eq; reflexivity. }
       { rewrite /M27 upd_eq; reflexivity. }
     }
-    rewrite /pk_saved. iFrame.
+    rewrite /pk_saved. iFrame "S9 S19 S20 S21 S22 S23 S24 S26 S27".
   Qed.
   (* ================================================================== *)
   (*  THE EPILOGUE (0x260 .. 0x274), the end of every path.              *)
@@ -1721,13 +1729,13 @@ Section ProofPrintk.
       | replace (mword_of_int (11 + Z.of_nat 6) : mword 5) with (mword_of_int 17 : mword 5)
           by (apply bv_eq; vm_compute; reflexivity)
       | lia ].
-    - iFrame "V7". iIntros "V7". iFrame.
-    - iFrame "V6". iIntros "V6". iFrame.
-    - iFrame "V5". iIntros "V5". iFrame.
-    - iFrame "V4". iIntros "V4". iFrame.
-    - iFrame "V3". iIntros "V3". iFrame.
-    - iFrame "V2". iIntros "V2". iFrame.
-    - iFrame "V1". iIntros "V1". iFrame.
+    - iFrame "V7". iIntros "V7". iFrame "V7 V6 V5 V4 V3 V2 V1".
+    - iFrame "V6". iIntros "V6". iFrame "V7 V6 V5 V4 V3 V2 V1".
+    - iFrame "V5". iIntros "V5". iFrame "V7 V6 V5 V4 V3 V2 V1".
+    - iFrame "V4". iIntros "V4". iFrame "V7 V6 V5 V4 V3 V2 V1".
+    - iFrame "V3". iIntros "V3". iFrame "V7 V6 V5 V4 V3 V2 V1".
+    - iFrame "V2". iIntros "V2". iFrame "V7 V6 V5 V4 V3 V2 V1".
+    - iFrame "V1". iIntros "V1". iFrame "V7 V6 V5 V4 V3 V2 V1".
   Qed.
 
   (* the low half of a vararg slot, AT [mword 32] -- same ascription problem as

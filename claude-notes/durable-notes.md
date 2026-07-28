@@ -140,6 +140,37 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - **An `Ltac` body cannot reference a hypothesis by literal name.** `Ltac t := subst c; vm_compute in Hc; rewrite Hxx in H.` resolves those names at *definition* time and errors "Hypothesis c was not found". Worse, a `subst`-based variant can silently fail to peel in a large context while passing in a small standalone test, and the symptom surfaces as a confusing `apply` unification error one line later. Write the tactic name-free (`first [ … ; assumption | congruence ]`, `lazymatch goal with H : … |- _ => … end`); `congruence` sees through `Regidx`'s injectivity, so no `injection`/`subst` is needed for a register disequality. But see optimization.md before putting `congruence` in a peel loop.
 - Section gotchas: a lemma using NO section vars is not generalized over them; `intros ->` on a section-variable equation BREAKS references to sibling section lemmas (state such wrappers outside the section); `Proof using All` generalizes over ALL context vars (callers must then pass them). A section `Variable` (e.g. `root_ppn`) auto-threads intra-file but external callers pass it as the LEADING argument.
 
+## Proof-check speed: what actually costs time in these files
+
+Measured on ProofPrintk.v (4800 lines, ~65 s of coqc).  `coqc -time` plus a
+per-lemma roll-up is the tool; two findings generalise:
+
+- **`vm_compute` in the leaf side conditions is FREE** -- the ubiquitous
+  `ltac:(vm_compute; discriminate)` on `uint (mword_of_int 15 : mword 5) <> 0`
+  measures at well under a millisecond.  Do not go hunting there.
+- **The cost is Iris unification against `mword`/`bv` terms.**  A bare
+  `iFrame.` over a separating conjunction of a dozen `pa_stk sp0 j` cells
+  costs ~1 s, because every FAILED match unfolds `pa_stk` through
+  `add_vec_int` down to the bitvector records.  Two fixes, both cheap:
+  - `Local Strategy 1000 [pa_stk].` -- keeps failed comparisons first-order
+    (the slot indices are literals) while `unfold pa_stk` still works where
+    the arithmetic is wanted.  `Local Opaque` does NOT work: it blocks
+    `unfold` too.  Worth ~8% of the file.
+  - name the hypotheses (`iFrame "S9 S19 ..."`) instead of a bare `iFrame.`
+    -- 6.5 s to 0.5 s on one seven-way frame.  Give them in the GOAL's
+    conjunct order; a wrong order is worse than none (one reordering
+    experiment took a frame from 2.2 s to 3.8 s).
+
+Beware when measuring: this is a shared machine.  Wall AND user time swing
+30%+ with someone else's load, so A/B by re-running interleaved and taking
+the minimum, or align the two `-time` logs sentence-by-sentence and calibrate
+on the median ratio of the sentences you did not touch.
+
+Splitting a file to shrink the edit-check loop was tried and REVERTED: three
+files cost the same as one for a clean build (the per-file import overhead is
+only ~1.8 s), and at a minute per check the single file is not worth the
+extra structure.
+
 ## Reusable recipes (validated; reuse verbatim)
 
 - **WRAPPER RECIPE — generalizing a lemma without churning call sites.** The generic lemma gets the NEW name; the old name becomes a RESTATEMENT `Lemma` with the verbatim original statement, closed by `exact (<generic> <instance> <explicit binders>)`. NEVER make the old name a `Definition`/notation alias — an implicit argument (`dq`, a section variable) becomes positional and every call site churns. This is how the whole S-mode leaf layer went regime-generic (`R : s_regime`) with zero consumer edits.
