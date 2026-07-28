@@ -863,6 +863,10 @@ def main():
     ap.add_argument("--out", help="write here instead of stdout")
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="text format: show evidence and untouched functions")
+    ap.add_argument("--check", action="store_true",
+                    help="exit 1 if any manifest error is present (for CI: a "
+                         "stale MANIFEST_PROVEN/MANIFEST_ASSUMED entry is a "
+                         "real regression, unlike a coverage percentage)")
     args = ap.parse_args()
 
     syms = load_symbols(args.repo)
@@ -906,6 +910,11 @@ def main():
         print(f"wrote {args.out}", file=sys.stderr)
     else:
         print(text)
+
+    if args.check and errors:
+        for e in errors:
+            print(f"proof_coverage: manifest error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

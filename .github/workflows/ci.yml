@@ -133,6 +133,28 @@ jobs:
           # steps (checkout wipes them next run regardless, but be explicit).
           rm -f iris/*.v.timing
 
+      # ---- 3c. Proof coverage report (iris/) ----
+      # "What of the kernel is proved?" — the per-function proven / assumed /
+      # partial / none hierarchy, rendered into the step summary next to the
+      # build profile.  Plain Python over the checked-in kernel-rocq/ dump and
+      # the iris/ sources (no opam env, no ELF: without xv6-riscv/ the
+      # source-file attribution just degrades, by design).  Unlike the two
+      # informational steps around it, this one CAN fail the build — but only
+      # on MANIFEST errors (a MANIFEST_PROVEN/MANIFEST_ASSUMED entry whose
+      # file or lemma no longer exists): those mean the coverage numbers are
+      # lying, and the fix is a one-line manifest update.  A mere coverage
+      # change never fails CI.  Runs only on a successful build, so the
+      # report describes a green tree.
+      - name: Proof coverage report (iris/)
+        run: |
+          # The report is written (and lands in the summary) even when --check
+          # fails — a failing run is exactly when you want to read it.
+          rc=0
+          python3 tools/proof_coverage.py --format md \
+            --out "$RUNNER_TEMP/coverage.md" --check || rc=$?
+          cat "$RUNNER_TEMP/coverage.md" >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
       # ---- 4. Dead-code report (iris/) ----
       # Informational only: find_dead.py reads the .glob files the step above
       # just emitted and lists definitions/lemmas nothing references.  Its hits
