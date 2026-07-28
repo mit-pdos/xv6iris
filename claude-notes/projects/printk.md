@@ -181,7 +181,7 @@ half the frame-address lemmas -- write `f_equal; try (apply bv_eq; vm_compute;
 reflexivity)`.  And a value bound out of an existential resource arrives as
 `bv 8`, so ascribe `(b : mword 8)` at every leaf that wants an `mword`.
 
-### printk -- decode layer and epilogue DONE, the body not started
+### printk -- decode layer, epilogue and both exits DONE; the body not started
 
 `WpPrintkDecode.v` proves all **264** instruction facts (offsets 0x00..0x328)
 plus the 188 distinct decode words they rest on.  It was GENERATED from the
@@ -207,6 +207,29 @@ check it.
   `beqz` (that IS the panic path, so the `release` at 0x28a is dead), returns
   0, restores ra/s0/s2 and pops.  Its post is the spec's, including
   `mf !!! a0 = 0`.  `frame_cancel_192` was added to KernelRvcDecode.v for it.
+  Its callee-saved premise is **`pk_cs_kept m mc`**, the eleven registers it
+  does NOT restore, spelled out as a conjunction rather than quantified over
+  `is_cs_idx`: the enumeration tactic (`unfold is_cs_idx; destruct` fourteen
+  ways) is unusable inside an iris context this large -- it does not fail, it
+  runs for minutes.
+- **`wp_printk_restore`** + **`wp_printk_exit`** -- the nine-`ld` block that
+  undoes the lazy saves.  It sits at TWO addresses (0x24e, the end-of-string
+  exit, and 0x276, the `%`-at-end-of-string exit), so it is proved once over
+  `pk_restore_instrs B`, a bundle of the nine `instr` facts, and instantiated
+  at both (`pk_restore_at_24e` / `pk_restore_at_276`).  `pk_frame_of_saved`
+  folds the nine restored slots back into `pk_frame`, which is what lets the
+  exit hand straight over to the epilogue.
+
+  Two tactic gotchas this cost, both worth remembering:
+  - a raw `mword 5` disequality is NOT closed by `vm_compute; discriminate`
+    (a `bv` is a RECORD -- two distinct values share a constructor).  Go
+    through `bv_unsigned`: `intro He; apply (f_equal bv_unsigned) in He;
+    vm_compute in He; discriminate` (`mw_neq`).  `reg_neq` still works for the
+    `Regidx _ <> Regidx _` form, where the constructor does clash.
+  - never apply a hypothesis at `_` when its side conditions are discharged by
+    an inline `ltac:` -- the tactic then runs against an EVAR and the
+    `vm_compute` inside diverges.  Same trap as the leaf-value one above; it
+    shows up as a hang, not an error.
 
 810 bytes / 264 instructions, ~15 dispatch arms. The pieces still to do:
 
