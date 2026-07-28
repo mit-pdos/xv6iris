@@ -165,19 +165,42 @@ ANY_SYM = re.compile(r"KernelSyms\.(\w+)\s*(?:\+\s*(0x[0-9a-fA-F]+|\d+))?")
 LET_BIND = re.compile(r"\blet\s+(\w+)")
 # The caller's return address: bit 0 of register x1 (ra), cleared.
 RA_DERIVED = re.compile(r"!!!\s*Regidx\s*\(\s*mword_of_int\s+1\b")
+# Another function's entry address (a transfer OUT of this function).
+SYM_ADDR = re.compile(r"mword_of_int\s*\(?\s*KernelSyms\.(\w+)\b")
+
+
+def let_regions(text: str):
+    """(name, binding-text) for each `let` the body opens."""
+    lets = [(m.group(1), m.end()) for m in LET_BIND.finditer(text)]
+    ends = [p for _, p in lets[1:]] + [len(text)]
+    return [(n, text[s:e]) for (n, s), e in zip(lets, ends)]
 
 
 def return_targets(text: str) -> set:
     """Names the body binds to the caller's return address (ra-derived)."""
-    lets = [(m.group(1), m.end()) for m in LET_BIND.finditer(text)]
-    ends = [p for _, p in lets[1:]] + [len(text)]
-    return {n for (n, s), e in zip(lets, ends) if RA_DERIVED.search(text[s:e])}
+    return {n for n, b in let_regions(text) if RA_DERIVED.search(b)}
 
 
-def runs_to_return(text: str) -> bool:
-    """True when the spec's continuation sits at the caller's return address,
-    i.e. the spec covers the function all the way to its `ret`."""
-    names = return_targets(text) | {"ret_tgt", "rettgt", "ret_target"}
+def exit_targets(text: str, entry: str) -> set:
+    """Names the body binds to a DIFFERENT function's entry address.  A
+    never-returning function leaves this way instead of through `ra`: the boot
+    path runs off the end of _entry into start(), and off the end of start()
+    into main (via MRET)."""
+    out = set()
+    for n, b in let_regions(text):
+        m = SYM_ADDR.search(b)
+        if m and m.group(1) != entry:
+            out.add(n)
+    return out
+
+
+def runs_to_end(text: str, entry: str) -> bool:
+    """True when the spec's continuation sits past the last instruction of the
+    function, i.e. the spec covers the whole function: at the caller's return
+    address, or -- for a function that never returns -- at the entry of the
+    function it transfers to."""
+    names = (return_targets(text) | {"ret_tgt", "rettgt", "ret_target"}
+             | exit_targets(text, entry))
     return any(re.search(rf"pc_is\s+(?:\(\s*)?{re.escape(n)}\b", text) for n in names)
 REQUIRE = re.compile(r"^\s*(?:From\s+\w+\s+)?Require\s+(?:Import|Export)?\s*([^.]*)\.", re.M)
 MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)
@@ -398,7 +421,7 @@ def scan_proofs(repo: str) -> Proofs:
                     file=base, line=line, body=name,
                     symbol=m.group(1),
                     offset=int(m.group(2), 0) if m.group(2) else 0,
-                    whole=runs_to_return(text)))
+                    whole=runs_to_end(text, m.group(1))))
 
     for s in p.specs:
         s.modtype = body_of_modtype.get(s.body, "")

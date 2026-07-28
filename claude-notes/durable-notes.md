@@ -94,8 +94,10 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   `nm` on `xv6-riscv/kernel/*.o`, by name, with a `*.c`/`*.S` scan as fallback.
 - The proof side is derived from the spec-module shape
   ([`design/spec-modules.md`](design/spec-modules.md)): a `_body` whose entry
-  `pc_is` is `KernelSyms.<f>` at offset 0 and whose continuation `pc_is` is the
-  ra-derived return address is a whole-function spec; it counts as proven once
+  `pc_is` is `KernelSyms.<f>` at offset 0 and whose continuation `pc_is` leaves
+  the function — the ra-derived return address, or (for one that never returns,
+  like the boot path) a `let` bound to ANOTHER `KernelSyms` symbol — is a
+  whole-function spec; it counts as proven once
   a `Link*.v` instantiates a functor sealed by its `Module Type`. **So keeping
   a new proof in that shape is what keeps it visible to the report** — nothing
   needs to be registered.
@@ -109,10 +111,13 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   silent — a spec-shape slip shows up as a status downgrade, never as an error,
   so **check the report after adding a function** rather than assuming it
   counted.
-- The whole-function proofs that predate the shape (M-mode boot and the
-  assembly: `_entry`, `start`, `timerinit`, `spin`, `swtch`, `kernelvec`,
-  `userret`) name their entry pc through a local `Definition`, so they are
-  listed in the script's `MANIFEST_PROVEN`, as are the deliberately-assumed
+- The whole-function proofs that predate the shape (the piecewise M-mode boot
+  lemmas and the assembly: `_entry`, `start`, `timerinit`, `spin`, `swtch`,
+  `kernelvec`, `userret`) name their entry pc through a local `Definition`, so
+  they are listed in the script's `MANIFEST_PROVEN`. (The composed boot
+  contract — `_entry` through `start` into S-mode at `main` — IS in the module
+  shape: `SpecEntry.v` / `ProofEntry.v` / `LinkEntry.v`, over those lemmas.)
+  Also listed are the deliberately-assumed
   contracts (`myproc`, `panic`, `kerneltrap`) in `MANIFEST_ASSUMED`. Every
   entry is verified against the tree and a stale one is reported as a manifest
   error rather than silently counted — fix those when they appear.

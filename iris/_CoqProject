@@ -109,7 +109,9 @@ WpMemsetS.v
 WpSmodeSret.v
 WpTimerinit.v
 WpStartNew.v
-WpKernelNew.v
+SpecEntry.v
+ProofEntry.v
+LinkEntry.v
 WpKvInstr.v
 WpMemsetInstr.v
 WpKernelvecNew.v

@@ -174,6 +174,38 @@ forgotten) and walk's `wp_memset_page_zero_sconf` (`page_own p` in, the written
 the ~20 s inline memset composition out of the `ProofWalk` critical-path file
 into the separately-compilable `WpMemsetArray`.
 
+## The M-mode boot: one spec for a path that never returns
+
+The whole boot — `_entry` (entry.S) → `start()` → `timerinit()` → MRET → `main`
+in Supervisor — is ONE contract, `ENTRY.wp_entry_boot`
+(**`SpecEntry.v`** / **`ProofEntry.v`** / **`LinkEntry.v`**). Clients see a
+single spec: "power up at `_entry`, arrive at `<main>` in S-mode with these
+registers"; the piecewise lemmas it is composed from (`wp_entry`
+WpEntryNew.v, `wp_start` WpStartNew.v, `wp_timerinit` WpTimerinit.v) stay in
+their own files and are NOT part of the interface. `ProofEntry` is only the
+plumbing between them (~40 lines, 3.5 s) and takes no functor arguments,
+because those callees are plain lemmas rather than spec modules.
+
+Three things are specific to a never-returning function, and generalize to any
+other one:
+
+- **The continuation pc is another function's entry, not the ra return
+  address.** So the spec's exit is `let pcMain : mword 64 := mword_of_int
+  KernelSyms.main in … pc_is pcMain`, and `tools/proof_coverage.py`'s
+  `runs_to_end` counts a `let` bound to a DIFFERENT `KernelSyms` symbol as
+  leaving the function — without that rule the boot spec reads as a "fragment
+  at +0x0" even though it covers the function and then some.
+- **The entry/exit pcs are spelled through `KernelSyms`, the M-mode proofs
+  through their own local `Definition`s** (`pc_e0`, `st_main`). They are
+  convertible, not syntactically equal, so the proof meets them with
+  `iEval (change pcE with pc_e0) in "Hpc"` at the head and
+  `iEval (change st_main with pcMain) in "Hpc"` / `… in "Hmepc"` at the tail.
+- **`SpecEntry.v` is the one Spec file not stated over the definitional layer
+  alone.** Its post-state vocabulary (`m_jal`, `entry_ld_ea`, `st_mout`,
+  `st_pmpcfg1`, `ti_deadline`, …) is defined inside the M-mode Wp files, so it
+  requires them. Moving that pure vocabulary into a definitional file is what
+  would decouple it; nothing else depends on that split.
+
 ## Gotchas (all hit in practice)
 
 - **The spec's binder list must mirror the proof file's `Context` exactly.** A
