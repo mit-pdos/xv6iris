@@ -334,11 +334,6 @@ Lemma pkdc_45c1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 16, Regidx (mword_of_int 11)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x4601  li a2,0 *)
-Lemma pkdc_4601 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4601 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x4605  li a2,1 *)
 Lemma pkdc_4605 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -484,11 +479,6 @@ Lemma pkdc_8556 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 21)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x85da  mv a1,s6 *)
-Lemma pkdc_85da s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85da : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x8636  mv a2,a3 *)
 Lemma pkdc_8636 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -1399,7 +1389,7 @@ Section WpPrintkDecode.
 
   Lemma pki_c6 : kernel_text -∗ instr (mword_of_int (PK + 0xc6) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (PK + 0xc6)%Z (mword_of_int 0x85da : mword 16)
-    (mword_of_int (PK + 0xc6) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) pkdc_85da exec_execute_C_MV. Qed.
+    (mword_of_int (PK + 0xc6) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) cdec_85da exec_execute_C_MV. Qed.
 
   Lemma pki_c8 : kernel_text -∗ instr (mword_of_int (PK + 0xc8) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
   Proof. mk_rvc (PK + 0xc8)%Z (mword_of_int 0x6388 : mword 16)
@@ -1435,7 +1425,7 @@ Section WpPrintkDecode.
 
   Lemma pki_e2 : kernel_text -∗ instr (mword_of_int (PK + 0xe2) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (PK + 0xe2)%Z (mword_of_int 0x85da : mword 16)
-    (mword_of_int (PK + 0xe2) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) pkdc_85da exec_execute_C_MV. Qed.
+    (mword_of_int (PK + 0xe2) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) cdec_85da exec_execute_C_MV. Qed.
 
   Lemma pki_e4 : kernel_text -∗ instr (mword_of_int (PK + 0xe4) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 4)).
   Proof. mk_rvc (PK + 0xe4)%Z (mword_of_int 0x4388 : mword 16)
@@ -1515,11 +1505,11 @@ Section WpPrintkDecode.
 
   Lemma pki_11e : kernel_text -∗ instr (mword_of_int (PK + 0x11e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (PK + 0x11e)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (PK + 0x11e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) pkdc_4601 exec_execute_C_LI. Qed.
+    (mword_of_int (PK + 0x11e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma pki_120 : kernel_text -∗ instr (mword_of_int (PK + 0x120) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (PK + 0x120)%Z (mword_of_int 0x85da : mword 16)
-    (mword_of_int (PK + 0x120) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) pkdc_85da exec_execute_C_MV. Qed.
+    (mword_of_int (PK + 0x120) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) cdec_85da exec_execute_C_MV. Qed.
 
   Lemma pki_122 : kernel_text -∗ instr (mword_of_int (PK + 0x122) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 10), true, 4)).
   Proof. mk_base (PK + 0x122)%Z (mword_of_int 0x0007e503 : mword 32)
@@ -1547,11 +1537,11 @@ Section WpPrintkDecode.
 
   Lemma pki_138 : kernel_text -∗ instr (mword_of_int (PK + 0x138) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (PK + 0x138)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (PK + 0x138) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) pkdc_4601 exec_execute_C_LI. Qed.
+    (mword_of_int (PK + 0x138) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma pki_13a : kernel_text -∗ instr (mword_of_int (PK + 0x13a) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (PK + 0x13a)%Z (mword_of_int 0x85da : mword 16)
-    (mword_of_int (PK + 0x13a) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) pkdc_85da exec_execute_C_MV. Qed.
+    (mword_of_int (PK + 0x13a) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)) cdec_85da exec_execute_C_MV. Qed.
 
   Lemma pki_13c : kernel_text -∗ instr (mword_of_int (PK + 0x13c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
   Proof. mk_rvc (PK + 0x13c)%Z (mword_of_int 0x6388 : mword 16)
@@ -1583,7 +1573,7 @@ Section WpPrintkDecode.
 
   Lemma pki_154 : kernel_text -∗ instr (mword_of_int (PK + 0x154) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (PK + 0x154)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (PK + 0x154) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) pkdc_4601 exec_execute_C_LI. Qed.
+    (mword_of_int (PK + 0x154) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma pki_156 : kernel_text -∗ instr (mword_of_int (PK + 0x156) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 10 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (PK + 0x156)%Z (mword_of_int 0x45a9 : mword 16)
@@ -1619,7 +1609,7 @@ Section WpPrintkDecode.
 
   Lemma pki_170 : kernel_text -∗ instr (mword_of_int (PK + 0x170) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (PK + 0x170)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (PK + 0x170) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) pkdc_4601 exec_execute_C_LI. Qed.
+    (mword_of_int (PK + 0x170) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma pki_172 : kernel_text -∗ instr (mword_of_int (PK + 0x172) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (PK + 0x172)%Z (mword_of_int 0x45c1 : mword 16)
@@ -1683,7 +1673,7 @@ Section WpPrintkDecode.
 
   Lemma pki_1a4 : kernel_text -∗ instr (mword_of_int (PK + 0x1a4) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (PK + 0x1a4)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (PK + 0x1a4) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) pkdc_4601 exec_execute_C_LI. Qed.
+    (mword_of_int (PK + 0x1a4) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma pki_1a6 : kernel_text -∗ instr (mword_of_int (PK + 0x1a6) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (PK + 0x1a6)%Z (mword_of_int 0x45c1 : mword 16)

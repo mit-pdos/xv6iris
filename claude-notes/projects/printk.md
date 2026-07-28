@@ -162,6 +162,14 @@ each one cost:
   callee-saved, which is the whole reason gcc put the cursor and the sentinel
   there.
 
+Two further tactic notes from the shell:
+`pk_fbyte f j` exists because `(cstring_bytes f !!! j : mword 8)` written
+inline sends the elaborator looking for a `LookupTotal nat (mword ?n)`
+instance -- put the ascription in a Definition.  And `repeat split` on a
+conjunction of REGISTER-MAP lookups closes goals by conversion (`rf_upd` is
+transparent), so the bullets that follow land on the wrong goals or on none:
+use stdpp's `split_and!`, exactly as durable-notes.md says.
+
 Two performance/robustness traps worth repeating, both of which cost a >10-minute
 hang before being found (`coqc -time` pins them instantly -- the log's last
 sentence is the one BEFORE the offending tactic):
@@ -181,7 +189,7 @@ half the frame-address lemmas -- write `f_equal; try (apply bv_eq; vm_compute;
 reflexivity)`.  And a value bound out of an existential resource arrives as
 `bv 8`, so ascribe `(b : mword 8)` at every leaf that wants an `mword`.
 
-### printk -- decode layer, epilogue and both exits DONE; the body not started
+### printk -- the whole SHELL is done; the loop body and the arms are not
 
 `WpPrintkDecode.v` proves all **264** instruction facts (offsets 0x00..0x328)
 plus the 188 distinct decode words they rest on.  It was GENERATED from the
@@ -231,13 +239,22 @@ check it.
     `vm_compute` inside diverges.  Same trap as the leaf-value one above; it
     shows up as a hang, not an error.
 
-810 bytes / 264 instructions, ~15 dispatch arms. The pieces still to do:
+- **`wp_printk_prologue`** (0x00..0x1a) -- the 24-slot push, the three eager
+  saves, s0/s2, and the seven vararg spills.  `pk_va sp0 m` is the spilled
+  a1..a7: slot 7 down to slot 1, spelled out rather than indexed, so no
+  `7 - j` / `11 + j` arithmetic has to be reduced at every use (it does not
+  reduce, and `iExact` then fails on a conjunct that looks right).
+- **`wp_printk_setup`** (0x1e..0x62) -- the `panicking` test (falls through:
+  the panic path takes no lock), the va_list cursor into slot 23, the first
+  format byte, and then EITHER the empty-format-string exit straight to the
+  epilogue -- correct precisely because no lazy save has happened yet, so the
+  frame is already in `pk_frame` shape -- OR the nine lazy saves, the six
+  hoisted constants (`pk_consts`) and the jump to the loop head at 0x86.
 
-- the two restore blocks (0x24e and 0x276), nine `ld`s each, both falling into
-  the epilogue -- the same shape as consputc's rejoining arms, but the block
-  itself is identical at two addresses, so state it once over the nine `instr`
-  facts rather than twice over the tactics;
-- the 24-slot frame, whose full map is: slots 1..7 = the varargs (a1..a7
+So every instruction of printk outside the loop body and the dispatch arms is
+now proven.  What is left is 0x72..0x24a:
+
+- (reference) the 24-slot frame map is: slots 1..7 = the varargs (a1..a7
   spilled at `56(s0)..8(s0)`, s0 = sp0-64), 8 unused, 9 = ra, 10 = s0,
   11 = s1, 12 = s2, 13..18 = s3..s8, 19 = s9, 20 = s10, 21 = s11, 22 unused,
   23 = `ap` (at `-120(s0)`), 24 unused.  s1/s3..s8/s10/s11 are saved LAZILY at
