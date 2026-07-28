@@ -503,10 +503,20 @@ BEFORE the case split, or the blind split asks for `2 <= 1`.
 
 Left, in order:
 
-1. the arm selection from `pk_entry` -- fifteen cases, mechanical: in each,
-   `pk_entry` reduces to a literal and the matching arm lemma applies.  Only
-   `%s` needs a descriptor resource, since `PkANum`'s is `True`; `%%`, the
-   unknown directive and the `c0 = 0` exit consume no vararg at all.
+1. **`wp_printk_arm_num` is proven** -- the eleven entries whose directive
+   consumes a NUMBER (`%d %ld %lld %u %lu %llu %x %lx %llx %p %c`), selected
+   from `pk_entry` and run to 0x78.  Its postcondition is the union of the
+   arms': every callee-saved register except s1, s4, s5 is preserved, and
+   `s1 = i + 1 + snd (pk_dir c0 c1 c2)` -- which is exactly the index
+   `pk_kinds_step`'s tail moves to.  Two wrinkles worth keeping:
+   - the case order must be `pk_entry`'s (d, l, then u, x, p, c), because in
+     the `l` branch `pk_dir` still needs c0 ruled out against d,u,x,p,c,s --
+     `ascii_eqb_neq` derives those from `c0 = 'l'`.
+   - reduce `pk_entry`/`pk_dir` with `rewrite ?H1 ?H2 ...` over the WHOLE
+     fact set: a plain `rewrite` fails once the term has already collapsed to
+     a literal, so a per-leaf exact list is fragile.
+   Still to do: `wp_printk_arm_str` (`%s`, which needs the descriptor) and
+   `wp_printk_arm_none` (`%%` and the unknown directive, no vararg).
 2. the loop induction on the format index, carrying `pk_kinds (str_drop p f) =
    map pk_desc_kind (drop k descs)` and splitting the descriptor `big_sepL`
    at `k`.
