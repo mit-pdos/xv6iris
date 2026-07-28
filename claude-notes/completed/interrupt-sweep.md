@@ -37,7 +37,7 @@ Two consumer-side items were never in the sweep's scope and remain undone:
   takes for its `rdtime`/`csrw stimecmp`.
 - **vcgen-to-sconf**: `wp_vc_block_s_sconf` is built but has no consumer outside
   `WpSconfVc.v` (the sconf functions leaf-chain today); the only remaining
-  `wp_vc_block_s` (SIE-0) consumer is the kernelvec handler `WpKernelvecNew.v`
+  `wp_vc_block_s` (SIE-0) consumer is the kernelvec handler `ProofKernelvec.v`
   (`kv_store_prog`/`kv_load_prog` blocks).
 
 Pick these up under whatever project takes the boot path; they are recorded here
@@ -64,7 +64,7 @@ so the analysis is not lost.
   Release,Acquire,Kalloc,Kfree,WakeupParts,Wakeup,Memset,MemsetPage,Initlock,
   Walk,Mappages,Kvmmap,Freerange,Kinit}.v.
 - Import direction: leaf files import IntrDefs/WpSmodeIntr; WpIntrInv imports no
-  leaf file; WpKernelvecSpec does — keep the kernelvec cap on top.
+  leaf file; ProofKernelvec does — keep the kernelvec cap on top.
 - Perf: keep per-file compile times within ~10% (optimization.md rules apply;
   `sie_cap` adds one iDestruct per instruction).
 
@@ -201,7 +201,8 @@ so the analysis is not lost.
 ## Boot wiring — REMAINING (item 8)
 
 Bigger than "just allocate + plumb"; there is a real execution gap.  Current
-state (mapped): `wp_kernel` (WpKernelNew.v:36) composes `_entry`→`start()` and
+state (mapped): `ENTRY.wp_entry_boot` (SpecEntry.v, proven in ProofEntry.v,
+linked in LinkEntry.v) composes `_entry`→`start()` and
 STOPS at `<main>` (0x80000e82, Supervisor) handing back RAW cells (hart_state,
 cur_privilege, mstatus, mie, mideleg, menvcfg, satp, stack_own …) — NO γ, NO
 bundle.  The stvec handler is installed by `csrw stvec,a5` inside
@@ -222,7 +223,7 @@ bundle.  The stvec handler is installed by `csrw stvec,a5` inside
    re-split one 1/4 into two `(1/4/2)` eighths; build `sconf γ` from the raw
    cells (SmodeCore.v:1086 `smode_config_rebuild` or IntrDefs.v:350 direct);
    `intr_inv_alloc_off ⊤ γ kernelvec root_ppn MENVCFG_S` (IntrDefs.v:328, uses
-   `kernelvec_tv_direct`/`kernelvec_stvec_base`, WpKernelvecSpec.v:41) →
+   `kernelvec_tv_direct`/`kernelvec_stvec_base`, SpecKernelvec.v) →
    `intr_inv`; assemble `sie_cap` (sie_arm left 'b0 arm + a 32-slot `stack_own`
    carve) and `intr_count γ root 0` via `intr_count_init` (IntrDefs.v:495, needs
    intr_off_tok = the 2nd eighth + `intr_restore` from `intr_restore_intro`

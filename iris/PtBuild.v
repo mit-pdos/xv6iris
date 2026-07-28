@@ -162,6 +162,29 @@ Proof.
   exists c1, c0. tauto.
 Qed.
 
+(* The leaf word a vpn's path CURRENTLY reaches, as a FUNCTION of the
+   tree (the tree is concrete data, so the represented map is recoverable
+   from it): [None] when the path is cut short by a missing l1/l0 node,
+   otherwise the word sitting in the l0 slot.  This is what lets a
+   modulo-A/D mapping spec be turned back into an EXACT [pt_rep0] map
+   ([UptTree.upt_spec_rep0]). *)
+Definition pt_leaf_word (t : ptree) (vpn : mword 27) : option (mword 64) :=
+  match pt_kids t (vpn_idx 2 vpn) with
+  | None => None
+  | Some c1 =>
+      match pt_kids c1 (vpn_idx 1 vpn) with
+      | None => None
+      | Some c0 => Some (pt_ents c0 (vpn_idx 0 vpn))
+      end
+  end.
+
+Lemma ptree_maps_leaf_word (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 -> pt_leaf_word t vpn = Some p0.
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & _ & _ & He0 & _).
+  unfold pt_leaf_word. rewrite Hk2 Hk1 He0. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (* FUEL-GENERIC descent relations (the walk-loop pure layer).  A node [t]  *)
 (* sitting at level [lvl] on [vpn]'s path either MAPS down to a valid leaf, *)

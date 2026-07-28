@@ -102,6 +102,12 @@ are working on that effort — the relevant `projects/` file.
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
+- **[`vmfault.md`](projects/vmfault.md)** — vmfault + ismapped (+ the no-alloc
+  walk spec): the lazy-allocation page-fault handler, stated at the `proc_pt`
+  altitude so it PRESERVES the valid-user-page-table invariant — including the
+  `upt_tree_spec` blocks0 strengthening and the `pt_rep0 ⇄ upt_tree_spec`
+  bridge (`upt_ad_view`) that dovetail the runtime mappages/walk specs with
+  the user-table invariant.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode

@@ -1,47 +1,69 @@
-(* WpKernelvecNew.v -- K3: the COMPLETE kernelvec handler WP on the new-style
-   S-mode infrastructure (SmodeCore / WpSmodeGpr / WpSmodeSret / WpKvInstr).
+(* ProofKernelvec.v -- the complete WP for xv6's kernelvec, the S-mode trap
+   vector (kernelvec.S), as a sealed functor over its one callee's contract
+   ([SpecKerneltrap.KERNELTRAP]).
 
-   Contents:
-   - [kv_cell]           : an 8-byte owned stack window (as in the old WpKvTrap).
-   - [kt_clobbered]      : the caller-saved registers kerneltrap may clobber.
-   - [kerneltrap_returns]: THE axiom -- executing the kerneltrap body from its
-     entry (0x800026a2) returns to the address in ra, preserving sp + all
-     callee-saved registers, the S-mode config cells, PMP, TLB and the
-     caller's 17 saved-register stack windows.  This is the ONLY axiom.
+     kernelvec:
+       addi sp, sp, -256          # 1 instr : open the frame
+       sd   ra, 0(sp)  ... sd t6, 240(sp)   # 17 c.sdsp : save the caller-saved
+       call kerneltrap            # THE call (the assumed contract)
+       ld   ra, 0(sp)  ... ld t6, 240(sp)   # 17 c.ldsp : restore them
+       addi sp, sp, 256           # close the frame
+       sret                       # back to the interrupted pc
+
+   The pieces, bottom up:
    - [kv_cfg_split] / [kv_cfg_recombine]: the wp_start-style fraction
      choreography -- full raw cells <-> smode_config(1/2) + retained halves
      with the mstatus/mie/mideleg/menvcfg VALUES pinned outside the bundle.
-   - [wp_kv_prologue]    : instrs #1..#19 (c.addi16sp fill-fetch, 17 c.sdsp
-     saves incl. the data-walk fill, jal kerneltrap).
+   - [wp_kv_store_block_vc] / [wp_kv_load_block_vc]: the two 17-instruction
+     straight-line runs, discharged through the block VCgen (VcGenS.v) rather
+     than instruction by instruction.
+   - [wp_kv_prologue]    : instrs #1..#19 (c.addi16sp fill-fetch, the 17
+     c.sdsp saves incl. the data-walk fill, jal kerneltrap).
    - [wp_kv_epilogue]    : instrs #20..#38 (17 c.ldsp restores, c.addi16sp
      sp,+256, sret).
-   - [wp_kernelvec]      : the capstone -- entry-to-SRET, gpr file FULLY
-     PRESERVED (loads restore stores; -256/+256 cancels on sp), ONE Qed
-     modulo the two chunk lemmas.  Only kerneltrap_returns + platform
-     externs are assumed. *)
-From Stdlib Require Import ZArith FunctionalExtensionality.
+   - [wp_kernelvec]      : entry-to-SRET, gpr file FULLY PRESERVED (the loads
+     restore the stores; -256/+256 cancels on sp).  Carries its mstatus /
+     menvcfg parameters and their well-formedness premises explicitly.
+   - [kernelvec_handler_spec] : THE public contract (SpecKernelvec.v) -- the
+     cap that instantiates [wp_kernelvec] at MENVCFG_S and re-addresses
+     kernelvec's 17 sparse save windows as [pa_stk] slots of the per-trap
+     [intr_frame], so a trap into kernelvec returns idempotently to the
+     interrupted pc with SIE re-enabled and the frame intact.  The SIE ghost
+     kernelvec's WP consumes is a FRESH per-trap name [γk] (allocated here,
+     tied to the trapped SIE=0 and discarded at the sret) -- the REAL [γ]'s
+     pieces stay outside the handler run, untouched, so the live-bit tie is
+     restored for free when SRET brings SIE back to 1.
+
+   Only [Kerneltrap.kerneltrap_returns] + platform externs are assumed, and
+   that one arrives through the functor parameter -- see LinkKerneltrap.v. *)
+From Stdlib Require Import ZArith Bool FunctionalExtensionality.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
-From iris.base_logic.lib Require Import ghost_var.
+From iris.base_logic.lib Require Import ghost_var invariants.
 Require Import SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import RegFile.
-Require Import WpMmodeLeafBase.
+Require Import WpMmodeLeafBase StackOwn.
 Require Import SmodeCore MstatusBits KernelText WpKvInstr.
 Require Import VcGen VcGenS.
-From Kernel Require KernelSyms.
-Local Open Scope Z_scope.
 Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtCtl.
+Require Import WpIntrCore.
+Require Import IntrDefs.
+(* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the
+   WpGprCsrwCommon/C namespaces don't shadow anything here. *)
+Require WpGprCsrwCommon WpGprCsrwC.
+Require Import SpecKerneltrap SpecKernelvec.
+From Kernel Require KernelSyms.
+Local Open Scope Z_scope.
 Import Defs.
 
-Notation KV := KernelSyms.kernelvec.
-
+Module KernelvecProof (Kerneltrap : KERNELTRAP) : KERNELVEC.
 (* ===================================================================== *)
 (* Pure helpers.                                                          *)
 (* ===================================================================== *)
@@ -108,34 +130,6 @@ Definition kv_m1 (m : regfile) : regfile :=
 Definition kv_m2 (m : regfile) : regfile :=
   <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)]> (kv_m1 m).
 
-(* ===================================================================== *)
-(* kv_cell + kt_clobbered + THE kerneltrap axiom.                        *)
-(* ===================================================================== *)
-Section KvCell.
-  Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
-  (* the 8-byte stack cell at address [a] currently holding [v]: a
-     doubleword points-to, bundling the 8 byte facts with 8-alignment. *)
-  Definition kv_cell (a : mword 64) (v : bv 64) : iProp Σ :=
-    word_pointsto a (DfracOwn 1) v.
-End KvCell.
-
-(* The caller-saved temporaries a C function (kerneltrap) may clobber:
-   ra + t0..t6 + a0..a7 -- exactly the registers kernelvec's assembly saves
-   and restores around the call.  Every OTHER register (sp, gp, tp, s0..s11)
-   is callee-saved and must be preserved by kerneltrap.  (Same set as the
-   old WpKvTrap.kt_clobbered, re-keyed from register_bitvector_64 to the
-   gpr_file's regidx.) *)
-Definition kt_clobbered : gset regidx :=
-  {[ Regidx (mword_of_int 1 : mword 5); Regidx (mword_of_int 5 : mword 5);
-     Regidx (mword_of_int 6 : mword 5); Regidx (mword_of_int 7 : mword 5);
-     Regidx (mword_of_int 10 : mword 5); Regidx (mword_of_int 11 : mword 5);
-     Regidx (mword_of_int 12 : mword 5); Regidx (mword_of_int 13 : mword 5);
-     Regidx (mword_of_int 14 : mword 5); Regidx (mword_of_int 15 : mword 5);
-     Regidx (mword_of_int 16 : mword 5); Regidx (mword_of_int 17 : mword 5);
-     Regidx (mword_of_int 28 : mword 5); Regidx (mword_of_int 29 : mword 5);
-     Regidx (mword_of_int 30 : mword 5); Regidx (mword_of_int 31 : mword 5) ]}.
-
 (* The 18 registers kernelvec WRITES between entry and sret: sp + the 17
    saved/restored registers (⊇ kt_clobbered).  Key set of the final map_eq. *)
 Definition kv_saved : gset regidx :=
@@ -150,57 +144,9 @@ Definition kv_saved : gset regidx :=
      Regidx (mword_of_int 29 : mword 5); Regidx (mword_of_int 30 : mword 5);
      Regidx (mword_of_int 31 : mword 5) ]}.
 
-(* The kerneltrap contract (port of the old WpKvTrap.kerneltrap_returns into
-   the new-style resource vocabulary): EXECUTING the handler body, entered at
-   its function address 0x800026a2 with a return address [rava] in ra, reaches
-   PC = rava -- preserving sp and every callee-saved register (the register
-   file keeps the same domain and agrees with the input outside
-   [kt_clobbered]), the caller's 17 saved-register stack windows, and the
-   S-mode config cells / PMP / TLB.  misa / mseccfg / elp / pma_regions /
-   htif are pinned persistently by [hw_config]; the minstret counter cells
-   live in the (persistent) [minstret_inv]; sepc is NOT in the footprint
-   (kerneltrap saves and restores it), so it frames around the call --
-   exactly as in the old axiom. *)
-Axiom kerneltrap_returns :
-  forall `{!riscvGS Σ} `{CpuId} `{!sieG Σ}
-    (γ : gname) (dq : dfrac)
-    (m : regfile) (spv rava : mword 64)
-    (satp0 : mword 64)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6))
-    (pa1 pa2 pa3 pa4 pa5 pa6 pa7 pa8 pa9 pa10 pa11 pa12 pa13 pa14 pa15 pa16 pa17 : mword 64)
-    (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
-    (Phi : mval -> iProp Σ),
-    m !!! Regidx csp_rs1 = spv ->
-    m !!! Regidx (mword_of_int 1 : mword 5) = rava ->
-    smode_config γ dq -∗
-    satp ↦ᵣ satp0 -∗
-    tlb ↦ᵣ tlbvec -∗
-    pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
-    gpr_file m -∗
-    kv_cell pa1 v1 -∗ kv_cell pa2 v2 -∗ kv_cell pa3 v3 -∗ kv_cell pa4 v4 -∗
-    kv_cell pa5 v5 -∗ kv_cell pa6 v6 -∗ kv_cell pa7 v7 -∗ kv_cell pa8 v8 -∗
-    kv_cell pa9 v9 -∗ kv_cell pa10 v10 -∗ kv_cell pa11 v11 -∗ kv_cell pa12 v12 -∗
-    kv_cell pa13 v13 -∗ kv_cell pa14 v14 -∗ kv_cell pa15 v15 -∗ kv_cell pa16 v16 -∗
-    kv_cell pa17 v17 -∗
-    ▷ ( ∀ m' : regfile,
-        ⌜ ∀ r : regidx, r ∉ kt_clobbered → m' !!! r = m !!! r ⌝ -∗
-        smode_config γ dq -∗
-        satp ↦ᵣ satp0 -∗
-        tlb ↦ᵣ tlbvec -∗
-        pc_is rava -∗
-        gpr_file m' -∗
-        kv_cell pa1 v1 -∗ kv_cell pa2 v2 -∗ kv_cell pa3 v3 -∗ kv_cell pa4 v4 -∗
-        kv_cell pa5 v5 -∗ kv_cell pa6 v6 -∗ kv_cell pa7 v7 -∗ kv_cell pa8 v8 -∗
-        kv_cell pa9 v9 -∗ kv_cell pa10 v10 -∗ kv_cell pa11 v11 -∗ kv_cell pa12 v12 -∗
-        kv_cell pa13 v13 -∗ kv_cell pa14 v14 -∗ kv_cell pa15 v15 -∗ kv_cell pa16 v16 -∗
-        kv_cell pa17 v17 -∗
-        WP (Loop : expr riscv_lang) {{ Phi }} ) -∗
-    WP (Loop : expr riscv_lang) {{ Phi }}.
-
 (* ===================================================================== *)
 (* Block-VCgen support for the two 17-instruction straight-line runs      *)
-(* (the register-save c.sdsp block and the register-restore c.ldsp block),*)
-(* merged here from the former WpKernelvecVc.v.                            *)
+(* (the register-save c.sdsp block and the register-restore c.ldsp block).*)
 (* ===================================================================== *)
 Definition kv_store_prog : list vop_s :=
   [ VScsdsp (mword_of_int 0) (mword_of_int 1);
@@ -331,7 +277,7 @@ Lemma kv_load_run :
   = Some (VSt (KV + 0x4a) kv_load_regs1 kv_store_heap0 []).
 Proof. vm_compute. reflexivity. Qed.
 
-Section WpKernelvecNew.
+Section KernelvecCore.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
@@ -1237,7 +1183,7 @@ Section WpKernelvecNew.
   (* THE CAPSTONE: the complete kernelvec handler, entry to SRET, with   *)
   (* the GPR FILE FULLY PRESERVED (the 17 loads restore the 17 stores;   *)
   (* the axiom preserves the callee-saved rest; -256/+256 cancels on     *)
-  (* sp).  Only [kerneltrap_returns] + platform externs are assumed.     *)
+  (* sp).  Only the KERNELTRAP contract + platform externs are assumed. *)
   (* =================================================================== *)
   Lemma wp_kernelvec (root_ppn : mword 44) (γ : gname)
       (m : regfile)
@@ -1351,7 +1297,7 @@ Section WpKernelvecNew.
               with "Hsm Htlbinv Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iIntros "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
-    (* ---- the kerneltrap call (THE axiom) ---- *)
+    (* ---- the kerneltrap call (THE assumed contract) ---- *)
     assert (Hsp_l : kv_m2 m !!! Regidx csp_rs1 = kv_sp1 m).
     { unfold kv_m2. rewrite upd_ne; [| kv_regne]. unfold kv_m1. apply upd_eq. }
     assert (Hra_l : kv_m2 m !!! Regidx (mword_of_int 1 : mword 5)
@@ -1359,7 +1305,7 @@ Section WpKernelvecNew.
     { unfold kv_m2. apply upd_eq. }
     iDestruct (tlb_inv_pt_open with "Htlbinv") as (satp0 tlbmid t0 M)
       "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & HM & Hpte & Hpmp)".
-    iApply (kerneltrap_returns γ (DfracOwn (1/2)) (kv_m2 m) (kv_sp1 m)
+    iApply (Kerneltrap.kerneltrap_returns γ (DfracOwn (1/2)) (kv_m2 m) (kv_sp1 m)
               (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))
               satp0 tlbmid
               ((((kv_sp1 m)))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))))
@@ -1492,4 +1438,213 @@ Section WpKernelvecNew.
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
   Qed.
 
-End WpKernelvecNew.
+End KernelvecCore.
+
+(* kernelvec's sparse positive-offset save slots, re-addressed as [pa_stk]
+   slots below the INTERRUPTED sp: kv_sp1 = sp - 256, so the window at
+   kv_sp1 + 8j is stack slot 32 - j. *)
+Lemma kv_slot_addr (m : regfile) (off : mword 64) (k : nat) :
+  add_vec (sign_extend' 64 (caddi16sp_imm kv_imm1)) off
+    = (mword_of_int (- (8 * Z.of_nat k)) : mword 64) ->
+  add_vec (kv_sp1 m) off = pa_stk (m !!! Regidx csp_rs1) k.
+Proof.
+  intros H.
+  assert (Hr : kv_sp1 m
+               = add_vec (m !!! Regidx csp_rs1)
+                         (sign_extend' 64 (caddi16sp_imm kv_imm1))) by reflexivity.
+  rewrite Hr kv_addv_assoc H. unfold pa_stk, add_vec_int. reflexivity.
+Qed.
+
+Lemma kv_slot_addr0 (m : regfile) :
+  kv_sp1 m = pa_stk (m !!! Regidx csp_rs1) 32.
+Proof.
+  assert (Hr : kv_sp1 m
+               = add_vec (m !!! Regidx csp_rs1)
+                         (sign_extend' 64 (caddi16sp_imm kv_imm1))) by reflexivity.
+  rewrite Hr. unfold pa_stk, add_vec_int. apply f_equal.
+  apply bv_eq. vm_compute. reflexivity.
+Qed.
+
+Section KernelvecHandler.
+  Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
+  Context `{CID : CpuId}.
+
+  (* =================================================================== *)
+  (* [root_ppn] is introduced per trap (the contract's leading universal);
+     the frame pins menvcfg to MENVCFG_S, so the old menvcfg0 hypotheses
+     are concrete facts here. *)
+  Lemma kernelvec_handler_spec : kernelvec_handler_spec_body.
+  Proof.
+    cbv beta delta [kernelvec_handler_spec_body].
+    iIntros "#Hhw #Hinv #Htext".
+    iModIntro.
+    iIntros (root_ppn elp_v ms pc0 mie_v mdv0 m Φ)
+      "%Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hpc Hfile HF Hcont".
+    pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
+    assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
+      by (vm_compute; reflexivity).
+    assert (Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM MENVCFG_S) = PMM_Disabled)
+      by (vm_compute; reflexivity).
+    assert (Hlpe0 : _get_MEnvcfg_LPE MENVCFG_S = ('b"0"))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (HFIOM : eq_vec (_get_MEnvcfg_FIOM MENVCFG_S) ('b"1") = false)
+      by (vm_compute; reflexivity).
+    iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
+    (* re-address kernelvec's 17 sparse save windows as [pa_stk] slots *)
+    pose proof (kv_slot_addr0 m) as Hb32.
+    assert (Hb30 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 30)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb28 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 28)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb27 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 27)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb26 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 26)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb23 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 23)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb22 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 22)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb21 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 21)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb20 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 20)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb19 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 19)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb18 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 18)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb17 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 17)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb16 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 16)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb5 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 5)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb4 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 4)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb3 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 3)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    assert (Hb2 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 2)
+      by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    (* open the 32-slot frame and pull out the 17 save slots *)
+    iEval (rewrite /kv_frame_slots stack_own_slots; cbn [seq]) in "Hstk".
+    iDestruct "Hstk" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 &
+      S11 & S12 & S13 & S14 & S15 & S16 & S17 & S18 & S19 & S20 & S21 & S22 &
+      S23 & S24 & S25 & S26 & S27 & S28 & S29 & S30 & S31 & S32 & _)".
+    iDestruct "S32" as (w1) "Hw1".   iEval (rewrite -Hb32) in "Hw1".
+    iDestruct "S30" as (w2) "Hw2".   iEval (rewrite -Hb30) in "Hw2".
+    iDestruct "S28" as (w3) "Hw3".   iEval (rewrite -Hb28) in "Hw3".
+    iDestruct "S27" as (w4) "Hw4".   iEval (rewrite -Hb27) in "Hw4".
+    iDestruct "S26" as (w5) "Hw5".   iEval (rewrite -Hb26) in "Hw5".
+    iDestruct "S23" as (w6) "Hw6".   iEval (rewrite -Hb23) in "Hw6".
+    iDestruct "S22" as (w7) "Hw7".   iEval (rewrite -Hb22) in "Hw7".
+    iDestruct "S21" as (w8) "Hw8".   iEval (rewrite -Hb21) in "Hw8".
+    iDestruct "S20" as (w9) "Hw9".   iEval (rewrite -Hb20) in "Hw9".
+    iDestruct "S19" as (w10) "Hw10". iEval (rewrite -Hb19) in "Hw10".
+    iDestruct "S18" as (w11) "Hw11". iEval (rewrite -Hb18) in "Hw11".
+    iDestruct "S17" as (w12) "Hw12". iEval (rewrite -Hb17) in "Hw12".
+    iDestruct "S16" as (w13) "Hw13". iEval (rewrite -Hb16) in "Hw13".
+    iDestruct "S5" as (w14) "Hw14".  iEval (rewrite -Hb5) in "Hw14".
+    iDestruct "S4" as (w15) "Hw15".  iEval (rewrite -Hb4) in "Hw15".
+    iDestruct "S3" as (w16) "Hw16".  iEval (rewrite -Hb3) in "Hw16".
+    iDestruct "S2" as (w17) "Hw17".  iEval (rewrite -Hb2) in "Hw17".
+    (* clearing SIE on the trap-time mstatus is idempotent under legalization
+       (the ext-state / dirty / MPP well-formedness rides in via intr_ms_facts) *)
+    assert (Hleg_trap :
+      WpGprCsrwCommon.legalize_sstatus_val (trap_ms elp_v ms)
+        (WpGprCsrwCommon.sstatus_write_val (trap_ms elp_v ms) (mword_of_int 2))
+      = trap_ms elp_v ms).
+    { apply WpGprCsrwC.legalize_sie_clear_idem.
+      - apply trap_ms_SIE.
+      - rewrite trap_ms_XS; exact HXS.
+      - rewrite trap_ms_FS; exact HFS.
+      - rewrite trap_ms_VS; exact HVS.
+      - rewrite trap_ms_SD; exact HSD.
+      - rewrite trap_ms_MPP; exact HMPP. }
+    (* kernelvec's spec assumes a SIE ghost half tied to ITS entering mstatus
+       (SIE=0); the real γ's pieces stay outside the handler run, so allocate
+       a fresh per-trap name and hand kernelvec one half. *)
+    iMod (ghost_var_alloc (_get_Mstatus_SIE (trap_ms elp_v ms))) as (γk) "Hg".
+    iEval (rewrite -Qp.half_half) in "Hg".
+    iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
+    iApply (wp_kernelvec root_ppn γk m (trap_ms elp_v ms) mie_v mdv0 MENVCFG_S pc0
+              w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 Φ
+              (trap_ms_SIE_false elp_v ms)
+              (trap_ms_MPRV_false elp_v ms HMPRV0)
+              (trap_ms_SXL_eq elp_v ms HSXL)
+              Hmm HPBMTE eq_refl
+              (trap_ms_MXR_true elp_v ms HMXR)
+              Hpmm
+              (trap_ms_TSR_false elp_v ms HTSR)
+              (sret_newpriv_trap_ms elp_v ms)
+              Hlpe0
+              HFIOM
+              Hleg_trap
+              with "Hhw Hinv Hhs Hpriv Hms Hsie Hmie Hmdl Hmenv Htlbinv Hsepc
+                    Hpc Hfile Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hsepc Hpc Hfile
+             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
+    iEval (rewrite Hpc0) in "Hpc".
+    (* the save slots come back holding [m]'s registers; re-address them as
+       [pa_stk] slots and rebuild the 32-slot [stack_own] frame *)
+    iEval (rewrite Hb32) in "Hw1".
+    iEval (rewrite Hb30) in "Hw2".
+    iEval (rewrite Hb28) in "Hw3".
+    iEval (rewrite Hb27) in "Hw4".
+    iEval (rewrite Hb26) in "Hw5".
+    iEval (rewrite Hb23) in "Hw6".
+    iEval (rewrite Hb22) in "Hw7".
+    iEval (rewrite Hb21) in "Hw8".
+    iEval (rewrite Hb20) in "Hw9".
+    iEval (rewrite Hb19) in "Hw10".
+    iEval (rewrite Hb18) in "Hw11".
+    iEval (rewrite Hb17) in "Hw12".
+    iEval (rewrite Hb16) in "Hw13".
+    iEval (rewrite Hb5) in "Hw14".
+    iEval (rewrite Hb4) in "Hw15".
+    iEval (rewrite Hb3) in "Hw16".
+    iEval (rewrite Hb2) in "Hw17".
+    iAssert (stack_own (m !!! Regidx csp_rs1) kv_frame_slots)
+      with "[S1 S6 S7 S8 S9 S10 S11 S12 S13 S14 S15 S24 S25 S29 S31
+            Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17]"
+      as "Hstk".
+    2:{ iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hpc Hfile [Hmenv Htlbinv Hstk]").
+        { iExists pc0. iFrame "Hsepc". }
+        iFrame "Hmenv Htlbinv". iExact "Hstk". }
+    rewrite /kv_frame_slots stack_own_slots. cbn [seq].
+    iSplitL "S1"; [iExact "S1" |].
+    iSplitL "Hw17"; [by iExists _ |].
+    iSplitL "Hw16"; [by iExists _ |].
+    iSplitL "Hw15"; [by iExists _ |].
+    iSplitL "Hw14"; [by iExists _ |].
+    iSplitL "S6"; [iExact "S6" |].
+    iSplitL "S7"; [iExact "S7" |].
+    iSplitL "S8"; [iExact "S8" |].
+    iSplitL "S9"; [iExact "S9" |].
+    iSplitL "S10"; [iExact "S10" |].
+    iSplitL "S11"; [iExact "S11" |].
+    iSplitL "S12"; [iExact "S12" |].
+    iSplitL "S13"; [iExact "S13" |].
+    iSplitL "S14"; [iExact "S14" |].
+    iSplitL "S15"; [iExact "S15" |].
+    iSplitL "Hw13"; [by iExists _ |].
+    iSplitL "Hw12"; [by iExists _ |].
+    iSplitL "Hw11"; [by iExists _ |].
+    iSplitL "Hw10"; [by iExists _ |].
+    iSplitL "Hw9"; [by iExists _ |].
+    iSplitL "Hw8"; [by iExists _ |].
+    iSplitL "Hw7"; [by iExists _ |].
+    iSplitL "Hw6"; [by iExists _ |].
+    iSplitL "S24"; [iExact "S24" |].
+    iSplitL "S25"; [iExact "S25" |].
+    iSplitL "Hw5"; [by iExists _ |].
+    iSplitL "Hw4"; [by iExists _ |].
+    iSplitL "Hw3"; [by iExists _ |].
+    iSplitL "S29"; [iExact "S29" |].
+    iSplitL "Hw2"; [by iExists _ |].
+    iSplitL "S31"; [iExact "S31" |].
+    iSplitL "Hw1"; [by iExists _ |].
+    done.
+  Qed.
+
+End KernelvecHandler.
+End KernelvecProof.

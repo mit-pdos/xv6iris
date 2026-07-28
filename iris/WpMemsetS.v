@@ -76,7 +76,7 @@ Section WpMemsetS.
   (* jump_to variant allowing a 2-aligned (bit1 = 1) target under the C
      extension (Zca enabled) -- for the memset loop's back-edge, whose head
      [sb] sits at a 2-aligned (not 4-aligned) address in the relocated image.
-     Mirrors WpKernelvecNew.kv_exec_jump_to_zca, which lives downstream of this
+     Mirrors ProofKernelvec.kv_exec_jump_to_zca, which lives downstream of this
      file and so is re-proved locally. *)
 
   (* [exec_execute_JALR_ret] variant for a 2-aligned (bit1 possibly set)

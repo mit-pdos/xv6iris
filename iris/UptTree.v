@@ -30,6 +30,7 @@ Require Import SmodePte.
 Require Import PtAdBits.
 Require Import Pt4kWalk.
 Require Import PtTree.
+Require Import PtBuild.
 Require Import PtTreeAdue.
 Require Import KptPt.
 Require Import TrampPt.
@@ -158,7 +159,14 @@ Proof.
 Qed.
 
 (* the user table's mapping spec: trampoline + trapframe + the user map,
-   everything else blocks *)
+   everything else blocks -- and it blocks in the xv6 SHAPE: an unmapped
+   vpn's walk stops at a slot holding the LITERAL ZERO word
+   ([PtBuild.ptree_blocks0]), not merely at a model-invalid one.  That is
+   what every producer of this spec actually builds (a table is a
+   memset-zeroed page grown by mappages, and the Svadu A/D write-backs
+   only ever touch MAPPED leaves), and it is what the C walk's V-bit test
+   dispatches on -- so it is what makes the spec convertible back into an
+   exact [pt_rep0] map ([upt_spec_rep0] below). *)
 Definition upt_tree_spec (uroot tfp : mword 44)
     (um : gmap (mword 27) (mword 64)) (t : ptree) : Prop :=
   pt_base t = uroot /\
@@ -170,7 +178,7 @@ Definition upt_tree_spec (uroot tfp : mword 44)
      exists p2 p1 (a d : mword 1),
        ptree_maps t vpn p2 p1 (pte_set_ad w a d)) /\
   (forall vpn, vpn <> tramp_vpn -> vpn <> tf_vpn -> um !! vpn = None ->
-     ptree_blocks t vpn).
+     ptree_blocks0 t vpn).
 
 (* which canonical leaf a mapped vpn carries *)
 Definition upt_leaf_at (tfp : mword 44) (um : gmap (mword 27) (mword 64))
@@ -203,6 +211,195 @@ Proof.
   - exact (tramp_variant a d).
   - exact (tf_variant tfp a d).
   - exact (proj2 (Hwf _ _ Hl) a d).
+Qed.
+
+(* ===================================================================== *)
+(* §2b THE A/D-EXACT MAP a spec-satisfying tree represents.                *)
+(*                                                                        *)
+(*    [upt_tree_spec] is deliberately modulo the A/D bits, but the C code  *)
+(*    that walks or extends a user table (walk / mappages, via [pt_rep0])  *)
+(*    consumes the EXACT vpn -> word map.  The tree is concrete data, so   *)
+(*    that map is a FUNCTION of it ([PtBuild.pt_leaf_word]); the two views *)
+(*    are related by [upt_ad_view], which says the exact map has exactly   *)
+(*    the canonical map's domain (trampoline + trapframe + [um]) and holds *)
+(*    an A/D variant of each canonical leaf.                               *)
+(* ===================================================================== *)
+
+(* the canonical view as ONE map: what the table maps, ignoring A/D *)
+Definition upt_full_map (tfp : mword 44) (um : gmap (mword 27) (mword 64))
+    : gmap (mword 27) (mword 64) :=
+  <[tramp_vpn := pte_tramp]> (<[tf_vpn := pte_tf tfp]> um).
+
+Lemma upt_full_map_leaf_at (tfp : mword 44) (um : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w : mword 64) :
+  upt_full_map tfp um !! vpn = Some w -> upt_leaf_at tfp um vpn w.
+Proof.
+  unfold upt_full_map. intros Hl.
+  apply lookup_insert_Some in Hl. destruct Hl as [(Hv & Hw) | (_ & Hl)].
+  - subst. left. split; reflexivity.
+  - apply lookup_insert_Some in Hl. destruct Hl as [(Hv & Hw) | (_ & Hl)].
+    + subst. right. left. split; reflexivity.
+    + right. right. exact Hl.
+Qed.
+
+Lemma upt_full_map_None (tfp : mword 44) (um : gmap (mword 27) (mword 64))
+    (vpn : mword 27) :
+  upt_full_map tfp um !! vpn = None <->
+  (vpn <> tramp_vpn /\ vpn <> tf_vpn /\ um !! vpn = None).
+Proof.
+  unfold upt_full_map. split.
+  - intros Hl.
+    apply lookup_insert_None in Hl. destruct Hl as (Hl & Htr).
+    apply lookup_insert_None in Hl. destruct Hl as (Hu & Htf).
+    split; [exact (not_eq_sym Htr) | split; [exact (not_eq_sym Htf) | exact Hu]].
+  - intros (Htr & Htf & Hu).
+    apply lookup_insert_None. split; [| exact (not_eq_sym Htr)].
+    apply lookup_insert_None. split; [exact Hu | exact (not_eq_sym Htf)].
+Qed.
+
+Definition upt_ad_view (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64)) : Prop :=
+  (forall vpn, m_ad !! vpn = None <->
+     (vpn <> tramp_vpn /\ vpn <> tf_vpn /\ um !! vpn = None)) /\
+  (forall vpn w', m_ad !! vpn = Some w' ->
+     exists w (a d : mword 1), upt_leaf_at tfp um vpn w /\ w' = pte_set_ad w a d).
+
+(* OPEN: the modulo-A/D spec yields an exact map (the walk/mappages view) *)
+Lemma upt_spec_rep0 (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+    (t : ptree) :
+  upt_tree_spec uroot tfp um t ->
+  exists m_ad, pt_rep0 t m_ad /\ upt_ad_view tfp um m_ad.
+Proof.
+  intros Hspec.
+  pose proof Hspec as (Hbase & Htr & Htf & Hum & Hblk).
+  (* every vpn the canonical view maps has a leaf word, an A/D variant of it *)
+  assert (Hlw : forall (vpn : mword 27) (x : mword 64),
+            upt_full_map tfp um !! vpn = Some x ->
+            exists p2 p1 (a d : mword 1),
+              ptree_maps t vpn p2 p1 (pte_set_ad x a d) /\
+              pt_leaf_word t vpn = Some (pte_set_ad x a d)).
+  { intros vpn x Hl.
+    destruct (upt_spec_maps uroot tfp um t vpn x Hspec (upt_full_map_leaf_at tfp um vpn x Hl))
+      as (p2 & p1 & a & d & Hmaps).
+    exists p2, p1, a, d. split; [exact Hmaps |].
+    exact (ptree_maps_leaf_word t vpn p2 p1 _ Hmaps). }
+  exists (map_imap (fun vpn _ => pt_leaf_word t vpn) (upt_full_map tfp um)).
+  (* the two lookup bridges through [map_imap] *)
+  assert (HadSome : forall (vpn : mword 27) (w' : mword 64),
+            map_imap (fun vpn _ => pt_leaf_word t vpn) (upt_full_map tfp um) !! vpn = Some w' ->
+            exists x, upt_full_map tfp um !! vpn = Some x /\ pt_leaf_word t vpn = Some w').
+  { intros vpn w' Hl. rewrite map_lookup_imap in Hl.
+    destruct (upt_full_map tfp um !! vpn) as [x|] eqn:Hf; [| discriminate].
+    exists x. split; [reflexivity |]. cbn [mbind option_bind] in Hl. exact Hl. }
+  assert (HadNone : forall vpn : mword 27,
+            map_imap (fun vpn _ => pt_leaf_word t vpn) (upt_full_map tfp um) !! vpn = None ->
+            upt_full_map tfp um !! vpn = None).
+  { intros vpn Hl. rewrite map_lookup_imap in Hl.
+    destruct (upt_full_map tfp um !! vpn) as [x|] eqn:Hf; [| reflexivity].
+    exfalso. cbn [mbind option_bind] in Hl.
+    destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq).
+    rewrite Hq in Hl. discriminate. }
+  split.
+  - (* the exact representation *)
+    split.
+    + intros vpn w' Hl.
+      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
+      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & Hmaps & Hq').
+      rewrite Hq in Hq'. injection Hq' as Hq''.
+      exists p2, p1. rewrite Hq''. exact Hmaps.
+    + intros vpn Hl.
+      destruct (proj1 (upt_full_map_None tfp um vpn) (HadNone vpn Hl))
+        as (Hnt & Hntf & Hu).
+      exact (Hblk vpn Hnt Hntf Hu).
+  - (* its relation to the canonical view *)
+    split.
+    + intros vpn. split.
+      * intros Hl. exact (proj1 (upt_full_map_None tfp um vpn) (HadNone vpn Hl)).
+      * intros Hr. rewrite map_lookup_imap.
+        rewrite (proj2 (upt_full_map_None tfp um vpn) Hr). reflexivity.
+    + intros vpn w' Hl.
+      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
+      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq').
+      rewrite Hq in Hq'. injection Hq' as Hq''.
+      exists x, a, d.
+      split; [exact (upt_full_map_leaf_at tfp um vpn x Hf) | exact Hq''].
+Qed.
+
+(* CLOSE: an exact map in the canonical shape re-establishes the spec.
+   Serves both of vmfault's exits: the failure arms (map unchanged, tree
+   grew interior nodes only) and the success arm (view extended first). *)
+Lemma upt_spec_of_rep0 (uroot tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (t : ptree) :
+  upt_map_wf um -> upt_ad_view tfp um m_ad ->
+  pt_rep0 t m_ad -> pt_base t = uroot ->
+  upt_tree_spec uroot tfp um t.
+Proof.
+  intros Hwf (Hnone & Hsome) (Hmap & Hblk) Hbase.
+  split; [exact Hbase |].
+  split.
+  { (* trampoline *)
+    destruct (m_ad !! tramp_vpn) as [w'|] eqn:Hl.
+    - destruct (Hsome _ _ Hl) as (w & a & d & Hleaf & ->).
+      destruct (Hmap _ _ Hl) as (p2 & p1 & Hmaps).
+      destruct Hleaf as [(_ & ->) | [(Heq & _) | Hu]].
+      + exists p2, p1, a, d. exact Hmaps.
+      + exfalso. exact (tf_vpn_ne_tramp (eq_sym Heq)).
+      + exfalso. exact (upt_map_wf_not_tramp um _ _ Hwf Hu eq_refl).
+    - exfalso. destruct (proj1 (Hnone tramp_vpn) Hl) as (Hne & _). exact (Hne eq_refl). }
+  split.
+  { (* trapframe *)
+    destruct (m_ad !! tf_vpn) as [w'|] eqn:Hl.
+    - destruct (Hsome _ _ Hl) as (w & a & d & Hleaf & ->).
+      destruct (Hmap _ _ Hl) as (p2 & p1 & Hmaps).
+      destruct Hleaf as [(Heq & _) | [(_ & ->) | Hu]].
+      + exfalso. exact (tf_vpn_ne_tramp Heq).
+      + exists p2, p1, a, d. exact Hmaps.
+      + exfalso. exact (upt_map_wf_not_tf um _ _ Hwf Hu eq_refl).
+    - exfalso. destruct (proj1 (Hnone tf_vpn) Hl) as (_ & Hne & _). exact (Hne eq_refl). }
+  split.
+  { (* the user map *)
+    intros vpn w Hu.
+    destruct (m_ad !! vpn) as [w'|] eqn:Hl.
+    - destruct (Hsome _ _ Hl) as (w0 & a & d & Hleaf & ->).
+      destruct (Hmap _ _ Hl) as (p2 & p1 & Hmaps).
+      destruct Hleaf as [(Heq & _) | [(Heq & _) | Hu0]].
+      + exfalso. exact (upt_map_wf_not_tramp um vpn w Hwf Hu Heq).
+      + exfalso. exact (upt_map_wf_not_tf um vpn w Hwf Hu Heq).
+      + assert (Hw : w0 = w) by congruence.
+        exists p2, p1, a, d. rewrite <- Hw. exact Hmaps.
+    - exfalso. destruct (proj1 (Hnone vpn) Hl) as (_ & _ & Hnn). congruence. }
+  (* everything else blocks, in the xv6 zero shape *)
+  intros vpn Hnt Hntf Hu.
+  apply Hblk. apply (proj2 (Hnone vpn)).
+  split; [exact Hnt | split; [exact Hntf | exact Hu]].
+Qed.
+
+(* the success-arm extension: a fresh vpn's word is its own A/D variant *)
+Lemma upt_ad_view_insert (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w : mword 64) :
+  upt_ad_view tfp um m_ad -> m_ad !! vpn = None ->
+  upt_ad_view tfp (<[vpn := w]> um) (<[vpn := w]> m_ad).
+Proof.
+  intros (Hnone & Hsome) Hl.
+  split.
+  - intros v. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite !lookup_insert. split; [discriminate |].
+      intros (_ & _ & Hc). discriminate.
+    + rewrite (lookup_insert_ne m_ad vpn v w (not_eq_sym Hne)).
+      rewrite (lookup_insert_ne um vpn v w (not_eq_sym Hne)).
+      exact (Hnone v).
+  - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite lookup_insert in Hl'.
+      assert (Hw : w' = w) by congruence.
+      destruct (pte_set_ad_refl w) as (a & d & Hr).
+      exists w, a, d. split; [| rewrite Hw; exact Hr].
+      right. right. apply lookup_insert.
+    + rewrite (lookup_insert_ne m_ad vpn v w (not_eq_sym Hne)) in Hl'.
+      destruct (Hsome v w' Hl') as (w0 & a & d & Hleaf & Hr).
+      exists w0, a, d. split; [| exact Hr].
+      destruct Hleaf as [Ht | [Ht | Hu0]];
+        [left; exact Ht | right; left; exact Ht |].
+      right. right.
+      rewrite (lookup_insert_ne um vpn v w (not_eq_sym Hne)). exact Hu0.
 Qed.
 
 (* the spec survives the A/D write-back at any mapped vpn *)
@@ -265,8 +462,13 @@ Proof.
       exists q2, q1, a', d'.
       apply (ptree_set_leaf_maps_other t vpn vpn' _ _ _ _ Hne Hm2).
   - intros vpn' Hn1 Hn2 Hn3.
-    apply (ptree_set_leaf_blocks t vpn vpn' p2 p1 (pte_set_ad w a0 d0));
-      [exact Hmaps |].
+    assert (Hne : vpn' <> vpn).
+    { intros ->.
+      destruct Hleaf as [(-> & _) | [(-> & _) | Hl]];
+        [ exact (Hn1 eq_refl) | exact (Hn2 eq_refl) | congruence ]. }
+    apply (ptree_set_leaf0_blocks_other t vpn vpn' p2 p1 (pte_set_ad w a0 d0)
+             (pte_set_ad w a d) Hne (ptree_maps_level0 t vpn p2 p1 _ Hmaps));
+      [].
     apply (Hblk vpn' Hn1 Hn2 Hn3).
 Qed.
 

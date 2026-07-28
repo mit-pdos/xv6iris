@@ -33,7 +33,7 @@ Require Import IntrDefs.
 Import Defs.
 
 (* ---- Local helpers (copies: the originals are Local in WpSmodePtCtl.v /
-   WpSpinNew.v; [exec_execute_FENCE_rw_w] is exported and imported). ---- *)
+   ProofSpin.v; [exec_execute_FENCE_rw_w] is exported and imported). ---- *)
 Local Lemma exec_jump_to_zca (target : mword 64) s :
     eq_vec (access_vec_dec target 0) ('b"0") = true ->
     exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->

@@ -1,0 +1,103 @@
+(* SpecVmfault.v -- the public interface of Vmfault, stated independently of
+   its proof.  Requires only the definitional layer -- never a whole-function
+   proof file -- so every function proof can be checked in parallel.
+
+   vmfault(pagetable, va, read) is the lazy-allocation page-fault handler:
+   below p->sz and unmapped, it kallocs a page, zeroes it, and maps it
+   PTE_W|PTE_U|PTE_R at PGROUNDDOWN(va); anything else returns 0.
+
+   THE CONTRACT IS STATED AT THE [proc_pt] ALTITUDE: vmfault PRESERVES the
+   valid-user-page-table predicate of the table it operates on.  On failure
+   the caller gets [proc_pt P] back unchanged (the tree may have grown
+   interior nodes -- invisible, [pt_frame] is existential); on success it
+   gets [proc_pt (uptd_insert P (svpn_of va0) r)]: the SAME predicate with
+   the user map grown by exactly one entry -- the kalloc page [r] as a
+   user-RW leaf -- whose well-formedness ([proc_pt_wf]: upt_map_wf,
+   upt_acc_wf, um_pages_valid) is re-established inside, and whose page
+   ownership has moved from kalloc's [page_own] into [proc_pt_own].
+
+   The new page's ZEROED contents are deliberately not exposed: [proc_pt]
+   owns pages at existential bytes (the user-safety altitude).
+
+   Steady-state kalloc tier: [kalloc_env γa None _] is persistent (sealed
+   count witness), so it is taken once and not returned; kalloc may fail
+   nondeterministically, which is folded into the failure arm.
+
+   [uint szv <= 2^38] is the one fact the caller must know about p->sz
+   (MAXVA); where the canonical sz well-formedness lives is settled by the
+   usertrap/sbrk work (see claude-notes/projects/vmfault.md). *)
+From Stdlib Require Import Eqdep_dec ZArith Lia List.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl.
+From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import SmodeCore.
+Require Import InstrBytes KernelText.
+Require Import WpLock.
+Require Import RegFile.
+Require Import CalleeSaved.
+Require Import IntrDefs.
+Require Import ProcGeom CpuOwn.
+Require Import KallocInv.
+Require Import PtTree.
+Require Import PtBuild KvmSpec.
+Require Import UptTree UserPtTree.
+Require Import ProcPt ProcPtOwn.
+From Kernel Require KernelSyms.
+
+Notation VF := KernelSyms.vmfault.
+
+Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (P : uptd) (szv : mword 64) (K : nat) (eb : bool) (p : mword 64)
+    (C : iProp Σ) (dqs dqp : dfrac) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let va0 : mword 64 := and_vec va (mword_of_int (-4096)) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (38 <= K)%nat ->
+  (* the kalloc/mappages chain runs on the ambient CPU (push_off cid
+     convention) *)
+  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* the pagetable argument is the table [proc_pt P] describes -- the same
+     table [p->pagetable] holds (usertrap/copyin/copyout pass exactly that) *)
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  (* p->sz respects MAXVA *)
+  (uint szv <= 2 ^ 38)%Z ->
+  sie_cap_gpr γ mm K -∗
+  cpu_own γ 0%nat eb p C -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  p_sz p ↦₈{dqs} szv -∗
+  p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
+  proc_pt P -∗
+  kalloc_env γa None cid_word -∗
+  ( ∀ (mr : regfile),
+    sie_cap_gpr γ mr K -∗
+    cpu_own γ 0%nat eb p C -∗
+    pc_is ret_tgt -∗
+    p_sz p ↦₈{dqs} szv -∗
+    p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗ proc_pt P)
+      ∨ (∃ r : mword 64,
+           ⌜mr !!! Regidx (mword_of_int 10) = r⌝ ∗
+           ⌜page_valid r⌝ ∗
+           ⌜(uint va < uint szv)%Z⌝ ∗
+           ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
+           proc_pt (uptd_insert P (svpn_of va0) r)) ) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type VMFAULT.
+  Parameter wp_vmfault_sconf :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (P : uptd) (szv : mword 64) (K : nat) (eb : bool) (p : mword 64)
+      (C : iProp Σ) (dqs dqp : dfrac),
+      wp_vmfault_sconf_body γ γa Φ mm P szv K eb p C dqs dqp.
+End VMFAULT.

@@ -5,7 +5,7 @@
 
    Kept free of any whole-function proof so that spec files (SpecSwtch,
    SchedCtx, SpecSched, SpecYield) depend only on definitions -- the swtch
-   proof (WpSwtchSconf.v) and its decode layer (WpSwtchVc.v) sit above. *)
+   proof (ProofSwtch.v) and its decode layer (WpSwtchVc.v) sit above. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.

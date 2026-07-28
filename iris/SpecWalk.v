@@ -74,3 +74,53 @@ Module Type WALK.
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat),
       wp_walk_sconf_body γ γa Φ mm t m K lvl eb p C on.
 End WALK.
+
+(* --------------------------------------------------------------------- *)
+(* walk with alloc = 0 (ismapped's callee): a READ-ONLY descent.  The     *)
+(* kalloc branch is short-circuited (`!alloc || ...`) so there is no      *)
+(* kalloc_env, no cpu_own and no panic contract (the va >= MAXVA panic    *)
+(* arm is dead under the canonicality premise), and the tree is taken at  *)
+(* a GENERIC dfrac and returned UNCHANGED.  The result is decided by the  *)
+(* represented map: a vpn blocked at L2/L1 returns 0; a path that reaches *)
+(* level 0 returns that slot's address -- with the slot's current word    *)
+(* either the map's leaf (mapped) or the literal zero (unmapped).         *)
+(* --------------------------------------------------------------------- *)
+
+Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.walk in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let vpn := svpn_of va in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (8 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 10)
+    = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) ->
+  mm !!! Regidx (mword_of_int 12) = mword_of_int 0 ->
+  (uint va < 2 ^ 38)%Z ->
+  pt_rep0 t m ->
+  sie_cap_gpr γ mm K -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  ptree_own 2 dq t -∗
+  ( ∀ (mr : regfile),
+    sie_cap_gpr γ mr K -∗
+    pc_is ret_tgt -∗
+    ptree_own 2 dq t -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0 /\ m !! vpn = None)
+      \/ (exists p2 p1 w0,
+           ptree_level0 t vpn p2 p1 w0 /\
+           mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn /\
+           (m !! vpn = Some w0
+            \/ (w0 = mword_of_int 0 /\ m !! vpn = None))) ⌝ -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type WALK_NOALLOC.
+  Parameter wp_walk_noalloc_sconf :
+    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac),
+      wp_walk_noalloc_sconf_body γ Φ mm t m K dq.
+End WALK_NOALLOC.
