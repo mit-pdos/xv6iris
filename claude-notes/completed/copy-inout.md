@@ -462,8 +462,13 @@ share).
 
 ## Open questions / parked
 
-- `p->sz` well-formedness (`uint szv <= 2^38`) is still a spec premise, now in
-  three places (vmfault, copyin, copyout).  When usertrap/sbrk land it should
-  move into `proc_priv`; see vmfault.md.
+- `p->sz` well-formedness (`uint szv <= 2^38`) is still a spec premise in all
+  three of these (vmfault, copyin, copyout), and should stay one: they are
+  stated over the bare `p_sz` cell, BELOW the `proc_priv` altitude.  It is now
+  also a conjunct of `ProcInv.proc_priv`, so a caller at that altitude derives
+  it (`proc_priv_sz_bound`) instead of taking it — fetchaddr forced that move
+  earlier than this note anticipated, because a `proc_priv`-only caller could
+  not have discharged such a premise.  See projects/proc-struct-resources.md
+  (S4b) and design/proc-struct.md.
 - `copyinstr` (0x800014c8) is the third member of this family and reuses
   `walkaddr` + `ByteBuf` unchanged.  Not attempted here.

@@ -81,15 +81,7 @@ Lemma vf_ld72 :
         creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)
   = LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10 : mword 5),
           Regidx (mword_of_int 15 : mword 5), false, 8).
-Proof.
-  replace (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")) : mword 12)
-    with (mword_of_int 72 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
-    by (vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 7))) with (Regidx (mword_of_int 15 : mword 5))
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
+Proof. exact cshape_653c. Qed.
 
 Lemma vf_ld80 :
   LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),

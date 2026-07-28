@@ -456,6 +456,10 @@ SpecCopyin.v
 WpCopyinDecode.v
 ProofCopyin.v
 LinkCopyin.v
+SpecFetchaddr.v
+WpFetchaddrDecode.v
+ProofFetchaddr.v
+LinkFetchaddr.v
 SpecCopyout.v
 WpCopyoutDecode.v
 ProofCopyout.v

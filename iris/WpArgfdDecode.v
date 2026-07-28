@@ -92,11 +92,7 @@ Lemma afdc_c091 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 2, Cregidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x58  c.j -0x12 *)
-Lemma afdc_b7fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7fd : mword 16)) s
-  = Some (C_J (mword_of_int 2039), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* +0x58  c.j -0x12 -- [cdec_b7fd] (KernelRvcDecode.v; fetchaddr's +0x48 too) *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -297,6 +293,6 @@ Section ArgfdInstrs.
 
   Lemma afi_58 : kernel_text -∗ instr (mword_of_int (AF + 0x58) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AF + 0x58)%Z (mword_of_int 0xb7fd : mword 16)
-    (mword_of_int (AF + 0x58) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")), zreg)) afdc_b7fd exec_execute_C_J. Qed.
+    (mword_of_int (AF + 0x58) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")), zreg)) cdec_b7fd exec_execute_C_J. Qed.
 
 End ArgfdInstrs.

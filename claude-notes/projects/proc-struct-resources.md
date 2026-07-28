@@ -285,6 +285,55 @@ the evidence for every offset. This file is only the worklist.
       the page out TOGETHER, which is necessary: `proc_priv_trapframe`'s wand
       swallows the `proc_priv` the page is still inside, so the pair has to be
       one accessor.
+- [x] **S4b — `fetchaddr` PROVEN and LINKED** (`SpecFetchaddr.v` /
+      `WpFetchaddrDecode.v` / `ProofFetchaddr.v` / `LinkFetchaddr.v`, over
+      MYPROC + COPYIN; **17 s isolated**, axiom-clean, `proof_coverage` reads
+      it `proven`).  Twenty-six instructions, a 32-byte ra/s0/s1/s2 frame,
+      three arms joining at the epilogue.  It is the first function that
+      SPANS the two tiers this project and the copy-inout project had kept
+      apart — a `proc_priv` consumer whose whole body is a call to copyin,
+      which is stated over the bare cells plus `ProcPtOwn.proc_pt`.  What
+      that cost, and what it is worth reusing for:
+
+      * **`proc_priv` gained the `⌜uint (pv_sz V) <= 2^38⌝` conjunct**, and
+        `ProcInv` gained `upd_upt`, `proc_priv_sz_bound` and
+        `proc_priv_copy` (the three-piece accessor: `p_sz` cell +
+        `p_pagetable` cell + `proc_pt`, returned at an `uptd_ext`-extended
+        descriptor).  See design/proc-struct.md.  The bound had been PARKED
+        in copy-inout.md as "move it into `proc_priv` when usertrap/sbrk
+        land"; fetchaddr forced it early, because a caller at the
+        `proc_priv` altitude holds nothing else and could not have
+        discharged it.  Cost: zero — every external use of `proc_priv` goes
+        through an accessor, so the change is contained in `ProcInv.v`.
+      * **Take the borrow ONCE, and close it in every arm at
+        `P' := pv_upt V`.**  `p->sz` is read BEFORE the range test and
+        `p->pagetable` only after it, but splitting the accessor in two
+        would have given the two early `-1` arms a different postcondition
+        shape from the copyin arm.  One `proc_priv_copy` right after myproc
+        returns, closed with `uptd_ext_refl` on the arms that never called
+        copyin, keeps the spec's continuation uniform.
+      * **`ByteBuf.bb_word_acc`** is the `↦₈ ⇄ 8 named bytes` accessor a copy
+        into a caller's WORD-sized out-parameter needs (alignment captured
+        before the split, `nth_byte_assemble_len` to reassemble).  The word
+        comes back as `∃ w` — copyin names its destination bytes by an
+        arbitrary function, so nothing stronger is statable.
+      * **`snez rd,rs` / `negw rd,rs` read x0 as a SOURCE.**  The generic
+        leaves state their written value over `m !!! Regidx rs1`, so the
+        proof needs `IntrDefs.sie_cap_gpr_x0` (already in the tree, never
+        used before).  Turn copyin's `0 \/ -1` into an `exists sv rv, …`
+        BEFORE stepping the two instructions: both written values are then
+        closed literals and no WP step has to case-split.
+      * **A function's push and pop words need not be twins.**  gcc emitted
+        `c.addi sp,-32` to push but `c.addi16sp sp,32` to pop, so the two
+        ends take DIFFERENT leaves (`wp_caddi_sp_push_s_sconf` /
+        `wp_caddi16sp_pop_s_sconf`).
+      * Stack budget: `54 <= av` (4 for this frame, 50 for copyin's).
+      * Decode dedup, as the sweep discipline requires: `653c`
+        (`c.ld a5,72(a0)`, shared with vmfault), its AST-shape restatement
+        `cshape_653c`, and `b7fd` (shared with argfd) moved into
+        `KernelRvcDecode.v`; only `46a1` / `8626` / `6928` and the seven
+        base words are fetchaddr's own.
+
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates.

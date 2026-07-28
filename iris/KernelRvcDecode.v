@@ -1233,3 +1233,32 @@ Lemma cdec_89aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0x89aa : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 10)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x653c  c.ld a5,72(a0)     -- vmfault +0x14, fetchaddr +0x14 (p->sz) *)
+Lemma cdec_653c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x653c : mword 16)) s
+  = Some (C_LD (mword_of_int 9, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xb7fd  c.j -0x12          -- argfd +0x58, fetchaddr +0x48 *)
+Lemma cdec_b7fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xb7fd : mword 16)) s
+  = Some (C_J (mword_of_int 2039), s).
+  Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_653c]'s AST in the shape a WP load leaf takes: a literal [mword 12]
+   displacement and plain [Regidx]es. *)
+Lemma cshape_653c :
+  LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")),
+        creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)
+  = LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10 : mword 5),
+          Regidx (mword_of_int 15 : mword 5), false, 8).
+Proof.
+  replace (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")) : mword 12)
+    with (mword_of_int 72 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
+  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
+    by (vm_compute; reflexivity).
+  replace (creg2reg_idx (Cregidx (mword_of_int 7))) with (Regidx (mword_of_int 15 : mword 5))
+    by (vm_compute; reflexivity).
+  reflexivity.
+Qed.

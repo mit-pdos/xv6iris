@@ -80,6 +80,11 @@ Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
 Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V).
 
+(* the descriptor moves, everything else stays -- what copyin / copyout /
+   vmfault do to a process when they fault a page in ([uptd_ext], below). *)
+Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
+  MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V).
+
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
 
@@ -218,8 +223,17 @@ Section ProcInv.
      caller.  See the "holes" section of design/proc-struct.md. *)
   Definition cwd_ref (v : mword 64) : iProp Σ := emp%I.
 
+  (* [p->sz] NEVER EXCEEDS MAXVA.  This is a real invariant of a live
+     process -- exec and growproc are the only writers and both bound the
+     size -- and it belongs HERE rather than in each consumer's precondition:
+     vmfault / copyin / copyout sit BELOW the [proc_priv] altitude (they take
+     the bare [p_sz] cell, not the block) and must keep taking it as a
+     premise, but every caller AT this altitude holds nothing but
+     [proc_priv], so a premise there would be one no caller could discharge.
+     [proc_priv_sz_bound] is how such a caller pays it. *)
   Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
-    (p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+    (⌜uint (pv_sz V) <= 2 ^ 38⌝ ∗
+     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
      proc_fields pa (DfracOwn 1) V ∗
      proc_pt_at pa (pv_upt V) ∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
@@ -242,11 +256,12 @@ Section ProcInv.
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv γf pa pid V).
   Proof.
-    iIntros "(Hpid & Hf & Hpt & Htfp & Ho & Hc)".
+    iIntros "(%Hszb & Hpid & Hf & Hpt & Htfp & Ho & Hc)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv Hq word4_pointsto_frac_split. iFrame.
+    iIntros "Hq1". rewrite /proc_priv Hq word4_pointsto_frac_split.
+    iSplitR; [done|]. iFrame.
   Qed.
 
   (* The read-only trapframe-POINTER fraction: what [p->trapframe->aN] reads
@@ -276,19 +291,27 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
        proc_priv γf pa pid V).
   Proof.
-    iIntros "(Hpid & Hf & Hpt & Htfp & Ho & Hc)".
+    iIntros "(%Hszb & Hpid & Hf & Hpt & Htfp & Ho & Hc)".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iSplitL "Hq1"; [iExact "Hq1"|].
     iIntros "Hq1". rewrite /proc_priv /proc_pt_at.
-    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc". iFrame.
+    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc".
+    iSplitR; [done|]. iFrame.
   Qed.
 
   (* The array's length, which a caller needs BEFORE it knows which
      descriptor it wants: an fd below NOFILE always has a slot to look up. *)
   Lemma proc_priv_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv γf pa pid V -∗ ⌜length (pv_ofile V) = NOFILE⌝.
-  Proof. iIntros "(_ & _ & _ & _ & [%Hlen _] & _)". done. Qed.
+  Proof. iIntros "(_ & _ & _ & _ & _ & [%Hlen _] & _)". done. Qed.
+
+  (* The MAXVA bound on [p->sz], for a caller that must hand it to vmfault /
+     copyin / copyout.  Pure conclusion, so [iDestruct ... as %H] keeps the
+     block. *)
+  Lemma proc_priv_sz_bound (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜uint (pv_sz V) <= 2 ^ 38⌝.
+  Proof. iIntros "(%Hszb & _)". done. Qed.
 
   (* What a syscall-argument read needs, TOGETHER: the trapframe pointer
      fraction and the page it names.  [proc_priv_trapframe] alone cannot
@@ -301,12 +324,55 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) -∗ proc_priv γf pa pid V).
   Proof.
-    iIntros "(Hpid & Hf & Hpt & Htfp & Ho & Hc)".
+    iIntros "(%Hszb & Hpid & Hf & Hpt & Htfp & Ho & Hc)".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iFrame "Hq1 Htfp".
     iIntros "Hq1 Htfp". rewrite /proc_priv /proc_pt_at.
-    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc". iFrame.
+    iDestruct (word_join14 with "Hq1 Hq2") as "Htfc".
+    iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* =================================================================== *)
+  (* WHAT A COPY THROUGH THE PROCESS'S OWN TABLE NEEDS -- one accessor.   *)
+  (* =================================================================== *)
+  (* copyin / copyout are stated one tier DOWN, over the bare [p->sz] and
+     [p->pagetable] cells plus [ProcPtOwn.proc_pt] (SpecCopyin.v), because
+     they are also reachable from callers that hold no [struct proc] block.
+     This is the bridge from THIS altitude to that one.
+     What comes back is a descriptor EXTENDING the one that went out
+     ([uptd_ext]: the copy may have faulted pages in).  That is exactly why
+     the three pieces travel TOGETHER: [uptd_ext] pins [ud_root] and
+     [ud_tfp], so the two cells and the trapframe page are still described
+     by the NEW descriptor and the block can be rebuilt -- a wand that
+     returned only [proc_pt] would have swallowed the [proc_priv] the cells
+     are still inside (the [proc_priv_tf] lesson). *)
+  Lemma proc_priv_copy (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_sz pa ↦₈ pv_sz V ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗
+    proc_pt (pv_upt V) ∗
+    (∀ P' : uptd, ⌜uptd_ext (pv_upt V) P'⌝ -∗
+       p_sz pa ↦₈ pv_sz V -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗
+       proc_pt P' -∗
+       proc_priv γf pa pid (upd_upt V P')).
+  Proof.
+    iIntros "(%Hszb & Hpid & Hf & Hpt & Htfp & Ho & Hc)".
+    rewrite /proc_fields /proc_pt_at.
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iFrame "Hsz Hpg Hptt".
+    iIntros (P') "%Hext Hsz Hpg Hptt".
+    destruct Hext as (Hroot & Htf & _).
+    rewrite /proc_priv /proc_fields /proc_pt_at.
+    cbn [upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    rewrite Hroot Htf.
+    iSplitR; [iPureIntro; exact Hszb|].
+    iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
+    iFrame "Hpg Htfc Hptt Htfp Ho Hc".
   Qed.
 
   (* Borrow one fd slot and hand back a (possibly different) one. *)
@@ -317,11 +383,16 @@ Section ProcInv.
     ofile_slot γf pa fd v ∗
     (∀ v', ofile_slot γf pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
   Proof.
-    iIntros (Hfd) "(Hpid & Hf & Hpt & Htfp & [%Hlen Ho] & Hc)".
+    iIntros (Hfd) "(%Hszb & Hpid & Hf & Hpt & Htfp & [%Hlen Ho] & Hc)".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
-    rewrite /proc_priv /proc_ofiles /=. iFrame.
-    iPureIntro. rewrite length_insert. exact Hlen.
+    rewrite /proc_priv /proc_ofiles.
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iFrame "Hpid Hf Hpt Htfp".
+    iSplitL "Ho".
+    { iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen. }
+    iFrame "Hc".
   Qed.
 
   (* The whole point of the fractional pid: another core reading p->pid under
@@ -330,7 +401,7 @@ Section ProcInv.
       (V : pprivate) (dq : dfrac) :
     proc_priv γf pa pid V -∗ p_pid pa ↦₄{dq} pid' -∗ ⌜pid = pid'⌝.
   Proof.
-    iIntros "(Hpid & _) Hother".
+    iIntros "(_ & Hpid & _) Hother".
     iApply (word4_pointsto_agree with "Hpid Hother").
   Qed.
 

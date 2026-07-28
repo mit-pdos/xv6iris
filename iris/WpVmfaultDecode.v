@@ -104,11 +104,7 @@ Import Defs.
 
 (* 0x0c / 0x50  c.mv s3,a0 -- [cdec_89aa] (KernelRvcDecode.v) *)
 
-(* 0x14  c.ld a5,72(a0) *)
-Lemma vfdc_653c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x653c : mword 16)) s
-  = Some (C_LD (mword_of_int 9, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* 0x14  c.ld a5,72(a0) -- [cdec_653c] (KernelRvcDecode.v; fetchaddr's too) *)
 
 (* 0x1a / 0x3e / 0x76  c.li s3,0 *)
 Lemma vfdc_4981 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -297,7 +293,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_14 : kernel_text -∗ instr (mword_of_int (VF + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
   Proof. mk_rvc (VF + 0x14)%Z (mword_of_int 0x653c : mword 16)
-    (mword_of_int (VF + 0x14) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) vfdc_653c exec_execute_C_LD. Qed.
+    (mword_of_int (VF + 0x14) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) cdec_653c exec_execute_C_LD. Qed.
 
   Lemma vfi_16 : kernel_text -∗ instr (mword_of_int (VF + 0x16) : mword 64) false (BTYPE (mword_of_int 20 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 18), BLTU)).
   Proof. mk_base (VF + 0x16)%Z (mword_of_int 0x00f96a63 : mword 32)

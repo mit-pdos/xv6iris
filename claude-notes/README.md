@@ -79,10 +79,13 @@ are working on that effort — the relevant `projects/` file.
 
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
-  `argraw`/`argint`, `argfd`, `killed`, `sys_getpid`, `sys_close`, `sys_pause`)
-  and what is next (`p_ofile` loop lemmas for `fdalloc`, the remaining
-  syscalls, and `cwd_ref`). Keeps the measured account of why `argraw`'s
-  six-arm proof cost 74 GB, and sys_pause's path-dependent-frame recipe.
+  `argraw`/`argint`, `argfd`, `killed`, `sys_getpid`, `sys_close`, `sys_pause`,
+  `fetchaddr`) and what is next (`p_ofile` loop lemmas for `fdalloc`, the
+  remaining syscalls, and `cwd_ref`). Keeps the measured account of why
+  `argraw`'s six-arm proof cost 74 GB, sys_pause's path-dependent-frame
+  recipe, and — from fetchaddr, the first function spanning the `proc_priv`
+  and bare-cell tiers — the `proc_priv_copy` accessor and the x0-as-source
+  (`snez`/`negw`) recipe.
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —

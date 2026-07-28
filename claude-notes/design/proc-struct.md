@@ -244,11 +244,25 @@ half permanently in the lock resource), and call sites want to name it.
 
 ```coq
 Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
-  (p_pid pa ↦₄{#(1/2)} pid ∗
+  (⌜uint (pv_sz V) <= 2 ^ 38⌝ ∗
+   p_pid pa ↦₄{#(1/2)} pid ∗
    proc_fields pa (DfracOwn 1) V ∗
+   proc_pt_at pa (pv_upt V) ∗
+   tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
    proc_ofiles γf pa (pv_ofile V) ∗
-   cwd_ref γi (pv_cwd V))%I.
+   cwd_ref (pv_cwd V))%I.
 ```
+
+**`p->sz <= MAXVA` is a conjunct of the block, not a premise of its
+consumers.** It is a real invariant of a live process (exec and growproc are
+the only writers and both bound the size), and where it lives is forced by the
+"caller obligation the caller cannot discharge" rule: vmfault / copyin /
+copyout sit *below* this altitude — they take the bare `p_sz` cell, not the
+block — so they must keep taking the bound as a premise, but a function at
+*this* altitude (fetchaddr) holds nothing but `proc_priv` and could not
+discharge one. `proc_priv_sz_bound` is how such a caller pays the lower tier's
+premise. Nothing in the tree constructs a `proc_priv` yet (allocproc is
+unproven), so the conjunct costs no existing proof anything.
 
 **`proc_priv` is the resource that goes alongside `cur_proc p`.** It is what
 `sys_getpid` / `sys_sbrk` / `sys_dup` / `sys_chdir` open up, and it is what
@@ -263,6 +277,26 @@ Lemma proc_priv_ofile γf pa pid V fd v :        (* one fd slot, borrow-and-retu
   proc_priv γf pa pid V -∗ ofile_slot γf pa fd v ∗
     (∀ v', ofile_slot γf pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
 ```
+
+A third covers the whole address-space side at once:
+
+```coq
+Lemma proc_priv_copy γf pa pid V :        (* what a copy through p's own table needs *)
+  proc_priv γf pa pid V -∗
+  p_sz pa ↦₈ pv_sz V ∗ p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗ proc_pt (pv_upt V) ∗
+  (∀ P', ⌜uptd_ext (pv_upt V) P'⌝ -∗ p_sz pa ↦₈ pv_sz V -∗
+     p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P' -∗
+     proc_priv γf pa pid (upd_upt V P'))
+```
+
+This is the bridge from the `proc_priv` altitude down to the one
+copyin/copyout/vmfault are stated at. The three pieces travel **together**
+for the `proc_priv_tf` reason — a wand that returned only `proc_pt` would have
+swallowed the `proc_priv` the two cells are still inside — and what comes back
+is a descriptor *extending* the one that went out, because the copy may have
+faulted pages in. `uptd_ext` pinning `ud_root` and `ud_tfp` is exactly what
+keeps the two cells and the trapframe page described by the new descriptor, so
+the block can be rebuilt rather than reconstructed.
 
 The first one is exactly what `SpecAcquiresleep.v` / `SpecHoldingsleep.v`
 already consume. Those take `p_pid pj ↦₄{dq} pidv` at a *universally

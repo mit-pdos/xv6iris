@@ -203,4 +203,41 @@ Section ByteBuf.
     ([∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j) ⊢ page_own q.
   Proof. rewrite /page_own. apply bb_named_any. Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* A [uint64 *] AS A BUFFER.                                          *)
+  (* ------------------------------------------------------------------ *)
+  (* A [↦₈] cell IS an 8-byte buffer plus its alignment fact, so a copy
+     INTO a caller's word-sized out-parameter (fetchaddr's [*ip]) borrows
+     it as one and gets it back holding SOME value -- which is all a
+     contents-existential copy postcondition can say.
+
+     ONE accessor, not two lemmas: the alignment is what the rebuild needs
+     and the eight bytes no longer carry it, so it has to be captured
+     before the split (the [word_pointsto_split4] discipline).  The
+     returned value is existential because the copy names its bytes by an
+     arbitrary function; [nth_byte_assemble_len] is what turns eight
+     arbitrary bytes back into a word. *)
+  Lemma bb_word_acc (a : mword 64) (w : mword 64) :
+    a ↦₈ w -∗
+    ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ nth_byte w j) ∗
+    (∀ f : nat -> bv 8,
+       ([∗ list] j ∈ seq 0 8, pa_add a j ↦ₘ f j) -∗ ∃ w' : mword 64, a ↦₈ w').
+  Proof.
+    iIntros "Hw".
+    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (word_pointsto_bytes with "Hw") as "$".
+    iIntros (f) "Hf".
+    set (bs := [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
+                f 4%nat; f 5%nat; f 6%nat; f 7%nat]).
+    iExists (Z_to_bv 64 (assemble_bytes bs) : mword 64).
+    iApply (word_pointsto_intro _ _ _ Hal).
+    iApply (big_sepL_mono with "Hf"). intros i j Hj.
+    apply lookup_seq in Hj as [-> Hlt].
+    rewrite (nth_byte_assemble_len 64 bs i ltac:(cbn; lia) ltac:(cbn; lia)).
+    assert (Hbs : bs !!! i = f i).
+    { unfold bs.
+      destruct i as [|[|[|[|[|[|[|[|i']]]]]]]]; try reflexivity. cbn in Hlt. lia. }
+    rewrite Hbs. reflexivity.
+  Qed.
+
 End ByteBuf.
