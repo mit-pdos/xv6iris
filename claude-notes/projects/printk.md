@@ -558,8 +558,11 @@ Left, in order:
    the fuel `String.length f - p`.  `pk_kinds_step` rewrites the invariant's
    equation across the turn, and the descriptor `big_sepL` splits at `k` --
    the arms need only the k-th, and only `%s` needs it at all.
-3. the top-level statement (prologue + setup + loop + exit), which is also
-   where `uart_sent γd l` has to join the spec's precondition.
+3. the top-level statement (prologue + setup + loop + exit).  Its spec-side
+   prerequisite is **done**: `wp_printk_sconf_body` now takes `uart_sent γd l`
+   alongside `uart_tx_own γd l`, for the same reason the `%s` arm does -- an
+   empty format string prints nothing and still has to hand back the receipt,
+   which is a mono-list lower bound only the UART invariant can mint.
 4. the sealed functor over CONSPUTC/PRINTINT, and LinkPrintk.v.
 
 ### printk: what the arms still need

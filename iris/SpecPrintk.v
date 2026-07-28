@@ -120,7 +120,12 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-  dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+  (* [uart_sent γd l] as well as the transmitter token: a printk whose format
+     string is empty prints NOTHING, and that path still has to hand back
+     [uart_sent γd (l ++ [])].  The receipt is a mono-list lower bound only
+     the UART invariant can mint, so [uart_tx_own] alone cannot produce it.
+     Persistent, so threading it costs nothing. *)
+  dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
   ( ∀ mf bs,
     sie_cap_gpr γ mf K -∗
     pc_is ret_tgt -∗
