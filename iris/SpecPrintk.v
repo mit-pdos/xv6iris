@@ -60,7 +60,7 @@ Require Import KernelText KernelDataInv.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import PrintkFmt.
 From Kernel Require KernelSyms.
@@ -94,8 +94,8 @@ Definition pk_desc_res `{!riscvGS Σ} `{CID : CpuId} (v : mword 64) (d : pk_arg_
 Definition pk_vararg (m : regfile) (j : nat) : mword 64 :=
   m !!! Regidx (mword_of_int (11 + Z.of_nat j) : mword 5).
 
-Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
     (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 dqf : dfrac)
     (f : string) (descs : list pk_arg_desc) :=
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -117,7 +117,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-  dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+  dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
   ( ∀ mf bs,
     sie_cap_gpr γ mf K -∗
     pc_is ret_tgt -∗
@@ -133,9 +133,9 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 dqf : dfrac}
       (f : string) (descs : list pk_arg_desc),
-      wp_printk_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2 dqf f descs.
+      wp_printk_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs.
 End PRINTK.

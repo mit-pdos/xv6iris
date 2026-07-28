@@ -38,7 +38,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
-Require Import WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import WpConsputcDecode.
 Require Import SpecUartPutc SpecConsputc.
@@ -58,7 +58,7 @@ Module ConsputcProof (UartPutc : UARTPUTC) : CONSPUTC.
 
 Section ProofConsputc.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation CP := KernelSyms.consputc.
@@ -179,13 +179,13 @@ Section ProofConsputc.
   (* =================================================================== *)
 
   Hypothesis wp_uartputc :
-    forall (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    forall (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac),
-      wp_uartputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
+      wp_uartputc_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
 
-  Lemma wp_consputc_sconf_gen (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_consputc_sconf_gen (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac)
-    : wp_consputc_sconf_body γ γd Φ m K l pv pkv dqm dqm2.
+    : wp_consputc_sconf_body γ γd γv Φ m K l pv pkv dqm dqm2.
   Proof.
     cbv beta delta [wp_consputc_sconf_body].
     intros ra_i pcE ra0 ret_tgt HK Hpv Hpkv.
@@ -301,7 +301,7 @@ Section ProofConsputc.
       set (T2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (CP + 0x1e) : mword 64) 4)]> T1).
       assert (Htgtu1 : add_vec (mword_of_int (CP + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 1750 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu1) in "Hpc".
-      iApply (wp_uartputc γ γd Φ T2 (K - 2)%nat l pv pkv dqm dqm2 HK4 Hpv Hpkv
+      iApply (wp_uartputc γ γd γv Φ T2 (K - 2)%nat l pv pkv dqm dqm2 HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
       iIntros (mf1) "Hcg Hpc %Hcs1 Hpanicking Hpanicked Htx #Hsent1".
       destruct Hcs1 as [Hcs1 Hra1].
@@ -326,7 +326,7 @@ Section ProofConsputc.
       set (T4 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (CP + 0x26) : mword 64) 4)]> T3).
       assert (Htgtu2 : add_vec (mword_of_int (CP + 0x26) : mword 64) (sign_extend' 64 (mword_of_int 1742 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu2) in "Hpc".
-      iApply (wp_uartputc γ γd Φ T4 (K - 2)%nat _ pv pkv dqm dqm2 HK4 Hpv Hpkv
+      iApply (wp_uartputc γ γd γv Φ T4 (K - 2)%nat _ pv pkv dqm dqm2 HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
       iIntros (mf2) "Hcg Hpc %Hcs2 Hpanicking Hpanicked Htx #Hsent2".
       destruct Hcs2 as [Hcs2 Hra2].
@@ -351,7 +351,7 @@ Section ProofConsputc.
       set (T6 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (CP + 0x2c) : mword 64) 4)]> T5).
       assert (Htgtu3 : add_vec (mword_of_int (CP + 0x2c) : mword 64) (sign_extend' 64 (mword_of_int 1736 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu3) in "Hpc".
-      iApply (wp_uartputc γ γd Φ T6 (K - 2)%nat _ pv pkv dqm dqm2 HK4 Hpv Hpkv
+      iApply (wp_uartputc γ γd γv Φ T6 (K - 2)%nat _ pv pkv dqm dqm2 HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
       iIntros (mf3) "Hcg Hpc %Hcs3 Hpanicking Hpanicked Htx #Hsent3".
       destruct Hcs3 as [Hcs3 Hra3].
@@ -413,7 +413,7 @@ Section ProofConsputc.
       set (F1 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (CP + 0x10) : mword 64) 4)]> W3).
       assert (Htgtu : add_vec (mword_of_int (CP + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 1764 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu) in "Hpc".
-      iApply (wp_uartputc γ γd Φ F1 (K - 2)%nat l pv pkv dqm dqm2 HK4 Hpv Hpkv
+      iApply (wp_uartputc γ γd γv Φ F1 (K - 2)%nat l pv pkv dqm dqm2 HK4 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
       iIntros (mf) "Hcg Hpc %Hcsf Hpanicking Hpanicked Htx #Hsent".
       destruct Hcsf as [Hcsf Hraf].
@@ -446,13 +446,13 @@ End ProofConsputc.
 (* THE SEALED FUNCTOR: instantiate the callee's WP hypothesis with its     *)
 (* proven spec, discharging the CONSPUTC Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_consputc_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+  Definition wp_consputc_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac}
-      : wp_consputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2 :=
+      : wp_consputc_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2 :=
     wp_consputc_sconf_gen
-      (fun γ' γd' Φ' m' K' l' pv' pkv' dqm' dqm2' =>
-         UartPutc.wp_uartputc_sconf γ' γd' Φ' m' K' l' pv' pkv' (dqm:=dqm') (dqm2:=dqm2'))
-      γ γd Φ m0 K l pv pkv dqm dqm2.
+      (fun γ' γd' γv' Φ' m' K' l' pv' pkv' dqm' dqm2' =>
+         UartPutc.wp_uartputc_sconf γ' γd' γv' Φ' m' K' l' pv' pkv' (dqm:=dqm') (dqm2:=dqm2'))
+      γ γd γv Φ m0 K l pv pkv dqm dqm2.
 
 End ConsputcProof.

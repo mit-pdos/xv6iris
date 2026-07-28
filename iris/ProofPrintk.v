@@ -39,7 +39,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText KernelDataInv.
 Require Import KernelRvcDecode WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
-Require Import WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import PrintintArith StackBytes.
 Require Import WpPrintkDecode.
@@ -66,7 +66,7 @@ Local Strategy 1000 [pa_stk].
 
 Section ProofPrintk.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation PK := KernelSyms.printk.
@@ -1612,11 +1612,11 @@ Section ProofPrintk.
   (* ================================================================== *)
 
   Hypothesis wp_consputc :
-    forall (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    forall (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac),
-      wp_consputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
+      wp_consputc_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
 
-  Lemma wp_printk_char (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_char (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (mc : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     (30 <= K)%nat ->
@@ -1628,7 +1628,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (PK + 0x86) : mword 64) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -1668,7 +1668,7 @@ Section ProofPrintk.
     set (P1 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x72) : mword 64) 4)]> mc).
     assert (Htgtc : add_vec (mword_of_int (PK + 0x72) : mword 64) (sign_extend' 64 (mword_of_int 2096398 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
-    iApply (wp_consputc γ γd Φ P1 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ P1 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mk bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -1871,11 +1871,11 @@ Section ProofPrintk.
   Qed.
 
   Hypothesis wp_printint :
-    forall (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    forall (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac),
-      wp_printint_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
+      wp_printint_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
 
-  Lemma wp_printk_arm_d (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_d (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1893,7 +1893,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -2017,7 +2017,7 @@ Section ProofPrintk.
     assert (HD6a1 : (10 <= uint (D6 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /D6 upd_ne; [| reg_neq]. rewrite /D5 upd_ne; [| reg_neq]. rewrite HD4a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ D6 (K - 24)%nat l pv pkv dqm dqm2 HK14 HD6a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ D6 (K - 24)%nat l pv pkv dqm dqm2 HK14 HD6a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2055,7 +2055,7 @@ Section ProofPrintk.
   (* ------------------------------------------------------------------ *)
 
 
-  Lemma wp_printk_arm_ld (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_ld (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2075,7 +2075,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -2160,7 +2160,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2212,7 +2212,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_lld (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_lld (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2232,7 +2232,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -2316,7 +2316,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2368,7 +2368,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_lu (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_lu (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2388,7 +2388,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -2473,7 +2473,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2525,7 +2525,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_llu (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_llu (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2545,7 +2545,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -2629,7 +2629,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2681,7 +2681,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_lx (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_lx (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2701,7 +2701,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -2777,7 +2777,7 @@ Section ProofPrintk.
     assert (HS2a1 : (10 <= uint (S2 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S2 upd_ne; [| reg_neq]. rewrite HS1a1.
       rewrite (uint_moi_small 16 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S2 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS2a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S2 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS2a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2829,7 +2829,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_llx (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_llx (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2849,7 +2849,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
@@ -2933,7 +2933,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 16 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -2991,7 +2991,7 @@ Section ProofPrintk.
   (* ------------------------------------------------------------------ *)
 
 
-  Lemma wp_printk_arm_u (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_u (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3009,7 +3009,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -3097,7 +3097,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -3126,7 +3126,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_x (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_x (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3144,7 +3144,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -3231,7 +3231,7 @@ Section ProofPrintk.
     assert (HS3a1 : (10 <= uint (S3 !!! Regidx a1_idx) <= 16)%Z).
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 16 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
-    iApply (wp_printint γ γd Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
+    iApply (wp_printint γ γd γv Φ S3 (K - 24)%nat l pv pkv dqm dqm2 HK14 HS3a1 Hpv Hpkv
               with "Hcg Htext Hkdata Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -3266,7 +3266,7 @@ Section ProofPrintk.
 
   (* [%c] (0x1fa..0x20c): va_arg, then the low half of the slot straight to
      consputc.  Like the value arms, but with no (base, sign) pair. *)
-  Lemma wp_printk_arm_c (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_c (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3283,7 +3283,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -3344,7 +3344,7 @@ Section ProofPrintk.
     set (C2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x208) : mword 64) 4)]> C1).
     assert (Htgtc : add_vec (mword_of_int (PK + 0x208) : mword 64) (sign_extend' 64 (mword_of_int 2095992 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
-    iApply (wp_consputc γ γd Φ C2 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ C2 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -3374,7 +3374,7 @@ Section ProofPrintk.
      '%' in the first case and the unrecognised character in the second -- and
      the code prints it either way, which is why one lemma with a parameter
      for the leading character would not be simpler than these two. *)
-  Lemma wp_printk_arm_pct (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_pct (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (mc : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     (30 <= K)%nat ->
@@ -3385,7 +3385,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (PK + 0x246) : mword 64) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -3419,7 +3419,7 @@ Section ProofPrintk.
     set (P2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x248) : mword 64) 4)]> P1).
     assert (Htgtc : add_vec (mword_of_int (PK + 0x248) : mword 64) (sign_extend' 64 (mword_of_int 2095928 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
-    iApply (wp_consputc γ γd Φ P2 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ P2 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -3441,7 +3441,7 @@ Section ProofPrintk.
     rewrite /P2 upd_ne; [| congruence]. rewrite /P1 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Lemma wp_printk_arm_unknown (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_unknown (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (mc : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     (30 <= K)%nat ->
@@ -3452,7 +3452,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (PK + 0x31a) : mword 64) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -3488,7 +3488,7 @@ Section ProofPrintk.
     set (U2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x31e) : mword 64) 4)]> U1).
     assert (Htgtc1 : add_vec (mword_of_int (PK + 0x31e) : mword 64) (sign_extend' 64 (mword_of_int 2095714 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc1) in "Hpc".
-    iApply (wp_consputc γ γd Φ U2 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ U2 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (m1 bs1) "Hcg Hpc %Hcs1 Hpanicking Hpanicked Htx #Hsent1".
     destruct Hcs1 as [Hcs1 Hra1].
@@ -3513,7 +3513,7 @@ Section ProofPrintk.
     set (U4 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x324) : mword 64) 4)]> U3).
     assert (Htgtc2 : add_vec (mword_of_int (PK + 0x324) : mword 64) (sign_extend' 64 (mword_of_int 2095708 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc2) in "Hpc".
-    iApply (wp_consputc γ γd Φ U4 (K - 24)%nat (l ++ bs1)%list pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ U4 (K - 24)%nat (l ++ bs1)%list pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs2) "Hcg Hpc %Hcs2 Hpanicking Hpanicked Htx #Hsent2".
     destruct Hcs2 as [Hcs2 Hra2].
@@ -3621,7 +3621,7 @@ Section ProofPrintk.
 
      Induction is on FUEL rather than on [s]: the recursive call moves the
      INDEX, not the string, and the string points-to has to stay put. *)
-  Lemma wp_printk_str_loop (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_str_loop (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (K : nat) (pv pkv : mword 32) (dqm dqm2 dq : dfrac) (s : string) (sv : mword 64) :
     (30 <= K)%nat ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
@@ -3637,7 +3637,7 @@ Section ProofPrintk.
     sv ↦ₛ{ dq } s -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 20 ->
@@ -3666,7 +3666,7 @@ Section ProofPrintk.
     set (L1 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x22a) : mword 64) 4)]> mc).
     assert (Htgtc : add_vec (mword_of_int (PK + 0x22a) : mword 64) (sign_extend' 64 (mword_of_int 2095958 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
-    iApply (wp_consputc γ γd Φ L1 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ L1 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (m1 bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -3776,7 +3776,7 @@ Section ProofPrintk.
   (* the arm proper (0x20e..0x226): take the vararg, and either walk it or,
      for a null pointer, walk the literal instead.  Two lemmas because the
      two are two different DESCRIPTORS, not two branches of one caller. *)
-  Lemma wp_printk_arm_s (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_s (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 dq : dfrac) (s : string) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3796,7 +3796,7 @@ Section ProofPrintk.
     (pk_vararg m k) ↦ₛ{ dq } s -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 20 ->
@@ -3899,7 +3899,7 @@ Section ProofPrintk.
       iIntros "Hcg Hpc".
       assert (Hp22a : add_vec_int (mword_of_int (PK + 0x226) : mword 64) 4 = mword_of_int (PK + 0x22a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22a) in "Hpc".
-      iApply (wp_printk_str_loop γ γd Φ K pv pkv dqm dqm2 dq s (pk_vararg m k)
+      iApply (wp_printk_str_loop γ γd γv Φ K pv pkv dqm dqm2 dq s (pk_vararg m k)
                 HK Hpv Hpkv Hnonul (length (string_bytes s)) 0%nat S2 l
                 ((pa_stk sp0 23) ↦₈ (pk_ap s0v (S k)) ∗ pk_va sp0 m ∗ Rest)%I
                 ltac:(lia) Hlt HS2s4
@@ -3942,7 +3942,7 @@ Section ProofPrintk.
     vm_compute in Hj; discriminate.
   Qed.
 
-  Lemma wp_printk_arm_s_null (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_s_null (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3960,7 +3960,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 20 ->
@@ -4077,7 +4077,7 @@ Section ProofPrintk.
     iNext. iIntros "Hcg Hpc".
     assert (Htgth : add_vec (mword_of_int (PK + 0x244) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")))) = mword_of_int (PK + 0x22a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgth) in "Hpc".
-    iApply (wp_printk_str_loop γ γd Φ K pv pkv dqm dqm2 DfracDiscarded "(null)"%string
+    iApply (wp_printk_str_loop γ γd γv Φ K pv pkv dqm dqm2 DfracDiscarded "(null)"%string
               (mword_of_int pk_null_str : mword 64)
               HK Hpv Hpkv ltac:(vm_compute; reflexivity)
               6%nat 0%nat N4 l
@@ -4142,7 +4142,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- one pass of the nibble loop, 0x1e0 .. 0x1f2 ---- *)
-  Lemma wp_printk_hex_loop (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_hex_loop (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (K : nat) (pv pkv : mword 32) (dqm dqm2 : dfrac) (dg : mword 64) :
     (30 <= K)%nat ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
@@ -4156,7 +4156,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (PK + 0x1e0) : mword 64) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true ->
@@ -4234,7 +4234,7 @@ Section ProofPrintk.
     set (P4 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x1ea) : mword 64) 4)]> P3).
     assert (Htgtc : add_vec (mword_of_int (PK + 0x1ea) : mword 64) (sign_extend' 64 (mword_of_int 2096022 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
-    iApply (wp_consputc γ γd Φ P4 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ P4 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (m1 bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent".
     destruct Hcs as [Hcs Hra].
@@ -4337,7 +4337,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- the arm around it, 0x1b4 .. 0x1f8 ---- *)
-  Lemma wp_printk_arm_p (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printk_arm_p (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (pv pkv : mword 32)
       (dqm dqm2 : dfrac) (Rest : iProp Σ) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -4357,7 +4357,7 @@ Section ProofPrintk.
     pk_va sp0 m -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true ->
@@ -4441,7 +4441,7 @@ Section ProofPrintk.
     set (Q3 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x1ca) : mword 64) 4)]> Q2).
     assert (Htgtc1 : add_vec (mword_of_int (PK + 0x1ca) : mword 64) (sign_extend' 64 (mword_of_int 2096054 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc1) in "Hpc".
-    iApply (wp_consputc γ γd Φ Q3 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ Q3 (K - 24)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (m1 bs1) "Hcg Hpc %Hcs1 Hpanicking Hpanicked Htx #Hsent1".
     destruct Hcs1 as [Hcs1 Hra1].
@@ -4468,7 +4468,7 @@ Section ProofPrintk.
     set (Q5 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (PK + 0x1d2) : mword 64) 4)]> Q4).
     assert (Htgtc2 : add_vec (mword_of_int (PK + 0x1d2) : mword 64) (sign_extend' 64 (mword_of_int 2096046 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc2) in "Hpc".
-    iApply (wp_consputc γ γd Φ Q5 (K - 24)%nat (l ++ bs1)%list pv pkv dqm dqm2 HK6 Hpv Hpkv
+    iApply (wp_consputc γ γd γv Φ Q5 (K - 24)%nat (l ++ bs1)%list pv pkv dqm dqm2 HK6 Hpv Hpkv
               with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (m2 bs2) "Hcg Hpc %Hcs2 Hpanicking Hpanicked Htx #Hsent2".
     destruct Hcs2 as [Hcs2 Hra2].
@@ -4516,7 +4516,7 @@ Section ProofPrintk.
     assert (Hp1e0 : add_vec_int (mword_of_int (PK + 0x1dc) : mword 64) 4 = mword_of_int (PK + 0x1e0)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1e0) in "Hpc".
     (* the sixteen nibbles *)
-    iApply (wp_printk_hex_loop γ γd Φ K pv pkv dqm dqm2 (mword_of_int pk_digits_addr : mword 64)
+    iApply (wp_printk_hex_loop γ γd γv Φ K pv pkv dqm dqm2 (mword_of_int pk_digits_addr : mword 64)
               HK Hpv Hpkv 16%nat Q8 (l ++ bs1 ++ bs2)%list
               ((pa_stk sp0 19) ↦₈ (mc !!! Regidx (mword_of_int 25 : mword 5)) ∗
                (pa_stk sp0 23) ↦₈ (pk_ap s0v (S k)) ∗ pk_va sp0 m ∗ Rest)%I

@@ -46,7 +46,7 @@ Require Import SmodeCore.
 Require Import StackOwn StackBytes CalleeSaved KernelText KernelDataInv.
 Require Import KernelRvcDecode WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
-Require Import WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import ByteCursor PrintintArith.
 Require Import WpPrintintDecode.
@@ -67,7 +67,7 @@ Module PrintintProof (Consputc : CONSPUTC) : PRINTINT.
 
 Section ProofPrintint.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation PI := KernelSyms.printint.
@@ -593,11 +593,11 @@ Section ProofPrintint.
   (* ================================================================== *)
 
   Hypothesis wp_consputc :
-    forall (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    forall (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac),
-      wp_consputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
+      wp_consputc_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
 
-  Lemma wp_printint_ploop (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (K : nat)
+  Lemma wp_printint_ploop (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (K : nat)
       (buf : mword 64) (pv pkv : mword 32) (dqm dqm2 : dfrac) :
     (14 <= K)%nat ->
     eq_vec (sign_extend' 64 pv) zero_reg = false ->
@@ -612,7 +612,7 @@ Section ProofPrintint.
     bytes_own (DfracOwn 1) buf 24 -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> s1_idx ->
           mf !!! Regidx c = mp !!! Regidx c ⌝ -∗
@@ -668,7 +668,7 @@ Section ProofPrintint.
       assert (Htgtc : add_vec (mword_of_int (PI + 0x78) : mword 64) (sign_extend' 64 (mword_of_int 2096542 : mword 21)) = mword_of_int KernelSyms.consputc)
         by (apply bv_eq; vm_compute; reflexivity);
       iEval (rewrite Htgtc) in "Hpc";
-      iApply (wp_consputc γ γd Φ P2 (K - 8)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
+      iApply (wp_consputc γ γd γv Φ P2 (K - 8)%nat l pv pkv dqm dqm2 HK6 Hpv Hpkv
                 with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [-]");
       iIntros (mc bs) "Hcg Hpc %Hcs Hpanicking Hpanicked Htx #Hsent";
       destruct Hcs as [Hcs Hra];
@@ -747,7 +747,7 @@ Section ProofPrintint.
   (*  lazily-saved s1, and the epilogue.                                 *)
   (* ================================================================== *)
 
-  Lemma wp_printint_tail (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printint_tail (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mt : regfile) (K n : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -775,7 +775,7 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       sie_cap_gpr γ mf K -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -915,7 +915,7 @@ Section ProofPrintint.
     assert (Hp74 : add_vec_int (mword_of_int (PI + 0x70) : mword 64) 4 = mword_of_int (PI + 0x74)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp74) in "Hpc".
     (* ---- the print loop ---- *)
-    iApply (wp_printint_ploop γ γd Φ K buf pv pkv dqm dqm2 HK Hpv Hpkv (n - 1)%nat l T7
+    iApply (wp_printint_ploop γ γd γv Φ K buf pv pkv dqm dqm2 HK Hpv Hpkv (n - 1)%nat l T7
               ltac:(lia) HT7s1 HT7s2
               with "Hcg Htext Hpc Hbuf Hpanicking Hpanicked Hdev Htx Hdlab [-]").
     iIntros (mf bs) "%Hk Hcg Hpc Hbuf Hpanicking Hpanicked Htx #Hsent".
@@ -969,7 +969,7 @@ Section ProofPrintint.
   (*  why it takes the map at 0x12 abstractly.                           *)
   (* ================================================================== *)
 
-  Lemma wp_printint_main (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printint_main (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m mq : regfile) (K : nat) (x : mword 64) (l : list (bv 8))
       (pv pkv : mword 32) (dqm dqm2 : dfrac) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -999,7 +999,7 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ (mf : regfile) (bs : list (bv 8)),
       sie_cap_gpr γ mf K -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -1141,7 +1141,7 @@ Section ProofPrintint.
       iNext. iIntros "Hcg Hpc".
       assert (Htgt5c : add_vec (mword_of_int (PI + 0x44) : mword 64) (sign_extend' 64 (mword_of_int 24 : mword 13)) = mword_of_int (PI + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt5c) in "Hpc".
-      iApply (wp_printint_tail γ γd Φ m mf K i' l pv pkv dqm dqm2 HK Hpv Hpkv
+      iApply (wp_printint_tail γ γd γv Φ m mf K i' l pv pkv dqm dqm2 HK Hpv Hpkv
                 Hi1 ltac:(lia) Hf4 Hmfsp Hmfs2 Hmfcs Hal7 Hal6 Hal5
                 with "Hcg Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanicking Hpanicked Hdev Htx Hdlab Hcont").
     - (* a sign digit: buf[i'] = '-' , then the tail with n = i'+1 *)
@@ -1232,7 +1232,7 @@ Section ProofPrintint.
         rewrite /S2 upd_ne; [| congruence].
         rewrite /S1 upd_ne; [| congruence].
         exact (Hmfcs c Hc Nsp N8 N18). }
-      iApply (wp_printint_tail γ γd Φ m S4 K (i' + 1)%nat l pv pkv dqm dqm2 HK Hpv Hpkv
+      iApply (wp_printint_tail γ γd γv Φ m S4 K (i' + 1)%nat l pv pkv dqm dqm2 HK Hpv Hpkv
                 ltac:(lia) ltac:(lia) HS4a4
                 ltac:(rewrite /S4 upd_ne; [| reg_neq]; rewrite /S3 upd_ne; [| reg_neq];
                       rewrite /S2 upd_ne; [| reg_neq]; rewrite /S1 upd_ne; [exact Hmfsp | reg_neq])
@@ -1264,9 +1264,9 @@ Section ProofPrintint.
     iIntros "!>" (k j Hk) "Hb". by iExists (nth_byte digits_word j).
   Qed.
 
-  Lemma wp_printint_sconf_gen (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_printint_sconf_gen (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac)
-    : wp_printint_sconf_body γ γd Φ m K l pv pkv dqm dqm2.
+    : wp_printint_sconf_body γ γd γv Φ m K l pv pkv dqm dqm2.
   Proof.
     cbv beta delta [wp_printint_sconf_body].
     intros ra_i a1_i pcE ra0 ret_tgt HK Hbase Hpv Hpkv.
@@ -1381,7 +1381,7 @@ Section ProofPrintint.
       set (N1 := <[Regidx t1_idx := regval_into_reg (mword_of_int 0 : mword 64)]> W2).
       assert (Hp12 : add_vec_int (mword_of_int (PI + 0x10) : mword 64) 2 = mword_of_int (PI + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp12) in "Hpc".
-      iApply (wp_printint_main γ γd Φ m N1 K (m !!! Regidx a0_idx) l pv pkv dqm dqm2 HK Hpv Hpkv
+      iApply (wp_printint_main γ γd γv Φ m N1 K (m !!! Regidx a0_idx) l pv pkv dqm dqm2 HK Hpv Hpkv
                 ltac:(rewrite /N1 upd_ne; [rewrite HW2a1; exact Hbase | reg_neq])
                 ltac:(rewrite /N1 upd_ne; [exact HW2a0 | reg_neq])
                 ltac:(rewrite /N1 upd_ne; [exact HW2sp | reg_neq])
@@ -1437,7 +1437,7 @@ Section ProofPrintint.
         iNext. iIntros "Hcg Hpc".
         assert (Htgt12 : add_vec (mword_of_int (PI + 0x94) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1983 : mword 11) ('b"0")))) = mword_of_int (PI + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt12) in "Hpc".
-        iApply (wp_printint_main γ γd Φ m G2 K (sub_vec zero_reg (W2 !!! Regidx a0_idx)) l pv pkv dqm dqm2 HK Hpv Hpkv
+        iApply (wp_printint_main γ γd γv Φ m G2 K (sub_vec zero_reg (W2 !!! Regidx a0_idx)) l pv pkv dqm dqm2 HK Hpv Hpkv
                   ltac:(rewrite /G2 upd_ne; [| reg_neq]; rewrite /G1 upd_ne;
                         [rewrite HW2a1; exact Hbase | reg_neq])
                   ltac:(rewrite /G2 upd_ne; [| reg_neq]; rewrite /G1 upd_eq; reflexivity)
@@ -1466,7 +1466,7 @@ Section ProofPrintint.
         set (N1 := <[Regidx t1_idx := regval_into_reg (mword_of_int 0 : mword 64)]> W2).
         assert (Hp12 : add_vec_int (mword_of_int (PI + 0x10) : mword 64) 2 = mword_of_int (PI + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp12) in "Hpc".
-        iApply (wp_printint_main γ γd Φ m N1 K (m !!! Regidx a0_idx) l pv pkv dqm dqm2 HK Hpv Hpkv
+        iApply (wp_printint_main γ γd γv Φ m N1 K (m !!! Regidx a0_idx) l pv pkv dqm dqm2 HK Hpv Hpkv
                   ltac:(rewrite /N1 upd_ne; [rewrite HW2a1; exact Hbase | reg_neq])
                   ltac:(rewrite /N1 upd_ne; [exact HW2a0 | reg_neq])
                   ltac:(rewrite /N1 upd_ne; [exact HW2sp | reg_neq])
@@ -1484,13 +1484,13 @@ End ProofPrintint.
 (* THE SEALED FUNCTOR: instantiate the callee's WP hypothesis with its     *)
 (* proven spec, discharging the PRINTINT Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_printint_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+  Definition wp_printint_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac}
-      : wp_printint_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2 :=
+      : wp_printint_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2 :=
     wp_printint_sconf_gen
-      (fun γ' γd' Φ' m' K' l' pv' pkv' dqm' dqm2' =>
-         Consputc.wp_consputc_sconf γ' γd' Φ' m' K' l' pv' pkv' (dqm:=dqm') (dqm2:=dqm2'))
-      γ γd Φ m0 K l pv pkv dqm dqm2.
+      (fun γ' γd' γv' Φ' m' K' l' pv' pkv' dqm' dqm2' =>
+         Consputc.wp_consputc_sconf γ' γd' γv' Φ' m' K' l' pv' pkv' (dqm:=dqm') (dqm2:=dqm2'))
+      γ γd γv Φ m0 K l pv pkv dqm dqm2.
 
 End PrintintProof.

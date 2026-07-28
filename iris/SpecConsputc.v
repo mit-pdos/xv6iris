@@ -47,14 +47,14 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.
 
 Notation CPC := KernelSyms.consputc.
 
-Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
     (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.consputc in
@@ -68,7 +68,7 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{C
   kernel_text -∗ pc_is pcE -∗
   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-  dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+  dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
   ( ∀ mf bs,
     sie_cap_gpr γ mf K -∗
     pc_is ret_tgt -∗
@@ -81,8 +81,8 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{C
 
 Module Type CONSPUTC.
   Parameter wp_consputc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac},
-      wp_consputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
+      wp_consputc_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
 End CONSPUTC.
