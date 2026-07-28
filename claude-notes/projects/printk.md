@@ -466,8 +466,24 @@ Three gotchas cost real time here and are worth remembering:
   "does not match any subterm".  In ordinary term-application position it is
   fine.
 
-Left: the dispatch assembly (head + the three entries), the loop body that
-picks the arm from `pk_entry`, the loop induction, and the top-level spec.
+The **dispatch is assembled**: `wp_printk_dispatch` runs 0x8a to whichever arm
+the directive selects, concluding
+`pc_is (PK + pk_entry (pk_ch f (i+1)) (pk_ch f (i+2)) (pk_ch f (i+3)))`.
+All three of the head's exits end in that one statement because `pk_ch`
+already returns the NUL past the end of the string -- so the short-format
+cases need no separate treatment downstream, only the observation that a zero
+byte inside the bound can only be the terminator (`pk_fbyte_zero_end`).
+
+One more Iris-shaped constraint showed up: a lemma with THREE continuations
+cannot be applied with a single spatial `Hcont`, because `iApply` has to split
+the context across all three up front.  The caller therefore decides which
+exit is live first (`destruct (decide (pk_fbyte f (S i) = 0))`) and discharges
+the other two continuations from their own pure premises -- they need no
+resources, since as hypotheses of the lemma their arguments are given.  The
+same will apply to `wp_printk_advance`, which has two.
+
+Left: the loop body that picks the arm from `pk_entry`, the loop induction,
+and the top-level spec.
 
 ### printk: what the arms still need
 

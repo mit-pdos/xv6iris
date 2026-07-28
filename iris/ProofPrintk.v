@@ -6497,4 +6497,152 @@ Section ProofPrintk.
       exact (pk_chain_kept_trans mf D3 mq Hkk HD3k).
   Qed.
 
+
+
+  (* a nonzero byte inside the bound is a real character *)
+  Lemma pk_fbyte_nz_lt (f : string) (j : nat) :
+    (j < length (cstring_bytes f))%nat -> pk_fbyte f j <> (mword_of_int 0 : mword 8) ->
+    (j < String.length f)%nat.
+  Proof.
+    intros Hj Hnz. rewrite cstring_bytes_length in Hj.
+    destruct (Nat.eq_dec j (String.length f)) as [He | He]; [ | lia ].
+    exfalso. apply Hnz. rewrite He -(string_bytes_length f). apply pk_fbyte_nul.
+  Qed.
+
+  Lemma zext_pk_byte_nul : (zero_extend' 64 (pk_byte pk_nul) : mword 64) = zero_reg.
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+  (* the whole dispatch, 0x8a to whichever arm the directive selects.  The
+     three shapes [pk_kinds] distinguishes are exactly the head's three exits,
+     and all three end in the same statement because [pk_ch] already returns
+     the NUL past the end of the string. *)
+  Definition pk_disp_all (mf mc : regfile) : Prop :=
+    forall c : mword 5, c <> mword_of_int 9 -> c <> mword_of_int 11 ->
+      c <> mword_of_int 12 -> c <> mword_of_int 13 -> c <> mword_of_int 14 ->
+      c <> mword_of_int 15 -> c <> mword_of_int 21 ->
+      mf !!! Regidx c = mc !!! Regidx c.
+
+  Lemma wp_printk_dispatch (γ : gname) (Φ : mval -> iProp Σ)
+      (mc : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (i : nat)
+      (Rest : iProp Σ) :
+    (S i < length (cstring_bytes f))%nat ->
+    (Z.of_nat i + 1 < 2^31) ->
+    nonul f = true ->
+    mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
+    mc !!! Regidx s2_idx = fmt ->
+    pk_consts mc ->
+    sie_cap_gpr γ mc (K - 24)%nat -∗
+    kernel_text -∗
+    pc_is (mword_of_int (PK + 0x8a) : mword 64) -∗
+    fmt ↦ₛ{ dqf } f -∗
+    Rest -∗
+    ( ∀ mf : regfile,
+      ⌜ pk_disp_all mf mc
+        /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i)) ⌝ -∗
+      sie_cap_gpr γ mf (K - 24)%nat -∗
+      pc_is (mword_of_int (PK + pk_entry (pk_ch f (S i)) (pk_ch f (S (S i)))
+                                         (pk_ch f (S (S (S i))))) : mword 64) -∗
+      fmt ↦ₛ{ dqf } f -∗ Rest -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hlen Hi31 Hnn Hs4 Hs2 Hconsts.
+    destruct Hconsts as (Hs3 & Hs6 & Hs7 & Hs8 & Hs10 & Hs11).
+    iIntros "Hcg #Htext Hpc Hfmt HR Hcont".
+    (* [wp_printk_disp_head] has three continuations and only one copy of
+       [Hcont] to give them, so decide which exit is live FIRST -- the other
+       two are then discharged from their own pure premise. *)
+    destruct (decide (pk_fbyte f (S i) = (mword_of_int 0 : mword 8))) as [Hz0 | Hnz0].
+    { iApply (wp_printk_disp_head γ Φ mc K fmt dqf f i Rest Hlen Hi31 Hs4 Hs2
+                with "Hcg Htext Hpc Hfmt HR [-] [] []").
+      2: { iIntros (mf) "%Hv Hcg Hpc Hfmt HR". exfalso.
+           destruct Hv as (_ & _ & _ & _ & Hn & _). exact (Hn Hz0). }
+      2: { iIntros (mf) "%Hv Hcg Hpc Hfmt HR". exfalso.
+           destruct Hv as (_ & _ & _ & _ & _ & _ & Hn & _). exact (Hn Hz0). }
+      (* (a) c0 = 0 -- the string ends right after the '%' *)
+      iIntros (mf) "%Hv Hcg Hpc Hfmt HR".
+      destruct Hv as (Hkept & Hs1 & Hs5 & Hzz).
+      assert (Hend : S i = String.length f)
+        by (apply (pk_fbyte_zero_end f (S i) Hnn); [ rewrite cstring_bytes_length in Hlen; lia | exact Hzz ]).
+      assert (Hc0 : pk_ch f (S i) = pk_nul) by (apply pk_ch_nul; lia).
+      assert (Hc1 : pk_ch f (S (S i)) = pk_nul) by (apply pk_ch_nul; lia).
+      assert (Hc2 : pk_ch f (S (S (S i))) = pk_nul) by (apply pk_ch_nul; lia).
+      iApply (wp_printk_chain_2aa γ Φ mf K (pk_ch f (S i)) (pk_ch f (S (S i)))
+                (pk_ch f (S (S (S i)))) (fmt ↦ₛ{ dqf } f ∗ Rest)%I Hc0 Hc1 Hc2
+                ltac:(rewrite Hs5 Hc0 zext_pk_byte_nul; reflexivity)
+                ltac:(rewrite (Hkept (mword_of_int 24 : mword 5)); [exact Hs8 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                ltac:(rewrite (Hkept (mword_of_int 26 : mword 5)); [exact Hs10 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                ltac:(rewrite (Hkept (mword_of_int 27 : mword 5)); [exact Hs11 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                with "Hcg Htext Hpc [$Hfmt $HR] [-]").
+      iIntros (mg) "%Hk Hcg Hpc (Hfmt & HR)".
+      iApply ("Hcont" $! mg with "[%] Hcg Hpc Hfmt HR").
+      split.
+      + intros c N9 N11 N12 N13 N14 N15 N21.
+        rewrite (Hk c N11 N12 N13 N14 N15). apply Hkept; assumption.
+      + rewrite (Hk (mword_of_int 9 : mword 5)); [exact Hs1 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq]. }
+    destruct (decide (pk_fbyte f (S (S i)) = (mword_of_int 0 : mword 8))) as [Hz1 | Hnz1].
+    { iApply (wp_printk_disp_head γ Φ mc K fmt dqf f i Rest Hlen Hi31 Hs4 Hs2
+                with "Hcg Htext Hpc Hfmt HR [] [-] []").
+      1: { iIntros (mf) "%Hv Hcg Hpc Hfmt HR". exfalso.
+           destruct Hv as (_ & _ & _ & Hn). exact (Hnz0 Hn). }
+      2: { iIntros (mf) "%Hv Hcg Hpc Hfmt HR". exfalso.
+           destruct Hv as (_ & _ & _ & _ & _ & _ & _ & Hn). exact (Hn Hz1). }
+      (* (b) c0 <> 0, c1 = 0 -- one character of directive and no more *)
+      iIntros (mf) "%Hv Hcg Hpc Hfmt HR".
+      destruct Hv as (Hkept & Hs1 & Hs5 & Ha3 & Hnzz & Hzz).
+      assert (Hlt0 : (S i < String.length f)%nat) by (apply (pk_fbyte_nz_lt f (S i) Hlen Hnzz)).
+      assert (Hend : S (S i) = String.length f)
+        by (apply (pk_fbyte_zero_end f (S (S i)) Hnn); [ lia | exact Hzz ]).
+      assert (Hc1 : pk_ch f (S (S i)) = pk_nul) by (apply pk_ch_nul; lia).
+      assert (Hc2 : pk_ch f (S (S (S i))) = pk_nul) by (apply pk_ch_nul; lia).
+      iApply (wp_printk_chain_298 γ Φ mf K (pk_ch f (S i)) (pk_ch f (S (S i)))
+                (pk_ch f (S (S (S i)))) (fmt ↦ₛ{ dqf } f ∗ Rest)%I Hc1 Hc2
+                ltac:(rewrite Hs5 (pk_fbyte_ch f (S i) ltac:(lia)); reflexivity)
+                ltac:(rewrite Ha3 Hc1 zext_pk_byte_nul; reflexivity)
+                ltac:(rewrite (Hkept (mword_of_int 23 : mword 5)); [exact Hs7 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                ltac:(rewrite (Hkept (mword_of_int 24 : mword 5)); [exact Hs8 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                ltac:(rewrite (Hkept (mword_of_int 26 : mword 5)); [exact Hs10 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                ltac:(rewrite (Hkept (mword_of_int 27 : mword 5)); [exact Hs11 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+                with "Hcg Htext Hpc [$Hfmt $HR] [-]").
+      iIntros (mg) "%Hk Hcg Hpc (Hfmt & HR)".
+      iApply ("Hcont" $! mg with "[%] Hcg Hpc Hfmt HR").
+      split.
+      + intros c N9 N11 N12 N13 N14 N15 N21.
+        rewrite (Hk c N11 N12 N13 N14 N15). apply Hkept; assumption.
+      + rewrite (Hk (mword_of_int 9 : mword 5)); [exact Hs1 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq]. }
+    iApply (wp_printk_disp_head γ Φ mc K fmt dqf f i Rest Hlen Hi31 Hs4 Hs2
+              with "Hcg Htext Hpc Hfmt HR [] [] [-]").
+    1: { iIntros (mf) "%Hv Hcg Hpc Hfmt HR". exfalso.
+         destruct Hv as (_ & _ & _ & Hn). exact (Hnz0 Hn). }
+    1: { iIntros (mf) "%Hv Hcg Hpc Hfmt HR". exfalso.
+         destruct Hv as (_ & _ & _ & _ & _ & Hn). exact (Hnz1 Hn). }
+    (* (c) all three characters are there *)
+    iIntros (mf) "%Hv Hcg Hpc Hfmt HR".
+    destruct Hv as (Hkept & Hs1 & Ha5 & Ha4 & Hs5 & Ha3 & Hnzz0 & Hnzz1).
+    assert (Hlt1 : (S (S i) < String.length f)%nat).
+    { apply (pk_fbyte_nz_lt f (S (S i))); [ | exact Hnzz1 ].
+      rewrite cstring_bytes_length.
+      assert (S i < String.length f)%nat by (apply (pk_fbyte_nz_lt f (S i) Hlen Hnzz0)).
+      lia. }
+    assert (Hlen3 : (S (S (S i)) < length (cstring_bytes f))%nat)
+      by (rewrite cstring_bytes_length; lia).
+    iApply (wp_printk_chain_a4 γ Φ mf K fmt dqf f i (pk_ch f (S i)) (pk_ch f (S (S i)))
+              (pk_ch f (S (S (S i)))) Rest Hlen3 Hi31 eq_refl
+              ltac:(rewrite Hs5 (pk_fbyte_ch f (S i) ltac:(lia)); reflexivity)
+              ltac:(rewrite Ha3 (pk_fbyte_ch f (S (S i)) ltac:(lia)); reflexivity)
+              Ha5
+              ltac:(rewrite (Hkept s2_idx); [exact Hs2 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+              ltac:(rewrite (Hkept (mword_of_int 23 : mword 5)); [exact Hs7 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+              ltac:(rewrite (Hkept (mword_of_int 24 : mword 5)); [exact Hs8 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+              ltac:(rewrite (Hkept (mword_of_int 26 : mword 5)); [exact Hs10 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+              ltac:(rewrite (Hkept (mword_of_int 27 : mword 5)); [exact Hs11 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq])
+              with "Hcg Htext Hpc Hfmt HR [-]").
+    iIntros (mg) "%Hk Hcg Hpc Hfmt HR".
+    iApply ("Hcont" $! mg with "[%] Hcg Hpc Hfmt HR").
+    split.
+    + intros c N9 N11 N12 N13 N14 N15 N21.
+      rewrite (Hk c N11 N12 N13 N14 N15). apply Hkept; assumption.
+    + rewrite (Hk (mword_of_int 9 : mword 5)); [exact Hs1 | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq].
+  Qed.
+
 End ProofPrintk.
