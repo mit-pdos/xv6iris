@@ -174,7 +174,57 @@ forgotten) and walk's `wp_memset_page_zero_sconf` (`page_own p` in, the written
 the ~20 s inline memset composition out of the `ProofWalk` critical-path file
 into the separately-compilable `WpMemsetArray`.
 
+## An ASSUMED callee: `Module Type` + an `Axiom` in the link
+
+A callee with no proof still gets the full shape — the interface is what the
+caller's proof should be a functor over, whether or not anyone has discharged
+it. kerneltrap is the worked example: `SpecKerneltrap.v` states
+`wp_kerneltrap_returns_body` and `Module Type KERNELTRAP`, and
+`LinkKerneltrap.v` supplies the only instance:
+
+```coq
+Module Kerneltrap : KERNELTRAP.
+  Axiom kerneltrap_returns : forall …, wp_kerneltrap_returns_body … .
+End Kerneltrap.
+```
+
+so `ProofKernelvec.v` is axiom-free (it is `KernelvecProof (Kerneltrap :
+KERNELTRAP) : KERNELVEC`) and proving kerneltrap replaces one file. Two notes:
+
+- **Use `Axiom` inside the module, not `Declare Module Kerneltrap :
+  KERNELTRAP.`** The one-liner works and `Print Assumptions` reports it, but
+  `tools/proof_coverage.py` finds axioms by scanning for the keyword, so the
+  short form silently drops the assumption from the coverage report.
+- The link restates the binder list a second time (Module Type + Axiom). Only
+  the binders — the statement itself still lives once, in the `_body`.
+
+`panic` is deliberately NOT in this shape: its contract is persistent and gets
+threaded through callers' *statements* (`SpecPanic.panic_wp`), so a module
+parameter would buy nothing.
+
+## A whole-function proof whose contract is not a callable-function WP
+
+`kernelvec` fits the shape even though nothing ever *calls* it: the hardware
+traps to it, and its public contract is `IntrDefs.intr_handler_spec`, not an
+entry-pc/return-pc WP. Its entry-to-SRET WP (`wp_kernelvec`, with explicit
+mstatus/menvcfg parameters and their well-formedness premises) stays INTERNAL —
+`Module Type KERNELVEC` exposes only `kernelvec_handler_spec`, per the
+expose-only-what-a-caller-consumes rule. The one cost of that choice: the
+coverage tool cannot discover such a spec textually (its rule keys off the
+entry `pc_is` being `KernelSyms.<sym>` and the continuation being the ra-bound
+return address), so kernelvec stays in `proof_coverage.py`'s MANIFEST.
+
 ## Gotchas (all hit in practice)
+
+- **A `_body` that is a BARE `iProp` must NOT be annotated `: iProp Σ`.** With
+  the annotation it elaborates in `bi_scope` and the `Module Type`'s `Parameter
+  … : forall …, <body>` is rejected — *"has type iProp ?Σ which should be Set,
+  Prop or Type"*. Iris has no `bi_emp_valid` coercion; what makes the usual
+  `Lemma foo : A -∗ B` work is that a top-level `-∗` parses in `stdpp_scope` as
+  an entailment (a `Prop`). So leave the `Definition` unannotated and it
+  reproduces the original `Lemma` statement exactly. Most `_body`s never hit
+  this because they open with a pure premise or a `let`, which already forces
+  the whole thing into `Type`.
 
 - **The spec's binder list must mirror the proof file's `Context` exactly.** A
   missing class (e.g. `!lockG Σ` for anything mentioning `is_lock`) reports as

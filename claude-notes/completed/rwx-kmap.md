@@ -180,7 +180,7 @@ so sequencing is clear):
         kpt_tree_spec_gen_set_leaf_tramp DELETED.
       - tlb_inv_pt dropped the temporary ⌜M !! tramp_vpn = None⌝ conjunct
         (def + intro + open + every threaded destructure: SRegime grant-
-        facts, WpKernelvecNew, UserretEntryPt windows, ktramp_fetch_habs).
+        facts, ProofKernelvec, UserretEntryPt windows, ktramp_fetch_habs).
       - tlb_inv_pt_translateAddr_tramp + its _fetch wrapper DELETED; tramp
         translation goes through the general _at at (ppn:=tramp_ppn,
         pc:=KP_rx) with kperm_variant_check_fetch.  Bridge lemma

@@ -46,7 +46,8 @@
    LEAST [kv_frame_slots] below the interrupted sp -- the kernel must
    maintain that much free stack at every interrupts-enabled instruction --
    plus menvcfg and tlb_inv_pt.  [kernelvec_handler_spec] proves the real
-   kernelvec ([wp_kernelvec], WpKernelvecNew.v) satisfies the contract. *)
+   kernelvec ([wp_kernelvec], ProofKernelvec.v) satisfies the contract;
+   [SpecKernelvec.v] is the interface, [LinkKernelvec.v] the instantiation. *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.

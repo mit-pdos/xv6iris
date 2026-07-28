@@ -3,7 +3,7 @@
    using its own 16-byte stack frame (saves/restores ra,s0).  Built by
    composing the S-mode instruction lemmas (existing framework ones plus the
    new arithmetic/auipc lemmas in WpPushOff.v), following the stack-geometry
-   composition pattern of WpKernelvecNew (wp_kernelvec) / WpMemsetS.
+   composition pattern of ProofKernelvec (wp_kernelvec) / WpMemsetS.
 
    Disassembly (KernelInstrs.v, symbol mycpu @ 0x800018d6):
      +0x00  800018d6  1141      c.addi   sp,sp,-16    frame alloc

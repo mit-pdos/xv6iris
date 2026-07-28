@@ -112,7 +112,6 @@ WpStartNew.v
 WpKernelNew.v
 WpKvInstr.v
 WpMemsetInstr.v
-WpKernelvecNew.v
 MstatusBits.v
 WpIntrCore.v
 PlicPlan.v
@@ -141,7 +140,11 @@ UserExecClose.v
 UserKernelBridge.v
 IntrDefs.v
 WpIntrInv.v
-WpKernelvecSpec.v
+SpecKerneltrap.v
+LinkKerneltrap.v
+SpecKernelvec.v
+ProofKernelvec.v
+LinkKernelvec.v
 WpSmodeIntr.v
 WpSconfAlu.v
 WpSconfMem.v

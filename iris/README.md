@@ -479,7 +479,7 @@ arithmetic on `S32` registers is guarded off (`sval_is64`) — the executor
 fails rather than approximates.
 
 **Performance: the agreement interface and the kernelvec blocks
-(`VcGenS.v` / `WpKernelvecVc.v`).**  Profiling showed the first-cut VCgen
+(`VcGenS.v` / `ProofKernelvec.v`).**  Profiling showed the first-cut VCgen
 was compile-time-neutral: symbolic runs `vm_compute`d 32-entry
 mword-keyed register maps (~2s per run lemma), the seams materialized
 `vregs_den ρ vregs_init` (a term bigger than the hand proofs' maps), and
@@ -508,7 +508,7 @@ the per-cell `big_sepL_cons` *setoid* rewrites at the heap seams cost
 Measured effect (per-lemma coqc time, same statements):
 `wp_pop_off` 23.4s hand → 17.0s VCgen (+1.3s for all four run lemmas,
 was 8.2s); and on the block shape the VCgen is built for — kernelvec's
-17-instruction register-save/restore runs (`WpKernelvecVc.v`) — the
+17-instruction register-save/restore runs (`ProofKernelvec.v`) — the
 VCgen block lemmas cost 4.4s / 5.9s (+ ~2s runs + ~1.5s instr bundles)
 against 18.1s / 23.9s for the hand-chained `wp_kv_prologue` /
 `wp_kv_epilogue`: **roughly 3× faster**, with the block programs and
