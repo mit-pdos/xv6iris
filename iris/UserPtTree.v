@@ -306,7 +306,10 @@ Section UserPtFault.
     iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
     iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
     pose proof Hspec as (Hbase & _ & _ & _ & Hblkspec).
-    pose proof (Hblkspec (svpn_of va) Hnt Hntf Hnone) as Hblk.
+    (* the spec blocks in the xv6 ZERO shape; the ownership lemma only needs
+       model-invalidity *)
+    pose proof (PtBuild.ptree_blocks0_blocks t (svpn_of va)
+                  (Hblkspec (svpn_of va) Hnt Hntf Hnone)) as Hblk.
     iDestruct (ptree_own_blocked_mem σ (DfracOwn 1) t (svpn_of va) Hblk with "Hgh Ht")
       as %Hstop.
     iPureIntro.

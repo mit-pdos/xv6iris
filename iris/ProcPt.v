@@ -170,7 +170,7 @@ Proof.
   split.
   { intros vpn w Hl. rewrite lookup_empty in Hl. discriminate. }
   intros vpn Hnt Hntf _.
-  apply ptree_blocks0_blocks. apply Hblk. apply ppt_map_other; assumption.
+  apply Hblk. apply ppt_map_other; assumption.
 Qed.
 
 (* ===================================================================== *)

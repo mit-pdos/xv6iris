@@ -197,8 +197,14 @@ SpecKalloc.v
 ProofKalloc.v
 LinkKalloc.v
 SpecWalk.v
+SpecIsmapped.v
 ProofWalk.v
 LinkWalk.v
+ProofWalkNoalloc.v
+LinkWalkNoalloc.v
+WpIsmappedDecode.v
+ProofIsmapped.v
+LinkIsmapped.v
 SpecMappages.v
 ProofMappages.v
 LinkMappages.v
@@ -422,6 +428,10 @@ WpProcPagetableInstr.v
 ProofProcPagetable.v
 LinkProcPagetable.v
 ProcPtOwn.v
+SpecVmfault.v
+WpVmfaultDecode.v
+ProofVmfault.v
+LinkVmfault.v
 WpPipecloseDecode.v
 SpecPipeclose.v
 ProofPipeclose.v
