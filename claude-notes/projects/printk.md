@@ -329,18 +329,20 @@ share, and the pieces it needed are the reusable part:
   `pk_lo` carries the `mword 32` ascription for the same reason `pk_fbyte`
   carries the `mword 8` one.
 
-**Seven of the nine value arms are proven** (`%d %ld %lld %lu %llu %lx %llx`),
+**All nine value arms are proven** (`%d %ld %lld %lu %llu %lx %llx`),
 all over the shared `wp_printk_vaarg` and generated from a table -- they
 differ only in the `(sign, base)` pair, the load, and the `addiw s1,s4,n`
 that says how many format characters the directive consumed.  `%lx` does not
 even set `a2`, and does not have to: printint's contract is indifferent to
 `sign`.
 
-The two that are NOT proven, `%u` and `%x`, are blocked on one missing leaf:
-they read their argument with **`lwu`** (`LOAD (.., true, 4)`), and only the
-signed `wp_lw_s_sconf` exists.  `wp_lbu_s_sconf` is the width-1 unsigned load
-and its proof is the template -- the honest fix is to generalise that proof
-over the width (it is already `dqm`-parametric) rather than clone it at 4.
+`%u` and `%x` needed `lwu`, which did not exist.  The fix was NOT to clone
+the 190-line hand-rolled `wp_lbu_s_sconf`: `wp_load_s_sconf_au` is already
+generic in the extension flag, so **`wp_load_s_sconf_ugen`** (the unsigned
+twin of `wp_load_s_sconf_gen`, twenty lines) now serves both, and
+`wp_lbu_s_sconf` / `wp_lwu_s_sconf` are one-line instances of it.  That
+DELETED about 165 lines while adding a width -- the shape to reach for
+whenever a "we only have the signed one" gap turns up.
 
 ### printk: what the arms still need
 
