@@ -125,6 +125,14 @@ Section KvmSpecs.
   (* The panic contract now lives in SpecPanic.v (Require Export above), so
      the spinlock layer and the kvm chain share one statement. *)
 
+  (* At [on := None] every conjunct is persistent ([kalloc_avail _ None] is
+     the sealed witness), so the steady-state bundle can be taken with [#]
+     and re-supplied to EVERY kalloc-reaching call -- what a loop that calls
+     copyin/copyout (whose contracts consume the bundle) lives on. *)
+  Global Instance kalloc_env_None_persistent (γ : gname) (tp : mword 64) :
+    Persistent (kalloc_env γ None tp).
+  Proof. rewrite /kalloc_env. apply _. Qed.
+
   (* ------------------------------------------------------------------- *)
   (* kvmmake() / kvminit().  kvmmake returns (a0) the root of a fresh      *)
   (* table representing exactly [kvm_map]: the six kvmmap regions plus     *)

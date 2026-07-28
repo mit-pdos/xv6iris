@@ -8,9 +8,11 @@ field is read and written only under `pi->lock`. So the well-formedness
 predicate is exactly the shape the C code suggests, and everything interesting
 is in the reference algebra instead.
 
-Rocq: `PipeInv.v` (geometry, algebra, `pipe_res`/`is_pipe`, `new_pipe`);
-`SpecPipealloc.v` is the first function spec, in the usual spec-module shape
-([`spec-modules.md`](spec-modules.md)).
+Rocq: `PipeInv.v` (geometry, algebra, `pipe_res`/`is_pipe`, `new_pipe`, the
+queue coupling, `pipe_rw_ret`).  All four functions have spec modules in the
+usual shape ([`spec-modules.md`](spec-modules.md)): `SpecPipealloc.v`,
+`SpecPipeclose.v`, `SpecPipewrite.v`, `SpecPiperead.v`; pipeclose, pipewrite
+and piperead are proven and linked (pipealloc's link waits on fileclose).
 
 ## Geometry
 
@@ -57,10 +59,17 @@ pipe), and `pipe_slack pi` — the 4 padding bytes inside `struct spinlock` plus
 everything past offset 552. Nothing reads the slack; it is held only so the
 whole page can go back to `kfree`, which memsets all 4096 bytes.
 
-The queue coupling (live bytes are those at indices `[nread, nwrite)` mod
-PIPESIZE, `nwrite - nread ≤ PIPESIZE`) is deliberately **not** imposed yet: it
-belongs with the read/write specs and lands as one extra conjunct of
-`pipe_res`.
+The queue coupling is the pure conjunct `pipe_count_ok nr nw` — the
+free-running uint32 counters never hold more than PIPESIZE live bytes:
+`(uint32 nw − uint32 nr) mod 2^32 ≤ 512`.  It is established by `new_pipe`
+(0/0), rides through pipeclose untouched, and is maintained by exactly the
+two guarded increments: pipewrite's `nwrite++` behind the failed
+`nwrite == nread + PIPESIZE` test (`pipe_count_incr_w`) and piperead's
+`nread++` behind the failed `nread == nwrite` test (`pipe_count_decr_r`).
+Nothing consumes it yet — the CONTENTS of the live window stay existential
+(copyin/copyout are contents-existential, so no observable contract could
+say more); it and `pipe_data`'s tracked byte list are the hooks a future
+contents-indexed refinement builds on.
 
 ## The reference count: two ends, not one number
 
@@ -277,3 +286,31 @@ that belong here:
   lands, because pipealloc will fold the ends INTO the two `file_ref`s and
   sys_pipe will not mention them at all. This is the concrete cost of leaving
   `file_payload` for stage 2.
+
+## `piperead` / `pipewrite`
+
+Both proven and linked (`SpecPipewrite.v` / `SpecPiperead.v`,
+`ProofPipewrite.v` / `ProofPiperead.v`, ~2700 lines each).  The full design
+record, proof structure, and the gotchas they turned up are in
+[`../completed/pipe-rw.md`](../completed/pipe-rw.md); the durable shape:
+
+- **Two altitudes meet.**  The pipe enters at the REFERENCE tier — persistent
+  `is_pipe` plus `pipe_ref γp w q` for ANY end and ANY positive fraction,
+  which is the entire credential story (acquire, release, and the re-acquire
+  inside sleep all open the cancellable lock against it) — and the process
+  enters at the `proc_priv` altitude (the fetchaddr shape), coming back with
+  its user-table descriptor EXTENDED (`uptd_ext`, transitive across the
+  loop's copyin/copyout calls, each bridged by `ProcInv.proc_priv_copy`).
+- **The contracts are ownership + return-range only** (`pipe_rw_ret`: −1 or
+  0..max 0 n).  WHICH count comes back is concurrency- and copyin-dependent,
+  and the crossing bytes are unobservable at this altitude by design.
+- **Sleeping inside a reclaimable object is sound** because the sleeper's own
+  `pipe_ref` rides its frame through sched(): the pipe cannot die while any
+  process sleeps in it.  That is `SLEEP_GEN` (SpecSleep.v) — sleep over
+  `lock_openable + Tk/Dk`, the same generalization acquire/release already
+  had; the pipe instantiates Tk := `pipe_ref`, Dk := `pipe_dead`,
+  Rk := `pipe_res`.
+- **Interrupt level is pinned 0 at entry**: sleep's sched() demands noff = 1
+  — the pipe lock alone — so the copies run at lvl = 1, which is what forced
+  the level-generalization of the whole vmfault/copyin/copyout (and
+  walk/mappages) chain off its `lvl = 0` artifacts.

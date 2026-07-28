@@ -133,6 +133,13 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`pipe-rw.md`](completed/pipe-rw.md)** — piperead / pipewrite, both proven
+  and linked: the queue-coupling conjunct in `pipe_res`, the SLEEP_GEN
+  generalization (sleeping on a cancellable lock — the sleeper's own reference
+  keeps the object alive through sched), the interrupt-level generalization it
+  forced through the vmfault/copyin/copyout and walk/mappages chains, the
+  iLöb + fuel loop structures, and the shrink-wrapped-epilogue and
+  `∧`-conjoined-exit gotchas both proofs hit.
 - **[`copy-inout.md`](completed/copy-inout.md)** — copyin / copyout (+ the
   `walkaddr` callee), all three proven: the kernel↔user byte-copy pair at the
   `proc_pt` altitude, so both PRESERVE the user-page-table invariant and hand

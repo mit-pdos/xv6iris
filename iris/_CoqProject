@@ -471,7 +471,15 @@ WpCopyoutDecode.v
 ProofCopyout.v
 LinkCopyout.v
 WpPipecloseDecode.v
+WpPipewriteDecode.v
+WpPipereadDecode.v
 SpecPipeclose.v
+SpecPipewrite.v
+SpecPiperead.v
+ProofPipewrite.v
+LinkPipewrite.v
+ProofPiperead.v
+LinkPiperead.v
 ProofPipeclose.v
 LinkPipeclose.v
 WpConsputcDecode.v
