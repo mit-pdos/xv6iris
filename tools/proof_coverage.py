@@ -95,8 +95,10 @@ MANIFEST_PROVEN = {
     "swtch": ("WpSwtchSconf.v", "wp_swtch_sconf", "context switch, whole function"),
     "kernelvec": ("WpKernelvecNew.v", "wp_kernelvec",
                   "S-mode trap vector; assumes kerneltrap_returns"),
-    "userret": ("UserretAllPt.v", "wp_userret_pt",
+    "userret": ("ProofUserret.v", "wp_userret_pt",
                 "trampoline return-to-user path, over the user page table"),
+    "uservec": ("ProofUservec.v", "wp_uservec_pt",
+                "trampoline trap-from-user path, over the user page table"),
 }
 
 # Functions whose contract is *stated* but deliberately assumed (an Axiom, or a
