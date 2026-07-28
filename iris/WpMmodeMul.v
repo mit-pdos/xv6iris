@@ -47,6 +47,68 @@ Qed.
 
 
 (* ====================================================================== *)
+(* The other two M-extension ops the kernel uses: DIVU and REMU (printint's *)
+(* `x /= base` / `x % base`).  Both are structurally the MUL above -- read  *)
+(* rs1 and rs2, write rd -- so only the written value differs.  Both are    *)
+(* taken at [is_unsigned = true], which is what collapses the model's       *)
+(* signed-overflow fixup ([andb (not is_unsigned) ..] is [false]); the      *)
+(* divide-by-zero cases are the architectural ones (quotient -1, remainder  *)
+(* the dividend), NOT a stuck state, so no side condition is needed.        *)
+(* ====================================================================== *)
+
+Definition gpr_uint_src (rs : mword 5) (s : mstate) : Z :=
+  uint (if Z.eqb (uint rs) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs))) s.(sregs)).
+
+Definition gpr_divu_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  to_bits_truncate 64
+    (if Z.eqb (gpr_uint_src rs2 s) 0 then (-1)%Z
+     else Z.quot (gpr_uint_src rs1 s) (gpr_uint_src rs2 s)).
+
+Definition gpr_remu_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=
+  to_bits_truncate 64
+    (if Z.eqb (gpr_uint_src rs2 s) 0 then gpr_uint_src rs1 s
+     else Z.rem (gpr_uint_src rs1 s) (gpr_uint_src rs2 s)).
+
+Lemma exec_execute_DIVU_gpr (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, true))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg (gpr_divu_val rs2 rs1 s))).
+Proof.
+  intro Hrd. unfold gpr_divu_val, gpr_uint_src.
+  change (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)))
+    with (execute_DIV (Regidx rs2) (Regidx rs1) (Regidx rd) true).
+  unfold execute_DIV.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  cbn zeta.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnm.
+Qed.
+
+Lemma exec_execute_REMU_gpr (rs2 rs1 rd : mword 5) s :
+  uint rd <> 0 ->
+  exec (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, true))) s
+  = Some (RETIRE_SUCCESS,
+          set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+            (regval_into_reg (gpr_remu_val rs2 rs1 s))).
+Proof.
+  intro Hrd. unfold gpr_remu_val, gpr_uint_src.
+  change (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, true)))
+    with (execute_REM (Regidx rs2) (Regidx rs1) (Regidx rd) true).
+  unfold execute_REM.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  cbn zeta.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_wX_bits_gpr rd _ s)).
+  replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+  apply exec_returnm.
+Qed.
+
+(* ====================================================================== *)
 (* The register-GENERIC MUL WP: ONE lemma for `mul rd,rs1,rs2`, ANY        *)
 (* register triple (rs1/rs2/rd arbitrary; rs1 may equal rs2), with all     *)
 (* GPRs held as the single [gpr_file] resource.  Stated on the new         *)

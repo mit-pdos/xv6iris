@@ -464,3 +464,15 @@ WpPipecloseDecode.v
 SpecPipeclose.v
 ProofPipeclose.v
 LinkPipeclose.v
+WpConsputcDecode.v
+SpecConsputc.v
+ProofConsputc.v
+LinkConsputc.v
+PrintkFmt.v
+SpecPrintint.v
+SpecPrintk.v
+WpPrintintDecode.v
+PrintintArith.v
+StackBytes.v
+ProofPrintint.v
+LinkPrintint.v

@@ -466,19 +466,23 @@ Section WpSconfMem.
     rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r.
     rewrite Z.lor_0_r. rewrite Z.lor_0_l. reflexivity.
   Qed.
+  (* lbu rd, imm(rs1) -- the width-1 UNSIGNED load.  [dqm]-parametric: the byte
+     may be owned outright (a stack buffer) or held at [DfracDiscarded] (a
+     read-only image byte out of [kernel_data], which is how printint reads the
+     [digits] table). *)
   Lemma wp_lbu_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) (v : mword 8) :
+      (m : regfile) (n : nat) (v : mword 8) {dqm : dfrac} :
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
     sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    pa ↦ₘ v -∗
+    pa ↦ₘ{ dqm } v -∗
     ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n -∗
       pc_is (add_vec_int pc 4) -∗
-      pa ↦ₘ v -∗
+      pa ↦ₘ{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -486,7 +490,6 @@ Section WpSconfMem.
     set (width := (1 : Z)).
     set (c := false).
     set (lv := zero_extend' 64 v).
-    set (dqm := DfracOwn 1).
     assert (Hw0 : 0 < width) by (subst width; lia).
     assert (Hw8 : width <= 8) by (subst width; lia).
     assert (Hwdvd : Z.divide width 4096) by (subst width; exists 4096; reflexivity).
@@ -505,7 +508,7 @@ Section WpSconfMem.
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast, width; lia).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iAssert (wordw_pointsto width pa dqm v)%I with "[Hbytes]" as "Hbytes".
-    { subst width dqm. rewrite /wordw_pointsto.
+    { subst width. rewrite /wordw_pointsto.
       iSplit; [iPureIntro; change (is_aligned_vaddr (Virtaddr pa) 1 = true);
                  unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity|].
       change (Z.to_nat 1) with 1%nat. rewrite big_sepL_singleton pa_add_0 nth_byte0_id. iExact "Hbytes". }

@@ -624,6 +624,40 @@ Section WpSconfAlu.
       unfold gpr_addi_val, gpr_src. rewrite Hva. reflexivity.
   Qed.
 
+  (* li rd,imm -- the 4-byte [addi rd,x0,imm] the assembler emits for an
+     immediate too wide for [c.li].  The base-encoding analogue of
+     [wp_cli_s_sconf] (WpSmodeIntr.v): rs1 is x0, so NO register is read and the
+     written value is the sign-extended immediate outright -- which is why this
+     cannot be an instance of [wp_addi4_s_sconf], whose post would read
+     [m !!! Regidx zreg]. *)
+  Lemma wp_li4_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5) (imm : mword 12) (wval : mword 64)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    add_vec zero_reg (sign_extend' 64 imm) = wval ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (ITYPE (imm, zreg, Regidx rd, ADDI)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd
+              (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
+              (ITYPE (imm, zreg, Regidx rd, ADDI)) wval m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    intros s_pc Hnpc Hva _.
+    change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
+    rewrite (exec_execute_ITYPE_ADDI_gpr (zero_extend' 5 ('b"00")) rd imm s_pc).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    unfold gpr_addi_val.
+    replace (Z.eqb (uint (zero_extend' 5 ('b"00") : mword 5)) 0) with true
+      by (vm_compute; reflexivity).
+    rewrite Hwval. reflexivity.
+  Qed.
+
 
 
   (* ------------------------------------------------------------------- *)
@@ -1126,6 +1160,55 @@ Section WpSconfAlu.
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_MUL_gpr rs2 rs1 rd s_pc Hrd).
       unfold gpr_mul_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  (* divu / remu rd,rs1,rs2 -- printint's [x /= base] and [x % base].  Both
+     take the value as a caller-supplied [wval] (the model's own Z-level
+     quotient/remainder at the map-form operands), so a call site that knows
+     its divisor is nonzero closes the [Z.eqb .. 0] test by [vm_compute]
+     instead of carrying the architectural divide-by-zero case around. *)
+  Lemma wp_divu_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) :
+    uint rd <> 0 -> rd <> csp_rs1 ->
+    to_bits_truncate 64
+      (if Z.eqb (uint (m !!! Regidx rs2)) 0 then (-1)%Z
+       else Z.quot (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) = wval ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs2
+              (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      rewrite (exec_execute_DIVU_gpr rs2 rs1 rd s_pc Hrd).
+      unfold gpr_divu_val, gpr_uint_src. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_remu_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) :
+    uint rd <> 0 -> rd <> csp_rs1 ->
+    to_bits_truncate 64
+      (if Z.eqb (uint (m !!! Regidx rs2)) 0 then uint (m !!! Regidx rs1)
+       else Z.rem (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) = wval ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs2
+              (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      rewrite (exec_execute_REMU_gpr rs2 rs1 rd s_pc Hrd).
+      unfold gpr_remu_val, gpr_uint_src. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
   Lemma wp_addw_s_sconf (γ : gname) (Φ : mval -> iProp Σ)

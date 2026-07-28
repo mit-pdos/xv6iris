@@ -109,6 +109,14 @@ are working on that effort — the relevant `projects/` file.
   per-page accessor (`proc_pt_page_acc`, the `↦ₚ ⇄ ↦ₘ` move a memmove through
   a user page needs), `ByteBuf.v`'s buffer algebra, and why the contracts
   deliberately say nothing about the bytes that crossed.
+- **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
+  printint → consputc → uartputc_sync), verified on the PANIC path
+  (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it): consputc and
+  printint are proven — with the rejoining-arms epilogue shape, `StackBytes.v`'s
+  frame-resident char array, and the fuel induction that bounds printint's
+  digit loop inside `buf[20]` — and printk is specified, including
+  `PrintkFmt.v`, the pure model of which varargs a format string consumes,
+  which is what makes printk's variadic precondition statable.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
   done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
