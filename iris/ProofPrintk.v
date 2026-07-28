@@ -4571,4 +4571,256 @@ Section ProofPrintk.
     - iExists (mc !!! Regidx (mword_of_int 25 : mword 5)). iExact "S19".
   Qed.
 
+  (* ================================================================== *)
+  (*  THE DISPATCH (0x8a .. 0x328): which arm a directive selects.       *)
+  (*                                                                     *)
+  (*  gcc did not compile printk's if/else chain in source order.  It    *)
+  (*  hoisted the three lookahead characters into s5 / a3 / (later) a3'  *)
+  (*  and turned the "%l.." tests into two BOOLEAN FLAGS -- a4 for       *)
+  (*  [c0 == 'l'] and a5 for [c0 == 'l' && c1 == 'l'] -- so a single     *)
+  (*  comparison chain decides all fifteen arms.  [pk_dir] (PrintkFmt.v) *)
+  (*  is the source-order reading; the two agree because the arms are    *)
+  (*  pairwise disjoint on (c0,c1,c2), which is what the chain's proof   *)
+  (*  has to establish case by case.                                     *)
+  (*                                                                     *)
+  (*  This is the SHARED HEAD: read c0, and c1 if there is one.  Three   *)
+  (*  exits, corresponding to the three shapes [pk_kinds] distinguishes  *)
+  (*  -- the string ends after '%' (c0 = 0), it ends one character later *)
+  (*  (c1 = 0), or all three characters are there.                       *)
+  (* ================================================================== *)
+
+  (* the head leaves the two lookahead bytes in s5 and a3, [i+1] in s1 and
+     a5, and [&f[i+1]] in a4 -- the last is what the THIRD byte is read
+     through, at 0xf0, so it has to be named. *)
+  Definition pk_disp_kept (mf mc : regfile) : Prop :=
+    forall c : mword 5, c <> mword_of_int 9 -> c <> mword_of_int 21 ->
+      c <> mword_of_int 13 -> c <> mword_of_int 14 -> c <> mword_of_int 15 ->
+      mf !!! Regidx c = mc !!! Regidx c.
+
+  Lemma wp_printk_disp_head (γ : gname) (Φ : mval -> iProp Σ)
+      (mc : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (i : nat)
+      (Rest : iProp Σ) :
+    (S i < length (cstring_bytes f))%nat ->
+    (Z.of_nat i + 1 < 2^31) ->
+    mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
+    mc !!! Regidx s2_idx = fmt ->
+    sie_cap_gpr γ mc (K - 24)%nat -∗
+    kernel_text -∗
+    pc_is (mword_of_int (PK + 0x8a) : mword 64) -∗
+    fmt ↦ₛ{ dqf } f -∗
+    Rest -∗
+    (* (a) c0 = 0: the format string ends right after the '%' *)
+    ( ∀ mf : regfile,
+      ⌜ pk_disp_kept mf mc
+        /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))
+        /\ mf !!! Regidx (mword_of_int 21 : mword 5) = zero_reg
+        /\ pk_fbyte f (S i) = (mword_of_int 0 : mword 8) ⌝ -∗
+      sie_cap_gpr γ mf (K - 24)%nat -∗
+      pc_is (mword_of_int (PK + 0x2aa) : mword 64) -∗
+      fmt ↦ₛ{ dqf } f -∗ Rest -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    (* (b) c0 <> 0, c1 = 0: one character of directive and no more *)
+    ( ∀ mf : regfile,
+      ⌜ pk_disp_kept mf mc
+        /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))
+        /\ mf !!! Regidx (mword_of_int 21 : mword 5) = zero_extend' 64 (pk_fbyte f (S i))
+        /\ mf !!! Regidx (mword_of_int 13 : mword 5) = zero_reg
+        /\ pk_fbyte f (S i) <> (mword_of_int 0 : mword 8)
+        /\ pk_fbyte f (S (S i)) = (mword_of_int 0 : mword 8) ⌝ -∗
+      sie_cap_gpr γ mf (K - 24)%nat -∗
+      pc_is (mword_of_int (PK + 0x298) : mword 64) -∗
+      fmt ↦ₛ{ dqf } f -∗ Rest -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    (* (c) both there: on into the comparison chain at 0xa4 *)
+    ( ∀ mf : regfile,
+      ⌜ pk_disp_kept mf mc
+        /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))
+        /\ mf !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int (Z.of_nat (S i))
+        /\ mf !!! Regidx (mword_of_int 14 : mword 5) = pa_add fmt (S i)
+        /\ mf !!! Regidx (mword_of_int 21 : mword 5) = zero_extend' 64 (pk_fbyte f (S i))
+        /\ mf !!! Regidx (mword_of_int 13 : mword 5) = zero_extend' 64 (pk_fbyte f (S (S i)))
+        /\ pk_fbyte f (S i) <> (mword_of_int 0 : mword 8)
+        /\ pk_fbyte f (S (S i)) <> (mword_of_int 0 : mword 8) ⌝ -∗
+      sie_cap_gpr γ mf (K - 24)%nat -∗
+      pc_is (mword_of_int (PK + 0xa4) : mword 64) -∗
+      fmt ↦ₛ{ dqf } f -∗ Rest -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hlen Hi31 Hs4 Hs2.
+    iIntros "Hcg #Htext Hpc Hfmt HR K0 K1 Kgo".
+    (* +0x8a addiw a5,s4,1 : the index of c0 *)
+    iApply (wp_addiw_s_sconf γ Φ (mword_of_int (PK + 0x8a)) a5_idx (mword_of_int 20 : mword 5)
+              (mword_of_int 1 : mword 12) mc (K - 24)%nat
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              with "Hcg Hpc [] [-]").
+    { iApply (pki_8a with "Htext"). }
+    iIntros "Hcg Hpc".
+    set (D1 := <[Regidx a5_idx := regval_into_reg
+                   (sign_extend' 64 (subrange_vec_dec
+                      (add_vec (mc !!! Regidx (mword_of_int 20 : mword 5))
+                         (sign_extend' 64 (mword_of_int 1 : mword 12))) 31 0))]> mc).
+    assert (HD1a5 : D1 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i))).
+    { rewrite /D1 upd_eq. unfold regval_into_reg. rewrite Hs4.
+      rewrite (addiw_lit (Z.of_nat i) 1 (sign_extend' 64 (mword_of_int 1 : mword 12))
+                 ltac:(apply bv_eq; vm_compute; reflexivity)
+                 ltac:(change (2^31) with 2147483648; lia)).
+      f_equal. lia. }
+    assert (HD1s2 : D1 !!! Regidx s2_idx = fmt) by (rewrite /D1 upd_ne; [exact Hs2 | reg_neq]).
+    assert (Hp8e : add_vec_int (mword_of_int (PK + 0x8a) : mword 64) 4 = mword_of_int (PK + 0x8e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp8e) in "Hpc".
+    (* +0x8e c.mv s1,a5 : the arm calling convention -- s1 is (next index) - 1 *)
+    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (PK + 0x8e)) (mword_of_int 9 : mword 5) a5_idx
+              D1 (K - 24)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              with "Hcg Hpc [] [-]").
+    { iApply (pki_8e with "Htext"). }
+    iIntros "Hcg Hpc".
+    set (D2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (D1 !!! Regidx a5_idx))]> D1).
+    assert (HD2s1 : D2 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))).
+    { rewrite /D2 upd_eq. unfold regval_into_reg. rewrite HD1a5. apply pi_addv_zero_l. }
+    assert (HD2a5 : D2 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i)))
+      by (rewrite /D2 upd_ne; [exact HD1a5 | reg_neq]).
+    assert (HD2s2 : D2 !!! Regidx s2_idx = fmt)
+      by (rewrite /D2 upd_ne; [exact HD1s2 | reg_neq]).
+    assert (Hp90 : add_vec_int (mword_of_int (PK + 0x8e) : mword 64) 2 = mword_of_int (PK + 0x90)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp90) in "Hpc".
+    (* +0x90 add a4,s2,a5 : &f[i+1] *)
+    iApply (wp_add_s_sconf γ Φ (mword_of_int (PK + 0x90)) (mword_of_int 14 : mword 5)
+              s2_idx a5_idx (pa_add fmt (S i)) D2 (K - 24)%nat
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(rewrite HD2s2 HD2a5; unfold pa_add, add_vec_int; reflexivity)
+              with "Hcg Hpc [] [-]").
+    { iApply (pki_90 with "Htext"). }
+    iIntros "Hcg Hpc".
+    set (D3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (pa_add fmt (S i))]> D2).
+    assert (HD3a4 : D3 !!! Regidx (mword_of_int 14 : mword 5) = pa_add fmt (S i))
+      by (rewrite /D3 upd_eq; reflexivity).
+    assert (Hp94 : add_vec_int (mword_of_int (PK + 0x90) : mword 64) 4 = mword_of_int (PK + 0x94)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp94) in "Hpc".
+    (* +0x94 lbu s5,0(a4) : c0 *)
+    iDestruct (pk_str_byte fmt dqf f (S i) Hlen with "Hfmt") as "[Hb0 Hcl0]".
+    assert (Hla0 : add_vec (D3 !!! Regidx (mword_of_int 14 : mword 5))
+                     (sign_extend' 64 (mword_of_int 0 : mword 12)) = pa_add fmt (S i)).
+    { rewrite HD3a4.
+      replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
+        by (apply bv_eq; vm_compute; reflexivity).
+      apply kv_addv_zero. }
+    iEval (rewrite -Hla0) in "Hb0".
+    iApply (wp_lbu_s_sconf γ Φ (mword_of_int (PK + 0x94)) (mword_of_int 21 : mword 5)
+              (mword_of_int 14 : mword 5) (mword_of_int 0 : mword 12) D3 (K - 24)%nat
+              (pk_fbyte f (S i))
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              with "Hcg Hpc [] Hb0 [-]").
+    { iApply (pki_94 with "Htext"). }
+    iIntros "Hcg Hpc Hb0". iEval (rewrite Hla0) in "Hb0".
+    iDestruct ("Hcl0" with "Hb0") as "Hfmt".
+    set (D4 := <[Regidx (mword_of_int 21 : mword 5) := regval_into_reg (zero_extend' 64 (pk_fbyte f (S i)))]> D3).
+    assert (HD4s5 : D4 !!! Regidx (mword_of_int 21 : mword 5) = zero_extend' 64 (pk_fbyte f (S i)))
+      by (rewrite /D4 upd_eq; reflexivity).
+    assert (HD4a4 : D4 !!! Regidx (mword_of_int 14 : mword 5) = pa_add fmt (S i))
+      by (rewrite /D4 upd_ne; [exact HD3a4 | reg_neq]).
+    assert (HD4s1 : D4 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))).
+    { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_ne; [exact HD2s1 | reg_neq]. }
+    assert (HD4a5 : D4 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i))).
+    { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_ne; [exact HD2a5 | reg_neq]. }
+    (* what the head has kept so far -- the same at all three exits *)
+    assert (Hkept4 : pk_disp_kept D4 mc).
+    { intros c N9 N21 N13 N14 N15.
+      rewrite /D4 upd_ne; [| congruence]. rewrite /D3 upd_ne; [| congruence].
+      rewrite /D2 upd_ne; [| congruence]. rewrite /D1 upd_ne; [reflexivity | congruence]. }
+    assert (Hp98 : add_vec_int (mword_of_int (PK + 0x94) : mword 64) 4 = mword_of_int (PK + 0x98)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp98) in "Hpc".
+    (* +0x98 beqz s5 : nothing after the '%' *)
+    destruct (decide (pk_fbyte f (S i) = (mword_of_int 0 : mword 8))) as [Hc0 | Hc0].
+    { iApply (wp_beqz_x0_taken_s_sconf γ Φ (mword_of_int (PK + 0x98)) (mword_of_int 530 : mword 13)
+                (mword_of_int 21 : mword 5) D4 (K - 24)%nat
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite HD4s5 Hc0; vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc [] [-]").
+      { iApply (pki_98 with "Htext"). }
+      iNext. iIntros "Hcg Hpc".
+      assert (Htgt : add_vec (mword_of_int (PK + 0x98) : mword 64) (sign_extend' 64 (mword_of_int 530 : mword 13)) = mword_of_int (PK + 0x2aa)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt) in "Hpc".
+      iApply ("K0" $! D4 with "[%] Hcg Hpc Hfmt HR").
+      split_and!; [exact Hkept4 | exact HD4s1 | rewrite HD4s5 Hc0; apply bv_eq; vm_compute; reflexivity | exact Hc0]. }
+    iApply (wp_beqz_x0_fall_s_sconf γ Φ (mword_of_int (PK + 0x98)) (mword_of_int 530 : mword 13)
+              (mword_of_int 21 : mword 5) D4 (K - 24)%nat
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite HD4s5; apply zext8_nonzero; exact Hc0)
+              with "Hcg Hpc [] [-]").
+    { iApply (pki_98 with "Htext"). }
+    iIntros "Hcg Hpc".
+    assert (Hp9c : add_vec_int (mword_of_int (PK + 0x98) : mword 64) 4 = mword_of_int (PK + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp9c) in "Hpc".
+    (* c0 <> 0 means [i+1] is a character, so [i+2] is still inside the string *)
+    assert (Hlen2 : (S (S i) < length (cstring_bytes f))%nat).
+    { rewrite cstring_bytes_length. rewrite cstring_bytes_length in Hlen.
+      destruct (decide (S i = String.length f)) as [He | He].
+      - exfalso. apply Hc0. rewrite -(string_bytes_length f) in He.
+        rewrite He. apply pk_fbyte_nul.
+      - lia. }
+    (* +0x9c lbu a3,1(a4) : c1 *)
+    iDestruct (pk_str_byte fmt dqf f (S (S i)) Hlen2 with "Hfmt") as "[Hb1 Hcl1]".
+    assert (Hla1 : add_vec (D4 !!! Regidx (mword_of_int 14 : mword 5))
+                     (sign_extend' 64 (mword_of_int 1 : mword 12)) = pa_add fmt (S (S i))).
+    { rewrite HD4a4.
+      replace (sign_extend' 64 (mword_of_int 1 : mword 12)) with (mword_of_int 1 : mword 64)
+        by (apply bv_eq; vm_compute; reflexivity).
+      apply pa_add_S. }
+    iEval (rewrite -Hla1) in "Hb1".
+    iApply (wp_lbu_s_sconf γ Φ (mword_of_int (PK + 0x9c)) (mword_of_int 13 : mword 5)
+              (mword_of_int 14 : mword 5) (mword_of_int 1 : mword 12) D4 (K - 24)%nat
+              (pk_fbyte f (S (S i)))
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              with "Hcg Hpc [] Hb1 [-]").
+    { iApply (pki_9c with "Htext"). }
+    iIntros "Hcg Hpc Hb1". iEval (rewrite Hla1) in "Hb1".
+    iDestruct ("Hcl1" with "Hb1") as "Hfmt".
+    set (D5 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (zero_extend' 64 (pk_fbyte f (S (S i))))]> D4).
+    assert (HD5a3 : D5 !!! Regidx (mword_of_int 13 : mword 5) = zero_extend' 64 (pk_fbyte f (S (S i))))
+      by (rewrite /D5 upd_eq; reflexivity).
+    assert (HD5s5 : D5 !!! Regidx (mword_of_int 21 : mword 5) = zero_extend' 64 (pk_fbyte f (S i)))
+      by (rewrite /D5 upd_ne; [exact HD4s5 | reg_neq]).
+    assert (HD5s1 : D5 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i)))
+      by (rewrite /D5 upd_ne; [exact HD4s1 | reg_neq]).
+    assert (HD5a5 : D5 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i)))
+      by (rewrite /D5 upd_ne; [exact HD4a5 | reg_neq]).
+    assert (HD5a4 : D5 !!! Regidx (mword_of_int 14 : mword 5) = pa_add fmt (S i))
+      by (rewrite /D5 upd_ne; [exact HD4a4 | reg_neq]).
+    assert (Hkept5 : pk_disp_kept D5 mc).
+    { intros c N9 N21 N13 N14 N15.
+      rewrite /D5 upd_ne; [| congruence]. apply Hkept4; assumption. }
+    assert (Hpa0 : add_vec_int (mword_of_int (PK + 0x9c) : mword 64) 4 = mword_of_int (PK + 0xa0)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpa0) in "Hpc".
+    (* +0xa0 beqz a3 : one character of directive and no more *)
+    destruct (decide (pk_fbyte f (S (S i)) = (mword_of_int 0 : mword 8))) as [Hc1 | Hc1].
+    - iApply (wp_beqz_x0_taken_s_sconf γ Φ (mword_of_int (PK + 0xa0)) (mword_of_int 504 : mword 13)
+                (mword_of_int 13 : mword 5) D5 (K - 24)%nat
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite HD5a3 Hc1; vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc [] [-]").
+      { iApply (pki_a0 with "Htext"). }
+      iNext. iIntros "Hcg Hpc".
+      assert (Htgt : add_vec (mword_of_int (PK + 0xa0) : mword 64) (sign_extend' 64 (mword_of_int 504 : mword 13)) = mword_of_int (PK + 0x298)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt) in "Hpc".
+      iApply ("K1" $! D5 with "[%] Hcg Hpc Hfmt HR").
+      split_and!; [exact Hkept5 | exact HD5s1 | exact HD5s5
+                  | rewrite HD5a3 Hc1; apply bv_eq; vm_compute; reflexivity
+                  | exact Hc0 | exact Hc1].
+    - iApply (wp_beqz_x0_fall_s_sconf γ Φ (mword_of_int (PK + 0xa0)) (mword_of_int 504 : mword 13)
+                (mword_of_int 13 : mword 5) D5 (K - 24)%nat
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite HD5a3; apply zext8_nonzero; exact Hc1)
+                with "Hcg Hpc [] [-]").
+      { iApply (pki_a0 with "Htext"). }
+      iIntros "Hcg Hpc".
+      assert (Hpa4 : add_vec_int (mword_of_int (PK + 0xa0) : mword 64) 4 = mword_of_int (PK + 0xa4)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpa4) in "Hpc".
+      iApply ("Kgo" $! D5 with "[%] Hcg Hpc Hfmt HR").
+      split_and!; [exact Hkept5 | exact HD5s1 | exact HD5a5 | exact HD5a4
+                  | exact HD5s5 | exact HD5a3 | exact Hc0 | exact Hc1].
+  Qed.
+
 End ProofPrintk.

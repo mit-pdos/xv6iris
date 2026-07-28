@@ -403,7 +403,27 @@ Two leaves were missing and are now in WpSconfBtype.v: `wp_bnez_x0_taken` /
 `uint rs2 <> 0` side condition of the ordinary `wp_bne_*` cannot be met --
 the same reason the `beqz` twins exist.
 
-That leaves the dispatch chain (0x8a..0x2c6), the `c0 = 0` exit, and the
+### printk: the dispatch chain
+
+gcc did NOT compile printk's if/else chain in source order.  It hoisted the
+three lookahead characters into s5 / a3 / a3' and turned the `"%l.."` tests
+into two BOOLEAN FLAGS -- a4 for `c0 == 'l'` and a5 for `c0 == 'l' && c1 ==
+'l'` -- so one comparison chain (0x8a..0x328, with the tail at 0x2b6..0x328)
+decides all fifteen arms.  `pk_dir` is the source-order reading; the two agree
+only because the arms are pairwise disjoint on `(c0,c1,c2)`, and establishing
+that case by case is what the chain's proof costs.
+
+The SHARED HEAD (0x8a..0xa0) is proven: `wp_printk_disp_head`.  It reads c0
+and, if there is one, c1, and has three exits -- exactly the three shapes
+`pk_kinds` distinguishes: the string ends after the '%' (c0 = 0, exit 0x2aa),
+it ends one character later (c1 = 0, exit 0x298), or all three characters are
+there (0xa4).  The in-bounds argument for the SECOND byte is the one worth
+noting: `c0 <> 0` means index i+1 is a real character, hence i+2 is still
+inside `cstring_bytes f`.  The same step will license the THIRD byte (read at
+0xf0 through a4, which is why the head hands a4 back).
+
+Left: the comparison chain itself (0xa4..0xb6 and 0x2b6..0x328, with the two
+short-string entries at 0x298 and 0x2aa), the `c0 = 0` exit at 0x276, and the
 loop induction that ties the arms together.
 
 ### printk: what the arms still need
