@@ -106,44 +106,134 @@ Proof.
   - apply eq_vec_false_iff in E. symmetry. apply eq_vec_false_iff. congruence.
 Qed.
 
-(* the loop's end-pointer compare [p+(j+1) =? p+len] reflects the offset compare
-   [(j+1) =? len].  The two addresses differ by [len - (j+1)], a nonzero residue
-   mod 2^64 for every 0 < j+1 < len < 2^64, so NO no-wrap assumption on
-   [p .. p+len) is needed: if the buffer wraps the address space the cursor wraps
-   with it, exactly as the caller's [pa_add]-indexed buffer does. *)
+(* two DISTINCT residues below the modulus never differ by a multiple of it.
+   Kept mword-FREE and stated over a symbolic modulus so [lia] works normally
+   here (durable-notes' zify-hook rule); every address-compare lemma below
+   discharges its "the addresses differ" side through this. *)
+Lemma bc_mod_diff_nonzero (m x y : Z) :
+  (0 < m)%Z -> (0 <= x < m)%Z -> (0 <= y < m)%Z -> x <> y -> ((x - y) mod m <> 0)%Z.
+Proof.
+  intros Hm Hx Hy Hne Hd.
+  destruct (Z.le_gt_cases y x) as [Hle | Hgt].
+  - rewrite Z.mod_small in Hd; lia.
+  - assert (Hd' : ((y - x) mod m = 0)%Z).
+    { replace (y - x)%Z with (- (x - y))%Z by lia.
+      rewrite Z.mod_opp_l_z; [reflexivity | lia | exact Hd]. }
+    rewrite Z.mod_small in Hd'; lia.
+Qed.
+
+(* the cursor's unsigned value, once and for all.  NB the [: mword 64]
+   ascription: [pa_add] lands in [Arch.pa], whose width is an unreduced
+   [Z_idx (if xlen =? 32 then .. else ..)] match, and a [bv_unsigned]
+   elaborated at THAT width does not rewrite in a goal stated at width 64. *)
+Lemma pa_add_unsigned (p : mword 64) (k : nat) :
+  bv_unsigned (pa_add p k : mword 64) = bv_wrap 64 (bv_unsigned p + Z.of_nat k).
+Proof.
+  unfold pa_add, add_vec_int. rewrite bc_add_vec_unsigned, bc_moi_unsigned.
+  rewrite bv_wrap_add_idemp_r. reflexivity.
+Qed.
+
+(* the base fact every pointer-vs-pointer branch in a byte loop rests on:
+   [p+a =? p+b] reflects the INDEX compare [a =? b].  The two addresses differ
+   by [a - b], a nonzero residue mod 2^64 for any two distinct indices below
+   2^64, so NO no-wrap assumption on the buffer is needed -- if the buffer wraps
+   the address space the cursors wrap with it, exactly as the caller's
+   [pa_add]-indexed resource does. *)
+Lemma pa_add_eqb (p : mword 64) (a b : nat) :
+  (Z.of_nat a < 18446744073709551616)%Z -> (Z.of_nat b < 18446744073709551616)%Z ->
+  eq_vec (pa_add p a) (pa_add p b) = Nat.eqb a b.
+Proof.
+  intros Ha Hb.
+  assert (Hmod64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  pose (Hu := pa_add_unsigned p).
+  destruct (Nat.eqb_spec a b) as [He | Hne].
+  - apply eq_vec_true_iff. apply bv_eq. rewrite !Hu, He. reflexivity.
+  - apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
+    rewrite !Hu in Hc. unfold bv_wrap in Hc.
+    (* equal residues => the modulus divides [a - b], which is too small *)
+    assert (Hd : (((bv_unsigned p + Z.of_nat a) - (bv_unsigned p + Z.of_nat b))
+                    mod bv_modulus 64 = 0)%Z).
+    { rewrite Zminus_mod. rewrite Hc. rewrite Z.sub_diag. apply Zmod_0_l. }
+    replace ((bv_unsigned p + Z.of_nat a) - (bv_unsigned p + Z.of_nat b))%Z
+      with (Z.of_nat a - Z.of_nat b)%Z in Hd by ring.
+    refine (bc_mod_diff_nonzero (bv_modulus 64) _ _ _ _ _ _ Hd).
+    + rewrite Hmod64. lia.
+    + rewrite Hmod64. split; [apply Nat2Z.is_nonneg | exact Ha].
+    + rewrite Hmod64. split; [apply Nat2Z.is_nonneg | exact Hb].
+    + intro Hz. apply Hne. apply Nat2Z.inj. exact Hz.
+Qed.
+
+(* the loop's end-pointer compare, in the spelling memmove's [bne] produces
+   (the end pointer built as [len + base], so the operands are the other way
+   round) -- the [c = 0] instance of [pa_add_eqb] through [pa_add_comm]. *)
 Lemma pa_add_cmp_bound (p : mword 64) (len j : nat) :
   Z.of_nat len < 2 ^ 64 -> (j < len)%nat ->
   neq_vec (pa_add p (S j)) (add_vec (mword_of_int (Z.of_nat len) : mword 64) p)
     = negb (Nat.eqb (S j) len).
 Proof.
   intros Hlen Hj.
-  assert (Hmod64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
   assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
   rewrite E64 in Hlen.
-  (* both addresses, as the wrapped sum of the base and the offset *)
-  (* NB the [: mword 64] ascription: [pa_add] lands in [Arch.pa], whose width is
-     an unreduced [Z_idx (if xlen =? 32 then .. else ..)] match, and a
-     [bv_unsigned] elaborated at THAT width does not rewrite in a goal stated at
-     width 64. *)
-  assert (HxL : bv_unsigned (pa_add p (S j) : mword 64) = bv_wrap 64 (bv_unsigned p + Z.of_nat (S j))).
-  { unfold pa_add, add_vec_int. rewrite bc_add_vec_unsigned, bc_moi_unsigned.
-    rewrite bv_wrap_add_idemp_r. reflexivity. }
-  assert (HeL : bv_unsigned (add_vec (mword_of_int (Z.of_nat len) : mword 64) p)
-              = bv_wrap 64 (bv_unsigned p + Z.of_nat len)).
-  { rewrite bc_add_vec_unsigned, bc_moi_unsigned.
-    rewrite bv_wrap_add_idemp_l. f_equal. lia. }
-  unfold neq_vec. f_equal.
-  destruct (Nat.eqb_spec (S j) len) as [He | Hne].
-  - apply eq_vec_true_iff. apply bv_eq. rewrite HxL, HeL, He. reflexivity.
-  - apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
-    rewrite HxL, HeL in Hc. unfold bv_wrap in Hc.
-    (* equal residues => the modulus divides [len - (j+1)], which is too small *)
-    assert (Hd : (((bv_unsigned p + Z.of_nat len) - (bv_unsigned p + Z.of_nat (S j)))
-                    mod bv_modulus 64 = 0)%Z).
-    { rewrite Zminus_mod. rewrite Hc. rewrite Z.sub_diag. apply Zmod_0_l. }
-    replace ((bv_unsigned p + Z.of_nat len) - (bv_unsigned p + Z.of_nat (S j)))%Z
-      with (Z.of_nat len - Z.of_nat (S j))%Z in Hd by lia.
-    rewrite Z.mod_small in Hd; [ lia | rewrite Hmod64; lia ].
+  (* [lia] cannot be trusted on a bound against a big literal in this file (the
+     bitvector zify hook), so the two premises are staged by hand. *)
+  assert (HSj : (Z.of_nat (S j) < 18446744073709551616)%Z).
+  { apply (Z.le_lt_trans _ (Z.of_nat len)); [apply Nat2Z.inj_le; lia | exact Hlen]. }
+  rewrite (pa_add_comm p len). unfold neq_vec.
+  rewrite (pa_add_eqb p (S j) len HSj Hlen). reflexivity.
+Qed.
+
+(* the OTHER reading of two cursors off one base: their DIFFERENCE.  copyinstr
+   recovers the bytes still to go as [(base + (rem-1)) - (base + (n-1))], the
+   [sub s3,a4,a1] its outer loop advances with. *)
+Lemma pa_add_diff (p : mword 64) (a b : nat) :
+  (b <= a)%nat -> (Z.of_nat a < 18446744073709551616)%Z ->
+  sub_vec (pa_add p a) (pa_add p b) = (mword_of_int (Z.of_nat (a - b)) : mword 64).
+Proof.
+  intros Hle Ha. apply bv_eq.
+  pose (Hu := pa_add_unsigned p).
+  rewrite bc_sub_vec_unsigned, !Hu, bc_moi_unsigned.
+  rewrite bv_wrap_sub_idemp_l, bv_wrap_sub_idemp_r.
+  f_equal. rewrite (Nat2Z.inj_sub a b Hle). ring.
+Qed.
+
+(* ...and the cursor gcc reconstructs from a PRE-COMPUTED DIFFERENCE: copyinstr's
+   inner loop keeps [a2 = src - dst] and forms the source address as
+   [a2 + (dst + i)], so the base cancels. *)
+Lemma pa_add_delta (x p : mword 64) (i : nat) :
+  add_vec (sub_vec x p) (pa_add p i) = pa_add x i.
+Proof.
+  apply bv_eq.
+  rewrite bc_add_vec_unsigned, bc_sub_vec_unsigned, !pa_add_unsigned.
+  rewrite bv_wrap_add_idemp_l, bv_wrap_add_idemp_r.
+  f_equal. ring.
+Qed.
+
+(* two bumps off one base collapse into one.  A CHUNKED byte loop states its
+   outer cursor as [pa_add dst done] and its inner one relative to THAT, while
+   the caller's buffer is indexed from [dst] -- so every address the inner loop
+   forms has to be brought back to the caller's indexing through this. *)
+Lemma pa_add_assoc (p : mword 64) (a b : nat) :
+  pa_add (pa_add p a) b = pa_add p (a + b).
+Proof. exact (pa_add_bump p a b). Qed.
+
+(* the SOURCE pointer copyinstr forms, [(pa0 + srcva) - va0]: whatever the
+   in-page offset [srcva - va0] turns out to be, adding it to the page base
+   lands at that offset in the page.  The offset arrives as a premise, since
+   only the caller knows it (it comes out of [ProcPtOwn.pgd_off]). *)
+Lemma pa_add_of_diff (q c v : mword 64) (off : nat) :
+  sub_vec c v = (mword_of_int (Z.of_nat off) : mword 64) ->
+  sub_vec (add_vec q c) v = pa_add q off.
+Proof.
+  intro Hoff.
+  apply (f_equal bv_unsigned) in Hoff.
+  rewrite bc_sub_vec_unsigned, bc_moi_unsigned in Hoff.
+  apply bv_eq.
+  rewrite bc_sub_vec_unsigned, bc_add_vec_unsigned, pa_add_unsigned.
+  rewrite bv_wrap_sub_idemp_l.
+  replace (bv_unsigned q + bv_unsigned c - bv_unsigned v)%Z
+    with (bv_unsigned q + (bv_unsigned c - bv_unsigned v))%Z by ring.
+  rewrite <- bv_wrap_add_idemp_r, Hoff, bv_wrap_add_idemp_r.
+  reflexivity.
 Qed.
 
 (* the C source computes the byte count as [(unsigned int)n], i.e. [n << 32 >> 32]
@@ -271,4 +361,117 @@ Proof.
   rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)).
   rewrite bc_moi_unsigned. f_equal.
   rewrite Nat2Z.inj_sub; [reflexivity | exact Hle].
+Qed.
+
+(* ...and the decrement gcc spells as an ADD of the immediate -1 rather than a
+   [sub] (copyinstr's [addi a4,s3,-1]).  The immediate arrives sign-extended
+   from 12 bits, so the caller passes it as a closed [o] it [vm_compute]s. *)
+Lemma bc_add_m1_nat (k : nat) (o : mword 64) :
+  o = (mword_of_int (-1) : mword 64) ->
+  (1 <= k)%nat -> (Z.of_nat k < 18446744073709551616)%Z ->
+  add_vec (mword_of_int (Z.of_nat k) : mword 64) o
+  = (mword_of_int (Z.of_nat (k - 1)) : mword 64).
+Proof.
+  intros -> Hk1 Hk. apply bv_eq.
+  rewrite bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite bv_wrap_add_idemp_l, bv_wrap_add_idemp_r.
+  f_equal. rewrite (Nat2Z.inj_sub k 1 Hk1).
+  change (Z.of_nat 1) with 1%Z. ring.
+Qed.
+
+(* ===================================================================== *)
+(* The BYTE a loop just loaded, tested against zero.                      *)
+(* ===================================================================== *)
+(* A [lbu] leaves the byte ZERO-EXTENDED in the register, and a string walk
+   then branches on it -- so "the register is zero" has to be read back as
+   "the byte is the NUL".  Both directions; the [bv_zero_extend_unsigned]
+   side condition is an [N] inequality, which [lia] cannot see under the
+   bitvector zify hook, hence the [vm_compute]. *)
+Lemma bc_zext8_zero (b : mword 8) :
+  eq_vec (zero_extend' 64 b) (zero_reg : mword 64) = true ->
+  b = (mword_of_int 0 : mword 8).
+Proof.
+  intro H. apply eq_vec_true_iff in H.
+  apply (f_equal bv_unsigned) in H.
+  unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec,
+    SailStdpp.Values.to_word, to_word, get_word, MachineWord.MachineWord.zero_extend in H.
+  rewrite bv_zero_extend_unsigned in H; [ | vm_compute; intro Hc; discriminate Hc ].
+  change (bv_unsigned (zero_reg : mword 64)) with 0%Z in H.
+  apply bv_eq. rewrite H. vm_compute. reflexivity.
+Qed.
+
+Lemma bc_zext8_nonzero (b : mword 8) :
+  b <> (mword_of_int 0 : mword 8) ->
+  eq_vec (zero_extend' 64 b) (zero_reg : mword 64) = false.
+Proof.
+  intro H. destruct (eq_vec (zero_extend' 64 b) (zero_reg : mword 64)) eqn:E;
+    [ exfalso; apply H; exact (bc_zext8_zero b E) | reflexivity ].
+Qed.
+
+Lemma bc_zext8_iszero :
+  eq_vec (zero_extend' 64 (mword_of_int 0 : mword 8)) (zero_reg : mword 64) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+
+(* ===================================================================== *)
+(* Two cursors subtracted as C [int]s: [subw rd,rs1,rs2].                 *)
+(* ===================================================================== *)
+(* A function that returns a POINTER DIFFERENCE as an [int] (strlen's
+   [subw a0,a3,a0]) narrows both cursors to 32 bits, subtracts, and
+   sign-extends.  For a difference below 2^31 that is exactly the index, no
+   matter where the buffer sits: the 32-bit truncation loses only the base,
+   which cancels.  Stated over the two register values with the index
+   relation as a PREMISE (discharged by [pa_add_unsigned]) so that both
+   [subrange_vec_dec]s elaborate at the width-64 the register map gives
+   them. *)
+(* the [Z] identity, mword-free so [lia] behaves: narrowing both cursors to 32
+   bits and subtracting recovers the index, because the base cancels. *)
+Lemma bc_subw_arith (b k : Z) :
+  (0 <= k < 2147483648)%Z ->
+  ((((b + k) mod 18446744073709551616) mod 4294967296) - (b mod 4294967296))
+    mod 4294967296 = k.
+Proof.
+  intro Hk.
+  (* 2^32 divides 2^64, so the outer narrowing swallows the inner one *)
+  assert (Hmm : forall z : Z,
+            ((z mod 18446744073709551616) mod 4294967296)%Z = (z mod 4294967296)%Z).
+  { intro z. rewrite (Z.mod_eq z 18446744073709551616 ltac:(lia)).
+    replace (z - 18446744073709551616 * (z / 18446744073709551616))%Z
+      with (z + (- 4294967296 * (z / 18446744073709551616)) * 4294967296)%Z by ring.
+    apply Z_mod_plus_full. }
+  rewrite Hmm.
+  rewrite Zminus_mod_idemp_l, Zminus_mod_idemp_r.
+  replace (b + k - b)%Z with k by ring.
+  apply Z.mod_small. lia.
+Qed.
+
+Lemma bc_subw_diff (x y : mword 64) (k : nat) :
+  (Z.of_nat k < 2147483648)%Z ->
+  bv_unsigned x = bv_wrap 64 (bv_unsigned y + Z.of_nat k) ->
+  sign_extend' 64 (sub_vec (subrange_vec_dec x 31 0 : mword 32)
+                           (subrange_vec_dec y 31 0 : mword 32))
+  = (mword_of_int (Z.of_nat k) : mword 64).
+Proof.
+  intros Hk Hxy.
+  assert (Hk0 : (0 <= Z.of_nat k)%Z) by apply Nat2Z.is_nonneg.
+  set (w := sub_vec (subrange_vec_dec x 31 0 : mword 32)
+                    (subrange_vec_dec y 31 0 : mword 32)).
+  assert (Hw : bv_unsigned w = Z.of_nat k).
+  { unfold w. rewrite sub_vec32_unsigned.
+    rewrite !subrange_31_0_unsigned, Hxy.
+    unfold bv_wrap.
+    assert (Hm32 : (bv_modulus 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+    assert (Hm64 : (bv_modulus 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
+    rewrite Hm32, Hm64.
+    exact (bc_subw_arith (bv_unsigned y) (Z.of_nat k) (conj Hk0 Hk)). }
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  apply bv_eq. rewrite bv_sign_extend_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  unfold bv_signed. rewrite Hw.
+  assert (Hhm : bv_half_modulus (MachineWord.MachineWord.Z_idx 32) = 2147483648)
+    by (vm_compute; reflexivity).
+  rewrite bv_swrap_small;
+    [| rewrite Hhm; split; [apply (Z.le_trans _ 0); [lia | exact Hk0] | exact Hk]].
+  rewrite bc_moi_unsigned. reflexivity.
 Qed.

@@ -64,21 +64,40 @@ Proof.
   rewrite Z_to_bv_unsigned. reflexivity.
 Qed.
 
-Lemma add_vec64_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
+(* the model's [add_vec]/[sub_vec] agree with wrapped [Z] arithmetic AT ANY
+   WIDTH.  The generic statements spell the width as [Z_idx n] because that is
+   what [mword n]'s bitvector index literally is; every width instance below
+   closes by conversion, so use those at width 32 / 64 and reach for the
+   generic form only at a symbolic width. *)
+Lemma add_vec_unsigned {n : Z} (x y : mword n) :
+  bv_unsigned (add_vec x y)
+  = bv_wrap (MachineWord.MachineWord.Z_idx n) (bv_unsigned x + bv_unsigned y).
 Proof.
   unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
     SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 
-Lemma sub_vec64_unsigned (x y : mword 64) :
-  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
+Lemma sub_vec_unsigned {n : Z} (x y : mword n) :
+  bv_unsigned (sub_vec x y)
+  = bv_wrap (MachineWord.MachineWord.Z_idx n) (bv_unsigned x - bv_unsigned y).
 Proof.
   unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
     SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
   rewrite bv_sub_unsigned. reflexivity.
 Qed.
+
+Lemma add_vec64_unsigned (x y : mword 64) :
+  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
+Proof. exact (add_vec_unsigned x y). Qed.
+
+Lemma sub_vec64_unsigned (x y : mword 64) :
+  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
+Proof. exact (sub_vec_unsigned x y). Qed.
+
+Lemma sub_vec32_unsigned (x y : mword 32) :
+  bv_unsigned (sub_vec x y) = bv_wrap 32 (bv_unsigned x - bv_unsigned y).
+Proof. exact (sub_vec_unsigned x y). Qed.
 
 Lemma and_vec64_unsigned (x y : mword 64) :
   bv_unsigned (and_vec x y) = Z.land (bv_unsigned x) (bv_unsigned y).

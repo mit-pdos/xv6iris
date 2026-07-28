@@ -123,6 +123,17 @@ are working on that effort — the relevant `projects/` file.
   layer (what makes two successive fdalloc calls compose), the two
   shared-block lemmas, what the contract deliberately does not say, and the
   remaining work (proving argaddr and fdalloc).
+- **[`string-args.md`](projects/string-args.md)** — the string-argument cone
+  (argstr → argraw + fetchstr → myproc + copyinstr + strlen), all four proven
+  and linked: `ByteBuf`'s `bb_nonul`/`bb_cstr` vocabulary (a NUL-terminated
+  string as a property of the buffer's NAMING FUNCTION, which is what makes
+  copyinstr's and strlen's contracts compose with nothing in between), why a
+  CONTENTS postcondition forbids the `bb_join3` chunk-split copyin uses and
+  wants `bb_byte_acc` instead, copyinstr's two nested loops (the outer counter
+  recovered from two POINTERS, the inner cursor indexed off the chunk base,
+  fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
+  cursor and its `subw` pointer-difference return, and argstr's INLINED
+  argaddr.
 - **[`uvm-alloc-unmap.md`](projects/uvm-alloc-unmap.md)** — uvmunmap /
   uvmdealloc / uvmalloc: growing and shrinking a process's address space at
   the `proc_pt` altitude. Keeps the `um_inj` (no-aliasing) strengthening of

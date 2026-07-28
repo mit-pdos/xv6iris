@@ -129,23 +129,6 @@ Section ProofMemmove.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  (* the byte an [sb] writes when its source register was filled by an [lbu]:
-     the store leaf truncates to 8 bits what the load leaf zero-extended to 64. *)
-  Local Lemma trunc8_zext8 (b : mword 8) : trunc8 (zero_extend' 64 b) = b.
-  Proof.
-    apply bv_eq. unfold trunc8. rewrite autocast_id.
-    unfold subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.slice.
-    change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-    rewrite bv_extract_0_unsigned.
-    cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
-         MachineWord.MachineWord.zero_extend].
-    rewrite bv_zero_extend_unsigned; [| vm_compute; discriminate].
-    change (MachineWord.Z_idx 8) with 8%N.
-    apply bv_wrap_small. apply bv_unsigned_in_range.
-  Qed.
-
   (* the epilogue's [c.addi sp,16] undoes the prologue's 2-slot push. *)
   Local Lemma pa_stk2_up (X : mword 64) :
     add_vec (pa_stk X 2) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.

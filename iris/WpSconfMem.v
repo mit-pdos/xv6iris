@@ -1088,6 +1088,30 @@ Section WpSconfMem.
   Definition trunc8 (w : mword 64) : mword 8 :=
     autocast (T := mword) (subrange_vec_dec w (Z.sub (Z.mul 1 8) 1) 0).
 
+  (* the byte an [sb] writes when its source register was filled by an [lbu]:
+     the store leaf truncates to 8 bits what the load leaf zero-extended to
+     64.  Every byte-copy loop needs this (memmove, copyinstr), so it lives
+     next to [trunc8] rather than in each proof. *)
+  Lemma trunc8_zext8 (b : mword 8) : trunc8 (zero_extend' 64 b) = b.
+  Proof.
+    apply bv_eq. unfold trunc8. rewrite autocast_id.
+    unfold subrange_vec_dec. rewrite autocast_id.
+    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
+    unfold get_word, MachineWord.MachineWord.slice.
+    change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+    rewrite bv_extract_0_unsigned.
+    cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
+         MachineWord.MachineWord.zero_extend].
+    rewrite bv_zero_extend_unsigned; [| vm_compute; discriminate].
+    change (MachineWord.Z_idx 8) with 8%N.
+    apply bv_wrap_small. apply bv_unsigned_in_range.
+  Qed.
+
+  (* ...and the byte it writes when its source register is x0: copyinstr's
+     [sb zero,0(a5)], the store that plants the string terminator. *)
+  Lemma trunc8_zero : trunc8 (zero_reg : mword 64) = (mword_of_int 0 : mword 8).
+  Proof. apply bv_eq. vm_compute. reflexivity. Qed.
+
   Lemma wp_sb_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 8) :

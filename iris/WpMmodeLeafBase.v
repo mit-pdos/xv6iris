@@ -141,6 +141,16 @@ Proof. intros Ha Hw.
   rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
 
 (* WpGprLogic.v : exec_execute_ITYPE_XORI *)
+Lemma exec_execute_ITYPE_XORI (imm : mword 12) (rs1 rd : regidx) (a : mword 64) s s' :
+  exec (rX_bits rs1) s = Some (a, s) ->
+  exec (wX_bits rd (xor_vec a (sign_extend' 64 imm))) s = Some (tt, s') ->
+  exec (execute (ITYPE (imm, rs1, rd, XORI))) s = Some (RETIRE_SUCCESS, s').
+Proof. intros Ha Hw.
+  change (execute (ITYPE (imm, rs1, rd, XORI))) with (execute_ITYPE imm rs1 rd XORI).
+  unfold execute_ITYPE. cbn match.
+  rewrite (exec_bind_Some _ _ _ (xor_vec a (sign_extend' 64 imm)) s).
+  2:{ rewrite (exec_bind_Some _ _ _ _ _ Ha). apply exec_returnm. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hw). apply exec_returnm. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* File-generic value + execute for each op (mirror [gpr_addi_val] /       *)
@@ -264,6 +274,10 @@ Definition gpr_andi_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64
           (sign_extend' 64 imm).
 
 (* WpGprLogic.v : gpr_xori_val *)
+Definition gpr_xori_val (rs1 : mword 5) (imm : mword 12) (s : mstate) : mword 64 :=
+  xor_vec (if Z.eqb (uint rs1) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+          (sign_extend' 64 imm).
 
 (* WpGprLogic.v : exec_execute_ITYPE_ORI_gpr *)
 Lemma exec_execute_ITYPE_ORI_gpr (rs1 rd : mword 5) (imm : mword 12) s :
@@ -294,6 +308,18 @@ Proof.
 Qed.
 
 (* WpGprLogic.v : exec_execute_ITYPE_XORI_gpr *)
+Lemma exec_execute_ITYPE_XORI_gpr (rs1 rd : mword 5) (imm : mword 12) s :
+  exec (execute (ITYPE (imm, Regidx rs1, Regidx rd, XORI))) s
+  = Some (RETIRE_SUCCESS,
+          if Z.eqb (uint rd) 0 then s
+          else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (gpr_xori_val rs1 imm s))).
+Proof.
+  unfold gpr_xori_val.
+  eapply exec_execute_ITYPE_XORI.
+  - apply (exec_rX_bits_gpr rs1 s).
+  - apply (exec_wX_bits_gpr rd _ s).
+Qed.
 
 (* ====================================================================== *)
 (* The register-GENERIC RTYPE logic WPs: `<op> rd,rs1,rs2`, ANY triple     *)

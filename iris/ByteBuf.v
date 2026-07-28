@@ -36,10 +36,87 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import KallocInv.
 Local Open Scope Z_scope.
+
+(* ===================================================================== *)
+(* A C STRING inside a buffer, as a property of the naming function.      *)
+(* ===================================================================== *)
+(* [bb_nonul f d]: the first [d] bytes are all non-NUL.  [bb_cstr f k]: the
+   buffer holds a NUL-terminated string of length [k] -- the NUL is at [k]
+   and nowhere before it, so [k] is the length [strlen] will report.  This is
+   the whole of what copyinstr promises and the whole of what strlen assumes;
+   nothing is said about the bytes past the terminator, which is why the
+   predicate is on the naming function rather than on the resource.
+
+   Deliberately NOT [RiscvPtsto]'s [↦ₛ]: that indexes a region by a Coq
+   [string] and is meant for the kernel's read-only literals (persistent,
+   contents known).  Bytes copied out of USER memory have no known contents,
+   and the buffer they land in is longer than the string, so the naming
+   function -- the same one [bb_split3] / [bb_byte_acc] already move around --
+   is both the weaker and the more usable form.  Convert to [↦ₛ] later if a
+   caller ever wants it. *)
+Definition bb_nonul (f : nat -> bv 8) (d : nat) : Prop :=
+  forall j, (j < d)%nat -> f j <> (mword_of_int 0 : mword 8).
+
+Definition bb_cstr (f : nat -> bv 8) (k : nat) : Prop :=
+  bb_nonul f k /\ f k = (mword_of_int 0 : mword 8).
+
+Lemma bb_nonul_0 (f : nat -> bv 8) : bb_nonul f 0%nat.
+Proof. intros j Hj. exfalso. lia. Qed.
+
+(* the two ways a byte-at-a-time copy extends the prefix it has built *)
+Lemma bb_nonul_step (f : nat -> bv 8) (d : nat) :
+  bb_nonul f d -> f d <> (mword_of_int 0 : mword 8) -> bb_nonul f (S d).
+Proof.
+  intros Hn Hd j Hj.
+  destruct (Nat.eq_dec j d) as [-> | Hne]; [exact Hd | apply Hn; lia].
+Qed.
+
+Lemma bb_cstr_intro (f : nat -> bv 8) (k : nat) :
+  bb_nonul f k -> f k = (mword_of_int 0 : mword 8) -> bb_cstr f k.
+Proof. intros H1 H2. split; [exact H1 | exact H2]. Qed.
+
+(* [bb_cstr] pins the terminator's index: there is only ONE NUL-terminated
+   reading of a buffer.  This is what lets strlen's loop conclude that the
+   zero byte it stopped at is the [k] its precondition named. *)
+Lemma bb_cstr_uniq (f : nat -> bv 8) (k d : nat) :
+  bb_cstr f k -> bb_nonul f d -> f d = (mword_of_int 0 : mword 8) -> d = k.
+Proof.
+  intros [Hnk Hzk] Hnd Hzd.
+  destruct (Nat.lt_trichotomy d k) as [Hlt | [Heq | Hgt]].
+  - exfalso. exact (Hnk d Hlt Hzd).
+  - exact Heq.
+  - exfalso. exact (Hnd k Hgt Hzk).
+Qed.
+
+(* the functional update a single-byte store performs on the naming function *)
+Definition bb_upd (f : nat -> bv 8) (d : nat) (b : bv 8) : nat -> bv 8 :=
+  fun j => if Nat.eq_dec j d then b else f j.
+
+Lemma bb_upd_eq (f : nat -> bv 8) (d : nat) (b : bv 8) : bb_upd f d b d = b.
+Proof. rewrite /bb_upd. destruct (Nat.eq_dec d d); [reflexivity | done]. Qed.
+
+Lemma bb_upd_ne (f : nat -> bv 8) (d : nat) (b : bv 8) (j : nat) :
+  j <> d -> bb_upd f d b j = f j.
+Proof. intro H. rewrite /bb_upd. destruct (Nat.eq_dec j d); [done | reflexivity]. Qed.
+
+Lemma bb_nonul_upd (f : nat -> bv 8) (d : nat) (b : bv 8) :
+  bb_nonul f d -> b <> (mword_of_int 0 : mword 8) -> bb_nonul (bb_upd f d b) (S d).
+Proof.
+  intros Hn Hb. apply bb_nonul_step.
+  - intros j Hj. rewrite bb_upd_ne; [apply Hn; exact Hj | lia].
+  - rewrite bb_upd_eq. exact Hb.
+Qed.
+
+Lemma bb_cstr_upd (f : nat -> bv 8) (d : nat) :
+  bb_nonul f d -> bb_cstr (bb_upd f d (mword_of_int 0 : mword 8)) d.
+Proof.
+  intro Hn. apply bb_cstr_intro; [| apply bb_upd_eq].
+  intros j Hj. rewrite bb_upd_ne; [apply Hn; exact Hj | lia].
+Qed.
 
 Section ByteBuf.
   Context `{!riscvGS Σ}.
@@ -98,6 +175,41 @@ Section ByteBuf.
   Proof.
     rewrite (bb_split3 p k n 0 (k + n) f ltac:(lia)).
     rewrite big_sepL_nil bi.sep_emp. reflexivity.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* ONE BYTE of a buffer, borrowed and put back.                        *)
+  (* ------------------------------------------------------------------ *)
+  (* A byte-at-a-time loop (copyinstr's inner loop) reads and writes a
+     buffer ONE INDEX at a time, so what it wants is not a chunk split but a
+     single-index accessor.  The returning wand takes the NEW naming
+     function explicitly, with the obligation that it agrees with the old one
+     off the index touched: that keeps the caller in control of the buffer's
+     contents -- which is what a [bb_join3]-style existential would throw
+     away, and copyinstr's postcondition (a NUL-TERMINATED string, see
+     [bb_cstr]) needs the values, not just the ownership.  Reading is the
+     [g := f] instance, so this is one lemma and not two. *)
+  Lemma bb_byte_acc (p : mword 64) (n d : nat) (f : nat -> bv 8) (dq : dfrac) :
+    (d < n)%nat ->
+    ([∗ list] j ∈ seq 0 n, pa_add p j ↦ₘ{dq} f j) ⊢
+    pa_add p d ↦ₘ{dq} f d ∗
+    (∀ g : nat -> bv 8,
+       ⌜forall j, (j < n)%nat -> j <> d -> g j = f j⌝ -∗
+       pa_add p d ↦ₘ{dq} g d -∗
+       [∗ list] j ∈ seq 0 n, pa_add p j ↦ₘ{dq} g j).
+  Proof.
+    intro Hd.
+    assert (Hlk : seq 0 n !! d = Some d)
+      by (apply lookup_seq; split; [lia | exact Hd]).
+    rewrite (big_sepL_delete (fun _ y => (pa_add p y ↦ₘ{dq} f y)%I) (seq 0 n) d d Hlk).
+    iIntros "[Hd Hrest]". iFrame "Hd".
+    iIntros (g) "%Hag Hd".
+    rewrite (big_sepL_delete (fun _ y => (pa_add p y ↦ₘ{dq} g y)%I) (seq 0 n) d d Hlk).
+    iSplitL "Hd"; [iExact "Hd" |].
+    iApply (big_sepL_mono with "Hrest"). intros i j Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    destruct (decide (i = d)) as [-> | Hne]; [reflexivity |].
+    rewrite Hag; [reflexivity | lia | exact Hne].
   Qed.
 
   (* ------------------------------------------------------------------ *)
