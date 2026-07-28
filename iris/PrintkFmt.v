@@ -63,6 +63,17 @@ Definition pk_dir (c0 c1 c2 : ascii) : option pk_kind * nat :=
      else (None, 0))
   else (None, 0).
 
+(* The j-th character of [f], and [pk_nul] at or past its end -- exactly the
+   argument [pk_dir] is applied to when the format string runs out, so the
+   machine's three lookahead bytes are [pk_ch f (i+1..i+3)] whether or not the
+   string is long enough to hold them. *)
+Fixpoint pk_ch (f : string) (j : nat) : ascii :=
+  match f, j with
+  | EmptyString, _ => pk_nul
+  | String c _, O => c
+  | String _ r, S j' => pk_ch r j'
+  end.
+
 Definition pk_cons (o : option pk_kind) (ks : list pk_kind) : list pk_kind :=
   match o with None => ks | Some k => k :: ks end.
 

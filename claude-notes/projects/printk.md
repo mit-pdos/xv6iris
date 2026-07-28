@@ -422,9 +422,52 @@ noting: `c0 <> 0` means index i+1 is a real character, hence i+2 is still
 inside `cstring_bytes f`.  The same step will license the THIRD byte (read at
 0xf0 through a4, which is why the head hands a4 back).
 
-Left: the comparison chain itself (0xa4..0xb6 and 0x2b6..0x328, with the two
-short-string entries at 0x298 and 0x2aa), the `c0 = 0` exit at 0x276, and the
-loop induction that ties the arms together.
+The **comparison chain is proven**, as nine segment lemmas that compose into
+"the pc reaching `PK + pk_entry c0 c1 c2`":
+
+  `chain_a4`   0xa4..0xb6   the full-lookahead entry ('%d', '%ld')
+  `chain_ec`   0xec..0xf4   the join both non-matches take; reads the THIRD
+                            character and falls into 0x2b6
+  `chain_2b6`  0x2b6..0x2c6 builds the "ll" flag, tests '%lld'
+  `chain_2ca`  0x2ca..0x2d4 '%u', '%lu'
+  `chain_2d8`  0x2d8..0x2de '%llu'
+  `chain_2e2`  0x2e2..0x2ec '%x', '%lx'
+  `chain_2f0`  0x2f0..0x2f6 '%llx'
+  `chain_2fa`  0x2fa..0x31a '%p' '%c' '%s' '%%', the c0 = 0 exit, unknown
+  `chain_298`  0x298..0x2a8 the c1 = 0 preamble, jumps to 0x2ca
+  `chain_2aa`  0x2aa..0x2b4 the c0 = 0 preamble, falls into 0x2b6
+
+**`pk_entry` is written in the MACHINE's test order, not `pk_dir`'s.** That is
+the design decision that makes the whole thing tractable: each segment
+discharges its conclusion by rewriting exactly the tests it has already ruled
+out, so the hypotheses are a growing prefix `E1..E9` of "test k was false" and
+nothing has to be re-derived.  (The two orders agree because the arms are
+pairwise disjoint on `(c0,c1,c2)` -- the loop body is where that is cashed in,
+by destructing the same booleans.)
+
+The bridge from bytes to characters is `pk_eq_ascii` / `pk_sub_ascii`: every
+test in the chain is either `beq s5,<const reg>` or `addi rd,s5,-k; seqz`, and
+both reduce to `Ascii.eqb` once the byte is known to be a character's.  Doing
+that once is what keeps the chain a single linear walk instead of fifteen
+copies.  It rests on `moi64_inj_small` (`mword_of_int` is injective on the
+signed range) and `Ascii.N_ascii_bounded`.
+
+Three gotchas cost real time here and are worth remembering:
+
+- **`destruct (b) eqn:H` rewrites the OTHER hypotheses too.**  It generalises
+  every occurrence of the scrutinee, so hypotheses stated in terms of it come
+  out specialised and can no longer be passed to the next segment.  `case_eq
+  (b); intro H` leaves the context alone -- use it for these boolean splits.
+- **An iris hypothesis lives inside the goal**, so the same generalisation hits
+  an `iAssert` stated before the split.  A shared join (0xec) had to become a
+  top-level lemma rather than an `iAssert`.
+- **`ltac:(...)` in `$!` position** (supplying a Coq argument to an iris
+  hypothesis) does not see the expected type -- `rewrite` there fails with
+  "does not match any subterm".  In ordinary term-application position it is
+  fine.
+
+Left: the dispatch assembly (head + the three entries), the loop body that
+picks the arm from `pk_entry`, the loop induction, and the top-level spec.
 
 ### printk: what the arms still need
 
