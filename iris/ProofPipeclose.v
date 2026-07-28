@@ -469,7 +469,7 @@ Section ProofPipeclose.
         apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact Hcs'. }
       iAssert (True)%I as "_"; [done|].
       (* -- 0x24: lw a5,544(s1) : a5 := pi->readopen -- *)
-      iDestruct "Hres" as (nr nw ro wo vname bs) "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hbslen & Hdat & Hslack)".
+      iDestruct "Hres" as (nr nw ro wo vname bs) "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hcnt & %Hbslen & Hdat & Hslack)".
       assert (Hroaddr : add_vec (M !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 544 : mword 12)) = a_popen pi false)
         by (rewrite Hs1M; reflexivity).
       assert (Hwoaddr : add_vec (M !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 548 : mword 12)) = a_popen pi true)
@@ -684,7 +684,7 @@ Section ProofPipeclose.
     assert (Hs2M0 : M0 !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 11 : mword 5)).
     { rewrite (callee_saved_lookup HcsM0 (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact Hs2A4. }
     iPoseProof (pci_14 with "Htext") as "Hi14".
-    iDestruct "Hres" as (nr nw ro wo vname bs) "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hbslen & Hdat & Hslack)".
+    iDestruct "Hres" as (nr nw ro wo vname bs) "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hcnt & %Hbslen & Hdat & Hslack)".
     destruct w.
     - (* ===== writable: the branch falls through, the WRITE end closes ===== *)
       assert (Hbz : eq_vec (M0 !!! Regidx (mword_of_int 18 : mword 5)) (zero_reg : mword 64) = false)

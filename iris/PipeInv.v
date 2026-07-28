@@ -147,6 +147,147 @@ Lemma pflag_zero_not_open : ~ pflag_open (mword_of_int 0 : mword 32).
 Proof. unfold pflag_open. cbn. discriminate. Qed.
 
 (* ------------------------------------------------------------------ *)
+(*  The queue coupling                                                 *)
+(* ------------------------------------------------------------------ *)
+(* nread/nwrite are FREE-RUNNING uint32 counters: the live bytes are the
+   indices [nread, nwrite) taken in Z/2^32, and there are never more than
+   PIPESIZE of them.  This is the well-formedness the read/write proofs
+   maintain -- pipewrite's increment is guarded by the failed
+   [nwrite == nread + PIPESIZE] test and piperead's by the failed
+   [nread == nwrite] test -- and nothing else touches the counters.
+   (The CONTENTS of the live window stay existential: copyin/copyout are
+   contents-existential, so no observable contract could consume more.) *)
+Definition pipe_count (nr nw : mword 32) : Z :=
+  ((bv_unsigned nw - bv_unsigned nr) mod 2 ^ 32)%Z.
+
+Definition pipe_count_ok (nr nw : mword 32) : Prop :=
+  (pipe_count nr nw <= Z.of_nat PIPESIZE)%Z.
+
+Lemma pipe_count_ok_00 :
+  pipe_count_ok (mword_of_int 0 : mword 32) (mword_of_int 0 : mword 32).
+Proof. unfold pipe_count_ok, pipe_count. vm_compute. discriminate. Qed.
+
+(* the [mword 32] faces of the RiscvExtras width-64 identities (same
+   unfold-to-[bv_add] proof; the width is opaque to it). *)
+Local Lemma add_vec32_unsigned (x y : mword 32) :
+  bv_unsigned (add_vec x y) = bv_wrap 32 (bv_unsigned x + bv_unsigned y).
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned. reflexivity.
+Qed.
+
+Local Lemma wrap32_mod (z : Z) : bv_wrap 32 z = (z mod 2 ^ 32)%Z.
+Proof.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 32)%Z with (2 ^ 32)%Z. reflexivity.
+Qed.
+
+Local Lemma u32_range (x : mword 32) : (0 <= bv_unsigned x < 2 ^ 32)%Z.
+Proof.
+  pose proof (bv_unsigned_in_range _ x) as Hr.
+  unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N 32)%Z with (2 ^ 32)%Z in Hr.
+  exact Hr.
+Qed.
+
+(* the arithmetic, packaged over plain Z so [lia] never sees a bitvector
+   (the zify-hook recipe in durable-notes.md).  a/b are the raw uint32
+   values of nread/nwrite. *)
+Local Lemma pipe_count_arith_incr (a b : Z) :
+  (0 <= a < 2 ^ 32)%Z -> (0 <= b < 2 ^ 32)%Z ->
+  ((b - a) mod 2 ^ 32 <= 512)%Z ->
+  ((b - a) mod 2 ^ 32 <> 512)%Z ->
+  (((b + 1) mod 2 ^ 32 - a) mod 2 ^ 32 <= 512)%Z.
+Proof.
+  intros Ha Hb Hle Hne.
+  rewrite Zminus_mod_idemp_l.
+  replace (b + 1 - a)%Z with ((b - a) + 1)%Z by lia.
+  rewrite <- (Zplus_mod_idemp_l (b - a) 1).
+  assert (H0 : (0 <= (b - a) mod 2 ^ 32 < 2 ^ 32)%Z)
+    by (apply Z.mod_pos_bound; vm_compute; reflexivity).
+  rewrite Z.mod_small; lia.
+Qed.
+
+Local Lemma pipe_count_arith_decr (a b : Z) :
+  (0 <= a < 2 ^ 32)%Z -> (0 <= b < 2 ^ 32)%Z ->
+  ((b - a) mod 2 ^ 32 <= 512)%Z ->
+  a <> b ->
+  ((b - (a + 1) mod 2 ^ 32) mod 2 ^ 32 <= 512)%Z.
+Proof.
+  intros Ha Hb Hle Hne.
+  rewrite Zminus_mod_idemp_r.
+  replace (b - (a + 1))%Z with ((b - a) - 1)%Z by lia.
+  rewrite <- (Zminus_mod_idemp_l (b - a) 1).
+  assert (H0 : (0 <= (b - a) mod 2 ^ 32 < 2 ^ 32)%Z)
+    by (apply Z.mod_pos_bound; vm_compute; reflexivity).
+  assert (Hnz : ((b - a) mod 2 ^ 32 <> 0)%Z).
+  { intro Hz. apply Z.mod_divide in Hz; [|vm_compute; discriminate].
+    destruct Hz as [k Hk]. assert (k = 0)%Z by nia. lia. }
+  rewrite Z.mod_small; lia.
+Qed.
+
+(* pipewrite's increment, licensed by the failed full test: if the count is
+   in range and [nwrite] is NOT [nread + PIPESIZE], the count after
+   [nwrite++] still is. *)
+Lemma pipe_count_incr_w (nr nw : mword 32) :
+  pipe_count_ok nr nw ->
+  nw <> add_vec nr (mword_of_int 512 : mword 32) ->
+  pipe_count_ok nr (add_vec nw (mword_of_int 1 : mword 32)).
+Proof.
+  unfold pipe_count_ok, pipe_count. intros Hok Hne.
+  pose proof (u32_range nr) as Hnr. pose proof (u32_range nw) as Hnw.
+  rewrite add_vec32_unsigned wrap32_mod.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 32) = 1%Z) by (vm_compute; reflexivity).
+  rewrite H1.
+  apply pipe_count_arith_incr; [lia|lia|exact Hok|].
+  intro Heq. apply Hne. apply bv_eq.
+  rewrite add_vec32_unsigned wrap32_mod.
+  assert (H512 : bv_unsigned (mword_of_int 512 : mword 32) = 512%Z) by (vm_compute; reflexivity).
+  rewrite H512.
+  (* from (nw - nr) mod 2^32 = 512: nw = (nr + 512) mod 2^32 *)
+  assert (Hw : ((bv_unsigned nw - bv_unsigned nr) = 512
+                \/ (bv_unsigned nw - bv_unsigned nr) = 512 - 2 ^ 32)%Z).
+  { assert (Hr : (- 2 ^ 32 < bv_unsigned nw - bv_unsigned nr < 2 ^ 32)%Z) by lia.
+    destruct (Z.le_gt_cases 0 (bv_unsigned nw - bv_unsigned nr)) as [Hge | Hlt].
+    - left. rewrite Z.mod_small in Heq; lia.
+    - right.
+      assert (Hshift : ((bv_unsigned nw - bv_unsigned nr) mod 2 ^ 32
+                        = (bv_unsigned nw - bv_unsigned nr) + 2 ^ 32)%Z).
+      { rewrite <- (Z.mod_small ((bv_unsigned nw - bv_unsigned nr) + 2 ^ 32) (2 ^ 32)); [|lia].
+        rewrite <- Zplus_mod_idemp_r. rewrite Z_mod_same_full.
+        f_equal. lia. }
+      lia. }
+  destruct Hw as [Hw | Hw]; [rewrite Z.mod_small; lia|].
+  rewrite <- (Z.mod_small (bv_unsigned nw) (2 ^ 32)); [|lia].
+  replace (bv_unsigned nw)%Z with ((bv_unsigned nr + 512) + (- 1) * 2 ^ 32)%Z by lia.
+  rewrite Z_mod_plus_full. reflexivity.
+Qed.
+
+(* piperead's decrement, licensed by the failed empty test: nr ≠ nw means
+   the count is nonzero, so [nread++] keeps it in range. *)
+Lemma pipe_count_decr_r (nr nw : mword 32) :
+  pipe_count_ok nr nw ->
+  nr <> nw ->
+  pipe_count_ok (add_vec nr (mword_of_int 1 : mword 32)) nw.
+Proof.
+  unfold pipe_count_ok, pipe_count. intros Hok Hne.
+  pose proof (u32_range nr) as Hnr. pose proof (u32_range nw) as Hnw.
+  rewrite add_vec32_unsigned wrap32_mod.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 32) = 1%Z) by (vm_compute; reflexivity).
+  rewrite H1.
+  apply pipe_count_arith_decr; [lia|lia|exact Hok|].
+  intro Heq. apply Hne. by apply bv_eq.
+Qed.
+
+(* the return-value range piperead and pipewrite share: -1, or a count
+   between 0 and n (n itself clamped at 0 -- a non-positive request writes
+   or reads nothing and returns 0). *)
+Definition pipe_rw_ret (n : Z) (r : mword 64) : Prop :=
+  r = (mword_of_int (-1) : mword 64)
+  \/ exists i : Z, r = (mword_of_int i : mword 64) /\ (0 <= i <= Z.max 0 n)%Z.
+
+(* ------------------------------------------------------------------ *)
 (*  The reference algebra: one fraction ghost per end                   *)
 (* ------------------------------------------------------------------ *)
 
@@ -356,6 +497,7 @@ Section PipeInv.
        a_popen pi true  ↦₄ wo ∗
        pipe_endstate γp false ro ∗
        pipe_endstate γp true wo ∗
+       ⌜pipe_count_ok nr nw⌝ ∗
        ⌜length bs = PIPESIZE⌝ ∗ pipe_data pi bs ∗
        pipe_slack pi)%I.
 
@@ -422,7 +564,7 @@ Section PipeInv.
   Proof.
     iIntros "#Hs0 #Hs1 Hfrag Hres".
     iDestruct "Hres" as (nr nw ro wo vname bs)
-      "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hlen & Hdat & Hslack)".
+      "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hcnt & %Hlen & Hdat & Hslack)".
     iDestruct (pipe_endstate_shut_elim with "Hs0 Hst0") as "[-> H0]".
     iDestruct (pipe_endstate_shut_elim with "Hs1 Hst1") as "[-> H1]".
     iSplitL "Hfrag H0 H1"; [ by iFrame "Hfrag H0 H1" | ].
@@ -725,7 +867,7 @@ Section PipeInv.
       iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".
       iSplitL "Hm0"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm0")|].
       iSplitL "Hm1"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm1")|].
-      done. }
+      iSplit; [iPureIntro; exact pipe_count_ok_00 | done]. }
     iModIntro. iExists γl, γp.
     rewrite /is_pipe. iFrame "Hrd Hwr".
     iSplit; [done|]. iExact "Hlk".
