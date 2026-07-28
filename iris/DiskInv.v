@@ -102,24 +102,11 @@ Section DiskInv.
      disk_cfg γ (virtio_init_cfg pd pav pu) ∗
      ⌜forall j, (j < 4096)%nat -> addr_is_kdata (pa_add pd j)⌝ ∗
      ⌜forall j, (j < 4096)%nat -> addr_is_kdata (pa_add pav j)⌝ ∗
-     ⌜forall j, (j < 4096)%nat -> addr_is_kdata (pa_add pu j)⌝ ∗
-     (* the persistent static-claims bundle, so a DRIVER-level proof can run
-        the ↦ₚ ⇄ ↦ₘ tier bridges outside any leaf (the payoff bytes an
-        invariant accessor hands back arrive physical; the machine leaves
-        want the mem tier).  A copy, not the interface: it also rides in
-        [hw_config], but no extraction lemma exposes it at the
-        [sie_cap_gpr] altitude, and adding one would rebuild the whole
-        SmodeCore cone -- do that cleanup at a quiet moment instead. *)
-     kmap_static_claims)%I.
+     ⌜forall j, (j < 4096)%nat -> addr_is_kdata (pa_add pu j)⌝)%I.
 
   Global Instance disk_geom_persistent γ pd pav pu :
     Persistent (disk_geom γ pd pav pu).
   Proof. apply _. Qed.
-
-  Lemma disk_geom_kmap_claims (γ : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) :
-    disk_geom γ pd pav pu -∗ kmap_static_claims.
-  Proof. iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
 
   (* the kdata facts, in the form the tier bridges below consume *)
   Lemma disk_geom_static (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
@@ -128,7 +115,7 @@ Section DiskInv.
      /\ (forall j, (j < 4096)%nat -> kmap_static (svpn_of (pa_add pav j)) KP_rw)
      /\ (forall j, (j < 4096)%nat -> kmap_static (svpn_of (pa_add pu j)) KP_rw)⌝.
   Proof.
-    iIntros "(_ & _ & _ & _ & _ & %Hd & %Ha & %Hu & _)". iPureIntro.
+    iIntros "(_ & _ & _ & _ & _ & %Hd & %Ha & %Hu)". iPureIntro.
     split_and!; intros j Hj; apply kdata_svpn_class;
       [ exact (Hd j Hj) | exact (Ha j Hj) | exact (Hu j Hj) ].
   Qed.
@@ -142,7 +129,7 @@ Section DiskInv.
      /\ (forall j, (j < 4096)%nat ->
         (uint (pa_add pu j : SailStdpp.Values.mword 64) < 274877906944)%Z)⌝.
   Proof.
-    iIntros "(_ & _ & _ & _ & _ & %Hd & %Ha & %Hu & _)". iPureIntro.
+    iIntros "(_ & _ & _ & _ & _ & %Hd & %Ha & %Hu)". iPureIntro.
     assert (Hk : forall a : Arch.pa, addr_is_kdata a ->
               (uint (a : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros a Hka. unfold addr_is_kdata, ram_base, ram_size, text_end in Hka.

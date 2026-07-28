@@ -18,7 +18,9 @@ The protocol layer, in place and green:
   `dev_inv_body`), the four protocol accessors (publish / observe-avail /
   observe-used / reclaim) and the device-thread rules.
 - `WpSmodeHalf.v` (new, PROVEN) — `wp_lhu_s_sconf`/`wp_lh_s_sconf`/`wp_sh_s_sconf`
-  width-2 RAM leaves + `wp_load_s_sconf_gen_u`. NOTE: `WpSconfMem.v`'s
+  width-2 RAM leaves, one line each off `WpSconfMem.wp_load_s_sconf_gen_u` (the
+  width- AND uns-generic non-atomic load; `wp_load_s_sconf_gen`/`_ugen` are its
+  restatements). NOTE: `WpSconfMem.v`'s
   `wp_{load,store}_s_sconf_au` atomic-update parents are width/uns-generic —
   use THOSE (WpSconfLock pattern) for the dev_inv-opening leased-byte accesses.
 - `WpVirtioExec.v` + `WpVirtioMmio.v` (new, PROVEN) — window facts + raw-frag
@@ -26,23 +28,22 @@ The protocol layer, in place and green:
   `wp_lw_virtio_frag_s_sconf`) for the init proof. WpPlicExec towers were
   already window-generic; nothing cloned.
 
-### Pending cleanups (small, deliberately deferred to keep the tree green)
+### Interfaces this effort added that other drivers should reuse
 
-- **Promote the full-barrier fence leaf.** `WpSconfCtl.wp_fence_s_sconf` is
-  stated at pred=rw / succ=**w** (`release`'s `__sync_lock_release`).  Both
-  `virtio_disk_intr` (+0x2c, +0x3e) and `virtio_disk_rw` (+0x172, +0x182) use
-  `__sync_synchronize`, i.e. pred=rw / succ=**rw**, which no leaf covered;
-  `ProofVirtioDiskIntr.v` carries a local clone (`exec_execute_FENCE_rw_rw` +
-  `wp_fence_rw_s_sconf`).  Generalize `wp_fence_s_sconf` over pred/succ per the
-  WRAPPER RECIPE (durable-notes) and delete the clone — a second consumer now
-  exists, so this is no longer a one-off.
-- **Expose `kmap_static_claims` at the `sconf` level.** It rides in `hw_config`
-  inside `sconf` inside `sie_cap_gpr`, but no extraction lemma exposes it, so a
-  DRIVER-level proof that must run the ↦ₚ⇄↦ₘ tier bridges outside a leaf cannot
-  reach it.  `disk_geom` carries a copy as a stopgap
-  (`DiskInv.disk_geom_kmap_claims`); the real fix is a
-  `sie_cap_gpr γ m n -∗ kmap_static_claims` in SmodeCore.v, deferred only to
-  avoid rebuilding that cone under several live agents.
+- **The fence leaf is pred/succ-generic.** `WpSconfCtl.wp_fence_gen_s_sconf`
+  covers every `fence` (the model's whole pred/succ dispatch is barriers, and a
+  barrier is a no-op in the functional interpreter — `WpSmodePtCtl.
+  exec_execute_FENCE_S` is the exec fact).  `wp_fence_s_sconf` is its rw,w
+  restatement (`release`'s `__sync_lock_release`); the driver's
+  `__sync_synchronize` sites pass rw,rw.  Never clone it per barrier flavour.
+- **`kmap_static_claims` comes off the ambient config.**
+  `SmodeCore.hw_config_kmap_claims`, lifted to `IntrDefs.sconf_kmap_claims` /
+  `sie_cap_gpr_kmap_claims` (both `-∗ kmap_static_claims ∗ <bundle>`, consuming
+  nothing).  A DRIVER-level proof that must run the ↦ₚ⇄↦ₘ tier bridges between
+  instructions reads it off its threaded `sie_cap_gpr`
+  (`iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]"`), so no
+  geometry resource needs to carry a copy and no proof should destructure
+  `hw_config`'s seventeen conjuncts by position.
 
 - **`virtio_disk_intr` is PROVEN and LINKED** (`SpecVirtioDiskIntr.v` /
   `WpVirtioDiskIntrDecode.v` / `ProofVirtioDiskIntr.v` /
@@ -96,8 +97,6 @@ The protocol layer, in place and green:
     the parked payoff back into the cells `free_desc` wants.
 
 Remaining in the whole virtio effort:
-- the two **pending cleanups** above (the `fence rw,rw` leaf; exposing
-  `kmap_static_claims` at the `sconf` level);
 - the two currently-unused primed lemmas
   `ProofVirtioDiskRwB.{disk_window_le',mod8_set_seq_fresh'}` — P4 and P6 both
   ended up using the weaker `vdrwd_window_le2` route, so these can be deleted;

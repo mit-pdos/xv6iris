@@ -20,14 +20,9 @@
        [extend_value]/[subrange] plumbing computes at that width
        ([data2_ext_2] / [data2_ext_2_unsigned] / [store_ext_2] below).
 
-   One gap in WpSconfMem.v had to be filled: its non-atomic LOAD instance
-   [wp_load_s_sconf_gen] hard-codes [is_unsigned = false], so it cannot
-   state an [lhu].  [wp_load_s_sconf_gen_u] below is the [uns]-generic twin
-   (same proof, one line longer), built over the already [uns]-generic
-   [wp_load_s_sconf_au].  When WpSconfMem.v is next touched,
-   [wp_load_s_sconf_gen] should become the WRAPPER RECIPE restatement
-   [exact (wp_load_s_sconf_gen_u width c false ...)] and this copy should
-   move there.
+   The [uns]-generic non-atomic LOAD instance the [lhu] leaf needs lives in
+   WpSconfMem.v as [wp_load_s_sconf_gen_u]; its signed/unsigned specializations
+   [wp_load_s_sconf_gen] / [wp_load_s_sconf_ugen] are restatements of it.
 
    The model's convention, confirmed against [rv64d.extend_value]:
      [extend_value true  v = zero_extend' 64 v]   (is_unsigned -> LHU/LBU)
@@ -73,56 +68,7 @@ Section WpSmodeHalf.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
-  (* §1  The [uns]-generic non-atomic LOAD instance.                      *)
-  (*                                                                      *)
-  (* Verbatim [WpSconfMem.wp_load_s_sconf_gen] with [false] promoted to a *)
-  (* parameter [uns] and the extension result [lv] left to the caller.    *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_load_s_sconf_gen_u (width : Z) (c uns : bool) (γ : gname)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) {dqm : dfrac} :
-    0 < width -> width <= 8 ->
-    (width | 4096) ->
-    uint (to_bits 64 width) = width ->
-    (forall (addr : mword 64) (w : mword (8*width)) s,
-       dev_addr addr = false ->
-       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
-          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
-         = Some ((w, default_meta), s)) ->
-    extend_value uns
-      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-        (autocast (T := mword) v)) = lv ->
-    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗
-    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
-    wordw_pointsto width pa dqm v -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg lv]> m) n -∗
-      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
-      wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdsp.
-    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_au width c uns γ Φ pc rd rs1 imm m n
-              (fun w => extend_value uns
-                 (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-                    (autocast (T := mword) w)))
-              (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN)
-              Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hbytes]").
-    { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
-    iIntros (w) "Hcg Hpc [-> Hbw]".
-    iEval (rewrite Hlv) in "Hcg".
-    iApply ("Hcont" with "Hcg Hpc Hbw").
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* §2  The pure width-2 value facts.                                    *)
+  (* §1  The pure width-2 value facts.                                    *)
   (* ------------------------------------------------------------------- *)
 
   (* what the model's generic load plumbing computes at width 2: the
@@ -182,7 +128,7 @@ Section WpSmodeHalf.
   Proof. unfold trunc16. apply autocast_subrange16_id. Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* §3  The leaves: lhu / lh / sh.                                       *)
+  (* §2  The leaves: lhu / lh / sh.                                       *)
   (*                                                                      *)
   (* All three are base-encoding (4-byte) instructions -- RV64GC has no    *)
   (* compressed halfword access (c.lh/c.sh are Zcb, which the model's      *)

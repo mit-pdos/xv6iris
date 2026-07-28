@@ -39,6 +39,7 @@ Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
+Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *)
 Require Import SRegime.
 Require Import MstatusBits WpIntrCore.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
@@ -677,6 +678,33 @@ Section IntrDefs.
     iSplitL "Hhs"; [iExact "Hhs"|].
     iSplitL "Hsc"; [iExact "Hsc"|].
     iSplitL "Hsie"; [iExact "Hsie" | iExact "Hgpr"].
+  Qed.
+
+  (* [kmap_static_claims] at the sconf / sie_cap_gpr altitudes.  It rides in
+     [hw_config], which rides at the head of [sconf], which rides inside
+     [sie_cap_gpr]; these two extractions are how a DRIVER-level proof reaches
+     the ↦ₚ⇄↦ₘ tier bridges (KMap.v) between instructions, without either
+     destructing [hw_config]'s conjuncts by position or carrying a private
+     copy of the bundle in its own geometry resource.  Both are persistent
+     conclusions and CONSUME NOTHING -- the bundle is handed straight back, so
+     the call is [iDestruct (… with "Hcg") as "[#Hkm Hcg]"]. *)
+  Lemma sconf_kmap_claims γ :
+    sconf γ -∗ kmap_static_claims ∗ sconf γ.
+  Proof.
+    iIntros "Hsc".
+    iEval (rewrite /sconf) in "Hsc". iDestruct "Hsc" as "(#Hhw & Hrest)".
+    iDestruct (hw_config_kmap_claims with "Hhw") as "#Hkm".
+    iSplitR; [iExact "Hkm"|].
+    rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"].
+  Qed.
+
+  Lemma sie_cap_gpr_kmap_claims γ m avail :
+    sie_cap_gpr γ m avail -∗ kmap_static_claims ∗ sie_cap_gpr γ m avail.
+  Proof.
+    iIntros "Hcg".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct (hw_config_kmap_claims with "Hhw") as "#Hkm".
+    iSplitR; [iExact "Hkm" | iExact "Hcg"].
   Qed.
 
   (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof

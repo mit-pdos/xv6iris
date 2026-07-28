@@ -1350,6 +1350,14 @@ Lemma exec_execute_C_ANDI_leaf (imm : mword 6) (rsd : cregidx) (rd : mword 5) s 
   = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI)), s).
 Proof. intros H. rewrite exec_execute_C_ANDI H. reflexivity. Qed.
 
+(* c.or -- the register-only creg bridge (the virtio driver's
+   [flags |= VRING_DESC_F_NEXT] is the first consumer). *)
+Lemma exec_execute_C_OR_leaf (rsd rs2 : cregidx) (rd r2 : mword 5) s :
+  creg2reg_idx rsd = Regidx rd -> creg2reg_idx rs2 = Regidx r2 ->
+  exec (execute (C_OR (rsd, rs2))) s
+  = Some (ExecuteAs (RTYPE (Regidx r2, Regidx rd, Regidx rd, OR)), s).
+Proof. intros H1 H2. rewrite exec_execute_C_OR H1 H2. reflexivity. Qed.
+
 Lemma exec_execute_C_LW_leaf (uimm : mword 5) (rsc1 rdc : cregidx)
       (imm : mword 12) (rs1 rd : mword 5) s :
   zero_extend' 12 (concat_vec uimm ('b"00")) = imm ->

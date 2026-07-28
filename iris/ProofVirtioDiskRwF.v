@@ -774,11 +774,11 @@ Section ProofVirtioDiskRwF.
     destruct (vdrwf_dbnds m2 Hm8) as (Bm1 & Bm2 & Bm3 & Bm4 & _ & _ & _).
     destruct (vdrwf_dbnds t Ht8) as (Bt1 & Bt2 & Bt3 & Bt4 & _ & _ & _).
     (* ---- the geometry ---- *)
-    iDestruct (disk_geom_kmap_claims with "Hgeom") as "#Hkm".
+    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(Hspd & _ & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(Hcpd & _ & _).
     iPoseProof "Hgeom" as "Hgeom2".
-    iDestruct "Hgeom2" as "(#Hdp & _ & _ & %Hal0 & _ & _ & _ & _ & _)".
+    iDestruct "Hgeom2" as "(#Hdp & _ & _ & %Hal0 & _ & _ & _ & _)".
     destruct Hal0 as (Hald & _ & _).
     assert (Hsbuf : forall k, (k < 1024)%nat ->
               kmap_static (svpn_of (pa_add (b_data b) k)) KP_rw)

@@ -423,6 +423,47 @@ Section WpSconfBtype.
     iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 
+  (* BLT-fall, the SIGNED twin of [wp_bltu_fall_s_sconf] at two general
+     registers (free_desc's `i >= NUM` bound check).  The x0-specialized
+     [wp_blt_x0_fall_s_sconf] below is the same leaf against zero. *)
+  Lemma wp_blt_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : regfile) (n : nat) :
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zI_s (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLT)) -∗
+    ( sie_cap_gpr γ m n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
+              (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply exec_execute_BTYPE_BLT_fall. unfold rvv. rewrite Lva Lvb. exact Hcmp. }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  Qed.
+
   (* BGEU-fall (the freerange loop exit: no more full pages fit). *)
   Lemma wp_bgeu_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)

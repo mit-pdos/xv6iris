@@ -377,7 +377,55 @@ Section WpSconfMem.
     iApply ("Hcont" $! v with "Hcg [$Hpc' $Hnpc] HPsi").
   Qed.
 
-  (* the non-atomic instance: the caller owns the cell throughout. *)
+  (* The non-atomic instance: the caller owns the cell throughout.  Generic
+     in BOTH the width and the extension flag [uns], so every RAM load leaf
+     in the tree (lb/lbu/lh/lhu/lw/lwu/ld and the RVC twins) is one line off
+     it.  [wp_load_s_sconf_gen] / [wp_load_s_sconf_ugen] below are its
+     [uns = false] / [uns = true] restatements (WRAPPER RECIPE). *)
+  Lemma wp_load_s_sconf_gen_u (width : Z) (c uns : bool) (γ : gname)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) {dqm : dfrac} :
+    0 < width -> width <= 8 ->
+    (width | 4096) ->
+    uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (w : mword (8*width)) s,
+       dev_addr addr = false ->
+       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
+          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
+         = Some ((w, default_meta), s)) ->
+    extend_value uns
+      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
+        (autocast (T := mword) v)) = lv ->
+    let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
+    wordw_pointsto width pa dqm v -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg lv]> m) n -∗
+      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+      wordw_pointsto width pa dqm v -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdsp.
+    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
+    iApply (wp_load_s_sconf_au width c uns γ Φ pc rd rs1 imm m n
+              (fun w => extend_value uns
+                 (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
+                    (autocast (T := mword) w)))
+              (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN)
+              Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdsp
+              with "Hcg Hpc Hinstr [Hbytes]").
+    { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
+    iIntros (w) "Hcg Hpc [-> Hbw]".
+    iEval (rewrite Hlv) in "Hcg".
+    iApply ("Hcont" with "Hcg Hpc Hbw").
+  Qed.
+
+  (* the SIGNED restatement. *)
   Lemma wp_load_s_sconf_gen (width : Z) (c : bool) (γ : gname)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) {dqm : dfrac} :
@@ -406,22 +454,10 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdsp.
-    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_au width c false γ Φ pc rd rs1 imm m n
-              (fun w => extend_value false
-                 (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-                    (autocast (T := mword) w)))
-              (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN)
-              Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hbytes]").
-    { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
-    iIntros (w) "Hcg Hpc [-> Hbw]".
-    iEval (rewrite Hlv) in "Hcg".
-    iApply ("Hcont" with "Hcg Hpc Hbw").
+    exact (wp_load_s_sconf_gen_u width c false γ Φ pc rd rs1 imm m n v lv (dqm := dqm)).
   Qed.
 
-  (* The UNSIGNED twin.  [wp_load_s_sconf_au] is already generic in the
+  (* The UNSIGNED restatement.  [wp_load_s_sconf_gen_u] is generic in the
      extension ([uns]), so the two differ in exactly that flag -- which is why
      the width-1 [lbu] and the width-4 [lwu] are one-line instances of THIS
      rather than two hand-rolled copies of the same 190-line argument. *)
@@ -453,19 +489,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdsp.
-    iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_au width c true γ Φ pc rd rs1 imm m n
-              (fun w => extend_value true
-                 (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-                    (autocast (T := mword) w)))
-              (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN)
-              Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hbytes]").
-    { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
-    iIntros (w) "Hcg Hpc [-> Hbw]".
-    iEval (rewrite Hlv) in "Hcg".
-    iApply ("Hcont" with "Hcg Hpc Hbw").
+    exact (wp_load_s_sconf_gen_u width c true γ Φ pc rd rs1 imm m n v lv (dqm := dqm)).
   Qed.
 
 

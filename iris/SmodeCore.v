@@ -49,6 +49,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 Require Import WpGprCsrwCommon.
 Require Export SmodePte Pt4kWalk KptPt.
+Require Import KMap.   (* kmap_static_claims, extracted from [hw_config] below *)
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -940,6 +941,20 @@ Proof. solve_inG. Qed.
 Section SmodeCoreIris.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
+
+  (* The static kernel-mapping claims (KMap.v), off the ambient config bundle.
+     [hw_config] is persistent, so this consumes nothing.  It is THE interface
+     by which a proof that holds the config -- directly, or through [sconf] /
+     [sie_cap_gpr] (IntrDefs.v lifts this lemma to both) -- reaches the ↦ₚ⇄↦ₘ
+     tier bridges outside a leaf.  Use it instead of destructing [hw_config]'s
+     seventeen conjuncts by position. *)
+  Lemma hw_config_kmap_claims : hw_config -∗ kmap_static_claims.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hk)".
+    iExact "Hk".
+  Qed.
 
   (* The ambient S-mode machine configuration, keyed by the SIE ghost name [γ].
      Bundles the config registers + all the pure config facts an S-mode kernel

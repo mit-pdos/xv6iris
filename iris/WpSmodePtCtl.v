@@ -192,29 +192,34 @@ Proof.
 Qed.
 
 
-Lemma exec_execute_FENCE_rw_w (menvcfg0 : mword 64) s :
+(* A FENCE is state-preserving at EVERY pred/succ pair: the model's whole
+   pred/succ dispatch is an if-tree whose every arm is a [sail_barrier]
+   (a no-op in the functional interpreter) or a bare [returnM tt].  So the
+   S-mode exec fact is generic in [fm]/[pred]/[succ]/[rs]/[rd] -- which is
+   what makes ONE leaf serve both [__sync_lock_release]'s `fence rw,w` and
+   [__sync_synchronize]'s `fence rw,rw`.  (The User-mode twin, proved the
+   same way, is [UserExecFacts.exec_execute_FENCE_total_U].)               *)
+Lemma exec_execute_FENCE_S (menvcfg0 : mword 64)
+    (fm pred succ : mword 4) (rs rd : regidx) s :
   register_lookup cur_privilege s.(sregs) = Supervisor ->
   register_lookup menvcfg s.(sregs) = menvcfg0 ->
   eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-  exec (execute (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                        Regidx (mword_of_int 0), Regidx (mword_of_int 0)))) s
+  exec (execute (FENCE (fm, pred, succ, rs, rd))) s
     = Some (RETIRE_SUCCESS, s).
 Proof.
   intros Hcp Hmenv Hfiom.
-  change (execute (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                          Regidx (mword_of_int 0), Regidx (mword_of_int 0))))
-    with (execute_FENCE (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
-            (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0))).
+  change (execute (FENCE (fm, pred, succ, rs, rd)))
+    with (execute_FENCE fm pred succ rs rd).
   unfold execute_FENCE.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_is_fiom_active_S menvcfg0 s Hcp Hmenv)).
   rewrite Hfiom.
-  unfold effective_fence_set.
-  cbn match beta zeta.
-  match goal with |- context[if ?g then _ else _] =>
-    replace g with true by (vm_compute; reflexivity)
-  end.
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
+  cbn beta. cbv zeta. cbn match.
+  erewrite exec_bind0_Some.
+  2:{ repeat match goal with
+             | |- exec (if ?b then _ else _) _ = _ => destruct b
+             | |- exec (returnM (if ?b then _ else _)) _ = _ => destruct b
+             end;
+      first [ apply (exec_sail_barrier _ s) | apply exec_returnM ]. }
   apply exec_returnM.
 Qed.
 

@@ -81,39 +81,6 @@ Local Ltac vgeom := unfold vt_geom; split; [zrange_vm|];
 Lemma vg_060 : vt_geom (mword_of_int 0x10001060). Proof. vgeom. Qed.
 Lemma vg_064 : vt_geom (mword_of_int 0x10001064). Proof. vgeom. Qed.
 
-(* ===================================================================== *)
-(* §0b  fence rw,rw.  WpSconfCtl's [wp_fence_s_sconf] is stated at        *)
-(*      pred=rw / succ=w (release's [__sync_lock_release] barrier);       *)
-(*      [__sync_synchronize] is the FULL barrier, pred=rw / succ=rw.      *)
-(*      Same proof with the succ field changed.                          *)
-(* ===================================================================== *)
-
-Lemma exec_execute_FENCE_rw_rw (menvcfg0 : mword 64) s :
-  register_lookup cur_privilege s.(sregs) = Supervisor ->
-  register_lookup menvcfg s.(sregs) = menvcfg0 ->
-  eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ->
-  exec (execute (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
-                        Regidx (mword_of_int 0), Regidx (mword_of_int 0)))) s
-    = Some (RETIRE_SUCCESS, s).
-Proof.
-  intros Hcp Hmenv Hfiom.
-  change (execute (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
-                          Regidx (mword_of_int 0), Regidx (mword_of_int 0))))
-    with (execute_FENCE (mword_of_int 0) (mword_of_int 3) (mword_of_int 3)
-            (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0))).
-  unfold execute_FENCE.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_is_fiom_active_S menvcfg0 s Hcp Hmenv)).
-  rewrite Hfiom.
-  unfold effective_fence_set.
-  cbn match beta zeta.
-  match goal with |- context[if ?g then _ else _] =>
-    replace g with true by (vm_compute; reflexivity)
-  end.
-  cbn match.
-  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
-  apply exec_returnM.
-Qed.
-
 Lemma vt_add_vec_0 (x : mword 64) :
   add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
 Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
@@ -136,50 +103,6 @@ Section VtLeaves.
   Notation a0_idx := (mword_of_int 10 : mword 5).
   Notation a4_idx := (mword_of_int 14 : mword 5).
   Notation a5_idx := (mword_of_int 15 : mword 5).
-
-  (* ---- fence rw,rw over the sconf bundle ---- *)
-  Lemma wp_fence_rw_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗
-    instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
-                           Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    ( sie_cap_gpr γ m n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
-              (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
-                      Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
-              with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0)
-      by (unfold s_pc; tmig; exact Lmenv).
-    iModIntro. iExists s_pc.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_FENCE_rw_rw menvcfg0 s_pc Lpriv_pc Lmenv_pc Hfiom). }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
-      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
-      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
-  Qed.
 
   (* ---- the two dev_inv-borrowing virtio leaves, at a CONCRETE address ---- *)
 
@@ -374,7 +297,9 @@ Section VtLeaves.
     iEval (rewrite Hp2c) in "Hpc".
     (* ---- +0x2c: fence rw,rw ---- *)
     iPoseProof (vti_2c with "Htext") as "Hi2c".
-    iApply (wp_fence_rw_s_sconf γ Φ (mword_of_int (VDT + 0x2c)) B3 n
+    iApply (wp_fence_gen_s_sconf γ Φ (mword_of_int (VDT + 0x2c))
+              (mword_of_int 0) (mword_of_int 3) (mword_of_int 3)
+              (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) B3 n
               with "Hcg Hpc Hi2c [-]").
     iIntros "Hcg Hpc".
     assert (Hp30 : add_vec_int (mword_of_int (VDT + 0x2c) : mword 64) 4 = mword_of_int (VDT + 0x30))
@@ -1091,7 +1016,8 @@ End VtLoopSeam.
 (*     [word*_to_phys] bracket the access.  The alignment premise comes   *)
 (*     from [virtio_pages_aligned] via [vt_aligned_off]; the static/      *)
 (*     canonical premises from [disk_geom_static]/[_canonical]; and the   *)
-(*     claims bundle from [disk_geom_kmap_claims].                        *)
+(*     claims bundle off the threaded [sie_cap_gpr]                       *)
+(*     ([IntrDefs.sie_cap_gpr_kmap_claims]).                              *)
 (*                                                                        *)
 (*     [disk_cfg_agree] is what makes the accessor's address the one the  *)
 (*     CODE computes: it pins [v_cfg v = virtio_init_cfg pd pav pu], so   *)
@@ -1169,10 +1095,10 @@ Section VtDevRam.
   Proof.
     intros Hea Hrd Hrdsp.
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb0 Hcont".
-    iDestruct (disk_geom_kmap_claims with "Hgeom") as "#Hkm".
+    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & _ & Hcanu).
-    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _ & _)".
+    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _)".
     destruct Hal0 as (_ & _ & Halu).
     (* the two constant side conditions of the tier bridge at [pu + 2] *)
     assert (Halign : is_aligned_paddr (Physaddr (pa_add pu 2%nat)) 2 = true).
@@ -1262,10 +1188,10 @@ Section VtDevRam.
   Proof.
     intros Hpc0 Hea Hrd Hrdsp.
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrcpt #Hlbc Hcont".
-    iDestruct (disk_geom_kmap_claims with "Hgeom") as "#Hkm".
+    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & _ & Hcanu).
-    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _ & _)".
+    iDestruct "Hgeom" as "(_ & _ & _ & %Hal0 & #Hcfg0 & _ & _ & _)".
     destruct Hal0 as (_ & _ & Halu).
     assert (Halign : is_aligned_paddr (Physaddr (pa_add pu (vt_uoff p))) 4 = true).
     { apply (vt_aligned_off pu (vt_uoff p) 4 Halu);
@@ -1978,7 +1904,9 @@ Section VtBody.
     iPoseProof "Hgeom" as "(_ & _ & #Hup & _)".
     (* ---- +0x3e: fence rw,rw ---- *)
     iPoseProof (vti_3e with "Htext") as "Hi3e".
-    iApply (wp_fence_rw_s_sconf γ Φ (mword_of_int (VDT + 0x3e)) M n
+    iApply (wp_fence_gen_s_sconf γ Φ (mword_of_int (VDT + 0x3e))
+              (mword_of_int 0) (mword_of_int 3) (mword_of_int 3)
+              (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) M n
               with "Hcg Hpc Hi3e [-]").
     iIntros "Hcg Hpc".
     assert (Hp42 : add_vec_int (mword_of_int (VDT + 0x3e) : mword 64) 4 = mword_of_int (VDT + 0x42))
@@ -2171,7 +2099,7 @@ Section VtBody.
   Proof.
     intros HMs1 HMa5 Hh8.
     iIntros "Hcg #Htext Hpc #Hgeom Hstat Hcont".
-    iDestruct (disk_geom_kmap_claims with "Hgeom") as "#Hkm".
+    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     pose proof (kdata_svpn_class _ (vt_status_kdata h Hh8)) as Hstk.
     pose proof (vt_kdata_canon _ (vt_status_kdata h Hh8)) as Hstc.
     iDestruct (phys_to_byte (d_info_status h) byte_zero Hstk Hstc with "Hkm Hstat") as "Hstat".
@@ -2841,10 +2769,10 @@ Section VtLoopProof.
         rewrite (Hchain r Hcs). exact (Hthr r Hcs Ncsp N8 N9). }
     (* ================= THE disk_res SURGERY ================= *)
     iPoseProof "Hgeom" as "Hgeomd".
-    iDestruct (disk_geom_kmap_claims with "Hgeom") as "#Hkm".
+    iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & Hstav & _).
     iDestruct (disk_geom_canonical with "Hgeom") as %(_ & Hcanav & _).
-    iDestruct "Hgeomd" as "(_ & _ & _ & %Hal0 & _ & _ & _ & _ & _)".
+    iDestruct "Hgeomd" as "(_ & _ & _ & %Hal0 & _ & _ & _ & _)".
     destruct Hal0 as (_ & Halav & _).
     assert (Hq8 : (nr `mod` 8 < 8)%nat) by (apply Nat.mod_upper_bound; lia).
     (* the avail-ring cell out of the pin *)

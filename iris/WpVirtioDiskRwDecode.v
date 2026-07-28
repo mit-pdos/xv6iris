@@ -382,15 +382,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ---- C_* -> base expansions at this function's concrete operands ---- *)
 
-(* the creg-bridging leaf form of [exec_execute_C_OR] (the c.or of the
-   [flags |= VRING_DESC_F_NEXT] computation), matching the four
-   load/store leaf bridges of WpMmodeLeafBase.v. *)
-Lemma exec_execute_C_OR_leaf (rsd rs2 : cregidx) (rd r2 : mword 5) s :
-  creg2reg_idx rsd = Regidx rd -> creg2reg_idx rs2 = Regidx r2 ->
-  exec (execute (C_OR (rsd, rs2))) s
-  = Some (ExecuteAs (RTYPE (Regidx r2, Regidx rd, Regidx rd, OR)), s).
-Proof. intros H1 H2. rewrite exec_execute_C_OR H1 H2. reflexivity. Qed.
-
 Lemma rwe_c19c s :
   exec (execute (C_SW (mword_of_int 0, Cregidx (mword_of_int 3), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 11), 4)), s).

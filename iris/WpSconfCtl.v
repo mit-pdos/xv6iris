@@ -33,7 +33,7 @@ Require Import IntrDefs.
 Import Defs.
 
 (* ---- Local helpers (copies: the originals are Local in WpSmodePtCtl.v /
-   ProofSpin.v; [exec_execute_FENCE_rw_w] is exported and imported). ---- *)
+   ProofSpin.v; [exec_execute_FENCE_S] is exported and imported). ---- *)
 Local Lemma exec_jump_to_zca (target : mword 64) s :
     eq_vec (access_vec_dec target 0) ('b"0") = true ->
     exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
@@ -173,15 +173,20 @@ Section WpSconfCtl.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
-  (* fence rw,w -- state-preserving; the config is opened only for the    *)
-  (* priv/menvcfg side conditions.                                        *)
+  (* fence -- state-preserving at ANY pred/succ pair (the model's whole   *)
+  (* dispatch is barriers, and a barrier is a no-op in the functional     *)
+  (* interpreter); the config is opened only for the priv/menvcfg side    *)
+  (* conditions.  gcc emits two of them in xv6: `fence rw,w` for          *)
+  (* [__sync_lock_release] (release) and `fence rw,rw` for                *)
+  (* [__sync_synchronize] (the virtio driver), and both are this leaf.    *)
+  (* [wp_fence_s_sconf] below is the rw,w restatement (WRAPPER RECIPE).   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_fence_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : regfile) (n : nat) :
+  Lemma wp_fence_gen_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
+      (m : regfile) (n : nat) :
     sie_cap_gpr γ m n -∗
     pc_is pc -∗
-    instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                           Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
+    instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
     ( sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -189,8 +194,7 @@ Section WpSconfCtl.
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf γ m n Φ pc false
-              (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
-                      Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
+              (FENCE (fm, pred, succ, rs, rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -206,7 +210,8 @@ Section WpSconfCtl.
     iModIntro. iExists s_pc.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_FENCE_rw_w menvcfg0 s_pc Lpriv_pc Lmenv_pc Hfiom). }
+      apply (exec_execute_FENCE_S menvcfg0 fm pred succ rs rd s_pc
+               Lpriv_pc Lmenv_pc Hfiom). }
     iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
@@ -217,6 +222,24 @@ Section WpSconfCtl.
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
     iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  Qed.
+
+  (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
+     restatement of the generic leaf (WRAPPER RECIPE), so the existing call
+     sites do not change. *)
+  Lemma wp_fence_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (m : regfile) (n : nat) :
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗
+    instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                           Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
+    ( sie_cap_gpr γ m n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    exact (wp_fence_gen_s_sconf γ Φ pc (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
+             (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) m n).
   Qed.
 
   (* ------------------------------------------------------------------- *)

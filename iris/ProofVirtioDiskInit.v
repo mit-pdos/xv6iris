@@ -259,110 +259,14 @@ Definition vdi_v (st dfeat qsel qnum : Z) (rdy : bool) (d a u : Arch.pa)
               zero32 zero16 zero16 dk.
 
 (* ===================================================================== *)
-(* 4.  Extra instruction leaves this function needs.                      *)
-(*                                                                        *)
-(*   - a BASE-width ADDIW with DISTINCT rd/rs1 ([sext.w s2,a5]);          *)
-(*   - a BASE-width [bnez] against x0 (the QUEUE_READY test): WpSconfBtype *)
-(*     packages [beqz] against x0 but not its BNE twin, and its generic    *)
-(*     [wp_bne_fall_s_sconf] demands [uint rs2 <> 0].                      *)
+(* 4.  The two virtio-mmio leaves, at a CONCRETE effective address.       *)
+(*     Everything else this function executes is a shared leaf            *)
+(*     (WpSconfAlu / WpSconfMem / WpSconfBtype / WpSconfCtl).             *)
 (* ===================================================================== *)
-
-Local Definition vrvv (r : mword 5) (s : mstate) : mword 64 :=
-  if Z.eqb (uint r) 0 then zero_reg
-  else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s.(sregs).
-
-Local Lemma vexec_BTYPE_cmp_BNE (rs2 rs1 : mword 5) s :
-  exec (Defs.bind (rX_bits (Regidx rs1))
-          (fun w2 => Defs.bind (rX_bits (Regidx rs2))
-             (fun w3 => returnM (neq_vec w2 w3)))) s
-    = Some (neq_vec (vrvv rs1 s) (vrvv rs2 s), s).
-Proof.
-  unfold vrvv.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  apply exec_returnM.
-Qed.
-
-Local Lemma vexec_execute_BTYPE_BNE_fall (imm : mword 13) (rs2 rs1 : mword 5) s :
-  neq_vec (vrvv rs1 s) (vrvv rs2 s) = false ->
-  exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))) s
-    = Some (RETIRE_SUCCESS, s).
-Proof.
-  intro Hfall.
-  unfold execute. cbn match. unfold execute_BTYPE.
-  rewrite (exec_bind_Some _ _ _ _ _ (vexec_BTYPE_cmp_BNE rs2 rs1 s)).
-  rewrite Hfall. apply exec_returnM.
-Qed.
 
 Section VdiLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
-
-  Lemma wp_addiw4_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 -> rd <> csp_rs1 ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗ instr pc false (ADDIW (imm, Regidx rs1, Regidx rd)) -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
-        (sign_extend' 64 (subrange_vec_dec
-           (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0))]> m) n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base γ Φ pc rd rs1 rs1
-              (ADDIW (imm, Regidx rs1, Regidx rd))
-              (sign_extend' 64 (subrange_vec_dec
-                 (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0))
-              m n Hrd Hrdsp _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva _.
-      rewrite (exec_execute_ADDIW_gpr rs1 rd imm s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_addiw_val. rewrite Hva. reflexivity.
-  Qed.
-
-  Lemma wp_bnez_x0_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
-    neq_vec (m !!! Regidx rs1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BNE)) -∗
-    ( sie_cap_gpr γ m n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
-              (BTYPE (imm, zreg, Regidx rs1, BNE))
-              with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
-    iDestruct ("Hfb" with "Hrac") as "Hfile".
-    iModIntro. iExists s_pc.
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      change zreg with (Regidx (mword_of_int 0 : mword 5)).
-      apply vexec_execute_BTYPE_BNE_fall. unfold vrvv. rewrite Lva.
-      replace (Z.eqb (uint (mword_of_int 0 : mword 5)) 0) with true
-        by (vm_compute; reflexivity).
-      cbn match. exact Hcmp. }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
-      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg'".
-    iApply ("Hcont" with "Hcg' [$Hpc' $Hnpc]").
-  Qed.
-
-  (* -- the two virtio-mmio leaves, at a CONCRETE effective address -- *)
 
   Lemma wp_vdi_sw (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
@@ -1084,7 +988,7 @@ Section ProofVirtioDiskInit.
     iEval (rewrite Hp092) in "Hpc".
     (* +0x092 sext.w s2,a5 : remember the status word *)
     iPoseProof (vdi_092 with "Htext") as "Hi".
-    iApply (wp_addiw4_s_sconf γ Φ (mword_of_int (VDI + 0x092)) (mword_of_int 18 : mword 5)
+    iApply (wp_addiw_s_sconf γ Φ (mword_of_int (VDI + 0x092)) (mword_of_int 18 : mword 5)
               (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) B29 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
@@ -1165,6 +1069,7 @@ Section ProofVirtioDiskInit.
     iPoseProof (vdi_0a8 with "Htext") as "Hi".
     iApply (wp_bnez_x0_fall_s_sconf γ Φ (mword_of_int (VDI + 0x0a8)) (mword_of_int 240 : mword 13)
               (mword_of_int 15 : mword 5) B34 (K - 4)%nat
+              ltac:(vm_compute; discriminate)
               ltac:(rewrite HB34a5; vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
     assert (Hp0ac : add_vec_int (mword_of_int (VDI + 0x0a8) : mword 64) 4 = mword_of_int (VDI + 0x0ac)) by pcs.
@@ -1809,7 +1714,7 @@ Section ProofVirtioDiskInit.
     assert (Hp126 : add_vec_int (mword_of_int (VDI + 0x124) : mword 64) 2 = mword_of_int (VDI + 0x126)) by pcs.
     iEval (rewrite Hp126) in "Hpc".
     iPoseProof (vdi_126 with "Htext") as "Hi".
-    iApply (wp_addiw4_s_sconf γ Φ (mword_of_int (VDI + 0x126)) (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) H5 (K - 4)%nat
+    iApply (wp_addiw_s_sconf γ Φ (mword_of_int (VDI + 0x126)) (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) H5 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
     set (H6 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
@@ -1875,7 +1780,7 @@ Section ProofVirtioDiskInit.
     assert (Hp13a : add_vec_int (mword_of_int (VDI + 0x138) : mword 64) 2 = mword_of_int (VDI + 0x13a)) by pcs.
     iEval (rewrite Hp13a) in "Hpc".
     iPoseProof (vdi_13a with "Htext") as "Hi".
-    iApply (wp_addiw4_s_sconf γ Φ (mword_of_int (VDI + 0x13a)) (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) H9 (K - 4)%nat
+    iApply (wp_addiw_s_sconf γ Φ (mword_of_int (VDI + 0x13a)) (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) H9 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
     set (H10 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
