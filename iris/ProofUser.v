@@ -1,5 +1,6 @@
 (* ===================================================================== *)
-(* UserExecClose.v -- CLOSE the user-mode execute WP.                      *)
+(* ProofUser.v -- CLOSE the user-mode execution WP, and seal it behind     *)
+(* [SpecUser.USER].                                                        *)
 (*                                                                         *)
 (* Instantiates the two execute totalities (base_exec_total_u_holds /      *)
 (* rvc_exec_total_u_holds, UserTotalU.v) with the 19 PROVEN memory arms     *)
@@ -8,6 +9,11 @@
 (* UNCONDITIONALLY, discharging wp_user_exec_full's Hbase/Hrvc into the     *)
 (* final closed safety theorem [wp_user_exec_closed] -- no totality         *)
 (* hypotheses, axiom-clean beyond the 5 baseline platform stubs.           *)
+(*                                                                         *)
+(* This is the ONLY file where the user-mode interface meets the whole      *)
+(* User*.v proof tower: [UserProof] is sealed by [USER], so a consumer      *)
+(* requires SpecUser.v (cheap) and takes a [USER] functor argument rather   *)
+(* than pulling the tower into its own build path.                          *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
@@ -21,10 +27,13 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv WireInv RegFile.
 Require Import UserPtTree UserExec UserClassifyAsm.
 Require Import UserTotalU UserMemClassify UserActiveClass.
+Require Import SpecUser.
 Local Open Scope Z_scope.
 Import Defs.
 
-Section UserExecClose.
+Module UserProof : USER.
+
+Section ProofUser.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
@@ -56,12 +65,13 @@ Section UserExecClose.
   (* THE FINAL THEOREM: safety of arbitrary user-mode execution, with NO
      totality hypotheses -- the two totalities are now unconditional. *)
   Theorem wp_user_exec_closed (Φ : mval -> iProp Σ) :
-    hw_config -∗ minstret_inv -∗ wire_inv -∗
-    user_inv C pt -∗ stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    wp_user_exec_closed_body C pt Φ.
   Proof.
+    cbv beta delta [wp_user_exec_closed_body].
     apply (wp_user_exec_full C pt Φ
              base_exec_total_u_closed rvc_exec_total_u_closed).
   Qed.
 
-End UserExecClose.
+End ProofUser.
+
+End UserProof.

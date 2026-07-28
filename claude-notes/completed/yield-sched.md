@@ -76,7 +76,7 @@ The resumer predicate is THREE-place, `P c cret tpv`:
   swtch out again — the cells are what its next park saves into.  (The old
   wp_swtch dropped them; never exercised because it had no caller.)
 
-### 3. swtch over the sconf tier (SpecSwtch.v — DONE; WpSwtchSconf.v proof — TODO)
+### 3. swtch over the sconf tier (SpecSwtch.v — DONE; ProofSwtch.v proof — TODO)
 
 `swconf γ := sconf γ ∗ hart_state ∗ strans_inv ∗
 intr_off_tok γ` (SwtchCtx.v; INTERNAL to the swtch proof — the spec surface
@@ -87,7 +87,7 @@ closure; `sie_cap_gpr` is rebuilt on resume from `sie_arm` + fresh
 at every scheduler swtch.
 
 `wp_swtch_sconf` (SpecSwtch.v, Module Type SWTCH; proof a sealed module in
-WpSwtchSconf.v): consumes swconf, `gpr_file m0` (NOT sie_cap_gpr — swtch
+ProofSwtch.v): consumes swconf, `gpr_file m0` (NOT sie_cap_gpr — swtch
 loads sp from memory, unrepresentable in the sp-tracking sconf VCgen; the
 proof unbundles sconf and runs the plain `wp_vc_block_s_den_r
 (kpt_regime root_ppn)` engine), `ctx_cells oldc old_vs`,
@@ -234,9 +234,9 @@ All three carry `m !!! Regidx x4 = cid_word`.
 - [x] S2a: SwtchCtx.v (ctx_cells/callee_img/ctx_pc/valid_context/swconf),
       WpSwtchVc.v slimmed (decode + VCgen only; old sconf section and
       wp_swtch deleted), SpecSwtch.v, SchedCtx.v, SpecMyproc.v — all
-      compile; _CoqProject updated.  WpSwtchSconf.v is a SCAFFOLD with
+      compile; _CoqProject updated.  ProofSwtch.v is a SCAFFOLD with
       Admitted.
-- [x] S2b: wp_swtch_sconf PROVEN (WpSwtchSconf.v, sealed `: SWTCH`; no new
+- [x] S2b: wp_swtch_sconf PROVEN (ProofSwtch.v, sealed `: SWTCH`; no new
       axioms — Print Assumptions shows only the Sail model primitives +
       functional_extensionality_dep).  Two cleanup notes for S6:
       (a) `iNext` sees through `intr_count`'s transparent definition and

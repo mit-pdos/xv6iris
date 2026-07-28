@@ -196,12 +196,26 @@ the width for LOAD/STORE (`width_ok1248`), LR/SC (`lrsc_width_valid`={4,8}), AMO
 (`awidth_ok`={1,2,4,8,16}), re-proved via Q-rules
 (`goodbP_width_wide`/`_zalrsc_gate`); the memory dispatch extracts it from `Hdi`.
 
-`wp_user_exec_closed` (UserExecClose.v) is the complete arbitrary-user-execution
-WP — NO totality hypotheses:
+`wp_user_exec_closed` is the complete arbitrary-user-execution WP — NO totality
+hypotheses:
 `hw_config -∗ minstret_inv -∗ wire_inv -∗ user_inv C pt -∗ stvec_handler_wp C pt Φ
 -∗ WP Loop {{Φ}}`, obtained by instantiating `base/rvc_exec_total_u_holds` with
 the 19 arms (→ the unconditional `base/rvc_exec_total_u_closed`) and discharging
 `wp_user_exec_full`'s `Hbase`/`Hrvc`.
+
+It is stated and sealed in the spec-module shape
+([`../design/spec-modules.md`](../design/spec-modules.md)), so a consumer never
+requires the tower:
+- **`SpecUser.v`** — `wp_user_exec_closed_body C pt Φ` + `Module Type USER`. The
+  public face of the whole User\*.v development: requires only the definitional
+  layer (`UserExec` for `ucfg`/`user_inv`/`stvec_handler_wp`, `UserPtTree` for
+  `uptd`, `MinstretInv`/`WireInv`/`RiscvFetchExec`), and compiles in ~2 s.
+- **`ProofUser.v`** — `Module UserProof : USER`, the closure (the two
+  `_closed` totalities + the theorem). It takes no functor arguments (the
+  User\*.v tower is not itself in module-type shape), so it both proves and
+  instantiates `USER`; there is no `LinkUser.v`. This is the ONLY file where the
+  interface meets the tower, and the sole thing on the tower's critical path
+  downstream of `UserMemClassify`.
 
 AMO gotcha: decode does NOT constrain the op, and AMOSWAP.Q (width 16, a 128-bit
 register-PAIR read-modify-write) genuinely RETIRES on RAM — so rather than an

@@ -93,8 +93,9 @@ MANIFEST_PROVEN = {
     "timerinit": ("WpTimerinit.v", "wp_timerinit", "M-mode timer setup, whole function"),
     "spin": ("ProofSpin.v", "wp_spin", "the entry.S park loop (never returns)"),
     "swtch": ("ProofSwtch.v", "wp_swtch_sconf", "context switch, whole function"),
-    "kernelvec": ("WpKernelvecNew.v", "wp_kernelvec",
-                  "S-mode trap vector; assumes kerneltrap_returns"),
+    "kernelvec": ("ProofKernelvec.v", "wp_kernelvec",
+                  "S-mode trap vector (sealed as SpecKernelvec.KERNELVEC by "
+                  "LinkKernelvec.v); assumes kerneltrap_returns"),
     "userret": ("UserretAllPt.v", "wp_userret_pt",
                 "trampoline return-to-user path, over the user page table"),
 }
@@ -103,8 +104,8 @@ MANIFEST_PROVEN = {
 # hypothesis threaded through callers' specs) rather than proven.
 MANIFEST_ASSUMED = {
     "panic": ("SpecPanic.v", "panic_wp", "assumed as a hypothesis carried by callers"),
-    "kerneltrap": ("WpKernelvecNew.v", "kerneltrap_returns",
-                   "only 'it returns' is assumed, as an Axiom"),
+    "kerneltrap": ("SpecKerneltrap.v", "wp_kerneltrap_returns_body",
+                   "only 'it returns' is assumed; the Axiom is LinkKerneltrap.v"),
 }
 
 PROVEN, ASSUMED, PARTIAL, NONE = "proven", "assumed", "partial", "none"
