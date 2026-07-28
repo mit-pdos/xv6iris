@@ -37,6 +37,11 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WireInv WpVirtio.
+(* the disk's DMA lease is now carried in the KEYED driver protocol
+   ([virtio_proto], VirtioProto.v) rather than as the bare [virtio_lease];
+   these two are required AFTER SailStdpp.Base/Values above, exactly like
+   WpVirtio, so their (RiscvPtsto-mirroring) elaboration is unaffected. *)
+Require Import DiskPtsto VirtioProto.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -303,6 +308,7 @@ Proof. solve_inG. Qed.
 Section DevLoop.
   Context `{!riscvGS Σ}.
   Context `{!uartGhostG Σ}.
+  Context `{!diskGhostG Σ}.
 
   Definition devN : namespace := nroot .@ "dev".
 
@@ -551,24 +557,27 @@ Section DevLoop.
      enable bit, and it is per-hart-local enough that a hart running
      [plicinithart] concurrently with the others re-establishes it from its
      own write alone. *)
-  (* The VIRTIO half carries the disk's DMA LEASE ([virtio_lease], WpVirtio.v):
-     ownership of every byte the device may write, plus the pure obligation
-     that the queue its configuration names really does live inside those
-     bytes.  Unlike the other two halves this one is not merely a mirror of
-     the device state -- it is what MAKES the device thread's DMA step
-     justifiable, since the thread has to own what it overwrites.  It rides in
-     [dev_inv] rather than in a separate invariant because the driver hands the
-     lease over (and takes it back) at exactly the MMIO writes that already
-     open this one.
+  (* The VIRTIO half carries the disk's DRIVER PROTOCOL ([virtio_proto],
+     VirtioProto.v): the DMA lease -- ownership of every byte the device may
+     write, plus the positive obligation that the queue its configuration
+     names really does live inside those bytes -- held in the KEYED,
+     per-request form, together with the resources the driver deposits at
+     publish and withdraws at reclaim (the disk points-to auth, the receipts,
+     the completed/published counters).  Unlike the other two halves this one
+     is not merely a mirror of the device state -- it is what MAKES the device
+     thread's DMA step justifiable, since the thread has to own what it
+     overwrites.  It rides in [dev_inv] rather than in a separate invariant
+     because the driver hands the lease over (and takes it back) at exactly
+     the MMIO writes that already open this one.
 
      It also carries [virtio_isr_ok] (VirtioModel.v), the exact analogue of
      the PLIC's [plic_ok]: the interrupt-status register holds only the two
      bits the spec defines, which is what makes [virtio_disk_intr]'s 0x3
      acknowledgement provably drop the interrupt line ([virtio_ack_clears]). *)
-  Definition dev_inv_body (γ : uart_names) : iProp Σ :=
+  Definition dev_inv_body (γ : uart_names) (γd : disk_names) : iProp Σ :=
     (∃ (u : uart_state) (p : plic_state) (v : virtio_state),
        uart_frag u ∗ plic_frag p ∗ virtio_frag v ∗
-       uart_ghosts γ u ∗ virtio_lease v ∗
+       uart_ghosts γ u ∗ virtio_proto γd v ∗
        ⌜ plic_ok p ⌝ ∗ ⌜ virtio_isr_ok v ⌝)%I.
 
   Global Instance uart_frag_timeless u : Timeless (uart_frag u).
@@ -577,7 +586,7 @@ Section DevLoop.
   Proof. rewrite /plic_frag. apply _. Qed.
   Global Instance virtio_frag_timeless v : Timeless (virtio_frag v).
   Proof. rewrite /virtio_frag. apply _. Qed.
-  Global Instance dev_inv_body_timeless γ : Timeless (dev_inv_body γ).
+  Global Instance dev_inv_body_timeless γ γd : Timeless (dev_inv_body γ γd).
   Proof. rewrite /dev_inv_body. apply _. Qed.
 
   (* The device invariant as a client-facing, duplicable proposition.  The
@@ -585,12 +594,13 @@ Section DevLoop.
      touches UART/PLIC MMIO, so NO proof may hold [uart_frag]/[plic_frag]
      across a step: a client threads [dev_inv] and borrows the fragment by
      opening it around the access. *)
-  Definition dev_inv (γ : uart_names) : iProp Σ := inv devN (dev_inv_body γ).
+  Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
+    inv devN (dev_inv_body γ γd).
 
-  Global Instance dev_inv_persistent γ : Persistent (dev_inv γ).
+  Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
 
-  Lemma dev_inv_alloc E γ : dev_inv_body γ ={E}=∗ dev_inv γ.
+  Lemma dev_inv_alloc E γ γd : dev_inv_body γ γd ={E}=∗ dev_inv γ γd.
   Proof. iIntros "Hbody". rewrite /dev_inv. by iApply inv_alloc. Qed.
 
   (* Allocate all four UART ghosts from an initial device state.  Hands back
@@ -635,8 +645,8 @@ Section DevLoop.
     iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hoff".
   Qed.
 
-  Lemma wp_dev_loop γ Φ :
-    dev_inv γ -∗ wire_inv -∗
+  Lemma wp_dev_loop γ γd Φ :
+    dev_inv γ γd -∗ wire_inv -∗
     WP (DevLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "#Hinv #Hwinv". rewrite /dev_inv.
@@ -700,13 +710,13 @@ Section DevLoop.
       iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
     - (* the disk completes a queued request.  This is the only step that
          touches the byte memory, and the ONLY thing that justifies it is the
-         DMA lease inside the invariant: [virtio_lease_step] consumes the
+         DMA lease inside the invariant: [virtio_proto_step] consumes the
          lease's ownership of the written bytes and hands the same lease back,
          because the write set provably lands inside it and misses the queue's
          control region (VirtioModel.virtio_dma_ok). *)
       rewrite Hv in Hdisk.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iMod (virtio_lease_step vs m mv vnew w Hview Hdisk with "Hmem Hlease")
+      iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk with "Hmem Hlease")
         as "[Hmem' Hlease']".
       iMod ("Hwclose" with "[Hwires]") as "_".
       { iNext. iExists seip, meip. iFrame. }
@@ -724,7 +734,7 @@ Section DevLoop.
          verifiable.  Needing this refutation is exactly the pressure that
          makes well-formedness a driver obligation. *)
       rewrite Hv in Hstall.
-      iDestruct (virtio_lease_not_stalled m vs mv Hview with "Hmem Hlease")
+      iDestruct (virtio_proto_not_stalled m vs mv γd Hview with "Hmem Hlease")
         as %Hns.
       exfalso. congruence.
     - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)

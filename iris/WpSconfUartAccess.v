@@ -26,7 +26,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import DevModel WpUart.
+Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import SpecUart.
@@ -38,14 +38,14 @@ Module UartAccessProof (Uart : UART).
 Section WpSconfUartAccess.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   (* The LSR poll load (offset 5).  Takes [dev_inv] + the transmitter token;
      hands back the token and -- IF the read byte says THRE was set -- the
      [uart_out_lb] bound that makes the observation survive to a later THR
      write ([uart_tx_ready_persists], WpUart.v). *)
-  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) :
     uint rd <> 0 ->
@@ -53,7 +53,7 @@ Section WpSconfUartAccess.
     m !!! Regidx rs1 = uart_pa 5 ->
     sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗
     ( ∀ b : bv 8,
       sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
       pc_is (add_vec_int pc 4) -∗
@@ -63,7 +63,7 @@ Section WpSconfUartAccess.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf γ γd 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_lb_uart_s_sconf γ γd γv 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
               ltac:(unfold uart_size; lia) Hrd Hrdsp
@@ -89,13 +89,13 @@ Section WpSconfUartAccess.
      [uart_tx_ready_persists] turns them into [uart_write_thr_acc]'s two
      premises at the write's own state, so the byte provably lands in the FIFO.
      Postcondition: the grown token plus a permanent [uart_sent] record. *)
-  Lemma wp_uart_thr_write_s_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_uart_thr_write_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) :
     m !!! Regidx rs1 = uart_pa 0 ->
     sie_cap_gpr γ m n -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
     ( sie_cap_gpr γ m n -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
@@ -105,7 +105,7 @@ Section WpSconfUartAccess.
   Proof.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
     set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
-    iApply (Uart.wp_sb_uart_s_sconf γ γd 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf γ γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
               ltac:(unfold uart_size; lia)

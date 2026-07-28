@@ -133,9 +133,14 @@ are working on that effort — the relevant `projects/` file.
   law that makes uvmalloc's failure arm give back exactly the descriptor it
   was handed.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
-  machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) is
-  done; the driver side (`virtio_disk_init`/`_rw`/`_intr`, the width-4 S-mode
-  MMIO leaves, the lease-transfer protocol) is the remaining work.
+  machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
+  the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
+  proven and linked, `virtio_disk.c` 4/4) are done; the boot wiring that ties
+  init's post-state to the contracts `_rw`/`_intr` consume is what remains.
+- **[`virtio-disk-rw.md`](projects/virtio-disk-rw.md)** — the record of the
+  headline driver proof `virtio_disk_rw` (DONE): the phase map (P1..P6), the
+  seam each phase hands the next, the one protocol-spec change P6 forced
+  (`vs_data` for READ requests), and ~30 gotchas already paid for.
 
 ### `completed/` — finished projects, archived for reference
 

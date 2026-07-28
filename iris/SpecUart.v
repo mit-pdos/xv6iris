@@ -13,14 +13,14 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import KptPt.
 Require Import SmodeCore.
-Require Import WpUart WpSmodeUart.
+Require Import DiskPtsto WpUart WpSmodeUart.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Import Defs.
 
-Definition wp_lb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) :=
+Definition wp_lb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) :=
 let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let ldval := fun (b : bv 8) =>
@@ -36,7 +36,7 @@ autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Vir
 zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
 sie_cap_gpr γ m n -∗
 pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
-dev_inv γd -∗
+dev_inv γd γv -∗
 R -∗
 (∀ u b u', ⌜ uart_read u off = Some (b, u') ⌝ -∗
    uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S b) -∗
@@ -47,8 +47,8 @@ R -∗
   WP (Loop : expr riscv_lang) {{ Φ }}) -∗
 WP (Loop : expr riscv_lang) {{ Φ }}.
 
-Definition wp_sb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) :=
+Definition wp_sb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) :=
 let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -61,7 +61,7 @@ autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Vir
 zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
 sie_cap_gpr γ m n -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-dev_inv γd -∗
+dev_inv γd γv -∗
 R -∗
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
    uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
@@ -104,13 +104,13 @@ WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type UART.
   Parameter wp_lb_uart_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ),
-      wp_lb_uart_s_sconf_body γ γd off Φ pc is_rvc is_unsigned rd rs1 imm m n R S.
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ),
+      wp_lb_uart_s_sconf_body γ γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S.
   Parameter wp_sb_uart_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ),
-      wp_sb_uart_s_sconf_body γ γd off Φ pc is_rvc rs2 rs1 imm m n R S.
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ),
+      wp_sb_uart_s_sconf_body γ γd γv off Φ pc is_rvc rs2 rs1 imm m n R S.
   Parameter wp_sb_uart_frag_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (u u' : uart_state),

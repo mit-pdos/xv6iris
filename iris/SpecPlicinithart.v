@@ -52,7 +52,7 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import DevModel PlicPlan WpUart.
+Require Import DevModel PlicPlan DiskPtsto WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -64,8 +64,8 @@ Notation PLICINITHART := KernelSyms.plicinithart.
    = (1 << 10) | (1 << 1) = 1026 -- exactly the kernel's permitted set. *)
 Definition plic_senable_word : bv 32 := Z_to_bv 32 plic_dev_irq_mask.
 
-Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names)
+Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (γv : disk_names)
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -78,7 +78,7 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ}
   (4 <= n)%nat ->
   sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γd -∗
+  dev_inv γd γv -∗
   ( ∀ m' : regfile,
     sie_cap_gpr γ m' n -∗
     pc_is ret_tgt -∗
@@ -88,8 +88,8 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ}
 
 Module Type PLICINITHART.
   Parameter wp_plicinithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names)
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_plicinithart_sconf_body γ γd Φ m0 n.
+      wp_plicinithart_sconf_body γ γd γv Φ m0 n.
 End PLICINITHART.

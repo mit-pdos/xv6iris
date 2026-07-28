@@ -46,7 +46,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import WpDecodeBridge.
 Require Import KernelRvcDecode WpRvcBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import PlicPlan PlicHart WpUart WpPlic SpecCpuid SpecPlicComplete.
+Require Import PlicPlan PlicHart DiskPtsto WpUart WpPlic SpecCpuid SpecPlicComplete.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -96,7 +96,7 @@ Module PlicCompleteProof (Cpuid : CPUID) : PLIC_COMPLETE.
 
 Section ProofPlicComplete.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation PC := KernelSyms.plic_complete.
@@ -169,9 +169,9 @@ Section ProofPlicComplete.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plic_complete(), entry to return. *)
   (* =================================================================== *)
-  Lemma wp_plic_complete_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_plic_complete_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat)
-    : wp_plic_complete_sconf_body γ γd Φ m0 n.
+    : wp_plic_complete_sconf_body γ γd γv Φ m0 n.
   Proof.
     cbv beta delta [wp_plic_complete_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
@@ -337,7 +337,7 @@ Section ProofPlicComplete.
     { unfold N4. rewrite upd_eq. unfold regval_into_reg.
       rewrite HN3a5 HN3a4. unfold ph_sthb. apply ph_add_comm. }
     (* ---- 0x1a: c.sw s1,4(a5) -- PLIC_SCLAIM(hart) = irq ---- *)
-    iApply (wp_sw_plic_dev_s_sconf γ γd Φ (mword_of_int (PC + 0x1a)) true s1_idx a5_idx
+    iApply (wp_sw_plic_dev_s_sconf γ γd γv Φ (mword_of_int (PC + 0x1a)) true s1_idx a5_idx
               (mword_of_int 4 : mword 12) N4 (n - 4)%nat
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))

@@ -31,7 +31,7 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
-Require Import WpUart.
+Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl SpecUart.
@@ -54,7 +54,7 @@ Module UAcc := UartAccessProof Uart.
 
 Section ProofUartPutc.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation UPS := KernelSyms.uartputc_sync.
@@ -62,12 +62,12 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  THE THRE POLL LOOP: 0x26 -> 0x30, run under [dev_inv] (Löb).         *)
   (* =================================================================== *)
-  Lemma wp_uartputc_poll_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_uartputc_poll_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (mentry : regfile) (n : nat) (l : list (bv 8)) :
     mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
     sie_cap_gpr γ mentry n -∗ kernel_text -∗
     pc_is (mword_of_int (UPS + 0x26)) -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗
     ( ∀ b : bv 8,
       sie_cap_gpr γ (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> mentry) n -∗
       pc_is (mword_of_int (UPS + 0x30)) -∗
@@ -97,7 +97,7 @@ Section ProofUartPutc.
       WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Loop".
     { iLöb as "IH". iIntros (m Ha4m Hagm) "Hcg Hpc Hown Hk".
       (* 0x26  lbu a5,0(a4) *)
-      iApply (UAcc.wp_uart_lsr_read_s_sconf γ γd Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
+      iApply (UAcc.wp_uart_lsr_read_s_sconf γ γd γv Φ (mword_of_int (UPS + 0x26)) (mword_of_int 15) (mword_of_int 14)
                 m n l ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Ha4m
                 with "Hcg Hpc Hi26 Hdinv Hown").
       iIntros (b) "Hcg Hpc Hown Hlb".
@@ -146,7 +146,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  DEVICE CORE: 0x20 -> 0x3c (lui/addi + poll + zext.b + lui + THR).    *)
   (* =================================================================== *)
-  Lemma wp_uartputc_devcore_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_uartputc_devcore_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ)
       (m : regfile) (n : nat) (l : list (bv 8)) :
     let sb : mword 8 := autocast (T := mword)
@@ -154,7 +154,7 @@ Section ProofUartPutc.
           (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
     sie_cap_gpr γ m n -∗ kernel_text -∗
     pc_is (mword_of_int (UPS + 0x20)) -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ b : bv 8,
       sie_cap_gpr γ (ppc_f6' m b) n -∗ pc_is (mword_of_int (UPS + 0x3c)) -∗
       uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
@@ -187,7 +187,7 @@ Section ProofUartPutc.
     iIntros "Hcg Hpc".
     iEval (rewrite P26) in "Hpc".
     (* 0x26 -> 0x30  the poll loop *)
-    iApply (wp_uartputc_poll_sconf γ γd Φ (ppc_f2 m) n l (ppc_f2_a4 m)
+    iApply (wp_uartputc_poll_sconf γ γd γv Φ (ppc_f2 m) n l (ppc_f2_a4 m)
               with "Hcg Ht Hpc Hdinv Hown").
     iIntros (b) "Hcg Hpc Hown #Hlb".
     iEval (change (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> (ppc_f2 m))
@@ -215,7 +215,7 @@ Section ProofUartPutc.
                       (subrange_vec_dec (ppc_f6' m b !!! Regidx (mword_of_int 10))
                          (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = sb).
     { unfold sb. rewrite ppc_f6'_a0. reflexivity. }
-    iApply (UAcc.wp_uart_thr_write_s_sconf γ γd Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
+    iApply (UAcc.wp_uart_thr_write_s_sconf γ γd γv Φ (mword_of_int (UPS + 0x38)) (mword_of_int 10) (mword_of_int 15)
               (ppc_f6' m b) n l (ppc_f6'_a5 m b)
               with "Hcg Hpc Hi38 Hdinv Hown Hlb Hoff").
     iIntros "Hcg Hpc Hown Hsent".
@@ -227,7 +227,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  THE BODY: 0x0c -> 0x46 (panic checks + device core + 2nd panicking). *)
   (* =================================================================== *)
-  Lemma wp_uartputc_body_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_uartputc_body_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ)
       (m : regfile) (n : nat) (l : list (bv 8)) (pv pkv : mword 32)
       {dqm dqm2 : dfrac} :
@@ -240,7 +240,7 @@ Section ProofUartPutc.
     pc_is (mword_of_int (UPS + 0x0c)) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
-    dev_inv γd -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     ( ∀ mf,
       sie_cap_gpr γ mf n -∗ pc_is (mword_of_int (UPS + 0x46)) -∗
       ⌜ callee_saved m mf ⌝ -∗
@@ -333,7 +333,7 @@ Section ProofUartPutc.
                          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = sb).
     { unfold sb. rewrite HR9. reflexivity. }
     (* ---- 0x20 -> 0x3c device core ---- *)
-    iApply (wp_uartputc_devcore_sconf γ γd Φ f2 n l
+    iApply (wp_uartputc_devcore_sconf γ γd γv Φ f2 n l
               with "Hcg Ht Hpc Hdinv Hown Hoff").
     iIntros (b) "Hcg Hpc Hown Hsent".
     iEval (rewrite Hsbf2) in "Hown". iEval (rewrite Hsbf2) in "Hsent".
@@ -376,12 +376,12 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  THE WHOLE FUNCTION.                                                  *)
   (* =================================================================== *)
-  Lemma wp_uartputc_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_uartputc_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ)
       (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32)
       {dqm dqm2 : dfrac}
-    : wp_uartputc_sconf_body γ γd Φ m0 K l pv pkv dqm dqm2.
+    : wp_uartputc_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
     intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hpv Hpkv.
@@ -471,7 +471,7 @@ Section ProofUartPutc.
                          (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) : mword 8) = sb).
     { unfold sb. rewrite HR3s1. reflexivity. }
     (* ===== BODY (0x0c -> 0x46) ===== *)
-    iApply (wp_uartputc_body_sconf γ γd Φ R3 (K - 4)%nat l pv pkv (dqm:=dqm) (dqm2:=dqm2)
+    iApply (wp_uartputc_body_sconf γ γd γv Φ R3 (K - 4)%nat l pv pkv (dqm:=dqm) (dqm2:=dqm2)
               Hpv Hpkv
               with "Hcg Ht Hpc Hpk Hpkd Hdinv Hown Hoff").
     iIntros (mf) "Hcg Hpc %Hcs_body Hpk Hpkd Hown Hsent".

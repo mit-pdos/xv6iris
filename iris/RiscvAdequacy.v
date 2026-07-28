@@ -57,7 +57,7 @@ Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
 Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans arm bit *)
 Require Import WireInv.
-Require Import PlicPlan WpVirtio WpUart.
+Require Import PlicPlan WpVirtio DiskPtsto VirtioProto WpUart.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)
@@ -74,6 +74,9 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_virtioGS :: ghost_varG Σ virtio_state;
   (* the UART ghosts carried by [dev_inv_body] (WpUart.v) *)
   riscv_pre_uartGhostGS :: uartGhostG Σ;
+  (* the disk-driver protocol ghosts carried by [dev_inv_body]'s
+     [virtio_proto] half (DiskPtsto.v / VirtioProto.v) *)
+  riscv_pre_diskGhostGS :: diskGhostG Σ;
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): capacity only --
      the client mints the auth with [kmap_alloc] when establishing the
      Bare translation slot *)
@@ -89,6 +92,7 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ plic_state;
      ghost_varΣ virtio_state;
      uartGhostΣ;
+     diskGhostΣ;
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27) ].
 
@@ -387,10 +391,10 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
        initial PLIC must already satisfy it -- a reset PLIC (all S-context
        enable words clear) does. *)
     (Hplic : plic_ok g.(gdev).(dplic))
-    (* [dev_inv] carries the disk's DMA lease (WpVirtio.v), and the lease the
-       invariant is BORN with is the empty one -- which is only good while the
-       queue is not live.  So the invariant must be allocated before the
-       driver makes the queue ready; a reset device satisfies this. *)
+    (* [dev_inv] carries the disk's driver protocol (VirtioProto.v), whose DMA
+       lease the invariant is BORN with is the empty one -- which is only good
+       while the queue is not live.  So the invariant must be allocated before
+       the driver makes the queue ready; a reset device satisfies this. *)
     (Hvlive : virtio_live (v_cfg g.(gdev).(dvirtio)) = false)
     (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
        PLIC plan): the interrupt-status register holds only defined bits.  A
@@ -407,14 +411,16 @@ Proof.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
   (* allocate the four UART ghosts at the initial device state *)
   iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
-  iMod (dev_inv_alloc _ γ with "[Huf Hpf Hvf Hacc Hout Htx Hdl]") as "#Hinv".
+  (* allocate the disk-protocol ghosts at the initial (not-live) device state *)
+  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive) as (γv) "Hproto".
+  iMod (dev_inv_alloc _ γ γv with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto]") as "#Hinv".
   { rewrite /dev_inv_body.
     iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).
     iFrame "Hacc Hout Htx Hdl".
     iSplitL "Huf"; [iExact "Huf"|].
     iSplitL "Hpf"; [iExact "Hpf"|].
     iSplitL "Hvf"; [iExact "Hvf"|].
-    iSplitR; [ by iApply virtio_lease_init |].
+    iSplitL "Hproto"; [iExact "Hproto"|].
     iSplit; [ iPureIntro; exact Hplic | iPureIntro; exact Hvisr ]. }
   iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
           (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
@@ -425,5 +431,5 @@ Proof.
     { apply disjoint_singleton_l, not_elem_of_singleton. discriminate. }
     rewrite !big_sepS_singleton. done. }
   iModIntro. iSplitR; [done|].
-  iApply (wp_dev_loop γ with "Hinv Hwinv").
+  iApply (wp_dev_loop γ γv with "Hinv Hwinv").
 Qed.

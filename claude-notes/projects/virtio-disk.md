@@ -1,5 +1,112 @@
 # Project: the virtio disk device (VirtioModel.v / WpVirtio.v)
 
+## STATUS (driver effort — see design/virtio-driver.md for the design)
+
+All three driver functions (`virtio_disk_init`, `virtio_disk_intr`,
+`virtio_disk_rw`) and `free_desc` are proven, sealed and linked;
+`virtio_disk.c` reads **4/4 fns proven**.  What remains is listed at the end of
+this section.
+
+The protocol layer, in place and green:
+- `claude-notes/design/virtio-driver.md` — the driver-side protocol design (READ IT FIRST).
+- `VirtioQueue.v` (iris-free) — the keyed queue protocol, pure layer:
+  `vslot`/`slot_pin_ok`, the determined completion (`vslot_complete`), the
+  descriptor-triple counting argument.
+- `DiskPtsto.v` — the disk points-to ghost (`disk_byte`/`disk_bytes`/
+  `disk_block`), the `dclaim` record and the `disk_names` bundle.
+- `VirtioProto.v` — `virtio_proto` (which replaced `virtio_lease` in
+  `dev_inv_body`), the four protocol accessors (publish / observe-avail /
+  observe-used / reclaim) and the device-thread rules.
+- `WpSmodeHalf.v` (new, PROVEN) — `wp_lhu_s_sconf`/`wp_lh_s_sconf`/`wp_sh_s_sconf`
+  width-2 RAM leaves + `wp_load_s_sconf_gen_u`. NOTE: `WpSconfMem.v`'s
+  `wp_{load,store}_s_sconf_au` atomic-update parents are width/uns-generic —
+  use THOSE (WpSconfLock pattern) for the dev_inv-opening leased-byte accesses.
+- `WpVirtioExec.v` + `WpVirtioMmio.v` (new, PROVEN) — window facts + raw-frag
+  width-4 MMIO store/load leaves (`wp_sw_virtio_frag_s_sconf`,
+  `wp_lw_virtio_frag_s_sconf`) for the init proof. WpPlicExec towers were
+  already window-generic; nothing cloned.
+
+### Pending cleanups (small, deliberately deferred to keep the tree green)
+
+- **Promote the full-barrier fence leaf.** `WpSconfCtl.wp_fence_s_sconf` is
+  stated at pred=rw / succ=**w** (`release`'s `__sync_lock_release`).  Both
+  `virtio_disk_intr` (+0x2c, +0x3e) and `virtio_disk_rw` (+0x172, +0x182) use
+  `__sync_synchronize`, i.e. pred=rw / succ=**rw**, which no leaf covered;
+  `ProofVirtioDiskIntr.v` carries a local clone (`exec_execute_FENCE_rw_rw` +
+  `wp_fence_rw_s_sconf`).  Generalize `wp_fence_s_sconf` over pred/succ per the
+  WRAPPER RECIPE (durable-notes) and delete the clone — a second consumer now
+  exists, so this is no longer a one-off.
+- **Expose `kmap_static_claims` at the `sconf` level.** It rides in `hw_config`
+  inside `sconf` inside `sie_cap_gpr`, but no extraction lemma exposes it, so a
+  DRIVER-level proof that must run the ↦ₚ⇄↦ₘ tier bridges outside a leaf cannot
+  reach it.  `disk_geom` carries a copy as a stopgap
+  (`DiskInv.disk_geom_kmap_claims`); the real fix is a
+  `sie_cap_gpr γ m n -∗ kmap_static_claims` in SmodeCore.v, deferred only to
+  avoid rebuilding that cone under several live agents.
+
+- **`virtio_disk_intr` is PROVEN and LINKED** (`SpecVirtioDiskIntr.v` /
+  `WpVirtioDiskIntrDecode.v` / `ProofVirtioDiskIntr.v` /
+  `LinkVirtioDiskIntr.v`, a functor over ACQUIRE / RELEASE / WAKEUP; the
+  coverage report reads `proven`).  Things worth knowing before touching it:
+  - The loop (+0x3e..+0x86) is an `iLöb` over `vt_loop` (§8), whose exit
+    continuation `vt_exit` is *built once* (`iAssert … with "[Hcont Htok …]"`)
+    so the epilogue's resources — the caller's postcondition wand, the lock
+    token, `trap_csrs_pay` and the four frame slots — ride in its closure and
+    never have to be threaded through the Löb.  Same shape as
+    `ProofAcquiresleep.asl_loop` / `asl_exit`.
+  - The body is split into FIVE `Qed`-sealed chunks (§7/§9), each stating its
+    register effect as a *frame condition over an abstract output map*
+    (`∀ M', ⌜M' !!! a5 = … ∧ ∀ r ≠ a4,a5, M' !!! r = M !!! r⌝`) rather than a
+    `set`-tower — that is what keeps the chain's proof terms small and each
+    chunk independently debuggable.
+  - The `disk_res` surgery per iteration: `vt_flight_at_nr` → `big_sepM_delete`
+    on `fl`; `slot_pin_ok`'s `spo_ring` + `vt_pin_ring_split` splits the two
+    avail-ring bytes back out of the reclaimed pin (leaving exactly the
+    `pinr` disjointness `parked_res` asks for); `tri_card_8` bounds the live
+    window at two, so `nr mod 8` is provably absent from `mod8 (dom (delete nr
+    fl))` and `ring_slots_put` closes; the claim auth is *untouched*
+    (`delete nr fl ∪ <[nr:=b]> pk = fl ∪ pk`).
+  - The status panic at +0x5e is refuted by the protocol pinning the byte at
+    0; the byte crosses the ↦ₚ⇄↦ₘ tier with `phys_to_byte`/`byte_to_phys`,
+    whose `kmap_static` premise comes from `addr_is_kdata (pa_add disk_base k)`
+    (`vt_disk_kdata`) — the static `struct disk` is kernel DATA.
+  - `K_virtio_disk_intr = 22` and the spec demands `lvl + 2 < 2^31`, because
+    `acquire` raises the noff level before `wakeup` is called at `S lvl`
+    (the same shape as `SpecPipeclose`).
+
+- **`virtio_disk_rw` is PROVEN and LINKED** (2026-07-28) — six proof files
+  (`ProofVirtioDiskRw{,B,C,D,E,F}.v`) plus `LinkVirtioDiskRw.v`, a functor over
+  ACQUIRE / RELEASE / SLEEP / FREEDESC.  With it `virtio_disk.c` reads
+  **4/4 fns proven** in `tools/proof_coverage.py`.  The phase cut, the seam
+  contracts and ~30 gotchas are recorded in
+  [`virtio-disk-rw.md`](virtio-disk-rw.md) — read that before touching any of
+  the six files.  Two things worth knowing at THIS level:
+  - It forced the one remaining spec change to the protocol layer:
+    **`VirtioQueue.vslot.vs_data` now records the block's content for READ
+    requests too** (`spo_in` deleted, `slot_pend_res` pins it, `slot_done_res`
+    / `virtio_proto_reclaim_acc` / `DiskInv.parked_res` export the
+    unconditional `bs = vs_data sl`).  Without it a woken publisher could not
+    identify the disk fragments it handed into the pending resource with the
+    `disk_block` its caller gave it, and the READ postcondition was
+    unprovable.  General lesson: an invariant that takes an exclusive ghost
+    fragment across a sleep must RECORD its value.
+  - `DiskInv.dclaim`'s four fields are all load-bearing: `dc_slot` fixes the
+    postcondition's block content, `dc_tri` is how the woken publisher learns
+    its three descriptors were not recycled, and `dc_pin` is what lets it split
+    the parked payoff back into the cells `free_desc` wants.
+
+Remaining in the whole virtio effort:
+- the two **pending cleanups** above (the `fence rw,rw` leaf; exposing
+  `kmap_static_claims` at the `sconf` level);
+- the two currently-unused primed lemmas
+  `ProofVirtioDiskRwB.{disk_window_le',mod8_set_seq_fresh'}` — P4 and P6 both
+  ended up using the weaker `vdrwd_window_le2` route, so these can be deleted;
+- **the boot wiring**: `virtio_disk_init` is proven and linked, but nothing yet
+  ties its post-state to the `disk_geom` / `is_lock γk d_lock … (disk_res …)`
+  that `virtio_disk_rw` and `virtio_disk_intr` consume, so the three whole-
+  function contracts are not yet composed into a single "the disk works"
+  statement reachable from `main`.  That is the last structural piece.
+
 The device model behind `kernel/virtio_disk.c`. The MACHINE side is done and
 proven: the disk exists as a third device on the fabric, it runs as part of the
 device execution context, its DMA is modelled honestly, and `wp_dev_loop`

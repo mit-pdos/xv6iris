@@ -301,6 +301,26 @@ Local Lemma exec_execute_BTYPE_BGEU_taken_zca (imm : mword 13) (rs2 rs1 : mword 
     exact (exec_jump_to_zca _ s Halign Hzca).
   Qed.
 
+(* the SIGNED twin of [exec_execute_BTYPE_BGEU_taken_zca].  virtio_disk_rw's
+   partial-free path branches on [blez s2] and [bge a5,s2], both signed, and
+   both on their TAKEN arm -- the fall arm ([exec_execute_BTYPE_BGE_fall])
+   was all any earlier caller needed. *)
+Local Lemma exec_execute_BTYPE_BGE_taken_zca (imm : mword 13) (rs2 rs1 : mword 5) s :
+    zopz0zKzJ_s (rvv rs1 s) (rvv rs2 s) = true ->
+    eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+    exec (execute (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))) s
+      = Some (RETIRE_SUCCESS,
+              set_reg s nextPC (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm))).
+  Proof.
+    intros Htaken Halign Hzca.
+    unfold execute. cbn match. unfold execute_BTYPE.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_BTYPE_cmp_BGE rs2 rs1 s)).
+    rewrite Htaken.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg PC s)).
+    exact (exec_jump_to_zca _ s Halign Hzca).
+  Qed.
+
 Section WpSconfBtype.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -720,6 +740,172 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* SIGNED [bge]: the general pair plus the [x0] TAKEN specialization.    *)
+  (* Only [wp_bge_x0_fall_s_sconf] above existed, because no earlier proof *)
+  (* took a signed [bge] on its taken arm; virtio_disk_rw's partial-free   *)
+  (* path takes all three ([blez s2] with s2 = 0, and [bge a5,s2] with     *)
+  (* a5 = 1 against s2 = 1 / s2 = 2).                                      *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_bge_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : regfile) (n : nat) :
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zKzJ_s (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
+    ( sie_cap_gpr γ m n -∗
+      pc_is(add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
+              (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply exec_execute_BTYPE_BGE_fall. unfold rvv. rewrite Lva Lvb. exact Hcmp. }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  Qed.
+
+  Lemma wp_bge_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
+      (m : regfile) (n : nat) :
+    uint rs1 <> 0 -> uint rs2 <> 0 ->
+    zopz0zKzJ_s (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
+    ( ▷ ( sie_cap_gpr γ m n -∗
+      pc_is(add_vec pc (sign_extend' 64 imm)) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
+              (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "[#Hhw Hsc2]".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
+    { unfold s_pc, set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
+    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
+    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iModIntro.
+    iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      assert (Htk : zopz0zKzJ_s (rvv rs1 s_pc) (rvv rs2 s_pc) = true)
+        by (unfold rvv; rewrite Lva Lvb; exact Hcmp).
+      assert (HzcaS : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
+      { unfold s_pc, set_reg; cbn [sregs].
+        rewrite irrelevant_register_set; [ rewrite Lmisa; exact HmisaC | vm_compute; reflexivity ]. }
+      epose proof (exec_execute_BTYPE_BGE_taken_zca imm rs2 rs1 s_pc Htk) as Hred.
+      rewrite Hpcv in Hred. exact (Hred Hal0 (exec_currentlyEnabled_Zca s_pc HzcaS)). }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).(sregs)
+             = add_vec pc (sign_extend' 64 imm))
+      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
+    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  Qed.
+
+  (* the [x0] TAKEN twin of [wp_bge_x0_fall_s_sconf]: [blez rs2] with the
+     branch taken.  x0 is not in the register file, so its value is read
+     off the model rather than out of [gpr_file]. *)
+  Lemma wp_bge_x0_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
+      (m : regfile) (n : nat) :
+    uint rs2 <> 0 ->
+    zopz0zKzJ_s zero_reg (m !!! Regidx rs2) = true ->
+    eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE)) -∗
+    ( ▷ ( sie_cap_gpr γ m n -∗
+      pc_is(add_vec pc (sign_extend' 64 imm)) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
+              (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "[#Hhw Hsc2]".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
+    { unfold s_pc, set_reg; cbn [sregs].
+      rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
+    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
+    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iModIntro.
+    iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      assert (Htk : zopz0zKzJ_s (rvv (mword_of_int 0 : mword 5) s_pc) (rvv rs2 s_pc) = true).
+      { unfold rvv. rewrite Lvb.
+        replace (Z.eqb (uint (mword_of_int 0 : mword 5)) 0) with true
+          by (vm_compute; reflexivity).
+        cbn match. exact Hcmp. }
+      assert (HzcaS : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
+      { unfold s_pc, set_reg; cbn [sregs].
+        rewrite irrelevant_register_set; [ rewrite Lmisa; exact HmisaC | vm_compute; reflexivity ]. }
+      epose proof (exec_execute_BTYPE_BGE_taken_zca imm rs2 (mword_of_int 0 : mword 5) s_pc Htk) as Hred.
+      rewrite Hpcv in Hred. exact (Hred Hal0 (exec_currentlyEnabled_Zca s_pc HzcaS)). }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).(sregs)
+             = add_vec pc (sign_extend' 64 imm))
+      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iNext.
+    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
     iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
 

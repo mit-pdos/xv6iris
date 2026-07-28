@@ -41,7 +41,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import WpDecodeBridge.
 Require Import KernelRvcDecode KernelBaseDecode WpRvcBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import DevModel PlicPlan PlicHart WpUart WpPlic SpecCpuid SpecPlicClaim.
+Require Import DevModel PlicPlan PlicHart DiskPtsto WpUart WpPlic SpecCpuid SpecPlicClaim.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -90,7 +90,7 @@ Module PlicClaimProof (Cpuid : CPUID) : PLIC_CLAIM.
 
 Section ProofPlicClaim.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation PQ := KernelSyms.plic_claim.
@@ -151,9 +151,9 @@ Section ProofPlicClaim.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plic_claim(), entry to return.    *)
   (* =================================================================== *)
-  Lemma wp_plic_claim_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_plic_claim_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat)
-    : wp_plic_claim_sconf_body γ γd Φ m0 n.
+    : wp_plic_claim_sconf_body γ γd γv Φ m0 n.
   Proof.
     cbv beta delta [wp_plic_claim_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hhart Hn.
@@ -283,7 +283,7 @@ Section ProofPlicClaim.
     { unfold N4. rewrite upd_eq. unfold regval_into_reg, ph_sthb.
       rewrite HN3a5 HN3a0. reflexivity. }
     (* ---- 0x16: c.lw a0,4(a5) -- THE CLAIM ---- *)
-    iApply (wp_lw_plic_dev_s_sconf γ γd Φ (mword_of_int (PQ + 0x16)) true false
+    iApply (wp_lw_plic_dev_s_sconf γ γd γv Φ (mword_of_int (PQ + 0x16)) true false
               a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))

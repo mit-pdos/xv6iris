@@ -27,7 +27,7 @@ Require Import KptPt.
 Require Import SmodeCore WpSmodeGpr.
 Require Import KMap.
 Require Import SmodeCorePt SRegime.
-Require Import WpUart WpSmodeUart WpSmodePtUart.
+Require Import DiskPtsto WpUart WpSmodeUart WpSmodePtUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -38,14 +38,14 @@ Module UartProof : UART.
 
 Section ProofUart.
 Context `{!riscvGS Σ, !sieG Σ}.
-Context `{!uartGhostG Σ}.
+Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{CID : CpuId}.
 
-  Lemma wp_sb_uart_s_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_sb_uart_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ)
-    : wp_sb_uart_s_sconf_body γ γd off Φ pc is_rvc rs2 rs1 imm m n R S.
+    : wp_sb_uart_s_sconf_body γ γd γv off Φ pc is_rvc rs2 rs1 imm m n R S.
   Proof.
     cbv beta delta [wp_sb_uart_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
@@ -338,11 +338,11 @@ Qed.
   iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] Huf'").
 Qed.
 
-  Lemma wp_lb_uart_s_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_lb_uart_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ)
-    : wp_lb_uart_s_sconf_body γ γd off Φ pc is_rvc is_unsigned rd rs1 imm m n R S.
+    : wp_lb_uart_s_sconf_body γ γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S.
   Proof.
     cbv beta delta [wp_lb_uart_s_sconf_body].
   intros ea a8 ldval lppn Hoff Hrd Hrdsp Hcanon Hvpn_def Hpa.

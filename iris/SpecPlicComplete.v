@@ -39,7 +39,7 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import DevModel WpUart.
+Require Import DevModel DiskPtsto WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -47,8 +47,8 @@ Import Defs.
 
 Notation PLIC_COMPLETE := KernelSyms.plic_complete.
 
-Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names)
+Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (γv : disk_names)
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -61,7 +61,7 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
   (6 <= n)%nat ->
   sie_cap_gpr γ m0 n -∗
   kernel_text -∗ pc_is pcE -∗
-  dev_inv γd -∗
+  dev_inv γd γv -∗
   ( ∀ m' : regfile,
     sie_cap_gpr γ m' n -∗
     pc_is ret_tgt -∗
@@ -71,8 +71,8 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
 
 Module Type PLIC_COMPLETE.
   Parameter wp_plic_complete_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names)
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_plic_complete_sconf_body γ γd Φ m0 n.
+      wp_plic_complete_sconf_body γ γd γv Φ m0 n.
 End PLIC_COMPLETE.

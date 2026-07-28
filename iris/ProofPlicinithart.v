@@ -52,7 +52,7 @@ Require Import IntrDefs.
 Require Import WpDecodeBridge.
 Require Import KernelRvcDecode KernelBaseDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import PlicPlan PlicHart WpUart WpPlic SpecCpuid SpecPlicinithart.
+Require Import PlicPlan PlicHart DiskPtsto WpUart WpPlic SpecCpuid SpecPlicinithart.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -108,7 +108,7 @@ Module PlicinithartProof (Cpuid : CPUID) : PLICINITHART.
 
 Section ProofPlicinithart.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
 
   Notation PH := KernelSyms.plicinithart.
@@ -191,9 +191,9 @@ Section ProofPlicinithart.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plicinithart(), entry to return.  *)
   (* =================================================================== *)
-  Lemma wp_plicinithart_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_plicinithart_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat)
-    : wp_plicinithart_sconf_body γ γd Φ m0 n.
+    : wp_plicinithart_sconf_body γ γd γv Φ m0 n.
   Proof.
     cbv beta delta [wp_plicinithart_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
@@ -364,7 +364,7 @@ Section ProofPlicinithart.
     assert (HN5sw : (autocast (T := mword) (subrange_vec_dec (N5 !!! Regidx a4_idx) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = plic_senable_word).
     { rewrite HN5a4. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x1a: sw a4,128(a5) -- PLIC_SENABLE(hart) = 1026 ---- *)
-    iApply (wp_sw_plic_dev_s_sconf γ γd Φ (mword_of_int (PH + 0x1a)) false a4_idx a5_idx
+    iApply (wp_sw_plic_dev_s_sconf γ γd γv Φ (mword_of_int (PH + 0x1a)) false a4_idx a5_idx
               (mword_of_int 128 : mword 12) N5 (n - 2)%nat
               ltac:(rewrite HN5a5; exact (ph_geom_range _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_align _ (ph_senable_geom _ Hhart)))
@@ -424,7 +424,7 @@ Section ProofPlicinithart.
     assert (HN8sw : (autocast (T := mword) (subrange_vec_dec (N8 !!! Regidx z_idx) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = Z_to_bv 32 0).
     { rewrite HN8z. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x28: sw zero,0(a5) -- PLIC_SPRIORITY(hart) = 0 ---- *)
-    iApply (wp_sw_plic_dev_s_sconf γ γd Φ (mword_of_int (PH + 0x28)) false z_idx a5_idx
+    iApply (wp_sw_plic_dev_s_sconf γ γd γv Φ (mword_of_int (PH + 0x28)) false z_idx a5_idx
               (mword_of_int 0 : mword 12) N8 (n - 2)%nat
               ltac:(rewrite HN8a5; exact (ph_geom_range _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_align _ (ph_sthresh_geom _ Hhart)))
