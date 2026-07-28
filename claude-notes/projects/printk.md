@@ -482,8 +482,37 @@ the other two continuations from their own pure premises -- they need no
 resources, since as hypotheses of the lemma their arguments are given.  The
 same will apply to `wp_printk_advance`, which has two.
 
-Left: the loop body that picks the arm from `pk_entry`, the loop induction,
-and the top-level spec.
+### printk: the loop, and what the induction runs on
+
+`pk_kinds` recurses on the STRING; the format loop walks an INDEX.  The bridge
+is `str_drop`, and `pk_kinds_step` (PrintkFmt.v) is the equation the loop
+invariant is maintained by -- one turn rewrites `pk_kinds (str_drop p f)` in
+terms of exactly the three characters the dispatch just read:
+
+    pk_kinds (str_drop p f) =
+      if f[p] <> '%' then pk_kinds (str_drop (p+1) f)
+      else if f[p+1] = NUL then []
+      else let d := pk_dir f[p+1] f[p+2] f[p+3] in
+           pk_cons (fst d) (pk_kinds (str_drop (p+2+snd d) f))
+
+The uniform `p+2+snd d` tail is what makes the short-format cases disappear:
+when the string runs out the missing characters are `pk_ch`'s NUL, `pk_dir`
+returns `snd = 0` (`pk_dir_nul1`) or at most 1 (`pk_dir_nul2`), and `str_drop`
+past the end is `""`.  `pk_dir_nul2` needs its third-character tests reduced
+BEFORE the case split, or the blind split asks for `2 <= 1`.
+
+Left, in order:
+
+1. the arm selection from `pk_entry` -- fifteen cases, mechanical: in each,
+   `pk_entry` reduces to a literal and the matching arm lemma applies.  Only
+   `%s` needs a descriptor resource, since `PkANum`'s is `True`; `%%`, the
+   unknown directive and the `c0 = 0` exit consume no vararg at all.
+2. the loop induction on the format index, carrying `pk_kinds (str_drop p f) =
+   map pk_desc_kind (drop k descs)` and splitting the descriptor `big_sepL`
+   at `k`.
+3. the top-level statement (prologue + setup + loop + exit), which is also
+   where `uart_sent γd l` has to join the spec's precondition.
+4. the sealed functor over CONSPUTC/PRINTINT, and LinkPrintk.v.
 
 ### printk: what the arms still need
 
