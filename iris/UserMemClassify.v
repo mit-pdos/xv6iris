@@ -1752,7 +1752,7 @@ Section MemReadTotal.
     intros Hrd Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Load Data) User) s = Some (0, s)).
@@ -1872,7 +1872,7 @@ Section MemArmsU.
     intros Hrd Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Lpc Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     (* translationMode = Sv39 (non-consuming) *)
     iDestruct (utlb_inv_pt_translationMode_U uroot utfp uum s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
@@ -1974,7 +1974,7 @@ Section MemArmsU.
     intros Hrd Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Lpc Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U uroot utfp uum s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Load Data) User) s = Some (0, s)).
@@ -2100,7 +2100,7 @@ Section MemArmsU2.
     intros Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Lpc Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Store Data) User) s = Some (0, s)).
@@ -2551,7 +2551,7 @@ Section MemStoreEngine.
     intros Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Store Data) User) s = Some (0, s)).
@@ -2646,7 +2646,7 @@ Section MemLoadRd0.
     intros Hrd Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Load Data) User) s = Some (0, s)).
@@ -4242,7 +4242,7 @@ Section LRExecEngine.
     intros Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (LoadReserved Data) User) s = Some (0, s)).
@@ -5061,7 +5061,7 @@ Section SCEngine.
     intros Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (StoreConditional Data) User) s = Some (0, s)).
@@ -5879,7 +5879,7 @@ Section AmoEngine.
     intros Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s)).
@@ -6322,7 +6322,7 @@ Section AmoEngine16.
     intros Lcp Hmsok Hmisa Hmenv Hsenv Hhtif Hpma.
     iIntros "(Hreg & Hgh & Hdev) Hgpr Hupt".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
-    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS).
+    pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
     assert (Hpml : exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s)).

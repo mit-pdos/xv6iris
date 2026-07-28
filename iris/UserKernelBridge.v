@@ -58,16 +58,20 @@ Section UserKernelBridge.
     eq_vec (_get_Mstatus_MXR ms0) ('b"0") = true ->
     eq_vec (_get_Mstatus_FS ms0) ('b"00") = true ->
     eq_vec (_get_Mstatus_VS ms0) ('b"00") = true ->
+    eq_vec (_get_Mstatus_TVM ms0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_TSR ms0) ('b"1") = false ->
     user_mstatus_ok (sret_ms5 ms0).
   Proof.
-    intros HSXL HMXR HFS HVS.
+    intros HSXL HMXR HFS HVS HTVM HTSR.
     unfold user_mstatus_ok.
-    split; [| split; [| split; [| split]]].
+    split; [| split; [| split; [| split; [| split; [| split]]]]].
     - rewrite sret_ms5_SXL. exact HSXL.
     - rewrite sret_ms5_MPRV. vm_compute. reflexivity.
     - rewrite sret_ms5_MXR. exact HMXR.
     - rewrite sret_ms5_FS. exact HFS.
     - rewrite sret_ms5_VS. exact HVS.
+    - rewrite sret_ms5_TVM. exact HTVM.
+    - rewrite sret_ms5_TSR. exact HTSR.
   Qed.
 
   (* -------------------------------------------------------------------- *)
@@ -92,6 +96,8 @@ Section UserKernelBridge.
     eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
     eq_vec (_get_Mstatus_FS mstatus0) ('b"00") = true ->
     eq_vec (_get_Mstatus_VS mstatus0) ('b"00") = true ->
+    eq_vec (_get_Mstatus_TVM mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
     (* config-record data fields pinned to the cell values *)
     uc_dqc C = DfracOwn 1 ->
     uc_stvec C = stv ->
@@ -136,7 +142,7 @@ Section UserKernelBridge.
     udata_own pt.(ud_data) -∗
     user_inv C pt.
   Proof.
-    intros HSXL HMXR HFS HVS Hdqc Hstvec Hmie Hmdl Hmedl Hmip
+    intros HSXL HMXR HFS HVS HTVM HTSR Hdqc Hstvec Hmie Hmdl Hmedl Hmip
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hcov Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
@@ -148,7 +154,7 @@ Section UserKernelBridge.
     (* user_hart_ok *)
     iSplitR; [iPureIntro; exact I |].
     (* user_mstatus_ok *)
-    iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS) |].
+    iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS HTVM HTSR) |].
     (* lock-step va' = va *)
     iSplitR; [iPureIntro; intros u _; reflexivity |].
     iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr".

@@ -1078,7 +1078,7 @@ Section UserTotalU.
     base_post E sigma sigma_f va w g.
   Proof.
     intros Lmi Lcp Hmsok Lmisa Lmenv Hdec.
-    destruct Hmsok as (_ & _ & _ & Hfs & Hvs).
+    destruct Hmsok as (_ & _ & _ & Hfs & Hvs & _ & _).
     destruct (exec_execute_CSRReg_total_U csr i1 rd op
                 (set_reg sigma_f nextPC (add_vec_int va 4))
                 (register_lookup mstatus (set_reg sigma_f nextPC (add_vec_int va 4)).(sregs))
@@ -1103,7 +1103,7 @@ Section UserTotalU.
     base_post E sigma sigma_f va w g.
   Proof.
     intros Lmi Lcp Hmsok Lmisa Lmenv Hdec.
-    destruct Hmsok as (_ & _ & _ & Hfs & Hvs).
+    destruct Hmsok as (_ & _ & _ & Hfs & Hvs & _ & _).
     destruct (exec_execute_CSRImm_total_U csr imm rd op
                 (set_reg sigma_f nextPC (add_vec_int va 4))
                 (register_lookup mstatus (set_reg sigma_f nextPC (add_vec_int va 4)).(sregs))
