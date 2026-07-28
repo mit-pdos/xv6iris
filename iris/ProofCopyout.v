@@ -368,11 +368,13 @@ Section ProofCopyout.
   (* ------------------------------------------------------------------ *)
   Local Lemma co_loop (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac)
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac)
       (src spr : mword 64) :
     (50 <= K)%nat ->
     (Z.of_nat len < 2 ^ 64)%Z ->
     (uint szv <= 2 ^ 38)%Z ->
+    (* vmfault's kalloc: the transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     mm !!! Regidx Rtp = cid_word ->
     forall (fuel rem done : nat) (Pc : uptd) (M : regfile) (dstva : mword 64),
     (rem <= fuel)%nat -> (1 <= rem)%nat -> (done + rem = len)%nat ->
@@ -388,7 +390,7 @@ Section ProofCopyout.
     M !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64) ->
     M !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ->
     sie_cap_gpr γ M (K - 12)%nat -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ lvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (CPO + 0x50) : mword 64) -∗
     p_sz p ↦₈{dqs} szv -∗
@@ -404,7 +406,7 @@ Section ProofCopyout.
           /\ mj !!! Regidx Rs11 = mm !!! Regidx Rs11
           /\ uptd_ext P P' ⌝ -∗
         sie_cap_gpr γ mj (K - 12)%nat -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x9a) : mword 64) -∗
         p_sz p ↦₈{dqs} szv -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -413,7 +415,7 @@ Section ProofCopyout.
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hlen64 Hszb Hmmtp fuel.
+    intros HK Hlen64 Hszb Hlvl Hmmtp fuel.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     induction fuel as [| fuel IH];
       intros rem done Pc M dstva Hfuel Hrem Hsum Hext
@@ -526,7 +528,7 @@ Section ProofCopyout.
           /\ mj !!! Regidx Rs11 = mm !!! Regidx Rs11
           /\ uptd_ext P P' ⌝ -∗
         sie_cap_gpr γ mj (K - 12)%nat -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x9a) : mword 64) -∗
         p_sz p ↦₈{dqs} szv -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -558,7 +560,7 @@ Section ProofCopyout.
           /\ Md !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
           /\ Md !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
         sie_cap_gpr γ Md (K - 12)%nat -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x82) : mword 64) -∗
         p_sz p ↦₈{dqs} szv -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -627,7 +629,7 @@ Section ProofCopyout.
             /\ Mn !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64)
             /\ Mn !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ⌝ -∗
           sie_cap_gpr γ Mn (K - 12)%nat -∗
-          cpu_own γ 0%nat eb p C -∗
+          cpu_own γ lvl eb p C -∗
           pc_is (mword_of_int (CPO + 0x32) : mword 64) -∗
           p_sz p ↦₈{dqs} szv -∗
           p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -1227,8 +1229,8 @@ Section ProofCopyout.
                       = add_vec_int (mword_of_int (CPO + 0x6a) : mword 64) 4)
         by (rewrite /F4 upd_eq; reflexivity).
       iEval (rewrite -Hrootc) in "Hptc".
-      iApply (Vmfault.wp_vmfault_sconf γ γa Φ F4 Pc szv (K - 12)%nat eb p C dqs dqp
-                ltac:(lia) HF4tp HF4a0 Hszb
+      iApply (Vmfault.wp_vmfault_sconf γ γa Φ F4 Pc szv (K - 12)%nat lvl eb p C dqs dqp
+                ltac:(lia) HF4tp HF4a0 Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv [-]").
       iIntros (mf) "Hcg Hcnt Hpc Hszc Hptc %Hvfcs Hvfpay".
       iEval (rewrite Hrootc) in "Hptc".
@@ -1548,11 +1550,11 @@ Section ProofCopyout.
   Lemma wp_copyout_sconf
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac)
-    : wp_copyout_sconf_body γ γa Φ mm P szv len src_bytes K eb p C dqs dqp.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac)
+    : wp_copyout_sconf_body γ γa Φ mm P szv len src_bytes K lvl eb p C dqs dqp.
   Proof.
     cbv beta delta [wp_copyout_sconf_body].
-    intros pcE src ret_tgt HK Htp Hroot Hlenr Hlen64 Hszb.
+    intros pcE src ret_tgt HK Htp Hroot Hlenr Hlen64 Hszb Hlvl.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hszc Hptc Hpt #Henv Hsrc Hcont".
@@ -2021,7 +2023,7 @@ Section ProofCopyout.
           /\ mj !!! Regidx Rs11 = mm !!! Regidx Rs11
           /\ uptd_ext P P' ⌝ -∗
         sie_cap_gpr γ mj (K - 12)%nat -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x9a) : mword 64) -∗
         p_sz p ↦₈{dqs} szv -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -2376,8 +2378,8 @@ Section ProofCopyout.
       - exact Hjext.
       - rewrite HE13a0. exact Hjres. }
     (* ---- into the loop ---- *)
-    iApply (co_loop γ γa Φ mm P szv len src_bytes K eb p C dqs dqp src spr
-              HK Hlen64 Hszb Htp len len 0%nat P Q9 (mm !!! Regidx Ra1)
+    iApply (co_loop γ γa Φ mm P szv len src_bytes K lvl eb p C dqs dqp src spr
+              HK Hlen64 Hszb Hlvl Htp len len 0%nat P Q9 (mm !!! Regidx Ra1)
               ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_refl P)
               HQ9sp HQ9tp HQ9s11 HQ9s4 HQ9s5 HQ9s6 HQ9s7 HQ9s8 HQ9s9 HQ9s10
               with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv Hsrc Hepi").

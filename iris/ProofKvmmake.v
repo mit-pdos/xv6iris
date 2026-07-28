@@ -1286,7 +1286,7 @@ Section KvmmakeBody.
     assert (Hbud : (pt_missing (pt_empty_node bppn) (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) 1 < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 2 gsprev 0 nb (bound_uart bppn) Hgs ltac:(nat_le) Hnb). }
     iApply (wp_kvmmap γ γa Φ Wk (pt_empty_node bppn) ∅ 1 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat)
-              eq_refl Hc34 ltac:(rewrite HWka0; rewrite pt_empty_node_base; reflexivity)
+              ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0; rewrite pt_empty_node_base; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
               HWka3 ltac:(nat_le) HWka4 kmk_perm_ok6
@@ -1421,7 +1421,7 @@ Section KvmmakeBody.
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) 1 < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 0 gsprev 2 nb (bound_virtio t Hrep) Hgs ltac:(nat_le) Hnb). }
     iApply (wp_kvmmap γ γa Φ Wk t kvm_m1 1 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat)
-              eq_refl Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
+              ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
               HWka3 ltac:(nat_le) HWka4 kmk_perm_ok6
@@ -1556,7 +1556,7 @@ Section KvmmakeBody.
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) plic_npages < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 32 gsprev 2 nb (bound_plic t Hrep) Hgs ltac:(nat_le) Hnb). }
     iApply (wp_kvmmap γ γa Φ Wk t kvm_m2 plic_npages 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat)
-              eq_refl Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
+              ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
               HWka3 ltac:(nat_le) HWka4 kmk_perm_ok6
@@ -1705,7 +1705,7 @@ Section KvmmakeBody.
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) text_npages < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 2 gsprev 34 nb (bound_text t) Hgs ltac:(nat_le) Hnb). }
     iApply (wp_kvmmap γ γa Φ Wk t kvm_m3 text_npages 10 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat)
-              eq_refl Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
+              ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
               HWka3 ltac:(nat_le) HWka4 kmk_perm_ok10
@@ -1878,7 +1878,7 @@ Section KvmmakeBody.
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) data_npages < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 63 gsprev 36 nb (bound_data t Hrep) Hgs ltac:(nat_le) Hnb). }
     iApply (wp_kvmmap γ γa Φ Wk t kvm_m4 data_npages 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat)
-              eq_refl Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
+              ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
               HWka3 ltac:(nat_le) HWka4 kmk_perm_ok6
@@ -2032,7 +2032,7 @@ Section KvmmakeBody.
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) 1 < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 2 gsprev 99 nb (bound_tramp t) Hgs ltac:(nat_le) Hnb). }
     iApply (wp_kvmmap γ γa Φ Wk t kvm_m5 1 10 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat)
-              eq_refl Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
+              ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
               HWka3 ltac:(nat_le) HWka4 kmk_perm_ok10
@@ -2153,7 +2153,7 @@ Section KvmmakeBody.
     assert (HcsW : callee_saved mr6 Wp).
     { rewrite /Wp /Wm. repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
     iApply (wp_pms γ γa Φ Wp t6 kvm_map 0%nat (K - 4)%nat eb p C (avail_sub (Some nb) (1 + (0 + g1 + g2 + g3 + g4 + g5 + g6)))
-              eq_refl Hc44 HWp10 Hrep6 kmk_kstack_None
+              ltac:(vm_compute; reflexivity) Hc44 HWp10 Hrep6 kmk_kstack_None
               ltac:(exists (nb - (1 + (0 + g1 + g2 + g3 + g4 + g5 + g6)))%nat; split;
                     [apply avail_sub_Some
                     | rewrite (kstacks_missing_zero t6 Hrep6);

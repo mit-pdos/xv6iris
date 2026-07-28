@@ -400,7 +400,8 @@ Section ProofMappages.
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
     let ret_tgt := update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0") in
-    lvl = 0%nat ->
+    (* walk's kalloc: the transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (32 <= K)%nat ->
     (k + rem)%nat = npages -> (0 < rem)%nat ->
     mm !!! Regidx (mword_of_int 10)

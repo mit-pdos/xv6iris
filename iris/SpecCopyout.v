@@ -68,7 +68,7 @@ Notation CPO := KernelSyms.copyout.
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-    (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
   let src := mm !!! Regidx (mword_of_int 12) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -83,8 +83,11 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (Z.of_nat len < 2 ^ 64)%Z ->
   (* p->sz respects MAXVA (vmfault's premise) *)
   (uint szv <= 2 ^ 38)%Z ->
+  (* vmfault's kalloc keeps its transient noff increment in int range;
+     [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own γ lvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   p_sz p ↦₈{dqs} szv -∗
@@ -94,7 +97,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
   ( ∀ (mr : regfile) (P' : uptd),
     sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ lvl eb p C -∗
     pc_is ret_tgt -∗
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -112,6 +115,6 @@ Module Type COPYOUT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac),
-      wp_copyout_sconf_body γ γa Φ mm P szv len src_bytes K eb p C dqs dqp.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac),
+      wp_copyout_sconf_body γ γa Φ mm P szv len src_bytes K lvl eb p C dqs dqp.
 End COPYOUT.

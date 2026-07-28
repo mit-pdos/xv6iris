@@ -931,9 +931,9 @@ Section ProofFetchaddr.
         iEval (rewrite -HA7a1) in "Hbuf".
         (* ---- copyin(p->pagetable, ip, addr, 8) ---- *)
         iApply (Copyin.wp_copyin_sconf γ γa Φ A7 (pv_upt V) (pv_sz V) 8%nat
-                  (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat eb p C
+                  (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p C
                   (DfracOwn 1) (DfracOwn 1)
-                  HK50 HA7tp HA7a0 HA7len fa_len8 Hszb38
+                  HK50 HA7tp HA7a0 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hszc Hptc Hpt Henv Hbuf [-]").
         iIntros (mr P' dst_new) "Hcg Hcpu Hpc Hszc Hptc Hpt Hbuf %Hcsr %Hext %Hret".
         assert (Hpc2e : ret_pc (A7 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x2e))

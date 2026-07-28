@@ -34,7 +34,10 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  lvl = 0%nat ->
+  (* the kalloc chain below keeps its transient noff increment in int
+     range; [lvl] is otherwise generic (the identity pin this replaced was
+     an artifact of the boot-time callers) *)
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (22 <= K)%nat ->
   mm !!! Regidx (mword_of_int 10)
     = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) ->

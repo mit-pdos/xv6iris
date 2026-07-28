@@ -300,6 +300,13 @@ Proof.
   rewrite E. lia.
 Qed.
 
+(* copyout is generic in the interrupt level (the pipe loops call it at 1);
+   sys_pipe is at syscall altitude, so it passes 0 and pays vmfault's kalloc
+   premise here rather than inline at the two call sites (the inline-[ltac:]
+   trap, optimization.md). *)
+Lemma sp_n0 : (Z.of_nat 0%nat + 1 < 2 ^ 31)%Z.
+Proof. vm_compute. reflexivity. Qed.
+
 (* [upd_upt] and [upd_ofile] touch different fields, so the success arm's
    state can be read either way round; [sys_pipe_post] spells it with the
    descriptors outermost. *)
@@ -1984,8 +1991,8 @@ Section ProofSysPipe.
               (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
-              (av - 8)%nat eb p C (DfracOwn 1) (DfracOwn 1)
-              Hav50 HA5tp HA5a0 HA5a3 sp_len4 Hszb
+              (av - 8)%nat 0%nat eb p C (DfracOwn 1) (DfracOwn 1)
+              Hav50 HA5tp HA5a0 HA5a3 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hszc Hptc Hpt Henva Hbufhi [-]").
     iIntros (B0 Pa) "Hcg Hcpu Hpc Hszc Hptc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
     iEval (rewrite HA5a2) in "Hbufhi".
@@ -2366,8 +2373,8 @@ Section ProofSysPipe.
     iApply (Copyout.wp_copyout_sconf γ γa Φ C6 Pa
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
-              (av - 8)%nat eb p C (DfracOwn 1) (DfracOwn 1)
-              Hav50 HC6tp HC6a0 HC6a3 sp_len4 Hszb
+              (av - 8)%nat 0%nat eb p C (DfracOwn 1) (DfracOwn 1)
+              Hav50 HC6tp HC6a0 HC6a3 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hszc [Hptc] Hpt Henvb Hbuflo [-]").
     { rewrite HrootA. iExact "Hptc". }
     iIntros (D0 Pb) "Hcg Hcpu Hpc Hszc Hptc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".

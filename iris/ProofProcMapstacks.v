@@ -117,7 +117,8 @@ Section ProofPMS.
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-    lvl = 0%nat ->
+    (* kvmmap's kalloc: the transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (44 <= K)%nat ->
     Mf !!! Regidx csp_rs1 = spr ->
     Mf !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4) ->
@@ -420,7 +421,8 @@ Section ProofPMS.
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-    lvl = 0%nat ->
+    (* kvmmap's kalloc: the transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (44 <= K)%nat ->
     (i + rem)%nat = 64%nat -> (0 < rem)%nat ->
     (64 + kstacks_missing t < nb)%nat ->
@@ -523,7 +525,7 @@ Section ProofPMS.
               ltac:(lia)
               ltac:(rewrite HJ4; exact Hcid)
               ltac:(reflexivity)
-              ltac:(rewrite Hlvl; vm_compute; reflexivity)
+              Hlvl
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu [-]").
     iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret56 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (PM + 0x56)).

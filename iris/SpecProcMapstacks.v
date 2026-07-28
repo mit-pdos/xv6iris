@@ -41,7 +41,10 @@ Notation PMS := KernelSyms.proc_mapstacks.
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  lvl = 0%nat ->
+  (* the kalloc chain below keeps its transient noff increment in int
+     range; [lvl] is otherwise generic (the identity pin this replaced was
+     an artifact of the boot-time callers) *)
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (44 <= K)%nat ->
   mm !!! Regidx (mword_of_int 10)
     = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) ->

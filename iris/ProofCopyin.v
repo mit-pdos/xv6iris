@@ -460,12 +460,14 @@ Section ProofCopyin.
   (*  THE LOOP (+0x56 head, +0x2c body), by induction on FUEL.           *)
   (* ================================================================== *)
   Local Lemma ci_loop (γ γa : gname) (Φ : mval -> iProp Σ)
-      (P : uptd) (szv : mword 64) (K : nat) (eb : bool) (p : mword 64)
+      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dqs dqp : dfrac) (dst spr : mword 64) (len : nat)
       (v10 v11 : mword 64) :
     (50 <= K)%nat ->
     (Z.of_nat len < 2 ^ 64)%Z ->
     (uint szv <= 2 ^ 38)%Z ->
+    (* vmfault's kalloc: the transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     forall (fuel done rem : nat) (Pc : uptd) (m : regfile) (fd : nat -> bv 8),
     (rem <= fuel)%nat -> (1 <= rem)%nat -> (done + rem = len)%nat ->
     uptd_ext P Pc ->
@@ -480,7 +482,7 @@ Section ProofCopyin.
     m !!! Regidx Rs10 = v10 ->
     m !!! Regidx Rs11 = v11 ->
     sie_cap_gpr γ m (K - 12) -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ lvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (CPI + 0x56) : mword 64) -∗
     p_sz p ↦₈{dqs} szv -∗
@@ -497,7 +499,7 @@ Section ProofCopyin.
       ⌜res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜uptd_ext P P'⌝ -∗
       sie_cap_gpr γ mj (K - 12) -∗
-      cpu_own γ 0%nat eb p C -∗
+      cpu_own γ lvl eb p C -∗
       pc_is (mword_of_int (CPI + 0x76) : mword 64) -∗
       p_sz p ↦₈{dqs} szv -∗
       p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -506,7 +508,7 @@ Section ProofCopyin.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hlen64 Hszb.
+    intros HK Hlen64 Hszb Hlvl.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     intro fuel.
     induction fuel as [| fuel IH];
@@ -527,7 +529,7 @@ Section ProofCopyin.
       ⌜res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜uptd_ext P P'⌝ -∗
       sie_cap_gpr γ mj (K - 12) -∗
-      cpu_own γ 0%nat eb p C -∗
+      cpu_own γ lvl eb p C -∗
       pc_is (mword_of_int (CPI + 0x76) : mword 64) -∗
       p_sz p ↦₈{dqs} szv -∗
       p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -574,7 +576,7 @@ Section ProofCopyin.
         ⌜mb !!! Regidx Rs10 = v10⌝ -∗
         ⌜mb !!! Regidx Rs11 = v11⌝ -∗
         sie_cap_gpr γ mb (K - 12) -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPI + 0x2c) : mword 64) -∗
         p_sz p ↦₈{dqs} szv -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -1139,8 +1141,8 @@ Section ProofCopyin.
     iAssert (kalloc_env γa None cid_word) as "Henv".
     { iExists γk. iFrame "Hlock Havail Hpanic". }
     iEval (rewrite -Hrootc) in "Hptc".
-    iApply (Vmfault.wp_vmfault_sconf γ γa Φ V4 Pc szv (K - 12) eb p C dqs dqp
-              ltac:(lia) HV4tp HV4a0 Hszb
+    iApply (Vmfault.wp_vmfault_sconf γ γa Φ V4 Pc szv (K - 12) lvl eb p C dqs dqp
+              ltac:(lia) HV4tp HV4a0 Hszb Hlvl
               with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv [-]").
     iIntros (mv) "Hcg Hcnt Hpc Hszc Hptc %Hvcs Hvpost".
     iEval (rewrite Hrootc) in "Hptc".
@@ -1254,11 +1256,11 @@ Section ProofCopyin.
   Lemma wp_copyin_sconf
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac)
-    : wp_copyin_sconf_body γ γa Φ mm P szv len dst_olds K eb p C dqs dqp.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac)
+    : wp_copyin_sconf_body γ γa Φ mm P szv len dst_olds K lvl eb p C dqs dqp.
   Proof.
     cbv beta delta [wp_copyin_sconf_body].
-    intros pcE dst ret_tgt HK Htp Hroot Hlenr Hlen64 Hszb.
+    intros pcE dst ret_tgt HK Htp Hroot Hlenr Hlen64 Hszb Hlvl.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hszc Hptc Hpt Henv Hdst Hcont".
     iPoseProof (cii_00 with "Htext") as "Hi00".
@@ -1584,9 +1586,9 @@ Section ProofCopyin.
     assert (HL1 : (len <= len)%nat) by lia.
     assert (HL2 : (1 <= len)%nat) by lia.
     assert (HL3 : (0 + len = len)%nat) by lia.
-    iApply (ci_loop γ γa Φ P szv K eb p C dqs dqp dst spr len
+    iApply (ci_loop γ γa Φ P szv K lvl eb p C dqs dqp dst spr len
               (mm !!! Regidx Rs10) (mm !!! Regidx Rs11)
-              HK Hlen64 Hszb len 0%nat len P R9 dst_olds
+              HK Hlen64 Hszb Hlvl len 0%nat len P R9 dst_olds
               HL1 HL2 HL3 (uptd_ext_refl P)
               HR9sp HR9tp HR9s4 HR9s5 HR9s6 HR9s7 HR9s8 HR9s9 HR9s10 HR9s11
               with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv Hdst [-]").

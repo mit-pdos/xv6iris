@@ -699,7 +699,8 @@ Section ProofWalk.
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     let ret_tgt := update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0") in
-    lvl = 0%nat ->
+    (* kalloc's transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (22 <= K)%nat ->
     Mf !!! Regidx csp_rs1 = spr ->
     Mf !!! Regidx (mword_of_int 18 : mword 5) = cellA ->
@@ -810,7 +811,7 @@ Section ProofWalk.
               ltac:(lia)
               ltac:(rewrite HJ4; exact Hcid)
               ltac:(reflexivity)
-              ltac:(rewrite Hlvl; vm_compute; reflexivity)
+              Hlvl
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu [-]").
     iIntros (mr) "Hcg Hcnt Hpc %Hkcs Hkpost".
     (* the return pc: +0x7a *)
@@ -1109,7 +1110,8 @@ Section ProofWalk.
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     let ret_tgt := update_vec_dec (mm !!! Regidx (mword_of_int 1)) 0 ('b"0") in
-    lvl = 0%nat ->
+    (* kalloc's transient noff increment stays in int range *)
+    (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (22 <= K)%nat ->
     uint va < 274877906944 ->
     (1 <= L <= 2)%nat ->

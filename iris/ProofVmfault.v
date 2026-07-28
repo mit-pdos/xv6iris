@@ -165,12 +165,12 @@ Section ProofVmfault.
 
   Lemma wp_vmfault_sconf
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (szv : mword 64) (K : nat) (eb : bool) (p : mword 64)
+      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dqs dqp : dfrac)
-    : wp_vmfault_sconf_body γ γa Φ mm P szv K eb p C dqs dqp.
+    : wp_vmfault_sconf_body γ γa Φ mm P szv K lvl eb p C dqs dqp.
   Proof.
     cbv beta delta [wp_vmfault_sconf_body].
-    intros pcE va va0 ret_tgt HK Htp Hroot Hszb.
+    intros pcE va va0 ret_tgt HK Htp Hroot Hszb Hlvl.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hszc Hptc Hpt Henv Hcont".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -382,8 +382,8 @@ Section ProofVmfault.
         [| intros Hx; injection Hx as Hx2; subst c; apply H2; reflexivity].
       reflexivity. }
     (* ---- myproc() ---- *)
-    iApply (Myproc.wp_myproc_sconf γ Φ R5 (K - 6)%nat 0%nat eb p C
-              HR5tp ltac:(vm_compute; reflexivity) ltac:(lia)
+    iApply (Myproc.wp_myproc_sconf γ Φ R5 (K - 6)%nat lvl eb p C
+              HR5tp Hlvl ltac:(lia)
               with "Hcg Hcnt Htext Hpc").
     iIntros (msM mf) "%HmsM Hcg Hcnt Hpc %Hmp".
     destruct Hmp as (Hmpcs & Hmpa0).
@@ -463,7 +463,7 @@ Section ProofVmfault.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs2 -> c <> Rs3 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr γ mj (K - 6)%nat -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (VF + 0x1c) : mword 64) -∗
         (∃ w3 w6 : mword 64, pa_stk sp0 3 ↦₈ w3 ∗ pa_stk sp0 6 ↦₈ w6) -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -971,8 +971,8 @@ Section ProofVmfault.
           [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
         apply HN1thr; assumption. }
       iApply (Kalloc.wp_kalloc_sconf γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
-                A1 None 0%nat eb p C (K - 6)%nat
-                ltac:(lia) HA1tp ltac:(reflexivity) ltac:(vm_compute; reflexivity)
+                A1 None lvl eb p C (K - 6)%nat
+                ltac:(lia) HA1tp ltac:(reflexivity) Hlvl
                 with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic [-]").
       iIntros (mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
       assert (Hret4c : ret_pc (A1 !!! Regidx Rra) = mword_of_int (VF + 0x4c)).
@@ -1403,10 +1403,12 @@ Section ProofVmfault.
         rewrite vpn_at_0. rewrite HG6a1. exact Hnone. }
       iAssert (kalloc_env γa None (G6 !!! Regidx Rtp)) as "#Henv2".
       { iExists γk. iFrame "Hlock Havail Hpanic". }
-      (* ---- mappages(p->pagetable, va0, PGSIZE, mem, PTE_R|W|U) ---- *)
-      iApply (Mappages.wp_mappages_sconf γ γa Φ G6 t m_ad 1%nat 22 0%nat (K - 6)%nat
+      (* ---- mappages(p->pagetable, va0, PGSIZE, mem, PTE_R|W|U) ----
+         at the ambient [lvl]: mappages/walk are level-generic, and [Hlvl] is
+         exactly the int-range fact their kalloc needs. *)
+      iApply (Mappages.wp_mappages_sconf γ γa Φ G6 t m_ad 1%nat 22 lvl (K - 6)%nat
                 eb p C None
-                ltac:(reflexivity) ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
+                Hlvl ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh HG6tp
                 with "Hcg Hcnt Htext Hpc Hptree Henv2 [-]").
       iIntros (mg t' k g) "Hcg Hcnt Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
@@ -1586,9 +1588,9 @@ Section ProofVmfault.
           [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
         apply Hmgthr; assumption. }
       iApply (Kfree.wp_kfree_sconf γ Φ γa γk (mword_of_int KernelSyms.kmem)
-                (mword_of_int (KernelSyms.kmem + 24)) F2 None 0%nat eb p C (K - 6)%nat
+                (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p C (K - 6)%nat
                 ltac:(lia) HF2tp ltac:(reflexivity) ltac:(reflexivity)
-                ltac:(vm_compute; reflexivity)
+                Hlvl
                 with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic [-]").
       { rewrite /kfree_pre HF2a0.
         iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }

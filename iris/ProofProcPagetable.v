@@ -374,7 +374,7 @@ Section ProofProcPagetable.
       by (rewrite HM9a3; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite -HM9tp) in "Henv".
     iApply (MP.wp_mappages_sconf γ γa Φ M9 (pt_empty_node b0) ∅ 1 10 0%nat (K - 4)%nat eb p C (Some (nb - 1)%nat)
-              eq_refl Hc32
+              ltac:(vm_compute; reflexivity) Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HM9a3; apply bv_eq; vm_compute; reflexivity)
@@ -508,7 +508,7 @@ Section ProofProcPagetable.
     assert (Hrepm1 : pt_rep0 t1 ppt_m1) by (unfold ppt_m1; exact Hrep1).
     iEval (rewrite -HN8tp) in "Henv".
     iApply (MP.wp_mappages_sconf γ γa Φ N8 t1 ppt_m1 1 6 0%nat (K - 4)%nat eb p C (Some (nb - 1 - g1)%nat)
-              eq_refl Hc32
+              ltac:(vm_compute; reflexivity) Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HN8a3; exact Htfal)

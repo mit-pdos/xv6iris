@@ -53,7 +53,7 @@ Notation VF := KernelSyms.vmfault.
 
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-    (P : uptd) (szv : mword 64) (K : nat) (eb : bool) (p : mword 64)
+    (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (dqs dqp : dfrac) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
   let va := mm !!! Regidx (mword_of_int 11) in
@@ -68,8 +68,12 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
   (* p->sz respects MAXVA *)
   (uint szv <= 2 ^ 38)%Z ->
+  (* kalloc's acquire keeps the transient noff increment in int range;
+     [lvl] is otherwise generic -- vmfault runs at whatever nesting its
+     caller holds (usertrap at 0, pipewrite/piperead's copies at 1) *)
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own γ lvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   p_sz p ↦₈{dqs} szv -∗
@@ -78,7 +82,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   kalloc_env γa None cid_word -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ lvl eb p C -∗
     pc_is ret_tgt -∗
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -97,7 +101,7 @@ Module Type VMFAULT.
   Parameter wp_vmfault_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (szv : mword 64) (K : nat) (eb : bool) (p : mword 64)
+      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dqs dqp : dfrac),
-      wp_vmfault_sconf_body γ γa Φ mm P szv K eb p C dqs dqp.
+      wp_vmfault_sconf_body γ γa Φ mm P szv K lvl eb p C dqs dqp.
 End VMFAULT.
