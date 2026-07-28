@@ -36,6 +36,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - filedup ref overflow: track which [fd_slot] owns a reference; there can't be more than 2^31
 - cancellable lock invariant: pipe->lock needs to be cancelled when underlying pipe page is freed; pipe lock invariant conditional on holding a reference on pipe
 - gcc's 0x4fa4fa4fa4fa4fa5 optimization
+- printk spec: format string translates into precondition requirements on varargs
 
 Big things that still need to be done/explored:
 
