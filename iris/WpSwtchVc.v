@@ -429,7 +429,7 @@ Section WpSwtchVc.
 
   (* [valid_context] and its fixpoint machinery live in SwtchCtx.v; the
      sconf-tier whole-function swtch spec lives in SpecSwtch.v /
-     WpSwtchSconf.v. *)
+     ProofSwtch.v. *)
 
 
 End WpSwtchVc.

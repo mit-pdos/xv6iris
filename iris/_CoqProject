@@ -89,7 +89,9 @@ KernelText.v
 StackOwn.v
 CalleeSaved.v
 WpEntryNew.v
-WpSpinNew.v
+SpecSpin.v
+ProofSpin.v
+LinkSpin.v
 SmodePte.v
 PtAdBits.v
 Pt4kWalk.v
@@ -251,7 +253,8 @@ ProcInv.v
 WpPushOffBridges.v
 WpSwtchVc.v
 SpecSwtch.v
-WpSwtchSconf.v
+ProofSwtch.v
+LinkSwtch.v
 SchedCtx.v
 SpecMyproc.v
 WpMyprocDecode.v

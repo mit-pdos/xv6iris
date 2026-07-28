@@ -1,3 +1,10 @@
+(* ProofSpin.v -- the proof of [spin]'s whole-function spec (SpecSpin.v), as a
+   sealed module.  [spin] calls nothing, so SpinProof takes no functor
+   arguments.
+
+   The decode side lives here: [spin] is the single compressed self-jump
+   [c.j spin] = [0xa001] at 0x8000001a.  It decodes to [C_J imm_spin] whose
+   11-bit immediate is all-zero (jump offset 0), so it targets its own PC. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -12,17 +19,14 @@ From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpMmodeLeafBase.
+Require Import SpecSpin.
 Local Open Scope Z_scope.
 
-Section WpSpin.
+Module SpinProof : SPIN.
+Section ProofSpin.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* The [spin] symbol at 0x8000001a (just past _entry's [jal start]): a single
-     compressed self-jump [c.j spin] = [0xa001], the halt loop each hart runs
-     forever once start() returns.  It decodes to [C_J imm_spin] whose 11-bit
-     immediate is all-zero (jump offset 0), so it targets its own PC. *)
-  Definition pc_spin : mword 64 := mword_of_int KernelSyms.spin.
   Definition h_spin : mword 16 := mword_of_int 0xa001.
   Definition imm_spin : mword 11 :=
     concat_vec (concat_vec (concat_vec (concat_vec (concat_vec (concat_vec
@@ -120,14 +124,9 @@ Qed.
   (* ================================================================= *)
   Lemma wp_spin (Φ : mval -> iProp Σ) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    pmp_allows_all pmpcfg0 ->
-    mmode_config (DfracOwn q) -∗
-    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
-    pc_is pc_spin -∗
-    gpr_file m -∗
-    kernel_text -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    wp_spin_body Φ m pmpcfg0 q.
   Proof.
+    cbv beta delta [wp_spin_body].
     assert (Hbit0 : eq_vec (access_vec_dec pc_spin 0) ('b"0") = true)
       by (vm_compute; reflexivity).
     assert (Htgt : add_vec pc_spin (sign_extend' 64 jimm_spin) = pc_spin)
@@ -198,4 +197,5 @@ Qed.
     iApply ("IH" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
   Qed.
 
-End WpSpin.
+End ProofSpin.
+End SpinProof.

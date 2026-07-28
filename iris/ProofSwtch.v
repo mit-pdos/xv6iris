@@ -1,5 +1,6 @@
-(* WpSwtchSconf.v -- the proof of swtch()'s sconf-tier context-switch spec
-   (SpecSwtch.v), as a sealed module.
+(* ProofSwtch.v -- the proof of swtch()'s sconf-tier context-switch spec
+   (SpecSwtch.v), as a sealed module.  swtch calls nothing, so SwtchProof takes
+   no functor arguments.
 
    Plan (mirrors the retired smode-config wp_swtch proof that lived in
    WpSwtchVc.v, over the same decode facts / VCgen run, with three changes):
@@ -54,7 +55,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Module SwtchProof : SWTCH.
-Section WpSwtchSconf.
+Section ProofSwtch.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
@@ -243,5 +244,5 @@ Section WpSwtchSconf.
     { rewrite Hm4. iExact "HP". }
   Qed.
 
-End WpSwtchSconf.
+End ProofSwtch.
 End SwtchProof.
