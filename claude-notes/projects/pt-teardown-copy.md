@@ -1,12 +1,14 @@
-# Project: freewalk / uvmfree / uvmcopy
+# Project: freewalk / uvmfree / uvmcopy / uvmclear
 
-The page-table TEARDOWN path (`freewalk`, `uvmfree`) and fork's address-space
-COPY (`uvmcopy`) — the three vm.c functions left after
-[`uvm-alloc-unmap`](../completed/uvm-alloc-unmap.md).
+The page-table TEARDOWN path (`freewalk`, `uvmfree`), fork's address-space
+COPY (`uvmcopy`) and exec's guard-page edit (`uvmclear`) — the four vm.c
+functions left after [`uvm-alloc-unmap`](../completed/uvm-alloc-unmap.md).
+**With them, vm.c is 20/20 functions and 100.0 % of its bytes.**
 
 - `freewalk` (0x80001376, 92 B) — **the first recursive function in the tree**.
 - `uvmfree` (0x800013d2, 50 B) — `uvmunmap` + `freewalk`.
 - `uvmcopy` (0x80001404, 154 B) — walk + kalloc + memmove + mappages, per page.
+- `uvmclear` (0x8000149e, 42 B) — one leaf's U bit, cleared.
 
 ## The two design problems, and what they forced
 
@@ -164,6 +166,46 @@ and returns verbatim; the child grows by the pages the parent had mapped.
   postcondition to be stated against. Exposing it needs a contents-indexed
   `proc_pt`; every consumer so far wants the contents-blind one.
 
+### uvmclear — `SpecUvmclear.v`
+
+The one function that changes a user leaf's CLASSIFICATION without changing
+what the table maps: same ppn, same page, same ownership — the page just stops
+being reachable from user mode (exec's stack guard page). So the post is
+`proc_pt (uptd_set P vpn (pte_clear_u w))`, and **`proc_pt_own` is literally
+the same resource** (`um_ppns` is unchanged — `proc_pt_own_set_same` is a
+`reflexivity` after one rewrite, not a transfer).
+
+- **The panic arm is dead, and proving it is the interesting step.** The vpn is
+  mapped (a premise), so the no-alloc walk reaches level 0 and returns a slot
+  address *inside a page-table node* — which is a kalloc page, hence above
+  `kmem_lo`, hence nonzero. That is the **first consumer of `pt_node_claim`'s
+  new `page_valid` conjunct outside freewalk**: without it, "the pointer walk
+  returned is not NULL" is not provable at all.
+- **`uvm_perm_ok` at the cleared flag byte is a caller PREMISE, not derived** —
+  unlike uvmcopy's. Clearing a bit does not preserve the model's validity
+  predicate for free: `pte_is_invalid` mentions U in its non-leaf disjunct, so
+  preservation would need a state-generic congruence over the monadic
+  predicate. Not worth building for one 42-byte function, and every caller
+  knows its permission concretely (exec maps the stack at PTE_W, so the leaf is
+  flag byte 23 and the cleared byte is 7 — `uvm_perm_ok_7`, one `uvm_perm_tac`).
+  This is uvmalloc's precedent, not a new kind of obligation.
+- **No A/D existential leaks into the contract.** The code reads `*pte` as the
+  hardware left it and writes it back with bit 4 cleared; clearing bit 4
+  commutes with rewriting bits 6 and 7 (`pte_set_ad_clear_u`), so the tree ends
+  up holding an A/D variant of `pte_clear_u w` and the canonical entry is
+  exactly that — unlike uvmcopy, where the parent's A/D bits land on a
+  DIFFERENT page and the postcondition has to say so.
+- **Lightest contract in the file**: the no-alloc walk needs no `cpu_own`, no
+  `kalloc_env`, no `panic_wp`, and uvmclear allocates and frees nothing.
+
+**One bit fact carries the whole §2e block** (`ProcPtOwn`): `zcu_bit` —
+`Z.testbit (Z.land x M) k = if k =? 4 then false else Z.testbit x k`. Every
+clear-U lemma is an instance. `pte_ppn_clear_u` needs no hypothesis (bit 4 is
+below `pte_ppn`'s field 53:10) and `um_ppns_set_same` needs no `um_inj` (the
+rewritten entry contributes exactly the ppn it used to). `pte_set_ad_testbit` —
+the bitwise reading of `pte_set_ad`, which subsumes `pte_set_ad_ppn` / `_ext` /
+`_absorb` — was added for the commutation and **belongs in `PtAdBits.v`**.
+
 ## Machine shapes
 
 Every byte read from the tracked `kernel-rocq/KernelInstrs.v`;
@@ -180,6 +222,12 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
   two-AST frame idiom as uvmdealloc (prologue `1101` = plain `c.addi sp,-32`,
   epilogue `6105` = `c.addi16sp sp,32`). Straight-line, two paths joining at
   +0x0e.
+- **uvmclear**: 16-byte frame, 2 slots — 1=ra(8), 2=s0(0). **NOT the two-AST
+  frame idiom**: ±16 both fit C.ADDI's 6-bit signed field, so the prologue's
+  `1141` and the epilogue's `0141` are BOTH plain `C_ADDI` on sp (`0141` is not
+  `c.addi16sp` — that would be `6141`). objdump prints both as `addi sp,sp,N`,
+  which is exactly what invites the mistake. Single path; the panic block
+  +0x1e..+0x29 is dead.
 - **uvmcopy**: 80-byte frame, 10 slots — 1=ra(72) … 9=s7(8), 10 never written.
   **+0x00 is a 2-byte `c.beqz a2` taken BEFORE any push** — the `sz == 0` arm
   at +0x96 returns 0 with no frame at all. Loop head +0x2a, increment +0x24,
@@ -350,6 +398,13 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
       37 % of text (was 75 / 26 %). `Print Assumptions` on all three linked
       contracts: only the five Sail reservation/platform axioms, `Values.mword`
       and `functional_extensionality_dep`.
+- [x] **I** `uvmclear`: `SpecUvmclear.v`, `WpUvmclearDecode.v` (17 `ucli_*`
+      facts), `ProcPtOwn.v` §2e (12 lemmas, **no axioms at all** — pure bit and
+      map arithmetic), `ProofUvmclear.v` (**8.3 s / 760 MB**, 503 lines, one
+      `Lemma`, no join since the single path leaves nothing to rejoin) +
+      `LinkUvmclear.v`. `SpecUvmclear.v` unchanged; `(10 <= K)` exactly right.
+      `ProofIsmapped.v` is the near-verbatim template. `ProcPtOwn.v` went
+      14.8 s -> 19.0 s.
 - [ ] **H** consolidation: `BarePt.uvmf_np` and `ProcPtOwn.uvmc_np` are the
       SAME function (`ceil(sz/4096)`; `uint (pgroundup sz) / 4096` equals
       `(uint sz + 4095) / 4096` whenever `sz + 4095` does not wrap, which the
@@ -366,6 +421,11 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
       earn their keep — **`pt_kids_own_take` currently has no consumer
       anywhere in the tree**, because ProofFreewalk's loop turned out to be
       cleaner over raw `seqZ` splits than over `pt_kids_own` accessors.
+      From uvmclear, add: `ProcPtOwn.pte_set_ad_testbit` → `PtAdBits.v` (it
+      subsumes `pte_set_ad_ppn` / `_ext` / `_absorb`), `ProcPtOwn.upt_ad_view_set`
+      → `UptTree.v` next to `upt_ad_view_insert` (it is that lemma's OVERWRITE
+      sibling and uses nothing outside UptTree's vocabulary), and a
+      double-extension spelling of `pte_clear_u_andi` beside the single one.
 
 ## Where the new lemmas really belong (deferred: each costs a full-tree rebuild)
 

@@ -489,6 +489,10 @@ SpecUvmcopy.v
 WpUvmcopyDecode.v
 ProofUvmcopy.v
 LinkUvmcopy.v
+SpecUvmclear.v
+WpUvmclearDecode.v
+ProofUvmclear.v
+LinkUvmclear.v
 SpecUvmalloc.v
 WpUvmallocDecode.v
 ProofUvmalloc.v

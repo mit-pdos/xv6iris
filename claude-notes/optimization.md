@@ -111,3 +111,27 @@ Lemma uc_regidx_inj (x y : mword 5) : Regidx x = Regidx y -> x = y.   (* top lev
 `match` (not `lazymatch`) over the hypotheses is what makes it pick the right
 one of the nine disequalities. `uc_regidx_inj` belongs in `CalleeSaved.v` next
 to `is_cs_idx_true_neq`.
+
+## A missing bullet at the END of a `split_and!` block is invisible to every obvious probe
+
+`callee_saved` has fourteen conjuncts; supply thirteen and `Qed` says
+"Attempt to save an incomplete proof" — but the usual probes all lie, because
+the leftover goal sits behind the bullet focus:
+
+- `Show 1.` answers **"No such goal"**
+- `all: match goal with |- ?G => idtac G end` prints **nothing**
+- `all: idtac "X"` prints **once**
+
+**`Unshelve. Show Existentials.`** is what names it, in one run. Reach for that
+whenever "incomplete proof" is reported and the goal list looks empty — the
+same family as the "a failing tactic looks like a hang" entry in
+durable-notes.md: the diagnostic you would naturally try is the one that
+misleads you.
+
+## `u_pte_addr` (CommonWalk) and `pte_addr_at` (Pt4kWalk) are the same term, but only CONVERTIBLE
+
+`rewrite pte_addr_at_unsigned` in a goal spelled with `u_pte_addr` reports "no
+subterm matching" on a term you can see. Restate the fact you want at the `u_*`
+spelling in one line closed by `exact` (conversion does the work), then rewrite
+with the restatement. Same reflex for any Pt4kWalk fact reached from the `u_*`
+side.

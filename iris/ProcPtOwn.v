@@ -1539,6 +1539,304 @@ Proof.
   exact (pte_flags10_mk _ _ (pte_flags10_range w)).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* §2e CLEARING THE USER BIT -- uvmclear.                                  *)
+(*                                                                        *)
+(*   [ *pte &= ~PTE_U] (the [c.andi a5,a5,-17] at uvmclear+0x12) is the    *)
+(*   one edit that changes a user leaf's CLASSIFICATION without changing   *)
+(*   what the table maps: same ppn, same page, same ownership -- the page  *)
+(*   simply stops being reachable from user mode (exec's stack guard       *)
+(*   page).  So [um_ppns] is unchanged and [proc_pt_own] is literally the  *)
+(*   same resource; only the wf conjuncts and the tree's leaf word move.   *)
+(*                                                                        *)
+(*   Unlike §2d, the new leaf's [uvm_perm_ok] is NOT derived from the old  *)
+(*   one: [pte_is_invalid] mentions U (in the disjunct guarded by          *)
+(*   [pte_is_non_leaf]), so preservation would need a state-generic        *)
+(*   congruence over the model's monadic predicate.  It is a caller        *)
+(*   premise instead, exactly as in uvmalloc -- pure, ppn-independent, and *)
+(*   one [vm_compute] at a concrete permission ([uvm_perm_ok_7] is the     *)
+(*   instance exec needs).                                                 *)
+(* ---------------------------------------------------------------------- *)
+
+Definition pte_clear_u (w : mword 64) : mword 64 :=
+  and_vec w (mword_of_int (-17) : mword 64).
+
+(* ---- the mask, and the ONE bit fact everything below is built on ----- *)
+
+Local Lemma zcu_mask_unsigned :
+  bv_unsigned (mword_of_int (-17) : mword 64) = 18446744073709551599.
+Proof. vm_compute; reflexivity. Qed.
+
+Local Lemma zcu_mask_bit (k : Z) :
+  0 <= k < 64 -> Z.testbit 18446744073709551599 k = negb (Z.eqb k 4).
+Proof.
+  intros Hk.
+  assert (Hm : 18446744073709551599 = Z.lxor (Z.ones 64) (2 ^ 4))
+    by (vm_compute; reflexivity).
+  rewrite Hm Z.lxor_spec.
+  rewrite Z.testbit_ones; [| lia].
+  rewrite Z.pow2_bits_eqb; [| lia].
+  replace ((0 <=? k) && (k <? 64)) with true
+    by (symmetry; apply andb_true_iff; split;
+        [apply Z.leb_le; lia | apply Z.ltb_lt; lia]).
+  rewrite (Z.eqb_sym 4 k). destruct (Z.eqb k 4); reflexivity.
+Qed.
+
+(* bit [k] of [x land ~16] is bit [k] of [x], except at [k = 4].  Every
+   [pte_clear_u] fact below is an instance of this one line. *)
+Local Lemma zcu_bit (x k : Z) :
+  0 <= k < 64 ->
+  Z.testbit (Z.land x 18446744073709551599) k
+  = (if Z.eqb k 4 then false else Z.testbit x k).
+Proof.
+  intros Hk. rewrite Z.land_spec. rewrite (zcu_mask_bit k Hk).
+  destruct (Z.eqb k 4); [apply andb_false_r | apply andb_true_r].
+Qed.
+
+Local Lemma zcu_mask_nonneg : 0 <= 18446744073709551599.
+Proof. lia. Qed.
+
+Lemma pte_clear_u_unsigned (w : mword 64) :
+  bv_unsigned (pte_clear_u w) = Z.land (bv_unsigned w) 18446744073709551599.
+Proof.
+  unfold pte_clear_u. rewrite and_vec64_unsigned zcu_mask_unsigned. reflexivity.
+Qed.
+
+(* the bitwise reading of [pte_set_ad]: bits 6 and 7 come from a/d, every
+   other bit is the word's own.  A PtAdBits.v-altitude fact (see the note
+   at the end of this section). *)
+Lemma pte_set_ad_testbit (z : mword 64) (a d : mword 1) (k : Z) :
+  0 <= k < 64 ->
+  Z.testbit (bv_unsigned (pte_set_ad z a d)) k
+  = (if Z.eqb k 6 then Z.testbit (bv_unsigned a) 0
+     else if Z.eqb k 7 then Z.testbit (bv_unsigned d) 0
+     else Z.testbit (bv_unsigned z) k).
+Proof.
+  intros Hk.
+  unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags.
+  mw_prep.
+  destruct (decide (k = 6)) as [->|H6].
+  { rewrite Z.eqb_refl. cbv iota. tbk. }
+  destruct (decide (k = 7)) as [->|H7].
+  { rewrite (proj2 (Z.eqb_neq 7 6) ltac:(lia)) Z.eqb_refl. cbv iota. tbk. }
+  rewrite (proj2 (Z.eqb_neq k 6) H6) (proj2 (Z.eqb_neq k 7) H7). cbv iota.
+  destruct (decide (k < 8)) as [Hlt|Hge].
+  - tbk.
+  - tbk.
+Qed.
+
+(* the [c.andi] immediate as the decoder hands it over *)
+Lemma pte_clear_u_andi (w : mword 64) :
+  and_vec w (sign_extend' 64 (mword_of_int (-17) : mword 6)) = pte_clear_u w.
+Proof.
+  assert (Hs : (sign_extend' 64 (mword_of_int (-17) : mword 6) : mword 64)
+               = (mword_of_int (-17) : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hs. reflexivity.
+Qed.
+
+(* ...and the same immediate spelled as its POSITIVE 6-bit residue, which
+   is how the decode file has to hand it over ([bv_is_wf] rejects the
+   signed literal at that width). *)
+Lemma andi_imm6_47 : (mword_of_int 47 : mword 6) = (mword_of_int (-17) : mword 6).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* THE FORM THE PROOF ACTUALLY MEETS.  [WpUvmclearDecode.ucli_12] carries the
+   C.ANDI immediate as [sign_extend' 12 (mword_of_int 47 : mword 6)], and
+   [WpSconfAlu.wp_andi_s_sconf] then sign-extends THAT to 64 -- so the leaf's
+   [wval] premise is this double extension, not the single one above. *)
+Lemma pte_clear_u_andi12 (w : mword 64) :
+  and_vec w (sign_extend' 64 (sign_extend' 12 (mword_of_int 47 : mword 6) : mword 12))
+  = pte_clear_u w.
+Proof.
+  assert (Hs : (sign_extend' 64 (sign_extend' 12 (mword_of_int 47 : mword 6) : mword 12)
+                : mword 64)
+               = (mword_of_int (-17) : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hs. reflexivity.
+Qed.
+
+Lemma pte_clear_u_flags (w : mword 64) :
+  pte_flags10 (pte_clear_u w) = Z.land (pte_flags10 w) 1007.
+Proof.
+  unfold pte_flags10. rewrite pte_clear_u_unsigned.
+  rewrite <- !Z.land_assoc.
+  assert (H1 : Z.land 18446744073709551599 1023 = 1007) by (vm_compute; reflexivity).
+  assert (H2 : Z.land 1023 1007 = 1007) by (vm_compute; reflexivity).
+  rewrite H1 H2. reflexivity.
+Qed.
+
+Lemma pte_clear_u_hi (w : mword 64) :
+  (bv_unsigned w < 2 ^ 54)%Z -> (bv_unsigned (pte_clear_u w) < 2 ^ 54)%Z.
+Proof.
+  intros Hlt. rewrite pte_clear_u_unsigned.
+  exact (proj2 (z_land_pow2 54 (bv_unsigned w) 18446744073709551599
+                  ltac:(lia) (conj (proj1 (bv_unsigned_in_range _ w)) Hlt)
+                  zcu_mask_nonneg)).
+Qed.
+
+(* bits 53:10 do not move, because bit 4 is BELOW [pte_ppn]'s field --
+   which is why this one needs no hypothesis at all *)
+Local Lemma z_div1024_mod44_bits (y z : Z) :
+  (forall k, 10 <= k < 54 -> Z.testbit y k = Z.testbit z k) ->
+  y / 1024 mod 17592186044416 = z / 1024 mod 17592186044416.
+Proof.
+  intros Hb.
+  assert (H10 : 1024 = 2 ^ 10) by (vm_compute; reflexivity).
+  assert (H44 : 17592186044416 = 2 ^ 44) by (vm_compute; reflexivity).
+  rewrite H10 H44.
+  apply Z.bits_inj'. intros k Hk.
+  destruct (Z_lt_le_dec k 44) as [Hlt | Hge].
+  - rewrite !Z.mod_pow2_bits_low; [| lia | lia].
+    rewrite !Z.div_pow2_bits; [| lia | lia | lia | lia].
+    apply Hb. lia.
+  - rewrite !Z.mod_pow2_bits_high; [reflexivity | lia | lia].
+Qed.
+
+Lemma pte_ppn_clear_u (w : mword 64) : pte_ppn (pte_clear_u w) = pte_ppn w.
+Proof.
+  apply bv_eq. rewrite !ppn_unsigned. rewrite pte_clear_u_unsigned.
+  apply z_div1024_mod44_bits. intros k Hk.
+  rewrite (zcu_bit _ k ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq k 4) ltac:(lia)). reflexivity.
+Qed.
+
+(* V is bit 0, untouched by clearing bit 4 *)
+Lemma pte_clear_u_lor1 (w : mword 64) :
+  pte_valid w -> Z.lor (pte_flags10 (pte_clear_u w)) 1 = pte_flags10 (pte_clear_u w).
+Proof.
+  intros Hv.
+  pose proof (pte_flags10_lor1 w Hv) as Hf.
+  assert (Hb : Z.testbit (pte_flags10 w) 0 = true).
+  { rewrite <- Hf at 1. rewrite Z.lor_spec.
+    assert (Ht : Z.testbit 1 0 = true) by (vm_compute; reflexivity).
+    rewrite Ht. apply orb_true_r. }
+  rewrite pte_clear_u_flags.
+  apply z_lor1_id. rewrite Z.land_spec Hb.
+  assert (Ht : Z.testbit 1007 0 = true) by (vm_compute; reflexivity).
+  rewrite Ht. reflexivity.
+Qed.
+
+(* clearing bit 4 commutes with rewriting bits 6 and 7 *)
+Lemma pte_set_ad_clear_u (w : mword 64) (a d : mword 1) :
+  pte_clear_u (pte_set_ad w a d) = pte_set_ad (pte_clear_u w) a d.
+Proof.
+  apply (bv_eq_testbit 64). intros k Hk.
+  assert (Hk' : 0 <= k < 64) by (change (Z.of_N 64) with 64 in Hk; lia).
+  rewrite pte_clear_u_unsigned (zcu_bit _ k Hk').
+  rewrite (pte_set_ad_testbit w a d k Hk').
+  rewrite (pte_set_ad_testbit (pte_clear_u w) a d k Hk').
+  rewrite pte_clear_u_unsigned (zcu_bit _ k Hk').
+  destruct (decide (k = 4)) as [->|H4].
+  { rewrite Z.eqb_refl (proj2 (Z.eqb_neq 4 6) ltac:(lia))
+            (proj2 (Z.eqb_neq 4 7) ltac:(lia)). cbv iota. reflexivity. }
+  rewrite (proj2 (Z.eqb_neq k 4) H4). cbv iota. reflexivity.
+Qed.
+
+(* the reverse of [uvm_perm_ok_of_mk]: the two per-leaf clauses at any
+   page, out of the ppn-independent permission fact *)
+Lemma uvm_perm_ok_to_mk (p : mword 44) (f : Z) :
+  (0 <= f < 1024)%Z -> Z.lor f 1 = f -> uvm_perm_ok f ->
+  (forall a d : mword 1,
+     pte_valid (pte_set_ad (mk_pte p f) a d) /\ pte_leaf (pte_set_ad (mk_pte p f) a d) /\
+     pte_no_napot (pte_set_ad (mk_pte p f) a d) /\ pte_pbmt0 (pte_set_ad (mk_pte p f) a d))
+  /\ (forall acc : MemoryAccessType mem_payload,
+        u_acc acc -> uleaf_ok acc (mk_pte p f) \/ uleaf_denied acc (mk_pte p f)).
+Proof.
+  intros Hr Hlor (_ & Hleaf & Hacc).
+  (* the SAME projection equality as [uvm_perm_ok_of_mk]'s, read the other
+     way round.  Both sides are ppn-free, so ANY page witnesses it. *)
+  assert (Hproj : forall (r : mword 64) (a d : mword 1),
+    (subrange_vec_dec (pte_set_ad (uvm_pte f r) a d) 7 0 : mword 8)
+      = subrange_vec_dec (pte_set_ad (mk_pte p f) a d) 7 0
+    /\ ext_bits_of_PTE (pte_set_ad (uvm_pte f r) a d)
+      = ext_bits_of_PTE (pte_set_ad (mk_pte p f) a d)).
+  { intros r a d. split.
+    - rewrite (uvm_variant_flags f r a d Hr).
+      rewrite (mkpte_ad_flags p f a d Hr Hlor). reflexivity.
+    - rewrite (uvm_variant_ext f r a d Hr).
+      rewrite (mkpte_ad_ext p f a d Hr). reflexivity. }
+  set (r0 := (mword_of_int 0 : mword 64)).
+  split.
+  - intros a d.
+    destruct (Hproj r0 a d) as (Hf & He).
+    destruct (pte_proj_transfer _ _ Hf He) as (Tv & Tl & Tn & Tp & _ & _).
+    destruct (Hleaf r0 a d) as (Hv0 & Hl0 & Hn0 & Hp0).
+    split_and!; [exact (Tv Hv0) | exact (Tl Hl0) | exact (Tn Hn0) | exact (Tp Hp0)].
+  - intros acc Hu.
+    destruct (uleaf_transfer (uvm_pte f r0) (mk_pte p f) acc (Hproj r0)) as (Tok & Tde).
+    destruct (Hacc r0 acc Hu) as [H | H]; [left; exact (Tok H) | right; exact (Tde H)].
+Qed.
+
+(* PTE_R|PTE_W with U CLEARED -- exec's stack guard page, i.e. what
+   [uvm_perm_ok_22]'s leaf becomes under uvmclear. *)
+Lemma uvm_perm_ok_7 : uvm_perm_ok 7.
+Proof. uvm_perm_tac 7. Qed.
+
+(* ---- the descriptor move ---- *)
+
+(* one entry rewritten to an arbitrary word.  [ud_data] is the derived
+   footprint, normalised the way [uptd_insert_perm] does. *)
+Definition uptd_set (P : uptd) (vpn : mword 27) (x : mword 64) : uptd :=
+  UPTD P.(ud_root) P.(ud_tfp) (<[vpn := x]> P.(ud_um))
+       (um_pas (<[vpn := x]> P.(ud_um))).
+
+(* the PAGE SET does not move when a leaf keeps its ppn -- which is what
+   makes the ownership conjunct survive untouched *)
+Lemma um_ppns_set_same (um : gmap (mword 27) (mword 64)) (vpn : mword 27)
+    (w x : mword 64) :
+  um !! vpn = Some w -> pte_ppn x = pte_ppn w ->
+  um_ppns (<[vpn := x]> um) = um_ppns um.
+Proof.
+  intros Hl Hq. apply set_eq. intros q. split.
+  - intros Hin. apply elem_of_um_ppns in Hin. destruct Hin as (v & y & Hlv & Hqy).
+    apply lookup_insert_Some in Hlv. destruct Hlv as [(Hv & Hy) | (_ & Hlv)].
+    + apply elem_of_um_ppns. exists vpn, w. split; [exact Hl |].
+      subst y. exact (eq_trans (eq_sym Hq) Hqy).
+    + apply elem_of_um_ppns. exists v, y. split; [exact Hlv | exact Hqy].
+  - intros Hin. apply elem_of_um_ppns in Hin. destruct Hin as (v & y & Hlv & Hqy).
+    apply elem_of_um_ppns.
+    destruct (decide (v = vpn)) as [-> | Hne].
+    + exists vpn, x. split; [apply lookup_insert |].
+      assert (Hyw : y = w) by congruence.
+      rewrite Hq. rewrite <- Hqy. rewrite Hyw. reflexivity.
+    + exists v, y. split;
+        [ rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)); exact Hlv
+        | exact Hqy ].
+Qed.
+
+(* the A/D-view step for an OVERWRITE (upt_ad_view_insert is the FRESH
+   case, and asks [m_ad !! vpn = None]).  [upt_map_wf] supplies the two
+   fixed-vpn disequalities. *)
+Lemma upt_ad_view_set (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w x : mword 64) (a d : mword 1) :
+  upt_map_wf um -> upt_ad_view tfp um m_ad -> um !! vpn = Some w ->
+  upt_ad_view tfp (<[vpn := x]> um) (<[vpn := pte_set_ad x a d]> m_ad).
+Proof.
+  intros Hwf (Hnone & Hsome) Hl.
+  pose proof (upt_map_wf_not_tramp um vpn w Hwf Hl) as Hntr.
+  pose proof (upt_map_wf_not_tf um vpn w Hwf Hl) as Hntf.
+  split.
+  - intros v. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite !lookup_insert. split; [discriminate |].
+      intros (_ & _ & Hc). discriminate.
+    + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)).
+      rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)).
+      exact (Hnone v).
+  - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite lookup_insert in Hl'.
+      assert (Hw : w' = pte_set_ad x a d) by congruence.
+      exists x, a, d. split; [| exact Hw].
+      right. right. apply lookup_insert.
+    + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)) in Hl'.
+      destruct (Hsome v w' Hl') as (w0 & a0 & d0 & Hleaf & Hr).
+      exists w0, a0, d0. split; [| exact Hr].
+      destruct Hleaf as [Ht | [Ht | Hu0]];
+        [left; exact Ht | right; left; exact Ht |].
+      right. right.
+      rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)). exact Hu0.
+Qed.
+
 (* ===================================================================== *)
 (* §2f WHICH PAGE A WALKADDR VERDICT NAMES.                                *)
 (*                                                                         *)
@@ -1821,6 +2119,68 @@ Qed.
 (* THE FOOTPRINT SHRINKS BY EXACTLY ONE PAGE.  This is what [um_inj] buys:
    without it the deleted vpn's ppn could still be named by another entry
    and the page could not be handed to kfree. *)
+(* the wf conjuncts after uvmclear's edit (§2e).  [um_pages_valid] and
+   [um_inj] survive because the ppn does not move; the two leaf clauses come
+   from the caller's [uvm_perm_ok] through [uvm_perm_ok_to_mk]. *)
+Lemma proc_pt_wf_clear_u (P : uptd) (vpn : mword 27) (w : mword 64) :
+  proc_pt_wf P -> P.(ud_um) !! vpn = Some w ->
+  uvm_perm_ok (Z.land (pte_flags10 w) 1007) ->
+  proc_pt_wf (uptd_set P vpn (pte_clear_u w)).
+Proof.
+  intros (Hm & Ha & Hpv & Hi & Htfp) Hl Hperm.
+  destruct (Hm vpn w Hl) as (Hrange & Hvar).
+  (* the old leaf is a valid 4K leaf, hence has no extension bits ... *)
+  destruct (pte_set_ad_refl w) as (a0 & d0 & Hself).
+  destruct (Hvar a0 d0) as (Hv0 & Hl0 & Hn0 & Hp0).
+  rewrite <- Hself in Hv0. rewrite <- Hself in Hn0. rewrite <- Hself in Hp0.
+  assert (Hhi : (bv_unsigned w < 2 ^ 54)%Z).
+  { change (2 ^ 54)%Z with 18014398509481984%Z. exact (pte_hi_zero w Hv0 Hn0 Hp0). }
+  (* ... and neither does the cleared one, so it IS its ppn and its byte *)
+  assert (Heta : pte_clear_u w = mk_pte (pte_ppn w) (Z.land (pte_flags10 w) 1007)).
+  { pose proof (mk_pte_eta (pte_clear_u w) (pte_clear_u_hi w Hhi)) as He.
+    rewrite pte_ppn_clear_u in He. rewrite pte_clear_u_flags in He. exact He. }
+  assert (Hp10 : (2 ^ 10)%Z = 1024%Z) by (vm_compute; reflexivity).
+  assert (Hin : (0 <= pte_flags10 w < 2 ^ 10)%Z)
+    by (rewrite Hp10; exact (pte_flags10_range w)).
+  assert (Hfr : (0 <= Z.land (pte_flags10 w) 1007 < 1024)%Z).
+  { pose proof (z_land_pow2 10 (pte_flags10 w) 1007 ltac:(lia) Hin ltac:(lia)) as Hz.
+    rewrite Hp10 in Hz. exact Hz. }
+  assert (Hlor : Z.lor (Z.land (pte_flags10 w) 1007) 1 = Z.land (pte_flags10 w) 1007).
+  { pose proof (pte_clear_u_lor1 w Hv0) as Hq.
+    rewrite pte_clear_u_flags in Hq. exact Hq. }
+  destruct (uvm_perm_ok_to_mk (pte_ppn w) (Z.land (pte_flags10 w) 1007)
+              Hfr Hlor Hperm) as (Hnleaf & Hnacc).
+  rewrite <- Heta in Hnleaf. rewrite <- Heta in Hnacc.
+  unfold uptd_set, proc_pt_wf. cbn [ud_root ud_tfp ud_um]. split_and!.
+  - (* upt_map_wf: the vpn range is the OLD entry's *)
+    intros v y Hlv. apply lookup_insert_Some in Hlv.
+    destruct Hlv as [(Hv & Hy) | (_ & Hlv)].
+    + subst v. subst y. split; [exact Hrange | exact Hnleaf].
+    + exact (Hm v y Hlv).
+  - (* upt_acc_wf *)
+    intros v y Hlv. apply lookup_insert_Some in Hlv.
+    destruct Hlv as [(Hv & Hy) | (_ & Hlv)].
+    + subst v. subst y. exact Hnacc.
+    + exact (Ha v y Hlv).
+  - (* um_pages_valid: the page set does not move *)
+    unfold um_pages_valid.
+    rewrite (um_ppns_set_same P.(ud_um) vpn w (pte_clear_u w) Hl
+               (pte_ppn_clear_u w)).
+    exact Hpv.
+  - (* um_inj: neither does the ppn of the rewritten entry *)
+    intros v1 v2 w1 w2 Hl1 Hl2 Hq.
+    apply lookup_insert_Some in Hl1. apply lookup_insert_Some in Hl2.
+    pose proof (pte_ppn_clear_u w) as Hpp.
+    destruct Hl1 as [(Hv1 & Hw1) | (_ & Hl1)]; destruct Hl2 as [(Hv2 & Hw2) | (_ & Hl2)].
+    + rewrite <- Hv1. exact Hv2.
+    + subst v1. subst w1. rewrite Hpp in Hq.
+      exact (Hi vpn v2 w w2 Hl Hl2 Hq).
+    + subst v2. subst w2. rewrite Hpp in Hq.
+      exact (Hi v1 vpn w1 w Hl1 Hl Hq).
+    + exact (Hi v1 v2 w1 w2 Hl1 Hl2 Hq).
+  - exact Htfp.
+Qed.
+
 Lemma um_ppns_delete (um : gmap (mword 27) (mword 64)) (vpn : mword 27)
     (w : mword 64) :
   um_inj um -> um !! vpn = Some w ->
@@ -2509,6 +2869,19 @@ Section ProcPt.
   Proof.
     intros Hl. rewrite /proc_pt_own /uptd_delete. cbn [ud_um].
     rewrite (delete_notin _ _ Hl). reflexivity.
+  Qed.
+
+  (* THE CLEAR-U STEP owns nothing new and gives nothing back: the page
+     set is unchanged (same ppn), so this is an equality of resources, not
+     a transfer.  Compare [proc_pt_own_shrink], which really does hand a
+     page over. *)
+  Lemma proc_pt_own_set_same (P : uptd) (vpn : mword 27) (w x : mword 64) :
+    P.(ud_um) !! vpn = Some w -> pte_ppn x = pte_ppn w ->
+    proc_pt_own P ⊣⊢ proc_pt_own (uptd_set P vpn x).
+  Proof.
+    intros Hl Hq.
+    rewrite /proc_pt_own /uptd_set /upt_pages_own. cbn [ud_um].
+    rewrite (um_ppns_set_same P.(ud_um) vpn w x Hl Hq). reflexivity.
   Qed.
 
   Lemma proc_pt_wf_delete (P : uptd) (vpn : mword 27) :
