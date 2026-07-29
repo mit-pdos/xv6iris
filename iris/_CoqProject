@@ -293,6 +293,11 @@ SpecSched.v
 WpSchedDecode.v
 ProofSched.v
 LinkSched.v
+SpecScheduler.v
+WpSchedulerDecode.v
+WpSmodeWfi.v
+ProofScheduler.v
+LinkScheduler.v
 SpecYield.v
 WpYieldDecode.v
 ProofYield.v

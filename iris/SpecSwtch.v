@@ -35,7 +35,7 @@ Notation SW := KernelSyms.swtch.
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ)
-    (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+    (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
     (av : nat) (eb : bool) (p : mword 64) :=
   length old_vs = 14%nat ->
@@ -59,7 +59,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
   ▷ valid_context γ Φ P newc p -∗
-  P newc oldc (m0 !!! Regidx (mword_of_int 4 : mword 5)) -∗
+  P newc oldc (m0 !!! Regidx (mword_of_int 4 : mword 5)) p -∗
   ( ∀ (m : regfile) (eb' : bool),
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr γ m av -∗
@@ -68,7 +68,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       ctx_cells oldc (callee_img m0) -∗
       (∃ cret : mword 64,
          ▷ valid_context γ Φ P cret p ∗
-         P oldc cret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
+         P oldc cret (m !!! Regidx (mword_of_int 4 : mword 5)) p) -∗
       WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -76,7 +76,7 @@ Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64),
       wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs av eb p.

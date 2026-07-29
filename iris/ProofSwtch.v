@@ -25,8 +25,9 @@
      leaf [wp_cret_s_zca_r_later] (WpSmodePtCtl.v) -- the [iNext] there
      strips it.
 
-   - PAYLOAD: P is three-place (resumed ctx, resumer ctx, resumer tp); the
-     proof supplies [P newc oldc (m0 !!! x4)] and must show x4 threads
+   - PAYLOAD: P is four-place (resumed ctx, resumer ctx, resumer tp, the
+     record's own c->proc index); the proof supplies
+     [P newc oldc (m0 !!! x4) p] and must show x4 threads
      through the block unchanged (x4 is not among swtch_regs1's keys), and
      hands the resumed party [ctx_cells newc new_vs] back through the wand
      (the block only reads new's cells; [swtch_heap1] returns them intact). *)
@@ -69,7 +70,7 @@ Section ProofSwtch.
   Qed.
 
   Lemma wp_swtch_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) :
     wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs av eb p.

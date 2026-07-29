@@ -338,6 +338,17 @@ Proof.
   unfold KernelSyms.proc, proc_size, context_off. rewrite pg_modulus64. lia.
 Qed.
 
+(* proc addresses are injective on the array range. *)
+Lemma proc_addr_inj (i j : nat) :
+  (i < NPROC)%nat -> (j < NPROC)%nat ->
+  proc_addr i = proc_addr j -> i = j.
+Proof.
+  intros Hi Hj Heq.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite (proc_addr_unsigned i Hi) (proc_addr_unsigned j Hj) in Heq.
+  unfold proc_size in Heq. lia.
+Qed.
+
 (* proc-context addresses are injective on the array range. *)
 Lemma p_context_proc_addr_inj (i j : nat) :
   (i < NPROC)%nat -> (j < NPROC)%nat ->

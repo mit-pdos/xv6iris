@@ -862,8 +862,8 @@ Section ProofSched.
     iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
     (* resume: elim the SECOND disjunct (dispatched proc). *)
     iDestruct "Hresume" as (cret) "[Hvc' Hpay]".
-    iDestruct (p_sched_at_proc γs j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) Hj with "Hpay")
-      as "(%Htpv & %Hcret & Hpay2)".
+    iDestruct (p_sched_at_proc γs j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
+      as "(%Htpv & %Hcret & %Hpidx & Hpay2)".
     iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
     (* callee-image component equalities. *)

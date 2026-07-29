@@ -93,23 +93,29 @@ Section SchedCtx.
      proc_pub (proc_addr j))%I.
 
   (* ------------------------------------------------------------------ *)
-  (* The chain payload predicate.                                        *)
+  (* The chain payload predicate.  The FOURTH argument is the crossing's  *)
+  (* c->proc index [p] (the valid_context record's own index, passed      *)
+  (* through by the payload slot): both directions of a crossing happen   *)
+  (* at the same index -- the dispatcher pre-sets c->proc and nobody else *)
+  (* writes it -- and pinning [p = proc_addr j] here is what lets the     *)
+  (* RESUMED scheduler identify the parking proc's existential [j] with   *)
+  (* its own scan cursor (p_sched_at_cpu below).                          *)
   (* ------------------------------------------------------------------ *)
-  Definition p_sched : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ :=
-    fun c cret tpv =>
+  Definition p_sched : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ :=
+    fun c cret tpv p =>
     (⌜tpv = cid_word⌝ ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states. *)
        (⌜c = a_cpu_ctx cid_word⌝ ∗
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
-          ⌜cret = p_context (proc_addr j) /\ (j < NPROC)%nat /\
+          ⌜cret = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
           proc_held j γl st ch)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p. *)
        (∃ (j : nat) (γl : gname) (ch : mword 64),
-          ⌜c = p_context (proc_addr j) /\ (j < NPROC)%nat /\
+          ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx cid_word⌝ ∗
           proc_held j γl RUNNING ch)))%I.
 
@@ -123,22 +129,25 @@ Section SchedCtx.
   (* address; the other disjunct is refuted by cpus[]/proc[] adjacency.   *)
   (* ------------------------------------------------------------------ *)
 
-  (* build the parking-proc payload (what sched supplies at its swtch). *)
+  (* build the parking-proc payload (what sched supplies at its swtch;
+     [p = proc_addr j] is sched's own cpu_own/premise tie). *)
   Lemma p_sched_to_cpu (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> needs_ctx st = true ->
     proc_held j γl st ch -∗
-    p_sched (a_cpu_ctx cid_word) (p_context (proc_addr j)) cid_word.
+    p_sched (a_cpu_ctx cid_word) (p_context (proc_addr j)) cid_word (proc_addr j).
   Proof.
     iIntros (Hj Hγl Hst) "Hheld".
     iSplit; [done|]. iLeft. iSplit; [done|].
     iExists j, γl, st, ch. iFrame. done.
   Qed.
 
-  (* build the dispatch payload (what the scheduler supplies at its swtch). *)
+  (* build the dispatch payload (what the scheduler supplies at its swtch;
+     it has just written c->proc = proc_addr j, so its crossing index IS
+     proc_addr j). *)
   Lemma p_sched_to_proc (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
     proc_held j γl RUNNING ch -∗
-    p_sched (p_context (proc_addr j)) (a_cpu_ctx cid_word) cid_word.
+    p_sched (p_context (proc_addr j)) (a_cpu_ctx cid_word) cid_word (proc_addr j).
   Proof.
     iIntros (Hj Hγl) "Hheld".
     iSplit; [done|]. iRight.
@@ -147,10 +156,10 @@ Section SchedCtx.
 
   (* a resumed PROC context's payload: the resumer was this CPU's scheduler,
      the proc's own lock is held with state RUNNING. *)
-  Lemma p_sched_at_proc (j : nat) (cret tpv : mword 64) :
+  Lemma p_sched_at_proc (j : nat) (cret tpv p : mword 64) :
     (j < NPROC)%nat ->
-    p_sched (p_context (proc_addr j)) cret tpv -∗
-    ⌜tpv = cid_word⌝ ∗ ⌜cret = a_cpu_ctx cid_word⌝ ∗
+    p_sched (p_context (proc_addr j)) cret tpv p -∗
+    ⌜tpv = cid_word⌝ ∗ ⌜cret = a_cpu_ctx cid_word⌝ ∗ ⌜p = proc_addr j⌝ ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held j γl RUNNING ch.
   Proof.
@@ -159,28 +168,34 @@ Section SchedCtx.
     { exfalso.
       exact (a_cpu_ctx_ne_p_context cid_word j tp_ok_cid Hj (eq_sym Hc)). }
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts Hpay]".
-    destruct Hfacts as (Hc & Hj' & Hγl & Hcret).
+    destruct Hfacts as (Hc & Hp & Hj' & Hγl & Hcret).
     assert (j' = j) as -> by (apply (p_context_proc_addr_inj j' j Hj' Hj); congruence).
-    iSplit; [done|]. iExists γl, ch. iFrame. done.
+    iSplit; [done|]. iSplit; [done|]. iExists γl, ch. iFrame. done.
   Qed.
 
   (* the resumed CPU/scheduler context's payload: the resumer was a parking
-     proc holding its own lock in a parked state. *)
-  Lemma p_sched_at_cpu (cret tpv : mword 64) :
-    p_sched (a_cpu_ctx cid_word) cret tpv -∗
-    ⌜tpv = cid_word⌝ ∗
-    ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
-      ⌜cret = p_context (proc_addr j) /\ (j < NPROC)%nat /\
-       γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
+     proc holding its own lock in a parked state.  The scheduler KNOWS its
+     record's crossing index (it wrote c->proc = proc_addr j before parking),
+     so the payload's existential is pinned to its scan cursor by
+     [proc_addr] injectivity -- this is what identifies the lock the
+     payload delivers with the lock its release is about to give back. *)
+  Lemma p_sched_at_cpu (j : nat) (cret tpv : mword 64) :
+    (j < NPROC)%nat ->
+    p_sched (a_cpu_ctx cid_word) cret tpv (proc_addr j) -∗
+    ⌜tpv = cid_word⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
+    ∃ (γl : gname) (st : mword 32) (ch : mword 64),
+      ⌜γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
       proc_held j γl st ch.
   Proof.
-    iIntros "[%Htp Hpay]". iSplit; [done|].
+    iIntros (Hj) "[%Htp Hpay]". iSplit; [done|].
     iDestruct "Hpay" as "[[_ Hpay] | Hpay]".
-    { iDestruct "Hpay" as (j γl st ch) "[%Hfacts Hpay]".
-      iExists j, γl, st, ch. iFrame. done. }
-    iDestruct "Hpay" as (j γl ch) "[%Hfacts _]".
-    destruct Hfacts as (Hc & Hj & _).
-    exfalso. exact (a_cpu_ctx_ne_p_context cid_word j tp_ok_cid Hj Hc).
+    { iDestruct "Hpay" as (j' γl st ch) "[%Hfacts Hpay]".
+      destruct Hfacts as (Hcret & Hp & Hj' & Hγl & Hst).
+      assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
+      iSplit; [done|]. iExists γl, st, ch. iFrame. done. }
+    iDestruct "Hpay" as (j' γl ch) "[%Hfacts _]".
+    destruct Hfacts as (Hc & _ & Hj' & _).
+    exfalso. exact (a_cpu_ctx_ne_p_context cid_word j' tp_ok_cid Hj' Hc).
   Qed.
 
   (* ------------------------------------------------------------------ *)

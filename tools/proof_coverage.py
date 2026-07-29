@@ -239,6 +239,20 @@ def runs_to_end(text: str, entry: str, local_defs: dict | None = None) -> bool:
             if any(re.search(rf"\b{re.escape(n)}\b", args) and pc_of(dtext, n)
                    for n in names):
                 return True
+    # The DIVERGING shape: a function that never returns and never transfers
+    # out (scheduler's infinite dispatch loop) has no continuation at all --
+    # its conclusion is a bare `WP Loop {{Φ}}`.  Such a spec's ONLY `pc_is`
+    # is the entry pin, so: exactly one `pc_is` in the body, and none in any
+    # same-file predicate the body applies (a fragment that FACTORS a
+    # mid-function continuation into a predicate would put a `pc_is` there,
+    # and stays a fragment).  A fragment with an inline continuation has a
+    # second `pc_is`; a fragment with no continuation at all states nothing
+    # a caller could use, so it does not occur.
+    if len(re.findall(r"\bpc_is\b", text)) == 1:
+        applied = [dname for dname in (local_defs or {})
+                   if re.search(rf"\b{re.escape(dname)}\b", text)]
+        if not any(re.search(r"\bpc_is\b", (local_defs or {})[d]) for d in applied):
+            return True
     return False
 REQUIRE = re.compile(r"^\s*(?:From\s+\w+\s+)?Require\s+(?:Import|Export)?\s*([^.]*)\.", re.M)
 MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)

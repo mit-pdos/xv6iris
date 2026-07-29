@@ -83,6 +83,14 @@ Section SwtchCtx.
   (*          -- a chain rebuilds the suspended old context at the SAME P,    *)
   (*          so per-direction P's are impossible);                           *)
   (*   [cret] the resumer's context (existential: never pin a partner);       *)
+  (*   [p]    the record's own c->proc index (the fixpoint's second           *)
+  (*          argument, passed through to the payload).  Both crossing        *)
+  (*          directions happen at the same index -- the dispatcher pre-sets  *)
+  (*          c->proc and nobody else writes it -- so handing [p] to P is     *)
+  (*          what lets the RESUMED party identify its resumer's proc: the    *)
+  (*          scheduler's release needs the payload's existential j pinned    *)
+  (*          to its own scan cursor, and [p = proc_addr j] in the payload    *)
+  (*          (SchedCtx.p_sched) is that pin.                                 *)
   (*   [tpv]  the RESUMER's tp register value.  [callee_img] deliberately     *)
   (*          does not pin tp (a context may in principle resume on another   *)
   (*          CPU), but the resumed code recomputes every per-CPU cell        *)
@@ -120,7 +128,7 @@ Section SwtchCtx.
      is internal to the swtch proof; no [sc] parameter remains. *)
   Definition valid_context_pre
       (γ : gname) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
       (rec : mword 64 -d> mword 64 -d> iPropO Σ)
       : mword 64 -d> mword 64 -d> iPropO Σ := fun c p =>
     (∃ (vs : list (mword 64)) (av : nat),
@@ -135,21 +143,21 @@ Section SwtchCtx.
          pc_is (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
          (∃ cret : mword 64,
-            ▷ rec cret p ∗ P c cret (m !!! Regidx (mword_of_int 4 : mword 5))) -∗
+            ▷ rec cret p ∗ P c cret (m !!! Regidx (mword_of_int 4 : mword 5)) p) -∗
          WP (Loop : expr riscv_lang) {{ Phi }}))%I.
 
   Global Instance valid_context_pre_contractive γ Phi
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) :
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) :
     Contractive (valid_context_pre γ Phi P).
   Proof. solve_contractive. Qed.
 
   Definition valid_context (γ : gname) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : mword 64 -d> mword 64 -d> iPropO Σ :=
     fixpoint (valid_context_pre γ Phi P).
 
   Lemma valid_context_unfold (γ : gname) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) (c p : mword 64) :
+      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) (c p : mword 64) :
     valid_context γ Phi P c p ⊣⊢
       valid_context_pre γ Phi P (valid_context γ Phi P) c p.
   Proof. apply (fixpoint_unfold (valid_context_pre γ Phi P) c p). Qed.
