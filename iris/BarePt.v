@@ -78,32 +78,9 @@ Definition upt_fixed (otf : option (mword 44)) : gmap (mword 27) (mword 64) :=
 Definition uptg_map (otf : option (mword 44)) (um : gmap (mword 27) (mword 64))
     : gmap (mword 27) (mword 64) := upt_fixed otf ∪ um.
 
-(* the two fixed leaves, read out of [upt_full_map] *)
-Lemma upt_full_map_tramp (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
-  upt_full_map tfp um !! tramp_vpn = Some pte_tramp.
-Proof. apply lookup_insert. Qed.
-
-Lemma upt_full_map_tf (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
-  upt_full_map tfp um !! tf_vpn = Some (pte_tf tfp).
-Proof.
-  rewrite /upt_full_map.
-  rewrite (lookup_insert_ne _ tramp_vpn tf_vpn pte_tramp (not_eq_sym tf_vpn_ne_tramp)).
-  apply lookup_insert.
-Qed.
-
-(* a USER entry, read out of [upt_full_map]: [upt_map_wf] is what says the
-   vpn is neither fixed vpn, so the two inserts miss it. *)
-Lemma upt_full_map_um (tfp : mword 44) (um : gmap (mword 27) (mword 64))
-    (vpn : mword 27) (w : mword 64) :
-  upt_map_wf um -> um !! vpn = Some w -> upt_full_map tfp um !! vpn = Some w.
-Proof.
-  intros Hwf Hu. rewrite /upt_full_map.
-  rewrite (lookup_insert_ne _ tramp_vpn vpn pte_tramp
-             (not_eq_sym (upt_map_wf_not_tramp um vpn w Hwf Hu))).
-  rewrite (lookup_insert_ne _ tf_vpn vpn (pte_tf tfp)
-             (not_eq_sym (upt_map_wf_not_tf um vpn w Hwf Hu))).
-  exact Hu.
-Qed.
+(* the three POSITIVE readings of [upt_full_map] this file's [Some]-side
+   bridges run on -- [UptTree.upt_full_map_tramp] / [_tf] / [_um] -- live
+   next to their elimination forms, in UptTree.v. *)
 
 Lemma uptg_full_Some (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
   uptg_map (Some tfp) um = upt_full_map tfp um.
@@ -169,13 +146,6 @@ Proof.
     by (apply delete_notin; exact (uptg_fixed_user_none otf vpn Hlt)).
   rewrite Hd. reflexivity.
 Qed.
-
-(* uvmfree's run length: PGROUNDUP(sz)/PGSIZE, the number of user pages
-   uvmunmap clears.  The sibling of [ProcPtOwn.uvma_np] / [uvmd_np]; at
-   [sz = 0] it is 0, which is what makes uvmfree's ONE premise cover the
-   branch that skips uvmunmap entirely. *)
-Definition uvmf_np (sz : mword 64) : nat :=
-  Z.to_nat (uint (pgroundup sz) / 4096).
 
 Definition uptg_spec (otf : option (mword 44)) (uroot : mword 44)
     (um : gmap (mword 27) (mword 64)) (t : ptree) : Prop :=
@@ -258,61 +228,9 @@ Qed.
    [upt_spec_of_rep0] restated along the axis; both get SIMPLER, because
    [uptg_spec] and [uptg_view] are already phrased against one leaf map
    rather than through [upt_leaf_at] (the CLOSE direction loses its
-   [upt_map_wf] premise entirely). ---- *)
-
-(* OPEN, over an arbitrary leaf map. *)
-Lemma gleaf_spec_rep0 (M : gmap (mword 27) (mword 64)) (t : ptree) :
-  (forall vpn w, M !! vpn = Some w ->
-     exists p2 p1 (a d : mword 1), ptree_maps t vpn p2 p1 (pte_set_ad w a d)) ->
-  (forall vpn, M !! vpn = None -> ptree_blocks0 t vpn) ->
-  exists m_ad, pt_rep0 t m_ad /\
-    (forall vpn, m_ad !! vpn = None <-> M !! vpn = None) /\
-    (forall vpn w', m_ad !! vpn = Some w' ->
-       exists w (a d : mword 1), M !! vpn = Some w /\ w' = pte_set_ad w a d).
-Proof.
-  intros Hmaps Hblk.
-  assert (Hlw : forall (vpn : mword 27) (x : mword 64),
-            M !! vpn = Some x ->
-            exists p2 p1 (a d : mword 1),
-              ptree_maps t vpn p2 p1 (pte_set_ad x a d) /\
-              pt_leaf_word t vpn = Some (pte_set_ad x a d)).
-  { intros vpn x Hl.
-    destruct (Hmaps vpn x Hl) as (p2 & p1 & a & d & Hm).
-    exists p2, p1, a, d. split; [exact Hm |].
-    exact (ptree_maps_leaf_word t vpn p2 p1 _ Hm). }
-  exists (map_imap (fun vpn _ => pt_leaf_word t vpn) M).
-  assert (HadSome : forall (vpn : mword 27) (w' : mword 64),
-            map_imap (fun vpn _ => pt_leaf_word t vpn) M !! vpn = Some w' ->
-            exists x, M !! vpn = Some x /\ pt_leaf_word t vpn = Some w').
-  { intros vpn w' Hl. rewrite map_lookup_imap in Hl.
-    destruct (M !! vpn) as [x|] eqn:Hf; [| discriminate].
-    exists x. split; [reflexivity |]. cbn [mbind option_bind] in Hl. exact Hl. }
-  assert (HadNone : forall vpn : mword 27,
-            map_imap (fun vpn _ => pt_leaf_word t vpn) M !! vpn = None ->
-            M !! vpn = None).
-  { intros vpn Hl. rewrite map_lookup_imap in Hl.
-    destruct (M !! vpn) as [x|] eqn:Hf; [| reflexivity].
-    exfalso. cbn [mbind option_bind] in Hl.
-    destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq).
-    rewrite Hq in Hl. discriminate. }
-  split.
-  - split.
-    + intros vpn w' Hl.
-      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
-      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & Hm & Hq').
-      rewrite Hq in Hq'. injection Hq' as Hq''.
-      exists p2, p1. rewrite Hq''. exact Hm.
-    + intros vpn Hl. exact (Hblk vpn (HadNone vpn Hl)).
-  - split.
-    + intros vpn. split.
-      * intros Hl. exact (HadNone vpn Hl).
-      * intros Hr. rewrite map_lookup_imap. rewrite Hr. reflexivity.
-    + intros vpn w' Hl.
-      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
-      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq').
-      rewrite Hq in Hq'. injection Hq' as Hq''.
-      exists x, a, d. split; [exact Hf | exact Hq''].
-Qed.
+   [upt_map_wf] premise entirely).  OPEN is literally
+   [UptTree.gleaf_spec_rep0] -- the construction over an ARBITRARY leaf
+   map -- fed [uptg_map otf um]. ---- *)
 
 Lemma uptg_spec_rep0 (otf : option (mword 44)) (uroot : mword 44)
     (um : gmap (mword 27) (mword 64)) (t : ptree) :
@@ -363,6 +281,27 @@ Proof.
   intros (Hm & _ & Hp & Hi & _). split_and!; [exact Hm | exact Hp | exact Hi].
 Qed.
 
+(* ...over a whole DELETION RUN, which is what a loop that clears
+   [vpn_run vpn0 k] needs.  The [uptg_wf] twin of
+   [ProcPtOwn.proc_pt_wf_del_run]. *)
+Lemma uptg_wf_del_run (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
+    (k : nat) :
+  uptg_wf um -> uptg_wf (um_del_run um vpn0 k).
+Proof.
+  intros Hwf. induction k as [| k IH]; [exact Hwf |].
+  cbn [um_del_run]. exact (uptg_wf_delete _ _ IH).
+Qed.
+
+(* the [uptg_wf] twin of [ProcPtOwn.um_page_valid]: every page the user map
+   names is a kalloc page, which is kfree's precondition. *)
+Lemma uptg_page_valid (um : gmap (mword 27) (mword 64)) (vpn : mword 27)
+    (w : mword 64) :
+  uptg_wf um -> um !! vpn = Some w -> page_valid (page_base (pte_ppn w)).
+Proof.
+  intros (_ & Hpv & _) Hl. apply Hpv. apply elem_of_um_ppns.
+  exists vpn, w. split; [exact Hl | reflexivity].
+Qed.
+
 Section BarePt.
   Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
 
@@ -378,6 +317,26 @@ Section BarePt.
     uptg None uroot um.
 
   Typeclasses Opaque uptg bare_pt.
+
+  (* [ProcPtOwn.proc_pt_own_shrink] at [uptg_wf]: it only ever used
+     [um_inj] (for the footprint) and [um_pages_valid] (for kfree's
+     [page_valid]), neither of which is about the fixed leaves. *)
+  Lemma uptg_own_shrink (um : gmap (mword 27) (mword 64))
+      (vpn : mword 27) (w : mword 64) :
+    uptg_wf um -> um !! vpn = Some w ->
+    KMap.kmap_static_claims -∗ upt_pages_own um -∗
+      page_own (page_base (pte_ppn w)) ∗ upt_pages_own (delete vpn um).
+  Proof.
+    intros Hwf Hl.
+    pose proof (uptg_page_valid um vpn w Hwf Hl) as Hval.
+    destruct Hwf as (_ & _ & Hinj).
+    iIntros "#Hb Hown".
+    iEval (rewrite (upt_pages_own_take um vpn w Hinj Hl)) in "Hown".
+    iDestruct "Hown" as "[Hp Hrest]".
+    iSplitL "Hp".
+    { iApply (phys_to_page_own (pte_ppn w) Hval with "Hb Hp"). }
+    iExact "Hrest".
+  Qed.
 
   (* [proc_pt] IS the [Some] instance -- modulo [proc_pt_wf]'s two extra
      conjuncts, which [uptg] does not carry and which the [Some] direction

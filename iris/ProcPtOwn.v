@@ -1082,11 +1082,36 @@ Definition uvma_np (oldsz newsz : mword 64) : nat :=
 Definition uvmd_np (oldsz newsz : mword 64) : nat :=
   Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096).
 
-(* uvmcopy's run length: the loop is [for (i = 0; i < sz; i += PGSIZE)], so
-   it runs ceil(sz/4096) times -- NOT PGROUNDUP-based, and 0 exactly when
-   [sz = 0] (the frameless fast path at uvmcopy+0x00). *)
-Definition uvmc_np (sz : mword 64) : nat :=
+(* ...and the run length of the two functions whose bound is the SIZE
+   itself: ceil(sz/4096).  uvmcopy's loop is [for (i = 0; i < sz; i +=
+   PGSIZE)] and uvmfree's uvmunmap call takes [PGROUNDUP(sz)/PGSIZE] --
+   the SAME number ([pgroundup_quot] below, plus the no-wrap the range
+   premise gives).  0 exactly when [sz = 0], which is what makes both the
+   frameless fast path at uvmcopy+0x00 and uvmfree's skip arm fall out
+   with no case split in the specs. *)
+Definition uvm_np (sz : mword 64) : nat :=
   Z.to_nat ((uint sz + 4095) / 4096).
+
+(* THE REUSABLE PGROUNDUP FACT: masking the low 12 bits off cannot change a
+   division by 4096, so PGROUNDUP's quotient IS the raw sum's quotient.
+   UNCONDITIONAL -- [pgd_unsigned] reads [uint (pgroundup x)] as [a - a mod
+   4096] for whatever [a] the code's [add_vec x 4095] actually formed,
+   wrapped or not.  (The step from here to [uvm_np] is the one that needs
+   the no-wrap, i.e. the size range premise every uvm* spec carries.) *)
+Lemma z_pgu_quot (a : Z) : (a - a mod 4096) / 4096 = a / 4096.
+Proof.
+  pose proof (Z_div_mod_eq_full a 4096) as H.
+  assert (Hq : a - a mod 4096 = a / 4096 * 4096) by lia.
+  rewrite Hq. apply Z.div_mul. lia.
+Qed.
+
+Lemma pgroundup_quot (x : mword 64) :
+  uint (pgroundup x) / 4096
+  = bv_unsigned (add_vec x (mword_of_int 4095)) / 4096.
+Proof.
+  rewrite uint_unsigned. unfold pgroundup. rewrite pgd_unsigned.
+  apply z_pgu_quot.
+Qed.
 
 Lemma uvm_maxsz_val : uvm_maxsz = 274877898752.
 Proof. vm_compute. reflexivity. Qed.
@@ -1602,49 +1627,17 @@ Proof.
   unfold pte_clear_u. rewrite and_vec64_unsigned zcu_mask_unsigned. reflexivity.
 Qed.
 
-(* the bitwise reading of [pte_set_ad]: bits 6 and 7 come from a/d, every
-   other bit is the word's own.  A PtAdBits.v-altitude fact (see the note
-   at the end of this section). *)
-Lemma pte_set_ad_testbit (z : mword 64) (a d : mword 1) (k : Z) :
-  0 <= k < 64 ->
-  Z.testbit (bv_unsigned (pte_set_ad z a d)) k
-  = (if Z.eqb k 6 then Z.testbit (bv_unsigned a) 0
-     else if Z.eqb k 7 then Z.testbit (bv_unsigned d) 0
-     else Z.testbit (bv_unsigned z) k).
-Proof.
-  intros Hk.
-  unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags.
-  mw_prep.
-  destruct (decide (k = 6)) as [->|H6].
-  { rewrite Z.eqb_refl. cbv iota. tbk. }
-  destruct (decide (k = 7)) as [->|H7].
-  { rewrite (proj2 (Z.eqb_neq 7 6) ltac:(lia)) Z.eqb_refl. cbv iota. tbk. }
-  rewrite (proj2 (Z.eqb_neq k 6) H6) (proj2 (Z.eqb_neq k 7) H7). cbv iota.
-  destruct (decide (k < 8)) as [Hlt|Hge].
-  - tbk.
-  - tbk.
-Qed.
+(* [PtAdBits.pte_set_ad_testbit] -- the bitwise reading of [pte_set_ad] --
+   is what the commutation below runs on; it lives there, next to the three
+   laws it subsumes. *)
 
-(* the [c.andi] immediate as the decoder hands it over *)
-Lemma pte_clear_u_andi (w : mword 64) :
-  and_vec w (sign_extend' 64 (mword_of_int (-17) : mword 6)) = pte_clear_u w.
-Proof.
-  assert (Hs : (sign_extend' 64 (mword_of_int (-17) : mword 6) : mword 64)
-               = (mword_of_int (-17) : mword 64))
-    by (apply bv_eq; vm_compute; reflexivity).
-  rewrite Hs. reflexivity.
-Qed.
-
-(* ...and the same immediate spelled as its POSITIVE 6-bit residue, which
-   is how the decode file has to hand it over ([bv_is_wf] rejects the
-   signed literal at that width). *)
-Lemma andi_imm6_47 : (mword_of_int 47 : mword 6) = (mword_of_int (-17) : mword 6).
-Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-
-(* THE FORM THE PROOF ACTUALLY MEETS.  [WpUvmclearDecode.ucli_12] carries the
+(* THE [c.andi] IMMEDIATE, IN THE FORM THE PROOF ACTUALLY MEETS.
+   [WpUvmclearDecode.ucli_12] carries the
    C.ANDI immediate as [sign_extend' 12 (mword_of_int 47 : mword 6)], and
    [WpSconfAlu.wp_andi_s_sconf] then sign-extends THAT to 64 -- so the leaf's
-   [wval] premise is this double extension, not the single one above. *)
+   [wval] premise is this DOUBLE extension.  [bv_is_wf] rejects the signed
+   literal [-17] at width 6, which is why the decode file carries the
+   positive residue 47. *)
 Lemma pte_clear_u_andi12 (w : mword 64) :
   and_vec w (sign_extend' 64 (sign_extend' 12 (mword_of_int 47 : mword 6) : mword 12))
   = pte_clear_u w.
@@ -1805,37 +1798,8 @@ Proof.
         | exact Hqy ].
 Qed.
 
-(* the A/D-view step for an OVERWRITE (upt_ad_view_insert is the FRESH
-   case, and asks [m_ad !! vpn = None]).  [upt_map_wf] supplies the two
-   fixed-vpn disequalities. *)
-Lemma upt_ad_view_set (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
-    (vpn : mword 27) (w x : mword 64) (a d : mword 1) :
-  upt_map_wf um -> upt_ad_view tfp um m_ad -> um !! vpn = Some w ->
-  upt_ad_view tfp (<[vpn := x]> um) (<[vpn := pte_set_ad x a d]> m_ad).
-Proof.
-  intros Hwf (Hnone & Hsome) Hl.
-  pose proof (upt_map_wf_not_tramp um vpn w Hwf Hl) as Hntr.
-  pose proof (upt_map_wf_not_tf um vpn w Hwf Hl) as Hntf.
-  split.
-  - intros v. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite !lookup_insert. split; [discriminate |].
-      intros (_ & _ & Hc). discriminate.
-    + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)).
-      rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)).
-      exact (Hnone v).
-  - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
-    + rewrite lookup_insert in Hl'.
-      assert (Hw : w' = pte_set_ad x a d) by congruence.
-      exists x, a, d. split; [| exact Hw].
-      right. right. apply lookup_insert.
-    + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)) in Hl'.
-      destruct (Hsome v w' Hl') as (w0 & a0 & d0 & Hleaf & Hr).
-      exists w0, a0, d0. split; [| exact Hr].
-      destruct Hleaf as [Ht | [Ht | Hu0]];
-        [left; exact Ht | right; left; exact Ht |].
-      right. right.
-      rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)). exact Hu0.
-Qed.
+(* the OVERWRITE A/D-view step is [UptTree.upt_ad_view_set], next to its
+   FRESH sibling [upt_ad_view_insert]. *)
 
 (* ===================================================================== *)
 (* §2f WHICH PAGE A WALKADDR VERDICT NAMES.                                *)
@@ -2363,6 +2327,18 @@ Proof.
   - exact Ht.
 Qed.
 
+(* [upt_acc_wf] alone over the same run.  [proc_pt_wf_del_run] above is the
+   whole-descriptor version; this is the one conjunct [BarePt.uptg_wf]
+   deliberately drops, so every RE-SEAL of a generically-proved function at
+   the [Some] end of the [otf] axis has to re-establish exactly this. *)
+Lemma upt_acc_wf_del_run (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
+    (k : nat) :
+  upt_acc_wf um -> upt_acc_wf (um_del_run um vpn0 k).
+Proof.
+  intros Hwf. induction k as [| k IH]; [exact Hwf |].
+  cbn [um_del_run]. exact (upt_acc_wf_delete _ _ IH).
+Qed.
+
 (* ===================================================================== *)
 (* §4 The coverage side condition, as a theorem.                          *)
 (* ===================================================================== *)
@@ -2672,6 +2648,14 @@ Section ProcPt.
      [proc_priv] projection went 2 s -> 300 s / 15.7 GB without this).  Same
      reason [phys_page_own]/[upt_pages_own] are already opaque above. *)
   Typeclasses Opaque proc_pt proc_pt_at.
+
+  (* READ THE PURE CONJUNCT, without opening the tree.  Every other way in
+     ([proc_pt_acc_rep0] and friends) consumes the resource to get at
+     [proc_pt_wf]; a caller that only wants to know the descriptor is
+     well-formed -- to re-seal a generically-proved function at the [Some]
+     end of BarePt's [otf] axis, say -- needs it as a plain projection. *)
+  Lemma proc_pt_wf_get (P : uptd) : proc_pt P ⊢ ⌜proc_pt_wf P⌝.
+  Proof. rewrite /proc_pt. iIntros "(%Hwf & _)". iPureIntro. exact Hwf. Qed.
 
   (* ------------------------------------------------------------------ *)
   (* INTRO AT THE EMPTY MAP -- the join with the CONSTRUCTION side.       *)

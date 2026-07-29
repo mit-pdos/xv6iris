@@ -240,14 +240,14 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
 - [x] **S1** `PageGeom.v` split out; `pt_node_claim` strengthened;
       `pt_node_claim_from_static` re-premised and its three call sites moved
       over; `page_base` relocated. (orchestrator)
-- [ ] **S2** `PtFree.v` (§1 `pt_free_ok` + `vpn_mk`; §2 the node-page → kfree
+- [x] **S2** `PtFree.v` (§1 `pt_free_ok` + `vpn_mk`; §2 the node-page → kfree
       bridges) and `BarePt.v` (the `otf` axis) — statements written, proofs
       outstanding.
-- [ ] **S3** `ProcPtOwn.v` additions: `pte_flags10` + `uvm_perm_ok_of_leaf`
+- [x] **S3** `ProcPtOwn.v` additions: `pte_flags10` + `uvm_perm_ok_of_leaf`
       (§2c), `uvmc_np` and `um_del_run_restore_sub` (§3d).
 - [x] **A** `WpFreewalkDecode.v` — 36 `fwi_*` facts.
-- [ ] **B** `WpUvmfreeDecode.v` — 22 `ufi_*` facts.
-- [ ] **C** `WpUvmcopyDecode.v` — 65 `uci_*` facts.
+- [x] **B** `WpUvmfreeDecode.v` — 22 `ufi_*` facts.
+- [x] **C** `WpUvmcopyDecode.v` — 65 `uci_*` facts.
 - [x] **D** `ProofFreewalk.v` (`Module FreewalkProof (Kfree : KFREE) :
       FREEWALK`, **15.9 s / 0.99 GB** isolated, flat profile — the three
       `Qed`s at 0.98/0.75/0.64 s are the top sentences) + `LinkFreewalk.v`.
@@ -405,65 +405,79 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
       `LinkUvmclear.v`. `SpecUvmclear.v` unchanged; `(10 <= K)` exactly right.
       `ProofIsmapped.v` is the near-verbatim template. `ProcPtOwn.v` went
       14.8 s -> 19.0 s.
-- [ ] **H** consolidation: `BarePt.uvmf_np` and `ProcPtOwn.uvmc_np` are the
-      SAME function (`ceil(sz/4096)`; `uint (pgroundup sz) / 4096` equals
-      `(uint sz + 4095) / 4096` whenever `sz + 4095` does not wrap, which the
-      range premise gives). Merge them into one `ProcPtOwn.uvm_np` beside
-      `uvma_np` / `uvmd_np`. Also: `PtFree.pte_ptr_hi_zero` /
-      `pte_ptr_ext_zero` belong in `PtTree.v` next to `pte_hi_zero`, and the
-      `uptg_wf`-premised variant of `proc_pt_own_shrink` belongs in
-      `ProcPtOwn.v`; both were kept local only to avoid a full-tree rebuild
-      mid-project.  Add to that list: `ProofFreewalk.fw_ptr_and14` (the
-      R|W|X bit-test bridge) → `PtBuild.v` §7 next to `pte_valid_bit0`, and
-      `ProofUvmcopy.uc_regidx_inj` → `CalleeSaved.v` next to
-      `is_cs_idx_true_neq`.  Also decide there whether
-      `PtFree.pt_kids_own_take` / `pt_page_kfree_pre` / `pt_page_own_phys`
-      earn their keep — **`pt_kids_own_take` currently has no consumer
-      anywhere in the tree**, because ProofFreewalk's loop turned out to be
-      cleaner over raw `seqZ` splits than over `pt_kids_own` accessors.
-      From uvmclear, add: `ProcPtOwn.pte_set_ad_testbit` → `PtAdBits.v` (it
-      subsumes `pte_set_ad_ppn` / `_ext` / `_absorb`), `ProcPtOwn.upt_ad_view_set`
-      → `UptTree.v` next to `upt_ad_view_insert` (it is that lemma's OVERWRITE
-      sibling and uses nothing outside UptTree's vocabulary), and a
-      double-extension spelling of `pte_clear_u_andi` beside the single one.
+- [x] **H** the end-of-project cleanup sweep — everything the four proofs
+      kept local has moved to its altitude.  **Compile-time NOT neutral,
+      for once: it is a NET WIN, and all of it comes from one item.**
+      `PtAdBits.v` went **27.6 s -> 13.0 s** (interleaved isolated `coqc`,
+      old source compiled under a scratch module name), because
+      `pte_set_ad_absorb` / `_ppn` / `_ext` are now three-line corollaries
+      of `pte_set_ad_testbit` instead of three more `tbk` chases through
+      `update_subrange_vec_dec`.  PtAdBits sits on the
+      `SmodePte -> PtTree -> ... -> UptTree` tail, so that is ~15 s off the
+      critical path.  Everything else was within noise (ProcPtOwn 14.1 ->
+      13.3, PtFree 3.1 -> 2.4, all others +-0.3 s).  945 statements at HEAD
+      vs 940 after across the 17 touched files, every difference intended.
+      What moved, and the two judgement calls:
+      - `PtTree.v` (+4): `pte_ptr_ext_zero` / `pte_ptr_hi_zero` next to
+        `pte_hi_zero`; `pt_bv9_range` / `pt_mword27_unsigned` next to
+        `pt_mword9_unsigned`.  **`pte_piv_split` and `PtFree.ptf_piv_nonleaf`
+        collapsed into ONE `pte_piv_split` with all EIGHT disjuncts written
+        out concretely** — the three state probes (menvcfg.SSE, Svnapot,
+        menvcfg.PBMTE/Svrsw60t59b) are decided by `pte_s0`, so nothing has
+        to stay existential and any consumer can read off any disjunct.
+        Both consumers re-derive from it unchanged.  `pt_bv9_range` then
+        replaced the same three inline lines in six accessors (four in
+        `PtTree.v`, `PtBuild.pt_kids_own_ins`, `KptTree.u_pte_slot_facts`).
+      - `PtAdBits.v` (+3): `pte_set_ad_testbit` (from `ProcPtOwn`), plus the
+        two `Local` field readings `ppn_field_testbit` / `ext_field_testbit`
+        that turn it into the PPN and extension laws.  See the timing above.
+      - `UptTree.v` (+5): `upt_full_map_tramp` / `_tf` / `_um` (the missing
+        POSITIVE side of `upt_full_map_leaf_at` / `_None`), `gleaf_spec_rep0`
+        — with `upt_spec_rep0` now an 11-line instance of it — and
+        `upt_ad_view_set` next to `upt_ad_view_insert`.
+      - `PtBuild.v` §7 (+2 public, +6 `Local`): `fw_ptr_and14` /
+        `andi14_unsigned`, the R|W|X mask bridge, next to `pte_valid_bit0`
+        (V) and `pte_vu_bits` (V|U); and `pa_add_page_slot_pb`, which
+        absorbed both `PtFree.pa_add_page_slot_pb` and PtBuild's own
+        `Local pa_add_page_slot_u`.
+      - `ProcPtOwn.v`: `uvm_np` (see below), `z_pgu_quot` / `pgroundup_quot`,
+        `upt_acc_wf_del_run`, `proc_pt_wf_get`.  `BarePt.v`:
+        `uptg_wf_del_run`, `uptg_page_valid`, `uptg_own_shrink`.
+        `CalleeSaved.v`: `regidx_inj` (was `ProofUvmcopy.uc_regidx_inj`).
+      - **`uvmf_np` and `uvmc_np` are one `ProcPtOwn.uvm_np sz =
+        ceil(uint sz / 4096)`.**  The reusable half is
+        `pgroundup_quot : uint (pgroundup x) / 4096 = bv_unsigned (add_vec
+        x 4095) / 4096`, which is UNCONDITIONAL (`pgd_unsigned` +
+        `z_pgu_quot`); only identifying that sum with `uint sz + 4095`
+        wants the no-wrap, and every uvm* spec already carries the size
+        range premise that gives it.  So `uf_np_shift` gained that premise
+        and `SpecUvmfree`'s `let n` changed spelling; nothing else moved.
+      - **DELETED as dead**: `PtFree.pt_kids_own_take` (ProofFreewalk's loop
+        went over raw `seqZ` splits), `PtFree.pt_page_own_phys` /
+        `pt_page_kfree_pre` (used only by each other — the live pair is
+        `pt_slots_any_phys` / `pt_slots_kfree_pre`, and loose slots are the
+        only shape freewalk ever holds a node page in),
+        `ProcPtOwn.pte_clear_u_andi` + `andi_imm6_47` (ProofUvmclear's
+        `ucl_andi47` was `pte_clear_u_andi12` verbatim and now uses it).
+      - **`pa_add_page_slot` was NOT restated in `Pt4kWalk.v`.**  It cannot
+        be: naming `PageGeom.page_base` there means requiring `PageGeom.v`,
+        which imports the iris proofmode, and `Pt4kWalk.v` is deliberately
+        ssreflect-free — 27 of its rewrites use the vanilla
+        `rewrite .. by ..` form that ssreflect does not parse.  (There is no
+        require CYCLE; the blocker is the tactic dialect.)  The restatement
+        therefore lives in `PtBuild.v`, once, as the plan's fallback says.
+        Reusable rule: before moving a fact "down", check the destination's
+        tactic dialect, not just its require chain.
 
-## Where the new lemmas really belong (deferred: each costs a full-tree rebuild)
+## Where the lemmas ended up
 
-Kept local only to avoid rebuilding the world mid-project. Do these in the
-cleanup sweep:
+All of the deferred relocations landed in the **H** sweep above; that entry
+is the record.  The one durable discovery worth keeping separate:
 
-- **`PtFree.pte_ptr_ext_zero` / `pte_ptr_hi_zero` → `PtTree.v`**, next to
-  `pte_hi_zero`. These say a valid POINTER PTE has zero extension bits — which
-  is what lets freewalk's software `(pte >> 10) << 12` agree with
-  `page_base (pte_ppn w)`. It is provable from the model alone: `pte_is_invalid`
-  has a disjunct `pte_is_non_leaf(flags) && (A || D || U || ext ≠ 0)`, so
-  `pte_valid + pte_ptr` forces `ext = 0`. **This is why `pt_free_ok`'s pointer
-  case did not have to carry `pte_no_napot`/`pte_pbmt0`** — which mattered,
-  because `ptree_blocks0`'s pointer conjuncts are exactly valid+ptr and
-  `pt_free_ok_rep0` would otherwise have been unprovable.
-  While there: `PtTree.pte_piv_split` and `PtFree.ptf_piv_nonleaf` are the same
-  script with a different subset of `pte_is_invalid`'s eight disjuncts
-  existentialized — replace both with ONE split lemma exposing all eight.
-- **`PtFree.pt_mword27_unsigned` / `pt_bv9_range` → `PtTree.v`**, next to
-  `pt_mword9_unsigned`. `pt_bv9_range` is the two lines every `pt_kids_own`
-  accessor re-derives inline.
-- **`BarePt.upt_full_map_tramp` / `_tf` / `_um` → `UptTree.v`**, next to
-  `upt_full_map_leaf_at` / `_None`: they are the missing *positive* side of
-  that pair (the file has only the elimination forms).
-- **`BarePt.gleaf_spec_rep0` → `UptTree.v`**: the modulo-A/D-spec → exact-
-  `pt_rep0` construction over an arbitrary leaf map, i.e. `upt_spec_rep0` with
-  `upt_full_map tfp um` abstracted. `upt_spec_rep0` can then be re-derived from
-  it in three lines.
-- **`PtFree.pa_add_page_slot_pb` → `Pt4kWalk.v`**: restate `pa_add_page_slot`
-  itself at `PageGeom.page_base`'s spelling and drop both it and
-  `PtBuild`'s `Local pa_add_page_slot_u`.
-- The `uptg_wf`-premised variant of `ProcPtOwn.proc_pt_own_shrink` (it only
-  uses `um_inj` and `um_pages_valid`) belongs in `ProcPtOwn.v`.
-
-**Durable discovery:** a `Local Lemma` / `Local Definition` at a *file's* top
-level IS reachable by qualified name from another file (`PtTree.pte_s0`,
-`PtTree.pte_z_hi_zero`, …). `Local` only suppresses the unqualified `Import`
-path. So a `Local` helper never has to be re-proved downstream.
+**A `Local Lemma` / `Local Definition` at a *file's* top level IS reachable
+by qualified name from another file** (`PtTree.pte_s0`,
+`PtTree.pte_z_hi_zero`, …).  `Local` only suppresses the unqualified
+`Import` path.  So a `Local` helper never has to be re-proved downstream.
 
 ## Open questions / parked
 

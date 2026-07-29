@@ -453,9 +453,7 @@ Section PtSlotBridge.
     intros [Hklo Hkhi] Hj.
     assert (Ha : bv_unsigned (u_pte_addr b idx) = bv_unsigned b * 4096 + bv_unsigned idx * 8)
       by exact (pte_addr_at_unsigned b idx).
-    pose proof (bv_unsigned_in_range _ idx) as Hidxr.
-    assert (Hidxm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512) by (vm_compute; reflexivity).
-    rewrite Hidxm in Hidxr.
+    pose proof (pt_bv9_range idx) as Hidxr.
     unfold node_kdata in *. unfold ram_base, ram_size in Hklo, Hkhi.
     (* the shifted address is in the SAME page: unsigned is b*4096 + idx*8 + j *)
     assert (Hpaj : bv_unsigned (pa_add (u_pte_addr b idx) j)

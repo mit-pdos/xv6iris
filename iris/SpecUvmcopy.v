@@ -103,7 +103,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
-  let n := uvmc_np sz in
+  let n := uvm_np sz in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 10-slot frame + mappages' 32 (kalloc 14, uvmunmap 22, walk-noalloc 8,
      memmove 2 all fit inside it) *)

@@ -209,14 +209,34 @@ Qed.
    all read false there. *)
 Local Definition pte_s0 : mstate := MState init_regstate ∅ dev0_state.
 
+(* [pte_is_invalid] EVALUATED at [pte_s0], with ALL EIGHT disjuncts exposed
+   concretely.  The three state probes the model consults -- menvcfg.SSE,
+   [Ext_Svnapot], menvcfg.PBMTE / [Ext_Svrsw60t59b] -- are decided by that
+   state, so nothing is left existential and any consumer can read off any
+   disjunct it needs.  Two of them are read below: the RSW/reserved pair
+   (bits 60:59 and 58:54, for [pte_hi_zero]) and the NON-LEAF disjunct
+   (for [pte_ptr_ext_zero]). *)
 Local Lemma pte_piv_split (f : mword 8) (e : mword 10) :
-  exists b1 b2 b3 b4 b5 b6,
-    exec (pte_is_invalid f e) pte_s0
-    = Some (orb b1 (orb b2 (orb b3 (orb b4 (orb b5 (orb b6
-              (orb (andb (neq_vec (_get_PTE_Ext_RSW_60t59b e) (zeros' 2)) true)
-                   (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))), pte_s0).
+  exec (pte_is_invalid f e) pte_s0
+  = Some (orb (eq_vec (_get_PTE_Flags_V f) ('b"0"))
+          (orb (andb (eq_vec (_get_PTE_Flags_R f) ('b"0"))
+                  (andb (eq_vec (_get_PTE_Flags_W f) ('b"1"))
+                     (andb (eq_vec (_get_PTE_Flags_X f) ('b"0")) true)))
+          (orb (andb (eq_vec (_get_PTE_Flags_R f) ('b"0"))
+                  (andb (eq_vec (_get_PTE_Flags_W f) ('b"1"))
+                     (eq_vec (_get_PTE_Flags_X f) ('b"1"))))
+          (orb (andb (pte_is_non_leaf f)
+                  (orb (eq_vec (_get_PTE_Flags_A f) ('b"1"))
+                     (orb (eq_vec (_get_PTE_Flags_D f) ('b"1"))
+                        (orb (eq_vec (_get_PTE_Flags_U f) ('b"1"))
+                             (neq_vec e (zeros' 10))))))
+          (orb (andb (neq_vec (_get_PTE_Ext_N e) ('b"0")) true)
+          (orb (andb (neq_vec (_get_PTE_Ext_PBMT e) (zeros' 2))
+                  (orb true (not (page_based_mem_type_forwards_matches
+                                    (_get_PTE_Ext_PBMT e)))))
+          (orb (andb (neq_vec (_get_PTE_Ext_RSW_60t59b e) (zeros' 2)) true)
+               (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))), pte_s0).
 Proof.
-  do 6 eexists.
   unfold pte_is_invalid.
   eapply exec_or_v; [ apply exec_returnM | ].
   eapply exec_or_v;
@@ -240,8 +260,8 @@ Local Lemma pte_valid_rsw_res (w : mword 64) :
   _get_PTE_Ext_reserved (ext_bits_of_PTE w) = zeros' 5.
 Proof.
   intros Hv.
-  destruct (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0)) (ext_bits_of_PTE w))
-    as (b1 & b2 & b3 & b4 & b5 & b6 & Hex).
+  pose proof (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                (ext_bits_of_PTE w)) as Hex.
   specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
   do 6 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
   apply orb_false_iff in Hb. destruct Hb as [Hrsw Hres].
@@ -283,6 +303,56 @@ Proof.
     rewrite Hm in Hr. exact Hr. }
   rewrite pte_sub_63_54 in HE0.
   apply pte_z_hi_zero; [ | exact HE0 ].
+  pose proof (bv_unsigned_in_range _ w) as Hr.
+  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
+    by (vm_compute; reflexivity).
+  rewrite Hm in Hr. exact Hr.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* ...AND WHAT [pte_valid] PINS ON A POINTER PTE, WITH NO EXTRA CONJUNCTS. *)
+(*                                                                         *)
+(*   [pte_hi_zero] above needs [pte_no_napot] + [pte_pbmt0] as premises.    *)
+(*   A NON-LEAF word needs neither: [pte_is_invalid]'s fourth disjunct is   *)
+(*                                                                         *)
+(*     pte_is_non_leaf(flags) && (A=1 || D=1 || U=1 || ext != 0)            *)
+(*                                                                         *)
+(*   so on a pointer, validity forces the whole 10-bit extension field      *)
+(*   (bits 63:54) to zero all by itself, hence the word below 2^54.  That   *)
+(*   is what lets freewalk's software [(pte >> 10) << 12] agree with        *)
+(*   [page_base (pte_ppn w)], and it is why [PtFree.pt_free_ok]'s pointer   *)
+(*   case carries only [pte_valid + pte_ptr] -- exactly [ptree_blocks0]'s   *)
+(*   pointer conjuncts, which is what makes [pt_free_ok_rep0] provable.     *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma pte_ptr_ext_zero (w : mword 64) :
+  pte_valid w -> pte_ptr w -> ext_bits_of_PTE w = (zeros' 10 : mword 10).
+Proof.
+  intros Hv Hp.
+  pose proof (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                (ext_bits_of_PTE w)) as Hex.
+  specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
+  do 3 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  apply orb_false_iff in Hb; destruct Hb as [Hb _].
+  unfold pte_ptr in Hp. rewrite Hp in Hb. rewrite andb_true_l in Hb.
+  do 3 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  unfold neq_vec in Hb. apply negb_false_iff in Hb.
+  apply eq_vec_true_iff. exact Hb.
+Qed.
+
+Lemma pte_ptr_hi_zero (w : mword 64) :
+  pte_valid w -> pte_ptr w -> (bv_unsigned w < 18014398509481984)%Z.
+Proof.
+  intros Hv Hp.
+  pose proof (pte_ptr_ext_zero w Hv Hp) as He.
+  assert (Hext : ext_bits_of_PTE w = (subrange_vec_dec w 63 54 : mword 10))
+    by reflexivity.
+  rewrite Hext in He.
+  apply (f_equal bv_unsigned) in He.
+  rewrite pte_sub_63_54 in He.
+  assert (Z0 : bv_unsigned (zeros' 10 : mword 10) = 0) by (vm_compute; reflexivity).
+  rewrite Z0 in He.
+  apply pte_z_hi_zero; [| exact He].
   pose proof (bv_unsigned_in_range _ w) as Hr.
   assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
     by (vm_compute; reflexivity).
@@ -780,6 +850,30 @@ Proof.
   rewrite Hm. exact Hi.
 Qed.
 
+(* the RANGE of a 9-bit slot index, in the [0 <= _ < 512] shape every
+   [seqZ 0 512] lookup wants.  Every accessor below (and PtBuild's
+   [pt_kids_own_ins], KptTree's [u_pte_slot_facts]) opens with it. *)
+Lemma pt_bv9_range (x : mword 9) : 0 <= bv_unsigned x < 512.
+Proof.
+  pose proof (bv_unsigned_in_range _ x) as H.
+  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
+    by (vm_compute; reflexivity).
+  rewrite Hm in H. exact H.
+Qed.
+
+(* ...and the [mword 27] (vpn-width) twin of [pt_mword9_unsigned] *)
+Lemma pt_mword27_unsigned (i : Z) :
+  0 <= i < 134217728 -> bv_unsigned (mword_of_int i : mword 27) = i.
+Proof.
+  intros Hi.
+  cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
+  rewrite Z_to_bv_unsigned.
+  apply bv_wrap_small.
+  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728)
+    by (vm_compute; reflexivity).
+  rewrite Hm. exact Hi.
+Qed.
+
 Section PtTreeIris.
   Context `{!riscvGS Σ}.
 
@@ -847,10 +941,7 @@ Section PtTreeIris.
          u_pte_addr (pt_base t) i ↦ₚ₈{dq} w' -∗
          pt_page_own dq (pt_upd_ent t i w')).
   Proof.
-    pose proof (bv_unsigned_in_range _ i) as Hir.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hir.
+    pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hpg".
@@ -888,10 +979,7 @@ Section PtTreeIris.
       u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i ∗
       (u_pte_addr (pt_base t) i ↦ₚ₈{dq} pt_ents t i -∗ pt_page_own dq t).
   Proof.
-    pose proof (bv_unsigned_in_range _ i) as Hir.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hir.
+    pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hpg".
@@ -915,10 +1003,7 @@ Section PtTreeIris.
          pt_kids_own lvl dq (pt_upd_kid t i (Some c'))).
   Proof.
     intros Hk.
-    pose proof (bv_unsigned_in_range _ i) as Hir.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hir.
+    pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hks".
@@ -953,10 +1038,7 @@ Section PtTreeIris.
       ptree_own lvl dq c ∗ (ptree_own lvl dq c -∗ pt_kids_own lvl dq t).
   Proof.
     intros Hk.
-    pose proof (bv_unsigned_in_range _ i) as Hir.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hir.
+    pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hks".

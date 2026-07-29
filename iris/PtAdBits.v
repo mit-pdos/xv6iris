@@ -8,6 +8,12 @@
    parses):
      - [update_PTE_Bits_set_ad] : the write-back word is a variant;
      - [pte_set_ad_refl]        : every word is a variant of itself;
+     - [pte_set_ad_testbit]     : THE bitwise reading -- bit 6 is [a], bit
+                                  7 is [d], every other bit is the word's
+                                  own.  The three laws below are corollaries
+                                  of it, and so is anything that has to
+                                  commute [pte_set_ad] with another bit
+                                  operation (ProcPtOwn's clear-U block);
      - [pte_set_ad_absorb]      : re-varying absorbs (variance is stable
                                   under further A/D write-backs);
      - [pte_set_ad_ppn] / [pte_set_ad_ext] : the PPN and extension fields
@@ -129,43 +135,91 @@ Proof.
   tbk.
 Qed.
 
+(* THE BITWISE READING OF [pte_set_ad], from which the three laws below all
+   fall out: bit 6 comes from [a], bit 7 from [d], and every other bit is
+   the word's own.  Anything that has to know how [pte_set_ad] interacts
+   with another bit operation (clearing U, masking the flag byte) states
+   itself against this. *)
+Lemma pte_set_ad_testbit (z : mword 64) (a d : mword 1) (k : Z) :
+  0 <= k < 64 ->
+  Z.testbit (bv_unsigned (pte_set_ad z a d)) k
+  = (if Z.eqb k 6 then Z.testbit (bv_unsigned a) 0
+     else if Z.eqb k 7 then Z.testbit (bv_unsigned d) 0
+     else Z.testbit (bv_unsigned z) k).
+Proof.
+  intros Hk.
+  unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags.
+  mw_prep.
+  destruct (decide (k = 6)) as [->|H6].
+  { rewrite Z.eqb_refl. cbv iota. tbk. }
+  destruct (decide (k = 7)) as [->|H7].
+  { rewrite (proj2 (Z.eqb_neq 7 6) ltac:(lia)), Z.eqb_refl. cbv iota. tbk. }
+  rewrite (proj2 (Z.eqb_neq k 6) H6), (proj2 (Z.eqb_neq k 7) H7). cbv iota.
+  destruct (decide (k < 8)) as [Hlt|Hge].
+  - tbk.
+  - tbk.
+Qed.
+
+(* the two PTE FIELD extractions, read bit by bit: the PPN sits at 53:10 and
+   the extension at 63:54, so a field bit is a word bit at a fixed offset.
+   These are what turn [pte_set_ad_testbit] into the two field laws. *)
+Local Lemma ppn_field_testbit (x : mword 64) (k : Z) :
+  0 <= k < 44 ->
+  Z.testbit (bv_unsigned (PPN_of_PTE x)) k = Z.testbit (bv_unsigned x) (k + 10).
+Proof.
+  intros Hk.
+  unfold PPN_of_PTE.
+  change (Z.eqb 64 32) with false. cbv iota.
+  rewrite !autocast_refl.
+  mw_prep. tbk.
+Qed.
+
+Local Lemma ext_field_testbit (x : mword 64) (k : Z) :
+  0 <= k < 10 ->
+  Z.testbit (bv_unsigned (ext_bits_of_PTE x)) k = Z.testbit (bv_unsigned x) (k + 54).
+Proof.
+  intros Hk.
+  unfold ext_bits_of_PTE.
+  change (Z.eqb 64 64) with true. cbv iota.
+  unfold Mk_PTE_Ext.
+  mw_prep. tbk.
+Qed.
+
 (* a variant of a variant is a variant of the base (write-backs absorb) *)
 Lemma pte_set_ad_absorb (w : mword 64) (a d a' d' : mword 1) :
   pte_set_ad (pte_set_ad w a d) a' d' = pte_set_ad w a' d'.
 Proof.
-  unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags.
-  mw_prep.
   apply (bv_eq_testbit 64); intros k Hk.
-  destruct (decide (k < 6)); [tbk |].
-  destruct (decide (k = 6)) as [-> |]; [tbk |].
-  destruct (decide (k = 7)) as [-> |]; [tbk |].
-  tbk.
+  assert (Hk' : 0 <= k < 64) by (change (Z.of_N 64) with 64 in Hk; lia).
+  rewrite !(pte_set_ad_testbit _ _ _ k Hk').
+  destruct (Z.eqb k 6); [reflexivity |].
+  destruct (Z.eqb k 7); reflexivity.
 Qed.
 
 (* the PPN field (bits 53:10) is untouched: variants map to the same page *)
 Lemma pte_set_ad_ppn (w : mword 64) (a d : mword 1) :
   PPN_of_PTE (pte_set_ad w a d) = PPN_of_PTE w.
 Proof.
-  unfold PPN_of_PTE.
-  change (Z.eqb 64 32) with false. cbv iota.
-  rewrite !autocast_refl.
-  unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags.
-  mw_prep.
   apply (bv_eq_testbit 44); intros k Hk.
-  tbk.
+  assert (Hk' : 0 <= k < 44) by (change (Z.of_N 44) with 44 in Hk; lia).
+  rewrite !(ppn_field_testbit _ k Hk').
+  rewrite (pte_set_ad_testbit w a d (k + 10) ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq (k + 10) 6) ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq (k + 10) 7) ltac:(lia)).
+  cbv iota. reflexivity.
 Qed.
 
 (* the extension bits (63:54) are untouched *)
 Lemma pte_set_ad_ext (w : mword 64) (a d : mword 1) :
   ext_bits_of_PTE (pte_set_ad w a d) = ext_bits_of_PTE w.
 Proof.
-  unfold ext_bits_of_PTE.
-  change (Z.eqb 64 64) with true. cbv iota.
-  unfold Mk_PTE_Ext.
-  unfold pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A, Mk_PTE_Flags.
-  mw_prep.
   apply (bv_eq_testbit 10); intros k Hk.
-  tbk.
+  assert (Hk' : 0 <= k < 10) by (change (Z.of_N 10) with 10 in Hk; lia).
+  rewrite !(ext_field_testbit _ k Hk').
+  rewrite (pte_set_ad_testbit w a d (k + 54) ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq (k + 54) 6) ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq (k + 54) 7) ltac:(lia)).
+  cbv iota. reflexivity.
 Qed.
 
 (* the R/W/X flags are untouched, hence so is leaf-ness *)

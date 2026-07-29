@@ -63,6 +63,17 @@ Lemma is_cs_idx_true_neq (k c : mword 5) :
   is_cs_idx k = false -> is_cs_idx c = true -> Regidx k <> Regidx c.
 Proof. intros Hk Hc Heq. injection Heq as Heq'. subst c. rewrite Hc in Hk. discriminate. Qed.
 
+(* [Regidx] is injective.  The other half of the callee-saved peel's
+   disequality discharge: where the WRITTEN register is itself callee-saved,
+   [is_cs_idx_true_neq] does not apply and the branch has to turn the
+   index disequality it has in context into the [Regidx] one [upd_ne]
+   asks for.  Named (rather than inlined as [injection]) so that branch
+   can stay NAME-FREE -- an [Ltac] body cannot reference a hypothesis by
+   literal name (claude-notes/durable-notes.md); see the peel recipe at
+   the end of claude-notes/optimization.md. *)
+Lemma regidx_inj (x y : mword 5) : Regidx x = Regidx y -> x = y.
+Proof. intro H. injection H as H. exact H. Qed.
+
 
 (* Project one register out of a [callee_saved] fact, uniformly for ANY
    callee-saved index [c] (decided by [is_cs_idx c = true]).  A caller that

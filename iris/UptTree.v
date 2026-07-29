@@ -230,6 +230,37 @@ Definition upt_full_map (tfp : mword 44) (um : gmap (mword 27) (mword 64))
     : gmap (mword 27) (mword 64) :=
   <[tramp_vpn := pte_tramp]> (<[tf_vpn := pte_tf tfp]> um).
 
+(* the POSITIVE side: what each of the three kinds of leaf looks up to.
+   [upt_full_map_leaf_at] / [_None] below are the elimination forms; these
+   are the introduction forms, and they are what a caller phrased against
+   the leaf map itself (BarePt's [uptg_map]) needs to enter this file's
+   vocabulary. *)
+Lemma upt_full_map_tramp (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  upt_full_map tfp um !! tramp_vpn = Some pte_tramp.
+Proof. apply lookup_insert. Qed.
+
+Lemma upt_full_map_tf (tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  upt_full_map tfp um !! tf_vpn = Some (pte_tf tfp).
+Proof.
+  rewrite /upt_full_map.
+  rewrite (lookup_insert_ne _ tramp_vpn tf_vpn pte_tramp (not_eq_sym tf_vpn_ne_tramp)).
+  apply lookup_insert.
+Qed.
+
+(* a USER entry: [upt_map_wf] is what says the vpn is neither fixed vpn, so
+   the two inserts miss it. *)
+Lemma upt_full_map_um (tfp : mword 44) (um : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w : mword 64) :
+  upt_map_wf um -> um !! vpn = Some w -> upt_full_map tfp um !! vpn = Some w.
+Proof.
+  intros Hwf Hu. rewrite /upt_full_map.
+  rewrite (lookup_insert_ne _ tramp_vpn vpn pte_tramp
+             (not_eq_sym (upt_map_wf_not_tramp um vpn w Hwf Hu))).
+  rewrite (lookup_insert_ne _ tf_vpn vpn (pte_tf tfp)
+             (not_eq_sym (upt_map_wf_not_tf um vpn w Hwf Hu))).
+  exact Hu.
+Qed.
+
 Lemma upt_full_map_leaf_at (tfp : mword 44) (um : gmap (mword 27) (mword 64))
     (vpn : mword 27) (w : mword 64) :
   upt_full_map tfp um !! vpn = Some w -> upt_leaf_at tfp um vpn w.
@@ -263,7 +294,68 @@ Definition upt_ad_view (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64)) :
   (forall vpn w', m_ad !! vpn = Some w' ->
      exists w (a d : mword 1), upt_leaf_at tfp um vpn w /\ w' = pte_set_ad w a d).
 
-(* OPEN: the modulo-A/D spec yields an exact map (the walk/mappages view) *)
+(* OPEN, over an ARBITRARY leaf map [M]: a tree that maps every entry of [M]
+   modulo A/D and blocks everywhere else IS an exact [pt_rep0] of some map,
+   namely its own leaf words, and that map has [M]'s domain and holds an A/D
+   variant of each of [M]'s words.  This is the whole construction; the two
+   instances below ([upt_spec_rep0] here, [BarePt.uptg_spec_rep0] at the
+   [otf] axis) differ only in which leaf map they feed it. *)
+Lemma gleaf_spec_rep0 (M : gmap (mword 27) (mword 64)) (t : ptree) :
+  (forall vpn w, M !! vpn = Some w ->
+     exists p2 p1 (a d : mword 1), ptree_maps t vpn p2 p1 (pte_set_ad w a d)) ->
+  (forall vpn, M !! vpn = None -> ptree_blocks0 t vpn) ->
+  exists m_ad, pt_rep0 t m_ad /\
+    (forall vpn, m_ad !! vpn = None <-> M !! vpn = None) /\
+    (forall vpn w', m_ad !! vpn = Some w' ->
+       exists w (a d : mword 1), M !! vpn = Some w /\ w' = pte_set_ad w a d).
+Proof.
+  intros Hmaps Hblk.
+  assert (Hlw : forall (vpn : mword 27) (x : mword 64),
+            M !! vpn = Some x ->
+            exists p2 p1 (a d : mword 1),
+              ptree_maps t vpn p2 p1 (pte_set_ad x a d) /\
+              pt_leaf_word t vpn = Some (pte_set_ad x a d)).
+  { intros vpn x Hl.
+    destruct (Hmaps vpn x Hl) as (p2 & p1 & a & d & Hm).
+    exists p2, p1, a, d. split; [exact Hm |].
+    exact (ptree_maps_leaf_word t vpn p2 p1 _ Hm). }
+  exists (map_imap (fun vpn _ => pt_leaf_word t vpn) M).
+  assert (HadSome : forall (vpn : mword 27) (w' : mword 64),
+            map_imap (fun vpn _ => pt_leaf_word t vpn) M !! vpn = Some w' ->
+            exists x, M !! vpn = Some x /\ pt_leaf_word t vpn = Some w').
+  { intros vpn w' Hl. rewrite map_lookup_imap in Hl.
+    destruct (M !! vpn) as [x|] eqn:Hf; [| discriminate].
+    exists x. split; [reflexivity |]. cbn [mbind option_bind] in Hl. exact Hl. }
+  assert (HadNone : forall vpn : mword 27,
+            map_imap (fun vpn _ => pt_leaf_word t vpn) M !! vpn = None ->
+            M !! vpn = None).
+  { intros vpn Hl. rewrite map_lookup_imap in Hl.
+    destruct (M !! vpn) as [x|] eqn:Hf; [| reflexivity].
+    exfalso. cbn [mbind option_bind] in Hl.
+    destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq).
+    rewrite Hq in Hl. discriminate. }
+  split.
+  - split.
+    + intros vpn w' Hl.
+      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
+      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & Hm & Hq').
+      rewrite Hq in Hq'. injection Hq' as Hq''.
+      exists p2, p1. rewrite Hq''. exact Hm.
+    + intros vpn Hl. exact (Hblk vpn (HadNone vpn Hl)).
+  - split.
+    + intros vpn. split.
+      * intros Hl. exact (HadNone vpn Hl).
+      * intros Hr. rewrite map_lookup_imap. rewrite Hr. reflexivity.
+    + intros vpn w' Hl.
+      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
+      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq').
+      rewrite Hq in Hq'. injection Hq' as Hq''.
+      exists x, a, d. split; [exact Hf | exact Hq''].
+Qed.
+
+(* OPEN: the modulo-A/D spec yields an exact map (the walk/mappages view) --
+   [gleaf_spec_rep0] at [upt_full_map], with the [upt_leaf_at] disjunction
+   put back on both sides. *)
 Lemma upt_spec_rep0 (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
     (t : ptree) :
   upt_tree_spec uroot tfp um t ->
@@ -271,57 +363,22 @@ Lemma upt_spec_rep0 (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
 Proof.
   intros Hspec.
   pose proof Hspec as (Hbase & Htr & Htf & Hum & Hblk).
-  (* every vpn the canonical view maps has a leaf word, an A/D variant of it *)
-  assert (Hlw : forall (vpn : mword 27) (x : mword 64),
-            upt_full_map tfp um !! vpn = Some x ->
-            exists p2 p1 (a d : mword 1),
-              ptree_maps t vpn p2 p1 (pte_set_ad x a d) /\
-              pt_leaf_word t vpn = Some (pte_set_ad x a d)).
-  { intros vpn x Hl.
-    destruct (upt_spec_maps uroot tfp um t vpn x Hspec (upt_full_map_leaf_at tfp um vpn x Hl))
-      as (p2 & p1 & a & d & Hmaps).
-    exists p2, p1, a, d. split; [exact Hmaps |].
-    exact (ptree_maps_leaf_word t vpn p2 p1 _ Hmaps). }
-  exists (map_imap (fun vpn _ => pt_leaf_word t vpn) (upt_full_map tfp um)).
-  (* the two lookup bridges through [map_imap] *)
-  assert (HadSome : forall (vpn : mword 27) (w' : mword 64),
-            map_imap (fun vpn _ => pt_leaf_word t vpn) (upt_full_map tfp um) !! vpn = Some w' ->
-            exists x, upt_full_map tfp um !! vpn = Some x /\ pt_leaf_word t vpn = Some w').
-  { intros vpn w' Hl. rewrite map_lookup_imap in Hl.
-    destruct (upt_full_map tfp um !! vpn) as [x|] eqn:Hf; [| discriminate].
-    exists x. split; [reflexivity |]. cbn [mbind option_bind] in Hl. exact Hl. }
-  assert (HadNone : forall vpn : mword 27,
-            map_imap (fun vpn _ => pt_leaf_word t vpn) (upt_full_map tfp um) !! vpn = None ->
-            upt_full_map tfp um !! vpn = None).
-  { intros vpn Hl. rewrite map_lookup_imap in Hl.
-    destruct (upt_full_map tfp um !! vpn) as [x|] eqn:Hf; [| reflexivity].
-    exfalso. cbn [mbind option_bind] in Hl.
-    destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq).
-    rewrite Hq in Hl. discriminate. }
-  split.
-  - (* the exact representation *)
-    split.
-    + intros vpn w' Hl.
-      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
-      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & Hmaps & Hq').
-      rewrite Hq in Hq'. injection Hq' as Hq''.
-      exists p2, p1. rewrite Hq''. exact Hmaps.
-    + intros vpn Hl.
-      destruct (proj1 (upt_full_map_None tfp um vpn) (HadNone vpn Hl))
-        as (Hnt & Hntf & Hu).
-      exact (Hblk vpn Hnt Hntf Hu).
-  - (* its relation to the canonical view *)
-    split.
-    + intros vpn. split.
-      * intros Hl. exact (proj1 (upt_full_map_None tfp um vpn) (HadNone vpn Hl)).
-      * intros Hr. rewrite map_lookup_imap.
-        rewrite (proj2 (upt_full_map_None tfp um vpn) Hr). reflexivity.
-    + intros vpn w' Hl.
-      destruct (HadSome vpn w' Hl) as (x & Hf & Hq).
-      destruct (Hlw vpn x Hf) as (p2 & p1 & a & d & _ & Hq').
-      rewrite Hq in Hq'. injection Hq' as Hq''.
-      exists x, a, d.
-      split; [exact (upt_full_map_leaf_at tfp um vpn x Hf) | exact Hq''].
+  destruct (gleaf_spec_rep0 (upt_full_map tfp um) t
+              (fun vpn w Hl =>
+                 upt_spec_maps uroot tfp um t vpn w Hspec
+                   (upt_full_map_leaf_at tfp um vpn w Hl))
+              (fun vpn Hl =>
+                 match proj1 (upt_full_map_None tfp um vpn) Hl with
+                 | conj Hnt (conj Hntf Hu) => Hblk vpn Hnt Hntf Hu
+                 end))
+    as (m_ad & Hrep & Hnone & Hsome).
+  exists m_ad. split; [exact Hrep |]. split.
+  - intros vpn.
+    exact (iff_trans (Hnone vpn) (upt_full_map_None tfp um vpn)).
+  - intros vpn w' Hl.
+    destruct (Hsome vpn w' Hl) as (w & a & d & Hf & Hr).
+    exists w, a, d.
+    split; [exact (upt_full_map_leaf_at tfp um vpn w Hf) | exact Hr].
 Qed.
 
 (* CLOSE: an exact map in the canonical shape re-establishes the spec.
@@ -400,6 +457,39 @@ Proof.
         [left; exact Ht | right; left; exact Ht |].
       right. right.
       rewrite (lookup_insert_ne um vpn v w (not_eq_sym Hne)). exact Hu0.
+Qed.
+
+(* ...and its OVERWRITE sibling: the vpn is already in [um] (uvmclear
+   rewrites one leaf in place), so instead of [m_ad !! vpn = None] the
+   premise is [um !! vpn = Some w], and [upt_map_wf] supplies the two
+   fixed-vpn disequalities. *)
+Lemma upt_ad_view_set (tfp : mword 44) (um m_ad : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w x : mword 64) (a d : mword 1) :
+  upt_map_wf um -> upt_ad_view tfp um m_ad -> um !! vpn = Some w ->
+  upt_ad_view tfp (<[vpn := x]> um) (<[vpn := pte_set_ad x a d]> m_ad).
+Proof.
+  intros Hwf (Hnone & Hsome) Hl.
+  pose proof (upt_map_wf_not_tramp um vpn w Hwf Hl) as Hntr.
+  pose proof (upt_map_wf_not_tf um vpn w Hwf Hl) as Hntf.
+  split.
+  - intros v. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite !lookup_insert. split; [discriminate |].
+      intros (_ & _ & Hc). discriminate.
+    + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)).
+      rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)).
+      exact (Hnone v).
+  - intros v w' Hl'. destruct (decide (v = vpn)) as [-> | Hne].
+    + rewrite lookup_insert in Hl'.
+      assert (Hw : w' = pte_set_ad x a d) by congruence.
+      exists x, a, d. split; [| exact Hw].
+      right. right. apply lookup_insert.
+    + rewrite (lookup_insert_ne m_ad vpn v (pte_set_ad x a d) (not_eq_sym Hne)) in Hl'.
+      destruct (Hsome v w' Hl') as (w0 & a0 & d0 & Hleaf & Hr).
+      exists w0, a0, d0. split; [| exact Hr].
+      destruct Hleaf as [Ht | [Ht | Hu0]];
+        [left; exact Ht | right; left; exact Ht |].
+      right. right.
+      rewrite (lookup_insert_ne um vpn v x (not_eq_sym Hne)). exact Hu0.
 Qed.
 
 (* ---- the DELETION side (uvmunmap) ----------------------------------- *)

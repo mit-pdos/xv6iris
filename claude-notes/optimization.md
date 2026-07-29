@@ -18,6 +18,8 @@
 - **What makes a funnel `iApply` slow is register-file lookups, NOT the proofmode (measured).** A 5–7 s funnel `iApply` (`wp_walk_tail_sconf`/`wp_walk_alloc_sconf` in ProofWalk.v) profiled as: `rewrite` **80 %**, the lookup peel **67 %**, the whole iApply proofmode machinery only **17 %**, `pm_reduce` a mere **2.5 % (~0.005 s)**. So do NOT chase the proofmode: making addresses opaque `Definition`s buys ~2.5 % at most, and do NOT retry the "bare-name framing swap" `iEval (rewrite -Hacpu) in "Hcpu"` (it breaks on let-bound vars and chases that same 2.5 %). The `unshelve iApply …; all: first[…]` split makes the split visible (iApply 0.5 s, deferred lookup side-goals 6.2 s); inline-`ltac:` funnels just fuse the two into one sentence.
   - **The lever was the representation, and it has been taken: the register file is a total function `regfile := regidx → mword 64` (RegFile.v), not a `gmap`.** A lookup `M !!! Regidx j` over a deep update chain is one `vm_compute` over the concrete-key if-chain (`reg_lookup`) instead of O(depth) ssreflect `rewrite lookup_total_insert{,_ne}` — 9 lookups over a 20-deep chain: **1.22 s → 0.04 s (~30×)**, values stay abstract. Discharge every register lookup and `callee_saved` conjunct with `reg_lookup`, never `reflexivity`/`repeat split` (bare conversion over a transparent update tower blows up the async `Qed` — see completed/regfile-migration.md). Remaining levers on the funnels are per-call side-goal count and chain depth, not the tactic.
 - **State a whole-function WP's post in the ∀-continuation form — never with a deep `let m1 := … in … let mN := … in` register-map chain in the STATEMENT.** A let-chain statement makes every caller re-pay a huge structural `iApply` cost: each `iApply (wp_F …)` zeta-traverses the whole chain, ×N call sites (worst when the `mK` are nested `<[…]>` gmap inserts — those blow up quadratically; flat address lets are cheap). Instead universally quantify the return map as an abstract `∀ m', … gpr_file m' … ⌜callee_saved m0 m' ∧ <return-value facts>⌝ … -∗ WP` (the form CalleeSaved.v documents and most call specs already use), and keep the concrete `m1..mN` chain alive *inside the Proof only* as `set (mk := …)` local defs (the body's `change … with mk` / `unfold mk` steps are then unaffected), closing with `iApply ("Hcont" $! mN with …)`. Callers change by one token: `iIntros "…"` → `iIntros (m') "…"`. `wp_mycpu` is the worked example. Gotcha: the `set` tactic here does NOT accept `set (x : T := v)` — put the ascription in the term: `set (x := (v : T))`.
+- **A family of "field X is untouched" laws over one bit-level constructor should be N corollaries of ONE testbit reading, not N testbit chases.** `PtAdBits.v` proved `pte_set_ad_absorb` / `_ppn` / `_ext` each by `mw_prep` + `apply (bv_eq_testbit w); tbk` — i.e. each one re-unfolded `update_subrange_vec_dec` and re-chased the `bv_extract`/`bv_concat`/`bv_wrap` tower from scratch, at a different width. Stating the single bitwise reading (`pte_set_ad_testbit : 0 <= k < 64 -> Z.testbit (bv_unsigned (pte_set_ad z a d)) k = if k =? 6 then … else if k =? 7 then … else Z.testbit (bv_unsigned z) k`) once and deriving the three from it — each becomes `apply (bv_eq_testbit n); rewrite !<field>_testbit, pte_set_ad_testbit; …` over two tiny `Local` field-extraction lemmas — took the file from **27.6 s to 13.0 s** (2.1×, interleaved isolated `coqc`), with the extra lemma added. The chase cost is per-law and superlinear in the term it walks; the reading is paid once. PtAdBits is on the `SmodePte → PtTree → PtTreeAdue → KptTree → UptTree` tail, so this is wall time, not just CPU. Look for this shape wherever a file has several `apply (bv_eq_testbit _); tbk`-style proofs about the SAME constructor.
+
 - **Mark big concrete literals `Global Typeclasses Opaque`** (e.g. `kernel_bytes`, `kernel_data`, `kernel_symbols`, `mem_pointsto`): otherwise typeclass search (Persistent instances, every `#`-intro) unfolds the 23K-entry gmap (~108 s each). `vm_compute`/`reflexivity` ignore `Typeclasses Opaque`, so lookups still reduce. Use `Typeclasses Opaque`, never `Opaque` (a tactic may need to `unfold`).
 - **Never bury a `vm_compute`-heavy discharge in an inline `ltac:(…)`** term-arg to `iApply`/`iDestruct` over a big gmap — the proofmode re-elaborates the spliced term without the Qed vm-seal (~16–26 s/call). Prove it FIRST as a named hyp `assert (H : …) by (tac)`, then pass `H` (a named hyp's type is fixed, no re-elaboration). If several such args exist, use the **"unshelve hoist"**: replace the inline `ltac:(…)`s with bare `_`, prefix `unshelve iApply`, and discharge the resulting evar subgoals as standalone `{ … }` goals (they land after Iris's bracketed-resource subgoals and before the WP continuation).
   - **This rule applies to `iPoseProof` too, and the `kernel_data_string` string-literal witnesses were the worst offenders in the tree** (measured 2026-07-21): the byte-lookup premise `∀ j b, cstring_bytes s !! j = Some b → kernel_data !! (A + j) = Some b` passed as an inline `ltac:(intros j b Hj; do N (destruct j …); …)` cost **17–29 s per call site** — the single most expensive statement in the whole build. Hoisting it verbatim into `assert (Hs : ∀ j b, …). { … }` above the `iPoseProof` and passing `Hs` by name drops it to **under 0.2 s**: ProofFileinit 32 s→2 s, ProofTrapinit 26 s→2 s, ProofPrintkinit 20 s→2 s, ProofKinit 39 s→14 s, ProofUartinit 63 s→39 s (**−122 s ΣCPU, −5 %**). The tactic script is byte-identical; only its position changes. Write new `kernel_data_string` uses this way from the start.
@@ -106,19 +108,19 @@ reference Hx2 was not found") — the durable-notes trap. The robust form binds
 everything in the match:
 
 ```coq
-Lemma uc_regidx_inj (x y : mword 5) : Regidx x = Regidx y -> x = y.   (* top level *)
-...
 | lazymatch goal with
   | |- Regidx ?x <> Regidx ?y =>
       match goal with
-      | H : x <> y |- _ => exact (fun Hq => H (uc_regidx_inj x y Hq))
+      | H : x <> y |- _ => exact (fun Hq => H (regidx_inj x y Hq))
       end
   end ]
 ```
 
 `match` (not `lazymatch`) over the hypotheses is what makes it pick the right
-one of the nine disequalities. `uc_regidx_inj` belongs in `CalleeSaved.v` next
-to `is_cs_idx_true_neq`.
+one of the nine disequalities. **`regidx_inj` (`Regidx x = Regidx y -> x = y`)
+lives in `CalleeSaved.v`**, next to `is_cs_idx_true_neq` — it must be a named
+top-level lemma, not an inline `injection`, precisely so the branch can stay
+name-free.
 
 ## A missing bullet at the END of a `split_and!` block is invisible to every obvious probe
 

@@ -1336,9 +1336,18 @@ Section PtBuildIris.
     is_aligned_paddr (Physaddr (u_pte_addr b i)) 8 = true.
   Proof. exact (pte_addr_at_aligned8 b i). Qed.
 
-  Local Lemma pa_add_page_slot_u (b : mword 44) (i j : nat) :
+  (* byte [j] of slot [i] of a node page = byte [i*8+j] of the page, at
+     [PageGeom.page_base]'s spelling of the page's base.  [Pt4kWalk] states
+     the same fact with [page_base] written out ([page_base] is
+     definitionally that [zero_extend'/concat_vec] form, so [exact]
+     bridges); it cannot state it at this spelling itself, because
+     [PageGeom.v] imports the iris proofmode and Pt4kWalk.v is deliberately
+     ssreflect-free (27 of its rewrites use the vanilla [rewrite .. by ..]
+     form).  So the [page_base] restatement lives here, once -- PtFree.v's
+     [pt_slots_any_phys] is its other consumer. *)
+  Lemma pa_add_page_slot_pb (b : mword 44) (i j : nat) :
     (i < 512)%nat -> (j < 8)%nat ->
-    pa_add (zero_extend' 64 (concat_vec b (zeros' 12 : mword 12))) (i * 8 + j)
+    pa_add (page_base b) (i * 8 + j)
     = pa_add (u_pte_addr b (mword_of_int (Z.of_nat i))) j.
   Proof. exact (pa_add_page_slot b i j). Qed.
 
@@ -1402,7 +1411,7 @@ Section PtBuildIris.
       intros k' j Hkj. apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
       cbn [Nat.add].
       rewrite nth_byte_zero.
-      rewrite (pa_add_page_slot_u b k k' Hlt Hjlt).
+      rewrite (pa_add_page_slot_pb b k k' Hlt Hjlt).
       reflexivity.
     }
     destruct lvl.
@@ -1420,10 +1429,7 @@ Section PtBuildIris.
         pt_kids_own lvl dq (pt_upd_kid t i (Some c')).
   Proof.
     intros Hk.
-    pose proof (bv_unsigned_in_range _ i) as Hir.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hir.
+    pose proof (pt_bv9_range i) as Hir.
     assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
     { apply lookup_seqZ. split; lia. }
     iIntros "Hks" (c') "Hc".
@@ -2308,6 +2314,101 @@ Proof.
   split; apply bv_eq; rewrite H1.
   - rewrite pb_sub_0_0. rewrite pb_sub_7_0. apply pb_z_bit0_of. exact Hb0.
   - rewrite pb_sub_4_4. rewrite pb_sub_7_0. apply pb_z_bit4_of. exact Hb4.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE R|W|X MASK TEST -- the third member of the family.                  *)
+(*                                                                         *)
+(*   freewalk's [( *pte & (PTE_R|PTE_W|PTE_X)) == 0] is an [andi a4,a5,14]  *)
+(*   against bits 1..3, so it is the same bridge as [pte_valid_bit0] (the   *)
+(*   V bit) and [pte_vu_bits] (the V|U pair) one more field over: a         *)
+(*   NON-LEAF word masks to zero.                                          *)
+(* ---------------------------------------------------------------------- *)
+
+Local Lemma pb_sub_1_1 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 1 1 : mword 1) = bv_unsigned v / 2 ^ 1 mod 2.
+Proof. apply (subrange_dec_unsigned v 1 1 (2 ^ 1) 2); [lia | lia | reflexivity | reflexivity]. Qed.
+Local Lemma pb_sub_2_2 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 2 2 : mword 1) = bv_unsigned v / 2 ^ 2 mod 2.
+Proof. apply (subrange_dec_unsigned v 2 2 (2 ^ 2) 2); [lia | lia | reflexivity | reflexivity]. Qed.
+Local Lemma pb_sub_3_3 (v : mword 8) :
+  bv_unsigned (subrange_vec_dec v 3 3 : mword 1) = bv_unsigned v / 2 ^ 3 mod 2.
+Proof. apply (subrange_dec_unsigned v 3 3 (2 ^ 3) 2); [lia | lia | reflexivity | reflexivity]. Qed.
+
+Local Lemma pb_z_bit_false (y : Z) : y mod 2 = 0 -> Z.odd y = false.
+Proof. intros H. rewrite Zmod_odd in H. destruct (Z.odd y); [discriminate | reflexivity]. Qed.
+
+(* a flag-byte bit read back as a bit of the whole word *)
+Local Lemma pb_bitn (x n : Z) :
+  0 <= n -> n < 8 -> (x mod 256) / 2 ^ n mod 2 = 0 -> Z.testbit x n = false.
+Proof.
+  intros Hn0 Hn8 H.
+  change 256 with (2 ^ 8) in H.
+  apply pb_z_bit_false in H.
+  rewrite <- Z.bit0_odd in H.
+  rewrite (Z.div_pow2_bits (x mod 2 ^ 8) n 0 Hn0 ltac:(lia)) in H.
+  replace (0 + n) with n in H by lia.
+  rewrite (Z.mod_pow2_bits_low x 8 n ltac:(lia)) in H.
+  exact H.
+Qed.
+
+Local Lemma pb_z_land14 (x : Z) :
+  Z.testbit x 1 = false -> Z.testbit x 2 = false -> Z.testbit x 3 = false ->
+  Z.land x 14 = 0.
+Proof.
+  intros H1 H2 H3. apply Z.bits_inj_0. intros n.
+  destruct (Z_lt_le_dec n 0) as [Hn | Hn].
+  { apply Z.testbit_neg_r. exact Hn. }
+  rewrite Z.land_spec.
+  destruct (Z.eq_dec n 0) as [-> | Hn0].
+  { replace (Z.testbit 14 0) with false by (vm_compute; reflexivity). apply andb_false_r. }
+  destruct (Z.eq_dec n 1) as [-> | Hn1]. { rewrite H1. reflexivity. }
+  destruct (Z.eq_dec n 2) as [-> | Hn2]. { rewrite H2. reflexivity. }
+  destruct (Z.eq_dec n 3) as [-> | Hn3]. { rewrite H3. reflexivity. }
+  replace (Z.testbit 14 n) with false; [apply andb_false_r |].
+  symmetry. apply Z.bits_above_log2; [lia |].
+  replace (Z.log2 14) with 3 by (vm_compute; reflexivity). lia.
+Qed.
+
+Lemma andi14_unsigned (w : mword 64) :
+  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 14 : mword 12)) : mword 64)
+  = Z.land (bv_unsigned w) 14.
+Proof.
+  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.and.
+  rewrite bv_and_unsigned.
+  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
+    replace (bv_unsigned mm) with 14 by (vm_compute; reflexivity) end.
+  reflexivity.
+Qed.
+
+(* the C's [(pte & (PTE_R|PTE_W|PTE_X)) == 0] test on a NON-LEAF word *)
+Lemma fw_ptr_and14 (w : mword 64) :
+  pte_ptr w ->
+  and_vec w (sign_extend' 64 (mword_of_int 14 : mword 12)) = (mword_of_int 0 : mword 64).
+Proof.
+  intros Hp.
+  unfold pte_ptr, pte_is_non_leaf, Mk_PTE_Flags in Hp.
+  apply andb_prop in Hp. destruct Hp as [HX Hp].
+  apply andb_prop in Hp. destruct Hp as [HW HR].
+  apply eq_vec_true_iff in HX. apply eq_vec_true_iff in HW. apply eq_vec_true_iff in HR.
+  unfold _get_PTE_Flags_X in HX. unfold _get_PTE_Flags_W in HW. unfold _get_PTE_Flags_R in HR.
+  apply (f_equal bv_unsigned) in HX.
+  apply (f_equal bv_unsigned) in HW.
+  apply (f_equal bv_unsigned) in HR.
+  rewrite pb_sub_3_3 pb_sub_7_0 in HX.
+  rewrite pb_sub_2_2 pb_sub_7_0 in HW.
+  rewrite pb_sub_1_1 pb_sub_7_0 in HR.
+  replace (bv_unsigned ('b"0" : mword 1)) with 0 in HX by (vm_compute; reflexivity).
+  replace (bv_unsigned ('b"0" : mword 1)) with 0 in HW by (vm_compute; reflexivity).
+  replace (bv_unsigned ('b"0" : mword 1)) with 0 in HR by (vm_compute; reflexivity).
+  apply bv_eq. rewrite andi14_unsigned.
+  rewrite (pb_z_land14 (bv_unsigned w)
+             (pb_bitn (bv_unsigned w) 1 ltac:(lia) ltac:(lia) HR)
+             (pb_bitn (bv_unsigned w) 2 ltac:(lia) ltac:(lia) HW)
+             (pb_bitn (bv_unsigned w) 3 ltac:(lia) ltac:(lia) HX)).
+  vm_compute. reflexivity.
 Qed.
 
 (* ===================================================================== *)

@@ -21,7 +21,7 @@
    BOTH ARMS REACH THE JOIN WITH [bare_pt uroot ∅], which is the whole
    point of the contract's one interesting premise [dom um ⊆ vpn_run 0 n]:
 
-     - on the FALL arm [sz = 0], so [n = uvmf_np sz = 0] and
+     - on the FALL arm [sz = 0], so [n = uvm_np sz = 0] and
        [vpn_run vpn0 0 = ∅] forces [um = ∅] outright;
      - on the TAKEN arm uvmunmap hands back [um_del_run um vpn0 n], and the
        same premise says every surviving key was inside the run it just
@@ -36,19 +36,20 @@
    is freewalk-safe, which is precisely freewalk's precondition at
    [lvl := 2].
 
-   THE ARITHMETIC.  The contract's run length is
-   [uvmf_np sz = Z.to_nat (uint (pgroundup sz) / 4096)] while the code
-   computes [(sz + 4095) >> 12].  They agree, and the bridge needs NO
-   no-wrap hypothesis at all ([uf_np_shift]): [pgroundup x] is
-   [and_vec (add_vec x 4095) (-4096)], so [ProcPtOwn.pgd_unsigned] reads
-   [uint (pgroundup sz)] as [a - a mod 4096] for [a] the (possibly wrapped)
-   sum the code actually forms, and [(a - a mod 4096)/4096 = a/4096].  The
-   range premise is needed only for uvmunmap's own [uint va + npages*4096
-   <= uvm_maxsz] ([uf_np_range], which does go through
-   [pgroundup_unsigned] / [z_pgu_bound]).  Per claude-notes/durable-notes.md
-   every step of that is factored into [mword]-free [Z] lemmas, because a
-   goal mentioning [bv_unsigned] makes [lia] answer "Cannot find witness"
-   under this file's transitive [bitvector.tactics] import. *)
+   THE ARITHMETIC.  The C writes [PGROUNDUP(sz)/PGSIZE] while the contract's
+   run length is [ProcPtOwn.uvm_np sz = ceil(sz/4096)] -- the SAME number,
+   which is why uvmfree and uvmcopy share one definition.  The bridge
+   ([uf_np_shift]) is two steps: [ProcPtOwn.pgroundup_quot] is
+   UNCONDITIONAL ([pgroundup x] is [and_vec (add_vec x 4095) (-4096)], so
+   [pgd_unsigned] reads [uint (pgroundup sz)] as [a - a mod 4096] for [a]
+   the sum the code actually formed, wrapped or not, and
+   [(a - a mod 4096)/4096 = a/4096]); only the last step, identifying that
+   [a] with [uint sz + 4095], wants the size range premise -- the same one
+   uvmunmap needs for [uint va + npages*4096 <= uvm_maxsz]
+   ([uf_np_range]).  Per claude-notes/durable-notes.md every step of that
+   is factored into [mword]-free [Z] lemmas, because a goal mentioning
+   [bv_unsigned] makes [lia] answer "Cannot find witness" under this file's
+   transitive [bitvector.tactics] import. *)
 Set Printing Depth 40.
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
@@ -92,14 +93,10 @@ Module UvmfreeProof (Uvmunmap : UVMUNMAP_BARE) (Freewalk : FREEWALK) : UVMFREE.
 (*     All [mword]-free where it can be (the [lia] zify-hook rule).       *)
 (* --------------------------------------------------------------------- *)
 
-(* PGROUNDUP's quotient is the raw sum's quotient: masking the low 12 bits
-   off cannot change a division by 4096. *)
-Lemma uf_z_div_mod (a : Z) : (a - a mod 4096) / 4096 = a / 4096.
-Proof.
-  pose proof (Z_div_mod_eq_full a 4096) as H.
-  assert (Hq : a - a mod 4096 = a / 4096 * 4096) by lia.
-  rewrite Hq. apply Z.div_mul. lia.
-Qed.
+(* the PGROUNDUP-quotient identity is [ProcPtOwn.z_pgu_quot] /
+   [pgroundup_quot], stated next to [uvm_np] because it is what makes
+   uvmfree's [PGROUNDUP(sz)/PGSIZE] and uvmcopy's [ceil(sz/4096)] one
+   definition. *)
 
 Lemma uf_z_np_le (v : Z) : 0 <= v -> v / 4096 * 4096 <= v.
 Proof.
@@ -109,53 +106,69 @@ Proof.
   lia.
 Qed.
 
+(* ...so a run of [ceil(v/4096)] pages starting at 0 stays inside the user
+   region.  [mword]-free, because the [lia] zify hook answers "Cannot find
+   witness" whenever ANY [mword] is merely in context. *)
+Lemma uf_z_np_range (v : Z) :
+  0 <= v -> v + 4096 <= 274877898752 ->
+  (v + 4095) / 4096 * 4096 <= 274877898752.
+Proof.
+  intros H0 H1.
+  pose proof (uf_z_np_le (v + 4095) ltac:(lia)) as H.
+  lia.
+Qed.
+
 Lemma uf_z_small (v : Z) :
   0 <= v -> v + 4095 < 18446744073709551616 ->
   0 <= v + 4095 < 18446744073709551616.
 Proof. lia. Qed.
 
-(* THE BRIDGE.  What [srli a2,a1,0xc] computes out of [a1 = sz + 4095] is
-   exactly the contract's [uvmf_np sz]; no range premise is needed. *)
-Lemma uf_np_shift (sz : mword 64) :
-  bv_unsigned (add_vec sz (mword_of_int 4095)) / 4096 = Z.of_nat (uvmf_np sz).
+(* the size premise, as the no-wrap the two bridges below run on *)
+Lemma uf_no_wrap (sz : mword 64) :
+  uint sz + 4096 <= uvm_maxsz -> bv_unsigned sz + 4095 < 2 ^ 64.
 Proof.
-  unfold uvmf_np.
+  intros Hb. apply z_maxsz_no_wrap.
+  rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. exact Hb.
+Qed.
+
+(* THE BRIDGE.  What [srli a2,a1,0xc] computes out of [a1 = sz + 4095] is
+   exactly the contract's [uvm_np sz].  The PGROUNDUP half
+   ([ProcPtOwn.pgroundup_quot]) is unconditional; only identifying the
+   wrapped sum with [uint sz + 4095] needs the range premise. *)
+Lemma uf_np_shift (sz : mword 64) :
+  uint sz + 4096 <= uvm_maxsz ->
+  bv_unsigned (add_vec sz (mword_of_int 4095)) / 4096 = Z.of_nat (uvm_np sz).
+Proof.
+  intros Hb.
+  rewrite <- (pgroundup_quot sz).
+  unfold uvm_np.
   rewrite Z2Nat.id;
-    [| rewrite uint_unsigned; apply Z.div_pos;
-       [ exact (proj1 (bv_unsigned_in_range _ (pgroundup sz))) | lia ]].
-  rewrite uint_unsigned. unfold pgroundup. rewrite pgd_unsigned.
-  symmetry. apply uf_z_div_mod.
+    [| rewrite uint_unsigned; apply Z.div_pos; [| lia];
+       pose proof (proj1 (bv_unsigned_in_range _ sz)); lia].
+  rewrite !uint_unsigned.
+  rewrite (pgroundup_unsigned sz (uf_no_wrap sz Hb)).
+  apply z_pgu_quot.
 Qed.
 
 (* ...and the whole run fits the user region, which is uvmunmap's range
    premise at [va = 0]. *)
 Lemma uf_np_range (sz : mword 64) :
-  uint sz + 4096 <= uvm_maxsz -> Z.of_nat (uvmf_np sz) * 4096 <= uvm_maxsz.
+  uint sz + 4096 <= uvm_maxsz -> Z.of_nat (uvm_np sz) * 4096 <= uvm_maxsz.
 Proof.
   intros Hb.
   assert (Hmax : uvm_maxsz = 274877898752) by (vm_compute; reflexivity).
   assert (Hbz : bv_unsigned sz + 4096 <= 274877898752)
     by (rewrite -uint_unsigned -Hmax; exact Hb).
-  assert (Hpu : bv_unsigned (pgroundup sz)
-                = (bv_unsigned sz + 4095) - (bv_unsigned sz + 4095) mod 4096)
-    by (apply pgroundup_unsigned; apply z_maxsz_no_wrap; exact Hbz).
-  assert (Hpb : bv_unsigned (pgroundup sz) <= 274877898751).
-  { rewrite Hpu. apply z_pgu_bound;
-      [ exact (proj1 (bv_unsigned_in_range _ sz)) | exact Hbz ]. }
-  assert (Hn : Z.of_nat (uvmf_np sz) = bv_unsigned (pgroundup sz) / 4096).
-  { unfold uvmf_np. rewrite Z2Nat.id;
-      [ rewrite uint_unsigned; reflexivity
-      | rewrite uint_unsigned; apply Z.div_pos;
-        [ exact (proj1 (bv_unsigned_in_range _ (pgroundup sz))) | lia ]]. }
-  assert (Hle : 274877898751 <= 274877898752) by lia.
+  assert (Hlo : 0 <= bv_unsigned sz) by exact (proj1 (bv_unsigned_in_range _ sz)).
+  assert (Hn : Z.of_nat (uvm_np sz) = (bv_unsigned sz + 4095) / 4096).
+  { unfold uvm_np. rewrite uint_unsigned. rewrite Z2Nat.id;
+      [ reflexivity | apply Z.div_pos; [clear -Hlo; lia | lia] ]. }
   rewrite Hn Hmax.
-  exact (Z.le_trans _ _ _
-           (uf_z_np_le _ (proj1 (bv_unsigned_in_range _ (pgroundup sz))))
-           (Z.le_trans _ _ _ Hpb Hle)).
+  exact (uf_z_np_range _ Hlo Hbz).
 Qed.
 
 (* [sz = 0] is the arm that skips uvmunmap; the run length is 0 there. *)
-Lemma uf_np_zero (sz : mword 64) : sz = (zero_reg : mword 64) -> uvmf_np sz = 0%nat.
+Lemma uf_np_zero (sz : mword 64) : sz = (zero_reg : mword 64) -> uvm_np sz = 0%nat.
 Proof. intros ->. vm_compute. reflexivity. Qed.
 
 Lemma uf_nz_false (x : mword 64) : neq_vec x (zero_reg : mword 64) = false -> x = zero_reg.
@@ -216,7 +229,7 @@ Section ProofUvmfree.
     assert (HKuu : (22 <= K - 4)%nat) by lia.
     (* the run length, as the code's shift and as uvmunmap's range bound *)
     assert (Hnpz : bv_unsigned (add_vec sz (mword_of_int 4095)) / 4096 = Z.of_nat n)
-      by exact (uf_np_shift sz).
+      by exact (uf_np_shift sz Hbnd).
     assert (Hnrange : Z.of_nat n * 4096 <= uvm_maxsz) by exact (uf_np_range sz Hbnd).
 
     (* ================================================================= *)

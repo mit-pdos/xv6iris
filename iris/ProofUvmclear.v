@@ -90,17 +90,6 @@ Proof.
   unfold kmem_lo. lia.
 Qed.
 
-(* the [c.andi] immediate as the decoder hands it over (positive residue 47)
-   in the shape [ProcPtOwn.pte_clear_u_andi] is stated at *)
-Local Lemma ucl_andi47 (w : mword 64) :
-  and_vec w (sign_extend' 64 (sign_extend' 12 (mword_of_int 47 : mword 6))) = pte_clear_u w.
-Proof.
-  replace (sign_extend' 64 (sign_extend' 12 (mword_of_int 47 : mword 6)) : mword 64)
-    with (sign_extend' 64 (mword_of_int (-17) : mword 6) : mword 64)
-    by (apply bv_eq; vm_compute; reflexivity).
-  exact (pte_clear_u_andi w).
-Qed.
-
 Local Lemma ucl_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
 Proof. vm_compute. reflexivity. Qed.
 
@@ -329,7 +318,7 @@ Section ProofUvmclear.
     set (B2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (and_vec (B1 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (sign_extend' 12 (mword_of_int 47 : mword 6))))]> B1).
     assert (HB2a5 : B2 !!! Regidx (mword_of_int 15 : mword 5) = pte_clear_u wr).
-    { rewrite /B2 upd_eq. rewrite HB1a5. exact (ucl_andi47 wr). }
+    { rewrite /B2 upd_eq. rewrite HB1a5. exact (pte_clear_u_andi12 wr). }
     assert (HB2a0 : B2 !!! Regidx (mword_of_int 10 : mword 5) = pt_addr0 p1 vpn).
     { rewrite /B2. rewrite upd_ne; [| vm_compute; discriminate].
       rewrite /B1. rewrite upd_ne; [| vm_compute; discriminate].

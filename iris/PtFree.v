@@ -3,7 +3,7 @@
    and the altitude at which uvmfree's caller holds a table that is SAFE to
    tear apart.
 
-   Three pieces, in dependency order.
+   Two pieces, in dependency order.
 
    §1  [pt_free_ok lvl t] -- the PURE precondition of freewalk at level
        [lvl]: every slot of every node is either the literal ZERO word (so
@@ -21,12 +21,13 @@
        physical DOUBLEWORDS at [u_pte_addr]; kfree wants 4096 loose bytes
        at the VA tier.  [pt_slots_any_phys] is the regrouping (the inverse
        of [PtBuild.zero_page_to_node]'s, over the same
-       [big_sepL_seq_chunk]) and [pt_page_kfree_pre] the whole move, from
-       [pt_page_own] to [KallocInv.kfree_pre].  The [page_valid] it needs
-       rides in the node's own [PtTree.pt_node_claim] -- that is what the
-       claim was strengthened for.  [pt_kids_own_take] pulls one child out
-       of an owned node for the recursive call and leaves the parent
-       claiming no child there.
+       [big_sepL_seq_chunk]) and [pt_slots_kfree_pre] the whole move, to
+       [KallocInv.kfree_pre].  The [page_valid] it needs rides in the
+       node's own [PtTree.pt_node_claim] -- that is what the claim was
+       strengthened for.  Both are stated over LOOSE SLOTS at arbitrary
+       contents, which is the only shape freewalk ever holds a node page
+       in: by the time it frees the page, its loop has already zeroed the
+       slots that claimed children.
 
    The altitude at which a caller HOLDS such a table -- a process page
    table that has lost its trampoline and trapframe leaves -- is
@@ -136,26 +137,8 @@ Proof.
   apply (vmk_mod (a * 512 + b) c 512); lia.
 Qed.
 
-(* the two bitvector bridges *)
-Lemma pt_bv9_range (x : mword 9) : 0 <= bv_unsigned x < 512.
-Proof.
-  pose proof (bv_unsigned_in_range _ x) as H.
-  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-    by (vm_compute; reflexivity).
-  rewrite Hm in H. exact H.
-Qed.
-
-Lemma pt_mword27_unsigned (i : Z) :
-  0 <= i < 134217728 -> bv_unsigned (mword_of_int i : mword 27) = i.
-Proof.
-  intros Hi.
-  cbv [mword_of_int Values.mword_of_int MachineWord.MachineWord.Z_to_word].
-  rewrite Z_to_bv_unsigned.
-  apply bv_wrap_small.
-  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 27) = 134217728)
-    by (vm_compute; reflexivity).
-  rewrite Hm. exact Hi.
-Qed.
+(* the two bitvector bridges are [PtTree.pt_bv9_range] /
+   [PtTree.pt_mword27_unsigned], next to [pt_mword9_unsigned]. *)
 
 (* [vpn_mk] does not wrap: the three 9-bit fields fit in 27 bits. *)
 Lemma vpn_mk_unsigned (i2 i1 i0 : mword 9) :
@@ -298,107 +281,17 @@ Proof.
   - left. split; [reflexivity | exact (Hz2 i2 Hk2)].
 Qed.
 
-(* ===================================================================== *)
-(* §1b WHAT A VALID POINTER PTE PINS ABOVE THE PPN.                       *)
-(*                                                                        *)
-(*   freewalk computes the child's page base in SOFTWARE, [(pte >> 10) << *)
-(*   12], and [ProcPtOwn.pte2pa] identifies that with [page_base (pte_ppn *)
-(*   w)] only for [w < 2^54].  [PtTree.pte_hi_zero] gets that bound from  *)
-(*   [pte_valid + pte_no_napot + pte_pbmt0], but [pt_free_ok]'s pointer   *)
-(*   case carries only [pte_valid + pte_ptr] (exactly [ptree_blocks0]'s   *)
-(*   pointer conjuncts), and strengthening it would break                 *)
-(*   [pt_free_ok_rep0].  It does not have to be strengthened: the model's *)
-(*   [pte_is_invalid] has a disjunct                                      *)
-(*                                                                        *)
-(*     pte_is_non_leaf(flags) && (A=1 || D=1 || U=1 || ext != 0)          *)
-(*                                                                        *)
-(*   so on a NON-LEAF word, validity forces the whole 10-bit extension    *)
-(*   field (bits 63:54) to zero all by itself.                            *)
-(* ===================================================================== *)
-
-(* [pte_is_invalid] evaluated at a no-extension state, with the NON-LEAF
-   disjunct exposed (the other six are irrelevant here, so they stay
-   existential).  Mirrors [PtTree.pte_piv_split], which exposes the
-   RSW/reserved disjuncts instead. *)
-Local Lemma ptf_piv_nonleaf (f : mword 8) (e : mword 10) :
-  exists b1 b2 b3 x y z b5 b6 b7,
-    exec (pte_is_invalid f e) PtTree.pte_s0
-    = Some (orb b1 (orb b2 (orb b3
-              (orb (andb (pte_is_non_leaf f)
-                      (orb x (orb y (orb z (neq_vec e (zeros' 10))))))
-                   (orb b5 (orb b6 b7)))))
-            , PtTree.pte_s0).
-Proof.
-  do 9 eexists.
-  unfold pte_is_invalid.
-  eapply exec_or_v; [ apply exec_returnM | ].
-  eapply exec_or_v;
-    [ eapply exec_and_v; [ apply exec_returnM |
-        eapply exec_and_v; [ apply exec_returnM |
-          eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] ] ] | ].
-  eapply exec_or_v; [ apply exec_returnM | ].
-  eapply exec_or_v; [ apply exec_returnM | ].
-  eapply exec_or_v;
-    [ eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
-  eapply exec_or_v;
-    [ eapply exec_and_v; [ apply exec_returnM |
-        eapply exec_or_v; [ vm_compute; reflexivity | apply exec_returnM ] ] | ].
-  eapply exec_or_v; [ | apply exec_returnM ].
-  eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ].
-Qed.
-
-Lemma pte_ptr_ext_zero (w : mword 64) :
-  pte_valid w -> pte_ptr w -> ext_bits_of_PTE w = (zeros' 10 : mword 10).
-Proof.
-  intros Hv Hp.
-  destruct (ptf_piv_nonleaf (Mk_PTE_Flags (subrange_vec_dec w 7 0))
-              (ext_bits_of_PTE w))
-    as (b1 & b2 & b3 & x & y & z & b5 & b6 & b7 & Hex).
-  specialize (Hv PtTree.pte_s0). rewrite Hex in Hv. injection Hv as Hb.
-  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
-  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
-  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
-  apply orb_false_iff in Hb; destruct Hb as [Hb _].
-  unfold pte_ptr in Hp. rewrite Hp in Hb. rewrite andb_true_l in Hb.
-  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
-  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
-  apply orb_false_iff in Hb; destruct Hb as [_ Hb].
-  unfold neq_vec in Hb. apply negb_false_iff in Hb.
-  apply eq_vec_true_iff. exact Hb.
-Qed.
-
-Lemma pte_ptr_hi_zero (w : mword 64) :
-  pte_valid w -> pte_ptr w -> (bv_unsigned w < 18014398509481984)%Z.
-Proof.
-  intros Hv Hp.
-  pose proof (pte_ptr_ext_zero w Hv Hp) as He.
-  assert (Hext : ext_bits_of_PTE w = (subrange_vec_dec w 63 54 : mword 10))
-    by reflexivity.
-  rewrite Hext in He.
-  apply (f_equal bv_unsigned) in He.
-  rewrite PtTree.pte_sub_63_54 in He.
-  assert (Z0 : bv_unsigned (zeros' 10 : mword 10) = 0) by (vm_compute; reflexivity).
-  rewrite Z0 in He.
-  apply PtTree.pte_z_hi_zero; [| exact He].
-  pose proof (bv_unsigned_in_range _ w) as Hr.
-  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
-    by (vm_compute; reflexivity).
-  rewrite Hm in Hr. exact Hr.
-Qed.
+(* [pte_ptr_ext_zero] / [pte_ptr_hi_zero] -- "a valid POINTER pte has zero
+   extension bits, hence a word below 2^54", which is what lets freewalk's
+   software [(pte >> 10) << 12] agree with [page_base (pte_ppn w)] -- live
+   in PtTree.v next to [pte_hi_zero], off the same [pte_piv_split].  It is
+   why [pt_free_ok]'s pointer case above needs no [pte_no_napot]/
+   [pte_pbmt0]: those would have made [pt_free_ok_rep0] unprovable, since
+   [ptree_blocks0]'s pointer conjuncts are exactly valid + ptr. *)
 
 (* ===================================================================== *)
 (* §2 A node page, on its way to kfree.                                   *)
 (* ===================================================================== *)
-
-(* byte [j] of slot [i] of a node page = byte [i*8+j] of the page, at
-   [PageGeom.page_base]'s spelling of the page's base ([page_base] is
-   definitionally the [zero_extend'/concat_vec] form [Pt4kWalk] states it
-   with, so [exact] bridges).  The [PtBuild.pa_add_page_slot_u] of the
-   inverse regrouping. *)
-Lemma pa_add_page_slot_pb (b : mword 44) (i j : nat) :
-  (i < 512)%nat -> (j < 8)%nat ->
-  pa_add (page_base b) (i * 8 + j) = pa_add (u_pte_addr b (mword_of_int (Z.of_nat i))) j.
-Proof. exact (pa_add_page_slot b i j). Qed.
 
 Section PtFreeIris.
   Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
@@ -433,37 +326,12 @@ Section PtFreeIris.
     iExists (nth_byte w k'). iExact "Hb".
   Qed.
 
-  (* ...and a node whose slots still hold the description's words is that
-     same page (the words are forgotten). *)
-  Lemma pt_page_own_phys (t : ptree) :
-    pt_page_own (DfracOwn 1) t ⊢
-      ⌜page_valid (page_base (pt_base t))⌝ ∗ phys_page_own (pt_base t).
-  Proof.
-    iIntros "Hp".
-    iEval (rewrite /pt_page_own /pt_node_claim) in "Hp".
-    iDestruct "Hp" as "((%Hkd & %Hpv & #Hk) & Hs)".
-    iSplitR; [done |].
-    iApply pt_slots_any_phys.
-    iApply (big_sepL_mono with "Hs").
-    intros k i _. cbn beta. iIntros "H".
-    iExists (pt_ents t (mword_of_int i)). iExact "H".
-  Qed.
-
-  (* THE HAND-OFF.  A node page, at kfree's precondition.  [page_valid]
-     comes out of the node's own claim (PtTree.pt_node_claim), the tier
-     move from [ProcPtOwn.phys_to_page_own]. *)
-  Lemma pt_page_kfree_pre (t : ptree) :
-    kmap_static_claims -∗ pt_page_own (DfracOwn 1) t -∗
-      kfree_pre (page_base (pt_base t)).
-  Proof.
-    iIntros "#Hb Hp".
-    iDestruct (pt_page_own_phys with "Hp") as "[%Hv Hph]".
-    rewrite /kfree_pre. iSplitR; [done |].
-    iApply (phys_to_page_own (pt_base t) Hv with "Hb Hph").
-  Qed.
-
-  (* the same, for a page held as loose slots (freewalk's loop has
-     rewritten some of them, so the description's words are gone) *)
+  (* THE HAND-OFF: a node page, at kfree's precondition.  Stated for a page
+     held as LOOSE SLOTS, because that is the only shape freewalk ever has
+     one in (its loop has already rewritten some of the words, so the
+     description's are gone).  [page_valid] comes out of the node's own
+     claim ([PtTree.pt_node_claim]), the tier move from
+     [ProcPtOwn.phys_to_page_own]. *)
   Lemma pt_slots_kfree_pre (b : mword 44) :
     page_valid (page_base b) ->
     kmap_static_claims -∗
@@ -474,46 +342,6 @@ Section PtFreeIris.
     iDestruct (pt_slots_any_phys with "Hs") as "Hph".
     rewrite /kfree_pre. iSplitR; [done |].
     iApply (phys_to_page_own b Hv with "Hb Hph").
-  Qed.
-
-  (* TAKE ONE CHILD OUT.  freewalk frees the child and then zeroes the
-     slot, so the parent must be left claiming NO child at [i] -- the
-     destructive twin of [PtBuild.pt_kids_own_ins]. *)
-  Lemma pt_kids_own_take (lvl : nat) (dq : dfrac) (t : ptree) (i : mword 9) (c : ptree) :
-    pt_kids t i = Some c ->
-    pt_kids_own lvl dq t ⊢
-      ptree_own lvl dq c ∗ pt_kids_own lvl dq (pt_upd_kid t i None).
-  Proof.
-    intros Hk.
-    pose proof (bv_unsigned_in_range _ i) as Hir.
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 9) = 512)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hir.
-    assert (Hlk : seqZ 0 512 !! Z.to_nat (bv_unsigned i) = Some (bv_unsigned i)).
-    { apply lookup_seqZ. split; lia. }
-    iIntros "Hks".
-    iEval (rewrite /pt_kids_own) in "Hks".
-    iEval (rewrite (big_sepL_delete _ _ _ _ Hlk)) in "Hks".
-    iDestruct "Hks" as "[Hc Hks]".
-    iEval (rewrite pt_mword9_id Hk) in "Hc".
-    iSplitL "Hc"; [iExact "Hc" |].
-    rewrite /pt_kids_own.
-    rewrite (big_sepL_delete
-               (fun _ j => (match pt_kids (pt_upd_kid t i None) (mword_of_int j) with
-                            | Some cc => ptree_own lvl dq cc
-                            | None => emp end)%I)
-               _ _ _ Hlk).
-    iSplitR.
-    { iEval (rewrite pt_mword9_id pt_upd_kid_same). done. }
-    iApply (big_sepL_mono with "Hks").
-    intros k j Hkj. cbn beta.
-    case_decide as Hkk; [reflexivity |].
-    rewrite pt_upd_kid_other; [reflexivity |].
-    apply lookup_seqZ in Hkj. destruct Hkj as [-> Hjlt].
-    intros Heq. apply Hkk.
-    apply (f_equal bv_unsigned) in Heq.
-    rewrite pt_mword9_unsigned in Heq; [| lia].
-    lia.
   Qed.
 
 End PtFreeIris.

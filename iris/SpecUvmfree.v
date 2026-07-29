@@ -76,7 +76,7 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   let pcE : mword 64 := mword_of_int KernelSyms.uvmfree in
   let sz := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
-  let n := uvmf_np sz in
+  let n := uvm_np sz in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 4-slot frame + freewalk's 32 (uvmunmap needs only 22) *)
   (36 <= K)%nat ->

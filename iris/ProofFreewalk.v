@@ -202,94 +202,9 @@ Proof.
   revert He. generalize (bv_unsigned b). intros B HB. lia.
 Qed.
 
-(* ---- the [andi a4,a5,14] leaf test: a POINTER masks to zero ---------- *)
-
-Local Lemma fw_sub_7_0 (v : mword 64) :
-  bv_unsigned (subrange_vec_dec v 7 0 : mword 8) = bv_unsigned v mod 2 ^ 8.
-Proof. apply (subrange_dec_unsigned_lo0 v 7 (2 ^ 8)); [lia | reflexivity]. Qed.
-Local Lemma fw_sub_1_1 (v : mword 8) :
-  bv_unsigned (subrange_vec_dec v 1 1 : mword 1) = bv_unsigned v / 2 ^ 1 mod 2.
-Proof. apply (subrange_dec_unsigned v 1 1 (2 ^ 1) 2); [lia | lia | reflexivity | reflexivity]. Qed.
-Local Lemma fw_sub_2_2 (v : mword 8) :
-  bv_unsigned (subrange_vec_dec v 2 2 : mword 1) = bv_unsigned v / 2 ^ 2 mod 2.
-Proof. apply (subrange_dec_unsigned v 2 2 (2 ^ 2) 2); [lia | lia | reflexivity | reflexivity]. Qed.
-Local Lemma fw_sub_3_3 (v : mword 8) :
-  bv_unsigned (subrange_vec_dec v 3 3 : mword 1) = bv_unsigned v / 2 ^ 3 mod 2.
-Proof. apply (subrange_dec_unsigned v 3 3 (2 ^ 3) 2); [lia | lia | reflexivity | reflexivity]. Qed.
-
-Local Lemma fw_z_bit_false (y : Z) : y mod 2 = 0 -> Z.odd y = false.
-Proof. intros H. rewrite Zmod_odd in H. destruct (Z.odd y); [discriminate | reflexivity]. Qed.
-
-Local Lemma fw_bitn (x n : Z) :
-  0 <= n -> n < 8 -> (x mod 2 ^ 8) / 2 ^ n mod 2 = 0 -> Z.testbit x n = false.
-Proof.
-  intros Hn0 Hn8 H.
-  apply fw_z_bit_false in H.
-  rewrite <- Z.bit0_odd in H.
-  rewrite (Z.div_pow2_bits (x mod 2 ^ 8) n 0 Hn0 ltac:(lia)) in H.
-  replace (0 + n) with n in H by lia.
-  rewrite (Z.mod_pow2_bits_low x 8 n ltac:(lia)) in H.
-  exact H.
-Qed.
-
-Local Lemma fw_z_land14 (x : Z) :
-  Z.testbit x 1 = false -> Z.testbit x 2 = false -> Z.testbit x 3 = false ->
-  Z.land x 14 = 0.
-Proof.
-  intros H1 H2 H3. apply Z.bits_inj_0. intros n.
-  destruct (Z_lt_le_dec n 0) as [Hn | Hn].
-  { apply Z.testbit_neg_r. exact Hn. }
-  rewrite Z.land_spec.
-  destruct (Z.eq_dec n 0) as [-> | Hn0].
-  { replace (Z.testbit 14 0) with false by (vm_compute; reflexivity). apply andb_false_r. }
-  destruct (Z.eq_dec n 1) as [-> | Hn1]. { rewrite H1. reflexivity. }
-  destruct (Z.eq_dec n 2) as [-> | Hn2]. { rewrite H2. reflexivity. }
-  destruct (Z.eq_dec n 3) as [-> | Hn3]. { rewrite H3. reflexivity. }
-  replace (Z.testbit 14 n) with false; [apply andb_false_r |].
-  symmetry. apply Z.bits_above_log2; [lia |].
-  replace (Z.log2 14) with 3 by (vm_compute; reflexivity). lia.
-Qed.
-
-Lemma fw_and14_unsigned (w : mword 64) :
-  bv_unsigned (and_vec w (sign_extend' 64 (mword_of_int 14 : mword 12)) : mword 64)
-  = Z.land (bv_unsigned w) 14.
-Proof.
-  unfold and_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    to_word, get_word, SailStdpp.Values.with_word.
-  unfold MachineWord.MachineWord.and.
-  rewrite bv_and_unsigned.
-  match goal with |- context [Z.land _ (bv_unsigned ?mm)] =>
-    replace (bv_unsigned mm) with 14 by (vm_compute; reflexivity) end.
-  reflexivity.
-Qed.
-
-(* the C's [(pte & (PTE_R|PTE_W|PTE_X)) == 0] test on a NON-LEAF word *)
-Lemma fw_ptr_and14 (w : mword 64) :
-  pte_ptr w ->
-  and_vec w (sign_extend' 64 (mword_of_int 14 : mword 12)) = (mword_of_int 0 : mword 64).
-Proof.
-  intros Hp.
-  unfold pte_ptr, pte_is_non_leaf, Mk_PTE_Flags in Hp.
-  apply andb_prop in Hp. destruct Hp as [HX Hp].
-  apply andb_prop in Hp. destruct Hp as [HW HR].
-  apply eq_vec_true_iff in HX. apply eq_vec_true_iff in HW. apply eq_vec_true_iff in HR.
-  unfold _get_PTE_Flags_X in HX. unfold _get_PTE_Flags_W in HW. unfold _get_PTE_Flags_R in HR.
-  apply (f_equal bv_unsigned) in HX.
-  apply (f_equal bv_unsigned) in HW.
-  apply (f_equal bv_unsigned) in HR.
-  rewrite fw_sub_3_3 fw_sub_7_0 in HX.
-  rewrite fw_sub_2_2 fw_sub_7_0 in HW.
-  rewrite fw_sub_1_1 fw_sub_7_0 in HR.
-  replace (bv_unsigned ('b"0" : mword 1)) with 0 in HX by (vm_compute; reflexivity).
-  replace (bv_unsigned ('b"0" : mword 1)) with 0 in HW by (vm_compute; reflexivity).
-  replace (bv_unsigned ('b"0" : mword 1)) with 0 in HR by (vm_compute; reflexivity).
-  apply bv_eq. rewrite fw_and14_unsigned.
-  rewrite (fw_z_land14 (bv_unsigned w)
-             (fw_bitn (bv_unsigned w) 1 ltac:(lia) ltac:(lia) HR)
-             (fw_bitn (bv_unsigned w) 2 ltac:(lia) ltac:(lia) HW)
-             (fw_bitn (bv_unsigned w) 3 ltac:(lia) ltac:(lia) HX)).
-  vm_compute. reflexivity.
-Qed.
+(* the [andi a4,a5,14] leaf test -- "a POINTER masks to zero" -- is
+   [PtBuild.fw_ptr_and14], next to the V-bit ([pte_valid_bit0]) and V|U-pair
+   ([pte_vu_bits]) bridges of the same family. *)
 
 (* [CommonWalk.u_next_base] and [ProcPtOwn.pte_ppn] are the same ppn, one
    [autocast] apart. *)

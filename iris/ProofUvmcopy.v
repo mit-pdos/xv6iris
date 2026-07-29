@@ -103,7 +103,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 (* the loop-trip characterisation.  [i = 4096*j] is below [sz] exactly for
-   the first [(sz+4095)/4096 = uvmc_np sz] values of [j]. *)
+   the first [(sz+4095)/4096 = uvm_np sz] values of [j]. *)
 Lemma uc_z_iter (nz j : Z) : (4096 * j < nz) <-> (j < (nz + 4095) / 4096).
 Proof.
   pose proof (Z_div_mod_eq_full (nz + 4095) 4096) as Heq.
@@ -270,12 +270,6 @@ Definition uc_at (Pold Pnew P' : uptd) (vpn0 : mword 27) (i : nat) : Prop :=
       w' = pte_set_ad (uvm_pte (pte_flags10 w) r) a d
   end.
 
-(* [Regidx] is injective -- named so the callee-saved peel's disequality
-   discharge can stay NAME-FREE (an [Ltac] body cannot reference a hypothesis
-   by literal name; durable-notes.md). *)
-Lemma uc_regidx_inj (x y : mword 5) : Regidx x = Regidx y -> x = y.
-Proof. intro H. injection H as H. exact H. Qed.
-
 (* "the child's map agrees with the one we were given outside the prefix"
    is what supplies [um_del_run_restore_sub]'s domain premise *)
 Lemma uc_dom_sub (um um' : gmap (mword 27) (mword 64)) (vpn0 : mword 27) (j : nat) :
@@ -407,7 +401,7 @@ Section ProofUvmcopy.
       | lazymatch goal with
         | |- Regidx ?x <> Regidx ?y =>
             match goal with
-            | H : x <> y |- _ => exact (fun Hq => H (uc_regidx_inj x y Hq))
+            | H : x <> y |- _ => exact (fun Hq => H (regidx_inj x y Hq))
             end
         end ].
 
@@ -1659,7 +1653,7 @@ Section ProofUvmcopy.
     cbv beta delta [wp_uvmcopy_sconf_body].
     intros pcE sz vpn0 n ret_tgt HK Htp Hroot Hrootn Hszb Hfresh.
     assert (Hvpn0 : svpn_of (mword_of_int 0 : mword 64) = vpn0) by reflexivity.
-    assert (Hnd : n = uvmc_np sz) by reflexivity.
+    assert (Hnd : n = uvm_np sz) by reflexivity.
     assert (HK10 : (10 <= K)%nat) by (clear -HK; lia).
     assert (HKback : ((K - 10) + 10)%nat = K) by (clear -HK; lia).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
@@ -1673,7 +1667,7 @@ Section ProofUvmcopy.
       assert (Hszz : sz = (zero_reg : mword 64))
         by (apply eq_vec_true_iff; exact Hz0).
       assert (Hn0 : n = 0%nat).
-      { rewrite Hnd. unfold uvmc_np. rewrite Hszz.
+      { rewrite Hnd. unfold uvm_np. rewrite Hszz.
         assert (Hu : uint (zero_reg : mword 64) = 0%Z) by (vm_compute; reflexivity).
         rewrite Hu. exact uc_z_np_zero. }
       assert (Htgt96 : add_vec (pcE : mword 64)
@@ -1722,10 +1716,10 @@ Section ProofUvmcopy.
       - clear -He Hszlo. lia. }
     assert (Hnchar : forall k : nat,
               (4096 * Z.of_nat k < bv_unsigned sz)%Z <-> (k < n)%nat).
-    { intros k. rewrite Hnd. unfold uvmc_np. rewrite uint_unsigned.
+    { intros k. rewrite Hnd. unfold uvm_np. rewrite uint_unsigned.
       apply uc_z_nchar. apply uc_z_np_pos. clear -Hszpos; lia. }
     assert (Hnb : (Z.of_nat n < 67108863)%Z).
-    { rewrite Hnd. unfold uvmc_np. rewrite uint_unsigned.
+    { rewrite Hnd. unfold uvm_np. rewrite uint_unsigned.
       rewrite Z2Nat.id;
         [ apply uc_z_np_bound; exact Hszb
         | apply uc_z_np_pos; clear -Hszpos; lia ]. }

@@ -117,73 +117,6 @@ Definition uu_thr1 (mm m : regfile) : Prop :=
 
 
 (* ===================================================================== *)
-(* THE ALTITUDE-FREE HELPERS.                                             *)
-(*                                                                        *)
-(* uvmunmap's loop moves the map and the pages and NEVER the fixed        *)
-(* leaves, so everything it needs of the descriptor is [BarePt.uptg_wf]   *)
-(* -- [upt_map_wf] + [um_pages_valid] + [um_inj].  These four are the     *)
-(* [uptg_wf]-premised twins of [ProcPtOwn.um_page_valid] /                *)
-(* [proc_pt_wf_del_run] / [proc_pt_own_shrink] / [proc_pt_own_skip]; they *)
-(* belong next to those, in ProcPtOwn.v (or BarePt.v).                    *)
-(* ===================================================================== *)
-
-Lemma uu_uptg_wf_del_run (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
-    (k : nat) :
-  uptg_wf um -> uptg_wf (um_del_run um vpn0 k).
-Proof.
-  intros Hwf. induction k as [| k IH]; [exact Hwf |].
-  cbn [um_del_run]. exact (uptg_wf_delete _ _ IH).
-Qed.
-
-Lemma uu_acc_wf_del_run (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
-    (k : nat) :
-  upt_acc_wf um -> upt_acc_wf (um_del_run um vpn0 k).
-Proof.
-  intros Hwf. induction k as [| k IH]; [exact Hwf |].
-  cbn [um_del_run]. exact (upt_acc_wf_delete _ _ IH).
-Qed.
-
-Lemma uu_uptg_page_valid (um : gmap (mword 27) (mword 64)) (vpn : mword 27)
-    (w : mword 64) :
-  uptg_wf um -> um !! vpn = Some w -> page_valid (page_base (pte_ppn w)).
-Proof.
-  intros (_ & Hpv & _) Hl. apply Hpv. apply elem_of_um_ppns.
-  exists vpn, w. split; [exact Hl | reflexivity].
-Qed.
-
-Section UvmunmapOwn.
-  Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
-
-  (* [ProcPtOwn.proc_pt_own_shrink] at [uptg_wf]: it only ever used
-     [um_inj] (for the footprint) and [um_pages_valid] (for kfree's
-     [page_valid]), neither of which is about the fixed leaves. *)
-  Lemma uu_uptg_own_shrink (um : gmap (mword 27) (mword 64))
-      (vpn : mword 27) (w : mword 64) :
-    uptg_wf um -> um !! vpn = Some w ->
-    KMap.kmap_static_claims -∗ upt_pages_own um -∗
-      page_own (page_base (pte_ppn w)) ∗ upt_pages_own (delete vpn um).
-  Proof.
-    intros Hwf Hl.
-    pose proof (uu_uptg_page_valid um vpn w Hwf Hl) as Hval.
-    destruct Hwf as (_ & _ & Hinj).
-    iIntros "#Hb Hown".
-    iEval (rewrite (upt_pages_own_take um vpn w Hinj Hl)) in "Hown".
-    iDestruct "Hown" as "[Hp Hrest]".
-    iSplitL "Hp".
-    { iApply (phys_to_page_own (pte_ppn w) Hval with "Hb Hp"). }
-    iExact "Hrest".
-  Qed.
-
-  (* the pure conjunct [proc_pt] carries, read off without opening the
-     tree (the [Some] sealing needs [upt_acc_wf] and the trapframe page's
-     [page_valid], which [uptg_wf] deliberately drops). *)
-  Lemma uu_proc_pt_wf_get (P : uptd) : proc_pt P ⊢ ⌜proc_pt_wf P⌝.
-  Proof. rewrite /proc_pt. iIntros "(%Hwf & _)". iPureIntro. exact Hwf. Qed.
-
-End UvmunmapOwn.
-
-(* ===================================================================== *)
 (* THE WHOLE FUNCTION, PROVED ONCE OVER [BarePt.uptg].                    *)
 (* ===================================================================== *)
 
@@ -636,7 +569,7 @@ Section ProofUvmunmap.
         rewrite Hdn in Htview.
         iEval (rewrite Hdn) in "Hown".
         iDestruct (uptg_rebuild otf uroot (um_del_run um (svpn_of va) npages)
-                     t' m' (uu_uptg_wf_del_run um (svpn_of va) npages Hwf)
+                     t' m' (uptg_wf_del_run um (svpn_of va) npages Hwf)
                      Htview Htrep Htbase with "Hptree Hown") as "Hpt".
         iApply ("Hcont" $! T1 with "[%] [%] Hcg Hcnt Hpc Hpt").
         - exact HT1sp.
@@ -1003,11 +936,11 @@ Section ProofUvmunmap.
     assert (Hppn : pte_ppn w0 = pte_ppn wu)
       by (rewrite Hw0ad; apply pte_ppn_set_ad).
     assert (Hwfd : uptg_wf (um_del_run um (svpn_of va) done))
-      by (apply uu_uptg_wf_del_run; exact Hwf).
+      by (apply uptg_wf_del_run; exact Hwf).
     assert (Hpv : page_valid (page_base (pte_ppn wu)))
-      by (exact (uu_uptg_page_valid (um_del_run um (svpn_of va) done)
+      by (exact (uptg_page_valid (um_del_run um (svpn_of va) done)
                    (vpn_at (svpn_of va) done) wu Hwfd Humsome)).
-    iDestruct (uu_uptg_own_shrink (um_del_run um (svpn_of va) done)
+    iDestruct (uptg_own_shrink (um_del_run um (svpn_of va) done)
                  (vpn_at (svpn_of va) done) wu Hwfd Humsome with "Hkmapb Hown")
       as "[Hpage Hown]".
     (* --- +0x70 jal ra,kfree --- *)
@@ -1571,7 +1504,7 @@ Section SealUvmunmap.
 
   (* [proc_pt] IS the [Some] instance; the round trip owes [uptg] the two
      conjuncts it does not carry -- [upt_acc_wf] (preserved along the run
-     by [uu_acc_wf_del_run]) and the trapframe page's [page_valid], which
+     by [upt_acc_wf_del_run]) and the trapframe page's [page_valid], which
      the loop never touches. *)
   Lemma wp_uvmunmap_sconf
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
@@ -1582,7 +1515,7 @@ Section SealUvmunmap.
     cbv beta delta [wp_uvmunmap_sconf_body].
     intros pcE va vpn0 ret_tgt HK Htp Hroot Hval Hnpr Hdf Hrange.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
-    iDestruct (uu_proc_pt_wf_get P with "Hpt") as %Hwf.
+    iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
     destruct Hwf as (_ & Hacc & _ & _ & Htfv).
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
     iApply (Core.wp_uvmunmap_gen γ γa Φ mm (Some P.(ud_tfp)) P.(ud_root)
@@ -1592,7 +1525,7 @@ Section SealUvmunmap.
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
     iApply (uptg_proc_pt (uptd_del_run P vpn0 npages)
-              (uu_acc_wf_del_run P.(ud_um) vpn0 npages Hacc) Htfv).
+              (upt_acc_wf_del_run P.(ud_um) vpn0 npages Hacc) Htfv).
     iExact "Hpt".
   Qed.
 
