@@ -11,7 +11,7 @@
 (* §2  The DMA LEASE -- the part that has no analogue among the other       *)
 (*     devices, because the disk is the only BUS MASTER.  The device        *)
 (*     thread's step overwrites bytes of the harts' memory                  *)
-(*     (RiscvLang.DevStepDisk), so to justify that step at the Iris level   *)
+(*     (RiscvLang.DiskStepDma), so to justify that step at the Iris level   *)
 (*     the thread must OWN those bytes.  What it owns is                    *)
 (*                                                                         *)
 (*       [virtio_lease v] = an existentially-quantified set of physical     *)
@@ -162,7 +162,7 @@ Section WpVirtio.
   (* DEVICE-THREAD RULE 1.  The lease REFUTES the write-anything step: the
      queue the driver published is well formed, so the device is never in the
      position of owing an answer this model does not have.  Without this the
-     wild step of [DevStepDiskWild] would make [wp_dev_loop] unprovable -- which
+     wild step of [DiskStepWild] would make [wp_disk_loop] unprovable -- which
      is precisely the pressure that turns queue well-formedness into a driver
      obligation. *)
   Lemma virtio_lease_not_stalled (m : gmap Arch.pa (bv 8)) (v : virtio_state)

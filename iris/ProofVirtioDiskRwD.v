@@ -665,13 +665,14 @@ Section VdrwdLeaves.
     iApply (wp_load_s_sconf_au 2 false true γ Φ pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
               (fun w => (⌜w = wrap16 np⌝ ∗ ⌜(nr <= np)%nat⌝ ∗ disk_pub γd np)%I)
-              (⊤ ∖ ↑minstretN ∖ ↑devN) (dqm := DfracOwn 1)
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
               with "Hcg Hpc Hinstr [Hpub] [Hcont]").
-    { iInv "Hdinv" as ">Hdbody" "Hdclose".
-      iDestruct "Hdbody" as (u q vst) "(Huf & Hplf & Hvf & Hg & Hproto & %Hpok & %Hvok)".
+    { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+      iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       (* the window fact, read off the used-index accessor and given back *)
       iDestruct (virtio_proto_used_idx_acc γd vst np nr with "Hproto Hpub Hlb0")
         as (nc) "(%Hnrnc & %Hncnp & _ & _ & _ & Hwu & Hbacku)".
@@ -691,9 +692,8 @@ Section VdrwdLeaves.
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2 with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
-      iMod ("Hdclose" with "[Huf Hplf Hvf Hg Hproto]") as "_".
-      { iNext. iExists u, q, vst. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub". iSplitR; [done|]. iPureIntro. lia. }
     iIntros (w) "Hcg Hpc Hpost".
     iDestruct "Hpost" as "(-> & %Hle & Hpub)".
@@ -743,14 +743,15 @@ Section VdrwdLeaves.
     iApply (wp_store_s_sconf_au 2 false γ Φ pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
               (disk_pub γd (S np) ∗ disk_receipt γd np sl pin)%I
-              (⊤ ∖ ↑minstretN ∖ ↑devN)
+              (⊤ ∖ ↑minstretN ∖ ↑diskN)
               ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (m !!! Regidx rs2)); exact Hsv)
               with "Hcg Hpc Hinstr [Hpub Hpin Hwrb Hpend] [Hcont]").
-    { iInv "Hdinv" as ">Hdbody" "Hdclose".
-      iDestruct "Hdbody" as (u q vst) "(Huf & Hplf & Hvf & Hg & Hproto & %Hpok & %Hvok)".
+    { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+      iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       (* pin the live configuration first: the publish accessor's pure premise
          is stated at [v_cfg vst], and the caller supplies it at the frozen
          [virtio_init_cfg]. *)
@@ -774,9 +775,8 @@ Section VdrwdLeaves.
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hrcpt)".
-      iMod ("Hdclose" with "[Huf Hplf Hvf Hg Hproto]") as "_".
-      { iNext. iExists u, q, vst. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub Hrcpt". }
     iIntros "Hcg Hpc [Hpub Hrcpt]".
     iApply ("Hcont" with "Hcg Hpc Hpub Hrcpt").

@@ -3,12 +3,12 @@
    ONE Iris invariant, with their contents existentially quantified.
 
    Motivation (the exact analogue of MinstretInv.v): the PLIC may flip a hart's
-   interrupt pin at any time (the wire step of [dev_step], DevModel.v), so no
+   interrupt pin at any time (the wire step of [plic_step], DevModel.v), so no
    CPU-side proof may pin a wire's value -- and the device loop, symmetrically,
    only ever OVERWRITES a wire, so it never cares what the old value was.
    Owning the cells with existential contents makes the invariant trivially
    re-establishable after a wire write, hence persistent (duplicable): the
-   device thread ([wp_dev_loop], WpUart.v) and any future CPU-side interrupt
+   wire thread ([wp_plic_loop], WpUart.v) and any future CPU-side interrupt
    proof share [wire_inv] instead of threading the owned cells. *)
 From stdpp Require Import gmap finite.
 From iris.proofmode Require Import proofmode.

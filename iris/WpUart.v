@@ -11,12 +11,16 @@
        (read_ram/write_ram -> checked_mem_read/write -> mem_read/
        mem_write_value) for a 1-byte device access in Machine mode --
        the device twins of WpLoad.v / WpGprStore.v's RAM towers.
-   §3  the DEVICE THREAD: [wp_dev_loop] -- the [DevLoop] execution context
-       runs forever under the device invariant [dev_inv_body] (the device
-       halves) plus the wire invariant [wire_inv] (every hart's [sig_seip]/
-       [sig_meip] pin, WireInv.v).  This is the shape of every future
-       driver-vs-device proof: CPU-side WPs and the device loop share
-       [dev_inv]/[wire_inv]-style invariants.
+   §3  the DEVICE THREADS: [wp_uart_loop] / [wp_disk_loop] /
+       [wp_plic_loop] -- the three device execution contexts, each running
+       forever under ITS OWN invariant ([uart_inv] / [disk_inv] /
+       [plic_inv]), plus, for the wire, the wire invariant [wire_inv] (every
+       hart's [sig_seip]/[sig_meip] pin, WireInv.v).  [dev_inv] is retained
+       as the persistent BUNDLE of the three, which is what every
+       client-facing spec in the tree takes.  This is the shape of every
+       future driver-vs-device proof: CPU-side WPs and a device loop share
+       one sub-invariant, and a CPU-side proof opens only the sub-invariant
+       of the device it touches.
    §4  the interrupt chain, as pure facts: UART rx-avail raises the level
        ([uart_irq]), the gateway latches it ([plic_latch]), the latched
        source drives the hart's EIP wire ([plic_eip_uart]), and a high
@@ -61,6 +65,23 @@ Section DevGhost.
     done.
   Qed.
 
+
+  (* ... and the per-device halves of that agreement, for the proofs that hold
+     only ONE device's fragment (each device thread opens only its own
+     invariant, so it never has the other devices' fragments to hand). *)
+  Lemma dev_interp_agree_uart d u :
+    dev_interp d -∗ uart_frag u -∗ ⌜duart d = u⌝.
+  Proof.
+    iIntros "(Hua & _ & _) Hu".
+    by iDestruct (uart_agree with "Hua Hu") as %->.
+  Qed.
+
+  Lemma dev_interp_agree_plic d p :
+    dev_interp d -∗ plic_frag p -∗ ⌜dplic d = p⌝.
+  Proof.
+    iIntros "(_ & Hpa & _) Hp".
+    by iDestruct (plic_agree with "Hpa Hp") as %->.
+  Qed.
 
   (* uart-only update (the plic component rides along) *)
   Lemma dev_interp_update_uart d u u' :
@@ -250,8 +271,9 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §3  the device thread: [DevLoop] runs forever under the device          *)
-(*     invariant + the wire invariant.                                     *)
+(* §3  the device threads: [UartLoop]/[DiskLoop]/[PlicLoop] each run       *)
+(*     forever under their own invariant (+ the wire invariant, for the    *)
+(*     wire thread).                                                       *)
 (* ===================================================================== *)
 
 (* ===================================================================== *)
@@ -305,7 +327,7 @@ Definition uartGhostΣ : gFunctors :=
 Global Instance subG_uartGhostG Σ : subG uartGhostΣ Σ -> uartGhostG Σ.
 Proof. solve_inG. Qed.
 
-Section DevLoop.
+Section DevLoops.
   Context `{!riscvGS Σ}.
   Context `{!uartGhostG Σ}.
   Context `{!diskGhostG Σ}.
@@ -589,19 +611,95 @@ Section DevLoop.
   Global Instance dev_inv_body_timeless γ γd : Timeless (dev_inv_body γ γd).
   Proof. rewrite /dev_inv_body. apply _. Qed.
 
-  (* The device invariant as a client-facing, duplicable proposition.  The
-     device state is shared between the device thread and every CPU that
-     touches UART/PLIC MMIO, so NO proof may hold [uart_frag]/[plic_frag]
-     across a step: a client threads [dev_inv] and borrows the fragment by
-     opening it around the access. *)
+  (* ------------------------------------------------------------------ *)
+  (*  THREE invariants, one per device thread.                           *)
+  (*                                                                     *)
+  (*  The device step relations are pairwise decoupled (RiscvLang §3c),   *)
+  (*  so their Iris counterparts are too: each device's loop opens only   *)
+  (*  its own half of the fabric, and a CPU-side proof opens only the     *)
+  (*  half of the device it touches.  The namespaces are SUB-namespaces   *)
+  (*  of [devN], so every existing [↑devN ⊆ E] side condition in a leaf   *)
+  (*  statement keeps working unchanged (each [↑subN ⊆ ↑devN]).           *)
+  (* ------------------------------------------------------------------ *)
+  Definition uartN : namespace := devN .@ "uart".
+  Definition plicN : namespace := devN .@ "plic".
+  Definition diskN : namespace := devN .@ "disk".
+
+  Definition uart_inv_body (γ : uart_names) : iProp Σ :=
+    (∃ u : uart_state, uart_frag u ∗ uart_ghosts γ u)%I.
+
+  Definition plic_inv_body : iProp Σ :=
+    (∃ p : plic_state, plic_frag p ∗ ⌜ plic_ok p ⌝)%I.
+
+  Definition disk_inv_body (γd : disk_names) : iProp Σ :=
+    (∃ v : virtio_state,
+       virtio_frag v ∗ virtio_proto γd v ∗ ⌜ virtio_isr_ok v ⌝)%I.
+
+  Global Instance uart_inv_body_timeless γ : Timeless (uart_inv_body γ).
+  Proof. rewrite /uart_inv_body. apply _. Qed.
+  Global Instance plic_inv_body_timeless : Timeless plic_inv_body.
+  Proof. rewrite /plic_inv_body. apply _. Qed.
+  Global Instance disk_inv_body_timeless γd : Timeless (disk_inv_body γd).
+  Proof. rewrite /disk_inv_body. apply _. Qed.
+
+  Definition uart_inv (γ : uart_names) : iProp Σ := inv uartN (uart_inv_body γ).
+  Definition plic_inv : iProp Σ := inv plicN plic_inv_body.
+  Definition disk_inv (γd : disk_names) : iProp Σ := inv diskN (disk_inv_body γd).
+
+  Global Instance uart_inv_persistent γ : Persistent (uart_inv γ).
+  Proof. rewrite /uart_inv. apply _. Qed.
+  Global Instance plic_inv_persistent : Persistent plic_inv.
+  Proof. rewrite /plic_inv. apply _. Qed.
+  Global Instance disk_inv_persistent γd : Persistent (disk_inv γd).
+  Proof. rewrite /disk_inv. apply _. Qed.
+
+  Lemma uart_inv_alloc E γ : uart_inv_body γ ={E}=∗ uart_inv γ.
+  Proof. iIntros "Hbody". rewrite /uart_inv. by iApply inv_alloc. Qed.
+  Lemma plic_inv_alloc E : plic_inv_body ={E}=∗ plic_inv.
+  Proof. iIntros "Hbody". rewrite /plic_inv. by iApply inv_alloc. Qed.
+  Lemma disk_inv_alloc E γd : disk_inv_body γd ={E}=∗ disk_inv γd.
+  Proof. iIntros "Hbody". rewrite /disk_inv. by iApply inv_alloc. Qed.
+
+  (* The device invariant as a client-facing, duplicable proposition: the
+     BUNDLE of the three per-device invariants.  Same name and same arguments
+     as before the split, so every client spec in the tree is unchanged --
+     what changed is only that a proof holding it destructs the bundle and
+     opens the one sub-invariant it needs.  The device state is shared between
+     the device threads and every CPU that touches UART/PLIC/virtio MMIO, so
+     NO proof may hold [uart_frag]/[plic_frag]/[virtio_frag] across a step: a
+     client threads [dev_inv] and borrows the fragment by opening the relevant
+     half around the access. *)
   Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
-    inv devN (dev_inv_body γ γd).
+    (uart_inv γ ∗ plic_inv ∗ disk_inv γd)%I.
 
   Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
 
+  (* the three projections out of the bundle.  A leaf that borrows the fabric
+     takes [dev_inv] (unchanged statement) and projects the ONE half it
+     touches; the projections are wands out of a persistent premise, so a
+     leaf holding [dev_inv] in its intuitionistic context keeps it. *)
+  Lemma dev_inv_uart γ γd : dev_inv γ γd -∗ uart_inv γ.
+  Proof. iIntros "(#H & _ & _)". iExact "H". Qed.
+  Lemma dev_inv_plic γ γd : dev_inv γ γd -∗ plic_inv.
+  Proof. iIntros "(_ & #H & _)". iExact "H". Qed.
+  Lemma dev_inv_disk γ γd : dev_inv γ γd -∗ disk_inv γd.
+  Proof. iIntros "(_ & _ & #H)". iExact "H". Qed.
+
+  (* ... and the bundle allocation, at the EXISTING signature: the old
+     ∃-triple body is split into the three per-device bodies. *)
   Lemma dev_inv_alloc E γ γd : dev_inv_body γ γd ={E}=∗ dev_inv γ γd.
-  Proof. iIntros "Hbody". rewrite /dev_inv. by iApply inv_alloc. Qed.
+  Proof.
+    iIntros "Hbody". rewrite /dev_inv_body.
+    iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hproto & %Hpok & %Hvok)".
+    iMod (uart_inv_alloc E γ with "[Hu Hg]") as "#Huinv".
+    { iExists u. iFrame "Hu Hg". }
+    iMod (plic_inv_alloc E with "[Hp]") as "#Hpinv".
+    { iExists p. iFrame "Hp". iPureIntro. exact Hpok. }
+    iMod (disk_inv_alloc E γd with "[Hv Hproto]") as "#Hdinv".
+    { iExists v. iFrame "Hv Hproto". iPureIntro. exact Hvok. }
+    iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv".
+  Qed.
 
   (* Allocate all four UART ghosts from an initial device state.  Hands back
      the invariant's halves (as [dev_inv_body]'s ghost conjuncts) together
@@ -645,27 +743,30 @@ Section DevLoop.
     iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hoff".
   Qed.
 
-  Lemma wp_dev_loop γ γd Φ :
-    dev_inv γ γd -∗ wire_inv -∗
-    WP (DevLoop : expr riscv_lang) {{ Φ }}.
+  (* ------------------------------------------------------------------ *)
+  (*  THE UART THREAD.  Opens [uartN] for the tx/rx arms and [plicN] for  *)
+  (*  the latch arm -- never both, because no single UART transition      *)
+  (*  touches both halves.                                               *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_uart_loop γ Φ :
+    uart_inv γ -∗ plic_inv -∗
+    WP (UartLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#Hinv #Hwinv". rewrite /dev_inv.
+    iIntros "#Huinv #Hpinv".
     iLöb as "IH".
-    iApply wp_dev_step.
+    iApply wp_uart_step.
     iIntros (gr m d) "(Hgr & Hmem & Hdev)".
-    iInv "Hinv" as ">Hbody" "Hclose".
-    iInv "Hwinv" as ">Hwbody" "Hwclose".
-    iDestruct "Hbody" as (u p vs) "(Hu & Hp & Hv & Hg & Hlease & %Hpok & %Hvok)".
-    iDestruct "Hwbody" as (seip meip) "Hwires".
-    iDestruct (dev_interp_agree with "Hdev Hu Hp") as %[Hu Hp].
-    iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+    (* No invariant is opened until the arm is known: each arm then opens
+       exactly the one half of the fabric it moves. *)
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
-    iNext. iIntros (d' m' gr' Hstep).
+    iNext. iIntros (d' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [b u' Htx0 | b u' Hrx | i p' Hirq Hlatch
-                      | mv vnew w Hview Hdisk | mv w Hview Hstall | c].
+    destruct Hstep as [b u' Htx0 | b u' Hrx | p' Hirq Hlatch |].
     - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the
          tail of [u_out], so the accepted trace is UNCHANGED. *)
+      iInv "Huinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (u) "(Hu & Hg)".
+      iDestruct (dev_interp_agree_uart with "Hdev Hu") as %Hu.
       rewrite Hu in Htx0.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
       (* the accepted trace, the transmitter token and DLAB are all untouched;
@@ -680,13 +781,13 @@ Section DevLoop.
                    (uart_tx_pop_dlab _ _ _ Htx0) with "Hdl") as "Hdl".
       iMod (uart_out_update _ u u' with "Hout") as "[Hout _]".
       { rewrite (uart_tx_pop_out _ _ _ Htx0). by apply prefix_app_r. }
-      iMod ("Hwclose" with "[Hwires]") as "_".
-      { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp Hv Hacc Hout Htx Hdl Hlease]") as "_".
-      { iNext. iExists u', p, vs. rewrite /uart_ghosts. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iMod ("Hclose" with "[Hu' Hacc Hout Htx Hdl]") as "_".
+      { iNext. iExists u'. rewrite /uart_ghosts. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
     - (* a byte arrives from the outside world: rx only, trace untouched *)
+      iInv "Huinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (u) "(Hu & Hg)".
+      iDestruct (dev_interp_agree_uart with "Hdev Hu") as %Hu.
       rewrite Hu in Hrx.
       iMod (dev_interp_update_uart _ u u' with "Hdev Hu") as "[Hdev' Hu']".
       (* rx touches neither the tx side nor LCR: every ghost is unchanged *)
@@ -694,35 +795,58 @@ Section DevLoop.
                    (uart_rx_push_acc _ b _ Hrx)
                    (uart_rx_push_out _ b _ Hrx)
                    (uart_rx_push_dlab _ b _ Hrx) with "Hg") as "Hg".
-      iMod ("Hwclose" with "[Hwires]") as "_".
-      { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu' Hp Hv Hg Hlease]") as "_".
-      { iNext. iExists u', p, vs. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iMod ("Hclose" with "[Hu' Hg]") as "_".
+      { iNext. iExists u'. iFrame. }
       iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
-    - (* the gateway latches the UART's interrupt level: the UART is untouched *)
+    - (* the gateway latches the UART's interrupt level.  This is the ONE
+         UART transition that touches the PLIC, and it touches nothing else,
+         so only [plicN] is opened. *)
+      iInv "Hpinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (p) "(Hp & %Hpok)".
+      iDestruct (dev_interp_agree_plic with "Hdev Hp") as %Hp.
       iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
-      iMod ("Hwclose" with "[Hwires]") as "_".
-      { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu Hp' Hv Hg Hlease]") as "_".
-      { iNext. iExists u, p', vs. iFrame. iSplitR; [iPureIntro|iPureIntro; exact Hvok].
-        apply (plic_ok_latch p p' i); [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
+      iMod ("Hclose" with "[Hp']") as "_".
+      { iNext. iExists p'. iFrame "Hp'". iPureIntro.
+        apply (plic_ok_latch p p' uart_irq_id);
+          [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
       iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+    - (* the totality stutter (RiscvLang §3c): nothing moved, so nothing has
+         to be re-established and no invariant is opened at all. *)
+      iModIntro. iFrame "Hgr Hmem Hdev". iApply "IH".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE DISK THREAD.  Opens [diskN] for the DMA/wild arms and [plicN]   *)
+  (*  for the latch arm.                                                 *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_disk_loop γd Φ :
+    disk_inv γd -∗ plic_inv -∗
+    WP (DiskLoop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros "#Hvinv #Hpinv".
+    iLöb as "IH".
+    iApply wp_disk_step.
+    iIntros (gr m d) "(Hgr & Hmem & Hdev)".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+    iNext. iIntros (d' m' Hstep).
+    iMod "Hmask" as "_".
+    destruct Hstep as [mv vnew w Hview Hdisk | mv w Hview Hstall
+                      | p' Hirq Hlatch |].
     - (* the disk completes a queued request.  This is the only step that
          touches the byte memory, and the ONLY thing that justifies it is the
          DMA lease inside the invariant: [virtio_proto_step] consumes the
          lease's ownership of the written bytes and hands the same lease back,
          because the write set provably lands inside it and misses the queue's
          control region (VirtioModel.virtio_dma_ok). *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hdisk.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk with "Hmem Hlease")
         as "[Hmem' Hlease']".
-      iMod ("Hwclose" with "[Hwires]") as "_".
-      { iNext. iExists seip, meip. iFrame. }
-      iMod ("Hclose" with "[Hu Hp Hv' Hg Hlease']") as "_".
-      { iNext. iExists u, p, vnew. iFrame.
-        iSplitR; [iPureIntro; exact Hpok |].
+      iMod ("Hclose" with "[Hv' Hlease']") as "_".
+      { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
       iModIntro. iFrame "Hgr Hmem' Hdev'". iApply "IH".
     - (* The queue the driver published is MALFORMED, so the device may write
@@ -732,34 +856,74 @@ Section DevLoop.
          step happens its writes are bounded" -- there would be nothing to
          refute it with, and a driver that misconfigured the queue would be
          verifiable.  Needing this refutation is exactly the pressure that
-         makes well-formedness a driver obligation. *)
+         makes well-formedness a driver obligation.  (The [Idle] stutter below
+         does NOT weaken this: it is a separate constructor, and a malformed
+         queue still admits THIS one.) *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hstall.
       iDestruct (virtio_proto_not_stalled m vs mv γd Hview with "Hmem Hlease")
         as %Hns.
       exfalso. congruence.
-    - (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
-      iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
-      iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
-        [ apply elem_of_fin_to_set |].
-      iMod (reg_update_at c (gr c) sig_seip (seip c)
-              (bool_to_bit (dev_seip d (fin_to_nat c))) with "Hrc Hwc")
-        as "[Hrc' Hwc']".
-      iDestruct ("Hback" with "Hrc'") as "Hgr'".
-      set (seip' := fun c' : CPU =>
-             if decide (c' = c) then bool_to_bit (dev_seip d (fin_to_nat c))
-             else seip c').
-      iMod ("Hwclose" with "[Hwc' Hmc Hwrest]") as "_".
-      { iNext. iExists seip', meip.
-        iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
-        iSplitL "Hwc' Hmc".
-        { rewrite /seip' decide_True //. iFrame. }
-        iApply (big_sepS_mono with "Hwrest").
-        intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
-        rewrite /seip' decide_False; [ done | ].
-        intros ->. apply Hne, elem_of_singleton. reflexivity. }
-      iMod ("Hclose" with "[Hu Hp Hv Hg Hlease]") as "_".
-      { iNext. iExists u, p, vs. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
-      iModIntro. iFrame "Hgr' Hmem Hdev". iApply "IH".
+    - (* the gateway latches the DISK's interrupt level -- the disk's own
+         source, so this is the disk thread's business and not the UART's *)
+      iInv "Hpinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (p) "(Hp & %Hpok)".
+      iDestruct (dev_interp_agree_plic with "Hdev Hp") as %Hp.
+      iMod (dev_interp_update_plic _ p p' with "Hdev Hp") as "[Hdev' Hp']".
+      iMod ("Hclose" with "[Hp']") as "_".
+      { iNext. iExists p'. iFrame "Hp'". iPureIntro.
+        apply (plic_ok_latch p p' virtio_irq_id);
+          [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
+      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+    - (* the totality stutter (RiscvLang §3c) *)
+      iModIntro. iFrame "Hgr Hmem Hdev". iApply "IH".
   Qed.
-End DevLoop.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE WIRE THREAD.  [dev_seip d h] is [plic_eip (dplic d) h], read    *)
+  (*  off the PHYSICAL device state the lifting rule hands over, so this   *)
+  (*  proof needs NO agreement against [plic_frag] and therefore never     *)
+  (*  opens [plicN] at all -- the old proof opened the device invariant     *)
+  (*  here only to close it again.  [plic_inv] is still taken, to keep the  *)
+  (*  three loops' interfaces uniform and to record that the wire's value   *)
+  (*  is the PLIC's.                                                       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_plic_loop Φ :
+    plic_inv -∗ wire_inv -∗
+    WP (PlicLoop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros "#Hpinv #Hwinv".
+    iLöb as "IH".
+    iApply wp_plic_step.
+    iIntros (gr m d) "(Hgr & Hmem & Hdev)".
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+    iNext. iIntros (gr' Hstep).
+    iMod "Hmask" as "_".
+    destruct Hstep as [c].
+    (* the PLIC drives hart [c]'s sig_seip wire, borrowed from [wire_inv] *)
+    iInv "Hwinv" as ">Hwbody" "Hwclose".
+    iDestruct "Hwbody" as (seip meip) "Hwires".
+    iDestruct (gregs_interp_acc_at c with "Hgr") as "[Hrc Hback]".
+    iDestruct (big_sepS_delete _ _ c with "Hwires") as "[[Hwc Hmc] Hwrest]";
+      [ apply elem_of_fin_to_set |].
+    iMod (reg_update_at c (gr c) sig_seip (seip c)
+            (bool_to_bit (dev_seip d (fin_to_nat c))) with "Hrc Hwc")
+      as "[Hrc' Hwc']".
+    iDestruct ("Hback" with "Hrc'") as "Hgr'".
+    set (seip' := fun c' : CPU =>
+           if decide (c' = c) then bool_to_bit (dev_seip d (fin_to_nat c))
+           else seip c').
+    iMod ("Hwclose" with "[Hwc' Hmc Hwrest]") as "_".
+    { iNext. iExists seip', meip.
+      iApply (big_sepS_delete _ _ c); [ apply elem_of_fin_to_set |].
+      iSplitL "Hwc' Hmc".
+      { rewrite /seip' decide_True //. iFrame. }
+      iApply (big_sepS_mono with "Hwrest").
+      intros c' Hc'. apply elem_of_difference in Hc' as [_ Hne].
+      rewrite /seip' decide_False; [ done | ].
+      intros ->. apply Hne, elem_of_singleton. reflexivity. }
+    iModIntro. iFrame "Hgr' Hmem Hdev". iApply "IH".
+  Qed.
+End DevLoops.

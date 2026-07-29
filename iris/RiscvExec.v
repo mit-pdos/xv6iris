@@ -182,7 +182,8 @@ Section WPExec.
       exists false, tt, σ'. split; [exact Hrunf|done]. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct Hstep as [(cpu2 & Hcpu2 & -> & _ & -> & tick2 & u2 & σ2' & Hrun2 & ->)
-                      |(Hcontra & _)]; last discriminate Hcontra.
+                      |[(Hcontra & _) | [(Hcontra & _) | (Hcontra & _)]]];
+      [| discriminate Hcontra | discriminate Hcontra | discriminate Hcontra ].
     injection Hcpu2 as <-.
     iSpecialize ("Hk" $! tick2).
     destruct tick2;
@@ -198,44 +199,107 @@ End WPExec.
 Section WPDev.
   Context `{!riscvGS Σ}.
 
-  (* The device-thread analogue of [wp_exec_step]: one step of the [DevLoop]
-     execution context.  The device is ALWAYS reducible (the wire step exists
-     for any hart), so the user only proves PRESERVATION: for EVERY possible
-     device transition -- a byte leaving the tx FIFO, a byte arriving from
-     the outside world, the virtio disk completing a queued request, the PLIC
-     gateway latching a device's interrupt level, or the PLIC driving a
-     hart's [sig_seip] wire -- re-establish the register bridges (the wire
-     step writes a hart's [sig_seip] register, which needs its ghost-map
-     fragment unless the written value is unchanged), the byte memory and the
-     device interpretation.
+  (* The device-thread analogues of [wp_exec_step]: one step of each of the
+     THREE device execution contexts.  Every device relation is total (each
+     has either a premise-free arm or an explicit [Idle] stutter -- RiscvLang
+     §3c), so the user only ever proves PRESERVATION: for EVERY transition
+     that device admits, re-establish the register bridges, the byte memory
+     and the device interpretation.
 
-     The BYTE MEMORY is handed over rather than framed, because the disk is a
-     bus master: [DevStepDisk] returns a memory that differs from the one it
-     was given (RiscvLang §3c).  A client therefore has to own every byte the
-     DMA writes -- which is exactly what the device invariant's DMA lease
-     (WpVirtio.v) is for.  Every other device transition returns the memory
-     unchanged, so those cases still frame it. *)
-  Lemma wp_dev_step Φ :
+     All three hand over the SAME full interp triple
+     ([gregs_interp]/[gen_heap_interp]/[dev_interp]) that the old single
+     [wp_dev_step] handed, even where a given relation cannot touch one of
+     them: uniformity across the three rules is worth more here than shaving
+     an unused conjunct off two of them.  What differs is the SHAPE of the
+     post-state each rule asks for, which is exactly that relation's
+     footprint. *)
+
+  (* the UART: [duart]/[dplic] only -- registers and memory come back
+     unchanged *)
+  Lemma wp_uart_step Φ :
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
-       ▷ (∀ d' m' gr', ⌜dev_step d m gr d' m' gr'⌝ ={∅,⊤}=∗
-            gregs_interp gr' ∗ gen_heap_interp m' ∗ dev_interp d' ∗
-            WP (DevLoop : expr riscv_lang) {{ Φ }}))
-    ⊢ WP (DevLoop : expr riscv_lang) {{ Φ }}.
+       ▷ (∀ d', ⌜uart_step d d'⌝ ={∅,⊤}=∗
+            gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d' ∗
+            WP (UartLoop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (UartLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right.
+    { iPureIntro. do 4 eexists. right; left.
       split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. split; [reflexivity|].
-      do 3 eexists. split; [apply (DevStepWire _ _ _ 0%fin) | reflexivity]. }
+      eexists. split; [apply UartStepIdle | reflexivity]. }
     iIntros (e2 g2 efs Hstep) "!>".
     destruct Hstep as [(cpu2 & Hcontra & _)
-                      |(_ & -> & _ & -> & d' & m' & gr' & Hdstep & ->)];
-      first discriminate Hcontra.
-    iMod ("Hk" $! d' m' gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
+                      |[(_ & -> & _ & -> & d' & Hdstep & ->)
+                       |[(Hcontra & _) | (Hcontra & _)]]];
+      [ discriminate Hcontra | | discriminate Hcontra | discriminate Hcontra ].
+    iMod ("Hk" $! d' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
+  Qed.
+
+  (* the disk: [dvirtio]/[dplic] AND the byte memory.  The BYTE MEMORY is
+     handed over rather than framed, because the disk is a bus master:
+     [DiskStepDma] returns a memory that differs from the one it was given
+     (RiscvLang §3c).  A client therefore has to own every byte the DMA
+     writes -- which is exactly what the disk invariant's DMA lease
+     (WpVirtio.v / VirtioProto.v) is for. *)
+  Lemma wp_disk_step Φ :
+    (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
+       ▷ (∀ d' m', ⌜disk_step d m d' m'⌝ ={∅,⊤}=∗
+            gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
+            WP (DiskLoop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (DiskLoop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros "H".
+    iApply wp_lift_step; first done.
+    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
+    iModIntro. iSplitR.
+    { iPureIntro. do 4 eexists. right; right; left.
+      split; [reflexivity|]. split; [reflexivity|].
+      split; [reflexivity|]. split; [reflexivity|].
+      do 2 eexists. split; [apply DiskStepIdle | reflexivity]. }
+    iIntros (e2 g2 efs Hstep) "!>".
+    destruct Hstep as [(cpu2 & Hcontra & _)
+                      |[(Hcontra & _)
+                       |[(_ & -> & _ & -> & d' & m' & Hdstep & ->)
+                        |(Hcontra & _)]]];
+      [ discriminate Hcontra | discriminate Hcontra | | discriminate Hcontra ].
+    iMod ("Hk" $! d' m' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
+  Qed.
+
+  (* the wire: reads [dplic], writes ONE hart's registers.  Memory and the
+     device state come back unchanged; the register bridge does not (the wire
+     step writes a hart's [sig_seip] register, which needs its ghost-map
+     fragment unless the written value is unchanged). *)
+  Lemma wp_plic_step Φ :
+    (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
+       ▷ (∀ gr', ⌜plic_step d gr gr'⌝ ={∅,⊤}=∗
+            gregs_interp gr' ∗ gen_heap_interp m ∗ dev_interp d ∗
+            WP (PlicLoop : expr riscv_lang) {{ Φ }}))
+    ⊢ WP (PlicLoop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros "H".
+    iApply wp_lift_step; first done.
+    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
+    iModIntro. iSplitR.
+    { iPureIntro. do 4 eexists. right; right; right.
+      split; [reflexivity|]. split; [reflexivity|].
+      split; [reflexivity|]. split; [reflexivity|].
+      eexists. split; [apply (PlicStepWire _ _ 0%fin) | reflexivity]. }
+    iIntros (e2 g2 efs Hstep) "!>".
+    destruct Hstep as [(cpu2 & Hcontra & _)
+                      |[(Hcontra & _)
+                       |[(Hcontra & _)
+                        |(_ & -> & _ & -> & gr' & Hdstep & ->)]]];
+      [ discriminate Hcontra | discriminate Hcontra | discriminate Hcontra | ].
+    iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
     iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.
 

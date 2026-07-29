@@ -182,44 +182,79 @@ Global Instance greg_insert : Insert CPU regstate (CPU -> regstate) :=
   fun cpu rs gr c => if decide (c = cpu) then rs else gr c.
 
 (* ---------------------------------------------------------------------- *)
-(* 3c. The device execution context.                                        *)
+(* 3c. The device execution contexts -- THREE of them, one per device.      *)
 (*                                                                          *)
-(*   The devices run CONCURRENTLY with the harts: between any two CPU        *)
-(*   instructions the UART may transmit or receive a byte, the virtio disk   *)
-(*   may complete a queued request, the PLIC gateway may latch either        *)
-(*   device's (level) interrupt output, and the PLIC may propagate its       *)
-(*   per-hart EIP level onto a hart's external S-interrupt pin -- the        *)
-(*   [sig_seip] register, which is exactly the model's external interrupt    *)
-(*   WIRE: [read_mip IncludePlatformInterrupts] ORs it into mip, so          *)
-(*   [dispatchInterrupt] sees it on the next instruction boundary.           *)
+(*   The devices run CONCURRENTLY with the harts AND with each other:        *)
+(*   between any two CPU instructions the UART may transmit or receive a     *)
+(*   byte, the virtio disk may complete a queued request, either device's    *)
+(*   PLIC gateway may latch its (level) interrupt output, and the PLIC may   *)
+(*   propagate its per-hart EIP level onto a hart's external S-interrupt     *)
+(*   pin -- the [sig_seip] register, which is exactly the model's external   *)
+(*   interrupt WIRE: [read_mip IncludePlatformInterrupts] ORs it into mip,   *)
+(*   so [dispatchInterrupt] sees it on the next instruction boundary.        *)
+(*                                                                          *)
+(*   THE FACTORING.  Each device latches its OWN interrupt source into the   *)
+(*   PLIC, as part of that device's own step relation, and no relation ever  *)
+(*   reads another device's state.  The three are therefore pairwise         *)
+(*   decoupled over the [dev_state] fields:                                  *)
+(*                                                                          *)
+(*     uart_step  reads/writes  duart, dplic                                 *)
+(*     disk_step  reads/writes  dvirtio, dplic, and the byte memory          *)
+(*     plic_step  reads         dplic,  writes a hart's registers            *)
+(*                                                                          *)
+(*   so each gets its own execution context, its own lifting rule and its    *)
+(*   own Iris invariant, and a proof about one device never has to reason     *)
+(*   about the others' transitions.  ([dev_state] itself stays ONE object:   *)
+(*   the fields are what is partitioned, not the record.)                    *)
 (*                                                                          *)
 (*   The disk is a BUS MASTER, so unlike the UART and the PLIC its step is   *)
-(*   not confined to the device fabric: [dev_step] therefore carries the     *)
-(*   byte memory, and [DevStepDisk] overrides it with the write set the DMA  *)
+(*   not confined to the device fabric: [disk_step] therefore carries the    *)
+(*   byte memory, and [DiskStepDma] overrides it with the write set the DMA  *)
 (*   produced ([w ∪ m], VirtioModel.virtio_req_step).  Every other device    *)
 (*   transition returns the memory untouched.  The disk is also the only     *)
 (*   device that steps NONDETERMINISTICALLY, in two ways: the bus view it    *)
 (*   reads is unconstrained off the byte map, and a malformed queue lets it  *)
-(*   write anything anywhere ([DevStepDiskWild]).                            *)
+(*   write anything anywhere ([DiskStepWild]).                               *)
 (*                                                                          *)
-(*   Note the wire is updated by its OWN step (DevStepWire), not             *)
+(*   TOTALITY (the [Idle] arms).  The old single relation was total for free, *)
+(*   because [DevStepWire] had no premise -- there was always at least one    *)
+(*   enabled transition.  A STANDALONE UART or disk thread has no such arm:  *)
+(*   it can reach a state where no real transition is enabled (rx FIFO full   *)
+(*   and tx FIFO empty; no request pending; the interrupt line already        *)
+(*   latched or low), and then [wp_uart_loop]/[wp_disk_loop] could not prove  *)
+(*   not-stuck.  Hence an explicit stutter in each.  It is ONLY a stutter and *)
+(*   it excuses nothing: the wild arm below and the obligation to refute it   *)
+(*   are untouched, so "the device did nothing" is never an admissible        *)
+(*   explanation of a step the hardware would really have taken.              *)
+(*                                                                          *)
+(*   Note the wire is updated by its OWN step ([PlicStepWire]), not          *)
 (*   synchronously with the MMIO write that caused the level change: the     *)
 (*   interrupt line has propagation delay, which is both realistic and the   *)
 (*   weaker (hence safer) modelling choice.                                  *)
 (* ---------------------------------------------------------------------- *)
 
-Inductive dev_step (d : dev_state) (m : gmap Arch.pa (bv 8)) (gr : CPU -> regstate)
-    : dev_state -> gmap Arch.pa (bv 8) -> (CPU -> regstate) -> Prop :=
-  | DevStepTx b u' :
+(* The UART: drain a byte, accept a byte, latch ITS OWN interrupt source
+   ([dev_irq_level d uart_irq_id] reduces to [uart_irq d.(duart)]), or
+   stutter.  Reads and writes [duart] and [dplic] and nothing else. *)
+Inductive uart_step (d : dev_state) : dev_state -> Prop :=
+  | UartStepTx b u' :
       uart_tx_pop d.(duart) = Some (b, u') ->
-      dev_step d m gr (set_duart d u') m gr
-  | DevStepRx b u' :
+      uart_step d (set_duart d u')
+  | UartStepRx b u' :
       uart_rx_push d.(duart) b = Some u' ->
-      dev_step d m gr (set_duart d u') m gr
-  | DevStepLatch (i : N) p' :
-      dev_irq_level d i = true ->
-      plic_latch d.(dplic) i = Some p' ->
-      dev_step d m gr (set_dplic d p') m gr
+      uart_step d (set_duart d u')
+  | UartStepLatch p' :
+      dev_irq_level d uart_irq_id = true ->
+      plic_latch d.(dplic) uart_irq_id = Some p' ->
+      uart_step d (set_dplic d p')
+  (* the totality stutter -- see TOTALITY above *)
+  | UartStepIdle : uart_step d d.
+
+(* The disk: complete a queued request by DMA, scribble anywhere if the queue
+   the driver published is malformed, latch its own interrupt source, or
+   stutter.  This is the only relation that carries the byte memory. *)
+Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
+    : dev_state -> gmap Arch.pa (bv 8) -> Prop :=
   (* The disk masters the bus.  It does not read the byte MAP -- it reads a
      total VIEW of the bus that agrees with the map wherever the map is
      defined and is UNCONSTRAINED everywhere else (VirtioModel section 4), and
@@ -227,25 +262,40 @@ Inductive dev_step (d : dev_state) (m : gmap Arch.pa (bv 8)) (gr : CPU -> regsta
      nobody has accounted for returns an arbitrary byte, which is what a real
      bus does, and what forces a driver proof to account for every address it
      hands the device. *)
-  | DevStepDisk (mv : vmem) v' w :
+  | DiskStepDma (mv : vmem) v' w :
       mem_view m mv ->
       virtio_req_step d.(dvirtio) mv = Some (v', w) ->
-      dev_step d m gr (set_dvirtio d v') (w ∪ m) gr
+      disk_step d m (set_dvirtio d v') (w ∪ m)
   (* ... and when the queue the driver published is MALFORMED, the device may
      do anything at all: [w] is arbitrary, so this constructor lets the disk
      scribble over any address in the machine.  That is the honest reading of
      a driver-must-not obligation.  An earlier model instead had the device
      quietly do NOTHING, which let a driver that misconfigured the queue
      satisfy its DMA obligation vacuously and be verified anyway.
-     [wp_dev_loop] can only be proven by REFUTING this case from the device
+     [wp_disk_loop] can only be proven by REFUTING this case from the disk
      invariant, so queue well-formedness becomes a standing obligation on the
      driver rather than a gift from the model. *)
-  | DevStepDiskWild (mv : vmem) (w : gmap Arch.pa (bv 8)) :
+  | DiskStepWild (mv : vmem) (w : gmap Arch.pa (bv 8)) :
       mem_view m mv ->
       virtio_stalled d.(dvirtio) mv = true ->
-      dev_step d m gr d (w ∪ m) gr
-  | DevStepWire (c : CPU) :
-      dev_step d m gr d m
+      disk_step d m d (w ∪ m)
+  | DiskStepLatch p' :
+      dev_irq_level d virtio_irq_id = true ->
+      plic_latch d.(dplic) virtio_irq_id = Some p' ->
+      disk_step d m (set_dplic d p') m
+  (* the totality stutter -- see TOTALITY above.  It does NOT weaken the wild
+     arm: a malformed queue still admits [DiskStepWild], which the invariant
+     must still refute. *)
+  | DiskStepIdle : disk_step d m d m.
+
+(* The wire: propagate the PLIC's per-hart EIP level onto that hart's
+   external S-interrupt pin.  Reads [dplic] (through [dev_seip], which is
+   [plic_eip (dplic d)]) and writes one hart's register file; it needs no
+   stutter, since the arm has no premise and any hart may be chosen. *)
+Inductive plic_step (d : dev_state) (gr : CPU -> regstate)
+    : (CPU -> regstate) -> Prop :=
+  | PlicStepWire (c : CPU) :
+      plic_step d gr
         (<[c := register_set sig_seip
                   (bool_to_bit (dev_seip d (fin_to_nat c))) (gr c)]> gr).
 
@@ -257,20 +307,27 @@ Inductive dev_step (d : dev_state) (m : gmap Arch.pa (bv 8)) (gr : CPU -> regsta
 (*    while [prim_step] over [gstate] reads the selected hart's registers,    *)
 (*    pairs them with [gmem]/[gdev] to reconstruct that hart's [mstate], runs *)
 (*    one [riscv_step], and writes the resulting registers, memory and        *)
-(*    device state back.  [DevLoopE] is the device execution context: it      *)
-(*    steps [dev_step] forever, interleaved with the harts.                   *)
+(*    device state back.  [UartLoopE]/[DiskLoopE]/[PlicLoopE] are the THREE   *)
+(*    device execution contexts: each steps its own relation forever,          *)
+(*    interleaved with the harts and with each other.                         *)
 (* ---------------------------------------------------------------------- *)
 
 Class CpuId := cpu_id : CPU.
 
-Inductive mexpr := LoopE (cpu : CPU) | DevLoopE.
+Inductive mexpr :=
+  | LoopE (cpu : CPU)
+  | UartLoopE
+  | DiskLoopE
+  | PlicLoopE.
 Definition mval := Empty_set.
 Definition mobs := Empty_set.
 Definition of_val (v : mval) : mexpr := match v with end.
 Definition to_val (_ : mexpr) : option mval := None.
 
 Notation Loop := (LoopE cpu_id).
-Notation DevLoop := DevLoopE.
+Notation UartLoop := UartLoopE.
+Notation DiskLoop := DiskLoopE.
+Notation PlicLoop := PlicLoopE.
 
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
@@ -280,17 +337,28 @@ Definition prim_step
       run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
       g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev))
   \/
-  (e = DevLoopE /\ e' = DevLoopE /\ κ = [] /\ efs = [] /\
-    exists d' m' gr',
-      dev_step g.(gdev) g.(gmem) g.(gregs) d' m' gr' /\
-      g' = GState gr' m' d').
+  (e = UartLoopE /\ e' = UartLoopE /\ κ = [] /\ efs = [] /\
+    exists d',
+      uart_step g.(gdev) d' /\
+      g' = GState g.(gregs) g.(gmem) d')
+  \/
+  (e = DiskLoopE /\ e' = DiskLoopE /\ κ = [] /\ efs = [] /\
+    exists d' m',
+      disk_step g.(gdev) g.(gmem) d' m' /\
+      g' = GState g.(gregs) m' d')
+  \/
+  (e = PlicLoopE /\ e' = PlicLoopE /\ κ = [] /\ efs = [] /\
+    exists gr',
+      plic_step g.(gdev) g.(gregs) gr' /\
+      g' = GState gr' g.(gmem) g.(gdev)).
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
 Proof.
   split.
   - intros [].
   - intros e v Hv. discriminate Hv.
-  - intros e s κ e' s' efs [(cpu & -> & _) | (-> & _)]; reflexivity.
+  - intros e s κ e' s' efs
+      [(cpu & -> & _) | [(-> & _) | [(-> & _) | (-> & _)]]]; reflexivity.
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

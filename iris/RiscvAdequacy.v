@@ -1,6 +1,6 @@
 (* RiscvAdequacy.v -- whole-system adequacy: the harts running [Loop] plus the
-   device thread [DevLoop], composed into one thread pool, execute safely
-   forever.
+   THREE device threads [UartLoop]/[DiskLoop]/[PlicLoop], composed into one
+   thread pool, execute safely forever.
 
    This is the RISC-V instantiation of Iris's adequacy theorem
    ([wp_strong_adequacy], iris.program_logic.adequacy).  The shape mirrors
@@ -21,16 +21,18 @@
        wire invariant [wire_inv], lock invariants, [minstret_inv], ...) -- to
        prove
          * [WP (LoopE c) {{ _, True }}] for every chosen hart [c], and
-         * [WP DevLoop {{ _, True }}],
+         * [WP UartLoop {{ _, True }}], [WP DiskLoop {{ _, True }}] and
+           [WP PlicLoop {{ _, True }}] -- one per device thread,
        then the META-level conclusion holds, with no Iris judgment in it:
        every thread-pool configuration reachable from
-       [(LoopE <$> cs) ++ [DevLoop]] at state [g], by ANY interleaving of
-       hart and device steps, is reducible -- each hart can always execute
-       another instruction, and the device can always step.  In particular
-       every Iris invariant the caller established holds at every step of
-       every execution; "the system executes correctly" is whatever those
-       invariants + WPs enforce, and this theorem discharges all of it down
-       to the bare operational semantics ([prim_step]/[run]/[dev_step]).
+       [(LoopE <$> cs) ++ [UartLoopE; DiskLoopE; PlicLoopE]] at state [g], by
+       ANY interleaving of hart and device steps, is reducible -- each hart
+       can always execute another instruction, and each device can always
+       step.  In particular every Iris invariant the caller established holds
+       at every step of every execution; "the system executes correctly" is
+       whatever those invariants + WPs enforce, and this theorem discharges
+       all of it down to the bare operational semantics
+       ([prim_step]/[run]/[uart_step]/[disk_step]/[plic_step]).
 
    [LoopE c] is [Loop] with ambient hart [c]: a caller proves each hart's WP
    in the usual single-CPU spelling ([Context `{CID : CpuId}.] ... [WP Loop])
@@ -204,11 +206,11 @@ Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. The initial thread pool: one [LoopE c] per chosen hart, plus the      *)
-(*    device execution context.                                            *)
+(*    THREE device execution contexts (one per device -- RiscvLang §3c).   *)
 (* ---------------------------------------------------------------------- *)
 
 Definition cpu_pool (cs : list CPU) : list (expr riscv_lang) :=
-  (LoopE <$> cs) ++ [DevLoopE].
+  (LoopE <$> cs) ++ [UartLoopE; DiskLoopE; PlicLoopE].
 
 (* ---------------------------------------------------------------------- *)
 (* 5. The adequacy theorem.                                                *)
@@ -244,7 +246,9 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        virtio_frag (g.(gdev).(dvirtio))
        ={⊤}=∗
        ([∗ list] c ∈ cs, WP (LoopE c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
-       WP (DevLoop : expr riscv_lang) @ ⊤ {{ _, True }}) ->
+       WP (UartLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
+       WP (DiskLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
+       WP (PlicLoop : expr riscv_lang) @ ⊤ {{ _, True }}) ->
   forall t2 g2 e2,
     rtc erased_step (cpu_pool cs, g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -333,7 +337,8 @@ Proof.
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HsA HsB HuF HpF HvF]") as "[Hwps Hdwp]".
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth HsA HsB HuF HpF HvF]")
+    as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
     iFrame "Htext Hdata". iSplitL "Hkauth".
@@ -358,12 +363,14 @@ Proof.
     { rewrite /gregs_interp. iApply big_sepL_enum_to_set. iExact "Hauths". }
     iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
     iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
-  iSplitL "Hwps Hdwp".
-  { (* the WPs of the initial threads *)
+  iSplitL "Hwps Hwpu Hwpd Hwpp".
+  { (* the WPs of the initial threads: the harts, then the three devices *)
     rewrite big_sepL2_replicate_r; [|done].
     rewrite /cpu_pool big_sepL_app big_sepL_fmap /=.
     iSplitL "Hwps"; [iExact "Hwps"|].
-    iSplitL; [iExact "Hdwp"|done]. }
+    iSplitL "Hwpu"; [iExact "Hwpu"|].
+    iSplitL "Hwpd"; [iExact "Hwpd"|].
+    iSplitL "Hwpp"; [iExact "Hwpp"|done]. }
   (* the final observation: [wp_strong_adequacy]'s not-stuck clause IS φ *)
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
@@ -372,11 +379,14 @@ Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 6. Sanity corollary: the interface is consumable end-to-end.  The       *)
-(*    device-only system ([cs = []]; thread pool = just [DevLoop]) runs    *)
-(*    forever, from ANY initial state whose memory image is RAM: allocate  *)
-(*    the device invariant [dev_inv_body] from the initial [uart_frag]/    *)
-(*    [plic_frag] and the wire invariant [wire_inv] from every hart's       *)
-(*    [sig_seip]/[sig_meip] pin cells, and conclude with [wp_dev_loop].     *)
+(*    device-only system ([cs = []]; thread pool = the three device        *)
+(*    threads) runs forever, from ANY initial state whose memory image is  *)
+(*    RAM: allocate the three device invariants from the initial            *)
+(*    [uart_frag]/[plic_frag]/[virtio_frag] (via the bundle allocation      *)
+(*    [dev_inv_alloc] over [dev_inv_body], whose signature is unchanged)    *)
+(*    and the wire invariant [wire_inv] from every hart's [sig_seip]/       *)
+(*    [sig_meip] pin cells, then conclude with [wp_uart_loop],             *)
+(*    [wp_disk_loop] and [wp_plic_loop] -- one per pool thread.             *)
 (*    This is the smallest genuine instantiation of                         *)
 (*    [riscv_system_adequacy]; hart clients supply their [WP Loop]s the    *)
 (*    same way, with a richer [D].                                          *)
@@ -430,6 +440,16 @@ Proof.
     rewrite big_sepS_union; last first.
     { apply disjoint_singleton_l, not_elem_of_singleton. discriminate. }
     rewrite !big_sepS_singleton. done. }
+  (* the pool has three device threads now, so the conclusion splits into
+     the three loop WPs; each opens only the invariants its own relation
+     moves ([wp_plic_loop] is the only one that needs [wire_inv]). *)
+  iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+  iDestruct (dev_inv_plic with "Hinv") as "#Hpinv".
+  iDestruct (dev_inv_disk with "Hinv") as "#Hvinv".
   iModIntro. iSplitR; [done|].
-  iApply (wp_dev_loop γ γv with "Hinv Hwinv").
+  iSplitL.
+  { iApply (wp_uart_loop γ with "Huinv Hpinv"). }
+  iSplitL.
+  { iApply (wp_disk_loop γv with "Hvinv Hpinv"). }
+  iApply (wp_plic_loop with "Hpinv Hwinv").
 Qed.

@@ -35,7 +35,7 @@
        faults (unmapped or permission-denied or A/D-update-needed pages),
        misaligned accesses.
    INTERRUPTS CAN PREEMPT ANY STEP: at User privilege the effective SIE is
-   architecturally true (unmaskable), and the device loop (DevLoop's wire
+   architecturally true (unmaskable), and the wire thread (PlicLoop's wire
    step) may raise the external-interrupt wire [sig_seip] concurrently at
    any time.  So the user frame does NOT own the wire cells; they will be
    owned by an invariant SHARED with the device-execution WP, from which a

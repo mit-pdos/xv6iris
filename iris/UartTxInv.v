@@ -176,14 +176,16 @@ Section UartTxInv.
       uart_tx_own γu l ∗ uart_sent γu l.
   Proof.
     iIntros (HE) "#Hinv Hown".
-    iInv "Hinv" as ">Hbody" "Hclose".
-    iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hrest)".
+    (* only the UART half is needed, and [↑uartN ⊆ ↑devN ⊆ E] *)
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iInv "Huinv" as ">Hbody" "Hclose".
+    iDestruct "Hbody" as (u) "(Hu & Hg)".
     iEval (rewrite /uart_ghosts) in "Hg".
     iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
     iDestruct (uart_tx_own_agree with "Htx Hown") as %Hacc.
     iDestruct (uart_sent_get with "Hs") as "[Hs #Hlb]".
-    iMod ("Hclose" with "[Hu Hp Hv Hs Hout Htx Hdl Hrest]") as "_".
-    { iNext. iExists u, p, v. rewrite /uart_ghosts. iFrame. }
+    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl]") as "_".
+    { iNext. iExists u. rewrite /uart_ghosts. iFrame. }
     iModIntro. iFrame "Hown". rewrite -Hacc. iExact "Hlb".
   Qed.
 
@@ -194,14 +196,15 @@ Section UartTxInv.
       uart_tx_own γu l ∗ ⌜ L `prefix_of` l ⌝.
   Proof.
     iIntros (HE) "#Hinv Hown #HL".
-    iInv "Hinv" as ">Hbody" "Hclose".
-    iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hrest)".
+    iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
+    iInv "Huinv" as ">Hbody" "Hclose".
+    iDestruct "Hbody" as (u) "(Hu & Hg)".
     iEval (rewrite /uart_ghosts) in "Hg".
     iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
     iDestruct (uart_tx_own_agree with "Htx Hown") as %Hacc.
     iDestruct (uart_sent_prefix with "Hs HL") as %Hpre.
-    iMod ("Hclose" with "[Hu Hp Hv Hs Hout Htx Hdl Hrest]") as "_".
-    { iNext. iExists u, p, v. rewrite /uart_ghosts. iFrame. }
+    iMod ("Hclose" with "[Hu Hs Hout Htx Hdl]") as "_".
+    { iNext. iExists u. rewrite /uart_ghosts. iFrame. }
     iModIntro. iFrame "Hown". iPureIntro. by rewrite -Hacc.
   Qed.
 

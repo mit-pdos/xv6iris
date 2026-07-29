@@ -1113,13 +1113,14 @@ Section VtDevRam.
               (fun w => (∃ nc : nat, ⌜w = wrap16 nc⌝ ∗
                           ⌜(nr <= nc)%nat /\ (nc <= np)%nat⌝ ∗
                           disk_done_lb γd nc ∗ disk_pub γd np)%I)
-              (⊤ ∖ ↑minstretN ∖ ↑devN) (dqm := DfracOwn 1)
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
               with "Hcg Hpc Hinstr [Hpub] [Hcont]").
     { (* ---- the atomic update: open dev_inv, run the accessor ---- *)
-      iInv "Hdinv" as ">Hdbody" "Hdclose".
-      iDestruct "Hdbody" as (u p vst) "(Huf & Hplf & Hvf & Hg & Hproto & %Hpok & %Hvok)".
+      iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+      iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       iDestruct (virtio_proto_used_idx_acc γd vst np nr with "Hproto Hpub Hlb0")
         as (nc) "(%Hnrnc & %Hncnp & #Hcfgv & %Halv & #Hlbc & Hw2 & Hback)".
       iDestruct (disk_cfg_agree with "Hcfgv Hcfg0") as %Hceq.
@@ -1135,9 +1136,8 @@ Section VtDevRam.
       iDestruct (word2_to_phys (pa_add pu 2%nat) (wrap16 nc) Hst2 with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
-      iMod ("Hdclose" with "[Huf Hplf Hvf Hg Hproto]") as "_".
-      { iNext. iExists u, p, vst. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iExists nc. iFrame "Hlbc Hpub".
       iSplitR; [done|]. iPureIntro. split; [exact Hnrnc | exact Hncnp]. }
     iIntros (w) "Hcg Hpc Hpost".
@@ -1217,12 +1217,13 @@ Section VtDevRam.
                             disk_bytes γd (vs_sector_off sl) bs ∗
                             (if vs_is_out sl then emp
                              else phys_list (vr_buf (vs_req sl)) bs)))%I)
-              (⊤ ∖ ↑minstretN ∖ ↑devN) (dqm := DfracOwn 1)
+              (⊤ ∖ ↑minstretN ∖ ↑diskN) (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdsp
               with "Hcg Hpc Hinstr [Hpub Hrcpt] [Hcont]").
-    { iInv "Hdinv" as ">Hdbody" "Hdclose".
-      iDestruct "Hdbody" as (u q vst) "(Huf & Hplf & Hvf & Hg & Hproto & %Hpok & %Hvok)".
+    { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+      iInv "Hvinv" as ">Hdbody" "Hdclose".
+      iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
       iDestruct (virtio_proto_reclaim_acc γd vst np c p sl pin Hpc0
                    with "Hproto Hpub Hrcpt Hlbc")
         as "(_ & #Hcfgv & _ & %Hspo & Hw4 & Hback)".
@@ -1241,9 +1242,8 @@ Section VtDevRam.
                    (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))) Hst4
                    with "Hkm Hcell") as "Hw4".
       iMod ("Hback" with "Hw4") as "(Hproto & Hpub & #Hlbs & Hpin & Hstat & Hrest)".
-      iMod ("Hdclose" with "[Huf Hplf Hvf Hg Hproto]") as "_".
-      { iNext. iExists u, q, vst. iFrame.
-        iSplitR; [iPureIntro; exact Hpok | iPureIntro; exact Hvok]. }
+      iMod ("Hdclose" with "[Hvf Hproto]") as "_".
+      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub Hlbs Hpin Hstat Hrest".
       iSplitR; [done|]. iPureIntro. rewrite -Hceq. exact Hspo. }
     iIntros (w) "Hcg Hpc (-> & %Hspo & Hpub & #Hlbs & Hpin & Hstat & Hrest)".
