@@ -70,3 +70,44 @@
   - **The fix: one inversion lemma over the ABSTRACT displacement.** `vc_step_sp_move` already takes `d : Z` abstractly, so `sp_move_inv : vc_step_sp_move st pc' d = Some st1 -> ∃ v, (vsb st).(vregs)!!csp_rs1 = Some v ∧ … ∧ (POP-case ∨ PUSH-case)` does the whole guard case-analysis with `d` OPAQUE — no immediate ever enters a motive (proves in 0.006 s). Every WP lemma then `set (d := <its immediate>) in *; apply sp_move_inv in Hstep; cbn [vsb…]; destruct Hstep as (v & … & [POP | PUSH])` and gets its facts with the concrete immediate merely *substituted* (never normalised). Measured: `wp_vc_step_caddi16sp_sconf` ~30 s → <1 s; WpSconfVc.v 47 s → ~15 s.
   - **Minimal repro (for regression testing):** `set (d := zimm12 (caddi16sp_imm imm6)) in *; destruct (Z.ltb d vsp_half)` on the reduced `Hstep` is 28 s; byte-identical with `sign_extend' 12 imm6` is 1.7 s.
   - **General rule:** this bites ANY "`cbn`/`unfold` a Sail/bv computation into a hypothesis, then destruct guards over it" proof. The `vc_store8_sp` store-step lemmas are latent instances (cheap today only because `zoff6`/`zimm12 imm` offsets are simple); refactor them the same way (a `store8_sp_inv`) if a store ever gets an autocast-heavy offset.
+
+## `upd_ne`'s side goal when the written register IS callee-saved
+
+The standard name-free peel branch (`apply not_eq_sym; apply
+is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]`) does not apply
+when the register being written is itself callee-saved — every frame register
+of a `thr`-style transport. The tempting fallback is `congruence`, which is
+the 3.6x trap above. The replacement that works, and stays name-free:
+
+```coq
+| let He := fresh "Hxx" in
+  intro He; injection He as He; subst;
+  lazymatch goal with H : ?a <> ?a |- _ => exact (H eq_refl) end
+```
+
+(`subst` turns the excluded-register hypothesis `c <> k` into `k <> k`.)
+Needed in prologue and epilogue peels; a loop body whose writes are all
+caller-saved is covered by the `is_cs_idx_true_neq` branch alone.
+
+## The peel branch for a callee-saved *written* register, name-free
+
+The `subst`-based variant recorded above still fails on a `thr`-style
+transport that excludes NINE saved registers: any Ltac that *mentions* a
+hypothesis introduced by its own `injection` dies at definition time ("The
+reference Hx2 was not found") — the durable-notes trap. The robust form binds
+everything in the match:
+
+```coq
+Lemma uc_regidx_inj (x y : mword 5) : Regidx x = Regidx y -> x = y.   (* top level *)
+...
+| lazymatch goal with
+  | |- Regidx ?x <> Regidx ?y =>
+      match goal with
+      | H : x <> y |- _ => exact (fun Hq => H (uc_regidx_inj x y Hq))
+      end
+  end ]
+```
+
+`match` (not `lazymatch`) over the hypotheses is what makes it pick the right
+one of the nine disequalities. `uc_regidx_inj` belongs in `CalleeSaved.v` next
+to `is_cs_idx_true_neq`.

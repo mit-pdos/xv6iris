@@ -1138,11 +1138,9 @@ Section KvmmakeBody.
     iEval (rewrite -Hpbase) in "Hbytes".
     assert (Hbppn4k : bv_unsigned bppn * 4096 = bv_unsigned root0).
     { rewrite <- (page_base_unsigned bppn). rewrite Hpbase. reflexivity. }
-    assert (Hnkd : node_kdata bppn).
-    { unfold node_kdata. rewrite Hbppn4k. exact (kdata_bound_arith (bv_unsigned root0) Hpal Hplo Hphi). }
-    assert (Hkda : (text_end <= bv_unsigned bppn * 4096)%Z).
-    { rewrite Hbppn4k. exact (kda_arith (bv_unsigned root0) Hplo). }
-    iDestruct (pt_node_claim_from_static bppn Hnkd Hkda with "Hkmapb") as "#Hbclaim".
+    assert (Hnpv : page_valid (page_base bppn)).
+    { unfold page_base. rewrite Hpbase. exact Hpv. }
+    iDestruct (pt_node_claim_from_static bppn Hnpv with "Hkmapb") as "#Hbclaim".
     iDestruct (zero_page_to_node 2 (DfracOwn 1) bppn with "Hbclaim Hbytes") as "Hptree".
     (* callee-saved recovery for the output register-map [mfin] *)
     assert (Hbase9 : mfin !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))).

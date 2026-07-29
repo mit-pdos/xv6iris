@@ -967,19 +967,9 @@ Section ProofWalk.
     (* the freshly-allocated PT page's identity claim (uniform-claims PHYSICAL
        TIER): it is a kdata page, so [pt_node_claim bppn] comes off the static
        bundle -- what [zero_page_to_node] now needs to build the node. *)
-    assert (Hnkd : node_kdata bppn).
-    { assert (Hbppn4k : bv_unsigned bppn * 4096 = uint (mr !!! Regidx (mword_of_int 10 : mword 5))).
-      { rewrite uint_unsigned. rewrite <- Hpb. rewrite page_base_unsigned. reflexivity. }
-      unfold node_kdata, ram_base, ram_size. rewrite Hbppn4k.
-      pose proof Hal as Hald. apply Z.mod_divide in Hald; [| lia]. destruct Hald as [ka Hka].
-      lia. }
-    assert (Hkda : (text_end <= bv_unsigned bppn * 4096)%Z).
-    { assert (Hbppn4k : bv_unsigned bppn * 4096 = uint (mr !!! Regidx (mword_of_int 10 : mword 5))).
-      { rewrite uint_unsigned. rewrite <- Hpb. rewrite page_base_unsigned. reflexivity. }
-      rewrite Hbppn4k. unfold text_end, ram_base, ram_size.
-      pose proof Hal as Hald. apply Z.mod_divide in Hald; [| lia]. destruct Hald as [ka Hka].
-      lia. }
-    iDestruct (pt_node_claim_from_static bppn Hnkd Hkda with "Hkmapb") as "#Hbclaim".
+    assert (Hnpv : page_valid (page_base bppn)).
+    { unfold page_base. rewrite Hpb. exact Hpv. }
+    iDestruct (pt_node_claim_from_static bppn Hnpv with "Hkmapb") as "#Hbclaim".
     iDestruct (zero_page_to_node clvl (DfracOwn 1) bppn with "Hbclaim Hbytes") as "Hchild".
     (* +0x86 srli a5,s1,12 *)
     assert (Hmfs1 : mfin !!! Regidx (mword_of_int 9 : mword 5)

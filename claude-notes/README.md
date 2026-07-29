@@ -149,6 +149,18 @@ are working on that effort — the relevant `projects/` file.
   `static` helper that gcc INLINED away (uartgetc has no symbol). consoleintr
   is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
   boot wiring.
+- **[`pt-teardown-copy.md`](projects/pt-teardown-copy.md)** — freewalk /
+  uvmfree / uvmcopy: the page-table TEARDOWN path and fork's address-space
+  COPY. Keeps the two invariant changes they forced — `PtTree.pt_node_claim`
+  now records that a page-table node's page is a kalloc page (so no contract
+  had to grow a conjunct), and `BarePt.v`'s single `otf` axis, which states
+  the parked user table with OR without its trampoline/trapframe leaves and
+  lets uvmunmap be proved once and **sealed twice** — plus freewalk's
+  recursion recipe (a named `Prop` contract + hand-staged strong induction,
+  which is what makes a recursive function's proof splittable),
+  `uvm_perm_ok_of_leaf` (why uvmcopy's contract can ask the caller nothing
+  about the permission it copies), and the A/D subtlety that made the first
+  draft of uvmcopy's postcondition false.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all

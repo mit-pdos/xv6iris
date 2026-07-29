@@ -1,0 +1,111 @@
+(* SpecUvmfree.v -- the public interface of Uvmfree, stated independently of
+   its proof.
+
+     void uvmfree(pagetable_t pagetable, uint64 sz)
+     {
+       if (sz > 0)
+         uvmunmap(pagetable, 0, PGROUNDUP(sz) / PGSIZE, 1);
+       freewalk(pagetable);
+     }
+
+   STATED AT THE **BARE** TABLE ALTITUDE ([PtFree.bare_pt]), not at
+   [proc_pt].  This is forced by the code, and it is the honest reading:
+   uvmfree's only caller is
+
+     proc_freepagetable(pagetable, sz) {
+       uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+       uvmunmap(pagetable, TRAPFRAME,  1, 0);
+       uvmfree(pagetable, sz);
+     }
+
+   so by the time uvmfree runs, the trampoline and the trapframe leaves are
+   GONE and the table's only leaves are the user map.  It has to be that
+   way: freewalk panics on any leaf it meets, so at [proc_pt] -- where the
+   trampoline is still mapped -- uvmfree would not return at all, and a
+   contract claiming otherwise would describe different code.
+   [bare_pt uroot um] is exactly [proc_pt] with the two fixed leaves
+   removed and nothing else changed (PtFree.v §3), and the uvmunmap call
+   below is uvmunmap's BARE instance ([UVMUNMAP_BARE]) -- the same proof,
+   sealed at the other end of the [otf] axis.
+
+   THE ONE PREMISE THAT MATTERS: [dom um ⊆ vpn_run 0 n].  Every page the
+   table still maps must lie in the region uvmunmap is about to clear,
+   because freewalk requires a table that maps NOTHING.  It covers both
+   arms uniformly: at [sz = 0] the branch skips uvmunmap, and [n = 0]
+   makes the premise say [um = ∅] -- which is what the skipped call would
+   have had to establish anyway.  (A caller with a page mapped above
+   [PGROUNDUP(sz)] would really panic in freewalk; xv6 keeps [p->sz] an
+   upper bound on the user map, which is the fact this premise names.  See
+   claude-notes/projects/proc-pagetable-ownership.md step 7.)
+
+   NOTHING COMES BACK.  Both the user pages (via uvmunmap+kfree) and the
+   page-table pages (via freewalk+kfree) go to the allocator; the
+   postcondition is registers only.  [kalloc_env] rides at [on := None],
+   so the contract says nothing about the count. *)
+From Stdlib Require Import Eqdep_dec ZArith Lia List.
+From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import excl.
+From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import SmodeCore.
+Require Import InstrBytes KernelText.
+Require Import WpLock.
+Require Import RegFile.
+Require Import CalleeSaved.
+Require Import IntrDefs.
+Require Import ProcGeom CpuOwn.
+Require Import KallocInv.
+Require Import PtTree PtBuild KvmSpec.
+Require Import UptTree UserPtTree.
+Require Import ProcPtOwn.
+Require Import PtFree.
+Require Import BarePt.
+From Kernel Require KernelSyms.
+Import Defs.
+
+Notation UF := KernelSyms.uvmfree.
+
+Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (uroot : mword 44) (um : gmap (mword 27) (mword 64))
+    (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmfree in
+  let sz := mm !!! Regidx (mword_of_int 11) in
+  let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
+  let n := uvmf_np sz in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (* 4-slot frame + freewalk's 32 (uvmunmap needs only 22) *)
+  (36 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  mm !!! Regidx (mword_of_int 10) = page_base uroot ->
+  (* the size stays inside the user region, so PGROUNDUP does not wrap and
+     uvmunmap's range premise holds *)
+  (uint sz + 4096 <= uvm_maxsz)%Z ->
+  (* the table maps nothing above PGROUNDUP(sz): see the header *)
+  dom um ⊆ vpn_run vpn0 n ->
+  sie_cap_gpr γ mm K -∗
+  cpu_own γ 0%nat eb p C -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  bare_pt uroot um -∗
+  kalloc_env γa None cid_word -∗
+  ( ∀ (mr : regfile),
+    sie_cap_gpr γ mr K -∗
+    cpu_own γ 0%nat eb p C -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type UVMFREE.
+  Parameter wp_uvmfree_sconf :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (uroot : mword 44) (um : gmap (mword 27) (mword 64))
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
+      wp_uvmfree_sconf_body γ γa Φ mm uroot um K eb p C.
+End UVMFREE.

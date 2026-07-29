@@ -60,6 +60,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
+Require Export PageGeom.   (* [page_valid] / [page_base]: a node page is a kalloc page *)
 Require Import SmodePte.
 Require Import PtAdBits.
 Require Import Pt4kWalk.
@@ -319,6 +320,34 @@ Definition pt_page_vpn (b : mword 44) : mword 27 :=
 Definition node_kdata (b : mword 44) : Prop :=
   (ram_base <= bv_unsigned b * 4096)%Z /\
   (bv_unsigned b * 4096 + 4096 <= ram_base + ram_size)%Z.
+
+(* A KALLOC page is a kdata node page, and lies above the kernel text.  So
+   the single premise [pt_node_claim_from_static] needs of a freshly
+   allocated node is kalloc's own [page_valid].  ([kmem_lo] > [text_end] >
+   [ram_base], and [kmem_hi] = [ram_base]+[ram_size], so this is arithmetic
+   on the four literals -- plus the page's 4096-alignment, without which
+   [uint p < kmem_hi] would not give the +4096 headroom.)  The arithmetic
+   is routed through a [Z]-only helper: any goal mentioning [bv_unsigned]
+   defeats [lia] under this file's transitive [bitvector.tactics] import. *)
+Local Lemma pt_node_kdata_z (x : Z) :
+  x mod 4096 = 0 -> (kmem_lo <= x < kmem_hi)%Z ->
+  (ram_base <= x)%Z /\ (x + 4096 <= ram_base + ram_size)%Z /\ (text_end <= x)%Z.
+Proof.
+  unfold kmem_lo, kmem_hi, ram_base, ram_size, text_end.
+  intros Hm Hr. apply Z.mod_divide in Hm; [| lia].
+  destruct Hm as [k ->]. lia.
+Qed.
+
+Lemma page_valid_node_kdata (b : mword 44) :
+  page_valid (page_base b) ->
+  node_kdata b /\ (text_end <= bv_unsigned b * 4096)%Z.
+Proof.
+  intros [Hal Hr]. unfold page_aligned, page_in_range, PGSIZE in Hal, Hr.
+  rewrite uint_unsigned in Hal, Hr.
+  unfold page_base in Hal, Hr. rewrite page_base_unsigned in Hal, Hr.
+  destruct (pt_node_kdata_z _ Hal Hr) as (H1 & H2 & H3).
+  split; [split |]; assumption.
+Qed.
 
 (* the 9-bit walk index a level-[lvl] node decodes from [vpn] (Sv39:
    levels 2,1,0 top-down) *)
@@ -759,9 +788,22 @@ Section PtTreeIris.
      page is kdata.  Carried inside [pt_page_own] so a software walk can turn a
      physical slot [↦ₚ₈] into a VA-tier [↦₈] (reconstruct [mem_pointsto]) with
      NOTHING but the tree itself -- [kmap_at] supplies the mapping, [node_kdata]
-     the [addr_is_ram] + canonicality conjuncts [mem_pointsto] carries. *)
+     the [addr_is_ram] + canonicality conjuncts [mem_pointsto] carries.
+
+     ...AND that the node's page is a KALLOC page ([page_valid]).  Every page
+     table node in xv6 comes out of kalloc (uvmcreate's root, walk's interior
+     nodes, kvmmake's kernel table), and freewalk hands every one of them back
+     to kfree -- whose precondition is exactly [page_valid p ∗ page_own p].
+     Carrying it HERE rather than as a pure conjunct of each table-shaped spec
+     is what keeps it off walk's and mappages' contracts: it rides along with
+     the ownership, so a function that grows a tree re-establishes it once, at
+     the one place a node is created ([KptTree.pt_node_claim_from_static]),
+     and every consumer gets it for free.  [node_kdata] does NOT imply it --
+     a page between [etext] and [end] is kernel bss, in RAM but not
+     kalloc'able -- so this is a genuine strengthening. *)
   Definition pt_node_claim (b : mword 44) : iProp Σ :=
-    (⌜node_kdata b⌝ ∗ kmap_at (pt_page_vpn b) b KP_rw)%I.
+    (⌜node_kdata b⌝ ∗ ⌜page_valid (page_base b)⌝ ∗
+     kmap_at (pt_page_vpn b) b KP_rw)%I.
 
   Global Instance pt_node_claim_persistent b : Persistent (pt_node_claim b).
   Proof. rewrite /pt_node_claim. apply _. Qed.

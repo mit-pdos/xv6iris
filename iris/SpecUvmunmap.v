@@ -66,6 +66,7 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import PtFree BarePt.
 From Kernel Require KernelSyms.
 Import Defs.
 
@@ -117,3 +118,57 @@ Module Type UVMUNMAP.
       (C : iProp Σ),
       wp_uvmunmap_sconf_body γ γa Φ mm P npages K eb p C.
 End UVMUNMAP.
+
+(* --------------------------------------------------------------------- *)
+(* THE BARE INSTANCE.  proc_freepagetable drops the trampoline and the    *)
+(* trapframe (its two [do_free = 0] calls) before handing the table to    *)
+(* uvmfree, so uvmfree's uvmunmap call runs on a table with no fixed      *)
+(* leaves at all.  That is the OTHER end of BarePt.v's [otf] axis, and    *)
+(* it is the same machine code and the same proof: uvmunmap touches the   *)
+(* fixed leaves only by knowing the vpn it clears is not one of them,     *)
+(* which the range premise below gives at BOTH ends                       *)
+(* ([BarePt.uptg_fixed_user_none]).  ProofUvmunmap.v therefore proves one *)
+(* [uptg]-generic lemma and seals it twice; every existing caller keeps   *)
+(* the [proc_pt] statement above, unchanged.                              *)
+(* --------------------------------------------------------------------- *)
+
+Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (uroot : mword 44) (um : gmap (mword 27) (mword 64))
+    (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+    (C : iProp Σ) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let vpn0 := svpn_of va in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (22 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  mm !!! Regidx (mword_of_int 10) = page_base uroot ->
+  subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
+  mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
+  mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
+  (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+  sie_cap_gpr γ mm K -∗
+  cpu_own γ 0%nat eb p C -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  bare_pt uroot um -∗
+  kalloc_env γa None cid_word -∗
+  ( ∀ (mr : regfile),
+    sie_cap_gpr γ mr K -∗
+    cpu_own γ 0%nat eb p C -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    bare_pt uroot (um_del_run um vpn0 npages) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type UVMUNMAP_BARE.
+  Parameter wp_uvmunmap_bare_sconf :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (uroot : mword 44) (um : gmap (mword 27) (mword 64))
+      (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+      (C : iProp Σ),
+      wp_uvmunmap_bare_sconf_body γ γa Φ mm uroot um npages K eb p C.
+End UVMUNMAP_BARE.

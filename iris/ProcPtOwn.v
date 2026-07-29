@@ -101,6 +101,7 @@ Require Import UptTree.
 Require Import UserPtTree.
 Require Import ProcPt.
 Require Import KallocInv.
+Require Export PageGeom.  (* [page_base] / [page_valid] are named by this file's consumers *)
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -116,11 +117,11 @@ Definition pte_ppn (w : mword 64) : mword 44 :=
   autocast (T := mword) ((autocast (T := mword)
     (PPN_of_PTE (w : mword 64))) : mword 44).
 
-(* the base address of a physical page.  This is simultaneously the page's
-   physical base and its IDENTITY KERNEL VA -- i.e. the pointer value
-   kalloc returned and the one [p->pagetable] / [p->trapframe] hold. *)
-Definition page_base (ppn : mword 44) : mword 64 :=
-  zero_extend' 64 (concat_vec ppn (zeros' 12 : mword 12)).
+(* [page_base ppn] -- the base address of a physical page, simultaneously
+   the page's physical base and its IDENTITY KERNEL VA (the pointer value
+   kalloc returned, the one [p->pagetable] / [p->trapframe] hold) -- now
+   lives in PageGeom.v, low enough for [PtTree.pt_node_claim] to spell it.
+   The laws about it stay here. *)
 
 Lemma page_base_ppn_unsigned (ppn : mword 44) :
   bv_unsigned (page_base ppn) = bv_unsigned ppn * 4096.
@@ -1081,6 +1082,12 @@ Definition uvma_np (oldsz newsz : mword 64) : nat :=
 Definition uvmd_np (oldsz newsz : mword 64) : nat :=
   Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096).
 
+(* uvmcopy's run length: the loop is [for (i = 0; i < sz; i += PGSIZE)], so
+   it runs ceil(sz/4096) times -- NOT PGROUNDUP-based, and 0 exactly when
+   [sz = 0] (the frameless fast path at uvmcopy+0x00). *)
+Definition uvmc_np (sz : mword 64) : nat :=
+  Z.to_nat ((uint sz + 4095) / 4096).
+
 Lemma uvm_maxsz_val : uvm_maxsz = 274877898752.
 Proof. vm_compute. reflexivity. Qed.
 
@@ -1262,6 +1269,274 @@ Proof.
   rewrite uint_unsigned in Hlt.
   rewrite svpn_of_unsigned_gen.
   exact (z_svpn_lt_maxva _ (proj1 (bv_unsigned_in_range _ a)) Hlt).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* §2d THE PERMISSION OF AN EXISTING LEAF.                                 *)
+(*                                                                        *)
+(*   uvmcopy does not CHOOSE a permission -- it copies the parent leaf's   *)
+(*   own [PTE_FLAGS( *pte)] (the [andi a4,s3,1023] at uvmcopy+0x54) and    *)
+(*   hands it to mappages.  So [uvm_perm_ok] has to be DERIVED from what   *)
+(*   the parent's table already guarantees about that leaf, not demanded   *)
+(*   of the caller.  It can be, and the reason is structural: every        *)
+(*   predicate in [upt_map_wf]'s 4K-leaf clause and [upt_acc_wf]'s         *)
+(*   decided-access clause reads a leaf ONLY through                       *)
+(*   [subrange_vec_dec w 7 0] and [ext_bits_of_PTE w] -- so two leaves     *)
+(*   agreeing on their flag byte and extension bits satisfy exactly the    *)
+(*   same ones, whatever ppn each names.  [mk_pte_flags1024] /             *)
+(*   [mk_pte_ext] make both sides of the comparison ppn-free.              *)
+(* ---------------------------------------------------------------------- *)
+
+(* PTE_FLAGS: the low ten bits, exactly what [andi rd,rs,1023] computes *)
+Definition pte_flags10 (w : mword 64) : Z := Z.land (bv_unsigned w) 1023.
+
+(* ---- the arithmetic, over plain [Z] (the zify-hook rule again) ------- *)
+
+Local Lemma z_land1023 (x : Z) : Z.land x 1023 = x mod 1024.
+Proof.
+  assert (Ho : (1023 = Z.ones 10)%Z) by (vm_compute; reflexivity).
+  rewrite Ho. rewrite Z.land_ones; [| lia].
+  assert (Hp : (2 ^ 10 = 1024)%Z) by (vm_compute; reflexivity).
+  rewrite Hp. reflexivity.
+Qed.
+
+Local Lemma z_land1023_range (x : Z) : 0 <= x -> 0 <= Z.land x 1023 < 1024.
+Proof.
+  intros Hx.
+  assert (Hp : (2 ^ 10 = 1024)%Z) by (vm_compute; reflexivity).
+  rewrite <- Hp. rewrite Z.land_comm.
+  apply z_land_pow2; [lia | rewrite Hp; lia | exact Hx].
+Qed.
+
+(* bit 0 already set: oring in [PTE_V] changes nothing *)
+Local Lemma z_lor1_id (y : Z) : Z.testbit y 0 = true -> Z.lor y 1 = y.
+Proof.
+  intros H0. apply Z.bits_inj'. intros k Hk.
+  rewrite Z.lor_spec.
+  destruct (Z.eq_dec k 0) as [-> | Hne]; [rewrite H0; reflexivity |].
+  assert (Ht : Z.testbit 1 k = false).
+  { apply Z.bits_above_log2; [lia |]. rewrite Z.log2_1. lia. }
+  rewrite Ht. apply orb_false_r.
+Qed.
+
+(* "a value below 2^54 is its top 44 and its bottom 10 bits" *)
+Local Lemma z_pte_eta (x : Z) :
+  0 <= x -> x < 18014398509481984 ->
+  (x / 1024 mod 17592186044416) * 1024 + x mod 1024 = x.
+Proof.
+  intros H0 H1.
+  rewrite (Z.mod_small (x / 1024) 17592186044416);
+    [| split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]].
+  pose proof (Z_div_mod_eq_full x 1024). lia.
+Qed.
+
+Local Lemma z_mk_flags (q f : Z) : 0 <= f < 1024 -> (q * 1024 + f) mod 1024 = f.
+Proof.
+  intros Hf. rewrite Z.add_comm. rewrite Z_mod_plus_full.
+  apply Z.mod_small. exact Hf.
+Qed.
+
+Lemma pte_flags10_range (w : mword 64) : (0 <= pte_flags10 w < 1024)%Z.
+Proof.
+  unfold pte_flags10.
+  exact (z_land1023_range _ (proj1 (bv_unsigned_in_range _ w))).
+Qed.
+
+(* the flag byte of a [mk_pte] is the flag argument it was built at *)
+Lemma pte_flags10_mk (p : mword 44) (f : Z) :
+  (0 <= f < 1024)%Z -> pte_flags10 (mk_pte p f) = f.
+Proof.
+  intros Hf. unfold pte_flags10.
+  rewrite (mk_pte_unsigned p f Hf). rewrite z_land1023.
+  exact (z_mk_flags _ f Hf).
+Qed.
+
+(* a leaf with no extension bits IS its ppn and its flag byte.  ([pte_hi_zero]
+   supplies the hypothesis from the four 4K-leaf predicates.) *)
+Lemma mk_pte_eta (w : mword 64) :
+  (bv_unsigned w < 2 ^ 54)%Z -> w = mk_pte (pte_ppn w) (pte_flags10 w).
+Proof.
+  intros Hlt.
+  change (2 ^ 54)%Z with 18014398509481984%Z in Hlt.
+  apply bv_eq. symmetry.
+  rewrite (mk_pte_unsigned _ _ (pte_flags10_range w)).
+  rewrite ppn_unsigned. unfold pte_flags10. rewrite z_land1023.
+  exact (z_pte_eta _ (proj1 (bv_unsigned_in_range _ w)) Hlt).
+Qed.
+
+(* a valid leaf has V set, so [Z.lor perm 1] is [perm] -- which is what makes
+   [uvm_pte (pte_flags10 w) r] and [w] agree on their flag byte. *)
+Lemma pte_flags10_lor1 (w : mword 64) :
+  pte_valid w -> Z.lor (pte_flags10 w) 1 = pte_flags10 w.
+Proof.
+  intros Hv.
+  assert (Hb : Z.testbit (bv_unsigned w) 0 = true).
+  { destruct (Z.testbit (bv_unsigned w) 0) eqn:E; [reflexivity | exfalso].
+    exact (pte_valid_invalid_excl w Hv (pte_invalid_bit0 _ E)). }
+  apply z_lor1_id. unfold pte_flags10. rewrite z_land1023.
+  assert (Hp : (1024 = 2 ^ 10)%Z) by (vm_compute; reflexivity).
+  rewrite Hp. rewrite Z.mod_pow2_bits_low; [exact Hb | lia].
+Qed.
+
+(* ---- the two ppn-free projections of an A/D variant ------------------ *)
+
+(* the flag byte of an A/D variant of a [mk_pte], at ANY ppn.  This is
+   [uvm_variant_flags]' twin one level down: the same [pte_set_ad_zext_concat]
+   route, stated at the raw [mk_pte] rather than at [uvm_pte].  (The [Z.lor f 1]
+   premise is what [pte_flags10_lor1] supplies for a valid leaf.) *)
+Lemma mkpte_ad_flags (p : mword 44) (f : Z) (a d : mword 1) :
+  (0 <= f < 1024)%Z -> Z.lor f 1 = f ->
+  subrange_vec_dec (pte_set_ad (mk_pte p f) a d) 7 0
+  = (mword_of_int (uvm_flags f a d) : mword 8).
+Proof.
+  intros Hf H1.
+  pose proof (uvm_flags_bound f a d Hf) as Hb.
+  unfold uvm_flags in Hb |- *. rewrite H1 in Hb. rewrite H1.
+  unfold mk_pte. rewrite (pte_set_ad_zext_concat p f a d Hf).
+  exact (mk_pte_flags1024 p _ Hb).
+Qed.
+
+Lemma mkpte_ad_ext (p : mword 44) (f : Z) (a d : mword 1) :
+  (0 <= f < 1024)%Z ->
+  ext_bits_of_PTE (pte_set_ad (mk_pte p f) a d) = Mk_PTE_Ext (mword_of_int 0).
+Proof.
+  intros Hf. rewrite pte_set_ad_ext.
+  unfold ext_bits_of_PTE. change (Z.eqb 64 64) with true. cbv iota beta.
+  rewrite (mk_pte_ext p f Hf). reflexivity.
+Qed.
+
+(* ---- THE STRUCTURAL OBSERVATION -------------------------------------- *)
+
+(* Every PTE predicate in play reads its word ONLY through
+   [subrange_vec_dec _ 7 0] and [ext_bits_of_PTE _].  So two words agreeing
+   on those two projections satisfy exactly the same ones -- whatever ppn
+   each names.  Proved once here; both the leaf clause and the access
+   clause below are instances. *)
+Lemma pte_proj_transfer (x y : mword 64) :
+  (subrange_vec_dec x 7 0 : mword 8) = subrange_vec_dec y 7 0 ->
+  ext_bits_of_PTE x = ext_bits_of_PTE y ->
+  (pte_valid x -> pte_valid y)
+  /\ (pte_leaf x -> pte_leaf y)
+  /\ (pte_no_napot x -> pte_no_napot y)
+  /\ (pte_pbmt0 x -> pte_pbmt0 y)
+  /\ (forall acc pr mxr ds, pte_check_ok acc pr mxr ds x -> pte_check_ok acc pr mxr ds y)
+  /\ (forall acc pr mxr ds fl,
+        pte_check_denied acc pr mxr ds fl x -> pte_check_denied acc pr mxr ds fl y).
+Proof.
+  intros Hf He.
+  unfold pte_valid, pte_leaf, pte_no_napot, pte_pbmt0, pte_check_ok, pte_check_denied.
+  rewrite Hf He.
+  split_and!;
+    [ exact (fun H => H) | exact (fun H => H) | exact (fun H => H) | exact (fun H => H)
+    | exact (fun _ _ _ _ H => H) | exact (fun _ _ _ _ _ H => H) ].
+Qed.
+
+(* the same transfer at the [uleaf_*] altitude: the A/D quantifier is
+   already inside, so the projection equalities are asked per variant *)
+Lemma uleaf_transfer (x y : mword 64) (acc : MemoryAccessType mem_payload) :
+  (forall a d : mword 1,
+     (subrange_vec_dec (pte_set_ad x a d) 7 0 : mword 8)
+       = subrange_vec_dec (pte_set_ad y a d) 7 0
+     /\ ext_bits_of_PTE (pte_set_ad x a d) = ext_bits_of_PTE (pte_set_ad y a d)) ->
+  (uleaf_ok acc x -> uleaf_ok acc y) /\ (uleaf_denied acc x -> uleaf_denied acc y).
+Proof.
+  intros Hp. split.
+  - intros Hok a d mxr ds.
+    destruct (Hp a d) as (Hf & He).
+    destruct (pte_proj_transfer _ _ Hf He) as (_ & _ & _ & _ & Hc & _).
+    exact (Hc acc User mxr ds (Hok a d mxr ds)).
+  - intros Hde a d mxr ds.
+    destruct (Hp a d) as (Hf & He).
+    destruct (pte_proj_transfer _ _ Hf He) as (_ & _ & _ & _ & _ & Hc).
+    exact (Hc acc User mxr ds _ (Hde a d mxr ds)).
+Qed.
+
+(* THE TRANSFER, ppn-generically: the whole permission contract out of the
+   SAME contract at one arbitrary page [p].  The verdict does not depend on
+   the page, which is exactly why uvmcopy may re-use the parent's flag byte
+   on the fresh page kalloc returns. *)
+Lemma uvm_perm_ok_of_mk (p : mword 44) (f : Z) :
+  (0 <= f < 1024)%Z -> Z.lor f 1 = f ->
+  (forall a d : mword 1,
+     pte_valid (pte_set_ad (mk_pte p f) a d) /\ pte_leaf (pte_set_ad (mk_pte p f) a d) /\
+     pte_no_napot (pte_set_ad (mk_pte p f) a d) /\ pte_pbmt0 (pte_set_ad (mk_pte p f) a d)) ->
+  (forall acc : MemoryAccessType mem_payload,
+     u_acc acc -> uleaf_ok acc (mk_pte p f) \/ uleaf_denied acc (mk_pte p f)) ->
+  uvm_perm_ok f.
+Proof.
+  intros Hr Hlor Hleaf Hacc.
+  (* the projections of a [uvm_pte] variant and of the given leaf's variant
+     coincide, for every page [r] and every A/D pair *)
+  assert (Hproj : forall (r : mword 64) (a d : mword 1),
+    (subrange_vec_dec (pte_set_ad (mk_pte p f) a d) 7 0 : mword 8)
+      = subrange_vec_dec (pte_set_ad (uvm_pte f r) a d) 7 0
+    /\ ext_bits_of_PTE (pte_set_ad (mk_pte p f) a d)
+      = ext_bits_of_PTE (pte_set_ad (uvm_pte f r) a d)).
+  { intros r a d. split.
+    - rewrite (mkpte_ad_flags p f a d Hr Hlor).
+      rewrite (uvm_variant_flags f r a d Hr). reflexivity.
+    - rewrite (mkpte_ad_ext p f a d Hr).
+      rewrite (uvm_variant_ext f r a d Hr). reflexivity. }
+  split_and!.
+  - (* mappages_perm_ok: the four predicates at the ZERO ppn *)
+    unfold mappages_perm_ok. rewrite Hlor.
+    destruct (pte_set_ad_refl (mk_pte p f)) as (a0 & d0 & Hself).
+    destruct (Hleaf a0 d0) as (Hv0 & Hl0 & Hn0 & Hp0).
+    rewrite <- Hself in Hv0. rewrite <- Hself in Hl0.
+    rewrite <- Hself in Hn0. rewrite <- Hself in Hp0.
+    assert (Hbf : (subrange_vec_dec (mk_pte p f) 7 0 : mword 8)
+                  = subrange_vec_dec (mk_pte (zeros' 44) f) 7 0).
+    { rewrite (mk_pte_flags1024 p f Hr). rewrite (mk_pte_flags1024 (zeros' 44) f Hr).
+      reflexivity. }
+    pose proof (mk_pte_ext_word p f Hr) as Hbe.
+    destruct (pte_proj_transfer _ _ Hbf Hbe) as (Tv & Tl & Tn & Tp & _ & _).
+    split; [exact Hr |].
+    split_and!; [exact (Tv Hv0) | exact (Tl Hl0) | exact (Tn Hn0) | exact (Tp Hp0)].
+  - (* every A/D variant of every [uvm_pte f r] is a proper 4K leaf *)
+    intros r a d.
+    destruct (Hproj r a d) as (Hf & He).
+    destruct (pte_proj_transfer _ _ Hf He) as (Tv & Tl & Tn & Tp & _ & _).
+    destruct (Hleaf a d) as (Hv0 & Hl0 & Hn0 & Hp0).
+    split_and!; [exact (Tv Hv0) | exact (Tl Hl0) | exact (Tn Hn0) | exact (Tp Hp0)].
+  - (* every user access is decided -- the verdict is ppn-free *)
+    intros r acc Hu.
+    destruct (uleaf_transfer (mk_pte p f) (uvm_pte f r) acc (Hproj r)) as (Tok & Tde).
+    destruct (Hacc acc Hu) as [H | H]; [left; exact (Tok H) | right; exact (Tde H)].
+Qed.
+
+(* THE TRANSFER.  Everything [uvm_perm_ok] asks of the permission, out of
+   what [proc_pt] already knows about the leaf that carries it. *)
+Lemma uvm_perm_ok_of_leaf (w : mword 64) :
+  (forall a d : mword 1,
+     pte_valid (pte_set_ad w a d) /\ pte_leaf (pte_set_ad w a d) /\
+     pte_no_napot (pte_set_ad w a d) /\ pte_pbmt0 (pte_set_ad w a d)) ->
+  (forall acc : MemoryAccessType mem_payload,
+     u_acc acc -> uleaf_ok acc w \/ uleaf_denied acc w) ->
+  uvm_perm_ok (pte_flags10 w).
+Proof.
+  intros H1 H2.
+  destruct (pte_set_ad_refl w) as (a0 & d0 & Hself).
+  destruct (H1 a0 d0) as (Hv0 & Hl0 & Hn0 & Hp0).
+  rewrite <- Hself in Hv0. rewrite <- Hself in Hn0. rewrite <- Hself in Hp0.
+  pose proof (pte_hi_zero w Hv0 Hn0 Hp0) as Hhi.
+  assert (Hhi' : (bv_unsigned w < 2 ^ 54)%Z)
+    by (change (2 ^ 54)%Z with 18014398509481984%Z; exact Hhi).
+  pose proof (mk_pte_eta w Hhi') as Heta.
+  apply (uvm_perm_ok_of_mk (pte_ppn w) (pte_flags10 w)
+           (pte_flags10_range w) (pte_flags10_lor1 w Hv0)).
+  - rewrite <- Heta. exact H1.
+  - rewrite <- Heta. exact H2.
+Qed.
+
+(* ...and the leaf uvmcopy's mappages call actually writes, at the page
+   kalloc returned: same flag byte as the parent's. *)
+Lemma uvm_pte_flags10 (w r : mword 64) :
+  pte_valid w -> (bv_unsigned w < 2 ^ 54)%Z ->
+  pte_flags10 (uvm_pte (pte_flags10 w) r) = pte_flags10 w.
+Proof.
+  intros Hv _.
+  rewrite uvm_pte_mk. rewrite (pte_flags10_lor1 w Hv).
+  exact (pte_flags10_mk _ _ (pte_flags10_range w)).
 Qed.
 
 (* ===================================================================== *)
@@ -1671,11 +1946,15 @@ Qed.
 
 (* THE RESTORE LAW -- what makes uvmalloc's failure arm give back exactly
    the descriptor it was called with.  uvmalloc extends [um] over the run
-   (each vpn fresh), then uvmdealloc deletes precisely that run. *)
-Lemma um_del_run_restore (um um' : gmap (mword 27) (mword 64))
+   (each vpn fresh), then uvmdealloc deletes precisely that run.
+
+   THE SUBSET FORM is the general one: uvmcopy maps only the vpns the PARENT
+   had mapped, so its rollback run covers a subset of [vpn_run], not all of
+   it -- and the law never needed the equality.  [um_del_run_restore] is the
+   [=] instance (WRAPPER RECIPE: same statement, [exact]-ed off this one). *)
+Lemma um_del_run_restore_sub (um um' : gmap (mword 27) (mword 64))
     (vpn0 : mword 27) (k : nat) :
-  um ⊆ um' ->
-  dom um' = dom um ∪ vpn_run vpn0 k ->
+  um ⊆ um' -> dom um' ⊆ dom um ∪ vpn_run vpn0 k ->
   (forall i, (i < k)%nat -> um !! vpn_at vpn0 i = None) ->
   um_del_run um' vpn0 k = um.
 Proof.
@@ -1687,14 +1966,28 @@ Proof.
   - rewrite (um_del_run_out um' vpn0 k v Hnin).
     destruct (um !! v) as [w |] eqn:Hl.
     + exact (lookup_weaken um um' v w Hl Hsub).
-    + apply not_elem_of_dom. rewrite Hdom.
-      intros Hin. apply elem_of_union in Hin. destruct Hin as [Hin | Hin].
+    + apply not_elem_of_dom.
+      intros Hin. apply Hdom in Hin. apply elem_of_union in Hin.
+      destruct Hin as [Hin | Hin].
       * apply (not_elem_of_dom (D := gset (mword 27)) um v) in Hl.
         exact (Hl Hin).
       * exact (Hnin Hin).
 Qed.
 
+Lemma um_del_run_restore (um um' : gmap (mword 27) (mword 64))
+    (vpn0 : mword 27) (k : nat) :
+  um ⊆ um' ->
+  dom um' = dom um ∪ vpn_run vpn0 k ->
+  (forall i, (i < k)%nat -> um !! vpn_at vpn0 i = None) ->
+  um_del_run um' vpn0 k = um.
+Proof.
+  intros Hsub Hdom Hfresh.
+  apply (um_del_run_restore_sub um um' vpn0 k Hsub); [| exact Hfresh].
+  rewrite Hdom. reflexivity.
+Qed.
+
 (* the wf conjuncts ride across the whole run *)
+
 Lemma proc_pt_wf_del_run (P : uptd) (vpn0 : mword 27) (k : nat) :
   proc_pt_wf P -> proc_pt_wf (uptd_del_run P vpn0 k).
 Proof.

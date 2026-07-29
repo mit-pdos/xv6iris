@@ -499,7 +499,7 @@ Section PtSlotBridge.
     u_pte_addr b idx ↦ₚ₈{dq} w -∗
     u_pte_addr b idx ↦₈{dq} w.
   Proof.
-    iIntros "[%Hkd #Hk] Hw".
+    iIntros "(%Hkd & %Hpv & #Hk) Hw".
     iApply word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
@@ -519,7 +519,7 @@ Section PtSlotBridge.
     u_pte_addr b idx ↦₈{dq} w -∗
     u_pte_addr b idx ↦ₚ₈{dq} w.
   Proof.
-    iIntros "[%Hkd #Hk] Hw".
+    iIntros "(%Hkd & %Hpv & #Hk) Hw".
     iApply phys_word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
     iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
@@ -533,16 +533,20 @@ Section PtSlotBridge.
   Qed.
 
   (* build a fresh node's [pt_node_claim] from the static-claims bundle: a
-     kdata page ([node_kdata b], from [page_in_range_addr_is_kdata] at the
-     kalloc site) is identity-mapped, so its page-vpn's static claim is the
-     node's own claim.  This is what [zero_page_to_node]'s ONE caller
-     (ProofWalk) supplies for the just-allocated PT node. *)
+     kalloc page is a kdata page ([node_kdata b]) and is identity-mapped, so
+     its page-vpn's static claim is the node's own claim.  Every caller
+     ([zero_page_to_node]'s in ProofWalk, uvmcreate's and kvmmake's root)
+     has just taken the page out of kalloc, so the SINGLE premise it needs
+     is kalloc's own [page_valid] -- [node_kdata] and the [text_end] bound
+     both follow ([PtTree.page_valid_node_kdata]).  [page_valid] is also
+     what the claim now RECORDS, so freewalk can hand the node back to
+     kfree. *)
   Lemma pt_node_claim_from_static (b : mword 44) :
-    node_kdata b ->
-    (text_end <= bv_unsigned b * 4096)%Z ->
+    page_valid (page_base b) ->
     kmap_static_claims -∗ pt_node_claim b.
   Proof.
-    intros Hkd Hkda. iIntros "#Hb".
+    intros Hpv. iIntros "#Hb".
+    destruct (page_valid_node_kdata b Hpv) as (Hkd & Hkda).
     pose proof Hkd as [Hlo Hhi].
     unfold text_end, ram_base, ram_size in Hlo, Hhi, Hkda.
     assert (Ha0 : bv_unsigned (u_pte_addr b (mword_of_int 0)) = bv_unsigned b * 4096).
@@ -559,6 +563,7 @@ Section PtSlotBridge.
       rewrite (svpn_of_page (u_pte_addr b (mword_of_int 0)) b 0
                  ltac:(lia) ltac:(rewrite Ha0; lia) Hcana0). reflexivity. }
     rewrite /pt_node_claim. iSplitR; [iPureIntro; exact Hkd |].
+    iSplitR; [iPureIntro; exact Hpv |].
     iDestruct (kmap_static_claims_at (pt_page_vpn b) KP_rw Hstat with "Hb") as "#Hk".
     rewrite Hleaf. iExact "Hk".
   Qed.
