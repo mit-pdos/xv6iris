@@ -197,11 +197,12 @@ jobs:
       # the iris/ sources (no opam env, no ELF -- the step above best-effort
       # checks out xv6-riscv/ for source-file attribution, but the coverage
       # numbers themselves never depend on it).  Unlike the two informational
-      # steps around it, this one CAN fail the build — but only on MANIFEST
-      # errors (a MANIFEST_PROVEN/MANIFEST_ASSUMED entry whose file or lemma
-      # no longer exists): those mean the coverage numbers are lying, and the
-      # fix is a one-line manifest update.  A mere coverage change never fails
-      # CI.  Runs only on a successful build, so the report describes a green
+      # steps around it, this one CAN fail the build — but only on consistency
+      # errors: a MANIFEST_PROVEN/MANIFEST_ASSUMED entry whose file or lemma no
+      # longer exists, or _CoqProject drift (a .v in the tree that the project
+      # file does not list, so the build never compiles it — or one it lists
+      # that is gone).  Those all mean the coverage numbers are lying, and each
+      # fix is a one-line edit.  A mere coverage change never fails CI.  Runs only on a successful build, so the report describes a green
       # tree.
       - name: Proof coverage report (iris/)
         run: |

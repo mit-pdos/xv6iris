@@ -25,6 +25,13 @@ Three independent sources are joined on the *symbol name*:
    attributes correctly.  Falls back to scanning ``*.c`` / ``*.S`` for a
    definition or label when the objects are absent.
 
+The proof side is read from the files ``iris/_CoqProject`` lists -- the build's
+own target list -- and NOT from a ``iris/*.v`` glob.  A ``.v`` in the tree but
+absent from the project file is compiled by nobody, so a "proven" function read
+out of it would be a claim no build has ever checked; keying off ``_CoqProject``
+makes the report describe exactly what CI verifies.  Drift either way is a
+``--check`` error, never a silent adjustment (see ``coqproject_files``).
+
 WHAT COUNTS AS "PROVEN"
 -----------------------
 
@@ -368,14 +375,64 @@ class Proofs:
     axioms: dict = field(default_factory=lambda: defaultdict(list))   # file -> [name]
     requires: dict = field(default_factory=dict)          # file -> [file, ...]
     mentions: dict = field(default_factory=lambda: defaultdict(set))  # symbol -> {file}
+    errors: list = field(default_factory=list)            # _CoqProject drift
+
+
+def coqproject_files(repo: str):
+    """-> ([path, ...], [error, ...]) -- the file list the BUILD compiles.
+
+    Keyed off ``iris/_CoqProject``, not a ``*.v`` glob, because that list is
+    what ``coq_makefile`` turns into the build's targets.  A ``.v`` sitting in
+    the tree unlisted is never compiled by anyone, so a "proven" function read
+    out of it would be a claim no build has ever checked -- green CI over an
+    unverified proof, silent in both directions.  Keying off the project file
+    makes that impossible by construction: the report can only describe files
+    the build checks.
+
+    Both kinds of drift are returned as errors rather than quietly resolved,
+    since each is a real defect, and ``--check`` turns them into a failing step:
+    an unlisted file is an unchecked proof, and a listed-but-absent one breaks
+    the build outright.  Assumes the flat ``iris/*.v`` layout the report handles
+    (no subdirectories); a subdirectory entry would surface as "does not exist".
+    """
+    idir = os.path.join(repo, "iris")
+    proj = os.path.join(idir, "_CoqProject")
+    if not os.path.exists(proj):
+        return [], [f"_CoqProject: {proj} does not exist"]
+
+    errors, listed = [], []
+    seen = set()
+    with open(proj, errors="replace") as fh:
+        for raw in fh:
+            entry = raw.strip()
+            # skip blanks, comments, and the -R / -arg option lines
+            if not entry or entry.startswith("#") or entry.startswith("-"):
+                continue
+            if not entry.endswith(".v"):
+                continue
+            if entry in seen:
+                errors.append(f"_CoqProject: lists {entry} more than once")
+                continue
+            seen.add(entry)
+            listed.append(entry)
+
+    ondisk = {os.path.basename(p) for p in glob.glob(os.path.join(idir, "*.v"))}
+    for e in sorted(seen - ondisk):
+        errors.append(f"_CoqProject: lists iris/{e}, which does not exist")
+    for e in sorted(ondisk - seen):
+        errors.append(f"_CoqProject: iris/{e} is not listed, so the build never "
+                      f"compiles it -- nothing it claims is counted here")
+
+    files = sorted(os.path.join(idir, e) for e in listed if e in ondisk)
+    return files, errors
 
 
 def scan_proofs(repo: str) -> Proofs:
     p = Proofs()
     idir = os.path.join(repo, "iris")
-    files = sorted(glob.glob(os.path.join(idir, "*.v")))
+    files, p.errors = coqproject_files(repo)
     if not files:
-        sys.exit(f"no proof files under {idir}")
+        sys.exit(f"no proof files listed in {os.path.join(idir, '_CoqProject')}")
 
     known = {os.path.basename(f) for f in files}
     body_of_modtype = {}   # body definition name -> modtype (filled from Parameters)
@@ -682,7 +739,7 @@ def render_text(rep, verbose):
                 w(f"      {c}")
         w("")
     if rep["errors"]:
-        w("MANIFEST ERRORS (the declarations below no longer match the tree)")
+        w("CONSISTENCY ERRORS (the report below does not match the tree/build)")
         w("-" * 60)
         for e in rep["errors"]:
             w(f"  {e}")
@@ -725,7 +782,7 @@ def render_md(rep, verbose):
               f"{f.size} | {f.status} | {ev} |")
         w("")
     if rep["errors"]:
-        w("## Manifest errors\n")
+        w("## Consistency errors\n")
         for e in rep["errors"]:
             w(f"- {e}")
         w("")
@@ -835,7 +892,7 @@ def render_html(rep, verbose):
               f'<td class="ev">{ev}</td></tr>')
         w("</table></div></details>")
     if rep["errors"]:
-        w("<h2>Manifest errors</h2><ul>" +
+        w("<h2>Consistency errors</h2><ul>" +
           "".join(f"<li>{e(x)}</li>" for x in rep["errors"]) + "</ul>")
     if rep["notes"]:
         w("<h2>Notes</h2><ul>" +
@@ -866,9 +923,10 @@ def main():
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="text format: show evidence and untouched functions")
     ap.add_argument("--check", action="store_true",
-                    help="exit 1 if any manifest error is present (for CI: a "
-                         "stale MANIFEST_PROVEN/MANIFEST_ASSUMED entry is a "
-                         "real regression, unlike a coverage percentage)")
+                    help="exit 1 on any consistency error (for CI: a stale "
+                         "MANIFEST_PROVEN/MANIFEST_ASSUMED entry, or _CoqProject "
+                         "drift, is a real regression -- unlike a coverage "
+                         "percentage, which never fails)")
     args = ap.parse_args()
 
     syms = load_symbols(args.repo)
@@ -876,7 +934,9 @@ def main():
     funcs = build_functions(syms, instrs)
     notes = attribute_sources(args.repo, funcs)
     proofs = scan_proofs(args.repo)
-    errors = classify(funcs, proofs, args.repo)
+    # _CoqProject drift first: if the report is describing files the build never
+    # compiles, that undermines every number below it, so it leads.
+    errors = proofs.errors + classify(funcs, proofs, args.repo)
 
     fs_all = list(funcs.values())
     rep = {
@@ -915,7 +975,7 @@ def main():
 
     if args.check and errors:
         for e in errors:
-            print(f"proof_coverage: manifest error: {e}", file=sys.stderr)
+            print(f"proof_coverage: consistency error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

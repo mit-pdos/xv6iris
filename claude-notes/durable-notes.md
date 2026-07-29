@@ -103,8 +103,16 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   like the boot path) a `let` bound to ANOTHER `KernelSyms` symbol — is a
   whole-function spec; it counts as proven once
   a `Link*.v` instantiates a functor sealed by its `Module Type`. **So keeping
-  a new proof in that shape is what keeps it visible to the report** — nothing
-  needs to be registered.
+  a new proof in that shape is what keeps it visible to the report** — no
+  separate registration beyond `_CoqProject`.
+- **The scan is keyed off `iris/_CoqProject`, not a `*.v` glob**, so the report
+  can only ever describe files the build actually compiles: an unlisted `.v` is
+  compiled by nobody, and counting a "proven" function out of one would be a
+  claim no build has ever checked. Drift either way — a `.v` in the tree the
+  project file omits, or an entry whose file is gone, or a duplicate entry — is
+  a `--check` error that fails CI, not a silent adjustment. So **adding a file
+  to `iris/` means adding it to `_CoqProject`**; forgetting used to be invisible
+  in both directions at once (never built, still counted).
 - **Spell the entry pc so the report can SEE the symbol.** The script matches
   `KernelSyms.<f>` textually, either as `pc_is (mword_of_int KernelSyms.<f>)` or
   — the form to prefer — a `let pcE : mword 64 := mword_of_int KernelSyms.<f> in`
