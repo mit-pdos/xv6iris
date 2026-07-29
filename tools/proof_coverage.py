@@ -206,14 +206,40 @@ def exit_targets(text: str, entry: str) -> set:
     return out
 
 
-def runs_to_end(text: str, entry: str) -> bool:
+def runs_to_end(text: str, entry: str, local_defs: dict | None = None) -> bool:
     """True when the spec's continuation sits past the last instruction of the
     function, i.e. the spec covers the whole function: at the caller's return
     address, or -- for a function that never returns -- at the entry of the
-    function it transfers to."""
+    function it transfers to.
+
+    The continuation is not always spelled inline.  A body may FACTOR its
+    postcondition into a named predicate and apply it (SpecVirtioDiskInit.v's
+    `vdi_post`, done because carrying a twenty-wand chain as a spatial
+    hypothesis across ~140 instruction steps doubled the proof's compile time).
+    The `pc_is ret_tgt` then lives in that predicate, not here, and reading only
+    this chunk would call a fully proven whole-function spec a mere FRAGMENT --
+    silently, as a coverage downgrade rather than an error.  So when the inline
+    search fails, follow same-file predicates the body APPLIES.
+
+    The follow is deliberately narrow, or it would upgrade real fragment specs:
+    it fires only when the body passes one of *these* return/exit-target names
+    into the predicate AND the predicate puts that same name under a `pc_is`.  A
+    fragment spec passes a mid-function address instead, which is never in
+    `names`, so it stays a fragment."""
     names = (return_targets(text) | {"ret_tgt", "rettgt", "ret_target"}
              | exit_targets(text, entry))
-    return any(re.search(rf"pc_is\s+(?:\(\s*)?{re.escape(n)}\b", text) for n in names)
+    pc_of = lambda body, n: re.search(rf"pc_is\s+(?:\(\s*)?{re.escape(n)}\b", body)
+    if any(pc_of(text, n) for n in names):
+        return True
+    for dname, dtext in (local_defs or {}).items():
+        # the body applies `dname`, with `n` among the arguments of that
+        # application (same logical line, before the separating `-∗`)
+        for m in re.finditer(rf"\b{re.escape(dname)}\b([^.]*)", text):
+            args = m.group(1).split("-∗")[0]
+            if any(re.search(rf"\b{re.escape(n)}\b", args) and pc_of(dtext, n)
+                   for n in names):
+                return True
+    return False
 REQUIRE = re.compile(r"^\s*(?:From\s+\w+\s+)?Require\s+(?:Import|Export)?\s*([^.]*)\.", re.M)
 MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)
 # `Module KfreeProof (A : ACQUIRE) (B : MEMSETPAGE) : KFREE.`
@@ -447,6 +473,12 @@ def scan_proofs(repo: str) -> Proofs:
         for sym, _ in ANY_SYM.findall(src):
             p.mentions[sym].add(base)
 
+        # Same-file `Definition`s, for runs_to_end to follow a postcondition
+        # factored out of a `_body`.  A pre-pass, not the loop below, so the
+        # order of definitions in the file cannot matter.
+        local_defs = {nm: tx for _, kw2, nm, tx in chunks(src)
+                      if kw2 == "Definition" and nm and not nm.endswith("_body")}
+
         cur_modtype = None
         cur_impl = None
         for line, kw, name, text in chunks(src):
@@ -483,7 +515,7 @@ def scan_proofs(repo: str) -> Proofs:
                     file=base, line=line, body=name,
                     symbol=m.group(1),
                     offset=int(m.group(2), 0) if m.group(2) else 0,
-                    whole=runs_to_end(text, m.group(1))))
+                    whole=runs_to_end(text, m.group(1), local_defs)))
 
     for s in p.specs:
         s.modtype = body_of_modtype.get(s.body, "")
