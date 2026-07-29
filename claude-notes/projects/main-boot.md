@@ -39,11 +39,36 @@ every callee, but nothing yet DRIVES them.
   is the reusable tool for allocating any FAMILY of locks whose resources
   reference each other's names.
 
-**NOT landed: `ProofMain.v` / `LinkMain.v`.** main is *not* proven. What
-still blocks the boot arm is G1 alone (its rework also revises `SpecMain`'s
-device conjuncts); the secondary arm additionally waits on G5. The
-inventory main's precondition has to carry is §"Resource inventory", traced
-callee by callee.
+**`ProofMain.v` / `LinkMain.v` — main() is PROVEN** (`ec9f325`; main.c
+178/178 bytes; the axiom footprint is exactly the assumed callees:
+printk-general, userinit, virtio_disk_init, and kerneltrap via Kernelvec).
+Boot arm only; the secondary arm waits on G5. What the proof taught,
+worth keeping:
+
+- **A call-group helper lemma for a DIVERGING function concludes with a
+  bare `WP Loop {{Φ}}`**, so it names only what it consumes/produces and
+  every ambient (trap_csrs, started_inv, the deposit wand, persistents)
+  stays untouched in the top context. Six groups: entry/printk/kvm/trap/fs/
+  started. And because main never returns, NO `callee_saved` obligation is
+  threaded anywhere — the only register fact crossing all sixteen calls is
+  `tp = cid_word`.
+- Late SpecMain seam fixes the inventory table had missed: `cpu_own`'s `C`
+  must be `cpu_ctx_free` CONCRETELY (scheduler consumes it at that shape);
+  `Persistent P` is an instance argument of `started_inv_store_au`; the SIE
+  ghost's spare QUARTER (`ghost_var γ (1/4) 0`) is a top-level precondition
+  conjunct (it is what `intr_inv_alloc_off` consumes and nothing else
+  holds it); `intr_handler_avail` needs `KERNELVEC` as a 19th functor
+  argument (the alloc gives `intr_inv`, the handler contract comes from
+  `kernelvec_handler_spec`).
+- `main_globals_raw` additions the assemblies demanded: the
+  panicking/panicked pair (printk_flags_inv allocation), the per-proc
+  `p_chan` + `proc_pub` publics (procs_inv_alloc), `∃v, initproc ↦₈ v`.
+- The deposit wand delivers `printk_env`, `procs_inv`, AND the assembled
+  disk interface (`is_lock γk d_lock "virtio_disk" (disk_res …)` +
+  `disk_geom`) — so the proven virtio interface survives the handover
+  instead of being buried. Resources nothing consumes are DROPPED
+  (affine): the six unclaimed `lk_fresh`es, binit/iinit outputs,
+  kvminithart's `kmap_at`s, leftover pages.
 
 ## The function
 
