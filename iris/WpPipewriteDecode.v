@@ -409,11 +409,7 @@ Lemma pwdc_bf8d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 1977), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xb7cd  j 80004576 <pipewrite+0xd8> *)
-Lemma pwdc_b7cd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7cd : mword 16)) s
-  = Some (C_J (mword_of_int 2033), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_b7cd] -- shared, see KernelRvcDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -1073,6 +1069,6 @@ Section PipewriteInstrs.
   (* +0xf6  b7cd  j 80004576 <pipewrite+0xd8> *)
   Lemma pwi_f6 : kernel_text -∗ instr (mword_of_int (PW + 0xf6) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PW + 0xf6)%Z (mword_of_int 0xb7cd : mword 16)
-    (mword_of_int (PW + 0xf6) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) pwdc_b7cd exec_execute_C_J. Qed.
+    (mword_of_int (PW + 0xf6) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) cdec_b7cd exec_execute_C_J. Qed.
 
 End PipewriteInstrs.

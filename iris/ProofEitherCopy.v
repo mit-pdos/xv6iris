@@ -100,20 +100,6 @@ Proof.
   apply bv_eq; vm_compute; reflexivity.
 Qed.
 
-(* [c.ld a0,80(a0)] in the shape [wp_cld_s_sconf] wants *)
-Lemma ec_ld80 :
-  LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),
-        creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)
-  = LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10 : mword 5),
-          Regidx (mword_of_int 10 : mword 5), false, 8).
-Proof.
-  replace (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")) : mword 12)
-    with (mword_of_int 80 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
-
 (* the kernel arm returns the FLAG register, which the [c.beqz] proved zero *)
 Lemma ec_zero_reg_moi : (zero_reg : mword 64) = (mword_of_int 0 : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
@@ -790,7 +776,7 @@ Section ProofEitherCopyout.
       { rewrite /U3 upd_ne; [| reg_neq]. rewrite /U2 upd_ne; [| reg_neq].
         rewrite /U1 upd_ne; [exact HAa0 | reg_neq]. }
       (* ---- +0x24: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-      iEval (rewrite ec_ld80) in "Hi24".
+      iEval (rewrite cshape_6928) in "Hi24".
       assert (Hptaddr : add_vec (U3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                         = p_pagetable p)
         by (rewrite HU3a0; reflexivity).
@@ -1466,7 +1452,7 @@ Section ProofEitherCopyin.
       { rewrite /U3 upd_ne; [| reg_neq]. rewrite /U2 upd_ne; [| reg_neq].
         rewrite /U1 upd_ne; [exact HAa0 | reg_neq]. }
       (* ---- +0x24: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-      iEval (rewrite ec_ld80) in "Hi24".
+      iEval (rewrite cshape_6928) in "Hi24".
       assert (Hptaddr : add_vec (U3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                         = p_pagetable p)
         by (rewrite HU3a0; reflexivity).

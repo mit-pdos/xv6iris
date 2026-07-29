@@ -58,11 +58,7 @@ Lemma pidc_4701 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x86ca  c.mv a3,s2 *)
-Lemma pidc_86ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x86ca : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_86ca] -- shared, see KernelRvcDecode.v *)
 
 (* 0x88ba  c.mv a7,a4 *)
 Lemma pidc_88ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -327,7 +323,7 @@ Section WpPrintintDecode.
 
   Lemma pii_16 : kernel_text -∗ instr (mword_of_int (PI + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
   Proof. mk_rvc (PI + 0x16)%Z (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (PI + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) pidc_86ca exec_execute_C_MV. Qed.
+    (mword_of_int (PI + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) cdec_86ca exec_execute_C_MV. Qed.
 
   Lemma pii_18 : kernel_text -∗ instr (mword_of_int (PI + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (PI + 0x18)%Z (mword_of_int 0x4701 : mword 16)

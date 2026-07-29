@@ -91,20 +91,6 @@ Proof.
   apply bv_eq; vm_compute; reflexivity.
 Qed.
 
-(* [c.ld a0,80(a0)] in the shape [wp_cld_s_sconf] wants.  (The +0x14
-   [c.ld a5,72(a0)] is the shared [KernelRvcDecode.cshape_653c].) *)
-Lemma fa_ld80 :
-  LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),
-        creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)
-  = LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10 : mword 5),
-          Regidx (mword_of_int 10 : mword 5), false, 8).
-Proof.
-  replace (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")) : mword 12)
-    with (mword_of_int 80 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (*  The range test, as plain [Z] arithmetic.                              *)
@@ -854,7 +840,7 @@ Section ProofFetchaddr.
         { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
           rewrite /A3 upd_ne; [exact HA2a0 | reg_neq]. }
         (* ---- +0x28: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-        iEval (rewrite fa_ld80) in "Hi28".
+        iEval (rewrite cshape_6928) in "Hi28".
         assert (Hptaddr : add_vec (A5 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable p)
           by (rewrite HA5a0; reflexivity).

@@ -121,11 +121,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* 0x30  c.lui a5,0xfffff  (imm6 = 63, the 6-bit residue of -1) *)
 (* [cdec_77fd] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
-(* 0x36 / 0x60  c.mv a1,s4 *)
-Lemma vfdc_85d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85d2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_85d2] -- shared, see KernelRvcDecode.v *)
 
 (* 0x40  c.beqz a0,+0x8 *)
 Lemma vfdc_c501 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -151,11 +147,7 @@ Lemma vfdc_4759 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 22, Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x5c  c.mv a3,s2 *)
-Lemma vfdc_86ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x86ca : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_86ca] -- shared, see KernelRvcDecode.v *)
 
 (* 0x62  c.ld a0,80(s1) *)
 Lemma vfdc_68a8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -354,7 +346,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_36 : kernel_text -∗ instr (mword_of_int (VF + 0x36) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (VF + 0x36)%Z (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (VF + 0x36) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) vfdc_85d2 exec_execute_C_MV. Qed.
+    (mword_of_int (VF + 0x36) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) cdec_85d2 exec_execute_C_MV. Qed.
 
   Lemma vfi_38 : kernel_text -∗ instr (mword_of_int (VF + 0x38) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (VF + 0x38)%Z (mword_of_int 0x854e : mword 16)
@@ -422,7 +414,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_5c : kernel_text -∗ instr (mword_of_int (VF + 0x5c) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
   Proof. mk_rvc (VF + 0x5c)%Z (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (VF + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) vfdc_86ca exec_execute_C_MV. Qed.
+    (mword_of_int (VF + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) cdec_86ca exec_execute_C_MV. Qed.
 
   Lemma vfi_5e : kernel_text -∗ instr (mword_of_int (VF + 0x5e) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 12), LUI)).
   Proof. mk_rvc (VF + 0x5e)%Z (mword_of_int 0x6605 : mword 16)
@@ -430,7 +422,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_60 : kernel_text -∗ instr (mword_of_int (VF + 0x60) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (VF + 0x60)%Z (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (VF + 0x60) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) vfdc_85d2 exec_execute_C_MV. Qed.
+    (mword_of_int (VF + 0x60) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) cdec_85d2 exec_execute_C_MV. Qed.
 
   Lemma vfi_62 : kernel_text -∗ instr (mword_of_int (VF + 0x62) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
   Proof. mk_rvc (VF + 0x62)%Z (mword_of_int 0x68a8 : mword 16)

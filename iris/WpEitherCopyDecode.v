@@ -52,11 +52,10 @@
    pipealloc, binit and freerange already use, so all fifteen of its words
    come from [KernelRvcDecode].
 
-   THREE WORDS ARE NEW TO THE TREE -- [89b2], [8936] and [cc99].  Six more
-   ([86ca] [864e] [85d2] [85ce] [6928] [b7cd]) are stated locally here even
-   though each already appears in two or three other decode files: they are
-   candidates for the next KernelRvcDecode dedup sweep, not for a one-off
-   move that would rebuild the whole tree for two functions. *)
+   THREE WORDS ARE NEW TO THE TREE -- [89b2], [8936] and [cc99]; everything
+   else comes from [KernelRvcDecode], including the six ([86ca] [864e]
+   [85d2] [85ce] [6928] [b7cd]) that this function's sweep moved there out of
+   the two or three private copies each had. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -97,41 +96,8 @@ Lemma ecdc_cc99 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 15, Cregidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x1e  c.mv a3,s2 *)
-Lemma ecdc_86ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x86ca : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x20  c.mv a2,s3 *)
-Lemma ecdc_864e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x864e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x22  c.mv a1,s4 *)
-Lemma ecdc_85d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85d2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x24  c.ld a0,80(a0) *)
-Lemma ecdc_6928 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6928 : mword 16)) s
-  = Some (C_LD (mword_of_int 10, Cregidx (mword_of_int 2), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x3e  c.mv a1,s3 *)
-Lemma ecdc_85ce s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85ce : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* +0x48  c.j -0x1e *)
-Lemma ecdc_b7cd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7cd : mword 16)) s
-  = Some (C_J (mword_of_int 2033 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_86ca] [cdec_864e] [cdec_85d2] [cdec_85ce] [cdec_6928] [cdec_b7cd]
+   -- shared, see KernelRvcDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -249,19 +215,19 @@ Section EitherCopyInstrs.
 
   Lemma eco_1e : kernel_text -∗ instr (mword_of_int (ECO + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
   Proof. mk_rvc (ECO + 0x1e)%Z (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (ECO + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) ecdc_86ca exec_execute_C_MV. Qed.
+    (mword_of_int (ECO + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) cdec_86ca exec_execute_C_MV. Qed.
 
   Lemma eco_20 : kernel_text -∗ instr (mword_of_int (ECO + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (ECO + 0x20)%Z (mword_of_int 0x864e : mword 16)
-    (mword_of_int (ECO + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) ecdc_864e exec_execute_C_MV. Qed.
+    (mword_of_int (ECO + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) cdec_864e exec_execute_C_MV. Qed.
 
   Lemma eco_22 : kernel_text -∗ instr (mword_of_int (ECO + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (ECO + 0x22)%Z (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (ECO + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) ecdc_85d2 exec_execute_C_MV. Qed.
+    (mword_of_int (ECO + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) cdec_85d2 exec_execute_C_MV. Qed.
 
   Lemma eco_24 : kernel_text -∗ instr (mword_of_int (ECO + 0x24) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
   Proof. mk_rvc (ECO + 0x24)%Z (mword_of_int 0x6928 : mword 16)
-    (mword_of_int (ECO + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ecdc_6928 exec_execute_C_LD. Qed.
+    (mword_of_int (ECO + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) cdec_6928 exec_execute_C_LD. Qed.
 
   Lemma eco_26 : kernel_text -∗ instr (mword_of_int (ECO + 0x26) : mword 64) false (JAL (mword_of_int 2093982 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (ECO + 0x26)%Z (mword_of_int 0xb9eff0ef : mword 32)
@@ -305,7 +271,7 @@ Section EitherCopyInstrs.
 
   Lemma eco_3e : kernel_text -∗ instr (mword_of_int (ECO + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (ECO + 0x3e)%Z (mword_of_int 0x85ce : mword 16)
-    (mword_of_int (ECO + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) ecdc_85ce exec_execute_C_MV. Qed.
+    (mword_of_int (ECO + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) cdec_85ce exec_execute_C_MV. Qed.
 
   Lemma eco_40 : kernel_text -∗ instr (mword_of_int (ECO + 0x40) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (ECO + 0x40)%Z (mword_of_int 0x8552 : mword 16)
@@ -321,7 +287,7 @@ Section EitherCopyInstrs.
 
   Lemma eco_48 : kernel_text -∗ instr (mword_of_int (ECO + 0x48) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (ECO + 0x48)%Z (mword_of_int 0xb7cd : mword 16)
-    (mword_of_int (ECO + 0x48) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) ecdc_b7cd exec_execute_C_J. Qed.
+    (mword_of_int (ECO + 0x48) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) cdec_b7cd exec_execute_C_J. Qed.
 
   (* ------------------------- either_copyin -------------------------- *)
 
@@ -383,19 +349,19 @@ Section EitherCopyInstrs.
 
   Lemma eci_1e : kernel_text -∗ instr (mword_of_int (ECI + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
   Proof. mk_rvc (ECI + 0x1e)%Z (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (ECI + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) ecdc_86ca exec_execute_C_MV. Qed.
+    (mword_of_int (ECI + 0x1e) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) cdec_86ca exec_execute_C_MV. Qed.
 
   Lemma eci_20 : kernel_text -∗ instr (mword_of_int (ECI + 0x20) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (ECI + 0x20)%Z (mword_of_int 0x864e : mword 16)
-    (mword_of_int (ECI + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) ecdc_864e exec_execute_C_MV. Qed.
+    (mword_of_int (ECI + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) cdec_864e exec_execute_C_MV. Qed.
 
   Lemma eci_22 : kernel_text -∗ instr (mword_of_int (ECI + 0x22) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (ECI + 0x22)%Z (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (ECI + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) ecdc_85d2 exec_execute_C_MV. Qed.
+    (mword_of_int (ECI + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) cdec_85d2 exec_execute_C_MV. Qed.
 
   Lemma eci_24 : kernel_text -∗ instr (mword_of_int (ECI + 0x24) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
   Proof. mk_rvc (ECI + 0x24)%Z (mword_of_int 0x6928 : mword 16)
-    (mword_of_int (ECI + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ecdc_6928 exec_execute_C_LD. Qed.
+    (mword_of_int (ECI + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) cdec_6928 exec_execute_C_LD. Qed.
 
   Lemma eci_26 : kernel_text -∗ instr (mword_of_int (ECI + 0x26) : mword 64) false (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (ECI + 0x26)%Z (mword_of_int 0xc12ff0ef : mword 32)
@@ -439,7 +405,7 @@ Section EitherCopyInstrs.
 
   Lemma eci_3e : kernel_text -∗ instr (mword_of_int (ECI + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (ECI + 0x3e)%Z (mword_of_int 0x85ce : mword 16)
-    (mword_of_int (ECI + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) ecdc_85ce exec_execute_C_MV. Qed.
+    (mword_of_int (ECI + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) cdec_85ce exec_execute_C_MV. Qed.
 
   Lemma eci_40 : kernel_text -∗ instr (mword_of_int (ECI + 0x40) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (ECI + 0x40)%Z (mword_of_int 0x8552 : mword 16)
@@ -455,6 +421,6 @@ Section EitherCopyInstrs.
 
   Lemma eci_48 : kernel_text -∗ instr (mword_of_int (ECI + 0x48) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (ECI + 0x48)%Z (mword_of_int 0xb7cd : mword 16)
-    (mword_of_int (ECI + 0x48) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) ecdc_b7cd exec_execute_C_J. Qed.
+    (mword_of_int (ECI + 0x48) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) cdec_b7cd exec_execute_C_J. Qed.
 
 End EitherCopyInstrs.

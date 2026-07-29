@@ -198,11 +198,7 @@ Lemma uadc_c50d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 21, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x3e / 0x4a  c.mv a2,s3 *)
-Lemma uadc_864e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x864e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_864e] -- shared, see KernelRvcDecode.v *)
 
 (* 0x46  c.mv a4,s6 *)
 Lemma uadc_875a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -455,7 +451,7 @@ Section UvmallocInstrs.
 
   Lemma uai_3e : kernel_text -∗ instr (mword_of_int (UA + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (UA + 0x3e)%Z (mword_of_int 0x864e : mword 16)
-    (mword_of_int (UA + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) uadc_864e exec_execute_C_MV. Qed.
+    (mword_of_int (UA + 0x3e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) cdec_864e exec_execute_C_MV. Qed.
 
   Lemma uai_40 : kernel_text -∗ instr (mword_of_int (UA + 0x40) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (UA + 0x40)%Z (mword_of_int 0x4581 : mword 16)
@@ -475,7 +471,7 @@ Section UvmallocInstrs.
 
   Lemma uai_4a : kernel_text -∗ instr (mword_of_int (UA + 0x4a) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (UA + 0x4a)%Z (mword_of_int 0x864e : mword 16)
-    (mword_of_int (UA + 0x4a) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) uadc_864e exec_execute_C_MV. Qed.
+    (mword_of_int (UA + 0x4a) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) cdec_864e exec_execute_C_MV. Qed.
 
   Lemma uai_4c : kernel_text -∗ instr (mword_of_int (UA + 0x4c) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (UA + 0x4c)%Z (mword_of_int 0x85ca : mword 16)

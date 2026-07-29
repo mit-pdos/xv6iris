@@ -84,11 +84,7 @@ Lemma fadc_8626 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 9)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x28  c.ld a0,80(a0) *)
-Lemma fadc_6928 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6928 : mword 16)) s
-  = Some (C_LD (mword_of_int 10, Cregidx (mword_of_int 2), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_6928] -- shared, see KernelRvcDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -211,7 +207,7 @@ Section FetchaddrInstrs.
 
   Lemma fai_28 : kernel_text -∗ instr (mword_of_int (FA + 0x28) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
   Proof. mk_rvc (FA + 0x28)%Z (mword_of_int 0x6928 : mword 16)
-    (mword_of_int (FA + 0x28) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) fadc_6928 exec_execute_C_LD. Qed.
+    (mword_of_int (FA + 0x28) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) cdec_6928 exec_execute_C_LD. Qed.
 
   Lemma fai_2a : kernel_text -∗ instr (mword_of_int (FA + 0x2a) : mword 64) false (JAL (mword_of_int 2092862 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (FA + 0x2a)%Z (mword_of_int 0xf3ffe0ef : mword 32)

@@ -10,7 +10,7 @@
    [p->pagetable], then -- only if that returned >= 0 -- strlen over the
    buffer, and the two arms join at the 5-slot epilogue (+0x2e).  The
    [c.ld a0,80(a0)] at +0x1e is the same [p->pagetable] read fetchaddr does;
-   [fs_ld80] below is its shape in the form the load leaf takes.            *)
+   [KernelRvcDecode.cshape_6928] is its shape in the form the leaf takes.   *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -39,23 +39,11 @@ Lemma fsdc_8932 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 12)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.mv a3,s2 *)
-Lemma fsdc_86ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x86ca : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_86ca] -- shared, see KernelRvcDecode.v *)
 
-(* c.mv a2,s3 *)
-Lemma fsdc_864e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x864e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_864e] -- shared, see KernelRvcDecode.v *)
 
-(* c.ld a0,80(a0)      # a0 := p->pagetable *)
-Lemma fsdc_6928 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6928 : mword 16)) s
-  = Some (C_LD (mword_of_int 10, Cregidx (mword_of_int 2), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_6928] -- shared, see KernelRvcDecode.v *)
 
 (* c.j -0x0c           # -> +0x2e, the epilogue *)
 Lemma fsdc_bfc5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -144,11 +132,11 @@ Section InstrsFS.
 
   Lemma fsi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x18) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).  (* c.mv a3,s2 *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x18)%Z (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (KernelSyms.fetchstr + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) fsdc_86ca exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.fetchstr + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) cdec_86ca exec_execute_C_MV. Qed.
 
   Lemma fsi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x1a) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).  (* c.mv a2,s3 *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x1a)%Z (mword_of_int 0x864e : mword 16)
-    (mword_of_int (KernelSyms.fetchstr + 0x1a) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) fsdc_864e exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.fetchstr + 0x1a) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)) cdec_864e exec_execute_C_MV. Qed.
 
   Lemma fsi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 11), ADD)).  (* c.mv a1,s1 *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x1c)%Z (mword_of_int 0x85a6 : mword 16)
@@ -156,7 +144,7 @@ Section InstrsFS.
 
   Lemma fsi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x1e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).  (* c.ld a0,80(a0)      # a0 := p->pagetable *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x1e)%Z (mword_of_int 0x6928 : mword 16)
-    (mword_of_int (KernelSyms.fetchstr + 0x1e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) fsdc_6928 exec_execute_C_LD. Qed.
+    (mword_of_int (KernelSyms.fetchstr + 0x1e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) cdec_6928 exec_execute_C_LD. Qed.
 
   Lemma fsi_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x20) : mword 64) false (JAL (mword_of_int 2092260 : mword 21, Regidx (mword_of_int 1))).  (* jal ra,copyinstr    # -4892 -> 0x800014c8 *)
   Proof. mk_base (KernelSyms.fetchstr + 0x20)%Z (mword_of_int 0xce5fe0ef : mword 32)
@@ -211,19 +199,3 @@ Section InstrsFS.
     (mword_of_int (KernelSyms.fetchstr + 0x3e) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)) fsdc_bfc5 exec_execute_C_J. Qed.
 
 End InstrsFS.
-
-
-(* [cdec_6928]'s AST in the shape the [c.ld] WP leaf takes.  (Identical to
-   ProofFetchaddr's [fa_ld80]; both read [p->pagetable] into a0 off a0.) *)
-Lemma fs_ld80 :
-  LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),
-        creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)
-  = LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10 : mword 5),
-          Regidx (mword_of_int 10 : mword 5), false, 8).
-Proof.
-  replace (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")) : mword 12)
-    with (mword_of_int 80 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.

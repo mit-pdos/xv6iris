@@ -82,18 +82,35 @@ binit and freerange already use, so all fifteen of its words come from
 - `Set Printing Depth 40.` is at the top of the proof file, as it must be in
   anything proving over `proc_priv`.
 
+## Cleanup sweep — DONE
+
+Six compressed words moved into `KernelRvcDecode.v` and their **fourteen**
+private copies deleted across eleven files — `86ca` (c.mv a3,s2: printk,
+vmfault, fetchstr), `864e` (c.mv a2,s3: uvmalloc, fetchstr), `85d2` (c.mv
+a1,s4: binit, vmfault), `85ce` (c.mv a1,s3: copyin), `6928` (c.ld a0,80(a0):
+fetchaddr, fetchstr), `b7cd` (c.j -0x1e: copyout, pipewrite).
+
+With them, the **load-shape** lemma that turns `cdec_6928`'s cregidx AST into
+the literal-displacement form `wp_cld_s_sconf` wants: `cshape_6928`, retiring
+`ProofFetchaddr.fa_ld80` / `WpFetchstrDecode.fs_ld80` / this file's
+`ec_ld80`.  Deduplicating against what was already there turned up two more,
+both in `ProofVmfault.v`: `vf_ld80` was a verbatim copy of the existing
+`cshape_68a8` (the s1-based twin), and `vf_ld72` was already nothing but an
+alias for `cshape_653c`.  Net −90 lines.
+
+Two rules this sweep re-confirms:
+
+- **grep the STATEMENT, not the word.**  Nothing here was offset-named, but
+  the shape lemmas were named per-function (`fa_`/`fs_`/`vf_`/`ec_ld80`), so
+  a word-keyed grep finds none of them.
+- **diff every `*_<off>` instruction fact against HEAD afterwards.**  All 510
+  statements across the eleven touched decode files came out identical; only
+  the decode lemma each is proved FROM changed.  A slip here is silent.
+
 ## Worklist
 
 - [x] specs, decode, both proofs, both links, `_CoqProject`, full build green.
-- [ ] **Decode-word dedup (deferred to the next tree-wide sweep).**  Six
-      words are stated locally in `WpEitherCopyDecode.v` although each
-      already appears in two or three other decode files: `86ca` (c.mv
-      a3,s2), `864e` (c.mv a2,s3), `85d2` (c.mv a1,s4), `85ce` (c.mv a1,s3),
-      `6928` (c.ld a0,80(a0)), `b7cd` (c.j -0x1e).  Their home is
-      `KernelRvcDecode.v`; moving them costs a full-tree rebuild, so it is
-      worth doing with the other pending moves, not for two functions.
-      `ec_ld80` is the third copy of the same `c.ld a0,80(a0)` shape lemma
-      (`ProofFetchaddr.fa_ld80` is the second) and belongs in the same sweep.
+- [x] decode-word + shape-lemma dedup (above).
 - [ ] **The callers.**  Nothing in the tree consumes these yet.  The xv6
       consumers are `consoleread`/`consolewrite` (which pass a literal 1, so
       `user` instantiates to `true` and the premise is a `vm_compute`) and

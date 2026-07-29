@@ -239,11 +239,7 @@ Lemma codc_6d02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 26)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xb8  j     +0x9a *)
-Lemma codc_b7cd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7cd : mword 16)) s
-  = Some (C_J (mword_of_int 2033 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_b7cd] -- shared, see KernelRvcDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts -- all fourteen are copyout's own.          *)
@@ -690,7 +686,7 @@ Section CopyoutInstrs.
 
   Lemma coi_b8 : COP 0xb8 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)).  (* j     +0x9a -- -> +0x9a *)
   Proof. mk_rvc (CO + 0xb8)%Z (mword_of_int 0xb7cd : mword 16)
-    (mword_of_int (CO + 0xb8) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) codc_b7cd exec_execute_C_J. Qed.
+    (mword_of_int (CO + 0xb8) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2033 : mword 11) ('b"0")), zreg)) cdec_b7cd exec_execute_C_J. Qed.
 
   Lemma coi_ba : COP 0xba true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).  (* li    a0,-1 -- the not-writable exit *)
   Proof. mk_rvc (CO + 0xba)%Z (mword_of_int 0x557d : mword 16)

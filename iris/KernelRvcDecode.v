@@ -1420,3 +1420,61 @@ Lemma cdec_bfe1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xbfe1 : mword 16)) s
   = Some (C_J (mword_of_int 2028 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ---- the either_copy{out,in} sweep: six words each of which already had
+   two or three private copies, plus the [c.ld a0,80(a0)] load shape that
+   had four ---- *)
+
+(* 0x86ca  c.mv a3,s2         -- printk, vmfault, fetchstr, either_copy* *)
+Lemma cdec_86ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x86ca : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 18)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x864e  c.mv a2,s3         -- uvmalloc, fetchstr, either_copy* *)
+Lemma cdec_864e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x864e : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 19)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x85d2  c.mv a1,s4         -- binit, vmfault, either_copy* *)
+Lemma cdec_85d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x85d2 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 20)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x85ce  c.mv a1,s3         -- copyin, either_copy* *)
+Lemma cdec_85ce s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x85ce : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 19)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x6928  c.ld a0,80(a0)     -- p->pagetable read into the SAME register:
+   fetchaddr, fetchstr, either_copy*.  ([cdec_68a8] is the s1-based twin.) *)
+Lemma cdec_6928 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6928 : mword 16)) s
+  = Some (C_LD (mword_of_int 10, Cregidx (mword_of_int 2), Cregidx (mword_of_int 2)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_6928]'s AST in the shape a WP load leaf takes.  This is the one the
+   [ProofFetchaddr] / [ProofFetchstr] / [ProofEitherCopy] trio each had a
+   private copy of; [cshape_68a8] is its s1-based twin. *)
+Lemma cshape_6928 :
+  LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),
+        creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)
+  = LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 10 : mword 5),
+          Regidx (mword_of_int 10 : mword 5), false, 8).
+Proof.
+  replace (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")) : mword 12)
+    with (mword_of_int 80 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
+  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
+    by (vm_compute; reflexivity).
+  reflexivity.
+Qed.
+
+(* 0xb7cd  c.j -0x1e          -- copyout, pipewrite, either_copy*
+   (11-bit residue 2033) *)
+Lemma cdec_b7cd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xb7cd : mword 16)) s
+  = Some (C_J (mword_of_int 2033 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.

@@ -74,29 +74,6 @@ Local Open Scope Z_scope.
 (* Pure bridges.                                                          *)
 (* ===================================================================== *)
 
-(* [c.ld a5,72(a0)] and [c.ld a0,80(s1)] in the shape [wp_cld_s_sconf] wants *)
-Lemma vf_ld72 :
-  LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")),
-        creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)
-  = LOAD (mword_of_int 72 : mword 12, Regidx (mword_of_int 10 : mword 5),
-          Regidx (mword_of_int 15 : mword 5), false, 8).
-Proof. exact cshape_653c. Qed.
-
-Lemma vf_ld80 :
-  LOAD (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")),
-        creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)
-  = LOAD (mword_of_int 80 : mword 12, Regidx (mword_of_int 9 : mword 5),
-          Regidx (mword_of_int 10 : mword 5), false, 8).
-Proof.
-  replace (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")) : mword 12)
-    with (mword_of_int 80 : mword 12) by (apply bv_eq; vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 1))) with (Regidx (mword_of_int 9 : mword 5))
-    by (vm_compute; reflexivity).
-  replace (creg2reg_idx (Cregidx (mword_of_int 2))) with (Regidx (mword_of_int 10 : mword 5))
-    by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
-
 (* a kalloc page is page-aligned, in mappages' [subrange] spelling *)
 Lemma vf_page_align12 (r : mword 64) :
   page_valid r -> subrange_vec_dec r 11 0 = (zeros' 12 : mword 12).
@@ -408,7 +385,7 @@ Section ProofVmfault.
     { intros c Hc H2 H8 H18 H19.
       rewrite (callee_saved_lookup Hmpcs c Hc). apply HR5thr; assumption. }
     (* ---- +0x14 c.ld a5,72(a0) : the p->sz read ---- *)
-    iEval (rewrite vf_ld72) in "Hi14".
+    iEval (rewrite cshape_653c) in "Hi14".
     iApply (wp_cld_s_sconf γ Φ (mword_of_int (VF + 0x14)) Ra5 Ra0
               (mword_of_int 72 : mword 12) mf (K - 6)%nat szv (dqm:=dqs)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1295,7 +1272,7 @@ Section ProofVmfault.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp62) in "Hpc".
       (* +0x62 c.ld a0,80(s1)   (a0 := p->pagetable) *)
-      iEval (rewrite vf_ld80) in "Hi62".
+      iEval (rewrite cshape_68a8) in "Hi62".
       iApply (wp_cld_s_sconf γ Φ (mword_of_int (VF + 0x62)) Ra0 Rs1
                 (mword_of_int 80 : mword 12) G4 (K - 6)%nat
                 (page_base P.(ud_root)) (dqm:=dqp)

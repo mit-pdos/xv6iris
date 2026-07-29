@@ -58,11 +58,7 @@ Lemma bidc_e8bc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_SD (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x85d2  c.mv a1,s4 *)
-Lemma bidc_85d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85d2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_85d2] -- shared, see KernelRvcDecode.v *)
 
 (* 0xe7a4  c.sd s1,72(a5) *)
 Lemma bidc_e7a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -338,7 +334,7 @@ Section WpBinitDecode.
 
   Lemma bii_5a : kernel_text -∗ instr (mword_of_int (BI + 0x5a) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (BI + 0x5a)%Z (mword_of_int 0x85d2 : mword 16)
-    (mword_of_int (BI + 0x5a) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) bidc_85d2 exec_execute_C_MV. Qed.
+    (mword_of_int (BI + 0x5a) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 11), ADD)) cdec_85d2 exec_execute_C_MV. Qed.
 
   Lemma bii_5c : kernel_text -∗ instr (mword_of_int (BI + 0x5c) : mword 64) false (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (BI + 0x5c)%Z (mword_of_int 0x01048513 : mword 32)

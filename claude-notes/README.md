@@ -142,7 +142,8 @@ are working on that effort — the relevant `projects/` file.
   else …` — including why `proc_priv` is required only on the user arm and why
   the kernel arm's length bound is the tighter one (`sext.w`). Also: `ec_epi`,
   the epilogue of a block gcc emitted TWICE proved once and instantiated at
-  both addresses, and the deferred decode-word dedup.
+  both addresses, and a decode-word + load-shape dedup sweep (14 private
+  copies of 6 words, plus 5 copies of 3 load-shape lemmas, retired).
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
