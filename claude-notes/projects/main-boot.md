@@ -213,14 +213,45 @@ axiom on its own schedule. `SpecMain` changes with this: `main_devices_raw`
 is replaced by the persistent invariant(s) plus the boot hart's tokens
 (`uart_tx_own γ []`, the unfrozen dlab half, the virtio config half).
 
-STATUS: direction approved; the DECOUPLING is landed (`7d9bf8f`): three
-device threads (`UartLoop`/`DiskLoop`/`PlicLoop`) with pairwise-decoupled
-step relations (each device latches its OWN interrupt into the PLIC), the
-three invariants `uart_inv γ` / `plic_inv` / `disk_inv γd` (sub-namespaces
-of `devN`), and `dev_inv` retained as the compatibility bundle so no
-consumer spec changed — see [`../design/device.md`](../design/device.md).
-Remaining: the init-under-invariant rework (dlab unfreeze, virtio cfg
-tracker, new init specs, adequacy, SpecMain revision) per worklist item 2.
+STATUS: direction approved and mostly LANDED.
+
+- The DECOUPLING (`7d9bf8f`): three device threads
+  (`UartLoop`/`DiskLoop`/`PlicLoop`) with pairwise-decoupled step relations
+  (each device latches its OWN interrupt into the PLIC), the three
+  invariants `uart_inv γ` / `plic_inv` / `disk_inv γd` (sub-namespaces of
+  `devN`), `dev_inv` retained as the compatibility bundle so no consumer
+  spec changed — see [`../design/device.md`](../design/device.md).
+- The INIT-UNDER-INVARIANT restatement (`2761f08`): `uart_ghosts_alloc` no
+  longer freezes DLAB (returns `uart_dlab_is γ ½ (uart_dlab u)`; adequacy's
+  `Hdlab` hypothesis is GONE); the virtio config tracker REUSES the existing
+  `dn_cfg`/`disk_cfg_is` cell — the not-live proto arm now holds
+  `disk_cfg_is γ ½ (v_cfg v)` and the halves rejoin into the exclusive
+  fraction `disk_cfg_set` consumes at the live flip (new: `disk_cfg_is_agree`
+  / `_split` / `_join`; no new gname, no Σ change); the four init contracts
+  are RESTATED over the invariants and AXIOMATIZED (uartinit, consoleinit,
+  plicinit, virtio_disk_init read `assumed` — intentional, temporary; their
+  old raw-frag proofs were deleted from the build, recoverable at
+  `git show 2761f08^:iris/Proof<F>.v` for the rework); `SpecMain` revised
+  (`main_devices_raw` gone → `dev_inv` bundle + boot tokens
+  `uart_tx_own/uart_out_lb/uart_sent γd l0`, `uart_dlab_is γd ½ b0`,
+  `disk_cfg_is γv ½ c0` + `⌜virtio_live c0 = false⌝`; payload now the WAND
+  `□ (∀ γpr γs, printk_env -∗ procs_inv -∗ P)`).
+- `vdi_post` reshape worth knowing: the DMA lease is paid in at the final
+  DRIVER_OK write, so the `pu` page is forfeited and `pav` comes back as
+  `seq 4 4092` (ring entries on; the 2 flags bytes go with the leased
+  index); the rw/intr LIVE WITNESS is `disk_pub γv 0` (the not-live arm
+  holds `ghost_var (dn_np γ) 1 0`, so the caller's half refutes it), and
+  the config identity is the persistent `disk_cfg γv (virtio_init_cfg …)`.
+
+Remaining under G1: re-prove uartinit/consoleinit/plicinit against the new
+contracts (small; old scripts reusable — leaf swap to the accessor-form
+device stores + the ghost callbacks), and the virtio_disk_init rework
+(bigger, can trail). NEW GAP, blocks main's DISK-LOCK assembly (main owes a
+`newlock` over `DiskInv.disk_res` from `vdi_post` + boot tokens):
+`disk_ghosts_alloc` still DISCARDS the `dn_claim` ghost-map auth and the
+`mono_nat` lower bound, and nothing supplies `d_used_idx ↦₂ 0` — extend
+`disk_ghosts_alloc` to return them and thread them through adequacy into
+`SpecMain` as boot tokens before ProofMain's disk-lock step.
 
 ### G2 — printk's only proven contract is the PANIC path
 
