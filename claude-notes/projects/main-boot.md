@@ -213,9 +213,14 @@ axiom on its own schedule. `SpecMain` changes with this: `main_devices_raw`
 is replaced by the persistent invariant(s) plus the boot hart's tokens
 (`uart_tx_own γ []`, the unfrozen dlab half, the virtio config half).
 
-STATUS: analysis settled; remedy pending sign-off (it reworks four finished
-proofs — uartinit, consoleinit, plicinit, virtio_disk_init — and revises the
-adequacy allocation), see the session that wrote this note.
+STATUS: direction approved; the DECOUPLING is landed (`7d9bf8f`): three
+device threads (`UartLoop`/`DiskLoop`/`PlicLoop`) with pairwise-decoupled
+step relations (each device latches its OWN interrupt into the PLIC), the
+three invariants `uart_inv γ` / `plic_inv` / `disk_inv γd` (sub-namespaces
+of `devN`), and `dev_inv` retained as the compatibility bundle so no
+consumer spec changed — see [`../design/device.md`](../design/device.md).
+Remaining: the init-under-invariant rework (dlab unfreeze, virtio cfg
+tracker, new init specs, adequacy, SpecMain revision) per worklist item 2.
 
 ### G2 — printk's only proven contract is the PANIC path
 
