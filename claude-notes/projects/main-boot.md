@@ -20,16 +20,30 @@ every callee, but nothing yet DRIVES them.
   (`started_inv_alloc`, `started_inv_load_au`, `started_inv_store_au`), shaped
   to plug straight into `wp_load_s_sconf_au` / `wp_store_s_sconf_au`
   (WpSconfMem.v) at width 4.
+- **`SpecMain.v`** — the BOOT-HART contract (`wp_main_boot_sconf` +
+  `Module Type MAIN`), precondition factored into `main_locks_raw` /
+  `main_globals_raw` / `main_devices_raw` / `main_hart_raw`. NOTE: the
+  `main_devices_raw` conjunct and the "main is what allocates the device
+  invariant" comment are known-wrong pending G1's rework (see below) — the
+  rest of the statement is settled.
+- **`SpecPrintkGen.v` / `LinkPrintkGen.v`** and **`SpecUserinit.v` /
+  `LinkUserinit.v`** — the two assumed-callee interfaces (G2, G3 below,
+  both marked LANDED with their design decisions).
+- **`wp_fence_gen_later_s_sconf`** (WpSconfCtl.v, G4) and
+  **`procs_inv_alloc`** (SpecProcinit.v §ProcinitProcsInv — NOT SchedCtx.v:
+  SchedCtx cannot import SpecProcinit, that would be a cycle). The alloc
+  needed **`WpLock.newlock_delayed`** (`==∗ ∃ γ, ∀ R, R ={E}=∗ is_lock γ lk
+  s R` — name first, resource later), because each proc lock's
+  `proc_lock_res` mentions ALL 64 gnames through `p_sched`, so `newlock`'s
+  pick-γ-and-demand-R-together shape is circular over the list. That lemma
+  is the reusable tool for allocating any FAMILY of locks whose resources
+  reference each other's names.
 
-**NOT landed: `SpecMain.v` / `ProofMain.v` / `LinkMain.v`.** main is *not*
-proven and its contract is deliberately not frozen yet. Five gaps block it, and
-every one of them is in a CALLEE's contract or in a shared abstraction, not in
-main; freezing a `SpecMain.v` against contracts that must change first would be
-building on a shape we already know is wrong (see the guiding principle in
-`durable-notes.md`). The gaps and their fixes are §"Blockers" below; the
-inventory main's precondition has to carry is §"Resource inventory", already
-traced callee by callee, so `SpecMain.v` is a transcription job once the
-blockers clear.
+**NOT landed: `ProofMain.v` / `LinkMain.v`.** main is *not* proven. What
+still blocks the boot arm is G1 alone (its rework also revises `SpecMain`'s
+device conjuncts); the secondary arm additionally waits on G5. The
+inventory main's precondition has to carry is §"Resource inventory", traced
+callee by callee.
 
 ## The function
 
@@ -132,15 +146,76 @@ needed:
   device and programs its queue").
 
 So the disk fragment must still be raw at 0x9a while the invariant must already
-exist at 0x52. **Fix: split the device invariant** — a UART+PLIC invariant
-allocatable right after `consoleinit`/`plicinit`, and a separate disk invariant
-allocated by `virtio_disk_init` itself out of the raw fragment. That is the
-honest factoring anyway: the three devices share nothing but the `dev_interp`
-conjunct of `state_interp`, and the code initializes them at three different
-times. Consumers to re-point: `SpecPrintk`, `SpecPrintkinit`?, `SpecPlicinithart`,
+exist at 0x52.
+
+**The first-draft fix ("split the invariant; allocate each half when its
+device is initialized") does NOT work, and neither does today's raw-frag init
+tier.** The device thread (`wp_dev_loop`) is a top-level thread of the whole
+system from step 0, and EVERY autonomous device step must update the
+ghost-var pair behind `dev_interp`: the lifting rule hands the thread the
+auth half, and the user half IS the fragment. A UART rx byte can arrive at
+step 0 (nothing gates it), so `uart_frag` must be reachable through an
+invariant at every step of the execution — and the same holds for
+`plic_frag` (the gateway latch fires whenever an irq line is up) and
+`virtio_frag` (the thread must REFUTE `DevStepDiskWild` at every step, which
+only `virtio_proto` can do). **No device fragment can ever sit raw in a
+CPU's precondition while the system runs.** Consequences: the raw-frag
+contracts of `consoleinit`/`uartinit`, `plicinit`, and `virtio_disk_init`
+are incompatible with the final wiring; so are `SpecMain.main_devices_raw`
+and its "main is what allocates the invariant" comment; today's
+`riscv_device_adequacy` only escapes because its thread pool is the device
+alone and its initial-state hypotheses (`Hdlab`, `Hvlive`) quietly assume a
+machine that xv6's own init code would un-assume.
+
+**The workable fix: the device invariant(s) exist from time 0 (allocated in
+adequacy, before any thread runs), and the three init functions are proven
+UNDER them, keeping their determinism through per-device side ghosts:**
+
+- **disk** — `virtio_proto` is ALREADY keyed on `virtio_live (v_cfg v)` (the
+  not-live arm is trivial; `disk_ghosts_alloc` works from any not-live
+  state), so the invariant is allocatable at power-on. Extend the not-live
+  arm with a config-tracking half (`ghost_var γc ½ (v_cfg v)`); the boot
+  chain holds the other half, so `virtio_disk_init` keeps deterministic
+  knowledge of the config it programs across its MMIO writes (the device
+  never touches `v_cfg`, so device steps preserve it). The `QUEUE_READY <- 1`
+  write is where the arm flips and the DMA lease is paid in; the retired
+  ghost halves come back to the driver. `_rw`/`_intr` are unaffected except
+  for spec re-pointing (they already run in the live arm).
+- **uart** — stop freezing DLAB inside `uart_ghosts_alloc`: return the raw
+  `dfrac_agree` half instead, let the boot chain thread it through
+  `uartinit`'s baud-latch dance and FREEZE it after the final LCR write
+  (dlab=false), which is when `uart_dlab_off` is minted. The FCR
+  FIFO-clear write is verifiable under the invariant because the boot chain
+  holds `uart_tx_own γ []`, which pins `uart_acc = []`, hence `u_tx = []`,
+  hence the clear does not shrink the accepted trace (adequacy hypothesis:
+  power-on FIFOs empty — honest). All other uartinit writes are
+  config-only and ghost-stable. `uartinit`/`consoleinit` re-proven over
+  accessor-form leaves (the raw-frag store leaf `wp_sb_uart_frag_s_sconf`
+  gets an invariant-opening sibling).
+- **plic** — `plicinit`/`plicinithart` re-proven over accessor leaves; their
+  writes (priorities, one hart's S-context enable word) preserve `plic_ok`;
+  no extra ghost (nothing reads config back, and no consumer yet needs
+  "the priorities are set").
+
+The SPLIT (UART+PLIC invariant vs. disk invariant) is now an interface-
+hygiene choice, not a correctness need — still worth doing while every
+consumer is being touched anyway (printk should not drag `disk_names`).
+Consumers to re-point: `SpecPrintk`, `SpecPrintkGen`, `SpecPlicinithart`,
 `SpecConsputc`, `SpecUartwrite`, `SpecUartintr`, `SpecVirtioDiskRw`,
-`SpecVirtioDiskIntr`, `SpecConsoleintr`, and the `WpPlic`/`WpVirtioDev`/`WpUart`
-leaves that open it.
+`SpecVirtioDiskIntr`, `SpecConsoleintr`, and the `WpPlic`/`WpVirtioDev`/
+`WpUart` leaves that open it.
+
+**Staging so main is not blocked on the proof rework:** state the new
+invariant-form `Spec*` for the four init functions and AXIOMATIZE the
+reworked ones (assumed-callee shape, like G2/G3); `ProofMain` proceeds over
+the interfaces, and each raw-frag proof is then re-worked to discharge its
+axiom on its own schedule. `SpecMain` changes with this: `main_devices_raw`
+is replaced by the persistent invariant(s) plus the boot hart's tokens
+(`uart_tx_own γ []`, the unfrozen dlab half, the virtio config half).
+
+STATUS: analysis settled; remedy pending sign-off (it reworks four finished
+proofs — uartinit, consoleinit, plicinit, virtio_disk_init — and revises the
+adequacy allocation), see the session that wrote this note.
 
 ### G2 — printk's only proven contract is the PANIC path
 
@@ -150,28 +225,51 @@ path (`panicking == 0`), where printk takes `pr.lock`, so the proven spec does
 not apply. See [`printk.md`](printk.md): "Only the general (non-panic) path
 remains, blocked on uartputc_sync's."
 
-**Fix (short term): `SpecPrintkGen.v` + `LinkPrintkGen.v`** in the assumed-callee
+**LANDED: `SpecPrintkGen.v` + `LinkPrintkGen.v`** in the assumed-callee
 shape (`Module Type` + `Axiom` in the link, as for `KERNELTRAP` —
 [`../design/spec-modules.md`](../design/spec-modules.md)), so main's proof is a
-functor over it and proving printk-general later replaces exactly one file. Keep
-the interface PERSISTENT-heavy so it crosses `started_inv` for free:
+functor over it and proving printk-general later replaces exactly one file. The
+interface is PERSISTENT-heavy (`printk_env` is proved `Persistent`), so it
+crosses `started_inv` for free:
 
 ```coq
-printk_env γd γv γpr := is_lock γpr pr_lock "pr" emp ∗ <device invariant> ∗ <panic-flag inv>
+printk_env γpr γd γv := is_lock γpr pr_lock "pr" (pr_res γd) ∗
+                        uart_dlab_off γd ∗ dev_inv γd γv ∗ printk_flags_inv
+pr_res γd            := ∃ l, uart_tx_own γd l ∗ uart_sent γd l
 ```
-`pr` is `static struct { struct spinlock lock; } pr;` — the lock protects
-NOTHING (`R = emp`); it only serializes output. And do NOT thread the
-`panicking`/`panicked` cells: printk works whichever way the flag reads, so the
-general contract should not require `panicking = 0` at all (requiring it forces
-a fraction of the cell into every caller and forbids `panic` from writing it).
-Put the two flags in their own invariant inside `printk_env`.
+One deliberate deviation from this note's first draft, which said `R = emp`
+("the lock only serializes output"): **the `pr` lock protects the transmitter
+token.** A general-path printk transmits bytes, so its future proof needs
+transmit rights from somewhere that a SECONDARY hart can also pay — and the
+persistent `is_lock` is the only such place (the caller-held-token shape of
+the panic path is unpayable post-boot, and `R = emp` would have axiomatized
+an interface with no transmit-rights story at all). Consequence for main:
+the boot hart pays `pr_res` (the `uart_tx_own γ []` + `uart_sent γ []` it
+gets from the uart ghost allocation) into the lock when it builds
+`printk_env` after `printkinit`. Note the standing tension with uartwrite,
+whose proof keeps the token in `tx_lock`'s invariant
+([`uart-driver.md`](uart-driver.md)) — the two homes cannot both link into
+one system; reconciling them is the printk-general/console project's
+problem, and whichever home wins, this axiom file is the one that changes.
+
+The general contract does NOT require `panicking = 0` (that would force a
+fraction of the cell into every caller and forbid `panic` from writing it);
+the two flag cells live in their own invariant `printk_flags_inv` inside
+`printk_env`. The spec also threads `cpu_own` net-zero and the tp premise
+(the general path acquires `pr.lock`), and its post is minimal:
+`callee_saved` + ra restored, no `a0` claim, no output claim.
 
 ### G3 — `userinit()` has no spec
 
-No `SpecUserinit.v`. Same fix as G2: state the interface (the weakest thing main
-can pay — `sie_cap_gpr`, `cpu_own γ 0 …`, `kernel_text`/`kernel_data`,
-`panic_wp`, `procs_inv`, `kalloc_env`, the `initproc` cell) and axiomatize it in
-`LinkUserinit.v`.
+**LANDED: `SpecUserinit.v` + `LinkUserinit.v`**, same assumed-callee shape:
+the weakest interface main can pay — `sie_cap_gpr`, `cpu_own γ 0 …` net-zero,
+`kernel_text`/`kernel_data`, `panic_wp`, `procs_inv`, `kalloc_env` (consumed
+by `userinit_pages := 8`, provisional), the `initproc` cell (back
+existentially). `K_userinit := 50` is provisional — namei's true depth is
+unknown; adjusting either constant, or adding the FS-side resources namei's
+real proof will demand, replaces exactly this one file plus its Axiom.
+(Typeclass note: the context deliberately drops `SpecMain`'s `!fileG Σ` —
+nothing in the statement needs it.)
 
 ### G4 — the payload arrives under a `▷` and nothing on the loop-exit path strips it
 
@@ -186,16 +284,13 @@ gets `▷ P`. The later must be stripped at a program step, and only
 continuation without a later. (The loop-BACK edge does expose one, which is why
 the iLöb recursion itself is fine.)
 
-**Fix: one later-exposing leaf, at the fence.** `wp_fence_gen_s_sconf`'s proof
-already sits inside `wp_instr_s_sconf`'s post-step callback, where an `iNext` is
-available (compare `wp_cbeqz_taken_s_sconf`, which does exactly that); a
-`wp_fence_gen_later_s_sconf` whose continuation is `▷ (sie_cap_gpr … -∗ …)` is
-that proof plus one `iNext`. Put it in `WpSconfCtl.v` (WRAPPER RECIPE: new name,
-existing lemma untouched, zero call-site churn). This is also the semantically
-right place — `fence rw,rw` IS the acquire barrier, so "the fence is where
-`▷ P` becomes `P`" is the reading you want in the proof. Cost: recompiling
-`WpSconfCtl.v` and everything above it, so batch it with any other central-file
-edit (G1, and the `Timeless` instances above).
+**LANDED: `wp_fence_gen_later_s_sconf` (WpSconfCtl.v)** — the existing fence
+leaf's statement with the continuation under `▷` (WRAPPER RECIPE: new name,
+existing lemma untouched, zero call-site churn); the proof is the original
+plus one `iNext` inside `wp_instr_s_sconf`'s post-step callback. This is
+also the semantically right place — `fence rw,rw` IS the acquire barrier, so
+"the fence is where `▷ P` becomes `P`" is the reading the secondary arm's
+proof will use.
 
 ### G5 — the per-hart resources the secondary arm needs are globally unique
 
@@ -275,9 +370,10 @@ Three assemblies main itself owes, none of them a callee call:
 
 1. **`kalloc_env γa on tp` from `is_kmem` + `kalloc_avail`** (`KvmSpec.v:118`),
    between `kinit` and `kvminit`.
-2. **`procs_inv γ Φ γs` from the 64 `proc_ready`s** — 64 `lock_alloc`s plus
-   persisting each `p->kstack` into `is_kstack`. Worth a helper
-   (`procs_inv_alloc`) in `SchedCtx.v` rather than 64 lines in `ProofMain.v`.
+2. **`procs_inv γ Φ γs` from the 64 `proc_ready`s** — DONE:
+   `SpecProcinit.procs_inv_alloc` (§ProcinitProcsInv), consuming per proc
+   `proc_ready i` + the two public cells procinit does not touch, over
+   `WpLock.newlock_delayed` (see Status).
 3. **`intr_handler_avail γ` via `intr_inv_alloc_off`** (`IntrDefs.v:356`), from
    `trapinithart`'s `stvec ↦ᵣ kernelvec` plus the SIE ghost's spare quarter —
    this is step 3 of interrupt-sweep's item 8, and main is its only caller.
@@ -291,27 +387,25 @@ device invariant, `printk_env`, the kernel table (G5), and `procs_inv` (G5).
 
 ## Worklist
 
-1. **G2 + G3**: `SpecPrintkGen.v` / `LinkPrintkGen.v` and `SpecUserinit.v` /
-   `LinkUserinit.v` — assumed-callee shape. Cheap, unblocks the boot arm's two
-   remaining holes. Add all four to `_CoqProject`.
-2. **G1**: split `dev_inv`. Batch with the `Timeless` instances (into
-   `RiscvPtsto.v`), the `mndb_0330000f` / `mnd_cr{2,6,7}` decode dedup (into
-   `KernelBaseDecode.v` / `KernelRvcDecode.v` — `fence rw,rw` is now proved
-   privately in both `WpVirtioDiskIntrDecode.v` and `WpMainDecode.v`), and
-   G4's `wp_fence_gen_later_s_sconf` (into `WpSconfCtl.v`), since all four
-   touch files with big cones.
-3. `procs_inv_alloc` in `SchedCtx.v`.
-4. **`SpecMain.v`** — `wp_main_boot_sconf` from the table above, diverging, with
-   the payload handled as a parameter: main's boot contract takes
-   `□ (∀ γd γv γs …, <init output> -∗ P)` and applies it at the store, so main's
-   proof never has to know what the secondaries want. Then `ProofMain.v` as a
-   functor over the eighteen callee interfaces, and the one-line `LinkMain.v`.
-   Spell the entry pc as `let pcE : mword 64 := mword_of_int KernelSyms.main in`
-   so `tools/proof_coverage.py` sees the symbol.
-5. **G5** — its own project, and prior to any multi-hart claim: the mask-carrying
+1. ~~G2 + G3 + G4 + `procs_inv_alloc` + the Timeless fold + the
+   `0330000f`/`creg_c*` decode dedup~~ — DONE (commits `a1cafcf`, `81aa9ea`);
+   see Status.
+2. **G1**: the invariant-from-time-0 rework described above — the WpUart.v
+   invariant restructure (+ optional split), the `uart_ghosts_alloc` DLAB
+   unfreeze, the virtio not-live cfg tracker, the new invariant-form init
+   specs (axiomatized where the proof rework is deferred), the adequacy
+   allocation, and the `SpecMain` device-precondition revision.
+3. **`SpecMain.v` revision + `ProofMain.v`** — after G1: replace
+   `main_devices_raw` with the invariant(s) + boot-hart tokens, and switch
+   the payload to the wand shape — main's boot contract takes
+   `□ (∀ γd γv γs …, <init output> -∗ P)` and applies it at the store, so
+   main's proof never has to know what the secondaries want. Then
+   `ProofMain.v` as a functor over the eighteen callee interfaces, and the
+   one-line `LinkMain.v`.
+4. **G5** — its own project, and prior to any multi-hart claim: the mask-carrying
    `sr_absorb` (so the kernel page table can be shared), `kmap_auth` at a
    fraction, `kernel_pagetable ↦₈□`, `strans_name : CPU -> gname`, and a
    hart-generic `p_sched`. Only then `wp_main_secondary_sconf`.
-6. Adequacy: `started_inv_alloc` goes inside `riscv_system_adequacy`'s
+5. Adequacy: `started_inv_alloc` goes inside `riscv_system_adequacy`'s
    `={⊤}=∗`, beside the device-ghost allocation
    ([`../design/adequacy.md`](../design/adequacy.md)).
