@@ -256,17 +256,24 @@ when virtio_disk_init's proof is reworked. `uartinit_post` and
 write-by-write through the accessor; recover from `269677c^` if ever
 needed).
 
+The disk-lock gap is CLOSED (`4da1fa5`): `disk_ghosts_alloc`/`_mint` now
+also return `ghost_map_auth (dn_claim γ) 1 ∅` and `disk_done_lb γ 0`;
+`main_globals_raw` gained `d_used_idx ↦₂ wrap16 0` AND — a discovery —
+`[∗ list] i ∈ seq 0 8, disk_slot_raw i` (the `disk` struct's `info[8]` +
+`ops[8]` cells at disk+40..295, which NOTHING previously supplied;
+`free_slot_res_split : free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗
+disk_slot_raw i`). **`DiskBoot.disk_res_boot`** (new definitional file
+DiskBoot.v — it needs both DiskInv's and SpecVirtioDiskInit's vocabulary
+plus ByteBuf, so it sits above DiskInv) is the checked composition:
+vdi_post's device conjuncts + the boot tokens ⊢ `disk_res γ pd pav pu` at
+the empty state; feed its alignment premise with
+`init_cfg_pages_aligned_of_valid` from vdi_post's three `page_valid`s.
+This is what ProofMain applies right before its disk-lock `newlock`.
+`ByteBuf.bb_chunk` (a k*n buffer as k records of n bytes) came out of
+rebuilding `desc_entry_own` from the desc page's bytes — reusable.
+
 Remaining under G1: the virtio_disk_init proof rework (bigger, can trail —
-the axiom stands in meanwhile). NEW GAP, blocks main's DISK-LOCK assembly
-(main owes a `newlock` over `DiskInv.disk_res` from `vdi_post` + boot
-tokens; at boot `disk_res`'s maps are empty so the pure conjuncts are
-trivial): `disk_ghosts_alloc` still DISCARDS the `dn_claim` ghost-map auth
-(`disk_res` wants it at `∅`) and the `mono_nat` lower bound (`disk_done_lb
-γ 0`, persistent), and `main_globals_raw` lacks the `d_used_idx ↦₂ 0` RAM
-cell (a .bss cell of the `disk` struct that virtio_disk_init never touches
-— concrete 0, like the `kmem+24 ↦₈ 0` precedent). Fix: return both from
-`disk_ghosts_alloc`, thread through adequacy into `SpecMain` boot tokens,
-and add the cell to `main_globals_raw`.
+the axiom stands in meanwhile).
 
 ### G2 — printk's only proven contract is the PANIC path
 
