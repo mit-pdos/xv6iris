@@ -107,6 +107,14 @@ Proof.
   unfold MachineWord.MachineWord.and. apply bv_and_unsigned.
 Qed.
 
+Lemma or_vec64_unsigned (x y : mword 64) :
+  bv_unsigned (or_vec x y) = Z.lor (bv_unsigned x) (bv_unsigned y).
+Proof.
+  cbv [or_vec Operators_mwords.word_binop Operators_mwords.with_word'
+       SailStdpp.Values.with_word to_word get_word].
+  unfold MachineWord.MachineWord.or. apply bv_or_unsigned.
+Qed.
+
 Lemma sext64_moi32_unsigned (z : Z) : (0 <= z < 2^31)%Z ->
   bv_unsigned (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
 Proof.
@@ -243,7 +251,6 @@ Qed.
 Lemma subrange_31_0_unsigned (a : mword 64) :
   bv_unsigned (subrange_vec_dec a 31 0 : mword 32) = bv_unsigned a mod 4294967296.
 Proof. apply (subrange_dec_unsigned_lo0 a 31 4294967296); [lia | vm_compute; reflexivity]. Qed.
-
 
 (* sign-extending a 9-bit value to 12 bits then to 64 is the same as
    zero-extending it to 64 directly: the 12-bit zero-extension's sign bit

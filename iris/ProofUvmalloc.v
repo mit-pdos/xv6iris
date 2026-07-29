@@ -59,6 +59,7 @@ Require Import PtTree PtBuild.
 Require Import UptTree UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
+Require Import ByteCursor.
 Require Import ProcPt ProcPtOwn.
 Require Import WpUvmallocDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -69,15 +70,20 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
-(* §1  Pure [Z] arithmetic.                                               *)
+(* §1  uvmalloc's OWN pure [Z] arithmetic -- the loop-trip characterisation *)
+(*     and the vpn/range facts that mention this function's constants.     *)
 (*                                                                        *)
 (*   Kept STRICTLY [mword]-free: this file's transitive [bitvector.tactics] *)
 (*   import installs a zify hook that makes [lia] answer Cannot-find-      *)
 (*   witness on any goal mentioning [bv_unsigned] (durable-notes.md).      *)
+(*                                                                        *)
+(*   The SHARED half lives at its own altitude: the PGROUNDUP / run-length *)
+(*   arithmetic and the run vocabulary in ProcPtOwn.v §3d ([z_pgu_*],      *)
+(*   [uvm_maxsz_val], [vpn_run_*], [dom_run_*]), the leaf-insert moves in  *)
+(*   §2b ([uvm_run1], [uptd_ext_insert_perm]), [uvm_perm_ori18] in §2c,    *)
+(*   [aligned_low12] / [pgroundup_id] / [vpn_lt_ne] in §3c-d, the cursor   *)
+(*   bump [ByteCursor.bc_add_moi], and [RiscvExtras.or_vec64_unsigned].    *)
 (* ===================================================================== *)
-
-Lemma ua_maxsz_val : uvm_maxsz = 274877898752.
-Proof. unfold uvm_maxsz. vm_compute. reflexivity. Qed.
 
 (* the run length is 0 exactly on the two arms where the C does nothing *)
 Lemma ua_z_np_zero (nz pu : Z) : nz <= pu -> Z.to_nat ((nz - pu + 4095) / 4096) = 0%nat.
@@ -107,22 +113,6 @@ Proof. intros Hq. rewrite (ua_z_iter pu nz (Z.of_nat j)). lia. Qed.
 
 Lemma ua_z_np_pos (pu nz : Z) : pu < nz -> 0 <= (nz - pu + 4095) / 4096.
 Proof. intros H. apply Z.div_pos; lia. Qed.
-
-(* PGROUNDUP, read through [pgroundup_unsigned]'s closed form *)
-Lemma ua_z_pgu_id (v : Z) : v mod 4096 = 0 -> (v + 4095) - (v + 4095) mod 4096 = v.
-Proof.
-  intros H.
-  assert (Hn : 4096 <> 0) by lia.
-  assert (Hmod : (v + 4095) mod 4096 = 4095).
-  { rewrite (Z.add_mod v 4095 4096 Hn) H. vm_compute. reflexivity. }
-  lia.
-Qed.
-
-Lemma ua_z_pgu_ge (v : Z) : v <= (v + 4095) - (v + 4095) mod 4096.
-Proof.
-  assert (Hp : 0 < 4096) by lia.
-  pose proof (Z.mod_pos_bound (v + 4095) 4096 Hp). lia.
-Qed.
 
 (* uvmdealloc's run length between two page-aligned sizes *)
 Lemma ua_z_npd (pu k : Z) : (pu + 4096 * k - pu) / 4096 = k.
@@ -183,110 +173,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §2  Pure bitvector bridges.  [ua_or_vec64_unsigned] belongs in         *)
-(*     RiscvExtras.v next to [and_vec64_unsigned]; [ua_align12] /         *)
-(*     [ua_pgroundup_id] / [ua_vpn_ne] / [ua_run1] / [ua_vpn_run_*] /     *)
-(*     [ua_ext_insert] belong in ProcPtOwn.v.  They live here because     *)
-(*     both files are being edited concurrently.                          *)
-(* ===================================================================== *)
-
-Lemma ua_or_vec64_unsigned (x y : mword 64) :
-  bv_unsigned (or_vec x y) = Z.lor (bv_unsigned x) (bv_unsigned y).
-Proof.
-  cbv [or_vec Operators_mwords.word_binop Operators_mwords.with_word'
-       SailStdpp.Values.with_word to_word get_word].
-  unfold MachineWord.MachineWord.or. apply bv_or_unsigned.
-Qed.
-
-(* [ori s6,a3,18] lands on the spelling mappages' [perm] premise wants *)
-Lemma ua_ori18 (x : Z) :
-  0 <= x < 512 ->
-  or_vec (mword_of_int x : mword 64) (sign_extend' 64 (mword_of_int 18 : mword 12))
-  = (mword_of_int (Z.lor x 18) : mword 64).
-Proof.
-  intros Hx.
-  assert (Hlor : 0 <= Z.lor x 18 < 512).
-  { assert (H9 : (2 ^ 9)%Z = 512) by (vm_compute; reflexivity).
-    pose proof (z_lor_pow2 9 x 18 ltac:(lia) ltac:(rewrite H9; lia)
-                  ltac:(rewrite H9; lia)) as Hz.
-    rewrite H9 in Hz. exact Hz. }
-  assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  apply bv_eq. rewrite ua_or_vec64_unsigned.
-  assert (H18 : bv_unsigned (sign_extend' 64 (mword_of_int 18 : mword 12) : mword 64) = 18)
-    by (vm_compute; reflexivity).
-  rewrite H18 !moi64_unsigned.
-  rewrite (bv_wrap_small 64 x ltac:(rewrite Hm; lia)).
-  rewrite (bv_wrap_small 64 (Z.lor x 18) ltac:(rewrite Hm; lia)).
-  reflexivity.
-Qed.
-
-Lemma ua_align12 (x : mword 64) :
-  bv_unsigned x mod 4096 = 0 -> subrange_vec_dec x 11 0 = (zeros' 12 : mword 12).
-Proof.
-  intros H.
-  assert (Hand : and_vec x (mword_of_int (-4096)) = x).
-  { apply bv_eq. rewrite pgd_unsigned H. apply Z.sub_0_r. }
-  rewrite <- Hand. apply pgrounddown_low12.
-Qed.
-
-Lemma ua_pgroundup_id (x : mword 64) :
-  bv_unsigned x mod 4096 = 0 -> (bv_unsigned x + 4095 < 2 ^ 64)%Z -> pgroundup x = x.
-Proof.
-  intros Hm Hb. apply bv_eq. rewrite (pgroundup_unsigned x Hb).
-  exact (ua_z_pgu_id _ Hm).
-Qed.
-
-Lemma ua_add4096 (x : mword 64) (b : Z) :
-  bv_unsigned x = b -> 0 <= b -> b + 4096 < 18446744073709551616 ->
-  bv_unsigned (add_vec x (mword_of_int 4096)) = b + 4096.
-Proof.
-  intros Hx H0 Hb.
-  assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  assert (H4 : bv_unsigned (mword_of_int 4096 : mword 64) = 4096)
-    by (vm_compute; reflexivity).
-  rewrite add_vec64_unsigned Hx H4. apply bv_wrap_small. rewrite Hm. lia.
-Qed.
-
-(* a strictly smaller vpn is a different vpn (used against [tramp_vpn] /
-   [tf_vpn] without ever naming them) *)
-Lemma ua_vpn_ne (v w : mword 27) : bv_unsigned v < bv_unsigned w -> v <> w.
-Proof. intros H He. rewrite He in H. exact (Z.lt_irrefl _ H). Qed.
-
-(* mappages' one-page run post IS the uvm leaf insert *)
-Lemma ua_run1 (m : gmap (mword 27) (mword 64)) (v : mword 27) (perm : Z) (r : mword 64) :
-  pt_insert_run m v (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44) perm 1
-  = <[v := uvm_pte perm r]> m.
-Proof. cbn [pt_insert_run]. rewrite vpn_at_0. reflexivity. Qed.
-
-Lemma ua_vpn_run_0 (v : mword 27) : vpn_run v 0 = (∅ : gset (mword 27)).
-Proof. reflexivity. Qed.
-
-Lemma ua_vpn_run_S (v : mword 27) (k : nat) :
-  vpn_run v (S k) = vpn_run v k ∪ {[vpn_at v k]}.
-Proof.
-  unfold vpn_run. rewrite seq_S fmap_app list_to_set_app_L.
-  cbn [fmap list_fmap list_to_set]. rewrite union_empty_r_L. reflexivity.
-Qed.
-
-Lemma ua_dom_run0 (D : gset (mword 27)) (v : mword 27) : D = D ∪ vpn_run v 0.
-Proof. rewrite ua_vpn_run_0 union_empty_r_L. reflexivity. Qed.
-
-Lemma ua_dom_step (D R : gset (mword 27)) (v : mword 27) :
-  {[v]} ∪ (D ∪ R) = D ∪ (R ∪ {[v]}).
-Proof.
-  rewrite (union_comm_L ({[v]} : gset (mword 27)) (D ∪ R)).
-  symmetry. apply union_assoc_L.
-Qed.
-
-Lemma ua_ext_insert (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64) :
-  P.(ud_um) !! vpn = None -> uptd_ext P (uptd_insert_perm P perm vpn r).
-Proof.
-  intros Hn. unfold uptd_ext, uptd_insert_perm. cbn [ud_root ud_tfp ud_um].
-  split_and!; [reflexivity | reflexivity | apply insert_subseteq; exact Hn].
-Qed.
-
-(* ===================================================================== *)
-(* §3  The postcondition payload and the +0x78 join contract.             *)
+(* §2  The postcondition payload and the +0x78 join contract.             *)
 (* ===================================================================== *)
 
 Local Notation URra := (mword_of_int 1 : mword 5).
@@ -343,7 +230,7 @@ Section UvmallocDefs.
 End UvmallocDefs.
 
 (* ===================================================================== *)
-(* §4  THE WHOLE FUNCTION.                                                *)
+(* §3  THE WHOLE FUNCTION.                                                *)
 (* ===================================================================== *)
 
 Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
@@ -501,11 +388,11 @@ Section ProofUvmalloc.
     assert (Havmod : (bv_unsigned av mod 4096 = 0)%Z)
       by (rewrite Hav; exact (ua_z_avmod pu (Z.of_nat i) Hpumod)).
     assert (Hpgav : pgroundup av = av).
-    { apply ua_pgroundup_id; [exact Havmod |].
+    { apply pgroundup_id; [exact Havmod |].
       rewrite Hav. change (2 ^ 64)%Z with 18446744073709551616%Z.
       clear -Hain Hnb. lia. }
     assert (Hpgpu : pgroundup (pgroundup oldsz) = pgroundup oldsz).
-    { apply ua_pgroundup_id; [rewrite Hpu; exact Hpumod |].
+    { apply pgroundup_id; [rewrite Hpu; exact Hpumod |].
       rewrite Hpu. change (2 ^ 64)%Z with 18446744073709551616%Z.
       clear -Hain Hnb. lia. }
     assert (Hnpd : uvmd_np av (pgroundup oldsz) = i).
@@ -529,9 +416,9 @@ Section ProofUvmalloc.
               P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None).
     { intros j Hj. apply Hfresh. clear -Hj Hin. lia. }
     assert (Hudold : (uint av + 4096 <= uvm_maxsz)%Z).
-    { rewrite uint_unsigned ua_maxsz_val. exact Havb. }
+    { rewrite uint_unsigned uvm_maxsz_val. exact Havb. }
     assert (Hudnew : (uint (pgroundup oldsz) + 4096 <= uvm_maxsz)%Z).
-    { rewrite uint_unsigned ua_maxsz_val Hpu. clear -Hain Hnb. lia. }
+    { rewrite uint_unsigned uvm_maxsz_val Hpu. clear -Hain Hnb. lia. }
     assert (Hrooti : Pi.(ud_root) = P.(ud_root)) by exact (proj1 Hext).
     (* ---- +0x36 jal ra,kalloc ---- *)
     iPoseProof (uai_36 with "Htext") as "Hi36".
@@ -1083,18 +970,18 @@ Section ProofUvmalloc.
         exact (vpn_at_ne (svpn_of (pgroundup oldsz)) j i Hj Hilt (eq_sym Hje)). }
     assert (Hmadnone : m_ad !! svpn_of av = None).
     { apply (proj1 Hview (svpn_of av)). split_and!.
-      - apply ua_vpn_ne. rewrite tramp_vpn_unsigned.
+      - apply vpn_lt_ne. rewrite tramp_vpn_unsigned.
         assert (Hx1 : (67108862 < 67108863)%Z) by lia.
         exact (Z.lt_trans _ _ _ Hvpnb Hx1).
-      - apply ua_vpn_ne. rewrite tf_vpn_unsigned. exact Hvpnb.
+      - apply vpn_lt_ne. rewrite tf_vpn_unsigned. exact Hvpnb.
       - exact Humnone. }
     assert (HB11root : B11 !!! Regidx Ra0
                        = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
     { rewrite HB11a0 Hbase Hrooti. reflexivity. }
     assert (Hmpva : subrange_vec_dec (B11 !!! Regidx Ra1) 11 0 = (zeros' 12 : mword 12))
-      by (rewrite HB11a1; exact (ua_align12 av Havmod)).
+      by (rewrite HB11a1; exact (aligned_low12 av Havmod)).
     assert (Hmppa : subrange_vec_dec (B11 !!! Regidx Ra3) 11 0 = (zeros' 12 : mword 12)).
-    { rewrite HB11a3. apply ua_align12. rewrite <- uint_unsigned.
+    { rewrite HB11a3. apply aligned_low12. rewrite <- uint_unsigned.
       unfold page_aligned, PGSIZE in Hral. exact Hral. }
     assert (Hmpsz : B11 !!! Regidx Ra2 = mword_of_int (Z.of_nat 1 * 4096))
       by (rewrite HB11a2; apply bv_eq; vm_compute; reflexivity).
@@ -1147,7 +1034,7 @@ Section ProofUvmalloc.
       rewrite (callee_saved_lookup Hgcs c Hc). apply HB11thr; assumption. }
     destruct Hmpay as [(Hk1 & Hga0) | (Hklt & Hga0 & _)].
     { (* =========== mappages SUCCEEDED: one more page mapped =========== *)
-      subst k. rewrite ua_run1 in Hrep'.
+      subst k. rewrite uvm_run1 in Hrep'.
       iPoseProof (uai_56 with "Htext") as "Hi56".
       iPoseProof (uai_58 with "Htext") as "Hi58".
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
@@ -1159,11 +1046,11 @@ Section ProofUvmalloc.
       set (Pj := uptd_insert_perm Pi (Z.lor xperm 18) (svpn_of av) r).
       assert (Hextj : uptd_ext P Pj)
         by (exact (uptd_ext_trans P Pi Pj Hext
-                     (ua_ext_insert Pi (Z.lor xperm 18) (svpn_of av) r Humnone))).
+                     (uptd_ext_insert_perm Pi (Z.lor xperm 18) (svpn_of av) r Humnone))).
       assert (Hdomj : dom Pj.(ud_um)
                       = dom P.(ud_um) ∪ vpn_run (svpn_of (pgroundup oldsz)) (S i)).
       { rewrite /Pj /uptd_insert_perm. cbn [ud_um].
-        rewrite dom_insert_L Hdom Hvpn ua_vpn_run_S. apply ua_dom_step. }
+        rewrite dom_insert_L Hdom Hvpn vpn_run_S. apply dom_run_step. }
       (* +0x54 c.bnez a0 FALLS (a0 = 0) *)
       assert (Hbnf : neq_vec (mg !!! Regidx Ra0) zero_reg = false)
         by (rewrite Hga0; vm_compute; reflexivity).
@@ -1187,7 +1074,8 @@ Section ProofUvmalloc.
         by (clear -Hain Hnb; lia).
       assert (Havs : bv_unsigned (add_vec av (mword_of_int 4096))
                      = (pu + 4096 * Z.of_nat (S i))%Z).
-      { rewrite (ua_add4096 av (pu + 4096 * Z.of_nat i) Hav Hav0b Hav1b).
+      { rewrite (bc_add_moi av (pu + 4096 * Z.of_nat i) 4096 Hav Hav0b
+                            ltac:(vm_compute; discriminate) Hav1b).
         rewrite Nat2Z.inj_succ. unfold Z.succ. ring. }
       assert (HB12s2 : B12 !!! Regidx Rs2 = add_vec av (mword_of_int 4096)).
       { rewrite /B12 upd_eq. rewrite Hmgs2 Hmgs3. reflexivity. }
@@ -1626,7 +1514,7 @@ Section ProofUvmalloc.
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hcont".
     (* ---- the PGROUNDUP arithmetic, kept over plain [Z] (the zify rule) --- *)
     rewrite uint_unsigned in Hobd. rewrite uint_unsigned in Hnbd.
-    rewrite ua_maxsz_val in Hobd. rewrite ua_maxsz_val in Hnbd.
+    rewrite uvm_maxsz_val in Hobd. rewrite uvm_maxsz_val in Hnbd.
     pose proof (proj1 (bv_unsigned_in_range _ oldsz)) as Hov0.
     pose proof (proj1 (bv_unsigned_in_range _ newsz)) as Hnz0.
     remember (bv_unsigned oldsz) as ov eqn:Hov.
@@ -1637,7 +1525,7 @@ Section ProofUvmalloc.
                    = ((ov + 4095) - (ov + 4095) mod 4096)%Z).
     { rewrite Hov. apply pgroundup_unsigned. rewrite <- Hov. exact Hovb. }
     remember ((ov + 4095) - (ov + 4095) mod 4096)%Z as pu eqn:Hpud.
-    assert (Hpuge : (ov <= pu)%Z) by (rewrite Hpud; apply ua_z_pgu_ge).
+    assert (Hpuge : (ov <= pu)%Z) by (rewrite Hpud; apply z_pgu_ge).
     assert (Hpumod : (pu mod 4096 = 0)%Z)
       by (rewrite Hpud; exact (z_pgd_mod (ov + 4095))).
     assert (Hpu0 : (0 <= pu)%Z) by (clear -Hov0 Hpuge; lia).
@@ -1686,7 +1574,7 @@ Section ProofUvmalloc.
           (rewrite /Y1; rewrite upd_ne; [reflexivity | reg_neq]). }
       iRight. iExists P.
       iSplitR; [iPureIntro; apply uptd_ext_refl |].
-      iSplitR; [iPureIntro; rewrite Hn0; apply ua_dom_run0 |].
+      iSplitR; [iPureIntro; rewrite Hn0; apply dom_run_0 |].
       iSplitR.
       { iPureIntro. left. split; [exact Hlt0 |].
         rewrite /Y1 upd_eq. rewrite add_vec_zero_l. reflexivity. }
@@ -2262,7 +2150,7 @@ Section ProofUvmalloc.
       { iExists u56, u40, u16. iFrame "Hk3 Hk5 Hk8". }
       { rewrite /ua_pay. iRight. iExists P.
         iSplitR; [iPureIntro; apply uptd_ext_refl |].
-        iSplitR; [iPureIntro; rewrite Hn0; apply ua_dom_run0 |].
+        iSplitR; [iPureIntro; rewrite Hn0; apply dom_run_0 |].
         iSplitR; [iPureIntro; right; split; [exact Hoin | reflexivity] |].
         iExact "Hpt". } }
 
@@ -2341,7 +2229,7 @@ Section ProofUvmalloc.
                         (sign_extend' 64 (mword_of_int 18 : mword 12))
                       = (mword_of_int (Z.lor xperm 18) : mword 64)).
     { rewrite /R11. rewrite upd_ne; [| reg_neq]. rewrite HR10a3.
-      apply ua_ori18. exact Hxrng. }
+      apply uvm_perm_ori18. exact Hxrng. }
     iApply (wp_ori_s_sconf γ Φ (mword_of_int (UA + 0x32)) Rs6 Ra3
               (mword_of_int 18 : mword 12) (mword_of_int (Z.lor xperm 18) : mword 64)
               R11 (K - 10)%nat ltac:(vm_compute; discriminate)
@@ -2384,7 +2272,7 @@ Section ProofUvmalloc.
               HK Hxrng Hperm Hb3 Hb5 Hb8 Hpuv (eq_sym Hnz) Hpumod Hpu0 Hnbd Hoin
               Hnchar Hfr Htp
               n 0%nat P R12 (pgroundup oldsz) Hsum0 Hn1 Hav0
-              (uptd_ext_refl P) (ua_dom_run0 (dom P.(ud_um)) (svpn_of (pgroundup oldsz)))
+              (uptd_ext_refl P) (dom_run_0 (dom P.(ud_um)) (svpn_of (pgroundup oldsz)))
               HR12sp HR12tp HR12s2 HR12s3 HR12s4 HR12s5 HR12s6 HR12s7 HR12thr
               with "Hcg Hcnt Htext Hpc Hpt Henv Hk3 Hk5 Hk8 Hepi").
   Qed.

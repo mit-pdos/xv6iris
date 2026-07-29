@@ -27,9 +27,13 @@
    which is EXACTLY [ProcPtOwn.pgroundup]; +0x32/+0x34/+0x38 turn the
    difference into [mword_of_int (Z.of_nat (uvmd_np oldsz newsz))].  Per
    claude-notes/durable-notes.md all of that arithmetic is factored into
-   [mword]-free top-level [Z] lemmas ([udl_z_*] below), because any goal
-   mentioning [bv_unsigned] answers "Cannot find witness" to [lia] under this
-   file's transitive [bitvector.tactics] import.
+   [mword]-free top-level [Z] lemmas -- [ProcPtOwn.z_pgu_*] / [z_np_*] --
+   because any goal mentioning [bv_unsigned] answers "Cannot find witness" to
+   [lia] under this file's transitive [bitvector.tactics] import.  The two
+   [mword] bridges it needs are [ByteCursor.add_vec_comm] and
+   [ByteCursor.srli12_div4096]; the compressed [c.sub] leaf is
+   [WpSconfAlu.wp_csub_wval_s_sconf] (the explicit-[wval] form; the
+   encoding's own rd = rs1 shape is [wp_csub_s_sconf], a restatement of it).
 
    On the two arms that SKIP the unmap, [uvmd_np oldsz newsz = 0] (the
    quotient is 0 or negative and [Z.to_nat] clamps), so the descriptor the
@@ -55,6 +59,7 @@ Require Import WpLock.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
+Require Import ByteCursor.
 Require Import ProcPtOwn.
 Require Import WpUvmdeallocDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -64,154 +69,6 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
-
-(* ===================================================================== *)
-(* §0  Plain-[Z] arithmetic.  Everything [lia] must see lives here, with  *)
-(*     no [mword] / [bv_unsigned] anywhere in the statement (the zify     *)
-(*     hook rule -- claude-notes/durable-notes.md).                       *)
-(*     These belong next to [pgroundup_unsigned] in ProcPtOwn.v.          *)
-(* ===================================================================== *)
-
-(* [uvm_maxsz] as a literal, so the two size premises can be fed to [lia]. *)
-Lemma udl_z_lt264 (v : Z) : v + 4096 <= 274877898752 -> v + 4095 < 2 ^ 64.
-Proof. intros H. change (2 ^ 64) with 18446744073709551616. lia. Qed.
-
-(* PGROUNDUP -- as [pgroundup_unsigned] reads it -- is MONOTONE. *)
-Lemma udl_z_pgu_mono (a b : Z) :
-  a <= b -> (a + 4095) - (a + 4095) mod 4096 <= (b + 4095) - (b + 4095) mod 4096.
-Proof.
-  intros Hab.
-  pose proof (Z_div_mod_eq_full (a + 4095) 4096) as Ha.
-  pose proof (Z_div_mod_eq_full (b + 4095) 4096) as Hb.
-  assert (Hd : (a + 4095) / 4096 <= (b + 4095) / 4096)
-    by (apply Z.div_le_mono; lia).
-  lia.
-Qed.
-
-(* ... and never exceeds its argument by a page. *)
-Lemma udl_z_pgu_bound (v : Z) :
-  0 <= v -> v + 4096 <= 274877898752 ->
-  (v + 4095) - (v + 4095) mod 4096 <= 274877898751.
-Proof.
-  intros H0 H1. pose proof (Z.mod_pos_bound (v + 4095) 4096 ltac:(lia)). lia.
-Qed.
-
-Lemma udl_z_tonat0 (q : Z) : q <= 0 -> Z.to_nat q = 0%nat.
-Proof. intros H. destruct q as [| pz | pz]; [reflexivity | exfalso; lia | reflexivity]. Qed.
-
-Lemma udl_z_np0 (pu pn : Z) : pu <= pn -> Z.to_nat ((pu - pn) / 4096) = 0%nat.
-Proof.
-  intros H. apply udl_z_tonat0.
-  apply Z.div_le_upper_bound; lia.
-Qed.
-
-(* the run length on the arm that DOES unmap: the difference of two
-   page-aligned values divides exactly. *)
-Lemma udl_z_np_exact (pu pn : Z) :
-  pn <= pu -> pu mod 4096 = 0 -> pn mod 4096 = 0 ->
-  0 <= (pu - pn) / 4096 /\ (pu - pn) / 4096 * 4096 = pu - pn.
-Proof.
-  intros Hle Hu Hn.
-  assert (Hm : (pu - pn) mod 4096 = 0)
-    by (rewrite Zminus_mod Hu Hn; vm_compute; reflexivity).
-  pose proof (Z_div_mod_eq_full (pu - pn) 4096) as Hdm.
-  split; [apply Z.div_pos; lia | lia].
-Qed.
-
-Lemma udl_z_np_lt31 (pu pn : Z) :
-  0 <= pn -> pu <= 274877898751 -> (pu - pn) / 4096 < 2147483648.
-Proof.
-  intros H0 H1.
-  apply Z.le_lt_trans with (pu / 4096).
-  - apply Z.div_le_mono; lia.
-  - apply Z.div_lt_upper_bound; lia.
-Qed.
-
-Lemma udl_z_div4096_range (v : Z) :
-  0 <= v < 18446744073709551616 -> 0 <= v / 4096 < 18446744073709551616.
-Proof.
-  intros [H0 H1]. split; [apply Z.div_pos; lia |].
-  apply Z.le_lt_trans with v; [| lia]. apply Z.div_le_upper_bound; lia.
-Qed.
-
-(* ===================================================================== *)
-(* §1  Two [mword] bridges.  [udl_addv_comm] belongs in RiscvExtras.v,    *)
-(*     [udl_srli12] next to [subrange_31_0_unsigned] there.               *)
-(* ===================================================================== *)
-
-Lemma udl_addv_comm (x y : mword 64) : add_vec x y = add_vec y x.
-Proof.
-  apply bv_eq. rewrite !add_vec64_unsigned. rewrite Z.add_comm. reflexivity.
-Qed.
-
-(* [srli rd,rs,0xc] is unsigned division by the page size. *)
-Lemma udl_srli12 (x : mword 64) :
-  shift_bits_right x (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
-  = (mword_of_int (bv_unsigned x / 4096) : mword 64).
-Proof.
-  assert (Hr : shift_bits_right x
-                 (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
-             = shiftr x 12).
-  { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
-  rewrite Hr. apply bv_eq.
-  unfold shiftr, SailStdpp.Values.with_word, get_word,
-    MachineWord.MachineWord.logical_shift_right.
-  rewrite bv_shiftr_unsigned.
-  assert (H12 : bv_unsigned (MachineWord.MachineWord.N_to_word
-                   (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12)) = 12).
-  { unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
-    rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
-  rewrite H12. rewrite Z.shiftr_div_pow2; [| lia].
-  change (2 ^ 12) with 4096.
-  rewrite moi64_unsigned. symmetry. apply bvw64_small.
-  apply udl_z_div4096_range.
-  pose proof (bv_unsigned_in_range _ x) as Hr64.
-  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
-    by (vm_compute; reflexivity).
-  rewrite Hm in Hr64. exact Hr64.
-Qed.
-
-(* ===================================================================== *)
-(* §2  The compressed [c.sub rd,rd,rs2] leaf.  Its base-width twin        *)
-(*     [wp_sub_s_sconf] is in WpSconfAlu.v; this belongs right next to    *)
-(*     it (uvmdealloc is the first caller of the compressed form, just as *)
-(*     [udexec_C_SUB] in WpUvmdeallocDecode.v is the first user of the    *)
-(*     kernel-side C_SUB expansion).                                      *)
-(* ===================================================================== *)
-
-Section WpCsub.
-  Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
-
-  Lemma wp_csub_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
-      pc_is (add_vec_int pc 2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf γ Φ pc rd rs1 rs2
-              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m n
-              Hrd Hrdsp _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva Hvb.
-      change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)))
-        with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SUB).
-      rewrite (exec_execute_RTYPE_SUB_gpr rs2 rs1 rd s_pc).
-      replace (Z.eqb (uint rd) 0) with false
-        by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_sub_val. rewrite Hva Hvb Hwval. reflexivity.
-  Qed.
-
-End WpCsub.
 
 (* ===================================================================== *)
 (* THE WHOLE FUNCTION.                                                    *)
@@ -267,16 +124,16 @@ Section ProofUvmdealloc.
       by (rewrite -uint_unsigned -Hmax; exact Hnb).
     assert (Hpuz : bv_unsigned (pgroundup oldsz)
                    = (bv_unsigned oldsz + 4095) - (bv_unsigned oldsz + 4095) mod 4096)
-      by (apply pgroundup_unsigned; apply udl_z_lt264; exact Hobz).
+      by (apply pgroundup_unsigned; apply z_maxsz_no_wrap; exact Hobz).
     assert (Hpnz : bv_unsigned (pgroundup newsz)
                    = (bv_unsigned newsz + 4095) - (bv_unsigned newsz + 4095) mod 4096)
-      by (apply pgroundup_unsigned; apply udl_z_lt264; exact Hnbz).
+      by (apply pgroundup_unsigned; apply z_maxsz_no_wrap; exact Hnbz).
     assert (Hpumod : bv_unsigned (pgroundup oldsz) mod 4096 = 0)
       by (rewrite Hpuz; apply z_pgd_mod).
     assert (Hpnmod : bv_unsigned (pgroundup newsz) mod 4096 = 0)
       by (rewrite Hpnz; apply z_pgd_mod).
     assert (Hpubnd : bv_unsigned (pgroundup oldsz) <= 274877898751).
-    { rewrite Hpuz. apply udl_z_pgu_bound;
+    { rewrite Hpuz. apply z_pgu_bound;
         [exact (proj1 (bv_unsigned_in_range _ oldsz)) | exact Hobz]. }
     assert (Hpn0 : 0 <= bv_unsigned (pgroundup newsz))
       by exact (proj1 (bv_unsigned_in_range _ (pgroundup newsz))).
@@ -603,10 +460,10 @@ Section ProofUvmdealloc.
         by (rewrite HA2a2 HA2a1; exact Hcmp1).
       (* the run is empty *)
       assert (Hple : bv_unsigned (pgroundup oldsz) <= bv_unsigned (pgroundup newsz)).
-      { rewrite Hpuz Hpnz. apply udl_z_pgu_mono.
+      { rewrite Hpuz Hpnz. apply z_pgu_mono.
         rewrite -!uint_unsigned. exact Hge. }
       assert (Hnp0 : uvmd_np oldsz newsz = 0%nat)
-        by (rewrite Hnpdef; apply udl_z_np0; exact Hple).
+        by (rewrite Hnpdef; apply z_np_zero; exact Hple).
       iAssert (proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)))
         with "[Hpt]" as "Hpt".
       { iEval (rewrite (proc_pt_data_irrel P
@@ -788,7 +645,7 @@ Section ProofUvmdealloc.
     iIntros "Hcg Hpc".
     assert (Hsum5 : add_vec (A8 !!! Regidx Ra5) (A8 !!! Regidx Ra1)
                     = add_vec oldsz (mword_of_int 4095))
-      by (rewrite HA8a5 HA8a1; apply udl_addv_comm).
+      by (rewrite HA8a5 HA8a1; apply add_vec_comm).
     iEval (rewrite Hsum5) in "Hcg".
     set (A9 := <[Regidx Ra5 := regval_into_reg (add_vec oldsz (mword_of_int 4095))]> A8).
     change (<[Regidx Ra5 := regval_into_reg (add_vec oldsz (mword_of_int 4095))]> A8) with A9.
@@ -870,7 +727,7 @@ Section ProofUvmdealloc.
       { unfold zopz0zI_u in Hcmp2.
         rewrite -!uint_unsigned. exact (proj1 (Z.ltb_ge _ _) Hcmp2). }
       assert (Hnp0 : uvmd_np oldsz newsz = 0%nat)
-        by (rewrite Hnpdef; apply udl_z_np0; exact Hple).
+        by (rewrite Hnpdef; apply z_np_zero; exact Hple).
       iAssert (proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)))
         with "[Hpt]" as "Hpt".
       { iEval (rewrite (proc_pt_data_irrel P
@@ -915,14 +772,14 @@ Section ProofUvmdealloc.
     (* ================================================================= *)
     (* §G  The run length, as a plain [Z].                                *)
     (* ================================================================= *)
-    destruct (udl_z_np_exact (bv_unsigned (pgroundup oldsz)) (bv_unsigned (pgroundup newsz))
+    destruct (z_np_exact (bv_unsigned (pgroundup oldsz)) (bv_unsigned (pgroundup newsz))
                 ltac:(lia) Hpumod Hpnmod) as [Hq0 Hqmul].
     assert (Hqz : Z.of_nat (uvmd_np oldsz newsz)
                   = (bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096)
       by (rewrite Hnpdef; apply Z2Nat.id; exact Hq0).
     assert (Hqlt : (bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096
                    < 2147483648)
-      by (apply udl_z_np_lt31; [exact Hpn0 | exact Hpubnd]).
+      by (apply z_np_lt31; [exact Hpn0 | exact Hpubnd]).
 
     (* ================================================================= *)
     (* §H  +0x32..+0x3e: npages, do_free = 1, uvmunmap().                 *)
@@ -941,7 +798,7 @@ Section ProofUvmdealloc.
                                      - bv_unsigned (pgroundup newsz)) : mword 64)).
     { rewrite HA10a5 HA10a4. apply bv_eq.
       rewrite sub_vec64_unsigned. symmetry. apply moi64_unsigned. }
-    iApply (wp_csub_s_sconf γ Φ (mword_of_int (UD + 0x32)) Ra5 Ra5 Ra4
+    iApply (wp_csub_wval_s_sconf γ Φ (mword_of_int (UD + 0x32)) Ra5 Ra5 Ra4
               (mword_of_int (bv_unsigned (pgroundup oldsz)
                              - bv_unsigned (pgroundup newsz)) : mword 64)
               A10 (K - 4)%nat
@@ -972,7 +829,7 @@ Section ProofUvmdealloc.
     assert (Hnpv : shift_bits_right (B1 !!! Regidx Ra5)
                      (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
                    = (mword_of_int (Z.of_nat (uvmd_np oldsz newsz)) : mword 64)).
-    { rewrite HB1a5 udl_srli12 Hqz.
+    { rewrite HB1a5 srli12_div4096 Hqz.
       assert (Hbd : bv_unsigned (mword_of_int (bv_unsigned (pgroundup oldsz)
                                   - bv_unsigned (pgroundup newsz)) : mword 64)
                     = bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)).

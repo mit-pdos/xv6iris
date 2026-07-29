@@ -39,7 +39,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 Require Import InstrBytes.
 Require Import WpDecode ExecCommon KernelText.
 Require Import WpMmodeLeafBase.
-Require Import KernelRvcDecode.
+Require Import KernelRvcDecode KernelBaseDecode.
 Require Import WpAmo.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
@@ -133,10 +133,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 
 (* ---- the panic arm (+0x34 .. +0x3c): auipc a0 / addi a0 / jal panic ---- *)
 (* +0x34  0x00006517  auipc a0,0x6 *)
-Lemma aqdec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; aq_dbase s Hpriv ]. Qed.
+(* [bdec_00006517] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* +0x38  0x40c50513  addi a0,a0,1036 *)
 Lemma aqdec_addi_msg s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -312,7 +309,7 @@ Section WpAcquireTop.
   (* the panic arm: the c.bnez at +0x18 lands here when holding() said 1. *)
   Lemma aqi_34 : kernel_text -∗ instr (mword_of_int (AQ + 0x34) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (AQ + 0x34)%Z (mword_of_int 0x00006517 : mword 32)
-    (mword_of_int (AQ + 0x34) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) aqdec_auipc. Qed.
+    (mword_of_int (AQ + 0x34) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00006517. Qed.
 
   Lemma aqi_38 : kernel_text -∗ instr (mword_of_int (AQ + 0x38) : mword 64) false (ITYPE (mword_of_int 0x40c : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (AQ + 0x38)%Z (mword_of_int 0x40c50513 : mword 32)

@@ -232,10 +232,7 @@ Lemma prdc_0905 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xbfc9  j 80004658 <piperead+0xc2> *)
-Lemma prdc_bfc9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfc9 : mword 16)) s
-  = Some (C_J (mword_of_int 2025), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_bfc9] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -864,6 +861,6 @@ Section PipereadInstrs.
   (* +0xf0  bfc9  j 80004658 <piperead+0xc2> *)
   Lemma pri_f0 : kernel_text -∗ instr (mword_of_int (PR + 0xf0) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PR + 0xf0)%Z (mword_of_int 0xbfc9 : mword 16)
-    (mword_of_int (PR + 0xf0) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)) prdc_bfc9 exec_execute_C_J. Qed.
+    (mword_of_int (PR + 0xf0) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)) cdec_bfc9 exec_execute_C_J. Qed.
 
 End PipereadInstrs.

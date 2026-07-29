@@ -54,10 +54,7 @@ Lemma kdc_4595 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_LI (mword_of_int 5, Regidx (mword_of_int 11)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma kdc_17fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x17fd : mword 16)) s
-  = Some (C_ADDI (mword_of_int 63, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_17fd] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 Lemma kdc_ef95 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xef95 : mword 16)) s
@@ -388,7 +385,7 @@ Section WpKallocDecode.
 
   Lemma kfi_1c : kernel_text -∗ instr (mword_of_int (KF + 0x1c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KF + 0x1c)%Z (mword_of_int 0x17fd : mword 16)
-    (mword_of_int (KF + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kdc_17fd exec_execute_C_ADDI. Qed.
+    (mword_of_int (KF + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) cdec_17fd exec_execute_C_ADDI. Qed.
 
   Lemma kfi_1e : kernel_text -∗ instr (mword_of_int (KF + 0x1e) : mword 64) false (RTYPE (Regidx (mword_of_int 10), Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLTU)).
   Proof. mk_base (KF + 0x1e)%Z (mword_of_int 0x00a7b7b3 : mword 32)

@@ -20,7 +20,7 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpLock.
-Require Import KernelRvcDecode WpRvcBridge WpDecode WpDecodeBridge.
+Require Import KernelRvcDecode KernelBaseDecode WpRvcBridge WpDecode WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 From Kernel Require KernelSyms.
 Import Defs.
@@ -87,10 +87,7 @@ Section Kvmmap.
   Proof. mk_rvc (KM + 0x1a)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int (KM + 0x1a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* ---- the (unreachable-return) panic arm ---- *)
-  Lemma kvdec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
-    = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+  (* [bdec_00006517] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
   Lemma kvdec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x01650513 : mword 32)) s
     = Some (ITYPE (mword_of_int 0x16 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
@@ -101,7 +98,7 @@ Section Kvmmap.
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
   Lemma ki_1c : KMP 0x1c false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
-  Proof. mk_base (KM + 0x1c)%Z (mword_of_int 0x00006517 : mword 32) (mword_of_int (KM + 0x1c) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kvdec_auipc. Qed.
+  Proof. mk_base (KM + 0x1c)%Z (mword_of_int 0x00006517 : mword 32) (mword_of_int (KM + 0x1c) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00006517. Qed.
   Lemma ki_20 : KMP 0x20 false (ITYPE (mword_of_int 0x16 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KM + 0x20)%Z (mword_of_int 0x01650513 : mword 32) (mword_of_int (KM + 0x20) : mword 64) (ITYPE (mword_of_int 0x16 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kvdec_addi. Qed.
   Lemma ki_24 : KMP 0x24 false (JAL (mword_of_int 2094876 : mword 21, Regidx (mword_of_int 1))).

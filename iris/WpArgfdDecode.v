@@ -75,10 +75,7 @@ Import Defs.
 (* ===================================================================== *)
 
 (* +0x0e  c.mv s1,a2 *)
-Lemma afdc_84b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84b2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_84b2] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* +0x36  c.beqz a5,+0x20 *)
 Lemma afdc_c385 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -185,7 +182,7 @@ Section ArgfdInstrs.
 
   Lemma afi_0e : kernel_text -∗ instr (mword_of_int (AF + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (AF + 0x0e)%Z (mword_of_int 0x84b2 : mword 16)
-    (mword_of_int (AF + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)) afdc_84b2 exec_execute_C_MV. Qed.
+    (mword_of_int (AF + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)) cdec_84b2 exec_execute_C_MV. Qed.
 
   Lemma afi_10 : kernel_text -∗ instr (mword_of_int (AF + 0x10) : mword 64) false (ITYPE (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (AF + 0x10)%Z (mword_of_int 0xfdc40593 : mword 32)

@@ -281,35 +281,6 @@ Section WpSconfAlu.
       unfold gpr_and_val. rewrite Hva Hvb. reflexivity.
   Qed.
 
-  (* the compressed [c.sub rd,rd,rs2] -- copyinstr forms its source/destination
-     pointer DIFFERENCE with one ([c.sub a2,a2,s1]). *)
-  Lemma wp_csub_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs2 : mword 5)
-      (m : regfile) (n : nat) :
-    uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sie_cap_gpr γ m n -∗
-    pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, SUB)) -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
-        (sub_vec (m !!! Regidx rd) (m !!! Regidx rs2))]> m) n -∗
-      pc_is (add_vec_int pc 2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf γ Φ pc rd rd rs2
-              (RTYPE (Regidx rs2, Regidx rd, Regidx rd, SUB))
-              (sub_vec (m !!! Regidx rd) (m !!! Regidx rs2))
-              m n Hrd Hrdsp _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva Hvb.
-      change (execute (RTYPE (Regidx rs2, Regidx rd, Regidx rd, SUB)))
-        with (execute_RTYPE (Regidx rs2) (Regidx rd) (Regidx rd) SUB).
-      rewrite (exec_execute_RTYPE_SUB_gpr rs2 rd rd s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_sub_val. rewrite Hva Hvb. reflexivity.
-  Qed.
-
   (* the base (4-byte) [and rd,rs1,rs2] with rd <> rs1, which the compressed
      [wp_cand_s_sconf] above cannot express: vmfault's [and s4,s2,a5] and both
      copy loops' PGROUNDDOWN mask a virtual address with -4096 into a
@@ -392,6 +363,60 @@ Section WpSconfAlu.
       rewrite (exec_execute_RTYPE_SUB_gpr rs2 rs1 rd s_pc).
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       unfold gpr_sub_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  (* the COMPRESSED [c.sub] -- same leaf, 2-byte pc bump.  (The
+     [C_SUB -> RTYPE] expansion is [WpMmodeLeafBase.exec_execute_C_SUB].)
+     Stated with the stored value as an explicit [wval] so the term the map
+     holds is CLOSED -- the "stored value containing an insert-lookup"
+     derailment in claude-notes/durable-notes.md.  [wp_csub_s_sconf] below is
+     the encoding's own shape (c.sub can only encode rd = rs1) as a
+     restatement of this one. *)
+  Lemma wp_csub_wval_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = wval ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf γ Φ pc rd rs1 rs2
+              (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m n
+              Hrd Hrdsp _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)))
+        with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) SUB).
+      rewrite (exec_execute_RTYPE_SUB_gpr rs2 rs1 rd s_pc).
+      replace (Z.eqb (uint rd) 0) with false
+        by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_sub_val. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  (* the shape the C.SUB encoding actually has, at the stored value inline. *)
+  Lemma wp_csub_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs2 : mword 5)
+      (m : regfile) (n : nat) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, SUB)) -∗
+    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg
+        (sub_vec (m !!! Regidx rd) (m !!! Regidx rs2))]> m) n -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hrd Hrdsp.
+    exact (wp_csub_wval_s_sconf γ Φ pc rd rd rs2
+             (sub_vec (m !!! Regidx rd) (m !!! Regidx rs2)) m n
+             Hrd Hrdsp eq_refl).
   Qed.
 
   Lemma wp_add_s_sconf (γ : gname) (Φ : mval -> iProp Σ)

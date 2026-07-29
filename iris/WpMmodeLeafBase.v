@@ -1337,6 +1337,16 @@ Lemma exec_execute_C_ADDW (rsd rs2 : cregidx) s :
   = Some (ExecuteAs (RTYPEW (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, ADDW)), s).
 Proof. unfold execute. cbn match. unfold execute_C_ADDW. cbn zeta. apply exec_returnM. Qed.
 
+(* c.sub -- the creg-form SUB expansion (uvmdealloc's [npages] computation is
+   the kernel's first use).  [UserExecFacts.exec_execute_C_SUB] is the
+   user-mode catalog's independent copy; the two files are SIBLINGS (neither
+   imports the other), so it cannot be retired in favour of this one without
+   dragging this Iris-heavy file into the user-exec chain. *)
+Lemma exec_execute_C_SUB (rsd rs2 : cregidx) s :
+  exec (execute (C_SUB (rsd, rs2))) s
+  = Some (ExecuteAs (RTYPE (creg2reg_idx rs2, creg2reg_idx rsd, creg2reg_idx rsd, SUB)), s).
+Proof. unfold execute. cbn match. unfold execute_C_SUB. cbn zeta. apply exec_returnM. Qed.
+
 Lemma exec_execute_C_ANDI (imm : mword 6) (rsd : cregidx) s :
   exec (execute (C_ANDI (imm, rsd))) s
   = Some (ExecuteAs (ITYPE (sign_extend' 12 imm, creg2reg_idx rsd, creg2reg_idx rsd, ANDI)), s).

@@ -83,10 +83,7 @@ Lemma sddec_addi_a5_8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) 
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x68  0x95be  c.add a1,a1,a5 *)
-Lemma sddec_add_a1_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x95be : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 11), Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_95be] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* ===================================================================== *)
 (* Fresh base (32-bit) decode templates.                                  *)
@@ -380,7 +377,7 @@ Section WpSchedDecode.
   (* ---- +0x68: c.add a1,a1,a5 ---- *)
   Lemma sdi_68 : kernel_text -∗ instr (mword_of_int (SD + 0x68) : mword 64) true (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (SD + 0x68)%Z (mword_of_int 0x95be : mword 16)
-    (mword_of_int (SD + 0x68) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADD)) sddec_add_a1_a5 exec_execute_C_ADD. Qed.
+    (mword_of_int (SD + 0x68) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADD)) cdec_95be exec_execute_C_ADD. Qed.
 
   (* ---- +0x6a: addi a0,s1,96 ---- *)
   Lemma sdi_6a : kernel_text -∗ instr (mword_of_int (SD + 0x6a) : mword 64) false (ITYPE (mword_of_int 0x60 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).

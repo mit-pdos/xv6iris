@@ -98,3 +98,34 @@ Lemma bdec_0d078793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 208 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
+
+(* ---- words the uvmunmap / uvmalloc catalogs shared with the rest of the
+   tree ---- *)
+
+(* 0x00006517  auipc a0,0x6 -- acquire, kvmmap, proc_mapstacks, uvmunmap:
+   every function that materializes a pointer into the 0x80006xxx globals *)
+Lemma bdec_00006517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
+  = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0x00c79513  slli a0,a5,0xc -- walkaddr, uvmunmap (PTE2PA's << 12) *)
+Lemma bdec_00c79513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00c79513 : mword 32)) s
+  = Some (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15),
+                    Regidx (mword_of_int 10), SLLI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0x03459793  slli a5,a1,0x34 -- mappages, uvmunmap: the page-alignment
+   test [(va % PGSIZE) != 0], as a shift that keeps only the low 12 bits *)
+Lemma bdec_03459793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x03459793 : mword 32)) s
+  = Some (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 11),
+                    Regidx (mword_of_int 15), SLLI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0xf51ff0ef  jal ra,-0xb0 -- walkaddr, uvmalloc (JAL residue 2096976) *)
+Lemma bdec_f51ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf51ff0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.

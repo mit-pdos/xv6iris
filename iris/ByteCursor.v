@@ -275,6 +275,43 @@ Proof.
   rewrite Z.div_mul; [ reflexivity | rewrite E32; lia ].
 Qed.
 
+(* [srli rd,rs,0xc] -- the same decoder spelling of the shift amount as
+   [slli32_srli32] above, at 12: the instruction is unsigned division by the
+   page size.  (uvmdealloc's [npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz))
+   / PGSIZE].) *)
+Local Lemma bc_z_div4096_range (v : Z) :
+  0 <= v < 18446744073709551616 -> 0 <= v / 4096 < 18446744073709551616.
+Proof.
+  intros [H0 H1]. split; [apply Z.div_pos; lia |].
+  apply Z.le_lt_trans with v; [| lia]. apply Z.div_le_upper_bound; lia.
+Qed.
+
+Lemma srli12_div4096 (x : mword 64) :
+  shift_bits_right x (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
+  = (mword_of_int (bv_unsigned x / 4096) : mword 64).
+Proof.
+  assert (Hr : shift_bits_right x
+                 (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
+             = shiftr x 12).
+  { unfold shift_bits_right. f_equal; vm_compute; reflexivity. }
+  rewrite Hr. apply bv_eq.
+  unfold shiftr, SailStdpp.Values.with_word, get_word,
+    MachineWord.MachineWord.logical_shift_right.
+  rewrite bv_shiftr_unsigned.
+  assert (H12 : bv_unsigned (MachineWord.MachineWord.N_to_word
+                   (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12)) = 12).
+  { unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus; simpl; lia. }
+  rewrite H12. rewrite Z.shiftr_div_pow2; [| lia].
+  change (2 ^ 12) with 4096.
+  rewrite moi64_unsigned. symmetry. apply bvw64_small.
+  apply bc_z_div4096_range.
+  pose proof (bv_unsigned_in_range _ x) as Hr64.
+  assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
+    by (vm_compute; reflexivity).
+  rewrite Hm in Hr64. exact Hr64.
+Qed.
+
 (* ===================================================================== *)
 (*  THE LOOP COUNTER.                                                     *)
 (*                                                                        *)
@@ -308,6 +345,18 @@ Proof.
   split; [apply Nat2Z.is_nonneg | exact Hk].
 Qed.
 
+(* a cursor bumped by an IMMEDIATE, read back as the unsigned sum -- the
+   non-wrapping case, where the caller already knows the running value.
+   (uvmalloc's [a += PGSIZE].) *)
+Lemma bc_add_moi (x : mword 64) (b k : Z) :
+  bv_unsigned x = b -> 0 <= b -> 0 <= k -> b + k < 18446744073709551616 ->
+  bv_unsigned (add_vec x (mword_of_int k)) = b + k.
+Proof.
+  intros Hx H0 Hk Hb.
+  rewrite bc_add_vec_unsigned, Hx, (bc_moi_small k ltac:(lia)).
+  apply bc_wrap_small; lia.
+Qed.
+
 (* the zero test a [beqz]/[bnez] on the counter decides *)
 Lemma bc_eqz_moi (k : nat) : (Z.of_nat k < 18446744073709551616)%Z ->
   eq_vec (mword_of_int (Z.of_nat k) : mword 64) zero_reg = Nat.eqb k 0.
@@ -334,19 +383,38 @@ Proof.
   intros Hk Hne. rewrite (bc_eqz_moi k Hk). apply Nat.eqb_neq. exact Hne.
 Qed.
 
-(* the unsigned compare a [bgeu] on two counters decides *)
+(* the unsigned compare a [bgeu] decides, at ARBITRARY operands -- the two
+   one-sided readings.  A loop that compares two ADDRESSES (uvmunmap's
+   [a < va + npages*PGSIZE]) has no [mword_of_int (Z.of_nat _)] to appeal to,
+   so it wants the compare stated directly over [bv_unsigned]. *)
+Lemma bc_geu (x y : mword 64) :
+  (bv_unsigned y <= bv_unsigned x)%Z -> zopz0zKzJ_u x y = true.
+Proof.
+  intro H. unfold zopz0zKzJ_u. rewrite !uint_unsigned. rewrite Z.geb_leb.
+  apply Z.leb_le. exact H.
+Qed.
+
+Lemma bc_ltu (x y : mword 64) :
+  (bv_unsigned x < bv_unsigned y)%Z -> zopz0zKzJ_u x y = false.
+Proof.
+  intro H. unfold zopz0zKzJ_u. rewrite !uint_unsigned. rewrite Z.geb_leb.
+  apply Z.leb_gt. exact H.
+Qed.
+
+(* ...and the counter-flavoured instance, off the same two readings *)
 Lemma bc_ge_moi (a b : nat) :
   (Z.of_nat a < 18446744073709551616)%Z -> (Z.of_nat b < 18446744073709551616)%Z ->
   zopz0zKzJ_u (mword_of_int (Z.of_nat a) : mword 64) (mword_of_int (Z.of_nat b))
   = Nat.leb b a.
 Proof.
-  intros Ha Hb. unfold zopz0zKzJ_u. rewrite !uint_unsigned.
-  rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
-  rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)).
-  rewrite Z.geb_leb.
+  intros Ha Hb.
   destruct (Nat.leb_spec b a) as [Hle | Hlt].
-  - apply Z.leb_le. lia.
-  - apply Z.leb_gt. lia.
+  - apply bc_geu.
+    rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
+    rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)). lia.
+  - apply bc_ltu.
+    rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
+    rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)). lia.
 Qed.
 
 (* the decrement *)

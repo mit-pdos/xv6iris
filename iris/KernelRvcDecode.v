@@ -1338,3 +1338,85 @@ Lemma cdec_a025 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xa025 : mword 16)) s
   = Some (C_J (mword_of_int 20), s).
   Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ---- words the uvmunmap / uvmdealloc / uvmalloc catalogs shared with the
+   rest of the tree (each was proved locally in two to four files) ---- *)
+
+(* 0x17fd  c.addi a5,a5,-1    -- kalloc, uvmalloc, uvmdealloc (imm6 = 63,
+   the 6-bit residue of -1: the [0xfff] half of a PGROUNDUP) *)
+Lemma cdec_17fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x17fd : mword 16)) s
+  = Some (C_ADDI (mword_of_int 63, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x6785  c.lui a5,0x1       -- freerange, uvmalloc, uvmdealloc (PGSIZE) *)
+Lemma cdec_6785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x6785 : mword 16)) s
+  = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x77fd  c.lui a5,0xfffff   -- vmfault, uvmalloc (-4096; imm6 = 63) *)
+Lemma cdec_77fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x77fd : mword 16)) s
+  = Some (C_LUI (mword_of_int 63, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x83a9  c.srli a5,a5,0xa   -- walkaddr, uvmunmap (PTE2PA's >> 10) *)
+Lemma cdec_83a9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x83a9 : mword 16)) s
+  = Some (C_SRLI (mword_of_int 10, Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x84b2  c.mv s1,a2         -- argfd, uvmdealloc *)
+Lemma cdec_84b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x84b2 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 12)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x8556  c.mv a0,s5         -- copyin, printk, uvmalloc *)
+Lemma cdec_8556 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8556 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 21)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x8a32  c.mv s4,a2         -- pipewrite, uvmalloc *)
+Lemma cdec_8a32 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8a32 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 12)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x8ab6  c.mv s5,a3         -- copyout, uvmunmap *)
+Lemma cdec_8ab6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8ab6 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 13)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x95be  c.add a1,a1,a5     -- sched, uvmalloc *)
+Lemma cdec_95be s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x95be : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 11), Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xa015  c.j +0x24          -- printk, uvmunmap (offset/2 = 18) *)
+Lemma cdec_a015 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa015 : mword 16)) s
+  = Some (C_J (mword_of_int 18 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xb7d5  c.j -0x1c          -- consputc, uvmdealloc (11-bit residue 2034) *)
+Lemma cdec_b7d5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xb7d5 : mword 16)) s
+  = Some (C_J (mword_of_int 2034 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xbfc9  c.j -0x2e          -- piperead, uvmunmap (11-bit residue 2025) *)
+Lemma cdec_bfc9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbfc9 : mword 16)) s
+  = Some (C_J (mword_of_int 2025 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xbfe1  c.j -0x28          -- printk, uvmalloc (11-bit residue 2028) *)
+Lemma cdec_bfe1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbfe1 : mword 16)) s
+  = Some (C_J (mword_of_int 2028 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.

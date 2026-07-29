@@ -141,10 +141,7 @@ Section ProcMapstacksInstrs.
     exec (ext_decode_compressed (mword_of_int 0x6c02 : mword 16)) s
     = Some (C_LDSP (mword_of_int 0, Regidx (mword_of_int 24)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma pmsdec_98 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
-    = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+  (* [bdec_00006517] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
   Lemma pmsdec_9c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x94a50513 : mword 32)) s
     = Some (ITYPE (mword_of_int 2378 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
@@ -274,7 +271,7 @@ Section ProcMapstacksInstrs.
   Lemma pmsi_96 : PMS 0x96 true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).  (* ret *)
   Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x96)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x96) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
   Lemma pmsi_98 : PMS 0x98 false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).  (* auipc a0,0x6 *)
-  Proof. mk_base (KernelSyms.proc_mapstacks + 0x98)%Z (mword_of_int 0x00006517 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x98) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) pmsdec_98. Qed.
+  Proof. mk_base (KernelSyms.proc_mapstacks + 0x98)%Z (mword_of_int 0x00006517 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x98) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00006517. Qed.
   Lemma pmsi_9c : PMS 0x9c false (ITYPE (mword_of_int 2378 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).  (* addi a0,a0,-1718 # 80007158 <etext+0x158> *)
   Proof. mk_base (KernelSyms.proc_mapstacks + 0x9c)%Z (mword_of_int 0x94a50513 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x9c) : mword 64) (ITYPE (mword_of_int 2378 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) pmsdec_9c. Qed.
   Lemma pmsi_a0 : PMS 0xa0 false (JAL (mword_of_int 2093072 : mword 21, Regidx (mword_of_int 1))).  (* jal 80000826 <panic> *)

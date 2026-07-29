@@ -474,10 +474,7 @@ Lemma pkdc_84d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x8556  mv a0,s5 *)
-Lemma pkdc_8556 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8556 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 21)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_8556] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 
 (* 0x8636  mv a2,a3 *)
@@ -547,10 +544,7 @@ Lemma pkdc_a00d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xa015  j 80000582 *)
-Lemma pkdc_a015 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa015 : mword 16)) s
-  = Some (C_J (mword_of_int 18 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_a015] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0xa2c9  j 800007b2 *)
 Lemma pkdc_a2c9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -721,10 +715,7 @@ Lemma pkdc_bfd1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xbfe1  j 8000075c *)
-Lemma pkdc_bfe1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfe1 : mword 16)) s
-  = Some (C_J (mword_of_int 2028 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_bfe1] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0xc38d  beqz a5,80000786 *)
 Lemma pkdc_c38d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -1269,7 +1260,7 @@ Section WpPrintkDecode.
 
   Lemma pki_62 : kernel_text -∗ instr (mword_of_int (PK + 0x62) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PK + 0x62)%Z (mword_of_int 0xa015 : mword 16)
-    (mword_of_int (PK + 0x62) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")), zreg)) pkdc_a015 exec_execute_C_J. Qed.
+    (mword_of_int (PK + 0x62) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")), zreg)) cdec_a015 exec_execute_C_J. Qed.
 
   Lemma pki_64 : kernel_text -∗ instr (mword_of_int (PK + 0x64) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (PK + 0x64)%Z (mword_of_int 0x00012517 : mword 32)
@@ -1869,7 +1860,7 @@ Section WpPrintkDecode.
 
   Lemma pki_246 : kernel_text -∗ instr (mword_of_int (PK + 0x246) : mword 64) true (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PK + 0x246)%Z (mword_of_int 0x8556 : mword 16)
-    (mword_of_int (PK + 0x246) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) pkdc_8556 exec_execute_C_MV. Qed.
+    (mword_of_int (PK + 0x246) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) cdec_8556 exec_execute_C_MV. Qed.
 
   Lemma pki_248 : kernel_text -∗ instr (mword_of_int (PK + 0x248) : mword 64) false (JAL (mword_of_int 2095928 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PK + 0x248)%Z (mword_of_int 0xb39ff0ef : mword 32)
@@ -1989,7 +1980,7 @@ Section WpPrintkDecode.
 
   Lemma pki_288 : kernel_text -∗ instr (mword_of_int (PK + 0x288) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PK + 0x288)%Z (mword_of_int 0xbfe1 : mword 16)
-    (mword_of_int (PK + 0x288) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")), zreg)) pkdc_bfe1 exec_execute_C_J. Qed.
+    (mword_of_int (PK + 0x288) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")), zreg)) cdec_bfe1 exec_execute_C_J. Qed.
 
   Lemma pki_28a : kernel_text -∗ instr (mword_of_int (PK + 0x28a) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (PK + 0x28a)%Z (mword_of_int 0x00012517 : mword 32)
@@ -2169,7 +2160,7 @@ Section WpPrintkDecode.
 
   Lemma pki_322 : kernel_text -∗ instr (mword_of_int (PK + 0x322) : mword 64) true (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PK + 0x322)%Z (mword_of_int 0x8556 : mword 16)
-    (mword_of_int (PK + 0x322) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) pkdc_8556 exec_execute_C_MV. Qed.
+    (mword_of_int (PK + 0x322) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) cdec_8556 exec_execute_C_MV. Qed.
 
   Lemma pki_324 : kernel_text -∗ instr (mword_of_int (PK + 0x324) : mword 64) false (JAL (mword_of_int 2095708 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PK + 0x324)%Z (mword_of_int 0xa5dff0ef : mword 32)

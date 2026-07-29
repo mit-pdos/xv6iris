@@ -73,136 +73,13 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-(* ===================================================================== *)
-(* Pure [Z] bridges.                                                      *)
-(*                                                                        *)
-(*   [lia] misbehaves on any goal mentioning [bv_unsigned] under this      *)
-(*   file's transitive [bitvector.tactics] import (durable-notes.md), so   *)
-(*   every arithmetic step is packaged here over plain [Z] variables and   *)
-(*   applied as a closed fact.  [274877898752 = uvm_maxsz = 2^38 - 8192],  *)
-(*   [274877906944 = 2^38], [67108862 = tf_vpn], [67108863 = tramp_vpn].   *)
-(*                                                                        *)
-(*   HOME: these are uvmunmap's own range arithmetic; if uvmalloc /        *)
-(*   uvmdealloc want them too they belong next to [uvm_maxsz] in           *)
-(*   ProcPtOwn.v §3d.                                                      *)
-(* ===================================================================== *)
-
-Lemma uu_z_iter (v d np : Z) :
-  0 <= v -> 0 <= d -> d + 1 <= np -> v + np * 4096 <= 274877898752 ->
-  0 <= v + 4096 * d
-  /\ v + 4096 * d < 274877906944
-  /\ v + 4096 * d < 18446744073709551616
-  /\ (v + 4096 * d) / 4096 < 67108862.
-Proof.
-  intros H0 H1 H2 H3.
-  split; [lia |]. split; [lia |]. split; [lia |].
-  apply Z.div_lt_upper_bound; lia.
-Qed.
-
-Lemma uu_z_end64 (v np : Z) :
-  0 <= v -> 0 <= np -> v + np * 4096 <= 274877898752 ->
-  v + 4096 * np < 18446744073709551616.
-Proof. intros; lia. Qed.
-
-Lemma uu_z_strict (v a b : Z) : a < b -> v + 4096 * a < v + 4096 * b.
-Proof. intros; lia. Qed.
-
-Lemma uu_z_ne_lt (x y : Z) : x < y -> x = y -> False.
-Proof. intros; lia. Qed.
-
-Lemma uu_z_ne_tramp (x : Z) : x < 67108862 -> x = 67108863 -> False.
-Proof. intros; lia. Qed.
-
-Lemma uu_z_shl52 (x : Z) :
-  x mod 4096 = 0 -> x * 4503599627370496 mod 18446744073709551616 = 0.
-Proof.
-  intro H. apply Z.mod_divide in H; [| lia].
-  destruct H as [q Hq]. subst x.
-  replace (q * 4096 * 4503599627370496) with (q * 18446744073709551616) by lia.
-  apply Z.mod_mul. lia.
-Qed.
-
-Lemma uu_z_shl12 (z : Z) :
-  z mod 18446744073709551616 * 4096 mod 18446744073709551616
-  = z * 4096 mod 18446744073709551616.
-Proof. rewrite Z.mul_mod_idemp_l; [reflexivity | lia]. Qed.
-
-(* ===================================================================== *)
-(* The two shift bridges the alignment test and the [npages << 12] setup  *)
-(* need.  Both mirror [ProcPtOwn.ppo_shiftl12]'s one-line recipe.         *)
-(* HOME: next to [ProcPtOwn.pte2pa].                                      *)
-(* ===================================================================== *)
-
-Lemma uu_shl_unsigned_52 (v : mword 64) :
-  bv_unsigned (shiftl v 52)
-  = bv_unsigned v * 4503599627370496 mod 18446744073709551616.
-Proof.
-  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
-  rewrite bv_shiftl_unsigned.
-  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
-             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 52))) with 52
-    by (vm_compute; reflexivity).
-  rewrite Z.shiftl_mul_pow2; [reflexivity | lia].
-Qed.
-
-Lemma uu_shl_unsigned_12 (v : mword 64) :
-  bv_unsigned (shiftl v 12) = bv_unsigned v * 4096 mod 18446744073709551616.
-Proof.
-  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
-  rewrite bv_shiftl_unsigned.
-  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
-             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 12))) with 12
-    by (vm_compute; reflexivity).
-  rewrite Z.shiftl_mul_pow2; [reflexivity | lia].
-Qed.
-
-(* [va << 52 == 0] IS the page-alignment test: only the low twelve bits
-   survive the shift. *)
-Lemma uu_shl52_aligned (a : mword 64) (n : Z) (s : mword n) :
-  int_of_mword false s = 52 ->
-  bv_unsigned a mod 4096 = 0 ->
-  shift_bits_left a s = (mword_of_int 0 : mword 64).
-Proof.
-  intros Hs Ha. apply bv_eq.
-  unfold shift_bits_left. rewrite Hs. rewrite uu_shl_unsigned_52.
-  replace (bv_unsigned (mword_of_int 0 : mword 64)) with 0
-    by (vm_compute; reflexivity).
-  exact (uu_z_shl52 _ Ha).
-Qed.
-
-Lemma uu_shl12_moi (z : Z) (n : Z) (s : mword n) :
-  int_of_mword false s = 12 ->
-  shift_bits_left (mword_of_int z : mword 64) s = (mword_of_int (z * 4096) : mword 64).
-Proof.
-  intro Hs. apply bv_eq.
-  unfold shift_bits_left. rewrite Hs. rewrite uu_shl_unsigned_12.
-  rewrite !bc_moi_unsigned. exact (uu_z_shl12 z).
-Qed.
-
-(* the loop bound [s3 = va + npages*PGSIZE], as [add s3,a2,a1] computes it *)
-Lemma uu_bound_val (va : mword 64) (n : nat) (k : Z) (s : mword k) :
-  int_of_mword false s = 12 ->
-  add_vec (shift_bits_left (mword_of_int (Z.of_nat n) : mword 64) s) va
-  = add_vec va (mword_of_int (4096 * Z.of_nat n)).
-Proof.
-  intro Hs. rewrite (uu_shl12_moi (Z.of_nat n) k s Hs).
-  rewrite (Z.mul_comm (Z.of_nat n) 4096). apply add_vec_comm.
-Qed.
-
-(* the two readings of the unsigned compare a [bgeu] decides *)
-Lemma uu_geu (x y : mword 64) :
-  (bv_unsigned y <= bv_unsigned x)%Z -> zopz0zKzJ_u x y = true.
-Proof.
-  intro H. unfold zopz0zKzJ_u. rewrite !uint_unsigned. rewrite Z.geb_leb.
-  apply Z.leb_le. exact H.
-Qed.
-
-Lemma uu_ltu (x y : mword 64) :
-  (bv_unsigned x < bv_unsigned y)%Z -> zopz0zKzJ_u x y = false.
-Proof.
-  intro H. unfold zopz0zKzJ_u. rewrite !uint_unsigned. rewrite Z.geb_leb.
-  apply Z.leb_gt. exact H.
-Qed.
+(* uvmunmap's arithmetic is all SHARED and lives at its own altitude: the
+   run-cursor / PGROUNDUP [Z] facts ([z_run_iter], [z_run_end64],
+   [z_run_strict], [z_lt_tramp_vpn_ne]) and the two shift bridges
+   ([shl52_aligned] -- the page-alignment test -- [shl12_moi] and
+   [shl12_pages_add]) are in ProcPtOwn.v; the two readings of the unsigned
+   compare a [bgeu] decides are [ByteCursor.bc_geu] / [bc_ltu].  Only the
+   two callee-saved transport predicates below are function-specific. *)
 
 (* the callee-saved registers the function never touches, in its two
    flavours: inside the loop s1 is live (it holds the PTE pointer), at the
@@ -571,7 +448,7 @@ Section ProofUvmunmap.
     (* ---- the iteration's numeric facts ---- *)
     pose proof (bv_unsigned_in_range 64 va) as [Hva0 _].
     assert (Hdnp : (Z.of_nat done + 1 <= Z.of_nat npages)%Z) by lia.
-    destruct (uu_z_iter (bv_unsigned va) (Z.of_nat done) (Z.of_nat npages)
+    destruct (z_run_iter (bv_unsigned va) (Z.of_nat done) (Z.of_nat npages)
                 Hva0 (Nat2Z.is_nonneg done) Hdnp Hrange)
       as (Hcnn & Hc38 & Hc64 & Hcvpn).
     assert (Hcuru : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat done)))
@@ -590,11 +467,11 @@ Section ProofUvmunmap.
     assert (Hntf : vpn_at (svpn_of va) done <> tf_vpn).
     { intro He. apply (f_equal bv_unsigned) in He. rewrite Hvpnu in He.
       replace (bv_unsigned tf_vpn) with 67108862 in He by (vm_compute; reflexivity).
-      exact (uu_z_ne_lt _ _ Hcvpn He). }
+      exact (Z.lt_neq _ _ Hcvpn He). }
     assert (Hntr : vpn_at (svpn_of va) done <> tramp_vpn).
     { intro He. apply (f_equal bv_unsigned) in He. rewrite Hvpnu in He.
       replace (bv_unsigned tramp_vpn) with 67108863 in He by (vm_compute; reflexivity).
-      exact (uu_z_ne_tramp _ Hcvpn He). }
+      exact (z_lt_tramp_vpn_ne _ Hcvpn He). }
     (* ---- the instruction facts ---- *)
     iPoseProof (uui_50 with "Htext") as "Hi50".
     iPoseProof (uui_52 with "Htext") as "Hi52".
@@ -664,7 +541,7 @@ Section ProofUvmunmap.
       { (* the run is finished: close the table and leave at +0x76 *)
         assert (Hdn : S done = npages) by lia.
         assert (Hcmp : zopz0zKzJ_u (T1 !!! Regidx Rs2) (T1 !!! Regidx Rs3) = true).
-        { rewrite HT1s2 HT1s3. rewrite Hdn. apply uu_geu. apply Z.le_refl. }
+        { rewrite HT1s2 HT1s3. rewrite Hdn. apply bc_geu. apply Z.le_refl. }
         iApply (wp_bgeu_taken_s_sconf γ Φ (mword_of_int (UU + 0x4c))
                   (mword_of_int 42 : mword 13) Rs3 Rs2 T1 (K - 8)
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -686,15 +563,15 @@ Section ProofUvmunmap.
       (* more pages to go: fall through to the loop head *)
       assert (Hsdlt : (S done < npages)%nat) by lia.
       assert (Hcmp : zopz0zKzJ_u (T1 !!! Regidx Rs2) (T1 !!! Regidx Rs3) = false).
-      { rewrite HT1s2 HT1s3. apply uu_ltu.
+      { rewrite HT1s2 HT1s3. apply bc_ltu.
         rewrite (pb_va_k_unsigned va (S done)
-                   ltac:(exact (proj1 (proj2 (proj2 (uu_z_iter (bv_unsigned va)
+                   ltac:(exact (proj1 (proj2 (proj2 (z_run_iter (bv_unsigned va)
                             (Z.of_nat (S done)) (Z.of_nat npages) Hva0
                             (Nat2Z.is_nonneg (S done)) ltac:(lia) Hrange))))) ).
         rewrite (pb_va_k_unsigned va npages
-                   ltac:(exact (uu_z_end64 (bv_unsigned va) (Z.of_nat npages)
+                   ltac:(exact (z_run_end64 (bv_unsigned va) (Z.of_nat npages)
                            Hva0 (Nat2Z.is_nonneg npages) Hrange))).
-        apply uu_z_strict. lia. }
+        apply z_run_strict. lia. }
       iApply (wp_bgeu_fall_s_sconf γ Φ (mword_of_int (UU + 0x4c))
                 (mword_of_int 42 : mword 13) Rs3 Rs2 T1 (K - 8)
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1306,7 +1183,7 @@ Section ProofUvmunmap.
     assert (Hshl : shift_bits_left (R2 !!! Regidx Ra1)
               (subrange_vec_dec (mword_of_int 52 : mword 6) (Z.sub log2_xlen 1) 0)
             = (mword_of_int 0 : mword 64)).
-    { rewrite HR2a1. exact (uu_shl52_aligned va _ _ Hs52 Hva12). }
+    { rewrite HR2a1. exact (shl52_aligned va _ _ Hs52 Hva12). }
     iApply (wp_slli_s_sconf γ Φ (mword_of_int (UU + 0x08)) Ra5 Ra1
               (mword_of_int 52 : mword 6) (mword_of_int 0 : mword 64) R2 (K - 8)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hshl
@@ -1425,7 +1302,7 @@ Section ProofUvmunmap.
     assert (HR7a1 : R7 !!! Regidx Ra1 = va) by lkp.
     assert (Hbnd : add_vec (R7 !!! Regidx Ra2) (R7 !!! Regidx Ra1)
                    = add_vec va (mword_of_int (4096 * Z.of_nat npages))).
-    { rewrite HR7a2 HR7a1. apply uu_bound_val. exact Hs12'. }
+    { rewrite HR7a2 HR7a1. apply shl12_pages_add. exact Hs12'. }
     iApply (wp_add_s_sconf γ Φ (mword_of_int (UU + 0x20)) Rs3 Ra2 Ra1
               (add_vec va (mword_of_int (4096 * Z.of_nat npages))) R7 (K - 8)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hbnd
@@ -1473,12 +1350,12 @@ Section ProofUvmunmap.
     assert (Hends : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat npages)))
                     = bv_unsigned va + 4096 * Z.of_nat npages).
     { apply pb_va_k_unsigned.
-      exact (uu_z_end64 (bv_unsigned va) (Z.of_nat npages) Hva0
+      exact (z_run_end64 (bv_unsigned va) (Z.of_nat npages) Hva0
                (Nat2Z.is_nonneg npages) Hrz). }
     destruct (Nat.eq_dec npages 0) as [Hnp0 | Hnppos].
     { (* ============ npages == 0: nothing to do ============ *)
       assert (Hcmp : zopz0zKzJ_u (R9 !!! Regidx Ra1) (R9 !!! Regidx Rs3) = true).
-      { rewrite HR9a1 HR9s3. apply uu_geu. rewrite Hends. rewrite Hnp0. cbn [Z.of_nat]. lia. }
+      { rewrite HR9a1 HR9s3. apply bc_geu. rewrite Hends. rewrite Hnp0. cbn [Z.of_nat]. lia. }
       iApply (wp_bgeu_taken_s_sconf γ Φ (mword_of_int (UU + 0x26))
                 (mword_of_int 82 : mword 13) Rs3 Ra1 R9 (K - 8)
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -1501,7 +1378,7 @@ Section ProofUvmunmap.
         iExact "Hpt". } }
     (* ============ npages >= 1: run the loop ============ *)
     assert (Hcmp : zopz0zKzJ_u (R9 !!! Regidx Ra1) (R9 !!! Regidx Rs3) = false).
-    { rewrite HR9a1 HR9s3. apply uu_ltu. rewrite Hends.
+    { rewrite HR9a1 HR9s3. apply bc_ltu. rewrite Hends.
       assert (Hnp1 : (1 <= Z.of_nat npages)%Z) by lia. lia. }
     iApply (wp_bgeu_fall_s_sconf γ Φ (mword_of_int (UU + 0x26))
               (mword_of_int 82 : mword 13) Rs3 Ra1 R9 (K - 8)

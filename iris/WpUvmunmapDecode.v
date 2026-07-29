@@ -98,7 +98,7 @@ Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import KernelRvcDecode.
+Require Import KernelRvcDecode KernelBaseDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -144,10 +144,7 @@ Lemma uudc_e38d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x1c  c.mv s5,a3 *)
-Lemma uudc_8ab6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8ab6 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 13)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_8ab6] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x1e  c.slli a2,a2,0xc *)
 Lemma uudc_0632 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -156,10 +153,7 @@ Lemma uudc_0632 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x2c  c.j +0x24  (offset/2 = 18) *)
-Lemma uudc_a015 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa015 : mword 16)) s
-  = Some (C_J (mword_of_int 18 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_a015] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x4a  c.add s2,s2,s6 *)
 Lemma uudc_995a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -180,26 +174,17 @@ Lemma uudc_d37d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x6a  c.srli a5,a5,0xa  -- the first half of PTE2PA *)
-Lemma uudc_83a9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x83a9 : mword 16)) s
-  = Some (C_SRLI (mword_of_int 10, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_83a9] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x74  c.j -0x2e  (offset/2 = -23; 11-bit residue 2025) *)
-Lemma uudc_bfc9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfc9 : mword 16)) s
-  = Some (C_J (mword_of_int 2025 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_bfc9] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts -- all thirteen are uvmunmap's own.         *)
 (* ===================================================================== *)
 
 (* 0x08  slli a5,a1,0x34  -- (va << 52) != 0 is the "not page aligned" test *)
-Lemma uudb_03459793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x03459793 : mword 32)) s
-  = Some (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 15), SLLI), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_03459793] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x20  add s3,a2,a1  -- the loop bound va + npages*PGSIZE *)
 Lemma uudb_00b609b3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -214,10 +199,7 @@ Lemma uudb_0535f963 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* 0x3a  auipc a0,0x6  -- first half of the panic-message address *)
-Lemma uudb_00006517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00006517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_00006517] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x3e  addi a0,a0,-280  (12-bit residue 3816) *)
 Lemma uudb_ee850513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -262,10 +244,7 @@ Lemma uudb_fe0a80e3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* 0x6c  slli a0,a5,0xc  -- the second half of PTE2PA *)
-Lemma uudb_00c79513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00c79513 : mword 32)) s
-  = Some (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_00c79513] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x70  jal ra,kfree  (0x8000126e -> 0x80000a46 is -2088) *)
 Lemma uudb_fd8ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -302,7 +281,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_08 : kernel_text -∗ instr (mword_of_int (UU + 0x08) : mword 64) false (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_base (UU + 0x08)%Z (mword_of_int 0x03459793 : mword 32)
-    (mword_of_int (UU + 0x08) : mword 64) (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 15), SLLI)) uudb_03459793. Qed.
+    (mword_of_int (UU + 0x08) : mword 64) (SHIFTIOP (mword_of_int 52 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 15), SLLI)) bdec_03459793. Qed.
 
   Lemma uui_0c : kernel_text -∗ instr (mword_of_int (UU + 0x0c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (UU + 0x0c)%Z (mword_of_int 0xe38d : mword 16)
@@ -340,7 +319,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_1c : kernel_text -∗ instr (mword_of_int (UU + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (UU + 0x1c)%Z (mword_of_int 0x8ab6 : mword 16)
-    (mword_of_int (UU + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 21), ADD)) uudc_8ab6 exec_execute_C_MV. Qed.
+    (mword_of_int (UU + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 21), ADD)) cdec_8ab6 exec_execute_C_MV. Qed.
 
   Lemma uui_1e : kernel_text -∗ instr (mword_of_int (UU + 0x1e) : mword 64) true (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)).
   Proof. mk_rvc (UU + 0x1e)%Z (mword_of_int 0x0632 : mword 16)
@@ -364,7 +343,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_2c : kernel_text -∗ instr (mword_of_int (UU + 0x2c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UU + 0x2c)%Z (mword_of_int 0xa015 : mword 16)
-    (mword_of_int (UU + 0x2c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")), zreg)) uudc_a015 exec_execute_C_J. Qed.
+    (mword_of_int (UU + 0x2c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")), zreg)) cdec_a015 exec_execute_C_J. Qed.
 
   (* --- the panic arm, 0x2e..0x45 (dead for a page-aligned va) --------- *)
 
@@ -394,7 +373,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_3a : kernel_text -∗ instr (mword_of_int (UU + 0x3a) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (UU + 0x3a)%Z (mword_of_int 0x00006517 : mword 32)
-    (mword_of_int (UU + 0x3a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) uudb_00006517. Qed.
+    (mword_of_int (UU + 0x3a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00006517. Qed.
 
   Lemma uui_3e : kernel_text -∗ instr (mword_of_int (UU + 0x3e) : mword 64) false (ITYPE (mword_of_int 3816 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (UU + 0x3e)%Z (mword_of_int 0xee850513 : mword 32)
@@ -466,11 +445,11 @@ Section UvmunmapInstrs.
 
   Lemma uui_6a : kernel_text -∗ instr (mword_of_int (UU + 0x6a) : mword 64) true (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
   Proof. mk_rvc (UU + 0x6a)%Z (mword_of_int 0x83a9 : mword 16)
-    (mword_of_int (UU + 0x6a) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) uudc_83a9 exec_execute_C_SRLI. Qed.
+    (mword_of_int (UU + 0x6a) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83a9 exec_execute_C_SRLI. Qed.
 
   Lemma uui_6c : kernel_text -∗ instr (mword_of_int (UU + 0x6c) : mword 64) false (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)).
   Proof. mk_base (UU + 0x6c)%Z (mword_of_int 0x00c79513 : mword 32)
-    (mword_of_int (UU + 0x6c) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)) uudb_00c79513. Qed.
+    (mword_of_int (UU + 0x6c) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)) bdec_00c79513. Qed.
 
   Lemma uui_70 : kernel_text -∗ instr (mword_of_int (UU + 0x70) : mword 64) false (JAL (mword_of_int 2095064 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (UU + 0x70)%Z (mword_of_int 0xfd8ff0ef : mword 32)
@@ -478,7 +457,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_74 : kernel_text -∗ instr (mword_of_int (UU + 0x74) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UU + 0x74)%Z (mword_of_int 0xbfc9 : mword 16)
-    (mword_of_int (UU + 0x74) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)) uudc_bfc9 exec_execute_C_J. Qed.
+    (mword_of_int (UU + 0x74) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)) cdec_bfc9 exec_execute_C_J. Qed.
 
   (* --- the epilogue: 0x76 from the loop exit, 0x78 from npages == 0 --- *)
 

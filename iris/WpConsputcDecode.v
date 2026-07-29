@@ -40,10 +40,7 @@ Lemma cpdc_4521 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xb7d5  c.j -28  (backspace arm -> the shared epilogue) *)
-Lemma cpdc_b7d5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7d5 : mword 16)) s
-  = Some (C_J (mword_of_int 2034 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_b7d5] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* ===================================================================== *)
 (* Base (32-bit) decode facts unique to consputc.                         *)
@@ -174,6 +171,6 @@ Section WpConsputcDecode.
 
   Lemma cpi_30 : kernel_text -∗ instr (mword_of_int (CP + 0x30) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (CP + 0x30)%Z (mword_of_int 0xb7d5 : mword 16)
-    (mword_of_int (CP + 0x30) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")), zreg)) cpdc_b7d5 exec_execute_C_J. Qed.
+    (mword_of_int (CP + 0x30) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")), zreg)) cdec_b7d5 exec_execute_C_J. Qed.
 
 End WpConsputcDecode.

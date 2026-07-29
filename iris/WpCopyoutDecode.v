@@ -147,10 +147,7 @@ Lemma codc_e06a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x24  mv    s5,a3 *)
-Lemma codc_8ab6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8ab6 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 13)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_8ab6] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x26  lui   s10,0xfffff *)
 Lemma codc_7d7d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -437,7 +434,7 @@ Section CopyoutInstrs.
 
   Lemma coi_24 : COP 0x24 true (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 21), ADD)).  (* mv    s5,a3 -- s5 := len (bytes left) *)
   Proof. mk_rvc (CO + 0x24)%Z (mword_of_int 0x8ab6 : mword 16)
-    (mword_of_int (CO + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 21), ADD)) codc_8ab6 exec_execute_C_MV. Qed.
+    (mword_of_int (CO + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 13), zreg, Regidx (mword_of_int 21), ADD)) cdec_8ab6 exec_execute_C_MV. Qed.
 
   Lemma coi_26 : COP 0x26 true (UTYPE (sign_extend' 20 (mword_of_int 63 : mword 6), Regidx (mword_of_int 26), LUI)).  (* lui   s10,0xfffff -- s10 := -4096, the PGROUNDDOWN mask *)
   Proof. mk_rvc (CO + 0x26)%Z (mword_of_int 0x7d7d : mword 16)

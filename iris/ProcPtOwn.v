@@ -180,7 +180,7 @@ Proof.
   rewrite Z.shiftr_div_pow2; [reflexivity | lia].
 Qed.
 
-Local Lemma ppo_shiftl12 (v : mword 64) :
+Lemma ppo_shiftl12 (v : mword 64) :
   bv_unsigned (shiftl v 12) = bv_unsigned v * 4096 mod 18446744073709551616.
 Proof.
   unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
@@ -213,6 +213,73 @@ Proof.
   rewrite ppo_shiftl12. rewrite ppo_shiftr10.
   rewrite page_base_ppn_unsigned. rewrite ppn_unsigned.
   apply z_pte2pa; [ exact (proj1 (bv_unsigned_in_range _ w)) | exact Hlt ].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* The OTHER shift-left width the uvm* code uses, and the two instruction   *)
+(* readings built on it and on [ppo_shiftl12].  [slli rd,rs,52] is the      *)
+(* PAGE-ALIGNMENT TEST (only the low twelve bits survive the shift), and    *)
+(* [slli rd,rs,12] turns a page COUNT into a byte size.                     *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma ppo_shiftl52 (v : mword 64) :
+  bv_unsigned (shiftl v 52)
+  = bv_unsigned v * 4503599627370496 mod 18446744073709551616.
+Proof.
+  unfold shiftl, with_word, get_word, MachineWord.MachineWord.logical_shift_left.
+  rewrite bv_shiftl_unsigned.
+  replace (bv_unsigned (MachineWord.MachineWord.N_to_word
+             (MachineWord.MachineWord.Z_idx 64) (MachineWord.MachineWord.Z_idx 52))) with 52
+    by (vm_compute; reflexivity).
+  rewrite Z.shiftl_mul_pow2; [reflexivity | lia].
+Qed.
+
+Local Lemma z_shl52 (x : Z) :
+  x mod 4096 = 0 -> x * 4503599627370496 mod 18446744073709551616 = 0.
+Proof.
+  intro H. apply Z.mod_divide in H; [| lia].
+  destruct H as [q Hq]. subst x.
+  replace (q * 4096 * 4503599627370496) with (q * 18446744073709551616) by lia.
+  apply Z.mod_mul. lia.
+Qed.
+
+Local Lemma z_shl12 (z : Z) :
+  z mod 18446744073709551616 * 4096 mod 18446744073709551616
+  = z * 4096 mod 18446744073709551616.
+Proof. rewrite Z.mul_mod_idemp_l; [reflexivity | lia]. Qed.
+
+(* [va << 52 == 0] IS the page-alignment test. *)
+Lemma shl52_aligned (a : mword 64) (n : Z) (s : mword n) :
+  int_of_mword false s = 52 ->
+  bv_unsigned a mod 4096 = 0 ->
+  shift_bits_left a s = (mword_of_int 0 : mword 64).
+Proof.
+  intros Hs Ha. apply bv_eq.
+  unfold shift_bits_left. rewrite Hs. rewrite ppo_shiftl52.
+  replace (bv_unsigned (mword_of_int 0 : mword 64)) with 0
+    by (vm_compute; reflexivity).
+  exact (z_shl52 _ Ha).
+Qed.
+
+Lemma shl12_moi (z : Z) (n : Z) (s : mword n) :
+  int_of_mword false s = 12 ->
+  shift_bits_left (mword_of_int z : mword 64) s = (mword_of_int (z * 4096) : mword 64).
+Proof.
+  intro Hs. apply bv_eq.
+  unfold shift_bits_left. rewrite Hs. rewrite ppo_shiftl12.
+  rewrite !bc_moi_unsigned. exact (z_shl12 z).
+Qed.
+
+(* [add rd,rs_count,rs_base] after a [slli rs_count,12]: a page COUNT
+   scaled to a byte size and added to a base -- uvmunmap's loop bound
+   [va + npages*PGSIZE]. *)
+Lemma shl12_pages_add (va : mword 64) (n : nat) (k : Z) (s : mword k) :
+  int_of_mword false s = 12 ->
+  add_vec (shift_bits_left (mword_of_int (Z.of_nat n) : mword 64) s) va
+  = add_vec va (mword_of_int (4096 * Z.of_nat n)).
+Proof.
+  intro Hs. rewrite (shl12_moi (Z.of_nat n) k s Hs).
+  rewrite (Z.mul_comm (Z.of_nat n) 4096). apply add_vec_comm.
 Qed.
 
 (* ===================================================================== *)
@@ -398,6 +465,15 @@ Definition uptd_insert_perm (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64
 Definition uptd_insert (P : uptd) (vpn : mword 27) (r : mword 64) : uptd :=
   uptd_insert_perm P 22 vpn r.
 
+(* mappages' ONE-PAGE run post IS the uvm leaf insert -- what lets a caller
+   that maps a single page read mappages' [pt_insert_run ... 1] postcondition
+   as the [uptd_insert_perm] its descriptor moves by. *)
+Lemma uvm_run1 (m : gmap (mword 27) (mword 64)) (v : mword 27) (perm : Z)
+    (r : mword 64) :
+  pt_insert_run m v (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44) perm 1
+  = <[v := uvm_pte perm r]> m.
+Proof. cbn [pt_insert_run]. rewrite vpn_at_0. reflexivity. Qed.
+
 (* one fresh vpn adds exactly one page to the footprint.  (The freshness
    hypothesis is needed: without it the insert would DROP the page the old
    entry named.) *)
@@ -450,13 +526,17 @@ Proof.
   split; [rewrite H5; exact H2 | exact (transitivity H3 H6)].
 Qed.
 
+Lemma uptd_ext_insert_perm (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64) :
+  P.(ud_um) !! vpn = None -> uptd_ext P (uptd_insert_perm P perm vpn r).
+Proof.
+  intros Hn. unfold uptd_ext, uptd_insert_perm. cbn [ud_root ud_tfp ud_um].
+  split_and!; [reflexivity | reflexivity | apply insert_subseteq; exact Hn].
+Qed.
+
+(* the [perm = 22] instance, under its original name *)
 Lemma uptd_ext_insert (P : uptd) (vpn : mword 27) (r : mword 64) :
   P.(ud_um) !! vpn = None -> uptd_ext P (uptd_insert P vpn r).
-Proof.
-  intros Hn. unfold uptd_ext, uptd_insert. cbn [ud_root ud_tfp ud_um].
-  split; [reflexivity |]. split; [reflexivity |].
-  apply insert_subseteq. exact Hn.
-Qed.
+Proof. exact (uptd_ext_insert_perm P 22 vpn r). Qed.
 
 (* ===================================================================== *)
 (* §2c THE MAPPED LEAF, CLASSIFIED -- at an arbitrary permission.          *)
@@ -652,6 +732,32 @@ Proof. uvm_perm_tac 26. Qed.
 Lemma uvm_perm_ok_30 : uvm_perm_ok 30.
 Proof. uvm_perm_tac 30. Qed.
 
+(* how the code BUILDS the permission: [ori rd,rs,18] ors PTE_R|PTE_U onto
+   the runtime [xperm], and the result must be spelled as the closed literal
+   [mword_of_int (Z.lor xperm 18)] that mappages' [perm] premise wants.
+   ([lia] cannot see [Z.lor] under the transitive [bitvector.tactics] import,
+   hence the detour through [z_lor_pow2].) *)
+Lemma uvm_perm_ori18 (x : Z) :
+  0 <= x < 512 ->
+  or_vec (mword_of_int x : mword 64) (sign_extend' 64 (mword_of_int 18 : mword 12))
+  = (mword_of_int (Z.lor x 18) : mword 64).
+Proof.
+  intros Hx.
+  assert (Hlor : 0 <= Z.lor x 18 < 512).
+  { assert (H9 : (2 ^ 9)%Z = 512) by (vm_compute; reflexivity).
+    pose proof (z_lor_pow2 9 x 18 ltac:(lia) ltac:(rewrite H9; lia)
+                  ltac:(rewrite H9; lia)) as Hz.
+    rewrite H9 in Hz. exact Hz. }
+  assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  apply bv_eq. rewrite or_vec64_unsigned.
+  assert (H18 : bv_unsigned (sign_extend' 64 (mword_of_int 18 : mword 12) : mword 64) = 18)
+    by (vm_compute; reflexivity).
+  rewrite H18 !moi64_unsigned.
+  rewrite (bv_wrap_small 64 x ltac:(rewrite Hm; lia)).
+  rewrite (bv_wrap_small 64 (Z.lor x 18) ltac:(rewrite Hm; lia)).
+  reflexivity.
+Qed.
+
 (* ---- the vmfault instance, as the tree already names it -------------- *)
 
 Lemma vmf_perm_ok22 : mappages_perm_ok 22.
@@ -829,6 +935,18 @@ Proof.
   vm_compute (bv_unsigned (zeros' 12 : mword 12)). reflexivity.
 Qed.
 
+(* ...and the same statement for a value that is ALREADY page-aligned (the
+   PGROUNDDOWN is then the identity), which is what mappages' [va] premise
+   asks of a loop cursor that started aligned and moved by whole pages. *)
+Lemma aligned_low12 (x : mword 64) :
+  bv_unsigned x mod 4096 = 0 -> subrange_vec_dec x 11 0 = (zeros' 12 : mword 12).
+Proof.
+  intros H.
+  assert (Hand : and_vec x (mword_of_int (-4096)) = x).
+  { apply bv_eq. rewrite pgd_unsigned H. apply Z.sub_0_r. }
+  rewrite <- Hand. apply pgrounddown_low12.
+Qed.
+
 Local Lemma z_pgd_bound (x : Z) :
   0 <= x -> x < 274877906944 -> x - x mod 4096 + 4096 <= 274877906944.
 Proof.
@@ -963,6 +1081,125 @@ Definition uvma_np (oldsz newsz : mword 64) : nat :=
 Definition uvmd_np (oldsz newsz : mword 64) : nat :=
   Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096).
 
+Lemma uvm_maxsz_val : uvm_maxsz = 274877898752.
+Proof. vm_compute. reflexivity. Qed.
+
+(* --------------------------------------------------------------------- *)
+(* THE PGROUNDUP / RUN-LENGTH ARITHMETIC, over plain [Z].                  *)
+(*                                                                        *)
+(*   Every one of these is stated [mword]-free on purpose: any goal        *)
+(*   mentioning [bv_unsigned] makes [lia] answer "Cannot find witness"     *)
+(*   under the transitive [bitvector.tactics] import the WP files carry    *)
+(*   (claude-notes/durable-notes.md), so the uvm* proofs feed these the    *)
+(*   [bv_unsigned] values and apply the result as a closed fact.  The      *)
+(*   literals: 274877898752 = [uvm_maxsz], 274877906944 = MAXVA = 2^38,    *)
+(*   67108862 = [tf_vpn], 67108863 = [tramp_vpn].  PGROUNDUP appears as    *)
+(*   [pgroundup_unsigned] reads it, [(v+4095) - (v+4095) mod 4096].        *)
+(* --------------------------------------------------------------------- *)
+
+(* a size inside the user region does not wrap when PGROUNDUP adds 4095 *)
+Lemma z_maxsz_no_wrap (v : Z) : v + 4096 <= 274877898752 -> v + 4095 < 2 ^ 64.
+Proof. intros H. change (2 ^ 64) with 18446744073709551616. lia. Qed.
+
+(* PGROUNDUP is MONOTONE ... *)
+Lemma z_pgu_mono (a b : Z) :
+  a <= b -> (a + 4095) - (a + 4095) mod 4096 <= (b + 4095) - (b + 4095) mod 4096.
+Proof.
+  intros Hab.
+  pose proof (Z_div_mod_eq_full (a + 4095) 4096) as Ha.
+  pose proof (Z_div_mod_eq_full (b + 4095) 4096) as Hb.
+  assert (Hd : (a + 4095) / 4096 <= (b + 4095) / 4096)
+    by (apply Z.div_le_mono; lia).
+  lia.
+Qed.
+
+(* ... never exceeds its argument by a page ... *)
+Lemma z_pgu_bound (v : Z) :
+  0 <= v -> v + 4096 <= 274877898752 ->
+  (v + 4095) - (v + 4095) mod 4096 <= 274877898751.
+Proof.
+  intros H0 H1. pose proof (Z.mod_pos_bound (v + 4095) 4096 ltac:(lia)). lia.
+Qed.
+
+(* ... is above its argument ... *)
+Lemma z_pgu_ge (v : Z) : v <= (v + 4095) - (v + 4095) mod 4096.
+Proof.
+  assert (Hp : 0 < 4096) by lia.
+  pose proof (Z.mod_pos_bound (v + 4095) 4096 Hp). lia.
+Qed.
+
+(* ... and is the identity on an already-aligned value. *)
+Lemma z_pgu_id (v : Z) : v mod 4096 = 0 -> (v + 4095) - (v + 4095) mod 4096 = v.
+Proof.
+  intros H.
+  assert (Hn : 4096 <> 0) by lia.
+  assert (Hmod : (v + 4095) mod 4096 = 4095).
+  { rewrite (Z.add_mod v 4095 4096 Hn) H. vm_compute. reflexivity. }
+  lia.
+Qed.
+
+Local Lemma z_to_nat_nonpos (q : Z) : q <= 0 -> Z.to_nat q = 0%nat.
+Proof. intros H. destruct q as [| pz | pz]; [reflexivity | exfalso; lia | reflexivity]. Qed.
+
+(* [uvmd_np] / [uvma_np] are 0 on the arms where the C does nothing *)
+Lemma z_np_zero (pu pn : Z) : pu <= pn -> Z.to_nat ((pu - pn) / 4096) = 0%nat.
+Proof.
+  intros H. apply z_to_nat_nonpos.
+  apply Z.div_le_upper_bound; lia.
+Qed.
+
+(* the run length on the arm that DOES move: the difference of two
+   page-aligned values divides exactly. *)
+Lemma z_np_exact (pu pn : Z) :
+  pn <= pu -> pu mod 4096 = 0 -> pn mod 4096 = 0 ->
+  0 <= (pu - pn) / 4096 /\ (pu - pn) / 4096 * 4096 = pu - pn.
+Proof.
+  intros Hle Hu Hn.
+  assert (Hm : (pu - pn) mod 4096 = 0)
+    by (rewrite Zminus_mod Hu Hn; vm_compute; reflexivity).
+  pose proof (Z_div_mod_eq_full (pu - pn) 4096) as Hdm.
+  split; [apply Z.div_pos; lia | lia].
+Qed.
+
+(* ...and it fits the [int npages] the C declares *)
+Lemma z_np_lt31 (pu pn : Z) :
+  0 <= pn -> pu <= 274877898751 -> (pu - pn) / 4096 < 2147483648.
+Proof.
+  intros H0 H1.
+  apply Z.le_lt_trans with (pu / 4096).
+  - apply Z.div_le_mono; lia.
+  - apply Z.div_lt_upper_bound; lia.
+Qed.
+
+(* THE RUN CURSOR [v + 4096*d], on iteration [d] of a run of [np] pages
+   that starts at [v] and stays inside the user region: in range, below
+   MAXVA, non-wrapping, and with a vpn strictly below [tf_vpn]. *)
+Lemma z_run_iter (v d np : Z) :
+  0 <= v -> 0 <= d -> d + 1 <= np -> v + np * 4096 <= 274877898752 ->
+  0 <= v + 4096 * d
+  /\ v + 4096 * d < 274877906944
+  /\ v + 4096 * d < 18446744073709551616
+  /\ (v + 4096 * d) / 4096 < 67108862.
+Proof.
+  intros H0 H1 H2 H3.
+  split; [lia |]. split; [lia |]. split; [lia |].
+  apply Z.div_lt_upper_bound; lia.
+Qed.
+
+(* the run's END pointer does not wrap either *)
+Lemma z_run_end64 (v np : Z) :
+  0 <= v -> 0 <= np -> v + np * 4096 <= 274877898752 ->
+  v + 4096 * np < 18446744073709551616.
+Proof. intros; lia. Qed.
+
+(* the cursor is strictly monotone in the iteration count *)
+Lemma z_run_strict (v a b : Z) : a < b -> v + 4096 * a < v + 4096 * b.
+Proof. intros; lia. Qed.
+
+(* a vpn below [tf_vpn] is not [tramp_vpn] *)
+Lemma z_lt_tramp_vpn_ne (x : Z) : x < 67108862 -> x = 67108863 -> False.
+Proof. intros; lia. Qed.
+
 (* the arithmetic lifted OUT of any goal mentioning [bv_unsigned] -- the
    zify-hook rule in claude-notes/durable-notes.md *)
 Local Lemma z_pgu_small (v : Z) :
@@ -991,6 +1228,20 @@ Qed.
 Lemma pgroundup_low12 (x : mword 64) :
   subrange_vec_dec (pgroundup x) 11 0 = (zeros' 12 : mword 12).
 Proof. unfold pgroundup. apply pgrounddown_low12. Qed.
+
+(* PGROUNDUP is the identity on an already-aligned size -- uvmalloc's loop
+   cursor after the first [oldsz = PGROUNDUP(oldsz)]. *)
+Lemma pgroundup_id (x : mword 64) :
+  bv_unsigned x mod 4096 = 0 -> (bv_unsigned x + 4095 < 2 ^ 64)%Z -> pgroundup x = x.
+Proof.
+  intros Hm Hb. apply bv_eq. rewrite (pgroundup_unsigned x Hb).
+  exact (z_pgu_id _ Hm).
+Qed.
+
+(* a strictly smaller vpn is a DIFFERENT vpn -- how the uvm* proofs rule out
+   [tramp_vpn] / [tf_vpn] without naming them. *)
+Lemma vpn_lt_ne (v w : mword 27) : bv_unsigned v < bv_unsigned w -> v <> w.
+Proof. intros H He. rewrite He in H. exact (Z.lt_irrefl _ H). Qed.
 
 Local Lemma z_svpn_lt_maxva (x : Z) :
   0 <= x -> x < 274877906944 -> (x / 4096) mod 134217728 < 67108864.
@@ -1352,6 +1603,30 @@ Proof. reflexivity. Qed.
 Lemma um_del_run_0 (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27) :
   um_del_run um vpn0 0 = um.
 Proof. reflexivity. Qed.
+
+(* the run as a SET, peeled the way uvmalloc's loop grows it (one vpn per
+   iteration, appended at the top) *)
+Lemma vpn_run_0 (v : mword 27) : vpn_run v 0 = (∅ : gset (mword 27)).
+Proof. reflexivity. Qed.
+
+Lemma vpn_run_S (v : mword 27) (k : nat) :
+  vpn_run v (S k) = vpn_run v k ∪ {[vpn_at v k]}.
+Proof.
+  unfold vpn_run. rewrite seq_S fmap_app list_to_set_app_L.
+  cbn [fmap list_fmap list_to_set]. rewrite union_empty_r_L. reflexivity.
+Qed.
+
+(* ...and the two set-algebra steps the "domain grew by exactly the run"
+   postcondition is carried by *)
+Lemma dom_run_0 (D : gset (mword 27)) (v : mword 27) : D = D ∪ vpn_run v 0.
+Proof. rewrite vpn_run_0 union_empty_r_L. reflexivity. Qed.
+
+Lemma dom_run_step (D R : gset (mword 27)) (v : mword 27) :
+  {[v]} ∪ (D ∪ R) = D ∪ (R ∪ {[v]}).
+Proof.
+  rewrite (union_comm_L ({[v]} : gset (mword 27)) (D ∪ R)).
+  symmetry. apply union_assoc_L.
+Qed.
 
 Lemma elem_of_vpn_run (vpn0 : mword 27) (k : nat) (v : mword 27) :
   v ∈ vpn_run vpn0 k <-> exists i, (i < k)%nat /\ v = vpn_at vpn0 i.

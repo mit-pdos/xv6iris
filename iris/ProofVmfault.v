@@ -108,10 +108,11 @@ Proof.
 Qed.
 
 (* mappages' one-page run post IS the vmfault leaf insert *)
+(* the [perm := 22] instance of [ProcPtOwn.uvm_run1] *)
 Lemma vf_run1 (m_ad : gmap (mword 27) (mword 64)) (vpn0 : mword 27) (r : mword 64) :
   pt_insert_run m_ad vpn0 (autocast (T := mword) (subrange_vec_dec r 55 12) : mword 44) 22 1
   = <[vpn0 := vmfault_pte r]> m_ad.
-Proof. cbn [pt_insert_run]. rewrite vpn_at_0. reflexivity. Qed.
+Proof. exact (uvm_run1 m_ad vpn0 22 r). Qed.
 
 (* the [mword]-free arithmetic (the zify-hook rule: keep [bv_unsigned] out of
    any goal [lia] must see) *)

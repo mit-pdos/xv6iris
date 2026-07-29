@@ -134,15 +134,6 @@ are working on that effort — the relevant `projects/` file.
   fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
   cursor and its `subw` pointer-difference return, and argstr's INLINED
   argaddr.
-- **[`uvm-alloc-unmap.md`](projects/uvm-alloc-unmap.md)** — uvmunmap /
-  uvmdealloc / uvmalloc: growing and shrinking a process's address space at
-  the `proc_pt` altitude. Keeps the `um_inj` (no-aliasing) strengthening of
-  `proc_pt_wf` and why ownership, not a caller premise, re-establishes it;
-  the perm-generic leaf layer (`uvm_pte` / `uvm_perm_ok` + the four
-  instances) that a runtime `xperm` forced; the run vocabulary
-  (`um_del_run` / `vpn_run` / `uptd_del_run`) and `um_del_run_restore`, the
-  law that makes uvmalloc's failure arm give back exactly the descriptor it
-  was handed.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
@@ -158,6 +149,17 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`uvm-alloc-unmap.md`](completed/uvm-alloc-unmap.md)** — uvmunmap /
+  uvmdealloc / uvmalloc, all three proven and linked: growing and shrinking a
+  process's address space at the `proc_pt` altitude. Keeps the `um_inj`
+  (no-aliasing) strengthening of `proc_pt_wf` and why OWNERSHIP, not a caller
+  premise, re-establishes it; the perm-generic leaf layer (`uvm_pte` /
+  `uvm_perm_ok` + the four instances) that a runtime `xperm` forced; the run
+  vocabulary (`um_del_run` / `vpn_run` / `uptd_del_run`) and
+  `um_del_run_restore`, the law that makes uvmalloc's failure arm give back
+  exactly the descriptor it was handed; and the measured finding that a
+  helper-relocation sweep over cheap `lia`/`rvc_oneshot` helpers is
+  compile-time NEUTRAL — structural payoff only, unlike the copy-inout sweep.
 - **[`pipe-rw.md`](completed/pipe-rw.md)** — piperead / pipewrite, both proven
   and linked: the queue-coupling conjunct in `pipe_res`, the SLEEP_GEN
   generalization (sleeping on a cancellable lock — the sleeper's own reference

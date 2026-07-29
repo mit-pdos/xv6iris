@@ -58,7 +58,7 @@ Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import KernelRvcDecode.
+Require Import KernelRvcDecode KernelBaseDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -84,10 +84,7 @@ Lemma wadc_4745 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x32  c.srli a5,a5,0xa *)
-Lemma wadc_83a9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x83a9 : mword 16)) s
-  = Some (C_SRLI (mword_of_int 10, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_83a9] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts -- all five are walkaddr's own.             *)
@@ -100,10 +97,7 @@ Lemma wadb_00b7f463 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* 0x16  jal ra,walk       (0x8000100c -> 0x80000f5c is -176) *)
-Lemma wadb_f51ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xf51ff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_f51ff0ef] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x1e  andi a3,a5,17     -- PTE_V|PTE_U *)
 Lemma wadb_0117f693 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -118,10 +112,7 @@ Lemma wadb_00e68663 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* 0x34  slli a0,a5,0xc    -- the second half of PTE2PA *)
-Lemma wadb_00c79513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00c79513 : mword 32)) s
-  = Some (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_00c79513] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* ===================================================================== *)
 (*  The per-instruction [instr] facts.                                    *)
@@ -183,7 +174,7 @@ Section WalkaddrInstrs.
 
   Lemma wai_16 : WAP 0x16 false (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (WA + 0x16)%Z (mword_of_int 0xf51ff0ef : mword 32)
-    (mword_of_int (WA + 0x16) : mword 64) (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))) wadb_f51ff0ef. Qed.
+    (mword_of_int (WA + 0x16) : mword 64) (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))) bdec_f51ff0ef. Qed.
 
   Lemma wai_1a : WAP 0x1a true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (WA + 0x1a)%Z (mword_of_int 0xc901 : mword 16)
@@ -231,11 +222,11 @@ Section WalkaddrInstrs.
 
   Lemma wai_32 : WAP 0x32 true (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
   Proof. mk_rvc (WA + 0x32)%Z (mword_of_int 0x83a9 : mword 16)
-    (mword_of_int (WA + 0x32) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) wadc_83a9 exec_execute_C_SRLI. Qed.
+    (mword_of_int (WA + 0x32) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83a9 exec_execute_C_SRLI. Qed.
 
   Lemma wai_34 : WAP 0x34 false (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)).
   Proof. mk_base (WA + 0x34)%Z (mword_of_int 0x00c79513 : mword 32)
-    (mword_of_int (WA + 0x34) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)) wadb_00c79513. Qed.
+    (mword_of_int (WA + 0x34) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)) bdec_00c79513. Qed.
 
   Lemma wai_38 : WAP 0x38 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (WA + 0x38)%Z (mword_of_int 0xbfcd : mword 16)

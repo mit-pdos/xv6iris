@@ -27,10 +27,7 @@ Import Defs.
 (* ===================================================================== *)
 (* Compressed decode facts (one per distinct 16-bit encoding).            *)
 (* ===================================================================== *)
-Lemma fdc_6785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6785 : mword 16)) s
-  = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_6785] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 Lemma fdc_777d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x777d : mword 16)) s
@@ -123,7 +120,7 @@ Section WpFreerangeDecode.
 
   Lemma fri_0a : kernel_text -∗ instr (mword_of_int (FR + 0x0a) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), LUI)).
   Proof. mk_rvc (FR + 0x0a)%Z (mword_of_int 0x6785 : mword 16)
-    (mword_of_int (FR + 0x0a) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), LUI)) fdc_6785 exec_execute_C_LUI. Qed.
+    (mword_of_int (FR + 0x0a) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), LUI)) cdec_6785 exec_execute_C_LUI. Qed.
 
   Lemma fri_0c : kernel_text -∗ instr (mword_of_int (FR + 0x0c) : mword 64) false (ITYPE (mword_of_int 4095 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_base (FR + 0x0c)%Z (mword_of_int 0xfff78713 : mword 32)

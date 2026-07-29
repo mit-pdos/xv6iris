@@ -3,8 +3,8 @@
 Specify and prove the three functions that GROW and SHRINK a process's user
 address space — `uvmunmap` (vm.c, 0x800011fe, 138 B), `uvmdealloc`
 (0x80001288, 68 B) and `uvmalloc` (0x800012cc, 170 B) — at the **`proc_pt`
-altitude**, like [`vmfault`](../completed/vmfault.md) and
-[`copyin`/`copyout`](../completed/copy-inout.md): each PRESERVES the
+altitude**, like [`vmfault`](vmfault.md) and
+[`copyin`/`copyout`](copy-inout.md): each PRESERVES the
 valid-user-page-table predicate, moving its user map by an explicit run of
 vpns.
 
@@ -185,7 +185,7 @@ proc_pt_data_irrel P Q : ud_root/ud_tfp/ud_um agree -> proc_pt P ⊣⊢ proc_pt 
 ```
 
 `proc_pt` never reads `ud_data`. (The field is still slated for retirement —
-[`proc-pagetable-ownership.md`](proc-pagetable-ownership.md) step 3; this
+[`proc-pagetable-ownership.md`](../projects/proc-pagetable-ownership.md) step 3; this
 lemma is the cheap stand-in, not a reason to keep it.)
 
 ## The specs
@@ -335,8 +335,90 @@ offsets as indices and had to rederive them; the tables below give both.
       12/20, 57.4 %); tree-wide 75 proven / 26 % of text (was 72 / 25 %).
       `Print Assumptions` on all three: only the five Sail
       reservation/platform axioms plus `functional_extensionality_dep`.
-      Cleanup sweep (helper relocation + decode-word dedup) tracked
-      separately.
+      Cleanup sweep: see below.
+
+## Cleanup sweep — DONE
+
+Both halves landed and the tree stayed green.  Unlike the copy-inout sweep,
+this one is **compile-time neutral** (every touched file within ±1 s of its
+baseline, isolated `coqc`): what the three proofs kept local was cheap —
+`lia` one-liners and `rvc_oneshot` decodes, which the concrete-decode bridge
+already makes fast.  The payoff here is structural, not build time.  **Do not
+expect a sweep to pay for itself unless the duplicated proofs were the
+expensive kind** (`decode_any` fallbacks, big `vm_compute`s).
+
+**Helper-lemma relocation.**  40 lemmas left the three proof files; 38 landed
+at their altitude, the rest were absorbed into something that already existed:
+
+- **`ProcPtOwn.v`** (+30).  §1 gained the shift bridges `ppo_shiftl52`,
+  `shl52_aligned` (the `va << 52 == 0` page-alignment test), `shl12_moi` and
+  `shl12_pages_add`, and `ppo_shiftl12` was un-`Local`ed — uvmunmap's
+  `uu_shl_unsigned_12` was that lemma **verbatim**.  §2b gained the
+  perm-generic `uvm_run1` (mappages' one-page run post = the uvm leaf
+  insert) and `uptd_ext_insert_perm`; both got WRAPPER-RECIPE restatements —
+  `ProofVmfault.vf_run1` and `ProcPtOwn.uptd_ext_insert` are now
+  `exact (<generic> … 22 …)`.  §2c gained `uvm_perm_ori18` (the `ori rd,rs,18`
+  that builds `PTE_R|PTE_U|xperm`), §3c `aligned_low12`, §3d `uvm_maxsz_val`,
+  `pgroundup_id`, `vpn_lt_ne`, the run set-algebra (`vpn_run_0`/`_S`,
+  `dom_run_0`/`_step`) and the whole `Z` block the three shared:
+  `z_maxsz_no_wrap`, `z_pgu_mono`/`_bound`/`_ge`/`_id`, `z_np_zero`/`_exact`/
+  `_lt31`, `z_run_iter`/`_end64`/`_strict`, `z_lt_tramp_vpn_ne`.  uvmdealloc
+  and uvmalloc had **independently proved the same four PGROUNDUP facts**.
+- **`ByteCursor.v`** (+5): `bc_geu` / `bc_ltu` (the two one-sided readings of
+  `zopz0zKzJ_u` at arbitrary operands — a loop comparing ADDRESSES has no
+  `mword_of_int (Z.of_nat _)` to appeal to), with `bc_ge_moi` **refactored to
+  go through them**; `bc_add_moi` (a cursor bumped by an immediate, read as
+  the unsigned sum); and `srli12_div4096`.
+- **`RiscvExtras.v`** (+1): `or_vec64_unsigned`, next to `and_vec64_unsigned`.
+- **`WpSconfAlu.v`**: `wp_csub_s_sconf`, next to the base-width
+  `wp_sub_s_sconf`.  **`WpMmodeLeafBase.v`**: `exec_execute_C_SUB`.
+
+**Two destinations moved from the plan.**  `srli12_div4096` was routed to
+`RiscvExtras` but had to go to `ByteCursor`: it names `shift_bits_right` /
+`log2_xlen`, which live in `Riscv.riscv_extras`, and `RiscvExtras.v` does not
+import that (`ByteCursor` does, and `slli32_srli32` right next to it is the
+same decoder spelling of a shift amount).  `ua_add4096` was routed to
+`ProcPtOwn` but is generic cursor arithmetic with no `ProcPtOwn` vocabulary,
+so it went to `ByteCursor` as `bc_add_moi`.  Same rule as last time: check
+which file can SEE the vocabulary.
+
+**`UserExecFacts.exec_execute_C_SUB` CANNOT be retired.**  `UserExecFacts.v`
+and `WpMmodeLeafBase.v` are **siblings** — neither is in the other's import
+closure, and `exec_execute_C_ANDI` is already duplicated between them for the
+same reason.  Retiring the user-side copy would put the Iris/proofmode-heavy
+`WpMmodeLeafBase` into the user-exec chain.  Both copies stay.
+
+**Left local, deliberately:** uvmunmap's `uu_thr`/`uu_thr1` (its two
+callee-saved transport predicates); uvmalloc's §1 (`ua_z_iter`/`ua_z_nchar`
+— the loop-trip characterisation — `ua_z_npd`, `ua_z_run_pa`, `ua_z_svpn`,
+`ua_z_avmod`, `ua_z_vpn0_bnd`, `ua_z_vpn_lt`, `ua_z_np_zero`), which are that
+function's own cursor/vpn arithmetic at its own constants; and the three
+files' `*_cr[567]` creg bridges.  `ua_z_np0` was **dead** and was deleted;
+`uu_z_ne_lt` was `Z.lt_neq` and was retired to it; `udl_addv_comm` was
+`ByteCursor.add_vec_comm` verbatim and was retired to it.
+
+**Decode-word dedup.**  17 words collapsed into the shared catalogs (13
+`cdec_*` in `KernelRvcDecode.v`, 4 `bdec_*` in `KernelBaseDecode.v`) and **41
+local copies deleted across 20 files** (net −24 proofs).  Compressed: `17fd`
+`6785` `77fd` `83a9` `84b2` `8556` `8a32` `8ab6` `95be` `a015` `b7d5` `bfc9`
+`bfe1`, plus `84ae`, which was **already** `cdec_84ae` — `WpMappagesInstr` and
+`WpUvmdeallocDecode` had each re-proved it anyway.  Base: `00006517` (four
+copies), `00c79513`, `03459793`, `f51ff0ef`.  The four offset-named homes the
+last sweep warned about were found by keying the index on the **word inside
+the statement**, not on the lemma name — that is what turned up
+`WpSchedDecode.sddec_add_a1_a5` (= `95be`), `WpAcquireTop.aqdec_auipc` /
+`WpKvmmap.kvdec_auipc` / `WpProcMapstacksInstr.pmsdec_98` (= `00006517`) and
+`WpMappagesInstr.mdec_16`/`mdec_34`.  The nine words the worklist flagged
+(`8f75` `97ae` `8ff5` `8f99` `4685` `995a` `e38d` `d57d` `d37d`) turned out to
+be **singletons** and stayed local.  A word-keyed index of the whole tree
+shows 108 duplicated words remaining, none involving these three functions —
+pre-existing debt, not swept here.
+
+Every `*_<off>` instruction fact in the 30 touched files was mechanically
+diffed against `HEAD`: **1000 statements, 0 mismatches** (only the decode
+lemma each is proved FROM changed).  Across all surviving lemmas in those
+files, 2359 statements compared, the single difference being the intended
+un-`Local` of `ppo_shiftl12`.
 
 ## Open questions / parked
 

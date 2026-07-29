@@ -119,10 +119,7 @@ Lemma vfdc_854e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x30  c.lui a5,0xfffff  (imm6 = 63, the 6-bit residue of -1) *)
-Lemma vfdc_77fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x77fd : mword 16)) s
-  = Some (C_LUI (mword_of_int 63, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_77fd] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
 
 (* 0x36 / 0x60  c.mv a1,s4 *)
 Lemma vfdc_85d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -349,7 +346,7 @@ Section VmfaultInstrs.
 
   Lemma vfi_30 : kernel_text -∗ instr (mword_of_int (VF + 0x30) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), LUI)).
   Proof. mk_rvc (VF + 0x30)%Z (mword_of_int 0x77fd : mword 16)
-    (mword_of_int (VF + 0x30) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), LUI)) vfdc_77fd exec_execute_C_LUI. Qed.
+    (mword_of_int (VF + 0x30) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), LUI)) cdec_77fd exec_execute_C_LUI. Qed.
 
   Lemma vfi_32 : kernel_text -∗ instr (mword_of_int (VF + 0x32) : mword 64) false (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 18), Regidx (mword_of_int 20), AND)).
   Proof. mk_base (VF + 0x32)%Z (mword_of_int 0x00f97a33 : mword 32)
