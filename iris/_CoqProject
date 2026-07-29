@@ -557,3 +557,9 @@ SpecArgstr.v
 WpArgstrDecode.v
 ProofArgstr.v
 LinkArgstr.v
+SpecEitherCopyout.v
+SpecEitherCopyin.v
+WpEitherCopyDecode.v
+ProofEitherCopy.v
+LinkEitherCopyout.v
+LinkEitherCopyin.v

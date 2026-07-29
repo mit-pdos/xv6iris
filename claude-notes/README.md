@@ -134,6 +134,15 @@ are working on that effort — the relevant `projects/` file.
   fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
   cursor and its `subw` pointer-difference return, and argstr's INLINED
   argaddr.
+- **[`either-copy.md`](projects/either-copy.md)** — either_copyout /
+  either_copyin, both proven and linked: the pair whose destination (resp.
+  source) is a USER or a KERNEL pointer depending on a run-time flag, which is
+  what forced the flag into the contract as a ghost boolean and made the
+  precondition, the postcondition and two numeric premises `if user then …
+  else …` — including why `proc_priv` is required only on the user arm and why
+  the kernel arm's length bound is the tighter one (`sext.w`). Also: `ec_epi`,
+  the epilogue of a block gcc emitted TWICE proved once and instantiated at
+  both addresses, and the deferred decode-word dedup.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
