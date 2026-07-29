@@ -1250,15 +1250,28 @@ Section ProofPrintint.
   Definition digits_word : mword 128 :=
     mword_of_int 0x66656463626139383736353433323130.
 
+  (* The sixteen [digits] bytes as a PURE lemma, outside any Iris goal.  It is
+     stated here — rather than spliced into the [iPoseProof] below as an inline
+     [ltac:(…)] — because the proofmode re-elaborates a spliced term without the
+     [Qed] vm-seal: that one argument was 66.7 s of this file's 104 s.  Same
+     rule (and same fix) as [ProofArgraw.ar_tbl_bytes]; see optimization.md. *)
+  Lemma digits_bytes (j : nat) : (j < 16)%nat ->
+    KernelData.kernel_data !! (KernelSyms.digits + Z.of_nat j)%Z
+      = Some (nth_byte digits_word j).
+  Proof.
+    intro Hj.
+    do 16 (destruct j as [|j]; [vm_compute; f_equal; apply bv_eq; reflexivity | ]).
+    lia.
+  Qed.
+
   Lemma digits_from_data : kernel_data -∗ digits_tbl (mword_of_int KernelSyms.digits).
   Proof.
+    assert (Hle : text_end <= KernelSyms.digits)
+      by (unfold text_end, KernelSyms.digits; lia).
+    pose proof digits_bytes as Hb.
     iIntros "#Hkd".
     iPoseProof (kernel_data_window KernelSyms.digits digits_word 16
-                  (mword_of_int KernelSyms.digits) eq_refl
-                  ltac:(unfold text_end, KernelSyms.digits; lia)
-                  ltac:(intros j Hj;
-                        do 16 (destruct j as [|j];
-                               [vm_compute; f_equal; apply bv_eq; reflexivity | ]); lia)
+                  (mword_of_int KernelSyms.digits) eq_refl Hle Hb
                   with "Hkd") as "Hw".
     rewrite /digits_tbl. iApply (big_sepL_impl with "Hw").
     iIntros "!>" (k j Hk) "Hb". by iExists (nth_byte digits_word j).

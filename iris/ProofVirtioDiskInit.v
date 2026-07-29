@@ -370,6 +370,18 @@ Section ProofVirtioDiskInit.
   Ltac nzd := vm_compute; discriminate.
   Ltac bvc := apply bv_eq; vm_compute; reflexivity.
 
+  (* NAMING THE REGISTER CHAIN: [pose], never [set].  Each leaf lemma is
+     applied at its ENTRY map by name ([iApply (wp_… Bk …)]) and hands back
+     [<[rd := v]> Bk], so the goal is never more than ONE insert deep and there
+     is nothing for [set]'s whole-goal occurrence abstraction to buy — while
+     paying for it means re-scanning this proof's Iris context (the device
+     invariant, the disk resources, the whole-function continuation) once per
+     instruction.  Measured on the 85 chain links here: [set] 1.7 s each,
+     [pose] ~0.05 s — 305 s vs 177 s for the file.  The next [iApply] closes
+     the gap with one delta step on the name.  Keep [set] only where the
+     abstraction is the point ([sp0], [spr], [dk], [pd], [pav], [pu] — values
+     that really do occur all over the goal). *)
+
   Lemma wp_virtio_disk_init_sconf (γ γa : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (v0 : virtio_state) (vlock : bv 32) (vname vcpu : bv 64)
@@ -413,7 +425,7 @@ Section ProofVirtioDiskInit.
     iApply (wp_caddi_sp_push_s_sconf γ Φ (mword_of_int VDI) (mword_of_int 32 : mword 6) m K 4
               Hc4 Hpush with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hframe Hpc". iClear "Hi".
-    set (W1 := <[Regidx csp_rs1 := regval_into_reg spr]> m).
+    pose (W1 := <[Regidx csp_rs1 := regval_into_reg spr]> m).
     iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (w1) "Hs1c". iDestruct "S2" as (w2) "Hs2c".
@@ -471,7 +483,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5) W1 (K - 4)%nat
               ltac:(vm_compute; reflexivity) ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
+    pose (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> W1).
     assert (Hp00c : add_vec_int (mword_of_int (VDI + 0x00a) : mword 64) 2 = mword_of_int (VDI + 0x00c)) by pcs.
     iEval (rewrite Hp00c) in "Hpc".
@@ -482,7 +494,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 2 : mword 20) W2 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (W3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg
+    pose (W3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (VDI + 0x00c) : mword 64) (auipc_off (mword_of_int 2 : mword 20)))]> W2).
     assert (Hp010 : add_vec_int (mword_of_int (VDI + 0x00c) : mword 64) 4 = mword_of_int (VDI + 0x010)) by pcs.
     iEval (rewrite Hp010) in "Hpc".
@@ -492,7 +504,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 11 : mword 5) (mword_of_int 156 : mword 12) W3 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (W4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg
+    pose (W4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg
         (add_vec (W3 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 156 : mword 12)))]> W3).
     assert (HW4a1 : W4 !!! Regidx (mword_of_int 11 : mword 5) = nmv) by (peel; bvc).
     assert (Hp014 : add_vec_int (mword_of_int (VDI + 0x010) : mword 64) 4 = mword_of_int (VDI + 0x014)) by pcs.
@@ -503,7 +515,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 30 : mword 20) W4 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (W5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
+    pose (W5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (VDI + 0x014) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))]> W4).
     assert (Hp018 : add_vec_int (mword_of_int (VDI + 0x014) : mword 64) 4 = mword_of_int (VDI + 0x018)) by pcs.
     iEval (rewrite Hp018) in "Hpc".
@@ -513,7 +525,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 10 : mword 5) (mword_of_int 4004 : mword 12) W5 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (W6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
+    pose (W6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (W5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 4004 : mword 12)))]> W5).
     assert (HW6a0 : W6 !!! Regidx (mword_of_int 10 : mword 5) = disk_lock) by (peel; bvc).
     assert (Hp01c : add_vec_int (mword_of_int (VDI + 0x018) : mword 64) 4 = mword_of_int (VDI + 0x01c)) by pcs.
@@ -524,7 +536,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 2078180 : mword 21) W6 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (W7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
+    pose (W7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (VDI + 0x01c) : mword 64) 4)]> W6).
     assert (Htgtil : add_vec (mword_of_int (VDI + 0x01c) : mword 64)
                        (sign_extend' 64 (mword_of_int 2078180 : mword 21))
@@ -570,7 +582,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) mil (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> mil).
+    pose (B1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> mil).
     assert (HB1a5 : B1 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp024 : add_vec_int (mword_of_int (VDI + 0x020) : mword 64) 4 = mword_of_int (VDI + 0x024)) by pcs.
     iEval (rewrite Hp024) in "Hpc".
@@ -583,7 +595,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B2 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0x74726976 : mword 32))]> B1).
+    pose (B2 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0x74726976 : mword 32))]> B1).
     assert (Hp026 : add_vec_int (mword_of_int (VDI + 0x024) : mword 64) 2 = mword_of_int (VDI + 0x026)) by pcs.
     iEval (rewrite Hp026) in "Hpc".
     (* +0x026 sext.w a4,a4 *)
@@ -592,7 +604,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 6) B2 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B2 !!! Regidx (mword_of_int 14 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B2).
     assert (Hp028 : add_vec_int (mword_of_int (VDI + 0x026) : mword 64) 2 = mword_of_int (VDI + 0x028)) by pcs.
@@ -603,7 +615,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 476967 : mword 20) (luival (mword_of_int 476967 : mword 20)) B3 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B4 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 476967 : mword 20))]> B3).
+    pose (B4 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 476967 : mword 20))]> B3).
     assert (Hp02c : add_vec_int (mword_of_int (VDI + 0x028) : mword 64) 4 = mword_of_int (VDI + 0x02c)) by pcs.
     iEval (rewrite Hp02c) in "Hpc".
     (* +0x02c addi a5,a5,-1674 *)
@@ -612,7 +624,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 15 : mword 5) (mword_of_int 2422 : mword 12) B4 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+    pose (B5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (add_vec (B4 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 2422 : mword 12)))]> B4).
     assert (HB5a5 : B5 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x74726976) by (peel; bvc).
     assert (HB5a4 : B5 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x74726976) by (peel; bvc).
@@ -633,7 +645,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B5 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B5).
+    pose (B6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B5).
     assert (HB6a5 : B6 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp038 : add_vec_int (mword_of_int (VDI + 0x034) : mword 64) 4 = mword_of_int (VDI + 0x038)) by pcs.
     iEval (rewrite Hp038) in "Hpc".
@@ -646,7 +658,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 2 : mword 32))]> B6).
+    pose (B7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 2 : mword 32))]> B6).
     assert (Hp03a : add_vec_int (mword_of_int (VDI + 0x038) : mword 64) 2 = mword_of_int (VDI + 0x03a)) by pcs.
     iEval (rewrite Hp03a) in "Hpc".
     (* +0x03a sext.w a5,a5 *)
@@ -655,7 +667,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 6) B7 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B7 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B7).
     assert (Hp03c : add_vec_int (mword_of_int (VDI + 0x03a) : mword 64) 2 = mword_of_int (VDI + 0x03c)) by pcs.
@@ -667,7 +679,7 @@ Section ProofVirtioDiskInit.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) B8 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B9 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (B9 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6))))]> B8).
     assert (HB9a5 : B9 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 2) by (peel; bvc).
     assert (HB9a4 : B9 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 2) by (peel; bvc).
@@ -688,7 +700,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B9 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B9).
+    pose (B10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B9).
     assert (HB10a5 : B10 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp046 : add_vec_int (mword_of_int (VDI + 0x042) : mword 64) 4 = mword_of_int (VDI + 0x046)) by pcs.
     iEval (rewrite Hp046) in "Hpc".
@@ -701,7 +713,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B11 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 2 : mword 32))]> B10).
+    pose (B11 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 2 : mword 32))]> B10).
     assert (Hp048 : add_vec_int (mword_of_int (VDI + 0x046) : mword 64) 2 = mword_of_int (VDI + 0x048)) by pcs.
     iEval (rewrite Hp048) in "Hpc".
     (* +0x048 sext.w a5,a5 *)
@@ -710,7 +722,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 6) B11 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B12 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B12 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B11 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B11).
     assert (HB12a5 : B12 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 2) by (peel; bvc).
@@ -732,7 +744,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B12 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B13 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B12).
+    pose (B13 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B12).
     assert (HB13a5 : B13 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp052 : add_vec_int (mword_of_int (VDI + 0x04e) : mword 64) 4 = mword_of_int (VDI + 0x052)) by pcs.
     iEval (rewrite Hp052) in "Hpc".
@@ -745,7 +757,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0x554d4551 : mword 32))]> B13).
+    pose (B14 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0x554d4551 : mword 32))]> B13).
     assert (Hp054 : add_vec_int (mword_of_int (VDI + 0x052) : mword 64) 2 = mword_of_int (VDI + 0x054)) by pcs.
     iEval (rewrite Hp054) in "Hpc".
     (* +0x054 sext.w a4,a4 *)
@@ -754,7 +766,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 6) B14 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B15 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B15 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B14 !!! Regidx (mword_of_int 14 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B14).
     assert (Hp056 : add_vec_int (mword_of_int (VDI + 0x054) : mword 64) 2 = mword_of_int (VDI + 0x056)) by pcs.
@@ -765,7 +777,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 349396 : mword 20) (luival (mword_of_int 349396 : mword 20)) B15 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B16 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 349396 : mword 20))]> B15).
+    pose (B16 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 349396 : mword 20))]> B15).
     assert (Hp05a : add_vec_int (mword_of_int (VDI + 0x056) : mword 64) 4 = mword_of_int (VDI + 0x05a)) by pcs.
     iEval (rewrite Hp05a) in "Hpc".
     (* +0x05a addi a5,a5,1361 *)
@@ -774,7 +786,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 15 : mword 5) (mword_of_int 1361 : mword 12) B16 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B17 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+    pose (B17 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (add_vec (B16 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 1361 : mword 12)))]> B16).
     assert (HB17a5 : B17 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x554d4551) by (peel; bvc).
     assert (HB17a4 : B17 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x554d4551) by (peel; bvc).
@@ -800,7 +812,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B17 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B18 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B17).
+    pose (B18 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B17).
     assert (HB18a5 : B18 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp066 : add_vec_int (mword_of_int (VDI + 0x062) : mword 64) 4 = mword_of_int (VDI + 0x066)) by pcs.
     iEval (rewrite Hp066) in "Hpc".
@@ -824,7 +836,7 @@ Section ProofVirtioDiskInit.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) B18 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B19 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (B19 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> B18).
     assert (HB19a5 : B19 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000)
       by (rewrite /B19 upd_ne; [exact HB18a5 | reg_neq]).
@@ -849,7 +861,7 @@ Section ProofVirtioDiskInit.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) B19 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B20 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (B20 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6))))]> B19).
     assert (HB20a5 : B20 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000)
       by (rewrite /B20 upd_ne; [exact HB19a5 | reg_neq]).
@@ -873,7 +885,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B20 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B21 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B20).
+    pose (B21 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B20).
     assert (HB21a4 : B21 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp076 : add_vec_int (mword_of_int (VDI + 0x072) : mword 64) 4 = mword_of_int (VDI + 0x076)) by pcs.
     iEval (rewrite Hp076) in "Hpc".
@@ -886,7 +898,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B22 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0 : mword 32))]> B21).
+    pose (B22 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0 : mword 32))]> B21).
     assert (Hp078 : add_vec_int (mword_of_int (VDI + 0x076) : mword 64) 2 = mword_of_int (VDI + 0x078)) by pcs.
     iEval (rewrite Hp078) in "Hpc".
     (* +0x078 lui a3,0xc7ffe *)
@@ -895,7 +907,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 819198 : mword 20) (luival (mword_of_int 819198 : mword 20)) B22 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B23 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (mword_of_int 819198 : mword 20))]> B22).
+    pose (B23 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (mword_of_int 819198 : mword 20))]> B22).
     assert (Hp07c : add_vec_int (mword_of_int (VDI + 0x078) : mword 64) 4 = mword_of_int (VDI + 0x07c)) by pcs.
     iEval (rewrite Hp07c) in "Hpc".
     (* +0x07c addi a3,a3,1887 *)
@@ -904,7 +916,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 13 : mword 5) (mword_of_int 1887 : mword 12) B23 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B24 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg
+    pose (B24 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg
         (add_vec (B23 !!! Regidx (mword_of_int 13 : mword 5)) (sign_extend' 64 (mword_of_int 1887 : mword 12)))]> B23).
     assert (Hp080 : add_vec_int (mword_of_int (VDI + 0x07c) : mword 64) 4 = mword_of_int (VDI + 0x080)) by pcs.
     iEval (rewrite Hp080) in "Hpc".
@@ -914,7 +926,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 13 : mword 5) B24 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B25 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (B25 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (and_vec (B24 !!! Regidx (mword_of_int 14 : mword 5)) (B24 !!! Regidx (mword_of_int 13 : mword 5)))]> B24).
     assert (Hp082 : add_vec_int (mword_of_int (VDI + 0x080) : mword 64) 2 = mword_of_int (VDI + 0x082)) by pcs.
     iEval (rewrite Hp082) in "Hpc".
@@ -924,7 +936,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B25 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B26 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B25).
+    pose (B26 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B25).
     assert (HB26a3 : B26 !!! Regidx (mword_of_int 13 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (HB26a4 : B26 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0) by (peel; bvc).
     assert (Hp086 : add_vec_int (mword_of_int (VDI + 0x082) : mword 64) 4 = mword_of_int (VDI + 0x086)) by pcs.
@@ -947,7 +959,7 @@ Section ProofVirtioDiskInit.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 11 : mword 6)))) B26 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B27 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (B27 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 11 : mword 6))))]> B26).
     assert (HB27a4 : B27 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 11) by (peel; bvc).
     assert (HB27a5 : B27 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
@@ -970,7 +982,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 15 : mword 5) (mword_of_int 112 : mword 12) B27 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B28 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+    pose (B28 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (add_vec (B27 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 112 : mword 12)))]> B27).
     assert (HB28a5 : B28 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001070) by (peel; bvc).
     assert (Hp090 : add_vec_int (mword_of_int (VDI + 0x08c) : mword 64) 4 = mword_of_int (VDI + 0x090)) by pcs.
@@ -984,7 +996,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B29 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 11 : mword 32))]> B28).
+    pose (B29 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 11 : mword 32))]> B28).
     assert (Hp092 : add_vec_int (mword_of_int (VDI + 0x090) : mword 64) 2 = mword_of_int (VDI + 0x092)) by pcs.
     iEval (rewrite Hp092) in "Hpc".
     (* +0x092 sext.w s2,a5 : remember the status word *)
@@ -993,7 +1005,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) B29 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B30 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B30 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B29 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0))]> B29).
     assert (HB30s2 : B30 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; bvc).
@@ -1005,7 +1017,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 8 : mword 6) B30 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B31 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+    pose (B31 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (and_vec (B30 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6))))]> B30).
     assert (HB31a5 : B31 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 8) by (peel; bvc).
@@ -1025,7 +1037,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B31 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B32 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B31).
+    pose (B32 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B31).
     assert (HB32a5 : B32 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp0a0 : add_vec_int (mword_of_int (VDI + 0x09c) : mword 64) 4 = mword_of_int (VDI + 0x0a0)) by pcs.
     iEval (rewrite Hp0a0) in "Hpc".
@@ -1051,7 +1063,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B33 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0 : mword 32))]> B32).
+    pose (B33 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 0 : mword 32))]> B32).
     assert (Hp0a6 : add_vec_int (mword_of_int (VDI + 0x0a4) : mword 64) 2 = mword_of_int (VDI + 0x0a6)) by pcs.
     iEval (rewrite Hp0a6) in "Hpc".
     (* +0x0a6 sext.w a5,a5 *)
@@ -1060,7 +1072,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 6) B33 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B34 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B34 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B33 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B33).
     assert (HB34a5 : B34 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0) by (peel; bvc).
@@ -1081,7 +1093,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 65537 : mword 20) (luival (mword_of_int 65537 : mword 20)) B34 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B35 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B34).
+    pose (B35 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> B34).
     assert (HB35a5 : B35 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (Hp0b0 : add_vec_int (mword_of_int (VDI + 0x0ac) : mword 64) 4 = mword_of_int (VDI + 0x0b0)) by pcs.
     iEval (rewrite Hp0b0) in "Hpc".
@@ -1094,7 +1106,7 @@ Section ProofVirtioDiskInit.
               ltac:(nzd) ltac:(nzd) ltac:(reflexivity)
               with "Hcg Hpc Hi Hv [-]").
     iIntros "Hcg Hpc Hv". iClear "Hi".
-    set (B36 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 8 : mword 32))]> B35).
+    pose (B36 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (Z_to_bv 32 8 : mword 32))]> B35).
     assert (Hp0b2 : add_vec_int (mword_of_int (VDI + 0x0b0) : mword 64) 2 = mword_of_int (VDI + 0x0b2)) by pcs.
     iEval (rewrite Hp0b2) in "Hpc".
     (* +0x0b2 sext.w a5,a5 *)
@@ -1103,7 +1115,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 6) B36 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B37 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (B37 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (B36 !!! Regidx (mword_of_int 15 : mword 5))
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> B36).
     assert (HB37a5 : B37 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 8) by (peel; bvc).
@@ -1124,7 +1136,7 @@ Section ProofVirtioDiskInit.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 7 : mword 6)))) B37 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B38 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (B38 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 7 : mword 6))))]> B37).
     assert (HB38a4 : B38 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 7) by (peel; bvc).
     assert (HB38a5 : B38 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 8)
@@ -1148,7 +1160,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 2077928 : mword 21) B38 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (B39 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
+    pose (B39 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (VDI + 0x0be) : mword 64) 4)]> B38).
     assert (Htgk1 : add_vec (mword_of_int (VDI + 0x0be) : mword 64)
                       (sign_extend' 64 (mword_of_int 2077928 : mword 21))
@@ -1185,7 +1197,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 30 : mword 20) mk1 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (C1 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
+    pose (C1 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (VDI + 0x0c2) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))]> mk1).
     assert (Hp0c6 : add_vec_int (mword_of_int (VDI + 0x0c2) : mword 64) 4 = mword_of_int (VDI + 0x0c6)) by pcs.
     iEval (rewrite Hp0c6) in "Hpc".
@@ -1195,7 +1207,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 9 : mword 5) (mword_of_int 3534 : mword 12) C1 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (C2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
+    pose (C2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
         (add_vec (C1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 3534 : mword 12)))]> C1).
     assert (HC2s1 : C2 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; bvc).
     assert (Hadesc : add_vec (C2 !!! Regidx (mword_of_int 9 : mword 5))
@@ -1220,7 +1232,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 2077914 : mword 21) C2 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (C3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
+    pose (C3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (VDI + 0x0cc) : mword 64) 4)]> C2).
     assert (Htgk2 : add_vec (mword_of_int (VDI + 0x0cc) : mword 64)
                       (sign_extend' 64 (mword_of_int 2077914 : mword 21))
@@ -1274,7 +1286,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 2077908 : mword 21) mk2 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (D2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
+    pose (D2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (VDI + 0x0d2) : mword 64) 4)]> mk2).
     assert (Htgk3 : add_vec (mword_of_int (VDI + 0x0d2) : mword 64)
                       (sign_extend' 64 (mword_of_int 2077908 : mword 21))
@@ -1313,7 +1325,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 10 : mword 5) mk3 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (E1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+    pose (E1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (add_vec zero_reg (mk3 !!! Regidx (mword_of_int 10 : mword 5)))]> mk3).
     assert (HE1s1 : E1 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact Hk3s1).
     assert (HE1a0 : E1 !!! Regidx (mword_of_int 10 : mword 5) = pu) by (peel; reflexivity).
@@ -1345,7 +1357,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Hadesc1). iExact "Hdesc". }
     iIntros "Hcg Hpc Hdesc". iClear "Hi".
     iEval (rewrite Hadesc1) in "Hdesc".
-    set (E2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg pd]> E1).
+    pose (E2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg pd]> E1).
     assert (HE2a0 : E2 !!! Regidx (mword_of_int 10 : mword 5) = pd) by (peel; reflexivity).
     assert (Hp0dc : add_vec_int (mword_of_int (VDI + 0x0da) : mword 64) 2 = mword_of_int (VDI + 0x0dc)) by pcs.
     iEval (rewrite Hp0dc) in "Hpc".
@@ -1365,7 +1377,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 30 : mword 20) E2 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (E3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
+    pose (E3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (VDI + 0x0e0) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))]> E2).
     assert (Havail2 : add_vec (E3 !!! Regidx (mword_of_int 14 : mword 5))
                         (sign_extend' 64 (mword_of_int 3512 : mword 12)) = disk_avail).
@@ -1381,7 +1393,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Havail2). iExact "Havail". }
     iIntros "Hcg Hpc Havail". iClear "Hi".
     iEval (rewrite Havail2) in "Havail".
-    set (E4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg pav]> E3).
+    pose (E4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg pav]> E3).
     assert (HE4a4 : E4 !!! Regidx (mword_of_int 14 : mword 5) = pav) by (peel; reflexivity).
     assert (HE4a5 : E4 !!! Regidx (mword_of_int 15 : mword 5) = pu)
       by (peel; apply vdi_addv_zero_l).
@@ -1415,7 +1427,7 @@ Section ProofVirtioDiskInit.
               (luival (sign_extend' 20 (mword_of_int 1 : mword 6))) E4 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (E5 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> E4).
+    pose (E5 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> E4).
     assert (Hp0ee : add_vec_int (mword_of_int (VDI + 0x0ec) : mword 64) 2 = mword_of_int (VDI + 0x0ee)) by pcs.
     iEval (rewrite Hp0ee) in "Hpc".
     iPoseProof (vdi_0ee with "Htext") as "Hi".
@@ -1423,14 +1435,14 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 64) E5 (K - 4)%nat ltac:(nzd) ltac:(nzd) ltac:(bvc)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (E6 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> E5).
+    pose (E6 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> E5).
     assert (Hp0f0 : add_vec_int (mword_of_int (VDI + 0x0ee) : mword 64) 2 = mword_of_int (VDI + 0x0f0)) by pcs.
     iEval (rewrite Hp0f0) in "Hpc".
     iPoseProof (vdi_0f0 with "Htext") as "Hi".
     iApply (wp_jal_s_sconf γ Φ (mword_of_int (VDI + 0x0f0)) (mword_of_int 1 : mword 5) (mword_of_int 2078288 : mword 21) E6 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (E7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (VDI + 0x0f0) : mword 64) 4)]> E6).
+    pose (E7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (VDI + 0x0f0) : mword 64) 4)]> E6).
     assert (Htgm1 : add_vec (mword_of_int (VDI + 0x0f0) : mword 64)
                       (sign_extend' 64 (mword_of_int 2078288 : mword 21))
                     = mword_of_int KernelSyms.memset) by bvc.
@@ -1465,14 +1477,14 @@ Section ProofVirtioDiskInit.
     iApply (wp_auipc_s_sconf γ Φ (mword_of_int (VDI + 0x0f4)) (mword_of_int 9 : mword 5) (mword_of_int 30 : mword 20) ms1 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (F1 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mword_of_int (VDI + 0x0f4) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))]> ms1).
+    pose (F1 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mword_of_int (VDI + 0x0f4) : mword 64) (auipc_off (mword_of_int 30 : mword 20)))]> ms1).
     assert (Hp0f8 : add_vec_int (mword_of_int (VDI + 0x0f4) : mword 64) 4 = mword_of_int (VDI + 0x0f8)) by pcs.
     iEval (rewrite Hp0f8) in "Hpc".
     iPoseProof (vdi_0f8 with "Htext") as "Hi".
     iApply (wp_addi4_s_sconf γ Φ (mword_of_int (VDI + 0x0f8)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 3484 : mword 12) F1 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (F2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (F1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 3484 : mword 12)))]> F1).
+    pose (F2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (F1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 3484 : mword 12)))]> F1).
     assert (HF2s1 : F2 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; bvc).
     assert (Hp0fc : add_vec_int (mword_of_int (VDI + 0x0f8) : mword 64) 4 = mword_of_int (VDI + 0x0fc)) by pcs.
     iEval (rewrite Hp0fc) in "Hpc".
@@ -1481,7 +1493,7 @@ Section ProofVirtioDiskInit.
               (luival (sign_extend' 20 (mword_of_int 1 : mword 6))) F2 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (F3 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> F2).
+    pose (F3 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> F2).
     assert (Hp0fe : add_vec_int (mword_of_int (VDI + 0x0fc) : mword 64) 2 = mword_of_int (VDI + 0x0fe)) by pcs.
     iEval (rewrite Hp0fe) in "Hpc".
     iPoseProof (vdi_0fe with "Htext") as "Hi".
@@ -1489,7 +1501,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 64) F3 (K - 4)%nat ltac:(nzd) ltac:(nzd) ltac:(bvc)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (F4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> F3).
+    pose (F4 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> F3).
     assert (Hp100 : add_vec_int (mword_of_int (VDI + 0x0fe) : mword 64) 2 = mword_of_int (VDI + 0x100)) by pcs.
     iEval (rewrite Hp100) in "Hpc".
     assert (HF4s1 : F4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HF2s1).
@@ -1501,14 +1513,14 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Haavail2). iExact "Havail". }
     iIntros "Hcg Hpc Havail". iClear "Hi".
     iEval (rewrite Haavail2) in "Havail".
-    set (F5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg pav]> F4).
+    pose (F5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg pav]> F4).
     assert (Hp102 : add_vec_int (mword_of_int (VDI + 0x100) : mword 64) 2 = mword_of_int (VDI + 0x102)) by pcs.
     iEval (rewrite Hp102) in "Hpc".
     iPoseProof (vdi_102 with "Htext") as "Hi".
     iApply (wp_jal_s_sconf γ Φ (mword_of_int (VDI + 0x102)) (mword_of_int 1 : mword 5) (mword_of_int 2078270 : mword 21) F5 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (F6 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (VDI + 0x102) : mword 64) 4)]> F5).
+    pose (F6 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (VDI + 0x102) : mword 64) 4)]> F5).
     assert (Htgm2 : add_vec (mword_of_int (VDI + 0x102) : mword 64)
                       (sign_extend' 64 (mword_of_int 2078270 : mword 21))
                     = mword_of_int KernelSyms.memset) by bvc.
@@ -1542,7 +1554,7 @@ Section ProofVirtioDiskInit.
               (luival (sign_extend' 20 (mword_of_int 1 : mword 6))) ms2 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) eq_refl with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (G1 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> ms2).
+    pose (G1 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> ms2).
     assert (Hp108 : add_vec_int (mword_of_int (VDI + 0x106) : mword 64) 2 = mword_of_int (VDI + 0x108)) by pcs.
     iEval (rewrite Hp108) in "Hpc".
     iPoseProof (vdi_108 with "Htext") as "Hi".
@@ -1550,7 +1562,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 0 : mword 64) G1 (K - 4)%nat ltac:(nzd) ltac:(nzd) ltac:(bvc)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (G2 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> G1).
+    pose (G2 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> G1).
     assert (Hp10a : add_vec_int (mword_of_int (VDI + 0x108) : mword 64) 2 = mword_of_int (VDI + 0x10a)) by pcs.
     iEval (rewrite Hp10a) in "Hpc".
     assert (HG2s1 : G2 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact Hms2s1).
@@ -1562,14 +1574,14 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Haused2). iExact "Hused". }
     iIntros "Hcg Hpc Hused". iClear "Hi".
     iEval (rewrite Haused2) in "Hused".
-    set (G3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg pu]> G2).
+    pose (G3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg pu]> G2).
     assert (Hp10c : add_vec_int (mword_of_int (VDI + 0x10a) : mword 64) 2 = mword_of_int (VDI + 0x10c)) by pcs.
     iEval (rewrite Hp10c) in "Hpc".
     iPoseProof (vdi_10c with "Htext") as "Hi".
     iApply (wp_jal_s_sconf γ Φ (mword_of_int (VDI + 0x10c)) (mword_of_int 1 : mword 5) (mword_of_int 2078260 : mword 21) G3 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (G4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (VDI + 0x10c) : mword 64) 4)]> G3).
+    pose (G4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (VDI + 0x10c) : mword 64) 4)]> G3).
     assert (Htgm3 : add_vec (mword_of_int (VDI + 0x10c) : mword 64)
                       (sign_extend' 64 (mword_of_int 2078260 : mword 21))
                     = mword_of_int KernelSyms.memset) by bvc.
@@ -1628,7 +1640,7 @@ Section ProofVirtioDiskInit.
               (luival (mword_of_int 65537 : mword 20)) ms3 (K - 4)%nat ltac:(nzd) ltac:(nzd) eq_refl
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> ms3).
+    pose (H1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> ms3).
     assert (Hp114 : add_vec_int (mword_of_int (VDI + 0x110) : mword 64) 4 = mword_of_int (VDI + 0x114)) by pcs.
     iEval (rewrite Hp114) in "Hpc".
     iPoseProof (vdi_114 with "Htext") as "Hi".
@@ -1636,7 +1648,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 8 : mword 64) H1 (K - 4)%nat ltac:(nzd) ltac:(nzd) ltac:(bvc)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H2 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (mword_of_int 8 : mword 64)]> H1).
+    pose (H2 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (mword_of_int 8 : mword 64)]> H1).
     assert (HH2a5 : H2 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (HH2a4 : H2 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 8) by (peel; reflexivity).
     assert (HH2s1 : H2 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact Hms3s1).
@@ -1661,7 +1673,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Hdad0). iExact "Hdlo". }
     iIntros "Hcg Hpc Hdlo". iClear "Hi".
     iEval (rewrite Hdad0) in "Hdlo".
-    set (H3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (word_lo pd : mword 32))]> H2).
+    pose (H3 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (word_lo pd : mword 32))]> H2).
     assert (HH3a4 : H3 !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 (word_lo pd : mword 32)) by (peel; reflexivity).
     assert (HH3a5 : H3 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH2a5).
     assert (HH3s1 : H3 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH2s1).
@@ -1684,7 +1696,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Hdad4). iExact "Hdhi". }
     iIntros "Hcg Hpc Hdhi". iClear "Hi".
     iEval (rewrite Hdad4) in "Hdhi".
-    set (H4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (word_hi pd : mword 32))]> H3).
+    pose (H4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (sign_extend' 64 (word_hi pd : mword 32))]> H3).
     assert (HH4a4 : H4 !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 (word_hi pd : mword 32)) by (peel; reflexivity).
     assert (HH4a5 : H4 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH3a5).
     assert (HH4s1 : H4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH3s1).
@@ -1709,7 +1721,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Hava3). iExact "Havail". }
     iIntros "Hcg Hpc Havail". iClear "Hi".
     iEval (rewrite Hava3) in "Havail".
-    set (H5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg pav]> H4).
+    pose (H5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg pav]> H4).
     assert (HH5a5 : H5 !!! Regidx (mword_of_int 15 : mword 5) = pav) by (peel; reflexivity).
     assert (HH5s1 : H5 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH4s1).
     assert (Hp126 : add_vec_int (mword_of_int (VDI + 0x124) : mword 64) 2 = mword_of_int (VDI + 0x126)) by pcs.
@@ -1718,7 +1730,7 @@ Section ProofVirtioDiskInit.
     iApply (wp_addiw_s_sconf γ Φ (mword_of_int (VDI + 0x126)) (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) H5 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H6 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (H6 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (H5 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0))]> H5).
     assert (Hp12a : add_vec_int (mword_of_int (VDI + 0x126) : mword 64) 4 = mword_of_int (VDI + 0x12a)) by pcs.
     iEval (rewrite Hp12a) in "Hpc".
@@ -1727,7 +1739,7 @@ Section ProofVirtioDiskInit.
               (luival (mword_of_int 65537 : mword 20)) H6 (K - 4)%nat ltac:(nzd) ltac:(nzd) eq_refl
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H7 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> H6).
+    pose (H7 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (luival (mword_of_int 65537 : mword 20))]> H6).
     assert (HH7a4 : H7 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x10001000) by (peel; bvc).
     assert (HH7a5 : H7 !!! Regidx (mword_of_int 15 : mword 5) = pav) by (peel; exact HH5a5).
     assert (HH7a3 : H7 !!! Regidx (mword_of_int 13 : mword 5) = sign_extend' 64 (subrange_vec_dec
@@ -1749,7 +1761,7 @@ Section ProofVirtioDiskInit.
     iApply (wp_srai_s_sconf γ Φ (mword_of_int (VDI + 0x132)) (mword_of_int 15 : mword 5) (mword_of_int 32 : mword 6) H7 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (shift_bits_right_arith (H7 !!! Regidx (mword_of_int 15 : mword 5))
+    pose (H8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (shift_bits_right_arith (H7 !!! Regidx (mword_of_int 15 : mword 5))
         (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))]> H7).
     assert (HH8a5 : H8 !!! Regidx (mword_of_int 15 : mword 5) = (mword_of_int 0 : mword 64))
       by (peel; try rewrite HH7a5; exact (vdi_srai32 pav Hpavlt)).
@@ -1774,7 +1786,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite Husa3). iExact "Hused". }
     iIntros "Hcg Hpc Hused". iClear "Hi".
     iEval (rewrite Husa3) in "Hused".
-    set (H9 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg pu]> H8).
+    pose (H9 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg pu]> H8).
     assert (HH9a5 : H9 !!! Regidx (mword_of_int 15 : mword 5) = pu) by (peel; reflexivity).
     assert (HH9a4 : H9 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH8a4).
     assert (HH9s1 : H9 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH8s1).
@@ -1784,7 +1796,7 @@ Section ProofVirtioDiskInit.
     iApply (wp_addiw_s_sconf γ Φ (mword_of_int (VDI + 0x13a)) (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 12) H9 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H10 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
+    pose (H10 := <[Regidx (mword_of_int 13 : mword 5) := regval_into_reg (sign_extend' 64 (subrange_vec_dec
         (add_vec (H9 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0))]> H9).
     assert (HH10a3 : H10 !!! Regidx (mword_of_int 13 : mword 5) = sign_extend' 64 (subrange_vec_dec
         (add_vec pu (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0))
@@ -1807,7 +1819,7 @@ Section ProofVirtioDiskInit.
     iApply (wp_srai_s_sconf γ Φ (mword_of_int (VDI + 0x142)) (mword_of_int 15 : mword 5) (mword_of_int 32 : mword 6) H10 (K - 4)%nat
               ltac:(nzd) ltac:(nzd) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H11 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (shift_bits_right_arith (H10 !!! Regidx (mword_of_int 15 : mword 5))
+    pose (H11 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (shift_bits_right_arith (H10 !!! Regidx (mword_of_int 15 : mword 5))
         (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))]> H10).
     assert (HH11a5 : H11 !!! Regidx (mword_of_int 15 : mword 5) = (mword_of_int 0 : mword 64))
       by (peel; try rewrite HH10a5; exact (vdi_srai32 pu Hpult)).
@@ -1829,7 +1841,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 1 : mword 64) H11 (K - 4)%nat ltac:(nzd) ltac:(nzd) ltac:(bvc)
               with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H12 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 1 : mword 64)]> H11).
+    pose (H12 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 1 : mword 64)]> H11).
     assert (HH12a5 : H12 !!! Regidx (mword_of_int 15 : mword 5) = (mword_of_int 1 : mword 64)) by (peel; reflexivity).
     assert (HH12a4 : H12 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH11a4).
     assert (HH12s1 : H12 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH11s1).
@@ -1937,7 +1949,7 @@ Section ProofVirtioDiskInit.
               (mword_of_int 15 : mword 64) H12 (K - 4)%nat ltac:(nzd) ltac:(nzd)
               ltac:(rewrite HH12s2; bvc) with "Hcg Hpc Hi [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (H13 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (mword_of_int 15 : mword 64)]> H12).
+    pose (H13 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (mword_of_int 15 : mword 64)]> H12).
     assert (HH13s2 : H13 !!! Regidx (mword_of_int 18 : mword 5) = (mword_of_int 15 : mword 64)) by (peel; reflexivity).
     assert (HH13a4 : H13 !!! Regidx (mword_of_int 14 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH12a4).
     assert (Hp170 : add_vec_int (mword_of_int (VDI + 0x16c) : mword 64) 4 = mword_of_int (VDI + 0x170)) by pcs.
@@ -1962,7 +1974,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite HH13sp Hb1). iExact "Hs1c". }
     iIntros "Hcg Hpc Hs1c". iClear "Hi".
     iEval (rewrite HH13sp Hb1) in "Hs1c".
-    set (P1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> H13).
+    pose (P1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 1 : mword 5))]> H13).
     assert (HP1sp : P1 !!! Regidx csp_rs1 = spr) by (rewrite /P1 upd_ne; [exact HH13sp | reg_neq]).
     assert (Hp176 : add_vec_int (mword_of_int (VDI + 0x174) : mword 64) 2 = mword_of_int (VDI + 0x176)) by pcs.
     iEval (rewrite Hp176) in "Hpc".
@@ -1973,7 +1985,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite HP1sp Hb2). iExact "Hs2c". }
     iIntros "Hcg Hpc Hs2c". iClear "Hi".
     iEval (rewrite HP1sp Hb2) in "Hs2c".
-    set (P2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> P1).
+    pose (P2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 8 : mword 5))]> P1).
     assert (HP2sp : P2 !!! Regidx csp_rs1 = spr) by (rewrite /P2 upd_ne; [exact HP1sp | reg_neq]).
     assert (Hp178 : add_vec_int (mword_of_int (VDI + 0x176) : mword 64) 2 = mword_of_int (VDI + 0x178)) by pcs.
     iEval (rewrite Hp178) in "Hpc".
@@ -1984,7 +1996,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite HP2sp Hb3). iExact "Hs3c". }
     iIntros "Hcg Hpc Hs3c". iClear "Hi".
     iEval (rewrite HP2sp Hb3) in "Hs3c".
-    set (P3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> P2).
+    pose (P3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 9 : mword 5))]> P2).
     assert (HP3sp : P3 !!! Regidx csp_rs1 = spr) by (rewrite /P3 upd_ne; [exact HP2sp | reg_neq]).
     assert (Hp17a : add_vec_int (mword_of_int (VDI + 0x178) : mword 64) 2 = mword_of_int (VDI + 0x17a)) by pcs.
     iEval (rewrite Hp17a) in "Hpc".
@@ -1995,7 +2007,7 @@ Section ProofVirtioDiskInit.
     { iEval (rewrite HP3sp Hb4). iExact "Hs4c". }
     iIntros "Hcg Hpc Hs4c". iClear "Hi".
     iEval (rewrite HP3sp Hb4) in "Hs4c".
-    set (P4 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 18 : mword 5))]> P3).
+    pose (P4 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg (m !!! Regidx (mword_of_int 18 : mword 5))]> P3).
     assert (HP4sp : P4 !!! Regidx csp_rs1 = spr) by (rewrite /P4 upd_ne; [exact HP3sp | reg_neq]).
     assert (Hp17c : add_vec_int (mword_of_int (VDI + 0x17a) : mword 64) 2 = mword_of_int (VDI + 0x17c)) by pcs.
     iEval (rewrite Hp17c) in "Hpc".
@@ -2019,7 +2031,7 @@ Section ProofVirtioDiskInit.
     iApply (wp_caddi16sp_pop_s_sconf γ Φ (mword_of_int (VDI + 0x17c)) (mword_of_int 2 : mword 6) P4 (K - 4)%nat 4%nat Hpop
               with "Hcg Hpc Hi Hframe [-]").
     iIntros "Hcg Hpc". iClear "Hi".
-    set (P5 := <[Regidx csp_rs1 := regval_into_reg (add_vec (P4 !!! Regidx csp_rs1)
+    pose (P5 := <[Regidx csp_rs1 := regval_into_reg (add_vec (P4 !!! Regidx csp_rs1)
         (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> P4).
     iEval (rewrite Hknk) in "Hcg".
     assert (Hp17e : add_vec_int (mword_of_int (VDI + 0x17c) : mword 64) 2 = mword_of_int (VDI + 0x17e)) by pcs.

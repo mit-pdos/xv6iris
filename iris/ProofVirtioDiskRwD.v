@@ -166,6 +166,21 @@ Proof.
   rewrite elem_of_union elem_of_singleton !elem_of_set_seq. lia.
 Qed.
 
+(* The same surgery on the FREE map's domain, as a pure fact over set
+   variables.  It is stated here — rather than run inline at the publish
+   step — because that step's goal sits under a whole-function Iris context:
+   [set_solver] there rescans every hypothesis and cost 417 s of this file's
+   455 s, while the identical goal in this three-variable context is instant.
+   See optimization.md, "never call [set_solver] from inside a phase proof". *)
+Lemma vdrwd_dom_fl_ins {A : Type} (nr np : nat) (fl : gmap nat A) (b : A) :
+  (nr <= np)%nat -> dom fl = set_seq nr (np - nr) ->
+  dom (<[ np := b ]> fl) = (set_seq nr (S np - nr) : gset nat).
+Proof.
+  intros Hle Hdfl.
+  rewrite dom_insert_L Hdfl (vdrwd_set_seq_snoc nr np Hle).
+  apply union_comm_L.
+Qed.
+
 (* ---- bitvector-level structural helpers ------------------------------ *)
 
 Lemma vdrwd_zext16_unsigned (x : SailStdpp.Values.mword 16) :
@@ -1757,8 +1772,7 @@ Section VdrwdP4.
     2:{ rewrite /disk_claim. iExact "Hfrag". }
     rewrite /vdrw_body.
     iSplitR.
-    { iPureIntro. rewrite dom_insert_L Hdfl.
-      rewrite (vdrwd_set_seq_snoc nr np Hle). set_solver. }
+    { iPureIntro. exact (vdrwd_dom_fl_ins nr np fl _ Hle Hdfl). }
     iSplitR; [iPureIntro; exact Hpkb|].
     iSplitR.
     { iPureIntro. exact (vdrwd_dom_tr_ins np fl pk tr (h, m2, t) V Hdtr). }
