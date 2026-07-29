@@ -102,11 +102,7 @@ Lemma sddec_jal_holding s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s 
   = Some (JAL (mword_of_int 2092400 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x20  0x00010717  auipc a4,0x10 *)
-Lemma sddec_auipc_a4 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00010717 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+(* [bdec_00010717] (+0x20, auipc a4,0x10) -- shared, see KernelBaseDecode.v *)
 
 (* +0x24  0x50a70713  addi a4,a4,1290 *)
 Lemma sddec_addi_a4 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -249,7 +245,7 @@ Section WpSchedDecode.
   (* ---- +0x20: auipc a4,0x10 ---- *)
   Lemma sdi_20 : kernel_text -∗ instr (mword_of_int (SD + 0x20) : mword 64) false (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (SD + 0x20)%Z (mword_of_int 0x00010717 : mword 32)
-    (mword_of_int (SD + 0x20) : mword 64) (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)) sddec_auipc_a4. Qed.
+    (mword_of_int (SD + 0x20) : mword 64) (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_00010717. Qed.
 
   (* ---- +0x24: addi a4,a4,1290 ---- *)
   Lemma sdi_24 : kernel_text -∗ instr (mword_of_int (SD + 0x24) : mword 64) false (ITYPE (mword_of_int 0x50a : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).

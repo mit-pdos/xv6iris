@@ -211,3 +211,29 @@ Ltac decode_bridge_ms :=
       [ apply agree_m; assumption | vm_compute; reflexivity | vm_compute; reflexivity ]
   | apply (decode_state_bridge D_s _ dstateS);
       [ apply agree_s; assumption | vm_compute; reflexivity | vm_compute; reflexivity ] ].
+
+(* [decode_bridge_ms] closes its concrete-decode obligation with a bare
+   [vm_compute; reflexivity], which needs the two sides' bitvector
+   WELL-FORMEDNESS PROOF TERMS to coincide.  For some words they do not: a CSRImm
+   word's 5-bit uimm arrives as a SLICE of the instruction word while the CSR
+   leaves (WpSconfCsr.v) phrase it as [mword_of_int 2], and a virtio MMIO word's
+   immediate likewise.  Only [bv_eq] closes such a pair.  [decode_bridge_ms_bv]
+   is the same bridge with the leafwise closing [rvc_oneshot] uses: descend the
+   AST with [f_equal] and close each field by [reflexivity] or [bv_eq].
+
+   [bv_eq] is spelled QUALIFIED: this file deliberately does not [Import]
+   stdpp's bitvector.definitions (it is already loaded transitively, but
+   importing it here would change the namespace of every file that imports the
+   bridge). *)
+Ltac decode_bridge_ms_bv :=
+  let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
+  intros Hmisa Hcfg;
+  destruct Hcfg as [[? ?]|[? ?]];
+  [ apply (decode_state_bridge D_m _ dstateM);
+      [ apply agree_m; assumption | vm_compute; reflexivity
+      | vm_compute;
+        repeat first [ reflexivity | (apply bitvector.definitions.bv_eq; vm_compute; reflexivity) | f_equal ] ]
+  | apply (decode_state_bridge D_s _ dstateS);
+      [ apply agree_s; assumption | vm_compute; reflexivity
+      | vm_compute;
+        repeat first [ reflexivity | (apply bitvector.definitions.bv_eq; vm_compute; reflexivity) | f_equal ] ] ].

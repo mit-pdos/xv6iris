@@ -155,12 +155,6 @@ are working on that effort — the relevant `projects/` file.
   is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
   boot wiring.
 
-- **[`scheduler.md`](projects/scheduler.md)** — scheduler(), the per-CPU
-  dispatch loop: the diverging whole-function spec, the 4-place chain-payload
-  refactor (the crossing index made visible to `p_sched`, which is what lets
-  the scheduler's release identify the proc that resumed it), the level-0
-  SIE flip leaves for the inlined intr_on/intr_off, the eb/trap_csrs
-  accounting across dispatch rounds, and the wfi stutter-loop leaf.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
@@ -176,6 +170,17 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`scheduler.md`](completed/scheduler.md)** — scheduler(), the per-CPU
+  dispatch loop, PROVEN: the tree's first DIVERGING whole-function spec (no
+  continuation; proof_coverage.py learned the shape), the 4-place
+  chain-payload refactor (the crossing's c->proc index made visible to
+  `p_sched`, which is what lets the resumed scheduler identify the parking
+  proc with its scan cursor — its release needs exactly that lock), the
+  level-0 SIE flip leaves for the inlined intr_on/intr_off, the eb/trap_csrs
+  accounting (a dispatch round legitimately re-enables interrupts mid-scan;
+  `found = 0 → SIE off` is what makes the wfi provable at SIE=0), the wfi
+  stutter-loop leaf (`WpSmodeWfi.v` — the model wakes on `mip & mie ≠ 0`,
+  no SIE gate, TW dead), and the three-□-loop proof structure.
 - **[`pt-teardown-copy.md`](completed/pt-teardown-copy.md)** — freewalk / uvmfree /
   uvmcopy / uvmclear: the page-table TEARDOWN path, fork's address-space COPY
   and exec's guard-page edit — **vm.c is 20/20 functions and 100 % of its

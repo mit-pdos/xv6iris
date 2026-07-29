@@ -91,11 +91,7 @@ Import Defs.
 (* Compressed words allocproc does not share with another decode file.    *)
 (* ===================================================================== *)
 
-(* +0x22  c.lw a5,24(s1)  -- p->state *)
-Lemma apdc_4c9c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4c9c : mword 16)) s
-  = Some (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* +0x22  c.lw a5,24(s1) -- p->state -- is the shared KernelRvcDecode.cdec_4c9c *)
 
 (* +0x24  c.beqz a5,+0x14 *)
 Lemma apdc_cb91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -178,10 +174,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* ---- their leaf-form expansions: the shape a WP memory leaf takes, with a
    literal [mword 12] displacement and plain [Regidx]es. ---- *)
 
-Lemma apexec_lw24_s1_a5 s :
-  exec (execute (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+(* the lw24 s1->a5 shape is the shared KernelRvcDecode.cexec_lw24_s1_a5 *)
 
 Lemma apexec_sw48_s1_a0 s :
   exec (execute (C_SW (mword_of_int 12, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)))) s
@@ -352,7 +345,7 @@ Section AllocprocInstrs.
 
   Lemma api_22 : kernel_text -∗ instr (mword_of_int (AP + 0x22) : mword 64) true (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (AP + 0x22)%Z (mword_of_int 0x4c9c : mword 16)
-    (mword_of_int (AP + 0x22) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) apdc_4c9c apexec_lw24_s1_a5. Qed.
+    (mword_of_int (AP + 0x22) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) cdec_4c9c cexec_lw24_s1_a5. Qed.
 
   Lemma api_24 : kernel_text -∗ instr (mword_of_int (AP + 0x24) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (AP + 0x24)%Z (mword_of_int 0xcb91 : mword 16)

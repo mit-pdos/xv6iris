@@ -1509,3 +1509,40 @@ Lemma cdec_b7c5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xb7c5 : mword 16)) s
   = Some (C_J (mword_of_int 2032 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ===================================================================== *)
+(*  Words the scheduler sweep collapsed (each had 2-3 private copies).     *)
+(* ===================================================================== *)
+
+(* 0xe062  c.sdsp s8,0(sp)   -- the tenth saved-register slot of a 10-save
+   frame: proc_mapstacks, scheduler *)
+Lemma cdec_e062 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe062 : mword 16)) s
+  = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 24)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x4b85  c.li s7,1         -- pipewrite, piperead, scheduler *)
+Lemma cdec_4b85 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4b85 : mword 16)) s
+  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 23)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x4c9c  c.lw a5,24(s1)    -- p->state, in every function that scans proc[]
+   with the cursor in s1: allocproc, wakeup, scheduler *)
+Lemma cdec_4c9c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4c9c : mword 16)) s
+  = Some (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_4c9c]'s AST in the shape a WP load leaf takes: a literal [mword 12]
+   displacement and plain [Regidx]es. *)
+Lemma cexec_lw24_s1_a5 s :
+  exec (execute (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* 0x855a  c.mv a0,s6        -- uvmcopy, scheduler *)
+Lemma cdec_855a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x855a : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22)), s).
+Proof. intro H. rvc_oneshot s H. Qed.

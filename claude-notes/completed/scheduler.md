@@ -194,11 +194,20 @@ whole-function spec for a diverging function.
       byte-identical to sched's (5 Sail platform axioms + funext).  1489
       lines, 62 s coqc.  Coverage: scheduler reads `proven` (proc.c 14/28).
 - [x] W8: full build green; `proof_coverage.py --check` green; committed.
-- [ ] W9 (cleanup sweep, mechanical): move the duplicated decode words to
-      KernelRvcDecode/KernelBaseDecode (`0x4b85`×3, `0x00011497`×5,
-      `0x00010717`×2, `0x00016917`×2, `0x4c9c`+LW-shape ×2, `0x855a`×2,
-      `0xe062`×2, `0x10016073`×2) and `decode_bridge_ms_bv` (×3) into
-      WpDecodeBridge.v, per the durable dedup rules.
+- [x] W9 (cleanup sweep): `0x4b85`(was ×3), `0x4c9c`+its LW exec-shape
+      (turned out ×3/×2 — WpAllocprocDecode held a third/second copy),
+      `0x855a`, `0xe062` → KernelRvcDecode (`cdec_*`, `cexec_lw24_s1_a5` —
+      exec-shape naming follows that file's `cexec_*` precedent, since its
+      `cshape_*` lemmas are pure AST equalities, not exec facts);
+      `0x00010717`, `0x10016073` → KernelBaseDecode (the csrsi word's
+      ProofPushOff copy differed only by the transparent `csr_sstatus`
+      alias — delta-equal, so one shared `Ox"100"` statement serves both);
+      `0x00011497`/`0x00016917` were ALREADY shared and only the scheduler
+      file's private copies needed retiring; `decode_bridge_ms_bv` →
+      WpDecodeBridge.v (spelled `apply bitvector.definitions.bv_eq` so the
+      bridge file needs no new Import).  Statement-diff verification over
+      all 14 touched files: 0 instr-fact changes.  KernelRvcDecode +0.17s,
+      KernelBaseDecode +0.61s.
 
 ## Proof-structure lessons (ProofScheduler.v)
 

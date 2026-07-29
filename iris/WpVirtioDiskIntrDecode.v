@@ -236,20 +236,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
    the head -- true for every AST whose immediates are [mword 12]/[mword 13]/
    [mword 20]/[mword 21] literals.  FENCE's four-bit pred/succ fields are not
    (they arrive as a slice, and only [bv_eq] closes them), so that one word
-   uses the leafwise-[bv_eq] variant.  Same tactic as WpVirtioDiskRwDecode's
-   local twin; kept local so the two decode files stay independent. *)
-Ltac decode_bridge_ms_bv :=
-  let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
-  intros Hmisa Hcfg;
-  destruct Hcfg as [[? ?]|[? ?]];
-  [ apply (decode_state_bridge D_m _ dstateM);
-      [ apply agree_m; assumption | vm_compute; reflexivity
-      | vm_compute;
-        repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ] ]
-  | apply (decode_state_bridge D_s _ dstateS);
-      [ apply agree_s; assumption | vm_compute; reflexivity
-      | vm_compute;
-        repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ] ] ].
+   uses WpDecodeBridge's leafwise-[bv_eq] variant [decode_bridge_ms_bv]. *)
 
 (* +0x0a  auipc s1,0x1e *)
 Lemma vtb_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

@@ -445,20 +445,9 @@ Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
 (* [decode_bridge_ms] closes its concrete-decode obligation with a bare
    [reflexivity], which needs the two sides' bitvector well-formedness
    PROOF TERMS to coincide.  For [fence rw,rw] -- the only word here whose
-   AST carries [mword 4] literals -- they do not, so that one word uses the
-   [bv_eq]-per-leaf closing of [rvc_oneshot] instead. *)
-Ltac decode_bridge_ms_bv :=
-  let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
-  intros Hmisa Hcfg;
-  destruct Hcfg as [[? ?]|[? ?]];
-  [ apply (decode_state_bridge D_m _ dstateM);
-      [ apply agree_m; assumption | vm_compute; reflexivity
-      | vm_compute;
-        repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ] ]
-  | apply (decode_state_bridge D_s _ dstateS);
-      [ apply agree_s; assumption | vm_compute; reflexivity
-      | vm_compute;
-        repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ] ] ].
+   AST carries [mword 4] literals -- they do not, so that one word uses
+   WpDecodeBridge's [decode_bridge_ms_bv], the same bridge with the
+   [bv_eq]-per-leaf closing of [rvc_oneshot]. *)
 
 Lemma rwb_00c52b83 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00c52b83 : mword 32) : M instruction) s

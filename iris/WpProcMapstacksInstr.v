@@ -41,10 +41,7 @@ Section ProcMapstacksInstrs.
 
   (* ExecuteAs redirects not in WpMmodeLeafBase (Local copies, as in
      WpMappagesInstr / WpWalkInstr) *)
-  Lemma pmsdec_14 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0xe062 : mword 16)) s
-    = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 24)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
+  (* [cdec_e062] (+0x14, c.sdsp s8,0(sp)) -- shared, see KernelRvcDecode.v *)
   Lemma pmsdec_1e s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0xfe848493 : mword 32)) s
     = Some (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
@@ -169,7 +166,7 @@ Section ProcMapstacksInstrs.
   Lemma pmsi_12 : PMS 0x12 true (STORE (csdsp_imm 1, Regidx (mword_of_int 23), sp, 8)).  (* sd s7,8(sp) *)
   Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x12)%Z (mword_of_int 0xe45e : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x12) : mword 64) (STORE (csdsp_imm 1, Regidx (mword_of_int 23), sp, 8)) cdec_e45e exec_execute_C_SDSP. Qed.
   Lemma pmsi_14 : PMS 0x14 true (STORE (csdsp_imm 0, Regidx (mword_of_int 24), sp, 8)).  (* sd s8,0(sp) *)
-  Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x14)%Z (mword_of_int 0xe062 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x14) : mword 64) (STORE (csdsp_imm 0, Regidx (mword_of_int 24), sp, 8)) pmsdec_14 exec_execute_C_SDSP. Qed.
+  Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x14)%Z (mword_of_int 0xe062 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x14) : mword 64) (STORE (csdsp_imm 0, Regidx (mword_of_int 24), sp, 8)) cdec_e062 exec_execute_C_SDSP. Qed.
   Lemma pmsi_16 : PMS 0x16 true (ITYPE (caddi4spn_imm (mword_of_int 20 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).  (* addi s0,sp,80 *)
   Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x16)%Z (mword_of_int 0x0880 : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x16) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 20 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0880 exec_execute_C_ADDI4SPN. Qed.
   Lemma pmsi_18 : PMS 0x18 true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).  (* mv s4,a0 *)

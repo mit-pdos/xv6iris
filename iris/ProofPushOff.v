@@ -18,7 +18,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu SpecMycpu WpPushOffTop WpPopOff.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu SpecMycpu WpPushOffTop WpPopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcGeom CpuOwn.
 Require Import WpPushOffBridges.
@@ -26,22 +26,10 @@ Require Import SpecPushOff.
 Import Defs.
 
 
-(* +0x24  0x10016073  csrsi sstatus,2 (rd = x0) -- pop_off's intr_on,
-   never reached by the old SIE=0-only proof, so its facts are new. *)
-Local Ltac psx_ast :=
-  first [ reflexivity
-        | repeat f_equal;
-          first [ reflexivity | apply bv_eq; vm_compute; reflexivity ] ].
-Local Ltac psx_dbase s Hpriv :=
-  decode_pause_prefix s Hpriv;
-  match goal with |- ?lhs = ?rhs =>
-    let l := eval vm_compute in lhs in change_no_check (l = rhs) end;
-  psx_ast.
-
-Lemma ppdec_24 (s : mstate) : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x10016073 : mword 32)) s
-  = Some (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; psx_dbase s Hpriv ]. Qed.
+(* +0x24  0x10016073  csrsi sstatus,2 (rd = x0) -- pop_off's intr_on.  Its
+   decode is KernelBaseDecode.v's shared [bdec_10016073], stated with the csr
+   field as [Ox"100"], which is (delta-)equal to the [csr_sstatus] the CSR
+   leaves -- and the [instr] fact below -- are phrased with. *)
 
 (* the epilogue +32 cancels a pa_stk 4 re-anchor (closed offsets). *)
 Local Lemma po_up_cancel (X : mword 64) :
@@ -94,7 +82,7 @@ Section ProofPushOff.
       (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)).
   Proof. mk_base (PP + 0x24)%Z (mword_of_int 0x10016073 : mword 32)
     (mword_of_int (PP + 0x24) : mword 64)
-    (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) ppdec_24. Qed.
+    (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) bdec_10016073. Qed.
 
   (* ------------------------------------------------------------------- *)
   (* pop_off's shared epilogue (PP+0x28..0x2e): restore ra/s0, trade the  *)

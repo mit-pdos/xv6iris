@@ -204,11 +204,7 @@ Lemma ucdc_94d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADD (Regidx (mword_of_int 9), Regidx (mword_of_int 20)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x2e  c.mv a0,s6 *)
-Lemma ucdc_855a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x855a : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_855a] (0x2e, c.mv a0,s6) -- shared, see KernelRvcDecode.v *)
 
 (* 0x34  c.beqz a0,-0x10  (offset/2 = -8; 8-bit residue 248) *)
 Lemma ucdc_d965 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -453,7 +449,7 @@ Section UvmcopyInstrs.
 
   Lemma uci_2e : kernel_text -∗ instr (mword_of_int (UC + 0x2e) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (UC + 0x2e)%Z (mword_of_int 0x855a : mword 16)
-    (mword_of_int (UC + 0x2e) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) ucdc_855a exec_execute_C_MV. Qed.
+    (mword_of_int (UC + 0x2e) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) cdec_855a exec_execute_C_MV. Qed.
 
   Lemma uci_30 : kernel_text -∗ instr (mword_of_int (UC + 0x30) : mword 64) false (JAL (mword_of_int 2095912 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (UC + 0x30)%Z (mword_of_int 0xb29ff0ef : mword 32)

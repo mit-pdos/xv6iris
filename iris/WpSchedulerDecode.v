@@ -16,10 +16,12 @@
    address maps straight to a lemma name.
 
    SHARED WORDS.  The 80-byte frame's c.addi16sp/ten c.sdsp/c.addi4spn, the
-   a5-materialization triple (c.mv a5,tp / sext.w / c.slli a5,7) and c.mv a0,s1
-   all come from KernelRvcDecode.v's [cdec_*]; [addi s1,s1,360] (the
-   [sizeof(struct proc)] stride) comes from KernelBaseDecode.v's
-   [bdec_16848493].  Nothing here imports another function's decode or WP file.
+   a5-materialization triple (c.mv a5,tp / sext.w / c.slli a5,7), c.mv a0,s1,
+   c.li s7,1, c.lw a5,24(s1) (with its leaf shape [cexec_lw24_s1_a5]) and
+   c.mv a0,s6 all come from KernelRvcDecode.v's [cdec_*]; [addi s1,s1,360] (the
+   [sizeof(struct proc)] stride), the three [auipc] relocations and the
+   [csrsi sstatus,2] come from KernelBaseDecode.v's [bdec_*].  Nothing here
+   imports another function's decode or WP file.
 
    The two CSRImm words are stated with the csr field as [Ox"100"], which is
    exactly (delta-)equal to the [csr_sstatus] that WpSconfCsr.v's csrsi/csrci
@@ -51,11 +53,7 @@ Notation SC := KernelSyms.scheduler.
 (* Fresh compressed decode templates (keyed by word).                     *)
 (* ===================================================================== *)
 
-(* +0x14  0xe062  c.sdsp s8,0(sp)  -- the tenth saved-register slot *)
-Lemma schdec_e062 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe062 : mword 16)) s
-  = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 24)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_e062] (+0x14, c.sdsp s8,0(sp)) -- shared, see KernelRvcDecode.v *)
 
 (* +0x28  0x975a  c.add a4,a4,s6 *)
 Lemma schdec_975a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -81,11 +79,8 @@ Lemma schdec_9a3e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   = Some (C_ADD (Regidx (mword_of_int 20), Regidx (mword_of_int 15)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x46  0x4b85  c.li s7,1  (the "found a runnable proc" flag) *)
-Lemma schdec_4b85 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4b85 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 23)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_4b85] (+0x46, c.li s7,1 -- the "found a runnable proc" flag) --
+   shared, see KernelRvcDecode.v *)
 
 (* +0x48  0xa83d  c.j +0x3e  (into the loop head at +0x86) *)
 Lemma schdec_a83d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -93,24 +88,11 @@ Lemma schdec_a83d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   = Some (C_J (mword_of_int 31), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x5e  0x4c9c  c.lw a5,24(s1)  (p->state) *)
-Lemma schdec_4c9c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4c9c : mword 16)) s
-  = Some (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_4c9c] (+0x5e, c.lw a5,24(s1) -- p->state) and its leaf-form shape
+   [cexec_lw24_s1_a5] -- shared, see KernelRvcDecode.v *)
 
-(* that c.lw in the leaf-friendly (Regidx / literal-displacement) form: one
-   instance of WpMmodeLeafBase's [exec_execute_C_LW_leaf]. *)
-Lemma schexec_lw24 s :
-  exec (execute (C_LW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
-
-(* +0x70  0x855a  c.mv a0,s6  (&c->context, swtch's first argument) *)
-Lemma schdec_855a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x855a : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_855a] (+0x70, c.mv a0,s6 -- &c->context, swtch's first argument) --
+   shared, see KernelRvcDecode.v *)
 
 (* +0x7a  0x8ade  c.mv s5,s7 *)
 Lemma schdec_8ade s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -152,11 +134,8 @@ Lemma schdec_00779b13 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (SHIFTIOP (mword_of_int 7 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 22), SLLI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x20, +0x2e  0x00010717  auipc a4,0x10 *)
-Lemma schdec_00010717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00010717 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+(* [bdec_00010717] (+0x20, +0x2e, auipc a4,0x10) -- shared, see
+   KernelBaseDecode.v *)
 
 (* +0x24  0x5ae70713  addi a4,a4,1454  (&pid_lock, i.e. cpus[] via +0x30) *)
 Lemma schdec_5ae70713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -254,33 +233,13 @@ Lemma schdec_10500073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (WFI tt, s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* [decode_bridge_ms] closes its concrete-decode obligation with a bare
-   [vm_compute; reflexivity], which needs the two sides' bitvector
-   well-formedness PROOF TERMS to coincide.  For the two CSRImm words they do
-   not: the decoder's 5-bit uimm arrives as a SLICE of the instruction word,
-   while the CSR leaves (WpSconfCsr.v) phrase it as [mword_of_int 2], and only
-   [bv_eq] closes that.  Same bridge, [rvc_oneshot]'s leafwise closing.  (Local
-   twin of the identical tactic in WpVirtioDiskRwDecode.v /
-   WpVirtioDiskIntrDecode.v, kept local so the decode files stay independent.) *)
-Local Ltac decode_bridge_ms_bv :=
-  let Hmisa := fresh "Hmisa" in let Hcfg := fresh "Hcfg" in
-  intros Hmisa Hcfg;
-  destruct Hcfg as [[? ?]|[? ?]];
-  [ apply (decode_state_bridge D_m _ dstateM);
-      [ apply agree_m; assumption | vm_compute; reflexivity
-      | vm_compute;
-        repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ] ]
-  | apply (decode_state_bridge D_s _ dstateS);
-      [ apply agree_s; assumption | vm_compute; reflexivity
-      | vm_compute;
-        repeat first [ reflexivity | (apply bv_eq; vm_compute; reflexivity) | f_equal ] ] ].
-
-(* +0x86  0x10016073  csrsi sstatus,2  (intr_on, rd = x0).  [Ox"100"] is the
-   [csr_sstatus] WpSconfCsr.v's CSRRS-immediate leaf is stated with. *)
-Lemma schdec_10016073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x10016073 : mword 32)) s
-  = Some (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRS), s).
-Proof. decode_bridge_ms_bv. Qed.
+(* [bdec_10016073] (+0x86, csrsi sstatus,2 -- intr_on, rd = x0) -- shared, see
+   KernelBaseDecode.v.  Its twin below is this file's only [decode_bridge_ms_bv]
+   word: [decode_bridge_ms]'s bare [vm_compute; reflexivity] cannot close the
+   concrete decode, because the decoder's 5-bit uimm arrives as a SLICE of the
+   instruction word while the CSR leaves (WpSconfCsr.v) phrase it as
+   [mword_of_int 2], and only [bv_eq] closes that; [Ox"100"] is the
+   [csr_sstatus] those leaves are stated with. *)
 
 (* +0x8a  0x10017073  csrci sstatus,2  (intr_off, rd = x0) *)
 Lemma schdec_10017073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -288,11 +247,7 @@ Lemma schdec_10017073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRC), s).
 Proof. decode_bridge_ms_bv. Qed.
 
-(* +0x90  0x00011497  auipc s1,0x11 *)
-Lemma schdec_00011497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+(* [bdec_00011497] (+0x90, auipc s1,0x11) -- shared, see KernelBaseDecode.v *)
 
 (* +0x94  0x96e48493  addi s1,s1,-1682  (&proc[0]; residue 2414) *)
 Lemma schdec_96e48493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -300,11 +255,7 @@ Lemma schdec_96e48493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 2414 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x9a  0x00016917  auipc s2,0x16 *)
-Lemma schdec_00016917 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00016917 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+(* [bdec_00016917] (+0x9a, auipc s2,0x16) -- shared, see KernelBaseDecode.v *)
 
 (* +0x9e  0x36490913  addi s2,s2,868  (&proc[NPROC], the scan's limit) *)
 Lemma schdec_36490913 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -359,7 +310,7 @@ Section WpSchedulerDecode.
 
   Lemma schi_14 : kernel_text -∗ instr (mword_of_int (SC + 0x14) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)).
   Proof. mk_rvc (SC + 0x14)%Z (mword_of_int 0xe062 : mword 16)
-    (mword_of_int (SC + 0x14) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)) schdec_e062 exec_execute_C_SDSP. Qed.
+    (mword_of_int (SC + 0x14) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 24), sp, 8)) cdec_e062 exec_execute_C_SDSP. Qed.
 
   (* ---- +0x16: c.addi4spn s0,sp,80 (the frame pointer) ---- *)
   Lemma schi_16 : kernel_text -∗ instr (mword_of_int (SC + 0x16) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 20 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
@@ -382,7 +333,7 @@ Section WpSchedulerDecode.
   (* ---- +0x20..+0x2a: c->proc = 0 ---- *)
   Lemma schi_20 : kernel_text -∗ instr (mword_of_int (SC + 0x20) : mword 64) false (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (SC + 0x20)%Z (mword_of_int 0x00010717 : mword 32)
-    (mword_of_int (SC + 0x20) : mword 64) (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)) schdec_00010717. Qed.
+    (mword_of_int (SC + 0x20) : mword 64) (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_00010717. Qed.
 
   Lemma schi_24 : kernel_text -∗ instr (mword_of_int (SC + 0x24) : mword 64) false (ITYPE (mword_of_int 1454 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_base (SC + 0x24)%Z (mword_of_int 0x5ae70713 : mword 32)
@@ -399,7 +350,7 @@ Section WpSchedulerDecode.
   (* ---- +0x2e..+0x36: s6 = &c->context ---- *)
   Lemma schi_2e : kernel_text -∗ instr (mword_of_int (SC + 0x2e) : mword 64) false (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (SC + 0x2e)%Z (mword_of_int 0x00010717 : mword 32)
-    (mword_of_int (SC + 0x2e) : mword 64) (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)) schdec_00010717. Qed.
+    (mword_of_int (SC + 0x2e) : mword 64) (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_00010717. Qed.
 
   Lemma schi_32 : kernel_text -∗ instr (mword_of_int (SC + 0x32) : mword 64) false (ITYPE (mword_of_int 1496 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_base (SC + 0x32)%Z (mword_of_int 0x5d870713 : mword 32)
@@ -434,7 +385,7 @@ Section WpSchedulerDecode.
   (* ---- +0x46: c.li s7,1 ---- *)
   Lemma schi_46 : kernel_text -∗ instr (mword_of_int (SC + 0x46) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 23), ADDI)).
   Proof. mk_rvc (SC + 0x46)%Z (mword_of_int 0x4b85 : mword 16)
-    (mword_of_int (SC + 0x46) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 23), ADDI)) schdec_4b85 exec_execute_C_LI. Qed.
+    (mword_of_int (SC + 0x46) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 23), ADDI)) cdec_4b85 exec_execute_C_LI. Qed.
 
   (* ---- +0x48: c.j +0x86 (jump into the loop head) ---- *)
   Lemma schi_48 : kernel_text -∗ instr (mword_of_int (SC + 0x48) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 31 : mword 11) ('b"0")), zreg)).
@@ -469,7 +420,7 @@ Section WpSchedulerDecode.
 
   Lemma schi_5e : kernel_text -∗ instr (mword_of_int (SC + 0x5e) : mword 64) true (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (SC + 0x5e)%Z (mword_of_int 0x4c9c : mword 16)
-    (mword_of_int (SC + 0x5e) : mword 64) (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) schdec_4c9c schexec_lw24. Qed.
+    (mword_of_int (SC + 0x5e) : mword 64) (LOAD (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) cdec_4c9c cexec_lw24_s1_a5. Qed.
 
   Lemma schi_60 : kernel_text -∗ instr (mword_of_int (SC + 0x60) : mword 64) false (BTYPE (mword_of_int 8170 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 15), BNE)).
   Proof. mk_base (SC + 0x60)%Z (mword_of_int 0xff3795e3 : mword 32)
@@ -490,7 +441,7 @@ Section WpSchedulerDecode.
 
   Lemma schi_70 : kernel_text -∗ instr (mword_of_int (SC + 0x70) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (SC + 0x70)%Z (mword_of_int 0x855a : mword 16)
-    (mword_of_int (SC + 0x70) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) schdec_855a exec_execute_C_MV. Qed.
+    (mword_of_int (SC + 0x70) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) cdec_855a exec_execute_C_MV. Qed.
 
   Lemma schi_72 : kernel_text -∗ instr (mword_of_int (SC + 0x72) : mword 64) false (JAL (mword_of_int 1452 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (SC + 0x72)%Z (mword_of_int 0x5ac000ef : mword 32)
@@ -521,7 +472,7 @@ Section WpSchedulerDecode.
   (* ---- +0x86..+0x8a: the loop head's intr_on / intr_off ---- *)
   Lemma schi_86 : kernel_text -∗ instr (mword_of_int (SC + 0x86) : mword 64) false (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRS)).
   Proof. mk_base (SC + 0x86)%Z (mword_of_int 0x10016073 : mword 32)
-    (mword_of_int (SC + 0x86) : mword 64) (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) schdec_10016073. Qed.
+    (mword_of_int (SC + 0x86) : mword 64) (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) bdec_10016073. Qed.
 
   Lemma schi_8a : kernel_text -∗ instr (mword_of_int (SC + 0x8a) : mword 64) false (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRC)).
   Proof. mk_base (SC + 0x8a)%Z (mword_of_int 0x10017073 : mword 32)
@@ -534,7 +485,7 @@ Section WpSchedulerDecode.
 
   Lemma schi_90 : kernel_text -∗ instr (mword_of_int (SC + 0x90) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (SC + 0x90)%Z (mword_of_int 0x00011497 : mword 32)
-    (mword_of_int (SC + 0x90) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) schdec_00011497. Qed.
+    (mword_of_int (SC + 0x90) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_00011497. Qed.
 
   Lemma schi_94 : kernel_text -∗ instr (mword_of_int (SC + 0x94) : mword 64) false (ITYPE (mword_of_int 2414 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (SC + 0x94)%Z (mword_of_int 0x96e48493 : mword 32)
@@ -546,7 +497,7 @@ Section WpSchedulerDecode.
 
   Lemma schi_9a : kernel_text -∗ instr (mword_of_int (SC + 0x9a) : mword 64) false (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC)).
   Proof. mk_base (SC + 0x9a)%Z (mword_of_int 0x00016917 : mword 32)
-    (mword_of_int (SC + 0x9a) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC)) schdec_00016917. Qed.
+    (mword_of_int (SC + 0x9a) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC)) bdec_00016917. Qed.
 
   Lemma schi_9e : kernel_text -∗ instr (mword_of_int (SC + 0x9e) : mword 64) false (ITYPE (mword_of_int 868 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
   Proof. mk_base (SC + 0x9e)%Z (mword_of_int 0x36490913 : mword 32)

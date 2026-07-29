@@ -180,6 +180,12 @@ Lemma bdec_00011517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
+(* auipc a4,0x10 -- the cpus[]/pid_lock relocation into a4: sched, scheduler *)
+Lemma bdec_00010717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00010717 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
 (* auipc s2,0x16 -- &proc[NPROC] (= <tickslock>): wakeup, allocproc *)
 Lemma bdec_00016917 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00016917 : mword 32)) s
@@ -227,3 +233,19 @@ Lemma bdec_fdc42703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8),
                 Regidx (mword_of_int 14), false, 4), s).
 Proof. decode_bridge_ms. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  The inlined intr_on/intr_off CSR-immediate words.  These need           *)
+(*  [decode_bridge_ms_bv], not [decode_bridge_ms]: the decoder's 5-bit uimm  *)
+(*  arrives as a SLICE of the instruction word while the CSR leaves          *)
+(*  (WpSconfCsr.v) phrase it as [mword_of_int 2], and only [bv_eq] closes    *)
+(*  that pair.  The csr field is [Ox"100"], which is (delta-)equal to the    *)
+(*  [csr_sstatus] WpPushOffCsr.v / WpSconfCsr.v are stated with, so those    *)
+(*  leaves apply directly.                                                  *)
+(* ---------------------------------------------------------------------- *)
+
+(* csrsi sstatus,2 (rd = x0) -- intr_on, inlined in pop_off and scheduler *)
+Lemma bdec_10016073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x10016073 : mword 32)) s
+  = Some (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRS), s).
+Proof. decode_bridge_ms_bv. Qed.
