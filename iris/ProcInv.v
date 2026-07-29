@@ -50,6 +50,7 @@ Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInv.
+Require Import KallocInv PageFields ByteBuf.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -87,6 +88,12 @@ Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
+
+(* a process GAINS its address space: the descriptor and the trapframe words
+   move, the scalar fields stay.  allocproc's move, once kalloc has produced
+   the trapframe page and proc_pagetable the table. *)
+Definition upd_pt (V : pprivate) (P : uptd) (ws : list (mword 64)) : pprivate :=
+  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_cwd V) (pv_name V).
 
 (* writing back what was already there is a no-op -- what a caller that only
    READS a descriptor (argfd) needs to close [proc_priv_ofile]'s accessor
@@ -214,6 +221,28 @@ Section ProcInv.
 
   Typeclasses Opaque tf_words tf_tail tf_page.
 
+  (* CONSTRUCTION: what [kalloc] hands allocproc IS a trapframe page.  The 36
+     struct words come out with EXISTENTIAL contents (a fresh page's bytes are
+     arbitrary), and the 3808-byte tail is exactly the window [tf_tail] owns
+     anonymously.  This is the one crossing the header above anticipates. *)
+  Lemma tf_page_of_page_own (tfp : mword 44) :
+    page_valid (page_base tfp) ->
+    page_own (page_base tfp) ⊢ ∃ ws : list (mword 64), tf_page tfp ws.
+  Proof.
+    intro Hpv. rewrite /page_own.
+    replace 4096%nat with (8 * TFWORDS + 3808)%nat by (vm_compute; reflexivity).
+    rewrite (bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).
+    iIntros "[Hpre Htail]".
+    iDestruct (page_words8 (page_base tfp) TFWORDS Hpv ltac:(vm_compute; lia)
+                 with "Hpre") as (ws) "[%Hlen Hws]".
+    iExists ws. rewrite /tf_page /tf_words /tf_tail /a_tf_word.
+    iSplit; [done|]. iFrame "Hws".
+    rewrite Nat.add_0_l.
+    replace (Z.to_nat TFBYTES) with (8 * TFWORDS)%nat by (vm_compute; reflexivity).
+    replace (4096 - Z.to_nat TFBYTES)%nat with 3808%nat by (vm_compute; reflexivity).
+    rewrite /byte_any. iExact "Htail".
+  Qed.
+
   (* borrow one trapframe word -- the nth syscall argument is [tf_arg_idx n] *)
   Lemma tf_page_word (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->
@@ -262,6 +291,27 @@ Section ProcInv.
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
      proc_ofiles γf pa (pv_ofile V) ∗
      cwd_ref (pv_cwd V))%I.
+
+  (* BUILDING one: allocproc is the only producer, and this is exactly its
+     move -- the scalar cells and the descriptor array come out of the
+     dormant block, the page table and the trapframe page it just built.
+     The [p->sz] bound travels with the dormant block (which is where the
+     invariant keeps it); everything else is a straight repackaging. *)
+  Lemma proc_priv_intro (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (P : uptd) (ws : list (mword 64)) :
+    (uint (pv_sz V) <= 2 ^ 38)%Z ->
+    p_pid pa ↦₄{DfracOwn (1/2)} pid -∗
+    proc_fields pa (DfracOwn 1) V -∗
+    proc_pt_at pa P -∗
+    tf_page (ud_tfp P) ws -∗
+    proc_ofiles γf pa (pv_ofile V) -∗
+    proc_priv γf pa pid (upd_pt V P ws).
+  Proof.
+    iIntros (Hsz) "Hpid Hf Hpt Htf Ho".
+    rewrite /proc_priv /cwd_ref.
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hsz|]. iFrame "Hpid Hf Hpt Htf Ho".
+  Qed.
 
   (* ---- projections: what callers actually use ---- *)
 
@@ -445,6 +495,32 @@ Section ProcInv.
     iApply (word4_pointsto_agree with "Hpid Hother").
   Qed.
 
+  (* The two halves of [p->pid], joined and split.  allocproc is the one
+     function that holds BOTH -- the invariant's permanent half out of
+     [SchedCtx.proc_pub] and the dormant block's -- and so the one function
+     that may WRITE the cell.  Joining first tells it the two halves agree,
+     which is what [word4_pointsto_agree] is for; splitting after the store
+     is what hands one half back to the invariant and one to [proc_priv]. *)
+  Local Lemma word4_half (a : mword 64) (w : mword 32) :
+    a ↦₄ w ⊣⊢ a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w.
+  Proof.
+    assert (Hq : DfracOwn 1 = DfracOwn (1/2 + 1/2)) by (f_equal; compute_done).
+    rewrite {1}Hq. apply word4_pointsto_frac_split.
+  Qed.
+
+  Lemma p_pid_join (pa : mword 64) (p1 p2 : mword 32) :
+    p_pid pa ↦₄{DfracOwn (1/2)} p1 -∗ p_pid pa ↦₄{DfracOwn (1/2)} p2 -∗
+    ⌜p1 = p2⌝ ∗ p_pid pa ↦₄ p1.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (word4_pointsto_agree with "H1 H2") as %<-.
+    iSplit; [done|]. rewrite word4_half. iFrame.
+  Qed.
+
+  Lemma p_pid_split (pa : mword 64) (v : mword 32) :
+    p_pid pa ↦₄ v -∗ p_pid pa ↦₄{DfracOwn (1/2)} v ∗ p_pid pa ↦₄{DfracOwn (1/2)} v.
+  Proof. rewrite word4_half. iIntros "$". Qed.
+
   (* =================================================================== *)
   (* The DORMANT shape: what the lock invariant holds at UNUSED/ZOMBIE.   *)
   (* =================================================================== *)
@@ -466,7 +542,8 @@ Section ProcInv.
   Definition proc_dormant (pa : mword 64) (st : mword 32) : iProp Σ :=
     (∃ (V : pprivate) (pid : mword 32),
        ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
-        pv_cwd V = (zero_reg : mword 64)⌝ ∗
+        pv_cwd V = (zero_reg : mword 64) /\
+        uint (pv_sz V) <= 2 ^ 38⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗
@@ -503,7 +580,8 @@ Section ProcInv.
   Definition proc_dormant_nofd (pa : mword 64) : iProp Σ :=
     (∃ (V : pprivate) (pid : mword 32),
        ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
-        pv_cwd V = (zero_reg : mword 64)⌝ ∗
+        pv_cwd V = (zero_reg : mword 64) /\
+        uint (pv_sz V) <= 2 ^ 38⌝ ∗
        p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
        proc_fields pa (DfracOwn 1) V ∗
        ofile_cells pa (pv_ofile V) ∗
@@ -514,7 +592,7 @@ Section ProcInv.
   Lemma proc_dormant_seal (pa : mword 64) :
     proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗ proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
     iExists V, pid. iFrame "Hpid Hf Ho Hsp Hctx". iSplit; [done|].
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
@@ -538,11 +616,13 @@ Section ProcInv.
     p_trapframe pa ↦₈ (zero_reg : mword 64) ∗
     fd_slots FDSPARE ∗
     ∃ (V : pprivate) (pid : mword 32),
-      ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64)⌝ ∗
+      ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
+       pv_cwd V = (zero_reg : mword 64) /\
+       uint (pv_sz V) <= 2 ^ 38⌝ ∗
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & %pid & [%Hof %Hcwd] & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp".
     iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
@@ -552,6 +632,115 @@ Section ProcInv.
     { rewrite big_sepL_sep. iFrame "Ho Hs". }
     iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "[Hcell Hslot]".
     apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". iLeft. by iFrame "Hslot".
+  Qed.
+
+  (* =================================================================== *)
+  (* The saved-context save area AS BYTES.                                *)
+  (* =================================================================== *)
+  (* allocproc does [memset(&p->context, 0, sizeof(p->context))], and memset
+     is stated over a BYTE buffer while [SwtchCtx.ctx_cells] is fourteen
+     [↦₈] cells.  These three lemmas are that conversion.  It has to be an
+     ACCESSOR rather than two independent directions: the eight bytes of a
+     word no longer carry the word's 8-alignment, so the rebuild's side
+     condition must be captured before the split (the
+     [word_pointsto_split4] discipline, and [ByteBuf.bb_word_acc] is the
+     one-cell instance this is built from). *)
+
+  (* [ctx_cells] in the uniform [pa_add]-indexed form every byte lemma is
+     stated at. *)
+  Local Lemma ctx_cells_at_run (c : mword 64) (o : nat) (vs : list (mword 64)) :
+    ctx_cells_at c (8 * Z.of_nat o) vs ⊣⊢
+    [∗ list] i ↦ v ∈ vs, pa_add c (8 * (o + i))%nat ↦₈ v.
+  Proof.
+    revert o. induction vs as [|v vs IH]; intro o.
+    - by rewrite big_sepL_nil.
+    - rewrite big_sepL_cons /=.
+      assert (Ha : pa_add c (8 * (o + 0))%nat = add_vec c (mword_of_int (8 * Z.of_nat o))).
+      { unfold pa_add, add_vec_int. apply bv_eq.
+        rewrite !ProcGeom.pg_add_vec_unsigned !ProcGeom.pg_moi_unsigned.
+        rewrite !bv_wrap_add_idemp_r. f_equal. lia. }
+      rewrite Ha.
+      replace (8 * Z.of_nat o + 8)%Z with (8 * Z.of_nat (S o))%Z by lia.
+      rewrite (IH (S o)).
+      apply bi.sep_proper; [reflexivity|].
+      apply big_sepL_proper. intros i x _.
+      by replace (S o + i)%nat with (o + S i)%nat by lia.
+  Qed.
+
+  Lemma ctx_cells_run (c : mword 64) (vs : list (mword 64)) :
+    ctx_cells c vs ⊣⊢ [∗ list] i ↦ v ∈ vs, pa_add c (8 * i)%nat ↦₈ v.
+  Proof.
+    rewrite /ctx_cells.
+    replace 0%Z with (8 * Z.of_nat 0)%Z by lia.
+    rewrite (ctx_cells_at_run c 0 vs).
+    apply big_sepL_proper. intros i x _. by rewrite Nat.add_0_l.
+  Qed.
+
+  (* a run of word cells, borrowed as an anonymous byte window and rebuilt at
+     whatever the bytes now hold. *)
+  Lemma wcells_bytes_acc (a : mword 64) (ws : list (mword 64)) :
+    ([∗ list] i ↦ w ∈ ws, pa_add a (8 * i)%nat ↦₈ w) ⊢
+    ([∗ list] j ∈ seq 0 (8 * length ws), byte_any (pa_add a j)) ∗
+    (∀ g : nat -> bv 8,
+       ([∗ list] j ∈ seq 0 (8 * length ws), pa_add a j ↦ₘ g j) -∗
+       ∃ ws' : list (mword 64), ⌜length ws' = length ws⌝ ∗
+         [∗ list] i ↦ w ∈ ws', pa_add a (8 * i)%nat ↦₈ w).
+  Proof.
+    assert (Hshift : forall (b : mword 64) (l : list (mword 64)),
+      ([∗ list] i ↦ x ∈ l, pa_add b (8 * S i)%nat ↦₈ x)
+      ⊣⊢ ([∗ list] i ↦ x ∈ l, pa_add (pa_add b 8) (8 * i)%nat ↦₈ x)).
+    { intros b l. apply big_sepL_proper. intros i x _.
+      rewrite InstrBytes.pa_add_add. replace (8 * S i)%nat with (8 + 8 * i)%nat by lia.
+      reflexivity. }
+    revert a. induction ws as [|w ws IH]; intro a.
+    - iIntros "_". cbn [length]. rewrite Nat.mul_0_r !big_sepL_nil.
+      iSplit; [done|]. iIntros (g) "_". iExists []. by iSplit.
+    - cbn [length]. replace (8 * S (length ws))%nat with (8 + 8 * length ws)%nat by lia.
+      rewrite big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0 (Hshift a ws).
+      iIntros "[Hh Ht]".
+      iDestruct (bb_word_acc a w with "Hh") as "[Hhb Hhback]".
+      iDestruct (IH (pa_add a 8) with "Ht") as "[Htb Htback]".
+      rewrite (bwin_split a 0 8 (8 * length ws)) Nat.add_0_l.
+      iSplitL "Hhb Htb".
+      { iSplitL "Hhb"; [iApply (bb_named_any with "Hhb")|].
+        rewrite (bwin_rebase a 8 (8 * length ws)). iExact "Htb". }
+      iIntros (g) "Hg".
+      rewrite (bb_split a 8 (8 * length ws) g).
+      iDestruct "Hg" as "[Hg0 Hg1]".
+      iDestruct ("Hhback" $! g with "Hg0") as (w') "Hw'".
+      iDestruct ("Htback" $! (fun j => g (8 + j)%nat) with "Hg1") as (ws') "[%Hlen Hws']".
+      iExists (w' :: ws'). iSplit; [iPureIntro; cbn; lia|].
+      rewrite big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
+      rewrite (Hshift a ws'). iFrame "Hw' Hws'".
+  Qed.
+
+  (* the instance allocproc uses: the whole 112-byte save area. *)
+  Lemma own_ctx_bytes (c : mword 64) :
+    own_ctx c ⊢
+    ([∗ list] j ∈ seq 0 112, byte_any (pa_add c j)) ∗
+    (∀ g : nat -> bv 8,
+       ([∗ list] j ∈ seq 0 112, pa_add c j ↦ₘ g j) -∗
+       ∃ ws : list (mword 64), ⌜length ws = 14%nat⌝ ∗
+         [∗ list] i ↦ w ∈ ws, pa_add c (8 * i)%nat ↦₈ w).
+  Proof.
+    iIntros "(%vs & %Hlen & Hvs)".
+    rewrite ctx_cells_run.
+    iDestruct (wcells_bytes_acc c vs with "Hvs") as "[Hb Hback]".
+    rewrite Hlen. iFrame "Hb".
+    iIntros (g) "Hg". iApply ("Hback" $! g with "Hg").
+  Qed.
+
+  (* the two context slots allocproc writes after the memset, in the address
+     form the two [sd rd,off(s1)] produce. *)
+  Lemma p_ctx_slot0 (pa : mword 64) : pa_add (p_context pa) 0 = p_context pa.
+  Proof. apply RiscvExtras.pa_add_0. Qed.
+
+  Lemma p_ctx_slot1 (pa : mword 64) :
+    pa_add (p_context pa) 8 = add_vec pa (mword_of_int 104).
+  Proof.
+    unfold pa_add, add_vec_int, p_context, context_off. apply bv_eq.
+    rewrite !ProcGeom.pg_add_vec_unsigned !ProcGeom.pg_moi_unsigned.
+    rewrite !bv_wrap_add_idemp_r !bv_wrap_add_idemp_l. f_equal. lia.
   Qed.
 
   (* =================================================================== *)

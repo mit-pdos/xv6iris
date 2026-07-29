@@ -42,7 +42,7 @@ Notation UVMC := KernelSyms.uvmcreate.
 Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  lvl = 0%nat ->
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (18 <= K)%nat ->
   (exists nb, on = Some nb /\ (0 < nb)%nat) ->
   (* kalloc's push/pop addresses this cpu's cells through tp *)

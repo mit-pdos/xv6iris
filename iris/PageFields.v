@@ -235,6 +235,35 @@ Section PageFields.
       [ exists 512; reflexivity | exact Hdvd ].
   Qed.
 
+  (* ---- a RUN of word cells out of a page's prefix ----
+
+     One field is [page_field8]; an ARRAY of them (the 36 [struct trapframe]
+     words allocproc carves out of a fresh page) is this.  Contents are
+     existential, which is all a page kalloc just handed over can say; the
+     length is the caller's [n].  Stated over [pa_add p (8 * i)] -- the same
+     form [ProcInv.a_tf_word] is defined at -- so a consumer needs no address
+     rewriting. *)
+  Lemma page_words8 (p : mword 64) (n : nat) :
+    page_valid p -> (8 * n <= 4096)%nat ->
+    ([∗ list] j ∈ seq 0 (8 * n), byte_any (pa_add p j)) ⊢
+    ∃ ws : list (mword 64), ⌜length ws = n⌝ ∗
+      ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦₈ w).
+  Proof.
+    intro Hpv. induction n as [|n IH]; intro Hn.
+    - iIntros "_". iExists []. by iSplit.
+    - replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
+      rewrite (bwin_split p 0 (8 * n) 8).
+      iIntros "[Hpre Hlast]".
+      iDestruct (IH ltac:(lia) with "Hpre") as (ws) "[%Hlen Hws]".
+      rewrite Nat.add_0_l.
+      iDestruct (page_field8 p (8 * n)%nat Hpv ltac:(lia)
+                   ltac:(exists (Z.of_nat n); lia) with "Hlast") as (w) "Hw".
+      iExists (ws ++ [w])%list.
+      iSplit; [iPureIntro; rewrite length_app Hlen /=; lia|].
+      rewrite big_sepL_app big_sepL_singleton Hlen. iFrame "Hws".
+      rewrite Nat.add_0_r. iExact "Hw".
+  Qed.
+
   (* ---- and back: a word cell IS anonymous bytes ----
 
      The converse direction, for reclaiming a page: an object being torn down

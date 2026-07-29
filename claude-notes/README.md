@@ -87,8 +87,12 @@ are working on that effort — the relevant `projects/` file.
   and bare-cell tiers — the `proc_priv_copy` accessor and the x0-as-source
   (`snez`/`negw`) recipe, and, from fdalloc, the fuel-induction descriptor
   scan and why the loop's continuation must be a premise of the loop
-  statement rather than a resource in its context.  Its worklist now leads
-  with `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
+  statement rather than a resource in its context.  **`allocproc` is proven
+  and linked** -- the one PRODUCER of `proc_priv`, and where the user page
+  table's construction and ownership sides meet -- but counted-only; the
+  worklist spells out the exact chain that makes it work in `kfork`'s
+  uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
+  `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —

@@ -466,16 +466,23 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
 
 ## What moves where, and when
 
-- **`allocproc`** finds `UNUSED`, so `inv_dormant` opens and hands it
-  `proc_dormant` — the field cells, `own_ctx`, and the second pid half. It
-  writes `pid` (both halves in hand), flips to `USED` (both guards now
-  `false`, so the release owes nothing), allocates the trapframe and
-  pagetable, and builds the initial `valid_context` for `forkret` —
-  **capturing `proc_priv` inside that closure**. Releasing at `RUNNABLE`
-  then leaves only `▷ proc_ctx` behind, matching the table. Turning
-  `proc_dormant` into a `proc_priv` is a pure repackaging: the `⌜pv_ofile V
-  = replicate NOFILE zero_reg⌝` fact discharges every `ofile_slot`'s null
-  disjunct with no `file_ref` to conjure.
+- **`allocproc`** (PROVEN — `projects/proc-struct-resources.md` S6) finds
+  `UNUSED`, so `inv_dormant` opens and hands it `proc_dormant` — the field
+  cells, `own_ctx`, and the second pid half. It writes `pid` (both halves in
+  hand — `ProcInv.p_pid_join` / `p_pid_split`), flips to `USED` (both guards
+  now `false`, so the release owes nothing), and allocates the trapframe and
+  pagetable. Turning `proc_dormant` into a `proc_priv` is a pure
+  repackaging (`ProcInv.proc_priv_intro`): the `⌜pv_ofile V = replicate
+  NOFILE zero_reg⌝` fact discharges every `ofile_slot`'s null disjunct with
+  no `file_ref` to conjure.
+  It **returns with the lock still held**, at `USED`, handing the caller
+  `proc_held j γl USED ch` beside the block; building the initial
+  `valid_context` for `forkret` — and so **capturing `proc_priv` inside that
+  closure** — is the CALLER's step, not allocproc's. allocproc leaves the
+  save area as raw cells with `ra = forkret` and `sp = kstack + PGSIZE`;
+  turning that into a member of the scheduler chain is a Löb argument about
+  forkret and belongs to whoever parks the process. Releasing at `RUNNABLE`
+  then leaves only `▷ proc_ctx` behind, matching the table.
 - **`fork`** holds the child's lock across `USED`, so it holds the child's
   `proc_priv` and may write `sz`/`pagetable`/`ofile`/`cwd`/`name` freely.
   Each `np->ofile[i] = filedup(p->ofile[i])` consumes a fresh `file_ref`
@@ -512,7 +519,19 @@ the block, so a syscall could not hold its allowance and still pass
   (+ `ofile_slot_null` / `ofile_slot_file`), `proc_ofiles`, `cwd_ref`,
   **`proc_priv`**, its projections (`proc_priv_pid`, `proc_priv_ofile`,
   `proc_priv_ofile_read`, `proc_priv_pid_agree`), **`proc_dormant`** +
-  `proc_dormant_to_priv`, and `is_kstack`.
+  `proc_dormant_to_priv`, and `is_kstack`.  Plus, from allocproc: the one
+  producer `proc_priv_intro` (+ `upd_pt`), `tf_page_of_page_own` (kalloc's
+  page IS a trapframe page), the `ctx_cells` ⇄ byte-buffer accessor
+  (`ctx_cells_run` / `wcells_bytes_acc` / `own_ctx_bytes`, which is what
+  `memset(&p->context, 0, 112)` runs over), and `p_pid_join` /
+  `p_pid_split`.
+
+**`procs_inv` also carries every proc's kstack.** `p->kstack` is write-once
+at procinit, so `is_kstack` is persistent and `SchedCtx.procs_inv` holds one
+per slot (`procs_inv_kstack`). It has to live there rather than in a
+caller's precondition because allocproc reads `p->kstack` of the slot its
+SCAN found — an index no premise could have named in advance — and being
+persistent it costs every existing consumer nothing.
 - **`sys_getpid`** — `SpecSysGetpid.v` / `ProofSysGetpid.v` /
   `LinkSysGetpid.v`, in the standard spec-module shape. The whole function,
   entry to return, over `proc_priv`. `Print Assumptions` shows only the Sail

@@ -599,3 +599,9 @@ SpecUartintr.v
 WpUartintrDecode.v
 ProofUartintr.v
 LinkUartintr.v
+SpecAllocpid.v
+LinkAllocpid.v
+SpecAllocproc.v
+WpAllocprocDecode.v
+ProofAllocproc.v
+LinkAllocproc.v

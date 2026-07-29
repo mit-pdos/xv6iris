@@ -933,6 +933,19 @@ Section PtTreeIris.
     ptree_own (S lvl) dq t ⊣⊢ pt_page_own dq t ∗ pt_kids_own lvl dq t.
   Proof. reflexivity. Qed.
 
+  (* the root node's page is a kalloc page -- read straight out of the claim,
+     without opening the tree.  A caller that has just been handed a table
+     ([SpecProcPagetable]'s post) and must show the returned pointer is not
+     NULL has nothing else to argue from; [page_valid_ne_null] does the rest. *)
+  Lemma ptree_own_page_valid (lvl : nat) (dq : dfrac) (t : ptree) :
+    ptree_own lvl dq t ⊢ ⌜page_valid (page_base (pt_base t))⌝.
+  Proof.
+    destruct lvl as [| l];
+      [ rewrite /ptree_own | rewrite ptree_own_S ];
+      rewrite /pt_page_own /pt_node_claim;
+      iIntros "[[(_ & %Hv & _) _] _]"; iPureIntro; exact Hv.
+  Qed.
+
   (* ---- single-node slot accessor (update form) ---------------------- *)
   Lemma pt_page_own_acc (dq : dfrac) (t : ptree) (i : mword 9) :
     pt_page_own dq t ⊢

@@ -66,7 +66,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  lvl = 0%nat ->
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (36 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_proc_pagetable < nb)%nat) ->
   subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->

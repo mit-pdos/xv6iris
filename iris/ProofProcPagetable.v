@@ -109,7 +109,7 @@ Section ProofProcPagetable.
   Proof.
     cbv beta delta [wp_proc_pagetable_sconf_body].
     intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb Hcid.
-    destruct Hex as (nb & Hon & Hnb). subst lvl. subst on.
+    destruct Hex as (nb & Hon & Hnb). subst on.
     assert (Hnb' : (3 < nb)%nat) by (unfold K_proc_pagetable in Hnb; exact Hnb).
     pose proof (ppt_cap_bounds K HK) as (Hc4 & Hc18 & Hc32).
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
@@ -245,8 +245,8 @@ Section ProofProcPagetable.
       rewrite add_vec_zero_l. rewrite /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HcidJ : J !!! Regidx (mword_of_int 4 : mword 5) = cid_word) by (rewrite HJ4; exact Hcid).
     iEval (rewrite -HJ4) in "Henv".
-    iApply (UV.wp_uvmcreate_sconf γ γa Φ J 0%nat (K - 4)%nat eb p C (Some nb)
-              eq_refl Hc18
+    iApply (UV.wp_uvmcreate_sconf γ γa Φ J lvl (K - 4)%nat eb p C (Some nb)
+              Hlvl Hc18
               (ex_intro _ nb (conj eq_refl (ppt_pos nb Hnb')))
               HcidJ
               with "Hcg Hcnt Htext Hpc Henv [-]").
@@ -373,8 +373,8 @@ Section ProofProcPagetable.
     assert (Hppn1 : (autocast (T := mword) (subrange_vec_dec (M9 !!! Regidx (mword_of_int 13 : mword 5)) 55 12) : mword 44) = tramp_ppn)
       by (rewrite HM9a3; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite -HM9tp) in "Henv".
-    iApply (MP.wp_mappages_sconf γ γa Φ M9 (pt_empty_node b0) ∅ 1 10 0%nat (K - 4)%nat eb p C (Some (nb - 1)%nat)
-              ltac:(vm_compute; reflexivity) Hc32
+    iApply (MP.wp_mappages_sconf γ γa Φ M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p C (Some (nb - 1)%nat)
+              Hlvl Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HM9a3; apply bv_eq; vm_compute; reflexivity)
@@ -507,8 +507,8 @@ Section ProofProcPagetable.
       by (rewrite HN8a3; reflexivity).
     assert (Hrepm1 : pt_rep0 t1 ppt_m1) by (unfold ppt_m1; exact Hrep1).
     iEval (rewrite -HN8tp) in "Henv".
-    iApply (MP.wp_mappages_sconf γ γa Φ N8 t1 ppt_m1 1 6 0%nat (K - 4)%nat eb p C (Some (nb - 1 - g1)%nat)
-              ltac:(vm_compute; reflexivity) Hc32
+    iApply (MP.wp_mappages_sconf γ γa Φ N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p C (Some (nb - 1 - g1)%nat)
+              Hlvl Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HN8a3; exact Htfal)

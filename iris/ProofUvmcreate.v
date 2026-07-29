@@ -91,7 +91,7 @@ Section ProofUvmcreate.
   Proof.
     cbv beta delta [wp_uvmcreate_sconf_body].
     intros ret_tgt Hlvl HK Hex Hcid.
-    destruct Hex as (nb & Hon & Hnb). subst lvl. subst on.
+    destruct Hex as (nb & Hon & Hnb). subst on.
     pose proof (uvc_cap_bounds K HK) as (Hc4 & Hc2 & Hc14).
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -188,11 +188,11 @@ Section ProofUvmcreate.
     assert (HcidJ : J !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
       by (rewrite HJ4; exact Hcid).
     iApply (AK.wp_kalloc_sconf γ Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J (Some nb) 0%nat eb p C (K - 4)%nat
+              J (Some nb) lvl eb p C (K - 4)%nat
               Hc14
               HcidJ
               ltac:(reflexivity)
-              ltac:(vm_compute; reflexivity)
+              Hlvl
               with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic [-]").
     iIntros (mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (UVC + 0x0e)).

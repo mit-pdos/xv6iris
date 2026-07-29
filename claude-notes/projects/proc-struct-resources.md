@@ -468,6 +468,125 @@ the evidence for every offset. This file is only the worklist.
         `KernelRvcDecode.v`; only `46a1` / `8626` / `6928` and the seven
         base words are fetchaddr's own.
 
+- [x] **S6 — `allocproc` PROVEN and LINKED, counted-only**
+      (`SpecAllocpid.v` / `LinkAllocpid.v` (assumed) / `SpecAllocproc.v` /
+      `WpAllocprocDecode.v` / `ProofAllocproc.v` / `LinkAllocproc.v`, over
+      ACQUIRE / RELEASE / ALLOCPID / KALLOC / PROC_PAGETABLE / MEMSET;
+      **38 s**, `proof_coverage` reads it `proven`, resting on the one
+      `wp_allocpid_sconf` axiom).  Fifty-five instructions: a 32-byte
+      ra/s0/s1/s2 frame, the proc[] scan, the allocation body, one shared
+      epilogue.
+
+      **THIS IS THE ONE PRODUCER of `ProcInv.proc_priv`** -- every syscall
+      proof in this project consumes a block that, until now, nothing in the
+      tree could build -- and it is where the user page table's CONSTRUCTION
+      side (`proc_pagetable`) meets its OWNERSHIP side, at
+      `ProcPtOwn.proc_pt_intro_ppt`.  What is worth reusing:
+
+      * **It returns WITH THE LOCK HELD.** allocproc never releases the slot
+        it took, so the post hands back `SchedCtx.proc_held j gl USED ch`
+        plus the detached private block, `cpu_own` at `S lvl` and the
+        matching `trap_csrs_pay lvl eb`.  A caller (fork / userinit) keeps
+        writing the child under `p->lock` and releases it itself.
+      * **State the postcondition as a FUNCTION OF THE RETURNED POINTER**
+        (`SpecAllocproc.allocproc_post ... rv`), not inside the
+        continuation.  Both exits join at the shared epilogue (+0x78), which
+        does `mv a0,s1` and knows the returned value and nothing else about
+        which arm produced it; with the post indexed by `rv` the epilogue is
+        ONE `iAssert`ed block taking `rv` and the payload.  Threading the
+        disjunction through the continuation instead would have duplicated
+        the whole eleven-instruction epilogue.
+      * **Three resources had to grow, and each grew where the INVARIANT
+        keeps it, not in a caller's precondition:**
+        - `SchedCtx.procs_inv` gained a per-proc `∃ ks, ProcInv.is_kstack`
+          conjunct (+ `procs_inv_kstack`).  `p->kstack` is write-once at
+          procinit, hence persistent; allocproc reads the kstack of the slot
+          the SCAN found, which it cannot name before the scan runs, so a
+          premise was impossible.  Persistent ⇒ free for every existing
+          consumer.
+        - `ProcInv.proc_dormant` / `_nofd` gained `⌜uint (pv_sz V) <= 2^38⌝`.
+          `proc_priv` demands it and allocproc writes no `p->sz` -- freeproc
+          zeroed it -- so the fact has to survive in the invariant.  Stated
+          as a BOUND, not `= 0`, so UNUSED and ZOMBIE share one conjunct.
+        - `ProcInv.proc_dormant_unused` additionally exposes
+          `pv_cwd V = 0`, which allocproc's post reports.
+      * **New ProcInv vocabulary, all reusable:** `tf_page_of_page_own` (a
+        kalloc'd page IS a trapframe page -- the one physical→typed crossing
+        the file's header anticipated), `own_ctx_bytes` + `ctx_cells_run` +
+        `wcells_bytes_acc` (the `ctx_cells` ⇄ 112-byte-buffer ACCESSOR
+        memset needs; an accessor and not two lemmas because the eight bytes
+        of a word no longer carry the word's 8-alignment), `p_pid_join` /
+        `p_pid_split` (allocproc is the one function holding BOTH halves,
+        hence the one that may write the cell), `proc_priv_intro`, `upd_pt`,
+        and `PageFields.page_words8` (n consecutive 8-byte cells out of a
+        page prefix).  `PtTree.ptree_own_page_valid` reads the root page's
+        `page_valid` out of `pt_node_claim` without opening the tree -- what
+        refutes proc_pagetable's `c.beqz`.
+      * **`uvmcreate` and `proc_pagetable` are now GENERIC IN `lvl`**
+        (`Z.of_nat lvl + 1 < 2^31`, mappages' and walk's shape) instead of
+        pinned at `lvl = 0`.  allocproc calls them with the proc lock HELD,
+        so their `cpu_own` is at `S lvl`; the pin was a fossil of the
+        boot-time callers and its removal cost two `0%nat → lvl` edits and
+        nothing else.
+      * **Every numeric side condition is a top-level mword-FREE lemma**
+        (`ap_K10` / `ap_K36` / `ap_lvlS` / `ap_nb_pt` / `ap_fuelS` / …).
+        Inside this proof the context is full of `bv_unsigned`s, so an
+        inline `ltac:(lia)` answers *"Cannot find witness"* -- the zify-hook
+        rule in durable-notes, hit six times here.  Same for the scan's exit
+        test: `ap_neq_end_eq` / `ap_neq_end_lt` are the two closed instances
+        of `ArrCursor.acur_neq`, passed by name.
+      * Stack budget: `40 <= K` (4 for this frame, 36 for proc_pagetable's).
+      * The two `freeproc` tails (+0x86 / +0x96) are NOT decoded: under the
+        counted premise both `c.beqz`s fall through.  See the next item.
+
+- [ ] **S7 — `allocproc` in the UNCOUNTED regime (what `kfork` needs).**
+      `kfork` calls allocproc with no page budget (`on = None`, kalloc may
+      fail), and there the two `freeproc` tails are LIVE.  The chain is
+      exact, and every link below it is already proven:
+
+      ```
+      allocproc(None)  <=  proc_pagetable(None)  +  FREEPROC (assumed)
+      proc_pagetable(None)  <=  uvmcreate(None)  +  its own two tails
+      those tails  <=  UVMFREE, UVMUNMAP        (both PROVEN and linked)
+      mappages                                   (ALREADY generic in `on`:
+                                                  its post's second arm is
+                                                  `avail_zero (avail_sub on g)`)
+      ```
+
+      So the work, smallest first:
+
+      1. **`uvmcreate` uncounted** -- drop `(exists nb, on = Some nb /\ 0 < nb)`
+         and add a second post arm (`a0 = 0`, budget unchanged).  Its only
+         failure is `kalloc() == 0`, one `c.beqz` taken arm plus the
+         epilogue.  Small and self-contained.
+      2. **`proc_pagetable` uncounted** -- prove its three failure tails
+         (`uvmcreate` returned 0; either `mappages` returned −1, which calls
+         `uvmunmap`/`uvmfree`).  `SpecProcPagetable.v`'s comment saying
+         those callees are unverified is STALE: vm.c is 20/20.
+      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** (assumed, the allocpid
+         shape).  At allocproc's two call sites `p->pagetable` is always 0,
+         so freeproc never reaches `proc_freepagetable` -- but do not
+         specialise the contract to that; state freeproc honestly and let
+         allocproc's sites instantiate it.
+      4. **allocproc's two tails** -- ten instructions, mostly words the
+         function already decodes (`c.mv a0,s1`, `c.mv s1,s2`, two `jal`s,
+         a `c.j` back to the shared epilogue at +0x78).
+      5. **The spec's third arm.** Keep ONE spec, generic in `on`, and give
+         `allocproc_post` an out-of-memory disjunct carrying
+         `⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝` -- which
+         a COUNTED caller (userinit) refutes from its own `K_allocproc < nb`
+         and an uncounted one (kfork) handles.  That is strictly better than
+         two `Module Type`s over a `*Core` functor: the failure arm records
+         WHY it failed, so no caller has to carry a budget it does not have.
+
+- [ ] **S8 — prove `allocpid`.** Fifteen instructions @ 0x800019d0 and
+      structurally `killed` with a store added: acquire(&pid_lock),
+      `lw s1,0(a5)` / `addiw a4,s1,1` / `sw a4,0(a5)` on `<nextpid>`,
+      release, `c.mv a0,s1`.  `SpecAllocpid.v` already states the contract
+      (the lock's resource `nextpid_res` is the counter cell, value
+      existential -- the code lets the `int` overflow and no consumer needs
+      more), so proving it replaces `LinkAllocpid.v` and nothing else.
+
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates.

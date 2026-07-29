@@ -239,12 +239,31 @@ Section SchedCtx.
     proc_slots pa st -∗ proc_slots pa st'.
   Proof. intros Hn Hd Hd'. rewrite /proc_slots Hn Hd Hd'. iIntros "$". Qed.
 
+  (* allocproc's move: a slot found UNUSED yields the dormant block and
+     nothing else -- [needs_ctx UNUSED] is false, so the context guard is
+     [emp].  (The converse direction is [proc_lock_res_intro] at USED, where
+     BOTH guards are false and the release owes nothing.) *)
+  Lemma proc_slots_unused (pa : mword 64) :
+    proc_slots pa UNUSED -∗ proc_dormant pa UNUSED.
+  Proof.
+    rewrite /proc_slots inv_dormant_UNUSED.
+    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
+    iIntros "[_ $]".
+  Qed.
+
   (* the global proc-array invariant: an [is_lock] over every proc's
-     [proc_lock_res]. *)
+     [proc_lock_res], plus every proc's kernel-stack address.
+     [p->kstack] is written once by procinit and never again, so
+     [ProcInv.is_kstack] is PERSISTENT and belongs here rather than in any
+     caller's precondition: allocproc reads [p->kstack] of the slot it
+     found, which it cannot name before the scan runs.  The value is
+     existential -- the tie to [KvmMap.kstack_va i] is the page-table
+     world's business, not the lock protocol's. *)
   Definition procs_inv : iProp Σ :=
     (⌜length γs = NPROC⌝ ∗
-     [∗ list] i ↦ γl ∈ γs,
-       is_lock γl (proc_addr i) "proc"%string (proc_lock_res γl (proc_addr i)))%I.
+     ([∗ list] i ↦ γl ∈ γs,
+        is_lock γl (proc_addr i) "proc"%string (proc_lock_res γl (proc_addr i))) ∗
+     [∗ list] i ↦ _ ∈ γs, ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I.
 
   Global Instance procs_inv_persistent : Persistent procs_inv.
   Proof. apply _. Qed.
@@ -254,7 +273,20 @@ Section SchedCtx.
     γs !! i = Some γl ->
     procs_inv -∗ is_lock γl (proc_addr i) "proc"%string (proc_lock_res γl (proc_addr i)).
   Proof.
-    iIntros (Hi) "[_ Hbig]".
+    iIntros (Hi) "[_ [Hbig _]]".
+    by iDestruct (big_sepL_lookup with "Hbig") as "$".
+  Qed.
+
+  (* the array's length -- what a scan's fuel bound is stated over. *)
+  Lemma procs_inv_len : procs_inv -∗ ⌜length γs = NPROC⌝.
+  Proof. iIntros "[$ _]". Qed.
+
+  (* ... and the per-proc kstack address. *)
+  Lemma procs_inv_kstack (i : nat) (γl : gname) :
+    γs !! i = Some γl ->
+    procs_inv -∗ ∃ ks : mword 64, is_kstack (proc_addr i) ks.
+  Proof.
+    iIntros (Hi) "[_ [_ Hbig]]".
     by iDestruct (big_sepL_lookup with "Hbig") as "$".
   Qed.
 
