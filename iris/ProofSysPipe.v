@@ -2204,7 +2204,7 @@ Section ProofSysPipe.
       iApply ("Ht7c" $! B0 Pa with "[%] [%] Hcg Hcpu Hpc Hpriv Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HB0sp|]. split; [exact HB0s0|]. split; [exact HB0s1|].
         split; [exact HB0tp | exact HthrB0]. }
-      { exact Hext1. } }
+      { exact (uptd_ext_sz_ext _ _ _ Hext1). } }
     (* ===== the first copyout succeeded: do the second ===== *)
     iApply (wp_blt_x0_fall_s_sconf γ Φ (mword_of_int (SP + 0x60))
               (mword_of_int 28 : mword 13) Ra0 B0 (av - 8)%nat
@@ -2280,7 +2280,7 @@ Section ProofSysPipe.
     (* +0x70 c.ld a0,80(s1) -- a0 := p->pagetable (unchanged: [uptd_ext]) *)
     assert (HrootA : ud_root Pa
                      = ud_root (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))))
-      by exact (proj1 Hext1).
+      by exact (proj1 (proj1 Hext1)).
     assert (Hptb : add_vec (C4 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 80 : mword 12))
                    = p_pagetable p) by (rewrite HC4s1; reflexivity).
     iEval (rewrite -Hptb) in "Hptc".
@@ -2384,8 +2384,9 @@ Section ProofSysPipe.
     assert (Hpc76 : ret_pc (C6 !!! Regidx Rra) = mword_of_int (SP + 0x76))
       by (rewrite HC6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc76) in "Hpc".
-    assert (Hextb : uptd_ext (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) Pb)
-      by exact (uptd_ext_trans _ Pa Pb Hext1 Hext2).
+    assert (Hextb : uptd_ext_sz (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
+                      (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) Pb)
+      by exact (uptd_ext_sz_trans _ _ Pa Pb Hext1 Hext2).
     assert (HD0sp : D0 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite (callee_saved_lookup HcsD0 csp_rs1 ltac:(vm_compute; reflexivity)); exact HC6sp).
     assert (HD0s0 : D0 !!! Regidx Rs0 = sp0)
@@ -2447,7 +2448,7 @@ Section ProofSysPipe.
       iApply ("Hepi" $! D1 Pb (zero_reg : mword 64)
                 with "[%] [%] Hcg Hcpu Hpc [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hu0 Hu1]").
       { split; [exact HD1sp|]. split; [exact HD1a5 | exact HthrD1]. }
-      { exact Hextb. }
+      { exact (uptd_ext_sz_ext _ _ _ Hextb). }
       { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
                 (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)). iFrame "Hlo Hhi". }
@@ -2470,7 +2471,7 @@ Section ProofSysPipe.
       iApply ("Ht7c" $! D1 Pb with "[%] [%] Hcg Hcpu Hpc Hpriv Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HD1sp|]. split; [exact HD1s0|]. split; [exact HD1s1|].
         split; [exact HD1tp | exact HthrD1]. }
-      { exact Hextb. }
+      { exact (uptd_ext_sz_ext _ _ _ Hextb). }
   Qed.
 
 

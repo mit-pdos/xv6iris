@@ -377,7 +377,7 @@ Section ProofCopyout.
     mm !!! Regidx Rtp = cid_word ->
     forall (fuel rem done : nat) (Pc : uptd) (M : regfile) (dstva : mword 64),
     (rem <= fuel)%nat -> (1 <= rem)%nat -> (done + rem = len)%nat ->
-    uptd_ext P Pc ->
+    uptd_ext_sz szv P Pc ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx Rtp = cid_word ->
     M !!! Regidx Rs11 = mm !!! Regidx Rs11 ->
@@ -403,7 +403,7 @@ Section ProofCopyout.
           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
           /\ mj !!! Regidx Rtp = mm !!! Regidx Rtp
           /\ mj !!! Regidx Rs11 = mm !!! Regidx Rs11
-          /\ uptd_ext P P' ⌝ -∗
+          /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr γ mj (K - 12)%nat -∗
         cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x9a) : mword 64) -∗
@@ -423,8 +423,8 @@ Section ProofCopyout.
     iIntros "Hcg Hcnt #Htext Hpc Hszc Hptc Hpt #Henv Hsrc Hcont".
     (* the descriptor's root is the caller's root, so [p->pagetable] and s7
        stay meaningful across every fault-in *)
-    destruct Hext as (Hrootc & Htfpc & Humc).
-    assert (Hextc : uptd_ext P Pc) by (split; [exact Hrootc | split; assumption]).
+    assert (Hextc : uptd_ext_sz szv P Pc) by exact Hext.
+    destruct Hext as ((Hrootc & Htfpc & Humc) & Hbelc).
     (* ---- +0x50 and s1,s4,s10 : va0 := PGROUNDDOWN(dstva) ---- *)
     set (va0 := (and_vec dstva (mword_of_int (-4096)) : mword 64)).
     iPoseProof (coi_50 with "Htext") as "Hi50".
@@ -525,7 +525,7 @@ Section ProofCopyout.
           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
           /\ mj !!! Regidx Rtp = mm !!! Regidx Rtp
           /\ mj !!! Regidx Rs11 = mm !!! Regidx Rs11
-          /\ uptd_ext P P' ⌝ -∗
+          /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr γ mj (K - 12)%nat -∗
         cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x9a) : mword 64) -∗
@@ -545,7 +545,7 @@ Section ProofCopyout.
     assert (Hnavz : Z.of_nat navail = 4096 - Z.of_nat off).
     { unfold navail. rewrite Nat2Z.inj_sub; [reflexivity | lia]. }
     iAssert (∀ (Pd : uptd) (Md : regfile) (pa0 : mword 64),
-        ⌜ uptd_ext P Pd
+        ⌜ uptd_ext_sz szv P Pd
           /\ Md !!! Regidx csp_rs1 = spr
           /\ Md !!! Regidx Rtp = cid_word
           /\ Md !!! Regidx Rs11 = mm !!! Regidx Rs11
@@ -1314,10 +1314,14 @@ Section ProofCopyout.
       iEval (rewrite svpn_of_pgrounddown) in "Hpt".
       rewrite svpn_of_pgrounddown in Hunone.
       set (Pd := uptd_insert Pc (svpn_of va0) r).
-      assert (Hextd : uptd_ext P Pd).
-      { apply (uptd_ext_trans P Pc Pd Hextc).
-        exact (uptd_ext_insert Pc (svpn_of va0) r Hunone). }
-      assert (Hrootd : Pd.(ud_root) = P.(ud_root)) by (destruct Hextd as (H & _); exact H).
+      assert (Hextd : uptd_ext_sz szv P Pd).
+      { apply (uptd_ext_sz_trans szv P Pc Pd Hextc).
+        apply (uptd_ext_sz_insert szv Pc (svpn_of va0) r Hunone).
+        apply svpn_of_below.
+        - rewrite -uint_unsigned. exact Hszb.
+        - rewrite -!uint_unsigned. exact Hszlt. }
+      assert (Hrootd : Pd.(ud_root) = P.(ud_root))
+        by (destruct Hextd as ((H & _) & _); exact H).
       assert (Hrnz : mf !!! Regidx Ra0 <> zero_reg).
       { rewrite Hra0. intro Hc.
         apply (page_valid_ne_null r Hrpv).
@@ -1592,7 +1596,7 @@ Section ProofCopyout.
       iApply ("Hcont" $! N0 P with "Hcg Hcnt Hpc Hszc Hptc Hpt Hsrc [%] [%] [%]").
       - rewrite /N0. apply callee_saved_insert_r;
           [vm_compute; reflexivity | apply callee_saved_refl].
-      - apply uptd_ext_refl.
+      - apply uptd_ext_sz_refl.
       - left. rewrite /N0 upd_eq. reflexivity. }
     (* ===== len > 0: the 96-byte prologue ===== *)
     iApply (wp_cbeqz_fall_s_sconf γ Φ pcE
@@ -2020,7 +2024,7 @@ Section ProofCopyout.
           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
           /\ mj !!! Regidx Rtp = mm !!! Regidx Rtp
           /\ mj !!! Regidx Rs11 = mm !!! Regidx Rs11
-          /\ uptd_ext P P' ⌝ -∗
+          /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr γ mj (K - 12)%nat -∗
         cpu_own γ lvl eb p C -∗
         pc_is (mword_of_int (CPO + 0x9a) : mword 64) -∗
@@ -2379,7 +2383,7 @@ Section ProofCopyout.
     (* ---- into the loop ---- *)
     iApply (co_loop γ γa Φ mm P szv len src_bytes K lvl eb p C dqs dqp src spr
               HK Hlen64 Hszb Hlvl Htp len len 0%nat P Q9 (mm !!! Regidx Ra1)
-              ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_refl P)
+              ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_sz_refl szv P)
               HQ9sp HQ9tp HQ9s11 HQ9s4 HQ9s5 HQ9s6 HQ9s7 HQ9s8 HQ9s9 HQ9s10
               with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv Hsrc Hepi").
   Qed.

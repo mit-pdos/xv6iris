@@ -183,6 +183,15 @@ their durable design notes, gotchas, and reusable recipes.
   `uvm_perm_ok_of_leaf` (why uvmcopy's contract can ask the caller nothing
   about the permission it copies), and the A/D subtlety that made the first
   draft of uvmcopy's postcondition false.
+- **[`growproc.md`](completed/growproc.md)** — growproc, proven and linked,
+  and the **`p->sz` ⇄ user-map coherence invariant** it forced: `um_below`
+  and the tightened size bound inside `proc_priv`, the `uptd_ext_sz`
+  relation copyin/copyout now hand back (a bare `uptd_ext` cannot rebuild
+  the block), the uvm* range premises relaxed to `<= uvm_maxsz` because the
+  old ones were undischargeable by their only caller, and the GUARD on
+  `uvmd_np` that makes `sbrk(-1)`'s wrapped `sz + n` say the truth. Also the
+  one-`iAssert`-EXIT shape for a function whose shared blocks want the same
+  linear resource.
 - **[`uvm-alloc-unmap.md`](completed/uvm-alloc-unmap.md)** — uvmunmap /
   uvmdealloc / uvmalloc, all three proven and linked: growing and shrinking a
   process's address space at the `proc_pt` altitude. Keeps the `um_inj`

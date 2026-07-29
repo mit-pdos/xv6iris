@@ -857,7 +857,7 @@ Section ProofEitherCopyout.
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2a) in "Hpc".
       iEval (rewrite HU5a2) in "Hsrc".
-      iAssert (⌜uptd_ext (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
+      iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
       iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
@@ -880,7 +880,7 @@ Section ProofEitherCopyout.
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
-      iExists P'. iSplitR; [iPureIntro; exact Hext|]. iExact "Hres".
+      iExists P'. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres".
     - (* ================= user_dst == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)
         by (rewrite HAs1; exact Hflag).
@@ -1533,7 +1533,7 @@ Section ProofEitherCopyin.
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2a) in "Hpc".
       iEval (rewrite HU5a1) in "Hdst".
-      iAssert (⌜uptd_ext (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
+      iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
       iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
@@ -1557,7 +1557,7 @@ Section ProofEitherCopyin.
       rewrite /either_copyin_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
       iSplitL "Hres".
-      { iExists P'. iSplitR; [iPureIntro; exact Hext|]. iExact "Hres". }
+      { iExists P'. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres". }
       iExists dst_new. iExact "Hdst".
     - (* ================= user_src == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)

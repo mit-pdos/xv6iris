@@ -1478,3 +1478,34 @@ Lemma cdec_b7cd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xb7cd : mword 16)) s
   = Some (C_J (mword_of_int 2033 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ===================================================================== *)
+(*  Words the growproc sweep collapsed (each had 1-5 private copies).     *)
+(* ===================================================================== *)
+
+(* 0x892a  c.mv s2,a0    -- printk, pipealloc, uvmcopy, vmfault,
+   proc_pagetable, growproc: the standard "park the callee's result in s2" *)
+Lemma cdec_892a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x892a : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x07b6  c.slli a5,a5,0xd  -- procinit's KSTACK arithmetic, growproc's
+   TRAPFRAME constant *)
+Lemma cdec_07b6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x07b6 : mword 16)) s
+  = Some (C_SLLI (mword_of_int 13, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xc50d  c.beqz a0,+0x2a   -- uvmalloc, growproc *)
+Lemma cdec_c50d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xc50d : mword 16)) s
+  = Some (C_BEQZ (mword_of_int 21, Cregidx (mword_of_int 2)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xb7c5  c.j -0x20         -- argraw, push_off, growproc
+   (11-bit residue 2032) *)
+Lemma cdec_b7c5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xb7c5 : mword 16)) s
+  = Some (C_J (mword_of_int 2032 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.

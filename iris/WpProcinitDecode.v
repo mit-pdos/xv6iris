@@ -46,9 +46,6 @@ Lemma pidc_878d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0x878d : mword 16)) s = Some (C_SRAI (mword_of_int 3, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma pidc_07b6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x07b6 : mword 16)) s = Some (C_SLLI (mword_of_int 13, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma pidc_6709 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x6709 : mword 16)) s = Some (C_LUI (mword_of_int 2, Regidx (mword_of_int 14)), s).
@@ -330,7 +327,7 @@ Section ProcinitInstrs.
 
   Lemma pii_8e : kernel_text -∗ instr (mword_of_int (PI + 0x8e) : mword 64) true (SHIFTIOP (mword_of_int 13 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_rvc (PI + 0x8e)%Z (mword_of_int 0x07b6 : mword 16)
-    (mword_of_int (PI + 0x8e) : mword 64) (SHIFTIOP (mword_of_int 13 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) pidc_07b6 exec_execute_C_SLLI. Qed.
+    (mword_of_int (PI + 0x8e) : mword 64) (SHIFTIOP (mword_of_int 13 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) cdec_07b6 exec_execute_C_SLLI. Qed.
 
   Lemma pii_90 : kernel_text -∗ instr (mword_of_int (PI + 0x90) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 2 : mword 6), Regidx (mword_of_int 14), LUI)).
   Proof. mk_rvc (PI + 0x90)%Z (mword_of_int 0x6709 : mword 16)

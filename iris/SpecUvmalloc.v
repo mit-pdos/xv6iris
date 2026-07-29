@@ -91,9 +91,13 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   mm !!! Regidx (mword_of_int 13) = (mword_of_int xperm : mword 64) ->
   (0 <= xperm < 512)%Z ->
   uvm_perm_ok (Z.lor xperm 18) ->
-  (* every page the loop maps lies in the user region, below TRAPFRAME *)
-  (uint oldsz + 4096 <= uvm_maxsz)%Z ->
-  (uint newsz + 4096 <= uvm_maxsz)%Z ->
+  (* every page the loop maps lies in the user region, below TRAPFRAME.  The
+     bound is [<= uvm_maxsz], not [+ 4096 <=]: the last page the loop maps
+     starts at PGROUNDUP(newsz) - 4096, so a size equal to TRAPFRAME is
+     exactly legal -- and it is the size growproc's own check
+     ([sz + n > TRAPFRAME] returns -1) lets through. *)
+  (uint oldsz <= uvm_maxsz)%Z ->
+  (uint newsz <= uvm_maxsz)%Z ->
   (* the run is unmapped to begin with (mappages panics on a remap, and it
      is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> P.(ud_um) !! vpn_at vpn0 i = None) ->

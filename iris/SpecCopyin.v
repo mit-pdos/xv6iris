@@ -17,8 +17,12 @@
    STATED AT THE [proc_pt] ALTITUDE, like vmfault: copyin PRESERVES the
    valid-user-page-table predicate of the table it reads through, and -- as
    it may fault pages in on the way -- hands back a descriptor EXTENDING the
-   one it was given ([uptd_ext]: same root, same trapframe, a user map that
-   only gained entries).  Both exits, 0 and -1, deliver that; a run that
+   one it was given ([uptd_ext_sz szv]: same root, same trapframe, a user map
+   that only gained entries, and every entry it gained BELOW [p->sz]).  The
+   size bound is not extra work: vmfault backs a page only after ruling out
+   [va >= p->sz], so the fact is already in the loop; stating it is what lets
+   a [proc_priv] caller rebuild its block (ProcInv.proc_priv_copy), which a
+   bare [uptd_ext] cannot.  Both exits, 0 and -1, deliver that; a run that
    gives up part-way has still copied a prefix and still faulted in whatever
    it faulted in, so there is nothing to roll back and no reason to split
    the resource story across the two arms.
@@ -99,7 +103,7 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
     proc_pt P' -∗
     ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
-    ⌜uptd_ext P P'⌝ -∗
+    ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
       \/ mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

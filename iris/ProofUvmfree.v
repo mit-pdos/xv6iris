@@ -128,7 +128,7 @@ Lemma uf_no_wrap (sz : mword 64) :
   uint sz + 4096 <= uvm_maxsz -> bv_unsigned sz + 4095 < 2 ^ 64.
 Proof.
   intros Hb. apply z_maxsz_no_wrap.
-  rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. exact Hb.
+  rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. clear -Hb. lia.
 Qed.
 
 (* THE BRIDGE.  What [srli a2,a1,0xc] computes out of [a1 = sz + 4095] is

@@ -109,7 +109,7 @@ Section ProofUvmdealloc.
     : wp_uvmdealloc_sconf_body γ γa Φ mm P K eb p C.
   Proof.
     cbv beta delta [wp_uvmdealloc_sconf_body].
-    intros pcE oldsz newsz ret_tgt HK Htp Hroot Hob Hnb.
+    intros pcE oldsz newsz ret_tgt HK Htp Hroot Hob.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt Henv Hcont".
@@ -118,31 +118,21 @@ Section ProofUvmdealloc.
     (* §A  The pure PGROUNDUP arithmetic, once and for all.               *)
     (* ================================================================= *)
     assert (Hmax : uvm_maxsz = 274877898752) by (vm_compute; reflexivity).
-    assert (Hobz : bv_unsigned oldsz + 4096 <= 274877898752)
+    assert (Hobz : bv_unsigned oldsz <= 274877898752)
       by (rewrite -uint_unsigned -Hmax; exact Hob).
-    assert (Hnbz : bv_unsigned newsz + 4096 <= 274877898752)
-      by (rewrite -uint_unsigned -Hmax; exact Hnb).
     assert (Hpuz : bv_unsigned (pgroundup oldsz)
                    = (bv_unsigned oldsz + 4095) - (bv_unsigned oldsz + 4095) mod 4096)
       by (apply pgroundup_unsigned; apply z_maxsz_no_wrap; exact Hobz).
-    assert (Hpnz : bv_unsigned (pgroundup newsz)
-                   = (bv_unsigned newsz + 4095) - (bv_unsigned newsz + 4095) mod 4096)
-      by (apply pgroundup_unsigned; apply z_maxsz_no_wrap; exact Hnbz).
     assert (Hpumod : bv_unsigned (pgroundup oldsz) mod 4096 = 0)
       by (rewrite Hpuz; apply z_pgd_mod).
-    assert (Hpnmod : bv_unsigned (pgroundup newsz) mod 4096 = 0)
-      by (rewrite Hpnz; apply z_pgd_mod).
-    assert (Hpubnd : bv_unsigned (pgroundup oldsz) <= 274877898751).
-    { rewrite Hpuz. apply z_pgu_bound;
-        [exact (proj1 (bv_unsigned_in_range _ oldsz)) | exact Hobz]. }
-    assert (Hpn0 : 0 <= bv_unsigned (pgroundup newsz))
-      by exact (proj1 (bv_unsigned_in_range _ (pgroundup newsz))).
-
-    (* the transport of [proc_pt P] to the zero-length-run descriptor *)
-    assert (Hnpdef : uvmd_np oldsz newsz
-                     = Z.to_nat ((bv_unsigned (pgroundup oldsz)
-                                  - bv_unsigned (pgroundup newsz)) / 4096))
-      by reflexivity.
+    assert (Hpubnd : bv_unsigned (pgroundup oldsz) <= 274877898752).
+    { rewrite Hpuz. apply z_pgu_maxsz.
+      split; [exact (proj1 (bv_unsigned_in_range _ oldsz)) | exact Hobz]. }
+    (* NOTHING about [newsz] is known yet, and nothing can be: the contract
+       says nothing, and on the arm the C skips [newsz] may be so large that
+       PGROUNDUP wraps.  The [newsz] arithmetic is therefore established
+       inside the [newsz < oldsz] branch, where the bound is inherited from
+       [oldsz]; on the other arm [uvmd_np]'s guard is what closes the run. *)
 
     (* ================================================================= *)
     (* §B  PROLOGUE: the 32-byte ra/s0/s1 frame.                          *)
@@ -458,12 +448,10 @@ Section ProofUvmdealloc.
         exact (proj1 (Z.leb_le _ _) Hcmp1). }
       assert (Hcmp1' : zopz0zKzJ_u (A2 !!! Regidx Ra2) (A2 !!! Regidx Ra1) = true)
         by (rewrite HA2a2 HA2a1; exact Hcmp1).
-      (* the run is empty *)
-      assert (Hple : bv_unsigned (pgroundup oldsz) <= bv_unsigned (pgroundup newsz)).
-      { rewrite Hpuz Hpnz. apply z_pgu_mono.
-        rewrite -!uint_unsigned. exact Hge. }
+      (* the run is empty -- straight off [uvmd_np]'s guard, with no
+         PGROUNDUP arithmetic, which is the point of guarding it *)
       assert (Hnp0 : uvmd_np oldsz newsz = 0%nat)
-        by (rewrite Hnpdef; apply z_np_zero; exact Hple).
+        by (apply uvmd_np_ge; rewrite -!uint_unsigned; exact Hge).
       iAssert (proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)))
         with "[Hpt]" as "Hpt".
       { iEval (rewrite (proc_pt_data_irrel P
@@ -491,6 +479,21 @@ Section ProofUvmdealloc.
     assert (Hlt : uint newsz < uint oldsz).
     { unfold zopz0zKzJ_u in Hcmp1. rewrite Z.geb_leb in Hcmp1.
       exact (proj1 (Z.leb_gt _ _) Hcmp1). }
+    (* ...so [newsz] inherits [oldsz]'s range, and its PGROUNDUP arithmetic
+       is available from here down *)
+    assert (Hnbz : bv_unsigned newsz <= 274877898752)
+      by (rewrite !uint_unsigned in Hlt; clear -Hlt Hobz; lia).
+    assert (Hpnz : bv_unsigned (pgroundup newsz)
+                   = (bv_unsigned newsz + 4095) - (bv_unsigned newsz + 4095) mod 4096)
+      by (apply pgroundup_unsigned; apply z_maxsz_no_wrap; exact Hnbz).
+    assert (Hpnmod : bv_unsigned (pgroundup newsz) mod 4096 = 0)
+      by (rewrite Hpnz; apply z_pgd_mod).
+    assert (Hpn0 : 0 <= bv_unsigned (pgroundup newsz))
+      by exact (proj1 (bv_unsigned_in_range _ (pgroundup newsz))).
+    assert (Hnpdef : uvmd_np oldsz newsz
+                     = Z.to_nat ((bv_unsigned (pgroundup oldsz)
+                                  - bv_unsigned (pgroundup newsz)) / 4096)).
+    { apply uvmd_np_lt. rewrite -!uint_unsigned. exact Hlt. }
     assert (Hcmp1' : zopz0zKzJ_u (A2 !!! Regidx Ra2) (A2 !!! Regidx Ra1) = false)
       by (rewrite HA2a2 HA2a1; exact Hcmp1).
     iApply (wp_bgeu_fall_s_sconf γ Φ (mword_of_int (UD + 0x0c))

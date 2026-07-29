@@ -329,8 +329,22 @@ the evidence for every offset. This file is only the worklist.
         (`addi a5,a5,208`) was already `KernelBaseDecode.bdec_0d078793`.
         Nine words are fdalloc's own — the loop body and the install arm.
 
+- [x] **`growproc` PROVEN and LINKED** (`SpecGrowproc.v` /
+      `WpGrowprocDecode.v` / `ProofGrowproc.v` / `LinkGrowproc.v`, over
+      MYPROC + UVMALLOC + UVMDEALLOC; **24 s / 1.1 GB**, axiom-clean).  It is
+      the function that WRITES `p->sz`, and it could not be specified until
+      the block said how the size relates to the map: `proc_priv` gained
+      `⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝` and its size bound tightened
+      from MAXVA to TRAPFRAME, copyin/copyout now hand back `uptd_ext_sz`
+      instead of `uptd_ext`, and two uvm* premises were relaxed/guarded
+      because they were undischargeable by their only caller.  Full account
+      in [`../completed/growproc.md`](../completed/growproc.md); read it
+      before touching `proc_priv` or the uvm* contracts.
+
 - [ ] **S4 — the next syscalls.** `sys_sbrk` (the unlocked `p->sz` write that
-      is the whole reason the private block cannot be fractionally shared).
+      is the whole reason the private block cannot be fractionally shared) —
+      now UNBLOCKED: it is `argint` + `myproc()->sz` + `growproc`, and every
+      premise growproc takes comes out of `proc_priv`.
       `sys_close` is done; `sys_read`/`sys_write`/`sys_fstat` are the other
       `argfd` callers and are cheap once `argfd` itself is linked — but note
       they pass a NULL out-parameter (`sys_read` passes `pf = 0`), which

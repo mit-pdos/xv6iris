@@ -193,10 +193,6 @@ Lemma uadc_6985 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x3c  c.beqz a0,+0x2a  (offset/2 = 21) *)
-Lemma uadc_c50d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc50d : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 21, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* [cdec_864e] -- shared, see KernelRvcDecode.v *)
 
@@ -447,7 +443,7 @@ Section UvmallocInstrs.
 
   Lemma uai_3c : kernel_text -∗ instr (mword_of_int (UA + 0x3c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 21 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (UA + 0x3c)%Z (mword_of_int 0xc50d : mword 16)
-    (mword_of_int (UA + 0x3c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 21 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) uadc_c50d exec_execute_C_BEQZ. Qed.
+    (mword_of_int (UA + 0x3c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 21 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c50d exec_execute_C_BEQZ. Qed.
 
   Lemma uai_3e : kernel_text -∗ instr (mword_of_int (UA + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (UA + 0x3e)%Z (mword_of_int 0x864e : mword 16)

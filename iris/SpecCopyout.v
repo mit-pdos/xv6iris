@@ -19,8 +19,9 @@
 
    The mirror of SpecCopyin.v, and stated at the same [proc_pt] altitude:
    copyout PRESERVES the valid-user-page-table predicate and hands back a
-   descriptor EXTENDING the one it was given ([uptd_ext]).  Read its header
-   for why the two exits share one resource story.
+   descriptor EXTENDING the one it was given, with every entry it gained
+   below [p->sz] ([uptd_ext_sz szv]).  Read its header for why the two exits
+   share one resource story, and for why the size bound is free.
 
    THE SOURCE BUFFER COMES BACK UNCHANGED ([src_bytes] on both sides) -- the
    one functional guarantee this contract makes, and the one a caller needs
@@ -103,7 +104,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
     proc_pt P' -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
     ⌜callee_saved mm mr⌝ -∗
-    ⌜uptd_ext P P'⌝ -∗
+    ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
       \/ mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

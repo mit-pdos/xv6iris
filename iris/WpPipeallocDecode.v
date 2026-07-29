@@ -128,10 +128,7 @@ Lemma padc_cd25 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x892a  c.mv s2,a0 *)
-Lemma padc_892a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x892a : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_892a] -- shared, see KernelRvcDecode.v *)
 
 (* 0xc12d  c.beqz a0,+0x62 *)
 Lemma padc_c12d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -440,7 +437,7 @@ Section PipeallocInstrs.
   (* +0x30  892a  c.mv s2,a0 *)
   Lemma pai_30 : kernel_text -∗ instr (mword_of_int (PA + 0x30) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (PA + 0x30)%Z (mword_of_int 0x892a : mword 16)
-    (mword_of_int (PA + 0x30) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) padc_892a exec_execute_C_MV. Qed.
+    (mword_of_int (PA + 0x30) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) cdec_892a exec_execute_C_MV. Qed.
 
   (* +0x32  c12d  c.beqz a0,+0x62 *)
   Lemma pai_32 : kernel_text -∗ instr (mword_of_int (PA + 0x32) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 49 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)).

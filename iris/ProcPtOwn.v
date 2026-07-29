@@ -1079,8 +1079,31 @@ Definition pgroundup (x : mword 64) : mword 64 :=
 Definition uvma_np (oldsz newsz : mword 64) : nat :=
   Z.to_nat ((bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) / 4096).
 
+(* [uvmd_np] is GUARDED on the shrink actually happening, and the guard is
+   load-bearing rather than cosmetic.  On the arm the C skips
+   ([newsz >= oldsz]) the quotient is not merely negative: [newsz] may be so
+   large that PGROUNDUP WRAPS to a small value, and then the raw quotient is
+   POSITIVE and the spec would claim an unmap that never ran.  That is not a
+   corner case -- it is growproc's ordinary underflow ([sbrk(-1)] on a
+   zero-sized process computes [sz + n = 2^64 - 1]).  Guarding here is what
+   lets [SpecUvmdealloc] carry NO premise about [newsz] at all, which is the
+   only form growproc can call it at. *)
 Definition uvmd_np (oldsz newsz : mword 64) : nat :=
-  Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096).
+  if bool_decide (bv_unsigned newsz < bv_unsigned oldsz)%Z
+  then Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096)
+  else 0%nat.
+
+Lemma uvmd_np_lt (oldsz newsz : mword 64) :
+  (bv_unsigned newsz < bv_unsigned oldsz)%Z ->
+  uvmd_np oldsz newsz
+  = Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096).
+Proof. intros H. unfold uvmd_np. by rewrite bool_decide_eq_true_2. Qed.
+
+Lemma uvmd_np_ge (oldsz newsz : mword 64) :
+  (bv_unsigned oldsz <= bv_unsigned newsz)%Z -> uvmd_np oldsz newsz = 0%nat.
+Proof.
+  intros H. unfold uvmd_np. rewrite bool_decide_eq_false_2; [reflexivity | lia].
+Qed.
 
 (* ...and the run length of the two functions whose bound is the SIZE
    itself: ceil(sz/4096).  uvmcopy's loop is [for (i = 0; i < sz; i +=
@@ -1130,7 +1153,7 @@ Proof. vm_compute. reflexivity. Qed.
 (* --------------------------------------------------------------------- *)
 
 (* a size inside the user region does not wrap when PGROUNDUP adds 4095 *)
-Lemma z_maxsz_no_wrap (v : Z) : v + 4096 <= 274877898752 -> v + 4095 < 2 ^ 64.
+Lemma z_maxsz_no_wrap (v : Z) : v <= 274877898752 -> v + 4095 < 2 ^ 64.
 Proof. intros H. change (2 ^ 64) with 18446744073709551616. lia. Qed.
 
 (* PGROUNDUP is MONOTONE ... *)
@@ -1145,13 +1168,7 @@ Proof.
   lia.
 Qed.
 
-(* ... never exceeds its argument by a page ... *)
-Lemma z_pgu_bound (v : Z) :
-  0 <= v -> v + 4096 <= 274877898752 ->
-  (v + 4095) - (v + 4095) mod 4096 <= 274877898751.
-Proof.
-  intros H0 H1. pose proof (Z.mod_pos_bound (v + 4095) 4096 ltac:(lia)). lia.
-Qed.
+(* PGROUNDUP never leaves the user region: see [z_pgu_maxsz] in §3f. *)
 
 (* ... is above its argument ... *)
 Lemma z_pgu_ge (v : Z) : v <= (v + 4095) - (v + 4095) mod 4096.
@@ -1195,7 +1212,7 @@ Qed.
 
 (* ...and it fits the [int npages] the C declares *)
 Lemma z_np_lt31 (pu pn : Z) :
-  0 <= pn -> pu <= 274877898751 -> (pu - pn) / 4096 < 2147483648.
+  0 <= pn -> pu <= 274877898752 -> (pu - pn) / 4096 < 2147483648.
 Proof.
   intros H0 H1.
   apply Z.le_lt_trans with (pu / 4096).
@@ -2337,6 +2354,328 @@ Lemma upt_acc_wf_del_run (um : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
 Proof.
   intros Hwf. induction k as [| k IH]; [exact Hwf |].
   cbn [um_del_run]. exact (upt_acc_wf_delete _ _ IH).
+Qed.
+
+(* ===================================================================== *)
+(* §3f  p->sz AND THE USER MAP: the coherence invariant.                  *)
+(* ===================================================================== *)
+(*   A live process maps NOTHING at or above [p->sz].  xv6 maintains that in
+   exactly three places -- exec and growproc set the size, uvmalloc maps the
+   run below it, and vmfault backs a page only once [va >= p->sz] has been
+   ruled out -- and it is what makes growproc's uvmalloc call legal at all:
+   the run [PGROUNDUP(sz) .. sz+n) is fresh in [ud_um] PRECISELY because
+   nothing above [sz] is mapped, and freshness is what keeps mappages off
+   its "remap" panic.
+     The invariant lives in [ProcInv.proc_priv] (design/proc-struct.md); what
+   is here is its vocabulary and the four laws its writers need -- one per
+   thing that can move: the map grows (vmfault, through [uptd_ext_sz]), the
+   map grows by a RUN and the size rises together (uvmalloc), the map loses a
+   run and the size falls together (uvmdealloc), and the size stays put while
+   the run above it is read as fresh (growproc's call).
+     Stated multiplicatively ([vpn * 4096 < sz]) rather than through
+   PGROUNDUP: it is the same set of vpns, and every proof about it then talks
+   to [lia] in one shape. *)
+
+Definition um_below (szv : mword 64) (um : gmap (mword 27) (mword 64)) : Prop :=
+  forall (vpn : mword 27) (w : mword 64),
+    um !! vpn = Some w -> (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z.
+
+Lemma um_below_empty (szv : mword 64) : um_below szv ∅.
+Proof. intros vpn w Hl. rewrite lookup_empty in Hl. discriminate. Qed.
+
+(* growing the SIZE alone never breaks it *)
+Lemma um_below_mono (szv szv' : mword 64) (um : gmap (mword 27) (mword 64)) :
+  (bv_unsigned szv <= bv_unsigned szv')%Z -> um_below szv um -> um_below szv' um.
+Proof. intros Hle Hb vpn w Hl. pose proof (Hb vpn w Hl). lia. Qed.
+
+Lemma um_below_insert (szv : mword 64) (um : gmap (mword 27) (mword 64))
+    (vpn : mword 27) (w : mword 64) :
+  (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z -> um_below szv um ->
+  um_below szv (<[vpn := w]> um).
+Proof.
+  intros Hv Hb v x Hl.
+  destruct (decide (v = vpn)) as [-> | Hne]; [exact Hv |].
+  rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hl. exact (Hb v x Hl).
+Qed.
+
+Lemma um_below_subseteq (szv : mword 64) (um um' : gmap (mword 27) (mword 64)) :
+  um ⊆ um' -> um_below szv um' -> um_below szv um.
+Proof.
+  intros Hsub Hb v w Hl. exact (Hb v w (lookup_weaken um um' v w Hl Hsub)).
+Qed.
+
+(* --------------------------------------------------------------------- *)
+Definition uptd_ext_sz (szv : mword 64) (P P' : uptd) : Prop :=
+  uptd_ext P P' /\
+  forall (vpn : mword 27) (w : mword 64),
+    P.(ud_um) !! vpn = None -> P'.(ud_um) !! vpn = Some w ->
+    (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z.
+
+Lemma uptd_ext_sz_ext (szv : mword 64) (P P' : uptd) :
+  uptd_ext_sz szv P P' -> uptd_ext P P'.
+Proof. intros [H _]. exact H. Qed.
+
+Lemma uptd_ext_sz_refl (szv : mword 64) (P : uptd) : uptd_ext_sz szv P P.
+Proof.
+  split; [apply uptd_ext_refl |].
+  intros vpn w Hn Hs. rewrite Hn in Hs. discriminate.
+Qed.
+
+Lemma uptd_ext_sz_trans (szv : mword 64) (P Q R : uptd) :
+  uptd_ext_sz szv P Q -> uptd_ext_sz szv Q R -> uptd_ext_sz szv P R.
+Proof.
+  intros [He1 Hb1] [He2 Hb2].
+  split; [exact (uptd_ext_trans P Q R He1 He2) |].
+  intros vpn w Hn Hs.
+  destruct (Q.(ud_um) !! vpn) as [w' |] eqn:Hq.
+  - exact (Hb1 vpn w' Hn Hq).
+  - exact (Hb2 vpn w Hq Hs).
+Qed.
+
+(* a WEAKER size is still a bound *)
+Lemma uptd_ext_sz_mono (szv szv' : mword 64) (P P' : uptd) :
+  (bv_unsigned szv <= bv_unsigned szv')%Z ->
+  uptd_ext_sz szv P P' -> uptd_ext_sz szv' P P'.
+Proof.
+  intros Hle [He Hb]. split; [exact He |].
+  intros vpn w Hn Hs. pose proof (Hb vpn w Hn Hs). lia.
+Qed.
+
+(* vmfault's move, at an arbitrary permission *)
+Lemma uptd_ext_sz_insert_perm (szv : mword 64) (P : uptd) (perm : Z)
+    (vpn : mword 27) (r : mword 64) :
+  P.(ud_um) !! vpn = None ->
+  (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z ->
+  uptd_ext_sz szv P (uptd_insert_perm P perm vpn r).
+Proof.
+  intros Hn Hlt. split; [exact (uptd_ext_insert_perm P perm vpn r Hn) |].
+  unfold uptd_insert_perm. cbn [ud_um]. intros v w Hv Hs.
+  destruct (decide (v = vpn)) as [-> | Hne]; [exact Hlt |].
+  rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hs.
+  rewrite Hv in Hs. discriminate.
+Qed.
+
+(* ...and the [perm = 22] instance copyin / copyout actually hand back *)
+Lemma uptd_ext_sz_insert (szv : mword 64) (P : uptd) (vpn : mword 27)
+    (r : mword 64) :
+  P.(ud_um) !! vpn = None ->
+  (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z ->
+  uptd_ext_sz szv P (uptd_insert P vpn r).
+Proof. exact (uptd_ext_sz_insert_perm szv P 22 vpn r). Qed.
+
+(* THE POINT of the relation: it carries the invariant across a call. *)
+Lemma um_below_ext_sz (szv : mword 64) (P P' : uptd) :
+  um_below szv P.(ud_um) -> uptd_ext_sz szv P P' -> um_below szv P'.(ud_um).
+Proof.
+  intros Hb [_ Hgrow] v w Hl.
+  destruct (P.(ud_um) !! v) as [w0 |] eqn:Hp.
+  - exact (Hb v w0 Hp).
+  - exact (Hgrow v w Hp Hl).
+Qed.
+
+(* ---- the arithmetic ---- *)
+
+Lemma z_pgu_least (v m : Z) :
+  m mod 4096 = 0 -> v <= m -> (v + 4095) - (v + 4095) mod 4096 <= m.
+Proof.
+  intros Hm Hle.
+  pose proof (Z_div_mod_eq_full (v + 4095) 4096) as Hd.
+  pose proof (Z_div_mod_eq_full m 4096) as Hm'.
+  assert (Hq : (v + 4095) / 4096 <= (m + 4095) / 4096)
+    by (apply Z.div_le_mono; lia).
+  assert (Hmq : (m + 4095) / 4096 = m / 4096).
+  { assert (Hk : (m + 4095)%Z = ((m / 4096) * 4096 + 4095)%Z) by lia.
+    rewrite Hk. rewrite Z.div_add_l; [| lia].
+    assert (H4095 : (4095 / 4096)%Z = 0%Z) by (vm_compute; reflexivity).
+    rewrite H4095. lia. }
+  lia.
+Qed.
+
+Lemma z_pgu_maxsz (v : Z) :
+  0 <= v <= 274877898752 -> (v + 4095) - (v + 4095) mod 4096 <= 274877898752.
+Proof. intros [H0 H1]. apply z_pgu_least; [vm_compute; reflexivity | exact H1]. Qed.
+
+(* the two readings of PGROUNDUP a size inside the user region gets *)
+Lemma pgroundup_maxsz (x : mword 64) :
+  (bv_unsigned x <= uvm_maxsz)%Z ->
+  (bv_unsigned x <= bv_unsigned (pgroundup x) <= uvm_maxsz)%Z
+  /\ (bv_unsigned (pgroundup x) mod 4096 = 0)%Z.
+Proof.
+  intros Hx.
+  pose proof (bv_unsigned_in_range _ x) as [Hx0 _].
+  rewrite uvm_maxsz_val in Hx.
+  assert (Hnw : (bv_unsigned x + 4095 < 2 ^ 64)%Z).
+  { change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+  rewrite (pgroundup_unsigned x Hnw).
+  split; [split |].
+  - apply z_pgu_ge.
+  - rewrite uvm_maxsz_val. apply z_pgu_maxsz. lia.
+  - apply z_pgd_mod.
+Qed.
+
+(* a va inside the user region names its own vpn with no wrap *)
+Lemma svpn_of_unsigned_small (a : mword 64) :
+  (bv_unsigned a <= uvm_maxsz)%Z ->
+  bv_unsigned (svpn_of a) = (bv_unsigned a / 4096)%Z.
+Proof.
+  intros Ha. pose proof (bv_unsigned_in_range _ a) as [Ha0 _].
+  rewrite uvm_maxsz_val in Ha.
+  rewrite svpn_of_unsigned_gen. apply Z.mod_small.
+  split; [apply Z.div_pos; lia |].
+  apply Z.div_lt_upper_bound; lia.
+Qed.
+
+Lemma svpn_of_below (a szv : mword 64) :
+  (bv_unsigned szv <= 2 ^ 38)%Z -> (bv_unsigned a < bv_unsigned szv)%Z ->
+  (bv_unsigned (svpn_of a) * 4096 < bv_unsigned szv)%Z.
+Proof.
+  intros Hsz Ha. pose proof (bv_unsigned_in_range _ a) as [Ha0 _].
+  change (2 ^ 38)%Z with 274877906944%Z in Hsz.
+  rewrite svpn_of_unsigned_gen.
+  assert (Hq : ((bv_unsigned a / 4096) mod 134217728)%Z = (bv_unsigned a / 4096)%Z).
+  { apply Z.mod_small.
+    split; [apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia]. }
+  rewrite Hq.
+  pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hd.
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)). lia.
+Qed.
+
+(* ...and at the PGROUNDDOWN'd va vmfault actually inserts at *)
+Lemma svpn_of_pgd_below (a szv : mword 64) :
+  (bv_unsigned szv <= 2 ^ 38)%Z -> (bv_unsigned a < bv_unsigned szv)%Z ->
+  (bv_unsigned (svpn_of (and_vec a (mword_of_int (-4096)))) * 4096
+   < bv_unsigned szv)%Z.
+Proof. intros H1 H2. rewrite svpn_of_pgrounddown. exact (svpn_of_below a szv H1 H2). Qed.
+
+(* ---- the three moves ---- *)
+
+Lemma um_below_run_fresh (szv : mword 64) (um : gmap (mword 27) (mword 64))
+    (n i : nat) :
+  um_below szv um ->
+  (bv_unsigned szv <= uvm_maxsz)%Z ->
+  (bv_unsigned (pgroundup szv) + 4096 * Z.of_nat n <= uvm_maxsz)%Z ->
+  (i < n)%nat ->
+  um !! vpn_at (svpn_of (pgroundup szv)) i = None.
+Proof.
+  intros Hb Hsz Hrun Hi.
+  destruct (pgroundup_maxsz szv Hsz) as [[Hge Hle] Hmod].
+  pose proof (Nat2Z.is_nonneg i) as Hi0.
+  assert (Hin : (Z.of_nat i < Z.of_nat n)%Z) by lia.
+  pose proof (bv_unsigned_in_range _ (pgroundup szv)) as [Hpu0 _].
+  rewrite uvm_maxsz_val in Hrun, Hle.
+  assert (Hv0 : bv_unsigned (svpn_of (pgroundup szv))
+                = (bv_unsigned (pgroundup szv) / 4096)%Z).
+  { apply svpn_of_unsigned_small. rewrite uvm_maxsz_val. lia. }
+  assert (Hqm : (bv_unsigned (pgroundup szv) / 4096 * 4096)%Z
+                = bv_unsigned (pgroundup szv)).
+  { pose proof (Z_div_mod_eq_full (bv_unsigned (pgroundup szv)) 4096). lia. }
+  assert (Hnw : (bv_unsigned (svpn_of (pgroundup szv)) + Z.of_nat i < 134217728)%Z).
+  { rewrite Hv0. lia. }
+  destruct (um !! vpn_at (svpn_of (pgroundup szv)) i) as [w |] eqn:Hl;
+    [| reflexivity].
+  exfalso.
+  pose proof (Hb _ _ Hl) as Hlt.
+  rewrite (vpn_at_unsigned _ _ Hnw) Hv0 in Hlt. lia.
+Qed.
+
+Lemma um_below_grow (oldsz newsz : mword 64) (um um' : gmap (mword 27) (mword 64)) :
+  um_below oldsz um ->
+  (bv_unsigned oldsz <= bv_unsigned newsz)%Z ->
+  (bv_unsigned newsz <= uvm_maxsz)%Z ->
+  dom um' = dom um ∪ vpn_run (svpn_of (pgroundup oldsz)) (uvma_np oldsz newsz) ->
+  um_below newsz um'.
+Proof.
+  intros Hb Hle Hmax Hdom v w Hl.
+  assert (Hvin : v ∈ dom um') by (apply elem_of_dom; exists w; exact Hl).
+  rewrite Hdom in Hvin. apply elem_of_union in Hvin.
+  destruct Hvin as [Hin | Hin].
+  { apply elem_of_dom in Hin as [w0 Hw0]. pose proof (Hb v w0 Hw0). lia. }
+  apply elem_of_vpn_run in Hin as (i & Hi & ->).
+  assert (Hold : (bv_unsigned oldsz <= uvm_maxsz)%Z) by lia.
+  destruct (pgroundup_maxsz oldsz Hold) as [[Hge Hple] Hmod].
+  pose proof (bv_unsigned_in_range _ (pgroundup oldsz)) as [Hpu0 _].
+  pose proof (Nat2Z.is_nonneg i) as Hi0.
+  assert (Hqpos : (0 < (bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) / 4096)%Z).
+  { assert (Hn0 : (0 < uvma_np oldsz newsz)%nat) by lia.
+    unfold uvma_np in Hn0. lia. }
+  assert (Hnz : (Z.of_nat (uvma_np oldsz newsz)
+                 = (bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) / 4096)%Z).
+  { unfold uvma_np. rewrite Z2Nat.id; [reflexivity | lia]. }
+  assert (Hin' : (Z.of_nat i < Z.of_nat (uvma_np oldsz newsz))%Z) by lia.
+  rewrite Hnz in Hin'.
+  assert (Hstep : (4096 * ((bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) / 4096 - 1)
+                   < bv_unsigned newsz - bv_unsigned (pgroundup oldsz))%Z).
+  { pose proof (Z_div_mod_eq_full (bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) 4096) as Hdm.
+    pose proof (Z.mod_pos_bound (bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095) 4096 ltac:(lia)). lia. }
+  rewrite uvm_maxsz_val in Hmax, Hple.
+  assert (Hv0 : bv_unsigned (svpn_of (pgroundup oldsz))
+                = (bv_unsigned (pgroundup oldsz) / 4096)%Z).
+  { apply svpn_of_unsigned_small. rewrite uvm_maxsz_val. lia. }
+  assert (Hqm : (bv_unsigned (pgroundup oldsz) / 4096 * 4096)%Z
+                = bv_unsigned (pgroundup oldsz)).
+  { pose proof (Z_div_mod_eq_full (bv_unsigned (pgroundup oldsz)) 4096). lia. }
+  assert (Hnw : (bv_unsigned (svpn_of (pgroundup oldsz)) + Z.of_nat i < 134217728)%Z).
+  { rewrite Hv0. lia. }
+  rewrite (vpn_at_unsigned _ _ Hnw) Hv0. lia.
+Qed.
+
+Lemma um_below_shrink (oldsz newsz : mword 64) (um : gmap (mword 27) (mword 64)) :
+  um_below oldsz um ->
+  (bv_unsigned newsz < bv_unsigned oldsz)%Z ->
+  (bv_unsigned oldsz <= uvm_maxsz)%Z ->
+  um_below newsz
+    (um_del_run um (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)).
+Proof.
+  intros Hb Hlt Hmax v w Hl.
+  set (v0 := svpn_of (pgroundup newsz)) in *.
+  set (k := uvmd_np oldsz newsz) in *.
+  assert (Hnin : v ∉ vpn_run v0 k).
+  { intros Hin. rewrite (um_del_run_in um v0 k v Hin) in Hl. discriminate. }
+  rewrite (um_del_run_out um v0 k v Hnin) in Hl.
+  pose proof (Hb v w Hl) as Hvold.
+  assert (Hnew : (bv_unsigned newsz <= uvm_maxsz)%Z) by lia.
+  destruct (pgroundup_maxsz newsz Hnew) as [[Hnge Hnle] Hnmod].
+  destruct (pgroundup_maxsz oldsz Hmax) as [[Hoge Hole] Homod].
+  pose proof (bv_unsigned_in_range _ v) as [Hv0b Hvhi].
+  pose proof (bv_unsigned_in_range _ (pgroundup newsz)) as [Hpn0 _].
+  pose proof (bv_unsigned_in_range _ (pgroundup oldsz)) as [Hpo0 _].
+  rewrite uvm_maxsz_val in Hnle, Hole.
+  destruct (Z.lt_ge_cases (bv_unsigned v * 4096) (bv_unsigned newsz))
+    as [Hok | Hbad]; [exact Hok | exfalso].
+  assert (Hvpn : (bv_unsigned (pgroundup newsz) <= bv_unsigned v * 4096)%Z).
+  { assert (Hnw : (bv_unsigned newsz + 4095 < 2 ^ 64)%Z).
+    { change (2 ^ 64)%Z with 18446744073709551616%Z. lia. }
+    rewrite (pgroundup_unsigned newsz Hnw).
+    apply z_pgu_least; [| exact Hbad].
+    apply Z.mod_mul. lia. }
+  assert (Hvpo : (bv_unsigned v * 4096 < bv_unsigned (pgroundup oldsz))%Z) by lia.
+  assert (Hkq : (Z.of_nat k
+                 = (bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096)%Z).
+  { unfold k. rewrite (uvmd_np_lt oldsz newsz Hlt). rewrite Z2Nat.id; [reflexivity |].
+    apply Z.div_pos; lia. }
+  assert (Hpnq : (bv_unsigned (pgroundup newsz) / 4096 * 4096)%Z
+                 = bv_unsigned (pgroundup newsz)).
+  { pose proof (Z_div_mod_eq_full (bv_unsigned (pgroundup newsz)) 4096). lia. }
+  assert (Hpoq : (bv_unsigned (pgroundup oldsz) / 4096 * 4096)%Z
+                 = bv_unsigned (pgroundup oldsz)).
+  { pose proof (Z_div_mod_eq_full (bv_unsigned (pgroundup oldsz)) 4096). lia. }
+  assert (Hkv : (Z.of_nat k
+                 = bv_unsigned (pgroundup oldsz) / 4096
+                   - bv_unsigned (pgroundup newsz) / 4096)%Z).
+  { rewrite Hkq.
+    assert (Hd : (bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz))%Z
+                 = ((bv_unsigned (pgroundup oldsz) / 4096
+                     - bv_unsigned (pgroundup newsz) / 4096) * 4096)%Z) by lia.
+    rewrite Hd. apply Z.div_mul. lia. }
+  assert (Hv0u : bv_unsigned v0 = (bv_unsigned (pgroundup newsz) / 4096)%Z).
+  { unfold v0. apply svpn_of_unsigned_small. rewrite uvm_maxsz_val. lia. }
+  set (i := Z.to_nat (bv_unsigned v - bv_unsigned v0)).
+  assert (Hiu : (Z.of_nat i = bv_unsigned v - bv_unsigned v0)%Z).
+  { unfold i. rewrite Z2Nat.id; [reflexivity |]. rewrite Hv0u. lia. }
+  assert (Hik : (i < k)%nat) by lia.
+  assert (Hnw : (bv_unsigned v0 + Z.of_nat i < 134217728)%Z) by lia.
+  apply Hnin. apply elem_of_vpn_run. exists i. split; [exact Hik |].
+  apply bv_eq. rewrite (vpn_at_unsigned _ _ Hnw). lia.
 Qed.
 
 (* ===================================================================== *)

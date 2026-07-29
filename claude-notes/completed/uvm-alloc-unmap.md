@@ -420,6 +420,24 @@ lemma each is proved FROM changed).  Across all surviving lemmas in those
 files, 2359 statements compared, the single difference being the intended
 un-`Local` of `ppo_shiftl12`.
 
+## Amended by growproc (see [`growproc.md`](growproc.md))
+
+Two premises here were wrong for the only caller either function has, and
+were fixed when growproc was proven:
+
+- **The range premises are `uint sz <= uvm_maxsz`, not `+ 4096 <=`.** The
+  real requirement is that each mapped page START below TRAPFRAME; the old
+  form left a page of slack that growproc's own check (`sz + n > TRAPFRAME`)
+  does not. Inside the proofs the weaker premise costs one step: "the cursor
+  has a whole page of room" now needs the cursor's 4096-alignment
+  (`ProofUvmalloc.ua_z_avfit`) instead of plain `lia`.
+- **`uvmd_np` is GUARDED on `newsz < oldsz`**, so `SpecUvmdealloc` carries no
+  premise about `newsz` at all. On the skipped arm the raw quotient is not
+  merely negative — a huge `newsz` makes PGROUNDUP WRAP and the quotient
+  positive, and the contract then claimed an unmap that never ran. That is
+  growproc's ordinary underflow (`sbrk(-1)` on a zero-sized process).
+  uvmalloc's rollback site case-splits on `i = 0` for it.
+
 ## Open questions / parked
 
 - **`do_free = 0`.** proc_freepagetable's use is out of scope by design (see
@@ -429,7 +447,10 @@ un-`Local` of `ppo_shiftl12`.
 - **`freewalk` / `uvmfree`** are the rest of the teardown path and are not
   attempted here; `uvmfree` is `uvmunmap` + `freewalk`, so its user-page
   half is done.
-- **`p->sz` coherence with `dom ud_um`** is still not part of table validity
-  (proc-pagetable-ownership.md step 7). These specs take the size arguments
-  as bare `mword 64`s and relate them to the map only through the run
-  length, which is the honest reading at this altitude.
+- **`p->sz` coherence with `dom ud_um`** is still not part of TABLE
+  validity, and should not be — a `uptd` knows nothing about a size. It is
+  now part of the PROCESS invariant instead (`ProcInv.proc_priv`'s
+  `um_below`; see [`growproc.md`](growproc.md)), which is what pays these
+  specs' freshness premise. These specs still take the size arguments as
+  bare `mword 64`s and relate them to the map only through the run length,
+  which remains the honest reading at this altitude.

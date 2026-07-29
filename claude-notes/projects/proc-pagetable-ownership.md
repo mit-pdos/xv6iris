@@ -208,8 +208,11 @@ in xv6 ("these are private to the process, so p->lock need not be held"), so
 belongs with the running process's private state, i.e. alongside the
 `cur_proc` resource (`completed/yield-sched.md`). Settle this when the first
 `uvm*` / `usertrapret` proof needs it. `p->sz` coherence with `um`'s domain
-is a *separate* fact the `uvmalloc`/`uvmdealloc` specs will carry; it is
-deliberately not part of table validity.
+is a *separate* fact, and it is now SETTLED: it lives in
+`ProcInv.proc_priv` as `um_below (pv_sz V) (ud_um (pv_upt V))`, not in table
+validity, because a `uptd` knows nothing about a size. growproc is what
+forced it and [`../completed/growproc.md`](../completed/growproc.md) is the
+account.
 
 Two things that correctly stay OUT of the parked form: `satp` (owned by the
 installed invariant only) and `pmp_config` — hart-level, and phantom in its

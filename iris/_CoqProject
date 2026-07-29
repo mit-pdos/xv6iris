@@ -607,3 +607,7 @@ SpecAllocproc.v
 WpAllocprocDecode.v
 ProofAllocproc.v
 LinkAllocproc.v
+SpecGrowproc.v
+WpGrowprocDecode.v
+ProofGrowproc.v
+LinkGrowproc.v

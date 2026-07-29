@@ -770,8 +770,8 @@ Section ProofFetchstr.
     { intros r Hr Ncsp N8 N9 N18 N19.
       rewrite (callee_saved_lookup Hcsr r Hr). apply HthrA5; assumption. }
     (* close the [proc_priv] borrow: the descriptor never moved *)
-    iAssert (⌜uptd_ext (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
-      [iPureIntro; apply uptd_ext_refl|].
+    iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
+      [iPureIntro; apply uptd_ext_sz_refl|].
     iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
     iEval (rewrite fs_upd_upt_id) in "Hpriv".
     (* ---- +0x24: bltz a0 -- copyinstr's answer decides the branch ---- *)

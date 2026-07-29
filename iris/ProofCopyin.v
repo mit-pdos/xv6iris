@@ -469,7 +469,7 @@ Section ProofCopyin.
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     forall (fuel done rem : nat) (Pc : uptd) (m : regfile) (fd : nat -> bv 8),
     (rem <= fuel)%nat -> (1 <= rem)%nat -> (done + rem = len)%nat ->
-    uptd_ext P Pc ->
+    uptd_ext_sz szv P Pc ->
     m !!! Regidx csp_rs1 = spr ->
     m !!! Regidx Rtp = cid_word ->
     m !!! Regidx Rs4 = (mword_of_int (Z.of_nat rem) : mword 64) ->
@@ -496,7 +496,7 @@ Section ProofCopyin.
       ⌜mj !!! Regidx Rs11 = v11⌝ -∗
       ⌜mj !!! Regidx Ra0 = res⌝ -∗
       ⌜res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64)⌝ -∗
-      ⌜uptd_ext P P'⌝ -∗
+      ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr γ mj (K - 12) -∗
       cpu_own γ lvl eb p C -∗
       pc_is (mword_of_int (CPI + 0x76) : mword 64) -∗
@@ -526,7 +526,7 @@ Section ProofCopyin.
       ⌜mj !!! Regidx Rs11 = v11⌝ -∗
       ⌜mj !!! Regidx Ra0 = res⌝ -∗
       ⌜res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64)⌝ -∗
-      ⌜uptd_ext P P'⌝ -∗
+      ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr γ mj (K - 12) -∗
       cpu_own γ lvl eb p C -∗
       pc_is (mword_of_int (CPI + 0x76) : mword 64) -∗
@@ -542,7 +542,8 @@ Section ProofCopyin.
     assert (Hoffz : Z.of_nat off = (bv_unsigned cur mod 4096)%Z)
       by (unfold off; apply ci_off_id).
     assert (Hoff4 : (off < 4096)%nat) by (unfold off; apply ci_off_lt).
-    assert (Hrootc : Pc.(ud_root) = P.(ud_root)) by (destruct Hext as (H & _); exact H).
+    assert (Hrootc : Pc.(ud_root) = P.(ud_root))
+      by (destruct Hext as ((H & _) & _); exact H).
     (* PGROUNDDOWN is idempotent (vmfault re-masks), and [va0 - cur + 4096] is
        the page tail.  Both stated at the LOCAL [va0] so [rewrite] matches. *)
     assert (Hidem : and_vec va0 (mword_of_int (-4096)) = va0)
@@ -560,7 +561,7 @@ Section ProofCopyin.
     (*  THE +0x2c JOIN: the chunk copy, over an arbitrary borrowed page.  *)
     (* ================================================================ *)
     iAssert (∀ (mb : regfile) (pa0 : mword 64) (Pd : uptd),
-        ⌜uptd_ext Pc Pd⌝ -∗
+        ⌜uptd_ext_sz szv Pc Pd⌝ -∗
         ⌜mb !!! Regidx Ra0 = pa0⌝ -∗
         ⌜mb !!! Regidx csp_rs1 = spr⌝ -∗
         ⌜mb !!! Regidx Rtp = cid_word⌝ -∗
@@ -861,7 +862,7 @@ Section ProofCopyin.
           + lkp.
           + rewrite /G4 upd_eq. reflexivity.
           + left; reflexivity.
-          + exact (uptd_ext_trans P Pc Pd Hext Hextd).
+          + exact (uptd_ext_sz_trans szv P Pc Pd Hext Hextd).
         - (* ---- more to copy: fall through to the loop head at +0x56 ---- *)
           iApply (wp_beqz_x0_fall_s_sconf γ Φ (mword_of_int (CPI + 0x52))
                     (mword_of_int 34 : mword 13) Rs4 G3 (K - 12)
@@ -891,7 +892,7 @@ Section ProofCopyin.
           assert (HF2 : (1 <= rem - n)%nat) by lia.
           assert (HF3 : (done + n + (rem - n) = len)%nat) by lia.
           iApply (IH (done + n)%nat (rem - n)%nat Pd G3 fd'
-                    HF1 HF2 HF3 (uptd_ext_trans P Pc Pd Hext Hextd)
+                    HF1 HF2 HF3 (uptd_ext_sz_trans szv P Pc Pd Hext Hextd)
                     HG3sp HG3tp HG3s4 HG3s5 HG3s6 HG3s7 HG3s8 HG3s9 HG3s10 HG3s11
                     with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv Hdst HEXIT").
       }
@@ -1060,7 +1061,7 @@ Section ProofCopyin.
       iApply ("CHUNK" $! mw (page_base (pte_ppn w)) Pc
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hszc Hptc Hpg Hback Hdst Hcont").
-      - apply uptd_ext_refl.
+      - apply uptd_ext_sz_refl.
       - exact Ha0v.
       - exact Hmwsp.
       - exact Hmwtp.
@@ -1176,7 +1177,7 @@ Section ProofCopyin.
     (* ---- +0x6e c.bnez a0 : the vmfault verdict ---- *)
     iDestruct "Hvpost" as "[(%Hvz & Hpt) | Hvs]".
     2:{ (* --- faulted in: borrow the brand-new page --- *)
-      iDestruct "Hvs" as (r) "(%Hva0r & %Hpvr & _ & %Hnone & Hpt)".
+      iDestruct "Hvs" as (r) "(%Hva0r & %Hpvr & %Hvlt & %Hnone & Hpt)".
       iDestruct (proc_pt_page_acc_vmfault Pc (svpn_of va0) r Hpvr with "Hkmapb Hpt")
         as "[Hpg Hback]".
       iApply (wp_cbnez_taken_s_sconf γ Φ (mword_of_int (CPI + 0x6e))
@@ -1193,7 +1194,10 @@ Section ProofCopyin.
       iApply ("CHUNK" $! mv r (uptd_insert Pc (svpn_of va0) r)
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hszc Hptc Hpg Hback Hdst Hcont").
-      - apply uptd_ext_insert. exact Hnone.
+      - apply uptd_ext_sz_insert; [exact Hnone |].
+        apply svpn_of_below.
+        + rewrite -uint_unsigned. exact Hszb.
+        + rewrite -!uint_unsigned. exact Hvlt.
       - exact Hva0r.
       - exact Hmvsp.
       - exact Hmvtp.
@@ -1301,7 +1305,7 @@ Section ProofCopyin.
       - unfold callee_saved.
         rewrite /Z1. split_and!;
           (rewrite upd_ne; [reflexivity | reg_neq]).
-      - apply uptd_ext_refl.
+      - apply uptd_ext_sz_refl.
       - left. rewrite /Z1 upd_eq. reflexivity.
     }
     (* ---- the real path: fall through into the 12-slot prologue ---- *)
@@ -1588,7 +1592,7 @@ Section ProofCopyin.
     iApply (ci_loop γ γa Φ P szv K lvl eb p C dqs dqp dst spr len
               (mm !!! Regidx Rs10) (mm !!! Regidx Rs11)
               HK Hlen64 Hszb Hlvl len 0%nat len P R9 dst_olds
-              HL1 HL2 HL3 (uptd_ext_refl P)
+              HL1 HL2 HL3 (uptd_ext_sz_refl szv P)
               HR9sp HR9tp HR9s4 HR9s5 HR9s6 HR9s7 HR9s8 HR9s9 HR9s10 HR9s11
               with "Hcg Hcnt Htext Hpc Hszc Hptc Hpt Henv Hdst [-]").
     iIntros (mj res P' g) "%Hjsp %Hjtp %Hjs10 %Hjs11 %Hja0 %Hres %Hjext

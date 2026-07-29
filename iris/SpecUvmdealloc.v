@@ -62,9 +62,12 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
   (26 <= K)%nat ->
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* both sizes name pages inside the user region *)
-  (uint oldsz + 4096 <= uvm_maxsz)%Z ->
-  (uint newsz + 4096 <= uvm_maxsz)%Z ->
+  (* the OLD size names a page inside the user region.  Nothing is asked of
+     [newsz]: on the arm where it matters it is below [oldsz] and so inherits
+     this bound, and on the arm where it does not, [uvmd_np]'s guard makes
+     the run empty -- which is what lets growproc call this at the wrapped
+     [sz + n] an [sbrk] with a big negative argument computes. *)
+  (uint oldsz <= uvm_maxsz)%Z ->
   sie_cap_gpr γ mm K -∗
   cpu_own γ 0%nat eb p C -∗
   kernel_text -∗

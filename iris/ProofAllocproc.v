@@ -1290,7 +1290,8 @@ Section ProofAllocproc.
         { rewrite /proc_pt_at. cbn [ud_root ud_tfp].
           iFrame "Hpt". iSplitL "Hpgcell"; [iExact "Hpgcell"|].
           iEval (rewrite -Hbasetf) in "Htfcell". iExact "Htfcell". }
-        iDestruct (proc_priv_intro γf (proc_addr k) pidn V (upt_desc (pt_base t) tfp) tfws Hszb
+        iDestruct (proc_priv_intro γf (proc_addr k) pidn V (upt_desc (pt_base t) tfp) tfws
+                     Hszb (um_below_empty (pv_sz V))
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
         iApply ("Htl" $! H5 (proc_addr k) with "[%] Hcg Hpc [-]").

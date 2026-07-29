@@ -256,7 +256,8 @@ half permanently in the lock resource), and call sites want to name it.
 
 ```coq
 Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
-  (⌜uint (pv_sz V) <= 2 ^ 38⌝ ∗
+  (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+   ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
    p_pid pa ↦₄{#(1/2)} pid ∗
    proc_fields pa (DfracOwn 1) V ∗
    proc_pt_at pa (pv_upt V) ∗
@@ -264,6 +265,17 @@ Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivat
    proc_ofiles γf pa (pv_ofile V) ∗
    cwd_ref (pv_cwd V))%I.
 ```
+
+**THE TWO SIZE CONJUNCTS.** `p->sz` never exceeds TRAPFRAME, and — the
+one that carries weight — **nothing is mapped at or above it**
+(`ProcPtOwn.um_below`). The second is what growproc pays uvmalloc's
+freshness premise out of: the run `[PGROUNDUP(sz) .. sz+n)` is fresh in
+`ud_um` precisely because the invariant says so, and no caller of growproc
+could have supplied it (`completed/growproc.md`). Its price is that
+`proc_priv_copy` takes `uptd_ext_sz (pv_sz V)` rather than `uptd_ext`: a
+bare extension says the map only GREW, not WHERE, and the block cannot be
+rebuilt without that. copyin/copyout pay it for free — vmfault backs a page
+only after ruling out `va >= p->sz`.
 
 **`p->sz <= MAXVA` is a conjunct of the block, not a premise of its
 consumers.** It is a real invariant of a live process (exec and growproc are
@@ -303,10 +315,21 @@ descriptor update.
 A third covers the whole address-space side at once:
 
 ```coq
-Lemma proc_priv_copy γf pa pid V :        (* what a copy through p's own table needs *)
+(* THE GENERAL ONE: both the size and the descriptor move -- growproc. *)
+Lemma proc_priv_addrspace γf pa pid V :
   proc_priv γf pa pid V -∗
   p_sz pa ↦₈ pv_sz V ∗ p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗ proc_pt (pv_upt V) ∗
-  (∀ P', ⌜uptd_ext (pv_upt V) P'⌝ -∗ p_sz pa ↦₈ pv_sz V -∗
+  (∀ P' szv', ⌜ud_root P' = ud_root (pv_upt V)⌝ -∗ ⌜ud_tfp P' = ud_tfp (pv_upt V)⌝ -∗
+     ⌜uint szv' <= uvm_maxsz⌝ -∗ ⌜um_below szv' (ud_um P')⌝ -∗
+     p_sz pa ↦₈ szv' -∗ p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P' -∗
+     proc_priv γf pa pid (upd_sz (upd_upt V P') szv'))
+
+(* ...and the COPY instance of it: the size stays put, the map only grew,
+   and every entry it gained is below the size. *)
+Lemma proc_priv_copy γf pa pid V :
+  proc_priv γf pa pid V -∗
+  p_sz pa ↦₈ pv_sz V ∗ p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗ proc_pt (pv_upt V) ∗
+  (∀ P', ⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝ -∗ p_sz pa ↦₈ pv_sz V -∗
      p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P' -∗
      proc_priv γf pa pid (upd_upt V P'))
 ```

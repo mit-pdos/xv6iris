@@ -84,12 +84,7 @@ Proof.
 Qed.
 
 (* +0x38  0xb7c5  c.j 80000bd8 *)
-Lemma podec_38 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7c5 : mword 16)) s
-  = Some (C_J (mword_of_int 2032 : mword 11), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
+(* [cdec_b7c5] -- shared, see KernelRvcDecode.v *)
 
 (* ---- base (4-byte) decodes ----
    [decode_any]'s final [reflexivity] fails here: [vm_compute] reduces BOTH
@@ -266,7 +261,7 @@ Section WpPushOffTop.
 
   Lemma poi_38 : kernel_text -∗ instr (mword_of_int (PO + 0x38) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PO + 0x38)%Z (mword_of_int 0xb7c5 : mword 16)
-    (mword_of_int (PO + 0x38) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)) podec_38 exec_execute_C_J. Qed.
+    (mword_of_int (PO + 0x38) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)) cdec_b7c5 exec_execute_C_J. Qed.
 
   (* ================================================================== *)
   (* [smode_config] wrappers for the raw leaves push_off/pop_off call,   *)

@@ -1535,7 +1535,7 @@ Section ProofPiperead.
                          (sign_extend' 64 (mword_of_int 66 : mword 13)) = mword_of_int (PR + 0xc2))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjbz) in "Hpc".
-        iAssert (⌜uptd_ext (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_refl|].
+        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iAssert (∃ b : bv 8, chaddr ↦ₘ b)%I with "[Hch]" as "Hchx"; [by iExists chb0|].
         iEval (rewrite /WXP) in "HWX".
@@ -1573,7 +1573,7 @@ Section ProofPiperead.
             /\ M3 !!! Regidx Rs9 = m !!! Regidx Rs9
             /\ M3 !!! Regidx Rs10 = m !!! Regidx Rs10
             /\ M3 !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-          ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
+          ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
           WXP -∗
           sie_cap_gpr γ M3 (av - 12)%nat -∗
           pc_is (mword_of_int (PR + 0x84) : mword 64) -∗
@@ -1585,7 +1585,7 @@ Section ProofPiperead.
           p_sz pj ↦₈ pv_sz V -∗
           p_pagetable pj ↦₈ page_base (ud_root (pv_upt V)) -∗
           proc_pt P' -∗
-          (∀ P'' : uptd, ⌜uptd_ext (pv_upt V) P''⌝ -∗ p_sz pj ↦₈ pv_sz V -∗
+          (∀ P'' : uptd, ⌜uptd_ext_sz (pv_sz V) (pv_upt V) P''⌝ -∗ p_sz pj ↦₈ pv_sz V -∗
              p_pagetable pj ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P'' -∗
              proc_priv γf pj pid (upd_upt V P'')) -∗
           chaddr ↦ₘ chb -∗
@@ -1598,7 +1598,8 @@ Section ProofPiperead.
         iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hsched".
         destruct Hrg3 as (H3csp & H3s0 & H3s1 & H3s2 & H3s3 & H3s4 & H3s5 & H3s6 & H3s7 & H3s8 & H3tp & H3s9 & H3s10 & H3s11).
         assert (HZi : (0 <= Z.of_nat i < n)%Z) by lia.
-        assert (Hroot : ud_root P' = ud_root (pv_upt V)) by (destruct Hex3 as (H1 & _); exact H1).
+        assert (Hroot : ud_root P' = ud_root (pv_upt V))
+          by (destruct Hex3 as ((H1 & _) & _); exact H1).
         iDestruct "Hres" as (nr nw ro wo vnm bs)
           "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hcnt & %Hbslen & Hdat & Hslack)".
         assert (Hnra : add_vec (M3 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 536 : mword 12)) = a_pnread pi)
@@ -1648,7 +1649,7 @@ Section ProofPiperead.
                            (sign_extend' 64 (mword_of_int 54 : mword 13)) = mword_of_int (PR + 0xc2))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hjc2) in "Hpc".
-          iAssert (⌜uptd_ext (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hex3|].
+          iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hex3|].
           iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hpriv".
           iAssert (pipe_res γp pi) with "[Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]" as "Hres".
           { iExists nr, nw, ro, wo, vnm, bs.
@@ -1665,7 +1666,7 @@ Section ProofPiperead.
             - rewrite (HthrK2 Rs9 ltac:(vm_compute; reflexivity)). exact H3s9.
             - rewrite (HthrK2 Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
             - rewrite (HthrK2 Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
-          { exact Hex3. }
+          { exact (uptd_ext_sz_ext _ _ _ Hex3). }
           { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
         (* the pipe is NOT empty: nr <> nw *)
         assert (Hne : nr <> nw) by (apply (pr_sext_neq nw nr); exact Hemp).
@@ -1853,7 +1854,8 @@ Section ProofPiperead.
         assert (Hqac : ret_pc (add_vec_int (mword_of_int (PR + 0xa8) : mword 64) 4)
                        = (mword_of_int (PR + 0xac) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hqac) in "Hpc".
-        assert (Hext' : uptd_ext (pv_upt V) P'') by (apply (uptd_ext_trans _ P' _); assumption).
+        assert (Hext' : uptd_ext_sz (pv_sz V) (pv_upt V) P'')
+          by (apply (uptd_ext_sz_trans _ _ P' _); assumption).
         assert (HthrMr : forall r : mword 5, is_cs_idx r = true -> mrc !!! Regidx r = M3 !!! Regidx r).
         { intros r Hr. rewrite (callee_saved_lookup Hcsr r Hr). apply HthrK; exact Hr. }
         assert (Hmrcs6 : mrc !!! Regidx Rs6 = (mword_of_int (-1) : mword 64))
@@ -1990,7 +1992,7 @@ Section ProofPiperead.
             assert (Hqc2 : add_vec_int (mword_of_int (PR + 0xbe) : mword 64) 4 = mword_of_int (PR + 0xc2))
               by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite Hqc2) in "Hpc".
-            iAssert (⌜uptd_ext (pv_upt V) P''⌝)%I as "#Hxe"; [iPureIntro; exact Hext'|].
+            iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P''⌝)%I as "#Hxe"; [iPureIntro; exact Hext'|].
             iDestruct ("Hpback" $! P'' with "Hxe Hszc Hptc Hpt") as "Hpriv".
             iAssert (∃ b : bv 8, chaddr ↦ₘ b)%I with "[Hch]" as "Hchx";
               [by iExists (trunc8 (K5 !!! Regidx Ra5))|].
@@ -2005,7 +2007,7 @@ Section ProofPiperead.
               - rewrite (HthrD Rs9 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s9.
               - rewrite (HthrD Rs10 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s10.
               - rewrite (HthrD Rs11 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s11. }
-            { exact Hext'. }
+            { exact (uptd_ext_sz_ext _ _ _ Hext'). }
             { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
           - (* i+1 < n: the back edge *)
             assert (HSilt : (S i < Nn)%nat) by lia.
@@ -2051,7 +2053,7 @@ Section ProofPiperead.
                          (sign_extend' 64 (mword_of_int 62 : mword 13)) = mword_of_int (PR + 0xea))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjea) in "Hpc".
-        iAssert (⌜uptd_ext (pv_upt V) P''⌝)%I as "#Hxe"; [iPureIntro; exact Hext'|].
+        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P''⌝)%I as "#Hxe"; [iPureIntro; exact Hext'|].
         iDestruct ("Hpback" $! P'' with "Hxe Hszc Hptc Hpt") as "Hpriv".
         iAssert (pipe_res γp pi) with "[Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]" as "Hres".
         { iExists nr, nw, ro, wo, vnm, bs.
@@ -2107,7 +2109,7 @@ Section ProofPiperead.
               rewrite (HthrMr Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
             - rewrite /E1 upd_ne; [| reg_neq].
               rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
-          { exact Hext'. }
+          { exact (uptd_ext_sz_ext _ _ _ Hext'). }
           { apply pr_ret_neg1. } }
         (* something WAS copied: keep the partial count *)
         iApply (wp_pr_bnez_x0_taken γ Φ (mword_of_int (PR + 0xea)) (mword_of_int 8152 : mword 13)
@@ -2129,7 +2131,7 @@ Section ProofPiperead.
           - rewrite (HthrMr Rs9 ltac:(vm_compute; reflexivity)). exact H3s9.
           - rewrite (HthrMr Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
           - rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
-        { exact Hext'. }
+        { exact (uptd_ext_sz_ext _ _ _ Hext'). }
         { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
       (* enter the copy loop at i = 0 *)
       iApply ("CLOOP" $! Nn 0%nat addrv G3 (pv_upt V) chb0
@@ -2137,7 +2139,7 @@ Section ProofPiperead.
       { lia. }
       { lia. }
       { split_and!; try assumption. }
-      { apply uptd_ext_refl. } }
+      { apply uptd_ext_sz_refl. } }
     (* ================= the WAIT LOOP (iLöb) from +0x34 ================= *)
     iAssert (∀ M : regfile,
         ⌜ callee_saved W0 M ⌝ -∗
@@ -2421,7 +2423,7 @@ Section ProofPiperead.
                        = mword_of_int (PR + 0xd6)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjd6) in "Hpc".
         iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
-        iAssert (⌜uptd_ext (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_refl|].
+        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".
         iApply ("HEPI" $! N3 (pv_upt V) (mword_of_int (-1))

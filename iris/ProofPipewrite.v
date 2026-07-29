@@ -2398,11 +2398,13 @@ Section ProofPipewrite.
               iDestruct "Hbuf" as "[Hch _]".
               iEval (rewrite Ha1N5 pa_add_0) in "Hch".
               (* rebuild [proc_priv] at the extended descriptor *)
-              iAssert (⌜uptd_ext Pc P'⌝)%I as "#Hxe"; [iPureIntro; exact Hextr|].
+              iAssert (⌜uptd_ext_sz (pv_sz V) Pc P'⌝)%I as "#Hxe";
+                [iPureIntro; exact Hextr|].
               iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hpriv".
               iEval (rewrite (pw_upd_upt_upd V Pc P')) in "Hpriv".
               assert (Hext' : uptd_ext (pv_upt V) P')
-                by (apply (uptd_ext_trans (pv_upt V) Pc P' Hext Hextr)).
+                by (apply (uptd_ext_trans (pv_upt V) Pc P' Hext
+                             (uptd_ext_sz_ext _ _ _ Hextr))).
               (* the register state survived copyin *)
               assert (HcsK3N5 : callee_saved K3 N5).
               { rewrite /N5 /N4 /N3 /N2 /N1.

@@ -161,6 +161,21 @@ Proof.
   rewrite (Z.mod_small (pu / 4096) 134217728); lia.
 Qed.
 
+(* AN ALIGNED CURSOR BELOW THE REGION HAS A WHOLE PAGE OF ROOM.  With the
+   size premise relaxed to [<= uvm_maxsz] this replaces what [lia] used to
+   get for free: [pu + 4096*i] is page-aligned and strictly below [nz], and
+   both [nz] and TRAPFRAME are too, so the cursor is a full page below it. *)
+Lemma ua_z_avfit (x nz : Z) :
+  x mod 4096 = 0 -> x < nz -> nz <= 274877898752 -> x + 4096 <= 274877898752.
+Proof.
+  intros Hm Hx Hnz.
+  pose proof (Z_div_mod_eq_full x 4096) as Hd.
+  assert (Hq : x = 4096 * (x / 4096)) by lia.
+  assert (Hlt : 4096 * (x / 4096) < 4096 * 67108862) by lia.
+  assert (Hql : x / 4096 < 67108862) by nia.
+  lia.
+Qed.
+
 (* a page below TRAPFRAME has a vpn strictly below [tf_vpn] = 2^26 - 2 *)
 Lemma ua_z_vpn_lt (x : Z) :
   0 <= x -> x + 4096 <= 274877898752 -> (x / 4096) mod 134217728 < 67108862.
@@ -329,7 +344,7 @@ Section ProofUvmalloc.
     bv_unsigned newsz = nz ->
     (pu mod 4096 = 0)%Z ->
     (0 <= pu)%Z ->
-    (nz + 4096 <= 274877898752)%Z ->
+    (nz <= 274877898752)%Z ->
     (uint oldsz <= uint newsz)%Z ->
     (forall j : nat, (pu + 4096 * Z.of_nat j < nz)%Z <-> (j < n)%nat) ->
     (forall j : nat, (j < n)%nat ->
@@ -383,10 +398,10 @@ Section ProofUvmalloc.
     pose proof (proj2 (Hnchar i) Hin) as Hain.
     assert (Hbnd38 : (pu + 4096 * Z.of_nat i < 274877906944)%Z)
       by (clear -Hain Hnb; lia).
-    assert (Havb : (bv_unsigned av + 4096 <= 274877898752)%Z)
-      by (rewrite Hav; clear -Hain Hnb; lia).
     assert (Havmod : (bv_unsigned av mod 4096 = 0)%Z)
       by (rewrite Hav; exact (ua_z_avmod pu (Z.of_nat i) Hpumod)).
+    assert (Havb : (bv_unsigned av + 4096 <= 274877898752)%Z)
+      by (apply (ua_z_avfit _ nz Havmod); [rewrite Hav; clear -Hain; lia | exact Hnb]).
     assert (Hpgav : pgroundup av = av).
     { apply pgroundup_id; [exact Havmod |].
       rewrite Hav. change (2 ^ 64)%Z with 18446744073709551616%Z.
@@ -395,9 +410,15 @@ Section ProofUvmalloc.
     { apply pgroundup_id; [rewrite Hpu; exact Hpumod |].
       rewrite Hpu. change (2 ^ 64)%Z with 18446744073709551616%Z.
       clear -Hain Hnb. lia. }
+    (* [uvmd_np]'s guard splits here: on the FIRST iteration the rollback
+       range is empty and the guard closes it; from the second on it is the
+       ordinary quotient. *)
     assert (Hnpd : uvmd_np av (pgroundup oldsz) = i).
-    { unfold uvmd_np. rewrite Hpgav Hpgpu Hav Hpu. rewrite ua_z_npd.
-      apply Nat2Z.id. }
+    { unfold uvmd_np. rewrite Hav Hpu.
+      destruct i as [| i'].
+      - rewrite bool_decide_eq_false_2; [reflexivity | lia].
+      - rewrite bool_decide_eq_true_2; [| lia].
+        rewrite Hpgav Hpgpu Hav Hpu. rewrite ua_z_npd. apply Nat2Z.id. }
     assert (Hvb : (bv_unsigned (svpn_of (pgroundup oldsz)) + Z.of_nat i < 134217728)%Z).
     { rewrite svpn_of_unsigned_gen Hpu.
       exact (ua_z_vpn0_bnd pu (Z.of_nat i) Hpu0 (Nat2Z.is_nonneg i) Hbnd38). }
@@ -408,17 +429,17 @@ Section ProofUvmalloc.
     assert (Hvpnb : (bv_unsigned (svpn_of av) < 67108862)%Z).
     { rewrite svpn_of_unsigned_gen. apply ua_z_vpn_lt.
       - rewrite Hav. clear -Hain Hpu0. lia.
-      - rewrite Hav. clear -Hain Hnb. lia. }
+      - clear -Havb Hav. lia. }
     assert (Hvpnb26 : (bv_unsigned (svpn_of av) < 67108864)%Z).
     { assert (Hx : (67108862 < 67108864)%Z) by lia.
       exact (Z.lt_trans _ _ _ Hvpnb Hx). }
     assert (Hfreshi : forall j : nat, (j < i)%nat ->
               P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None).
     { intros j Hj. apply Hfresh. clear -Hj Hin. lia. }
-    assert (Hudold : (uint av + 4096 <= uvm_maxsz)%Z).
-    { rewrite uint_unsigned uvm_maxsz_val. exact Havb. }
-    assert (Hudnew : (uint (pgroundup oldsz) + 4096 <= uvm_maxsz)%Z).
-    { rewrite uint_unsigned uvm_maxsz_val Hpu. clear -Hain Hnb. lia. }
+    (* uvmdealloc's ONE range premise, about its [oldsz] argument (= av);
+       it asks nothing about the [newsz] it is handed. *)
+    assert (Hudold : (uint av <= uvm_maxsz)%Z).
+    { rewrite uint_unsigned uvm_maxsz_val. clear -Havb. lia. }
     assert (Hrooti : Pi.(ud_root) = P.(ud_root)) by exact (proj1 Hext).
     (* ---- +0x36 jal ra,kalloc ---- *)
     iPoseProof (uai_36 with "Htext") as "Hi36".
@@ -617,14 +638,12 @@ Section ProofUvmalloc.
                 N4 !!! Regidx c = mm !!! Regidx c).
       { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
         ua_thr_peel. apply Hmkthr; assumption. }
-      assert (Hudo : (uint (N4 !!! Regidx Ra1) + 4096 <= uvm_maxsz)%Z)
+      assert (Hudo : (uint (N4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
         by (rewrite HN4a1; exact Hudold).
-      assert (Hudn : (uint (N4 !!! Regidx Ra2) + 4096 <= uvm_maxsz)%Z)
-        by (rewrite HN4a2; exact Hudnew).
       iAssert (kalloc_env γa None (N4 !!! Regidx Rtp)) as "#HenvN".
       { rewrite HN4tp. iExact "Henv". }
       iApply (Uvmdealloc.wp_uvmdealloc_sconf γ γa Φ N4 Pi (K - 10)%nat eb p C
-                HKud HN4tp HN4a0 Hudo Hudn
+                HKud HN4tp HN4a0 Hudo
                 with "Hcg Hcnt Htext Hpc Hpt HenvN [-]").
       iIntros (md) "Hcg Hcnt Hpc %Hdcs _ Hpt".
       iEval (rewrite HN4a1 HN4a2 Hpgpu Hnpd) in "Hpt".
@@ -1396,14 +1415,12 @@ Section ProofUvmalloc.
               G4 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       ua_thr_peel. apply Hfthr; assumption. }
-    assert (Hudo2 : (uint (G4 !!! Regidx Ra1) + 4096 <= uvm_maxsz)%Z)
+    assert (Hudo2 : (uint (G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
       by (rewrite HG4a1; exact Hudold).
-    assert (Hudn2 : (uint (G4 !!! Regidx Ra2) + 4096 <= uvm_maxsz)%Z)
-      by (rewrite HG4a2; exact Hudnew).
     iAssert (kalloc_env γa None (G4 !!! Regidx Rtp)) as "#HenvG".
     { rewrite HG4tp. iExact "Henv". }
     iApply (Uvmdealloc.wp_uvmdealloc_sconf γ γa Φ G4 Pi (K - 10)%nat eb p C
-              HKud HG4tp HG4a0 Hudo2 Hudn2
+              HKud HG4tp HG4a0 Hudo2
               with "Hcg Hcnt Htext Hpc Hpt HenvG [-]").
     iIntros (md2) "Hcg Hcnt Hpc %Hd2cs _ Hpt".
     iEval (rewrite HG4a1 HG4a2 Hpgpu Hnpd) in "Hpt".

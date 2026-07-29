@@ -472,3 +472,14 @@ share).
   (S4b) and design/proc-struct.md.
 - `copyinstr` (0x800014c8) is the third member of this family and reuses
   `walkaddr` + `ByteBuf` unchanged.  Not attempted here.
+
+## Amended by growproc: the postconditions carry `uptd_ext_sz`
+
+Both contracts now hand back `ProcPtOwn.uptd_ext_sz szv P P'` rather than
+`uptd_ext P P'` — the same extension, plus "every entry the map gained lies
+below `p->sz`". Nothing in either proof had to be discovered: vmfault's
+postcondition already reports `⌜uint va < uint szv⌝` and both loops were
+discarding it with `_`. What made the strengthening necessary is
+`ProcInv.proc_priv`'s new `um_below` conjunct — a caller at the `proc_priv`
+altitude cannot rebuild its block from a bare `uptd_ext`, because that says
+the map grew but not where. See [`growproc.md`](growproc.md).

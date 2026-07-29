@@ -662,8 +662,8 @@ Section ProofFetchaddr.
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 [-]").
       iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
-      iAssert (⌜uptd_ext (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
-        [iPureIntro; apply uptd_ext_refl|].
+      iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
+        [iPureIntro; apply uptd_ext_sz_refl|].
       iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
       iApply ("Hcont" $! mf (pv_upt V) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
       { exact Hcsf. }
@@ -779,8 +779,8 @@ Section ProofFetchaddr.
                   HE2sp HE2a0 HthrE2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 [-]").
         iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
-        iAssert (⌜uptd_ext (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
-          [iPureIntro; apply uptd_ext_refl|].
+        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
+          [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iApply ("Hcont" $! mf (pv_upt V) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
@@ -926,7 +926,7 @@ Section ProofFetchaddr.
         iEval (rewrite Hpc2e) in "Hpc".
         iEval (rewrite HA7a1) in "Hbuf".
         iDestruct ("Hipback" $! dst_new with "Hbuf") as (wnew) "Hip".
-        iAssert (⌜uptd_ext (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
+        iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
         iDestruct ("Hpback" $! P' with "Hxe Hszc Hptc Hpt") as "Hpriv".
         (* the frame and the callee-saved set survived copyin *)
         assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 4)
@@ -1004,7 +1004,7 @@ Section ProofFetchaddr.
         iIntros (mf) "[%Hcsf %Hfa0] Hcg Hpc".
         iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
-        { exact Hext. }
+        { exact (uptd_ext_sz_ext _ _ _ Hext). }
         iRight. iSplitR.
         { iPureIntro. split; [| exact Hok]. rewrite Hfa0. exact Hrvcase. }
         iExists wnew. iExact "Hip".
