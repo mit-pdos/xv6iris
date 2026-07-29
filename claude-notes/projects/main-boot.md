@@ -243,15 +243,30 @@ STATUS: direction approved and mostly LANDED.
   holds `ghost_var (dn_np γ) 1 0`, so the caller's half refutes it), and
   the config identity is the persistent `disk_cfg γv (virtio_init_cfg …)`.
 
-Remaining under G1: re-prove uartinit/consoleinit/plicinit against the new
-contracts (small; old scripts reusable — leaf swap to the accessor-form
-device stores + the ghost callbacks), and the virtio_disk_init rework
-(bigger, can trail). NEW GAP, blocks main's DISK-LOCK assembly (main owes a
-`newlock` over `DiskInv.disk_res` from `vdi_post` + boot tokens):
-`disk_ghosts_alloc` still DISCARDS the `dn_claim` ghost-map auth and the
-`mono_nat` lower bound, and nothing supplies `d_used_idx ↦₂ 0` — extend
-`disk_ghosts_alloc` to return them and thread them through adequacy into
-`SpecMain` as boot tokens before ProofMain's disk-lock step.
+uartinit/consoleinit/plicinit are RE-PROVEN against the new contracts
+(`269677c`, back to 100 proven): the store leaves went bare-invariant with
+the bundle names kept as restatements (`wp_sb_uart_uinv_s_sconf`,
+`wp_sw_plic_pinv_s_sconf`), `uart_dlab_update` (WpUart.v) is the new
+move-DLAB rule, and the per-offset `uart_write_*_stable` /
+`plic_write_prio_ok` pure lemmas live in DevModel.v / PlicPlan.v. The
+raw-fragment leaves `wp_sb_uart_frag_s_sconf` / `wp_sw_plic_s_sconf` now
+have ZERO callers — retire them together with the raw virtio MMIO leaves
+when virtio_disk_init's proof is reworked. `uartinit_post` and
+`plicinit_plic` were deleted (dead vocabulary — the new proofs go
+write-by-write through the accessor; recover from `269677c^` if ever
+needed).
+
+Remaining under G1: the virtio_disk_init proof rework (bigger, can trail —
+the axiom stands in meanwhile). NEW GAP, blocks main's DISK-LOCK assembly
+(main owes a `newlock` over `DiskInv.disk_res` from `vdi_post` + boot
+tokens; at boot `disk_res`'s maps are empty so the pure conjuncts are
+trivial): `disk_ghosts_alloc` still DISCARDS the `dn_claim` ghost-map auth
+(`disk_res` wants it at `∅`) and the `mono_nat` lower bound (`disk_done_lb
+γ 0`, persistent), and `main_globals_raw` lacks the `d_used_idx ↦₂ 0` RAM
+cell (a .bss cell of the `disk` struct that virtio_disk_init never touches
+— concrete 0, like the `kmem+24 ↦₈ 0` precedent). Fix: return both from
+`disk_ghosts_alloc`, thread through adequacy into `SpecMain` boot tokens,
+and add the cell to `main_globals_raw`.
 
 ### G2 — printk's only proven contract is the PANIC path
 
