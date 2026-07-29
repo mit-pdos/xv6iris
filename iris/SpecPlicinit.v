@@ -20,17 +20,17 @@
    in a CPU's precondition while the system runs -- so plicinit is stated over
    [WpUart.plic_inv] and borrows the fragment around each of its two writes.
 
-   NOTHING comes back on the device side.  The old [plic_frag (plicinit_plic p)]
-   postcondition is dropped: no consumer needs the priorities recorded (a
+   NOTHING comes back on the device side, and the contract does not name the
+   resulting PLIC state at all: no consumer needs the priorities recorded (a
    device-interrupt proof reads the invariant's [plic_ok], and priority writes
    preserve it), and there is no monotonicity constraint on the PLIC ghost that
-   would make a recorded value useful later.  [plicinit_plic] stays as pure
-   vocabulary for the proof.
+   would make a recorded value useful later.
 
-   THE PROOF IS TEMPORARILY ASSUMED (an [Axiom] in LinkPlicinit.v): the
-   raw-frag proof (ProofPlicinit.v, deleted here, recoverable from git history)
-   is being re-worked over the invariant-opening ACCESSOR-form PLIC store leaf.
-   See claude-notes/projects/main-boot.md, G1.
+   ProofPlicinit.v proves it over the invariant-opening ACCESSOR-form PLIC
+   store leaf [WpPlic.wp_sw_plic_pinv_s_sconf], whose per-write obligation --
+   "the write is DEFINED and preserves [plic_ok] at EVERY state the plan
+   admits", since a hart cannot know what the others have written -- is
+   [PlicPlan.plic_write_prio_ok] for a source-priority write.
 
    Requires only the definitional layer -- never a whole-function proof file. *)
 From Stdlib Require Import ZArith Lia List.
@@ -56,13 +56,6 @@ Notation PLICINIT := KernelSyms.plicinit.
 
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
-
-(* plicinit's effect on the PLIC state: sources [uart_irq_id] and
-   [virtio_irq_id] get priority 1; all other fields untouched.  This is
-   exactly [plic_write (.. off 40 ..) 1] then [plic_write (.. off 4 ..) 1]. *)
-Definition plicinit_plic (p : plic_state) : plic_state :=
-  PlicState (nupd (nupd (p_prio p) uart_irq_id (Z_to_bv 32 1)) virtio_irq_id (Z_to_bv 32 1))
-            (p_pending p) (p_claimed p) (p_enable p) (p_thresh p).
 
 Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=

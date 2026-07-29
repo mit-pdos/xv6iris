@@ -3,10 +3,13 @@
 
    A width-1 -> width-4 adaptation of [wp_sb_uart_s_sconf] (ProofUart.v),
    with the UART device leaf swapped for the width-4 PLIC device-store tower
-   ([exec_execute_STORE_4_gpr_S_walk_dev], WpPlicExec.v).  The device ghost is
-   handled through the RAW [plic_frag] half (the caller owns [plic_frag p] and
-   gets back [plic_frag p'] in the continuation) instead of through a
-   [dev_inv] invariant + uart-style accessor.  The translate side still runs
+   ([exec_execute_STORE_4_gpr_S_walk_dev], WpPlicExec.v).  Three forms of the
+   store, in this order: [wp_sw_plic_s_sconf] over the RAW [plic_frag] half
+   (the caller owns [plic_frag p] and gets [plic_frag p'] back -- NO CALLER
+   REMAINS, since the PLIC gateway latches from step 0 and no CPU precondition
+   may hold the fragment raw), [wp_sw_plic_pinv_s_sconf] which borrows it by
+   opening the bare [plic_inv], and [wp_sw_plic_dev_s_sconf], that leaf's
+   restatement over the [dev_inv] bundle.  The translate side still runs
    REGIME-BLIND through [sr_transform]/[sr_absorb] (claim from the static bundle) at the derived regime
    instance [strans_regime] (the folded translation slot [Htr] threads
    straight through, no skolem-root open or repack), absorbing the
@@ -209,14 +212,20 @@ Qed.
 
 (* The SAME width-4 PLIC store, but for code that runs CONCURRENTLY on every
    hart and therefore cannot own [plic_frag] across its step: the shared half
-   lives in the device invariant and this leaf borrows it by opening [dev_inv]
+   lives in the PLIC invariant and this leaf borrows it by opening [plic_inv]
    around the (atomic) write.  Nothing about the PLIC survives into the
    continuation -- what the caller gets instead is that the invariant, i.e.
    the kernel's PLIC plan [plic_ok] (PlicPlan.v), still holds.  The caller's
    obligation is correspondingly universal: the write must be DEFINED and must
    preserve the plan at EVERY state the plan admits, since the caller cannot
-   know what the other harts have written. *)
-Lemma wp_sw_plic_dev_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+   know what the other harts have written.
+
+   It takes the BARE [plic_inv], not the [dev_inv] bundle: the PLIC store
+   touches no UART and no disk resource, so a function whose contract mentions
+   only the PLIC ([plicinit]) can use it directly.  The bundle-taking form is
+   the restatement [wp_sw_plic_dev_s_sconf] below, kept verbatim for the
+   existing consumers. *)
+Lemma wp_sw_plic_pinv_s_sconf (γ : gname)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -230,14 +239,14 @@ Lemma wp_sw_plic_dev_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
   sie_cap_gpr γ m n -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-  dev_inv γd γv -∗
+  plic_inv -∗
   ( sie_cap_gpr γ m n -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
-  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  iIntros "Hcg Hpc Hinstr #Hpinv Hcont".
   iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
@@ -260,8 +269,7 @@ Proof.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
   iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
-  (* only the PLIC half of the fabric is touched, and [↑plicN ⊆ ↑devN] *)
-  iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
+  (* only the PLIC half of the fabric is touched *)
   iInv "Hpinv" as ">Hdbody" "Hdclose".
   iDestruct "Hdbody" as (p) "(Hplf & %Hpok)".
   iDestruct (plic_agree with "Hpldev Hplf") as %Hpeq.
@@ -367,6 +375,37 @@ Proof.
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+Qed.
+
+(* The bundle-taking RESTATEMENT of the leaf above, for the consumers written
+   before the device invariant was split per device ([plicinithart],
+   [plic_complete]): statement verbatim, proof one projection. *)
+Lemma wp_sw_plic_dev_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+    (m : regfile) (n : nat) :
+  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+  let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) in
+  (plic_base <= uint a8 < plic_base + plic_size)%Z ->
+  is_aligned_vaddr (Virtaddr a8) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+  kpt_dev_vpn (svpn_of a8) ->
+  (forall p, plic_ok p ->
+     exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
+  sie_cap_gpr γ m n -∗
+  pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
+  dev_inv γd γv -∗
+  ( sie_cap_gpr γ m n -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+Proof.
+  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
+  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
+  iApply (wp_sw_plic_pinv_s_sconf γ Φ pc is_rvc rs2 rs1 imm m n
+            Hrange Halign Hcanon Hdevvpn Hwrite
+            with "Hcg Hpc Hinstr Hpinv Hcont").
 Qed.
 
 (* The width-4 PLIC MMIO LOAD, dual to [wp_sw_plic_dev_s_sconf].  A PLIC read

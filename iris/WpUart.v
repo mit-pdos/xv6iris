@@ -479,6 +479,28 @@ Section DevLoops.
     uart_dlab u' = uart_dlab u -> uart_dlab_auth γ u -∗ uart_dlab_auth γ u'.
   Proof. iIntros (Heq) "Ha". rewrite /uart_dlab_auth Heq. done. Qed.
 
+  (* MOVING DLAB NEEDS BOTH HALVES.  Only a write to the LCR can change DLAB,
+     and this is the rule such a write's ghost step goes through: the invariant
+     half and the caller's half are re-agreed together at the new value.  So a
+     hart WITHOUT the caller half cannot move DLAB at all -- exclusion by ghost
+     arithmetic, the same argument as [uart_tx_own]'s for the transmitter --
+     which is what makes the frozen [uart_dlab_off] permanent.  The boot chain
+     is the one holder: it threads the half through [uartinit]'s divisor-latch
+     dance (DLAB on for the two divisor writes, off again at the final LCR
+     write) and then freezes it. *)
+  Lemma uart_dlab_update γ (u u' : uart_state) (b : bool) :
+    uart_dlab_auth γ u -∗ uart_dlab_is γ (DfracOwn (1/2)) b ==∗
+    uart_dlab_auth γ u' ∗ uart_dlab_is γ (DfracOwn (1/2)) (uart_dlab u').
+  Proof.
+    iIntros "Ha Hb". rewrite /uart_dlab_auth /uart_dlab_is.
+    iCombine "Ha Hb" as "H".
+    iMod (own_update _ _ (to_dfrac_agree (DfracOwn (1/2)) (uart_dlab u' : leibnizO bool)
+                          ⋅ to_dfrac_agree (DfracOwn (1/2)) (uart_dlab u' : leibnizO bool))
+            with "H") as "H".
+    { apply dfrac_agree_update_2. by rewrite dfrac_op_own Qp.half_half. }
+    iDestruct "H" as "[$ $]". done.
+  Qed.
+
   (* freeze a half into the permanent fact "DLAB is false" *)
   Lemma uart_dlab_freeze γ :
     uart_dlab_is γ (DfracOwn (1/2)) false ==∗ uart_dlab_off γ.

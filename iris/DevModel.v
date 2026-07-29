@@ -328,15 +328,99 @@ Proof.
   intro H. injection H as <-. cbn [u_out u_tx]. rewrite app_assoc. reflexivity.
 Qed.
 
-(* Writes to IER/LCR and to the read-only/ignored offsets leave the accepted
-   trace alone. *)
 (* NOTE (deliberate, load-bearing): there is NO general monotonicity lemma for
    [uart_write].  An FCR write (offset 2) with bit 2 set CLEARS the tx FIFO,
-   which SHRINKS [uart_acc] -- the queued bytes are discarded, never sent.  So
-   any invariant holding a monotone [uart_acc] ghost forbids that write: code
-   doing a FIFO-clearing FCR write cannot be verified while such an invariant
-   is in force, and must run before it is allocated.  xv6's [uart_init] does
-   exactly this write (FCR_FIFO_CLEAR = bits 1|2). *)
+   which in general SHRINKS [uart_acc] -- the queued bytes are discarded, never
+   sent -- so an invariant holding a monotone [uart_acc] ghost forbids it.
+   xv6's [uartinit] performs exactly that write (FCR_FIFO_CLEAR = bits 1|2),
+   and is verifiable anyway, because a proof that OWNS the transmitter can show
+   the FIFO empty at the write ([uart_write_2_stable] below, whose [u_tx u = []]
+   premise comes from [uart_tx_empty_of_out]) -- and a clear of an empty FIFO
+   shrinks nothing.  What stays forbidden is a FIFO-clearing write by code that
+   cannot prove the FIFO empty. *)
+
+(* -- CONFIG WRITES: which of the three tracked quantities each offset moves --
+
+   The three quantities the UART ghosts track are [uart_acc], [u_out] and
+   [uart_dlab] (see WpUart.v's [uart_ghosts]).  A leaf-level device store hands
+   its caller a [uart_write u off b = Some u'] equation and asks for the ghosts
+   back at [u']; the four lemmas below are what turn that equation into
+   "nothing moved" (or, for the LCR, "exactly DLAB moved"), one per offset the
+   16550 init sequence writes.  Together with [uart_write_out] they cover every
+   offset [uartinit] touches: 1 (IER/DLM), 0 with DLAB set (DLL), 3 (LCR) and
+   2 (FCR). *)
+
+(* DLAB is nothing but a field of the LCR, so an LCR-preserving transition
+   preserves it. *)
+Lemma uart_dlab_of_lcr (u u' : uart_state) :
+  u_lcr u' = u_lcr u -> uart_dlab u' = uart_dlab u.
+Proof. intro H. unfold uart_dlab. by rewrite H. Qed.
+
+(* ...and the three tracked quantities are all determined by three FIELDS, so
+   every per-offset lemma below reduces to reading those fields off the state
+   the write produced. *)
+Lemma uart_tracked_of_fields (u u' : uart_state) :
+  u_out u' = u_out u -> u_tx u' = u_tx u -> u_lcr u' = u_lcr u ->
+  uart_acc u' = uart_acc u /\ u_out u' = u_out u /\ uart_dlab u' = uart_dlab u.
+Proof.
+  intros Ho Ht Hl. unfold uart_acc.
+  rewrite Ho, Ht. split_and!;
+    [ reflexivity | reflexivity | exact (uart_dlab_of_lcr u u' Hl) ].
+Qed.
+
+(* Offset 1 is IER (DLAB clear) or DLM (DLAB set); neither is a FIFO nor the
+   LCR, so all three tracked quantities are fixed. *)
+Lemma uart_write_1_stable (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_write u 1 b = Some u' ->
+  uart_acc u' = uart_acc u /\ u_out u' = u_out u /\ uart_dlab u' = uart_dlab u.
+Proof.
+  intro H. unfold uart_write in H. cbn [Z.eqb] in H.
+  apply uart_tracked_of_fields;
+    destruct (uart_dlab u); injection H as <-; reflexivity.
+Qed.
+
+(* Offset 0 with DLAB SET is the divisor latch, NOT the transmit holding
+   register: it queues no byte, so it moves nothing tracked either.  (With DLAB
+   clear the same offset is a THR push -- [uart_write_thr_acc].) *)
+Lemma uart_write_0_dlab_stable (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_dlab u = true ->
+  uart_write u 0 b = Some u' ->
+  uart_acc u' = uart_acc u /\ u_out u' = u_out u /\ uart_dlab u' = uart_dlab u.
+Proof.
+  intros Hdlab H. unfold uart_write in H. cbn [Z.eqb] in H.
+  rewrite Hdlab in H.
+  apply uart_tracked_of_fields; injection H as <-; reflexivity.
+Qed.
+
+(* Offset 3 is the LCR -- the ONLY write that can move DLAB, and it moves
+   nothing else.  The new DLAB is just bit 7 of the stored byte. *)
+Lemma uart_write_3_stable (u : uart_state) (b : bv 8) (u' : uart_state) :
+  uart_write u 3 b = Some u' ->
+  uart_acc u' = uart_acc u /\ u_out u' = u_out u
+  /\ uart_dlab u' = Z.testbit (bv_unsigned b) 7.
+Proof.
+  intro H. unfold uart_write in H. cbn [Z.eqb] in H. injection H as <-.
+  unfold uart_acc, uart_dlab. cbn [u_out u_tx u_lcr].
+  split_and!; reflexivity.
+Qed.
+
+(* Offset 2 is the FCR.  Bit 1 clears the RECEIVE FIFO, which appears in none
+   of the three tracked quantities; bit 2 clears the TRANSMIT FIFO, which is
+   why the FIFO must be provably empty -- and then the clear is the identity
+   on it.  Nothing tracked moves. *)
+Lemma uart_write_2_stable (u : uart_state) (b : bv 8) (u' : uart_state) :
+  u_tx u = [] ->
+  uart_write u 2 b = Some u' ->
+  uart_acc u' = uart_acc u /\ u_out u' = u_out u /\ uart_dlab u' = uart_dlab u.
+Proof.
+  intros Htx H. unfold uart_write in H. cbn [Z.eqb] in H. injection H as <-.
+  apply uart_tracked_of_fields; cbn [u_out u_tx u_lcr];
+    [ reflexivity
+    | rewrite Htx;
+      match goal with |- (if ?c then _ else _) = _ => destruct c end;
+      reflexivity
+    | reflexivity ].
+Qed.
 
 (* -- the transmitted prefix [u_out] -- *)
 

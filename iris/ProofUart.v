@@ -41,15 +41,15 @@ Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{CID : CpuId}.
 
-  Lemma wp_sb_uart_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_sb_uart_uinv_s_sconf (γ : gname) (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ)
-    : wp_sb_uart_s_sconf_body γ γd γv off Φ pc is_rvc rs2 rs1 imm m n R S.
+    : wp_sb_uart_uinv_s_sconf_body γ γd off Φ pc is_rvc rs2 rs1 imm m n R S.
   Proof.
-    cbv beta delta [wp_sb_uart_s_sconf_body].
+    cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
-  iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
+  iIntros "Hcg Hpc Hinstr #Huinv HR Hacc Hcont".
   assert (Ha8pa : a8 = uart_pa off).
   { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry. apply zero_extend'_id. }
   assert (Hdevvpn : kpt_dev_vpn (svpn_of a8)).
@@ -82,8 +82,7 @@ Context `{CID : CpuId}.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
   iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
-  (* only the UART half of the fabric is touched, and [↑uartN ⊆ ↑devN] *)
-  iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+  (* only the UART half of the fabric is touched *)
   iInv "Huinv" as ">Hdbody" "Hdclose".
   iDestruct "Hdbody" as (u) "(Huf & Hg)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
@@ -190,6 +189,23 @@ Context `{CID : CpuId}.
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] HS").
 Qed.
+
+  (* The bundle-taking RESTATEMENT of the accessor leaf above, statement
+     verbatim, proof one projection out of [dev_inv]. *)
+  Lemma wp_sb_uart_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+    (off : Z) (Φ : mval -> iProp Σ)
+    (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+    (m : regfile) (n : nat) (R S : iProp Σ)
+    : wp_sb_uart_s_sconf_body γ γd γv off Φ pc is_rvc rs2 rs1 imm m n R S.
+  Proof.
+    cbv beta delta [wp_sb_uart_s_sconf_body].
+    intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
+    iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
+    iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
+    iApply (wp_sb_uart_uinv_s_sconf γ γd off Φ pc is_rvc rs2 rs1 imm m n R S
+              Hoff Hcanon Hvpn_def Hpa
+              with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
+  Qed.
 
   (* Raw-[uart_frag] store leaf: the accessor-form proof above with the
      [dev_inv] open/close and the four-ghost accessor wand stripped out, the

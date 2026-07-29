@@ -65,6 +65,22 @@ Lemma plic_ok_nupd_prio (p : plic_state) (i : N) (w : bv 32) :
                      (p_enable p) (p_thresh p)).
 Proof. intros Hp k. exact (Hp k). Qed.
 
+(* ...and a source-priority write is therefore ALWAYS admissible: an offset in
+   the priority window (positive, below [4 * plic_nsrc], 4-aligned) makes
+   [plic_write] take its first branch, which is defined for every state and
+   only ever touches [p_prio] -- a field the plan says nothing about.  This is
+   the exact shape an invariant-borrowing PLIC store leaf asks its caller for
+   ("the write is defined and preserves [plic_ok] at EVERY admissible state"),
+   and it is what discharges both of [plicinit]'s writes. *)
+Lemma plic_write_prio_ok (p : plic_state) (off : Z) (v : bv 32) :
+  ((0 <? off) && (off <? 4 * Z.of_nat plic_nsrc) && (off mod 4 =? 0))%Z = true ->
+  plic_ok p ->
+  exists p', plic_write p off v = Some p' /\ plic_ok p'.
+Proof.
+  intros Hoff Hp. unfold plic_write. rewrite Hoff.
+  eexists. split; [ reflexivity | ]. by apply plic_ok_nupd_prio.
+Qed.
+
 (* the gateway latching a pending source touches no enable word -- whichever
    of the machine's sources it was *)
 Lemma plic_ok_latch (p p' : plic_state) (i : N) :

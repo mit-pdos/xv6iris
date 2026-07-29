@@ -29,12 +29,9 @@
    these slots does not exist -- so anything richer would be a predicate with no
    consumer.  When one arrives it is built at the caller from these cells.
 
-   THE PROOF IS TEMPORARILY ASSUMED (an [Axiom] in LinkConsoleinit.v), because
-   its uartinit callee's is: ProofConsoleinit.v was deleted with
-   ProofUartinit.v and is recoverable from git history.  Its script is nearly
-   unchanged by the rework -- consoleinit only threads the device resources
-   through -- so it comes back as soon as UARTINIT is discharged.  See
-   claude-notes/projects/main-boot.md, G1. *)
+   ProofConsoleinit.v proves it as a functor over [INITLOCK] and [UARTINIT];
+   consoleinit touches no MMIO of its own, so the device side is pure transit
+   into and out of the uartinit call. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.

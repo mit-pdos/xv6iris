@@ -39,11 +39,11 @@
    uartinit writes no THR, so the accepted trace is unchanged and the token and
    receipt come back at the same [l].
 
-   THE PROOF IS TEMPORARILY ASSUMED (an [Axiom] in LinkUartinit.v).  The old
-   raw-frag proof (ProofUartinit.v, deleted here, recoverable from git history)
-   is being re-worked over the invariant-opening ACCESSOR-form UART store leaf;
-   until it lands this interface is axiom-backed and the coverage report reads
-   uartinit as assumed.  See claude-notes/projects/main-boot.md, G1. *)
+   ProofUartinit.v proves it by running each of the seven writes through the
+   invariant-opening ACCESSOR-form UART store leaf
+   [SpecUart.wp_sb_uart_uinv_s_sconf] and doing one ghost step per write, out
+   of the per-offset [uart_write] readings in DevModel.v
+   ([uart_write_1_stable] / [_0_dlab_stable] / [_3_stable] / [_2_stable]). *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -67,28 +67,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
 Notation UART_INIT := KernelSyms.uartinit.
 
-(* The UART state after the seven device-init writes.  Independent of the
-   entry state save for the preserved output trace [u_out u0]:
-     rx = [], tx = [] (FCR cleared both FIFOs); ier = 0x03; lcr = 0x03 (DLAB
-     off); fcr = 0x07; dll = 0x03; dlm = 0x00.
-   No longer part of the contract (the state lives inside [uart_inv] now), but
-   kept as the pure vocabulary the re-worked proof composes its seven writes
-   into. *)
-Definition uartinit_post (u0 : uart_state) : uart_state :=
-  UartState [] [] (u_out u0)
-            (Z_to_bv 8 0x03) (Z_to_bv 8 0x03) (Z_to_bv 8 0x07)
-            (Z_to_bv 8 0x03) (Z_to_bv 8 0x00).
-
-(* the device leaves init with DLAB off -- which is what licenses the freeze
-   that mints [uart_dlab_off] at the tail. *)
-Lemma uartinit_post_dlab_off (u0 : uart_state) : uart_dlab (uartinit_post u0) = false.
-Proof. reflexivity. Qed.
-
-(* and it accepts nothing: the accepted trace is exactly what came in, so the
-   transmitter token and the receipt come back at the same list. *)
-Lemma uartinit_post_acc (u0 : uart_state) :
-  u_tx (uartinit_post u0) = [] /\ uart_acc (uartinit_post u0) = u_out u0.
-Proof. split; [reflexivity|]. unfold uart_acc. by rewrite app_nil_r. Qed.
+(* NOTE: this file used to define [uartinit_post], the concrete UART state the
+   seven writes produce.  Nothing names it any more -- the state lives inside
+   [uart_inv], the contract talks only about the four ghosts, and the proof
+   goes write-by-write through the accessor leaf rather than composing a
+   closed-form successor -- so it is gone rather than kept as dead vocabulary. *)
 
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{CID : CpuId}
