@@ -600,6 +600,8 @@ WpUartintrDecode.v
 ProofUartintr.v
 LinkUartintr.v
 SpecAllocpid.v
+WpAllocpidDecode.v
+ProofAllocpid.v
 LinkAllocpid.v
 SpecAllocproc.v
 WpAllocprocDecode.v

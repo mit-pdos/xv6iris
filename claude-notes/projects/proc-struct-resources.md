@@ -602,8 +602,8 @@ the evidence for every offset. This file is only the worklist.
            premise: use the `*Core` functor recipe from durable-notes and
            seal ONE proof against TWO `Module Type`s — the counted contract
            userinit wants and the steady-state one kfork wants.
-      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** (assumed, the allocpid
-         shape).  At allocproc's two call sites `p->pagetable` is always 0,
+      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** (assumed, the
+         `SpecAllocpid` + `Axiom` shape allocpid used before S8 proved it).  At allocproc's two call sites `p->pagetable` is always 0,
          so freeproc never reaches `proc_freepagetable` -- but do not
          specialise the contract to that; state freeproc honestly and let
          allocproc's sites instantiate it.
@@ -618,13 +618,21 @@ the evidence for every offset. This file is only the worklist.
          two `Module Type`s over a `*Core` functor: the failure arm records
          WHY it failed, so no caller has to carry a budget it does not have.
 
-- [ ] **S8 — prove `allocpid`.** Fifteen instructions @ 0x800019d0 and
-      structurally `killed` with a store added: acquire(&pid_lock),
-      `lw s1,0(a5)` / `addiw a4,s1,1` / `sw a4,0(a5)` on `<nextpid>`,
-      release, `c.mv a0,s1`.  `SpecAllocpid.v` already states the contract
-      (the lock's resource `nextpid_res` is the counter cell, value
-      existential -- the code lets the `int` overflow and no consumer needs
-      more), so proving it replaces `LinkAllocpid.v` and nothing else.
+- [x] **S8 — `allocpid` PROVEN and LINKED** (`WpAllocpidDecode.v` /
+      `ProofAllocpid.v`; **11 s**), so `LinkAllocpid.v`'s `Axiom` is gone and
+      **the whole allocproc cone is axiom-free**.  Twenty-one instructions @
+      0x800019d0, structurally `killed` with a store added: a 32-byte
+      ra/s0/s1 frame, acquire(&pid_lock), `c.lw s1,0(a5)` / `addiw a4,s1,1` /
+      `c.sw a4,0(a5)` on `<nextpid>`, release, `c.mv a0,s1`.  The counter's
+      value is never named by the contract, so `nextpid_res`'s existential is
+      opened right after acquire and closed with whatever the `c.sw` wrote —
+      two lines of lock story for the whole function.
+      *Gotcha, and it is the durable-notes one:* the value `iDestruct`ed out
+      of `nextpid_res`'s existential arrives as `bv 32`, not `mword 32`, so
+      `sign_extend' 64 nv` fails to elaborate ("has type bv 32 while it is
+      expected to have type mword ?n").  Ascribe `(nv : mword 32)` at EVERY
+      use — the ascription leaves no mark, so the later `set`/`change` terms
+      still match.
 
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
