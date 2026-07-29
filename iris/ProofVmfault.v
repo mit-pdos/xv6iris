@@ -50,16 +50,15 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
-Require Import InstrBytes KernelText.
+Require Import InstrBytes.
 Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpLock.
-Require Import KMap.
 Require Import KallocInv.
-Require Import CommonWalk PtTree PtBuild.
-Require Import UptTree UserPtTree.
+Require Import PtTree PtBuild.
+Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPt ProcPtOwn.

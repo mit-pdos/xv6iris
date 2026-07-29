@@ -1,9 +1,6 @@
 (* LinkCopyin.v -- instantiates the Copyin proof against its callees' proofs
    (walkaddr, vmfault, memmove).  Sealed, so this is the only place the four
    ever meet. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import SpecWalkaddr SpecVmfault SpecMemmove.
-Require Import SpecCopyin.
 Require Import LinkWalkaddr LinkVmfault LinkMemmove.
 Require Import ProofCopyin.
 

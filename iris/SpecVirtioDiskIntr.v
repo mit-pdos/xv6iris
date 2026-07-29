@@ -23,7 +23,6 @@ From iris.program_logic Require Import language weakestpre lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
@@ -37,7 +36,7 @@ Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
-Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import DiskPtsto DiskInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

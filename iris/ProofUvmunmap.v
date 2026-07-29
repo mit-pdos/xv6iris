@@ -47,7 +47,7 @@ From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
+Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpMmodeLeafBase.
@@ -55,17 +55,16 @@ Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpLock.
-Require Import KMap.
 Require Import KallocInv.
 Require Import ByteCursor.
 Require Import CommonWalk PtTree.
 Require Import KptTree.
 Require Import PtBuild.
-Require Import PtAdBits KptExecMap TrampPt.
+Require Import KptExecMap TrampPt.
 Require Import UptTree UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
-Require Import ProcPt ProcPtOwn.
+Require Import ProcPtOwn.
 Require Import WpUvmunmapDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalk SpecKfree.

@@ -56,16 +56,16 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelText KernelDataInv.
+Require Import KernelText.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
-Require Import PtTree PtBuild KvmSpec.
-Require Import UptTree UserPtTree.
-Require Import ProcPt ProcPtOwn.
+Require Import KvmSpec.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
 Require Import SpecPanic.

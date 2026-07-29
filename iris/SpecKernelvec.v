@@ -28,9 +28,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import RegFile.
 Require Import MinstretInv.
-Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore KernelText.
 Require Import WpIntrCore.
 Require Import IntrDefs.

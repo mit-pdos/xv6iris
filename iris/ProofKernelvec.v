@@ -53,7 +53,6 @@ Require Import SmodeCore MstatusBits KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 Require Import KptTree.
 Require Import WpSmodePtLeaves WpSmodePtCtl.
-Require Import WpIntrCore.
 Require Import IntrDefs.
 (* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the
    WpGprCsrwCommon/C namespaces don't shadow anything here. *)

@@ -25,7 +25,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelRvcDecode KernelBaseDecode.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 

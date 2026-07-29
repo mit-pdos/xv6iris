@@ -57,8 +57,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
-Require Import WpMmodeLeafBase.
-Require Import KernelText MstatusBits.
+Require Import KernelText.
 Require Import SmodeCore.
 Require Import PtTree.
 Require Import TrampPt KptTree UptTree TransPt UserretDefs.

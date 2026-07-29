@@ -30,24 +30,23 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map 
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
-Require Import ExecCommon WpGpr RegFile.
-Require Import KptPt KMap.
-Require Import SmodeCore WpSmodeGpr.
-Require Import SmodeCorePt SRegime.
+Require Import WpGpr RegFile.
+Require Import KptPt.
+Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
 Require Import WpMycpu ProcGeom.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import KernelRvcDecode WpAuipc.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodePtCtl.
 Require Import MinstretInv.
 Require Import WpSmodeHalf.
-Require Import DevModel VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
-Require Import WpVirtio WpVirtioExec WpVirtioDev.
+Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import VirtioModel.
+Require Import WpVirtioDev.
 Require Import WpUart.
 Require Import SpecPanic SpecWakeup SpecAcquire SpecRelease.
 Require Import WpVirtioDiskIntrDecode.

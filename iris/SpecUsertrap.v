@@ -53,15 +53,14 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
-Require Import WpMmodeLeafBase.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import WpLock.
 Require Import FdSlots FileInv.
-Require Import ProcGeom CpuOwn.
+Require Import ProcGeom.
 Require Import PtTree.
-Require Import TrampPt KptTree UptTree TransPt UserretDefs.
+Require Import TrampPt KptTree UptTree.
 Require Import UserPtTree UserExec.
 Require Import SpecUserret.
 From Kernel Require KernelSyms.

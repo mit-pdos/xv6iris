@@ -43,10 +43,9 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
-Require Import PtTree.
-Require Import PtBuild KvmSpec.
-Require Import UptTree UserPtTree.
-Require Import ProcPt ProcPtOwn.
+Require Import KvmSpec.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 
 Notation VF := KernelSyms.vmfault.

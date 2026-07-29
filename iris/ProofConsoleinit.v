@@ -30,7 +30,7 @@ Require Import SmodeCore RegFile WpMmodeLeafBase.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
-Require Import KernelText KernelDataInv.
+Require Import KernelDataInv.
 Require Import DevModel.
 Require Import WpConsoleinitDecode.
 Require Import SpecInitlock SpecUartinit SpecConsoleinit.

@@ -31,7 +31,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import VirtioModel DiskPtsto DiskInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

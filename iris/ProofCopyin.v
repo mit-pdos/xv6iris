@@ -109,14 +109,13 @@ Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpLock.
-Require Import KMap.
 Require Import KallocInv.
 Require Import ByteCursor ByteBuf.
-Require Import CommonWalk PtTree PtBuild.
-Require Import UptTree UserPtTree.
+Require Import PtTree.
+Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
-Require Import ProcPt ProcPtOwn.
+Require Import ProcPtOwn.
 Require Import WpCopyinDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalkaddr SpecVmfault SpecMemmove.

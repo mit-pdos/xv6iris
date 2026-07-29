@@ -45,7 +45,6 @@ Require Import CalleeSaved.
 Require Import KernelDataInv.
 Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import ArrCursor.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import PipeInv.

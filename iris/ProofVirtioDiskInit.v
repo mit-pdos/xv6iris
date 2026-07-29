@@ -30,17 +30,18 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import InstrBytes ExecCommon WpGpr RegFile WpMmodeLeafBase.
-Require Import SmodeCore WpSmodeGpr.
+Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
+Require Import InstrBytes WpGpr RegFile WpMmodeLeafBase.
+Require Import SmodeCore.
 Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpAuipc.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
-Require Import KernelText KernelDataInv.
-Require Import ProcGeom CpuOwn.
+Require Import KernelDataInv.
+Require Import ProcGeom.
 Require Import KallocInv KvmSpec.
-Require Import KptPt KMap.
-Require Import DevModel VirtioModel WpVirtio WpVirtioExec WpVirtioMmio.
+Require Import KptPt.
+Require Import VirtioModel WpVirtioMmio.
+Require Import VirtioModel.
 Require Import WpMemsetPage.
 Require Import WpVirtioDiskInitDecode.
 Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.

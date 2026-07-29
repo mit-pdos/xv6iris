@@ -31,24 +31,23 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map 
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase ByteCursor.
-Require Import ExecCommon WpGpr RegFile.
+Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import IntrDefs WpSmodeIntr.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import KernelRvcDecode WpAuipc.
-Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpAuipc.
+Require Import WpSconfAlu WpSconfMem.
 Require Import WpSmodeHalf.
 Require Import WpUart.
-Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
-Require Import SpecPanic.
+Require Import VirtioModel DiskPtsto DiskInv.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import WpVirtioDiskRwDecode.
-Require Import SpecVirtioDiskRw.
+Require Import SwtchCtx.
 Require Import ProofVirtioDiskRw.
 Require Import ProofVirtioDiskRwB.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

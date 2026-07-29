@@ -39,10 +39,9 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
-Require Import PtTree.
-Require Import UptTree UserPtTree.
-Require Import PtBuild KvmSpec.
-Require Import ProcPt ProcPtOwn.
+Require Import UserPtTree.
+Require Import KvmSpec.
+Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
 Require Import SpecPanic.

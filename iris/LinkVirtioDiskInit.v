@@ -2,7 +2,6 @@
    callees' proofs (initlock + kalloc + memset).  Sealed, so this is the only
    place they ever meet.  The whole-function memset spec [MEMSET] is
    [MemsetArray] (LinkMemsetArray), not the [MEMSET_PARTS] module [Memset]. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import LinkInitlock LinkKalloc LinkMemsetArray ProofVirtioDiskInit.
 
 Module VirtioDiskInit := VirtioDiskInitProof Initlock Kalloc MemsetArray.

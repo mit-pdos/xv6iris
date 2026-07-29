@@ -63,9 +63,8 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ByteBuf.
-Require Import PtTree PtBuild.
-Require Import UptTree UserPtTree.
-Require Import ProcPt ProcPtOwn.
+Require Import UserPtTree.
+Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.

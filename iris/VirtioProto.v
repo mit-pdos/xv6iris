@@ -38,7 +38,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
-Require Import DevModel.
+Require Import VirtioModel.
 Require Import WpVirtio.
 Require Import VirtioQueue.
 Require Import DiskPtsto.

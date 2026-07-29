@@ -54,9 +54,8 @@ Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpLock.
-Require Import KMap.
 Require Import KallocInv.
-Require Import CommonWalk PtTree PtBuild.
+Require Import PtTree PtBuild.
 Require Import UptTree UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.

@@ -36,14 +36,13 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
-Require Import RiscvExec RiscvTryStep.
 Require Import SmodeCore.
-Require Import InstrBytes KernelText.
+Require Import InstrBytes.
 Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
-Require Import CommonWalk PtTree PtAdBits.
+Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys *)
 Require Import PtBuild.
 Require Import ProcPtOwn.

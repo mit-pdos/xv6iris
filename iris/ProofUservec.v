@@ -12,18 +12,13 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile.
-Require Import MinstretInv InstrBytes.
-Require Import WpGpr WpMmodeShiftiop.
+Require Import WpMmodeShiftiop.
 Require Import WpMmodeLeafBase.
-Require Import KernelText MstatusBits.
 Require Import SmodeCore.
-Require Import PtTree.
-Require Import KMap KptExecMap.
-Require Import TrampPt KptTree UptTree.
+Require Import TrampPt UptTree.
 Require Import UserretDefs UserretPt.
 Require Import UservecDefs UservecPt UservecExitPt.
 Require Import WpIntrCore.

@@ -64,9 +64,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import ByteBuf.
-Require Import PtTree PtBuild.
-Require Import UptTree UserPtTree.
-Require Import ProcPt ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 From Kernel Require KernelSyms.
 Import Defs.

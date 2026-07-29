@@ -57,7 +57,7 @@ Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
 Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans arm bit *)
 Require Import WireInv.
-Require Import PlicPlan WpVirtio DiskPtsto VirtioProto WpUart.
+Require Import PlicPlan DiskPtsto VirtioProto WpUart.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)

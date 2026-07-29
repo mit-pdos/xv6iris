@@ -43,7 +43,7 @@ Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
-Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import DiskPtsto DiskInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
