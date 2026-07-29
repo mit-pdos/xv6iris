@@ -634,6 +634,27 @@ the evidence for every offset. This file is only the worklist.
       use — the ascription leaves no mark, so the later `set`/`change` terms
       still match.
 
+- [x] **S9 — the proc-area decode dedup sweep** (done, the discipline in
+      durable-notes).  Five base words that were proved privately in two to
+      five `Wp*Decode.v` files each moved into `KernelBaseDecode.v`:
+      `00011497` (auipc s1,0x11 — procinit / proc_mapstacks / wakeup /
+      kalloc / allocproc), `00011517` (auipc a0,0x11 — procinit / kalloc /
+      mycpu / allocpid), `00016917` (auipc s2,0x16, i.e. `&proc[NPROC]` —
+      wakeup / allocproc), `00009797` (auipc a5,0x9 — kvminithart / kvmmake
+      / allocpid) and `06048513` (addi a0,s1,96, `&p->context` — sched /
+      allocproc).  `16848493` (addi s1,s1,360) was ALREADY in
+      `KernelBaseDecode` and still had two private copies; those are gone
+      too.  Ten files repointed, eleven private lemmas deleted, and the
+      sweep's check (ii) — extract every `instr (mword_of_int …` statement
+      from `git show HEAD:` and from the working tree and diff — came out at
+      **0 mismatches**.
+      *Watch for:* the repoint fails with *"Variable decname should be bound
+      to a term but is bound to the identifier"* when the file does not
+      `Require Import KernelBaseDecode` — `mk_base` takes the decode lemma
+      as a `constr`, so an out-of-scope name reports as a tactic-argument
+      error rather than "not found".  Six of the ten files needed the import
+      added.
+
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates.

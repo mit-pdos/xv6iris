@@ -23,6 +23,7 @@ Require Import InstrBytes KernelText.
 Require Import WpDecode WpDecodeBridge WpRvcBridge.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 Import Defs.
 
@@ -42,10 +43,6 @@ Section KvminithartInstrs.
   Lemma kvidec_08 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x12000073 : mword 32)) s
     = Some (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-  Lemma kvidec_0c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0x00009797 : mword 32)) s
-    = Some (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
   Lemma kvidec_10 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x2fc7b783 : mword 32)) s
@@ -79,7 +76,7 @@ Section KvminithartInstrs.
   Lemma kvi_08 : KVI 0x08 false (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0))).  (* sfence.vma zero,zero *)
   Proof. mk_base (KernelSyms.kvminithart + 0x08)%Z (mword_of_int 0x12000073 : mword 32) (mword_of_int (KernelSyms.kvminithart + 0x08) : mword 64) (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0))) kvidec_08. Qed.
   Lemma kvi_0c : KVI 0x0c false (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)).  (* auipc a5,0x9 *)
-  Proof. mk_base (KernelSyms.kvminithart + 0x0c)%Z (mword_of_int 0x00009797 : mword 32) (mword_of_int (KernelSyms.kvminithart + 0x0c) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kvidec_0c. Qed.
+  Proof. mk_base (KernelSyms.kvminithart + 0x0c)%Z (mword_of_int 0x00009797 : mword 32) (mword_of_int (KernelSyms.kvminithart + 0x0c) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_00009797. Qed.
   Lemma kvi_10 : KVI 0x10 false (LOAD (mword_of_int 764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)).  (* ld a5,764(a5) # 8000a238 <kernel_pagetable> *)
   Proof. mk_base (KernelSyms.kvminithart + 0x10)%Z (mword_of_int 0x2fc7b783 : mword 32) (mword_of_int (KernelSyms.kvminithart + 0x10) : mword 64) (LOAD (mword_of_int 764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)) kvidec_10. Qed.
   Lemma kvi_14 : KVI 0x14 true (SHIFTIOP (mword_of_int 12 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).  (* srli a5,a5,0xc *)

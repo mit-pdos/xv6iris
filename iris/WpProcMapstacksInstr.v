@@ -45,10 +45,6 @@ Section ProcMapstacksInstrs.
     exec (ext_decode_compressed (mword_of_int 0xe062 : mword 16)) s
     = Some (C_SDSP (mword_of_int 0, Regidx (mword_of_int 24)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma pmsdec_1a s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s
-    = Some (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
   Lemma pmsdec_1e s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0xfe848493 : mword 32)) s
     = Some (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
@@ -179,7 +175,7 @@ Section ProcMapstacksInstrs.
   Lemma pmsi_18 : PMS 0x18 true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).  (* mv s4,a0 *)
   Proof. mk_rvc (KernelSyms.proc_mapstacks + 0x18)%Z (mword_of_int 0x8a2a : mword 16) (mword_of_int (KernelSyms.proc_mapstacks + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)) cdec_8a2a exec_execute_C_MV. Qed.
   Lemma pmsi_1a : PMS 0x1a false (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)).  (* auipc s1,0x11 *)
-  Proof. mk_base (KernelSyms.proc_mapstacks + 0x1a)%Z (mword_of_int 0x00011497 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x1a) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) pmsdec_1a. Qed.
+  Proof. mk_base (KernelSyms.proc_mapstacks + 0x1a)%Z (mword_of_int 0x00011497 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x1a) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_00011497. Qed.
   Lemma pmsi_1e : PMS 0x1e false (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).  (* addi s1,s1,-24 # 80012778 <proc> *)
   Proof. mk_base (KernelSyms.proc_mapstacks + 0x1e)%Z (mword_of_int 0xfe848493 : mword 32) (mword_of_int (KernelSyms.proc_mapstacks + 0x1e) : mword 64) (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) pmsdec_1e. Qed.
   Lemma pmsi_22 : PMS 0x22 true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 24), ADD)).  (* mv s8,s1 *)

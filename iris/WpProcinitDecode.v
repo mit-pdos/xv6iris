@@ -66,9 +66,6 @@ Lemma pidb_93258593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x93258593 : mword 32)) s = Some (ITYPE (mword_of_int 0x932 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma pidb_00011517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma pidb_b1250513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xb1250513 : mword 32)) s = Some (ITYPE (mword_of_int 0xb12 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
@@ -90,9 +87,6 @@ Lemma pidb_b36ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xb36ff0ef : mword 32)) s = Some (JAL (mword_of_int 0x1ff336 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma pidb_00011497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma pidb_f2248493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf2248493 : mword 32)) s = Some (ITYPE (mword_of_int 0xf22 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
@@ -204,7 +198,7 @@ Section ProcinitInstrs.
 
   Lemma pii_1c : kernel_text -∗ instr (mword_of_int (PI + 0x1c) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (PI + 0x1c)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (PI + 0x1c) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) pidb_00011517. Qed.
+    (mword_of_int (PI + 0x1c) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma pii_20 : kernel_text -∗ instr (mword_of_int (PI + 0x20) : mword 64) false (ITYPE (mword_of_int 0xb12 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (PI + 0x20)%Z (mword_of_int 0xb1250513 : mword 32)
@@ -224,7 +218,7 @@ Section ProcinitInstrs.
 
   Lemma pii_30 : kernel_text -∗ instr (mword_of_int (PI + 0x30) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (PI + 0x30)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (PI + 0x30) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) pidb_00011517. Qed.
+    (mword_of_int (PI + 0x30) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma pii_34 : kernel_text -∗ instr (mword_of_int (PI + 0x34) : mword 64) false (ITYPE (mword_of_int 0xb16 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (PI + 0x34)%Z (mword_of_int 0xb1650513 : mword 32)
@@ -236,7 +230,7 @@ Section ProcinitInstrs.
 
   Lemma pii_3c : kernel_text -∗ instr (mword_of_int (PI + 0x3c) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (PI + 0x3c)%Z (mword_of_int 0x00011497 : mword 32)
-    (mword_of_int (PI + 0x3c) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) pidb_00011497. Qed.
+    (mword_of_int (PI + 0x3c) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_00011497. Qed.
 
   Lemma pii_40 : kernel_text -∗ instr (mword_of_int (PI + 0x40) : mword 64) false (ITYPE (mword_of_int 0xf22 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (PI + 0x40)%Z (mword_of_int 0xf2248493 : mword 32)

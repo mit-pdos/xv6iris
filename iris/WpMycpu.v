@@ -31,6 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode ExecCommon KernelText WpAuipc.
 Require Import WpMmodeLeafBase.
+Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -74,12 +75,6 @@ Local Ltac my_close2 s HmisaC :=
    holds a WEAKEST PRECONDITION; it is now [cdec_8792]/[cdec_2781]/[cdec_079e]
    in KernelRvcDecode.v. ---- *)
 (* +0x16  953e  c.add a0,a0,a5 -- [cdec_953e] (KernelRvcDecode.v) *)
-
-(* +0x0e  00011517  auipc a0,0x11 *)
-Lemma mydec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* +0x12  a9450513  addi a0,a0,-1388 *)
 Lemma mydec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -156,7 +151,7 @@ Section WpMycpu.
 
   Lemma myi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x0e) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.mycpu + 0x0e)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (KernelSyms.mycpu + 0x0e) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) mydec_auipc. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x0e) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma myi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) false (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KernelSyms.mycpu + 0x12)%Z (mword_of_int 0xa8650513 : mword 32)

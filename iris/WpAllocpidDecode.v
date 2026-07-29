@@ -82,11 +82,6 @@ Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivit
 (* Base (4-byte) decode facts.                                            *)
 (* ===================================================================== *)
 
-(* +0x0a / +0x26  auipc a0,0x11 *)
-Lemma apidb_00011517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x0e  addi a0,a0,-1682  (2^12 - 1682 = 2414) *)
 Lemma apidb_96e50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -100,11 +95,6 @@ Lemma apidb_a26ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2093606 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x16  auipc a5,0x9 *)
-Lemma apidb_00009797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00009797 : mword 32)) s
-  = Some (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x1a  addi a5,a5,-2034  (2^12 - 2034 = 2062) *)
 Lemma apidb_80e78793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -161,7 +151,7 @@ Section AllocpidInstrs.
 
   Lemma apdi_0a : kernel_text -∗ instr (mword_of_int (API + 0x0a) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (API + 0x0a)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (API + 0x0a) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) apidb_00011517. Qed.
+    (mword_of_int (API + 0x0a) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma apdi_0e : kernel_text -∗ instr (mword_of_int (API + 0x0e) : mword 64) false (ITYPE (mword_of_int 2414 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (API + 0x0e)%Z (mword_of_int 0x96e50513 : mword 32)
@@ -173,7 +163,7 @@ Section AllocpidInstrs.
 
   Lemma apdi_16 : kernel_text -∗ instr (mword_of_int (API + 0x16) : mword 64) false (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (API + 0x16)%Z (mword_of_int 0x00009797 : mword 32)
-    (mword_of_int (API + 0x16) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) apidb_00009797. Qed.
+    (mword_of_int (API + 0x16) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_00009797. Qed.
 
   Lemma apdi_1a : kernel_text -∗ instr (mword_of_int (API + 0x1a) : mword 64) false (ITYPE (mword_of_int 2062 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (API + 0x1a)%Z (mword_of_int 0x80e78793 : mword 32)
@@ -193,7 +183,7 @@ Section AllocpidInstrs.
 
   Lemma apdi_26 : kernel_text -∗ instr (mword_of_int (API + 0x26) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (API + 0x26)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (API + 0x26) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) apidb_00011517. Qed.
+    (mword_of_int (API + 0x26) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma apdi_2a : kernel_text -∗ instr (mword_of_int (API + 0x2a) : mword 64) false (ITYPE (mword_of_int 2386 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (API + 0x2a)%Z (mword_of_int 0x95250513 : mword 32)

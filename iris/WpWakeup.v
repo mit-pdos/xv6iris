@@ -43,6 +43,7 @@ From Kernel Require Import KernelSyms KernelInstrs.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 Require Export ProcGeom.
+Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
@@ -56,30 +57,15 @@ Import Defs.
 (* ======================================================================= *)
 
 (* ---- base instructions ---- *)
-(* 0x80001f58 auipc s1,0x11 *)
-Lemma wkd_f58 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 (* 0x80001f5c addi s1,s1,-2016 *)
 Lemma wkd_f5c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x81248493 : mword 32)) s
   = Some (ITYPE (mword_of_int 2066 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-(* 0x80001f64 auipc s2,0x16 *)
-Lemma wkd_f64 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00016917 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 (* 0x80001f68 addi s2,s2,532 *)
 Lemma wkd_f68 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x20690913 : mword 32)) s
   = Some (ITYPE (mword_of_int 518 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-(* 0x80001f74 addi s1,s1,360 *)
-Lemma wkd_f74 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x16848493 : mword 32)) s
-  = Some (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 (* 0x80001f78 beq s1,s2,+36 *)
 Lemma wkd_f78 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -206,7 +192,7 @@ Section WkLeaves.
   Lemma wki_12 : WKI 0x12 true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)).
   Proof. mk_rvc (KernelSyms.wakeup + 0x12)%Z (mword_of_int 0x8a2a : mword 16) (mword_of_int (KernelSyms.wakeup + 0x12) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 20), ADD)) cdec_8a2a exec_execute_C_MV. Qed.
   Lemma wki_14 : WKI 0x14 false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)).
-  Proof. mk_base (KernelSyms.wakeup + 0x14)%Z (mword_of_int 0x00011497 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x14) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) wkd_f58. Qed.
+  Proof. mk_base (KernelSyms.wakeup + 0x14)%Z (mword_of_int 0x00011497 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x14) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_00011497. Qed.
   Lemma wki_18 : WKI 0x18 false (ITYPE (mword_of_int 2066 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (KernelSyms.wakeup + 0x18)%Z (mword_of_int 0x81248493 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x18) : mword 64) (ITYPE (mword_of_int 2066 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) wkd_f5c. Qed.
   Lemma wki_1c : WKI 0x1c true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
@@ -214,7 +200,7 @@ Section WkLeaves.
   Lemma wki_1e : WKI 0x1e true (ITYPE (sign_extend' 12 (mword_of_int 3 : mword 6), zreg, Regidx (mword_of_int 21), ADDI)).
   Proof. mk_rvc (KernelSyms.wakeup + 0x1e)%Z (mword_of_int 0x4a8d : mword 16) (mword_of_int (KernelSyms.wakeup + 0x1e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 3 : mword 6), zreg, Regidx (mword_of_int 21), ADDI)) wkd_f62 exec_execute_C_LI. Qed.
   Lemma wki_20 : WKI 0x20 false (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC)).
-  Proof. mk_base (KernelSyms.wakeup + 0x20)%Z (mword_of_int 0x00016917 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x20) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC)) wkd_f64. Qed.
+  Proof. mk_base (KernelSyms.wakeup + 0x20)%Z (mword_of_int 0x00016917 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x20) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC)) bdec_00016917. Qed.
   Lemma wki_24 : WKI 0x24 false (ITYPE (mword_of_int 518 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
   Proof. mk_base (KernelSyms.wakeup + 0x24)%Z (mword_of_int 0x20690913 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x24) : mword 64) (ITYPE (mword_of_int 518 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) wkd_f68. Qed.
   Lemma wki_28 : WKI 0x28 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")), zreg)).
@@ -225,7 +211,7 @@ Section WkLeaves.
   Lemma wki_2c : WKI 0x2c false (JAL (mword_of_int 2092306 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.wakeup + 0x2c)%Z (mword_of_int 0xd13fe0ef : mword 32) (mword_of_int (KernelSyms.wakeup + 0x2c) : mword 64) (JAL (mword_of_int 2092306 : mword 21, Regidx (mword_of_int 1))) wkd_f70. Qed.
   Lemma wki_30 : WKI 0x30 false (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.wakeup + 0x30)%Z (mword_of_int 0x16848493 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x30) : mword 64) (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) wkd_f74. Qed.
+  Proof. mk_base (KernelSyms.wakeup + 0x30)%Z (mword_of_int 0x16848493 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x30) : mword 64) (ITYPE (mword_of_int 360 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) bdec_16848493. Qed.
   Lemma wki_34 : WKI 0x34 false (BTYPE (mword_of_int 36 : mword 13, Regidx (mword_of_int 18), Regidx (mword_of_int 9), BEQ)).
   Proof. mk_base (KernelSyms.wakeup + 0x34)%Z (mword_of_int 0x03248263 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x34) : mword 64) (BTYPE (mword_of_int 36 : mword 13, Regidx (mword_of_int 18), Regidx (mword_of_int 9), BEQ)) wkd_f78. Qed.
   Lemma wki_38 : WKI 0x38 false (JAL (mword_of_int 2095482 : mword 21, Regidx (mword_of_int 1))).

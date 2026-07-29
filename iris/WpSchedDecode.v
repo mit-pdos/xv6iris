@@ -24,6 +24,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes.
 Require Import WpDecode KernelText.
 Require Import WpMmodeLeafBase.
+Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
@@ -165,12 +166,6 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 Lemma sddec_addi_a1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x4fa58593 : mword 32)) s
   = Some (ITYPE (mword_of_int 0x4fa : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-
-(* +0x6a  0x06048513  addi a0,s1,96 *)
-Lemma sddec_addi_a0 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x06048513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0x60 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* +0x6e  0x50c000ef  jal swtch (target 0x80002398) *)
@@ -382,7 +377,7 @@ Section WpSchedDecode.
   (* ---- +0x6a: addi a0,s1,96 ---- *)
   Lemma sdi_6a : kernel_text -∗ instr (mword_of_int (SD + 0x6a) : mword 64) false (ITYPE (mword_of_int 0x60 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (SD + 0x6a)%Z (mword_of_int 0x06048513 : mword 32)
-    (mword_of_int (SD + 0x6a) : mword 64) (ITYPE (mword_of_int 0x60 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) sddec_addi_a0. Qed.
+    (mword_of_int (SD + 0x6a) : mword 64) (ITYPE (mword_of_int 0x60 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) bdec_06048513. Qed.
 
   (* ---- +0x6e: jal swtch ---- *)
   Lemma sdi_6e : kernel_text -∗ instr (mword_of_int (SD + 0x6e) : mword 64) false (JAL (mword_of_int 1292 : mword 21, Regidx (mword_of_int 1))).

@@ -27,6 +27,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
@@ -75,16 +76,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts (one per distinct 32-bit encoding).         *)
-(* ===================================================================== *)
-Lemma kdb_00011517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_00011497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma kdb_00011717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00011717 : mword 32)) s
@@ -234,7 +226,7 @@ Section WpKallocDecode.
 
   Lemma kai_0a : kernel_text -∗ instr (mword_of_int (KA + 0x0a) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KA + 0x0a)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (KA + 0x0a) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) kdb_00011517. Qed.
+    (mword_of_int (KA + 0x0a) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma kai_0e : kernel_text -∗ instr (mword_of_int (KA + 0x0e) : mword 64) false (ITYPE (mword_of_int 0x7f0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KA + 0x0e)%Z (mword_of_int 0x7f050513 : mword 32)
@@ -246,7 +238,7 @@ Section WpKallocDecode.
 
   Lemma kai_16 : kernel_text -∗ instr (mword_of_int (KA + 0x16) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (KA + 0x16)%Z (mword_of_int 0x00011497 : mword 32)
-    (mword_of_int (KA + 0x16) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) kdb_00011497. Qed.
+    (mword_of_int (KA + 0x16) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_00011497. Qed.
 
   Lemma kai_1a : kernel_text -∗ instr (mword_of_int (KA + 0x1a) : mword 64) false (LOAD (mword_of_int 0x7fc : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), false, 8)).
   Proof. mk_base (KA + 0x1a)%Z (mword_of_int 0x7fc4b483 : mword 32)
@@ -270,7 +262,7 @@ Section WpKallocDecode.
 
   Lemma kai_2a : kernel_text -∗ instr (mword_of_int (KA + 0x2a) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KA + 0x2a)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (KA + 0x2a) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) kdb_00011517. Qed.
+    (mword_of_int (KA + 0x2a) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma kai_2e : kernel_text -∗ instr (mword_of_int (KA + 0x2e) : mword 64) false (ITYPE (mword_of_int 0x7d0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KA + 0x2e)%Z (mword_of_int 0x7d050513 : mword 32)
@@ -322,7 +314,7 @@ Section WpKallocDecode.
 
   Lemma kai_4c : kernel_text -∗ instr (mword_of_int (KA + 0x4c) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KA + 0x4c)%Z (mword_of_int 0x00011517 : mword 32)
-    (mword_of_int (KA + 0x4c) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) kdb_00011517. Qed.
+    (mword_of_int (KA + 0x4c) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00011517. Qed.
 
   Lemma kai_50 : kernel_text -∗ instr (mword_of_int (KA + 0x50) : mword 64) false (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KA + 0x50)%Z (mword_of_int 0x7ae50513 : mword 32)

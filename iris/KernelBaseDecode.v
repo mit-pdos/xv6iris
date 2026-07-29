@@ -157,3 +157,45 @@ Lemma bdec_00094503 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 18),
                 Regidx (mword_of_int 10), true, 1), s).
 Proof. decode_bridge_ms. Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  The proc-area / nextpid relocations.  Each of these was proved       *)
+(*  privately in three to five decode files before the sweep; per the    *)
+(*  dedup discipline in claude-notes/durable-notes.md a word proved in   *)
+(*  two or more of them belongs here.                                    *)
+(* ------------------------------------------------------------------ *)
+
+(* auipc s1,0x11 -- the proc[] base, in the four functions that walk the
+   array with the cursor in s1: procinit, proc_mapstacks, wakeup, allocproc
+   (and kalloc, which reaches <kmem> the same way) *)
+Lemma bdec_00011497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00011497 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a0,0x11 -- the same relocation into a0: procinit, kalloc, mycpu,
+   allocpid *)
+Lemma bdec_00011517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00011517 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc s2,0x16 -- &proc[NPROC] (= <tickslock>): wakeup, allocproc *)
+Lemma bdec_00016917 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00016917 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 18), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a5,0x9 -- kvminithart, kvmmake, allocpid *)
+Lemma bdec_00009797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00009797 : mword 32)) s
+  = Some (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* addi a0,s1,96 -- &p->context, the argument to swtch (sched) and to
+   memset (allocproc) *)
+Lemma bdec_06048513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x06048513 : mword 32)) s
+  = Some (ITYPE (mword_of_int 96 : mword 12, Regidx (mword_of_int 9),
+                 Regidx (mword_of_int 10), ADDI), s).
+Proof. decode_bridge_ms. Qed.

@@ -24,6 +24,7 @@ Require Import InstrBytes KernelText.
 Require Import WpDecode WpDecodeBridge WpRvcBridge.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 Import Defs.
 
@@ -298,10 +299,6 @@ Section KvmmakeInstrs.
     exec (ext_decode (mword_of_int 0xf4bff0ef : mword 32)) s
     = Some (JAL (mword_of_int 2096970 : mword 21, Regidx (mword_of_int 1)), s).
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-  Lemma kidec_0c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0x00009797 : mword 32)) s
-    = Some (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
   Lemma kidec_10 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x06a7b823 : mword 32)) s
     = Some (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8), s).
@@ -318,7 +315,7 @@ Section KvmmakeInstrs.
   Lemma kii_08 : KIN 0x08 false (JAL (mword_of_int 2096970 : mword 21, Regidx (mword_of_int 1))).  (* jal 8000110e <kvmmake> *)
   Proof. mk_base (KernelSyms.kvminit + 0x08)%Z (mword_of_int 0xf4bff0ef : mword 32) (mword_of_int (KernelSyms.kvminit + 0x08) : mword 64) (JAL (mword_of_int 2096970 : mword 21, Regidx (mword_of_int 1))) kidec_08. Qed.
   Lemma kii_0c : KIN 0x0c false (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)).  (* auipc a5,0x9 *)
-  Proof. mk_base (KernelSyms.kvminit + 0x0c)%Z (mword_of_int 0x00009797 : mword 32) (mword_of_int (KernelSyms.kvminit + 0x0c) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kidec_0c. Qed.
+  Proof. mk_base (KernelSyms.kvminit + 0x0c)%Z (mword_of_int 0x00009797 : mword 32) (mword_of_int (KernelSyms.kvminit + 0x0c) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_00009797. Qed.
   Lemma kii_10 : KIN 0x10 false (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).  (* sd a0,112(a5) # 8000a238 <kernel_pagetable> *)
   Proof. mk_base (KernelSyms.kvminit + 0x10)%Z (mword_of_int 0x06a7b823 : mword 32) (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kidec_10. Qed.
   Lemma kii_14 : KIN 0x14 true (LOAD (csdsp_imm 1, sp, Regidx (mword_of_int 1), false, 8)).  (* ld ra,8(sp) *)
