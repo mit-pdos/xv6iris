@@ -60,15 +60,32 @@
 
    [P] IS PAID OUT OF WHAT MAIN BUILT.  It rides as a parameter with
    [Persistent P], but the boot hart is not handed it -- it is handed a WAND
-   [□ (∀ γpr γs, printk_env γpr γd γv -∗ procs_inv γ Φ γs -∗ P)] and applies it
-   at the [started = 1] store.  The two arguments are exactly the persistent
-   facts whose GHOST NAMES main chooses: [γpr] when it allocates the [pr] lock
-   out of printkinit's output (pr.lock protects the transmitter token --
-   SpecPrintkGen.v), and [γs] when it allocates the 64 proc locks out of
-   procinit's ([SpecProcinit.procs_inv_alloc]).  Everything else a secondary
-   hart wants is either already persistent in main's own precondition (the
-   device bundle) or, per G5, not statable yet.  main's proof therefore never
-   has to know what the secondaries want.
+   and applies it at the [started = 1] store.  Its arguments are exactly the
+   persistent facts whose GHOST NAMES main chooses: [γpr] when it allocates the
+   [pr] lock out of printkinit's output (pr.lock protects the transmitter token
+   -- SpecPrintkGen.v), [γs] when it allocates the 64 proc locks out of
+   procinit's ([SpecProcinit.procs_inv_alloc]), and [γk] when it allocates the
+   vdisk_lock over [DiskInv.disk_res] out of virtio_disk_init's
+   ([DiskBoot.disk_res_boot]) -- the disk's PAGES (its configuration identity)
+   are chosen by kalloc inside virtio_disk_init, so [pd pav pu] are quantified
+   here too, and the persistent [DiskInv.disk_geom] that names them travels
+   alongside the lock.  Everything else a secondary hart wants is either
+   already persistent in main's own precondition (the device bundle) or, per
+   G5, not statable yet.  main's proof therefore never has to know what the
+   secondaries want.
+
+   THE INTERRUPT QUARTER.  [IntrDefs]'s SIE choreography splits the live-bit
+   ghost 1/2 (tied in [sconf]) + 1/8 (the capability's arm) + 1/8 (the
+   push/pop count) + 1/4 (the INVARIANT's).  The invariant is
+   [IntrDefs.intr_inv], and main is the only code that ever allocates it
+   ([intr_inv_alloc_off], from trapinithart's [stvec ↦ᵣ kernelvec]) -- so the
+   spare quarter has to sit raw in main's precondition until then.  That is the
+   [ghost_var γ (1/4) ('b"0")] conjunct below; before the allocation nothing
+   holds an interrupt handler, hence the '0'.
+
+   THE CONTEXT SLOT is [SchedCtx.cpu_ctx_free], not an opaque [C]: nothing on
+   the boot path parks anything in [cpus[0].context], and [scheduler] at the
+   far end consumes [cpu_own γ 0 false p0 cpu_ctx_free] at exactly that shape.
 
    Requires only Spec files and the definitional layer -- never a [Proof*] file. *)
 From Stdlib Require Import ZArith Lia List.
@@ -158,15 +175,37 @@ Section SpecMain.
   (* at [wrap16 nr] with the completed count [nr = 0] at boot -- the same  *)
   (* precedent as the [kmem+24 ↦₈ 0] conjunct above; the others stay       *)
   (* contents-existential, which is all [free_slot_res] needs.            *)
+  (*                                                                     *)
+  (* PLUS three groups that no callee's precondition names but a caller-  *)
+  (* side ASSEMBLY does, and which therefore have nowhere else to come    *)
+  (* from:                                                               *)
+  (*  - [panicking] / [panicked], the two flag cells                       *)
+  (*    [SpecPrintkGen.printk_flags_inv] is an [inv] over.  main allocates *)
+  (*    that invariant before its first printk call, so it must own the    *)
+  (*    cells; contents-existential, since the invariant asserts nothing   *)
+  (*    about either value.                                               *)
+  (*  - per process, the two PUBLIC cells procinit never touches:          *)
+  (*    [p_chan] and [SchedCtx.proc_pub] (killed / xstate / the           *)
+  (*    invariant's permanent HALF of the pid cell -- [proc_raw] carries   *)
+  (*    the other half).  [SpecProcinit.procs_inv_alloc] consumes exactly  *)
+  (*    [proc_ready i] plus these two, so they are main's to supply.       *)
+  (*  - [initproc], the one global userinit writes.                        *)
   (* ------------------------------------------------------------------- *)
   Definition main_globals_raw : iProp Σ :=
     ((∃ r w : mword 64,
         devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) ∗
+     (∃ pv pkv : mword 32,
+        (mword_of_int KernelSyms.panicking : mword 64) ↦₄ pv ∗
+        (mword_of_int KernelSyms.panicked : mword 64) ↦₄ pkv) ∗
      (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) ∗
      (∃ kpt0 : mword 64,
         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) ∗
      ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
+     ([∗ list] i ∈ seq 0 NPROC,
+        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+        proc_pub (proc_addr i)) ∗
      fd_slots (NPROC * (NOFILE + FDSPARE)) ∗
+     (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) ∗
      ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
      ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
      blink_raw bhead ∗
@@ -196,12 +235,12 @@ Section SpecMain.
   Definition wp_main_boot_sconf_body
       (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
-      (p0 : mword 64) (C : iProp Σ)
+      (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (P : iProp Σ) :=
+      (P : iProp Σ) `{!Persistent P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
     (* the arm is decided by the ambient hart: [beqz a0] at main+0x14 takes
        the boot path exactly when cpuid() returns 0. *)
@@ -220,15 +259,22 @@ Section SpecMain.
        makes it live, and its config half [c0] is how main knows so *)
     virtio_live c0 = false ->
     sie_cap_gpr γ m K -∗
-    cpu_own γ 0 false p0 C -∗
+    cpu_own γ 0 false p0 cpu_ctx_free -∗
+    (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
+       code that ever allocates [IntrDefs.intr_inv] (out of trapinithart's
+       [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)
+    ghost_var γ (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     panic_wp -∗
     (* the handover channel, and the RECIPE for the deposit it will carry:
-       main applies this wand at the [started = 1] store, to the [pr] lock and
-       the 64 proc locks it has just allocated. *)
+       main applies this wand at the [started = 1] store, to the [pr] lock, the
+       64 proc locks and the vdisk_lock it has just allocated. *)
     started_inv P -∗
-    □ (∀ (γpr : gname) (γs : list gname),
-         printk_env γpr γd γv -∗ procs_inv γ Φ γs -∗ P) -∗
+    □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64),
+         printk_env γpr γd γv -∗
+         procs_inv γ Φ γs -∗
+         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+         disk_geom γv pd pav pu -∗ P) -∗
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -263,12 +309,12 @@ Module Type MAIN.
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
-      (p0 : mword 64) (C : iProp Σ)
+      (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (P : iProp Σ),
-      wp_main_boot_sconf_body γ Φ m K p0 C ps s1entry phystop
+      (P : iProp Σ) `{!Persistent P},
+      wp_main_boot_sconf_body γ Φ m K p0 ps s1entry phystop
         γd γv l0 b0 c0 tlbvec0 P.
 End MAIN.
