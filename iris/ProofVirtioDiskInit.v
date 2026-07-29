@@ -2165,6 +2165,11 @@ Section ProofVirtioDiskInit.
       rewrite /W3 upd_ne; [| congruence].
       rewrite /W2 upd_ne; [| congruence].
       rewrite /W1 upd_ne; [reflexivity | congruence]. }
+    (* The ONE place the postcondition is opened.  [vdi_post] is sealed
+       ([SpecVirtioDiskInit]) precisely so that it rides through the ~140
+       instruction steps above as a single constant instead of a twenty-wand
+       chain the proofmode re-traverses at every context split. *)
+    iEval (rewrite /vdi_post) in "Hcont".
     iApply ("Hcont" $! P5 pd pav pu with
       "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hv Hbpd Hbpav Hbpu Hdesc Havail Hused Hfree Hlk Hlnm Hcp").
     { try iPureIntro. unfold callee_saved.

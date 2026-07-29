@@ -59,10 +59,11 @@ Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import WpVirtioDiskRwDecode.
 Require Import SpecVirtioDiskRw.
+Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRw.
 Require Import ProofVirtioDiskRwB.
-Require Import ProofVirtioDiskRwC.
-Require Import ProofVirtioDiskRwD.
+Require Import ProofVirtioDiskRwC ProofVirtioDiskRwCSeam.
+Require Import ProofVirtioDiskRwD ProofVirtioDiskRwDSeam.
 Require Import ProofVirtioDiskRwE.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -933,9 +934,15 @@ Section ProofVirtioDiskRwF.
                  (vdrwf_off_canon disk_base _ (168 + 16 * h + 8)%nat 8 eq_refl Bh7
                     vdrwf_disk_canon)
                  with "Hkm Wo2") as "Wo2".
-    iDestruct (phys_to_byte (d_info_status h) byte_zero
-                 ltac:(unfold d_info_status; apply vdrwd_disk_static; lia)
-                 ltac:(unfold d_info_status; apply vdrwf_disk_canon; lia)
+    (* premises by NAME, not spliced in as [ltac:(…)]: the proofmode
+       re-elaborates a spliced term without the [Qed] vm-seal, and these two
+       cost 3.9 s in that position against ~0.1 s hoisted.  optimization.md. *)
+    assert (Hstatst : kmap_static (svpn_of (d_info_status h)) KP_rw)
+      by (unfold d_info_status; apply vdrwd_disk_static; lia).
+    assert (Hcanst : (uint (d_info_status h : SailStdpp.Values.mword 64)
+                      < 274877906944)%Z)
+      by (unfold d_info_status; apply vdrwf_disk_canon; lia).
+    iDestruct (phys_to_byte (d_info_status h) byte_zero Hstatst Hcanst
                  with "Hkm Hstat") as "Hstat".
     (* ================= +0x1b0 .. +0x1ce ============================== *)
     iPoseProof (rwi_1b0 with "Htext") as "Hi1b0".

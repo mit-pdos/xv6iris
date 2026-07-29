@@ -86,6 +86,52 @@ Definition disk_lock : mword 64 :=
    rule that a stack bound is never coupled to the arguments. *)
 Definition K_virtio_disk_init : nat := 18%nat.
 
+(* THE POSTCONDITION, as one named predicate rather than a twenty-wand chain
+   spelled inline at the end of the body.  This is a performance-critical
+   abstraction, not tidiness: the whole-function proof carries the continuation
+   as a spatial hypothesis across all ~140 instruction steps, and every
+   proofmode operation that splits or frames the context re-traverses its type
+   -- which, written out, is twenty wands over three [seq 0 4096] big-ops.
+   Sealed here it is one constant application, and the proof unfolds it exactly
+   once, at the return.  Measured on the first thirty instructions: 24 s with
+   the chain inline against 11.5 s with the continuation out of the way.
+   [Typeclasses Opaque] (never [Opaque]) so instance search never walks in
+   while [rewrite /vdi_post] at the return still does. *)
+Definition vdi_post
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    (γ γa : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
+    (v0 : virtio_state) (ret_tgt c_cpu : mword 64) : iProp Σ :=
+  ( ∀ (mr : regfile) (pd pav pu : mword 64),
+    sie_cap_gpr γ mr K -∗
+    cpu_own γ 0%nat eb pp C -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
+    kalloc_env γa (avail_sub on 3) (m !!! Regidx (mword_of_int 4 : mword 5)) -∗
+    (* The device is LIVE, its queue is the three pages just allocated, and
+       nothing has been published: seen = used_idx = 0 and the interrupt line
+       is low.  The disk image is untouched. *)
+    virtio_frag (VirtioState (virtio_init_cfg pd pav pu)
+                             zero32 zero16 zero16 (v_disk v0)) -∗
+    (* the three queue pages, zeroed.  The two bytes of the available ring's
+       index field being zero is what lets the caller pin [ai = 0] when it
+       builds the DMA lease. *)
+    ([∗ list] j ∈ seq 0 4096, (pa_add pd j) ↦ₘ byte_zero) -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add pav j) ↦ₘ byte_zero) -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add pu j) ↦ₘ byte_zero) -∗
+    disk_desc ↦₈ pd -∗
+    disk_avail ↦₈ pav -∗
+    disk_used ↦₈ pu -∗
+    ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ (Z_to_bv 8 1)) -∗
+    disk_lock ↦₄ (mword_of_int 0 : mword 32) -∗
+    (* the name field is written once and then DISCARDED: what comes back is
+       the persistent [lock_name], ready to be sealed into [is_lock]. *)
+    lock_name disk_lock "virtio_disk"%string -∗
+    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }})%I.
+Global Typeclasses Opaque vdi_post.
+
 Definition wp_virtio_disk_init_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ γa : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
@@ -119,34 +165,7 @@ Definition wp_virtio_disk_init_sconf_body
   disk_avail ↦₈ pav0 -∗
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
-  ( ∀ (mr : regfile) (pd pav pu : mword 64),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb pp C -∗
-    pc_is ret_tgt -∗
-    ⌜ callee_saved m mr ⌝ -∗
-    ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
-    kalloc_env γa (avail_sub on 3) (m !!! Regidx (mword_of_int 4 : mword 5)) -∗
-    (* The device is LIVE, its queue is the three pages just allocated, and
-       nothing has been published: seen = used_idx = 0 and the interrupt line
-       is low.  The disk image is untouched. *)
-    virtio_frag (VirtioState (virtio_init_cfg pd pav pu)
-                             zero32 zero16 zero16 (v_disk v0)) -∗
-    (* the three queue pages, zeroed.  The two bytes of the available ring's
-       index field being zero is what lets the caller pin [ai = 0] when it
-       builds the DMA lease. *)
-    ([∗ list] j ∈ seq 0 4096, (pa_add pd j) ↦ₘ byte_zero) -∗
-    ([∗ list] j ∈ seq 0 4096, (pa_add pav j) ↦ₘ byte_zero) -∗
-    ([∗ list] j ∈ seq 0 4096, (pa_add pu j) ↦ₘ byte_zero) -∗
-    disk_desc ↦₈ pd -∗
-    disk_avail ↦₈ pav -∗
-    disk_used ↦₈ pu -∗
-    ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ (Z_to_bv 8 1)) -∗
-    disk_lock ↦₄ (mword_of_int 0 : mword 32) -∗
-    (* the name field is written once and then DISCARDED: what comes back is
-       the persistent [lock_name], ready to be sealed into [is_lock]. *)
-    lock_name disk_lock "virtio_disk"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  vdi_post γ γa Φ m K eb pp C on v0 ret_tgt c_cpu -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type VIRTIODISKINIT.

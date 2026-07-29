@@ -13,12 +13,15 @@ remaining virtio-effort cleanups (see [`virtio-disk.md`](virtio-disk.md)) land.
 | --- | --- | --- |
 | `iris/SpecVirtioDiskRw.v` | `wp_virtio_disk_rw_sconf_body`, `Module Type VIRTIODISKRW`, `buf_own`, `K_virtio_disk_rw = 34` | — |
 | `iris/WpVirtioDiskRwDecode.v` | every `rwi_XXX` instruction fact, `VRW+0x000 .. +0x210` | ~40 s |
-| `iris/ProofVirtioDiskRw.v` | P1, P2.1 (scan), P2.2a/b + the seam `Definition`s | ~6 min |
-| `iris/ProofVirtioDiskRwB.v` | P2.3 (set-up + sleep-retry iLöb + partial-free tail) | ~1 min |
-| `iris/ProofVirtioDiskRwC.v` | P3 (five chunk lemmas + composition + the P2→P3 glue) | ~20 s |
-| `iris/ProofVirtioDiskRwD.v` | P4 (fence/AU leaves, the pin builder, `wp_vdrw_p4`, the P3→P4 glue) | ~7 min |
+| `iris/VirtioDiskRwDefs.v` | the FUNCTOR-FREE shared vocabulary (see below) | ~6 s |
+| `iris/ProofVirtioDiskRw.v` | P1, P2.1 (scan), P2.2a/b | ~21 s |
+| `iris/ProofVirtioDiskRwB.v` | P2.3 (set-up + sleep-retry iLöb + partial-free tail) | ~19 s |
+| `iris/ProofVirtioDiskRwC.v` | P3, five chunk lemmas + composition | ~19 s |
+| `iris/ProofVirtioDiskRwCSeam.v` | the P2→P3 glue, and nothing else | ~3 s |
+| `iris/ProofVirtioDiskRwD.v` | P4 (fence/AU leaves, the pin builder, `wp_vdrw_p4`) | ~33 s |
+| `iris/ProofVirtioDiskRwDSeam.v` | the P3→P4 glue, and nothing else | ~4 s |
 | `iris/ProofVirtioDiskRwE.v` | P5 (QUEUE_NOTIFY, `vdrw_p5_peek`, the completion-wait iLöb, the P4→P5 glue) | ~12 s |
-| `iris/ProofVirtioDiskRwF.v` | P6, the whole-function composition, `Module VirtioDiskRwProof … : VIRTIODISKRW` | ~62 s |
+| `iris/ProofVirtioDiskRwF.v` | P6, the whole-function composition, `Module VirtioDiskRwProof … : VIRTIODISKRW` | ~60 s |
 | `iris/LinkVirtioDiskRw.v` | `Module VirtioDiskRw := VirtioDiskRwProof Acquire Release Sleep FreeDesc` | — |
 
 **Why one file per phase.** Each phase re-pays its predecessors' `coqc` cost if
@@ -29,6 +32,25 @@ predecessor's functor internally (`Module P4 := VirtioDiskRwRestD …`), so the
 phases compose exactly as if they were one file. A phase that calls no callee
 does not need the functor at all — P3's chunk lemmas, all of P4, and P6's tier
 bridges live in plain `Section`s; only the glue re-opens it.
+
+**Why the SEAM files, and what belongs in `VirtioDiskRwDefs.v`.** The phase
+files are a require chain, and that chain is the whole build's critical path —
+so anything that pushes a heavy phase behind its predecessor costs wall-clock
+directly. Measured, almost nothing does: P3 is 19 s and P4 is 33 s, but their
+*glue* — the only part that has to see the previous phase's proof — is 0.6 s
+and 1.1 s. So each of those two is split, the glue lives in `…Seam.v`, and the
+heavy proof requires **only `VirtioDiskRwDefs.v`**; P3 and P4 then compile
+alongside P1/P2 instead of behind them (cone chain 166 s → 130 s).
+
+`VirtioDiskRwDefs.v` holds exactly the vocabulary that makes that possible: the
+bitvector/address helpers, `vdrw_regs`, the stack-slot bundles (`vdrw_idx`,
+`vdrw_scratch`, `vdrw_saved`), the lock's resource `vdrw_body`, and the
+descriptor-chain shapes (`vdrw_chain`, `vdrw_slot_rest`, `vdrw_ty`,
+`vdrw_flags`). **Nothing mentioning a callee module type belongs there** — if
+you need `ACQUIRE`/`RELEASE`/`SLEEP`/`FREEDESC`, you are writing a phase proof,
+not vocabulary. When you add a phase, put its shared shapes here and its glue
+in a `…Seam.v`; `coqdep` is the check — a heavy phase's `.vo` line should name
+`VirtioDiskRwDefs.vo` and nothing else from the cone.
 
 ## Phase map (addresses are `VRW + …`)
 

@@ -728,12 +728,22 @@ Lemma vinit_dma_disj (c : virtio_cfg) :
   range_map (avail_idx_pa c) 2 (nth_byte (wrap16 0))
     ##ₘ range_map (vc_used c) 4096 (fun _ : nat => byte_zero).
 Proof.
-  intro Hd. apply map_disjoint_dom. rewrite !range_map_dom. exact Hd.
+  (* [range_map_dom] lands on [pa_range _ 4096]; [avail_idx_dom]/[used_page_pas]
+     are that same term behind one delta step, but leaving the fold to
+     [exact]'s conversion makes it normalise a 4096-element [list_to_set] over
+     [gset Arch.pa] -- 3.7 s here and 3.5 s in [vinit_dma_dom] below, plus as
+     much again at each [Qed].  Unfolding both names first makes the match
+     syntactic. *)
+  intro Hd. apply map_disjoint_dom. rewrite !range_map_dom.
+  unfold avail_idx_dom, used_page_pas in Hd. exact Hd.
 Qed.
 
 Lemma vinit_dma_dom (c : virtio_cfg) :
   dom (vinit_dma c) = avail_idx_dom c ∪ used_page_pas c.
-Proof. unfold vinit_dma. rewrite dom_union_L !range_map_dom. reflexivity. Qed.
+Proof.
+  unfold vinit_dma, avail_idx_dom, used_page_pas.
+  rewrite dom_union_L !range_map_dom. reflexivity.
+Qed.
 
 Lemma vinit_dma_ctl (c : virtio_cfg) : vproto_ctl c vproto0 ⊆ vinit_dma c.
 Proof.

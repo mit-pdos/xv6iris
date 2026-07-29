@@ -548,10 +548,13 @@ ProofFreeDesc.v
 LinkFreeDesc.v
 SpecVirtioDiskRw.v
 WpVirtioDiskRwDecode.v
+VirtioDiskRwDefs.v
 ProofVirtioDiskRw.v
 ProofVirtioDiskRwB.v
 ProofVirtioDiskRwC.v
+ProofVirtioDiskRwCSeam.v
 ProofVirtioDiskRwD.v
+ProofVirtioDiskRwDSeam.v
 ProofVirtioDiskRwE.v
 ProofVirtioDiskRwF.v
 LinkVirtioDiskRw.v
