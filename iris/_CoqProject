@@ -627,3 +627,5 @@ LinkUserinit.v
 StartedInv.v
 WpMainDecode.v
 SpecMain.v
+ProofMain.v
+LinkMain.v

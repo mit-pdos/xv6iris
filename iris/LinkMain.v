@@ -1,0 +1,26 @@
+(* LinkMain.v -- the one place main's proof meets its callees' proofs.
+
+   Nineteen functor arguments: the eighteen functions main calls, plus
+   KERNELVEC (whose handler contract is what turns trapinithart's [stvec ↦ᵣ
+   kernelvec] into the [intr_handler_avail] the scheduler consumes).  Three of
+   the callee links are still ASSUMED contracts (an [Axiom] inside their own
+   sealed module -- printk's general path, userinit, virtio_disk_init), which is
+   exactly the axiom footprint [tools/proof_coverage.py] reports for main. *)
+Require Import RiscvLang RiscvPtsto SmodeCore.
+Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintkGen.
+Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
+Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
+Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
+Require Import SpecUserinit SpecScheduler SpecKernelvec.
+Require Import SpecMain.
+Require Import LinkCpuid LinkConsoleinit LinkPrintkinit LinkPrintkGen.
+Require Import LinkKinit LinkKvminit LinkKvminithart LinkProcinit.
+Require Import LinkTrapinit LinkTrapinithart LinkPlicinit LinkPlicinithart.
+Require Import LinkBinit LinkIinit LinkFileinit LinkVirtioDiskInit.
+Require Import LinkUserinit LinkScheduler LinkKernelvec.
+Require Import ProofMain.
+
+Module Main :=
+  MainProof Cpuid Consoleinit Printkinit PrintkGen Kinit Kvminit Kvminithart
+            Procinit Trapinit Trapinithart Plicinit Plicinithart Binit Iinit
+            Fileinit VirtioDiskInit Userinit Scheduler Kernelvec.
