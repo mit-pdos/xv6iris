@@ -96,6 +96,22 @@ are working on that effort — the relevant `projects/` file.
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
 - **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
   specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
+- **[`main-boot.md`](projects/main-boot.md)** — `main()`, the consumer end of
+  interrupt-sweep's parked boot wiring. LANDED: `WpMainDecode.v` (all 50
+  instructions) and `StartedInv.v` — the `started` flag as a one-shot escrow
+  (`∃ v, started ↦₄ v ∗ (⌜v = 0⌝ ∨ P)`) whose payload must be PERSISTENT
+  because up to `NCPU-1` harts read it, with the outer mask a parameter so the
+  file stays below the minstret invariant. NOT landed: `SpecMain.v` /
+  `ProofMain.v`, and the file explains why — five blockers, all in callees or
+  shared abstractions rather than in main (`dev_inv` bundles the disk with the
+  UART although printk runs twelve calls before `virtio_disk_init`; printk's
+  only proven contract is the panic path; `userinit` has no spec; the escrowed
+  payload arrives under a `▷` no leaf on the loop-exit path strips; and
+  `kvminithart`/`procs_inv` are per-hart-unique so the secondary arm needs a
+  mask-carrying `sr_absorb` and a hart-generic `p_sched` first). Keeps the
+  callee-by-callee resource inventory `SpecMain.v` transcribes, the three
+  assemblies main itself owes (`kalloc_env`, `procs_inv`,
+  `intr_inv_alloc_off`), and the ordered worklist.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`ProcPtOwn.v`): `proc_pt`, one
   predicate for a valid parked user table — trampoline + trapframe + the pages

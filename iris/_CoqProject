@@ -620,3 +620,6 @@ SpecSysSbrk.v
 WpSysSbrkDecode.v
 ProofSysSbrk.v
 LinkSysSbrk.v
+StartedInv.v
+WpMainDecode.v
+SpecMain.v
