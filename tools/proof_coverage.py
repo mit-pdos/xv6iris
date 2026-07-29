@@ -108,6 +108,8 @@ MANIFEST_ASSUMED = {
     "panic": ("SpecPanic.v", "panic_wp", "assumed as a hypothesis carried by callers"),
     "kerneltrap": ("SpecKerneltrap.v", "wp_kerneltrap_returns_body",
                    "only 'it returns' is assumed; the Axiom is LinkKerneltrap.v"),
+    "consoleintr": ("SpecConsoleintr.v", "wp_consoleintr_sconf_body",
+                    "uartintr's one unproven callee; the Axiom is LinkConsoleintr.v"),
 }
 
 PROVEN, ASSUMED, PARTIAL, NONE = "proven", "assumed", "partial", "none"

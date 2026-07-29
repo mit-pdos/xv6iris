@@ -174,6 +174,15 @@ Definition uart_write (u : uart_state) (off : Z) (b : bv 8) : option uart_state 
 Lemma uart_read_lsr (u : uart_state) : uart_read u 5 = Some (uart_lsr u, u).
 Proof. reflexivity. Qed.
 
+(* ...and so is reading the ISR, which in this model is a pure function of the
+   state (the THRE interrupt is a LEVEL here -- see [uart_isr] -- so the read
+   that xv6's uartintr performs to "acknowledge the interrupt" acknowledges
+   nothing.  That is deliberate: a level model only produces MORE interrupts
+   than the hardware, which a correct driver already tolerates). *)
+Lemma uart_read_isr (u : uart_state) : uart_read u 2 = Some (uart_isr u, u).
+Proof. reflexivity. Qed.
+
+
 (* -- MMIO totality --
 
    Every offset xv6 can name is serviced: no UART access in [0, uart_size)
@@ -273,6 +282,32 @@ Proof.
   unfold uart_rx_push, uart_acc.
   destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
   intro H. injection H as <-. reflexivity.
+Qed.
+
+(* NO READ MOVES ANY OF THE THREE TRACKED TX QUANTITIES.  Only the RHR read
+   advances the device at all, and it pops the RECEIVE FIFO, which appears in
+   none of [uart_acc] / [u_out] / [uart_dlab].  So a driver may read any UART
+   register with no transmitter token and no ghost obligation whatever --
+   [uart_ghosts_stable] (WpUart.v) applies to every offset.  This is what makes
+   uartintr's ISR acknowledge, its rx-ready poll and its RHR pops (uartgetc,
+   which gcc inlines into it) plain observations. *)
+Lemma uart_read_stable (u : uart_state) (off : Z) (b : bv 8) (u' : uart_state) :
+  uart_read u off = Some (b, u') ->
+  uart_acc u' = uart_acc u /\ u_out u' = u_out u /\ uart_dlab u' = uart_dlab u.
+Proof.
+  intro Hread. revert Hread. unfold uart_read.
+  destruct (off =? 0) eqn:E0.
+  { destruct (uart_dlab u) eqn:Ed.
+    - intro H. inversion H. subst u'. done.
+    - destruct (u_rx u) as [| c rx']; intro H; inversion H; subst u'; done. }
+  destruct (off =? 1) eqn:E1.
+  { destruct (uart_dlab u) eqn:Ed; intro H; inversion H; subst u'; done. }
+  destruct (off =? 2) eqn:E2. { intro H; inversion H; subst u'; done. }
+  destruct (off =? 3) eqn:E3. { intro H; inversion H; subst u'; done. }
+  destruct (off =? 5) eqn:E5. { intro H; inversion H; subst u'; done. }
+  destruct ((off =? 4) || (off =? 6) || (off =? 7)) eqn:E4.
+  { intro H; inversion H; subst u'; done. }
+  discriminate.
 Qed.
 
 (* A THR write appends the byte to the accepted trace -- but ONLY with DLAB

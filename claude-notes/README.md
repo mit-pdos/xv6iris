@@ -136,14 +136,19 @@ are working on that effort — the relevant `projects/` file.
   fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
   cursor and its `subw` pointer-difference return, and argstr's INLINED
   argaddr.
-- **[`uartwrite.md`](projects/uartwrite.md)** — uartwrite, the interrupt-driven
-  UART output path, PROVEN: the `tx_lock` invariant (`UartTxInv.v`) whose
-  implication "`tx_busy == 0` ⟹ everything accepted has been transmitted" is
-  what licenses a THR store with no THRE poll, why the transmitter token has to
+- **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
+  driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
+  `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹
+  everything accepted has been transmitted" is what licenses uartwrite's THR
+  store with no THRE poll and what uartintr's THRE arm re-establishes — the two
+  functions meet there and nowhere else. Also: why the transmitter token has to
   live in that lock (and the resulting tension with uartputc_sync's caller-held
   token), the `uart_sent_sub` SUBLIST output claim a driver that sleeps between
-  bytes can honestly make, and the induction-over-iLöb loop nest with its
-  `∧`-paired exits. Remaining: uartintr, consolewrite, boot wiring.
+  bytes can honestly make, the ghost-free UART read leaf (`uart_read_stable`)
+  that lets the rx drain run outside the critical section, and how to state a
+  `static` helper that gcc INLINED away (uartgetc has no symbol). consoleintr
+  is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
+  boot wiring.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all

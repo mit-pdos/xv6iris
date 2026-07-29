@@ -129,3 +129,31 @@ Lemma bdec_f51ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf51ff0ef : mword 32)) s
   = Some (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
+
+(* lui a5,0x10000 -- the UART base; uartinit +0x08, uartputc_sync +0x20/+0x34,
+   uartintr +0x0c/+0x20 *)
+Lemma bdec_100007b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x100007b7 : mword 32)) s
+  = Some (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* andi a5,a5,32 -- the LSR THRE mask; uartputc_sync +0x2a, uartintr +0x28 *)
+Lemma bdec_0207f793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0207f793 : mword 32)) s
+  = Some (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 15),
+                 Regidx (mword_of_int 15), ANDI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a5,0xa -- printk +0x1d2, uartputc_sync +0x0c/+0x16/+0x3c,
+   uartwrite +0x2e, uartintr +0x56 *)
+Lemma bdec_0000a797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0000a797 : mword 32)) s
+  = Some (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* lbu a0,0(s2) -- printk, and uartintr's inlined uartgetc (the RHR read) *)
+Lemma bdec_00094503 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00094503 : mword 32)) s
+  = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 18),
+                Regidx (mword_of_int 10), true, 1), s).
+Proof. decode_bridge_ms. Qed.

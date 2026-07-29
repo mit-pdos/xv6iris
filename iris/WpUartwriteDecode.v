@@ -27,7 +27,7 @@ Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import KernelRvcDecode.
+Require Import KernelRvcDecode KernelBaseDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -100,12 +100,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* ===================================================================== *)
 (* Base (32-bit) decode facts.                                            *)
 (* ===================================================================== *)
-
-(* auipc a0,0x12  (both &tx_lock materializations) *)
-Lemma uwdb_00012517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00012517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* addi a0,a0,-1500  -> &tx_lock *)
 Lemma uwdb_a2450513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -248,7 +242,7 @@ Section WpUartwriteDecode.
   (* --- acquire(&tx_lock) and the n <= 0 guard (+0x10 .. +0x1c) --- *)
   Lemma uwi_10 : kernel_text -∗ instr (mword_of_int (UW + 0x10) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (UW + 0x10)%Z (mword_of_int 0x00012517 : mword 32)
-    (mword_of_int (UW + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) uwdb_00012517. Qed.
+    (mword_of_int (UW + 0x10) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00012517. Qed.
 
   Lemma uwi_14 : kernel_text -∗ instr (mword_of_int (UW + 0x14) : mword 64) false (ITYPE (mword_of_int 0xa24 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (UW + 0x14)%Z (mword_of_int 0xa2450513 : mword 32)
@@ -407,7 +401,7 @@ Section WpUartwriteDecode.
   (* --- release(&tx_lock) and the epilogue (+0x7c .. +0x92) --- *)
   Lemma uwi_7c : kernel_text -∗ instr (mword_of_int (UW + 0x7c) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (UW + 0x7c)%Z (mword_of_int 0x00012517 : mword 32)
-    (mword_of_int (UW + 0x7c) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) uwdb_00012517. Qed.
+    (mword_of_int (UW + 0x7c) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00012517. Qed.
 
   Lemma uwi_80 : kernel_text -∗ instr (mword_of_int (UW + 0x80) : mword 64) false (ITYPE (mword_of_int 0x9b8 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (UW + 0x80)%Z (mword_of_int 0x9b850513 : mword 32)

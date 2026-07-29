@@ -1,0 +1,166 @@
+(* WpUartgetc.v -- uartgetc(), the one xv6 UART function that has no symbol.
+
+     static int uartgetc(void) {
+       if (ReadReg(LSR) & LSR_RX_READY) return ReadReg(RHR);
+       else return -1;
+     }
+
+   It is [static] and called once, so gcc INLINES it: there is no [uartgetc]
+   entry in KernelSyms.v, and the coverage report -- which is symbol-driven --
+   cannot count it.  What exists in the image is its BODY, four instructions
+   inside uartintr (+0x44 .. +0x4c), with the C's [c != -1] test fused into
+   the caller's loop branch: the "-1" is never materialized, the [beqz] on the
+   rx-ready bit IS it.
+
+   So this file states uartgetc the only way the compiled kernel admits: as a
+   block lemma parameterized by its four instruction addresses and its two
+   exits ("no input", at the branch target; "a byte", at the instruction after
+   the RHR read, with the byte in a0).  It is the pc-parameterized-block
+   recipe from claude-notes/durable-notes.md, used here not because the block
+   occurs twice but because it belongs to a function that no longer has an
+   address of its own.
+
+   Both accesses are ghost-free: no UART read moves the accepted trace, the
+   transmitted prefix or DLAB ([DevModel.uart_read_stable]), so uartgetc needs
+   neither the transmitter token nor tx_lock -- which is exactly why xv6 can
+   run the rx drain outside the critical section. *)
+From Stdlib Require Import ZArith Bool Lia List.
+From stdpp Require Import gmap list bitvector.definitions.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import ghost_var gen_heap invariants.
+From iris.program_logic Require Import language weakestpre lifting.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
+Require Import RegFile.
+Require Import WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import DevModel DiskPtsto WpUart.
+Require Import IntrDefs.
+Require Import SpecUart.
+Require Import WpSmodeUart.
+Require Import WpUartPutcSync.
+Require Import WpSconfAlu WpSconfBtype.
+Require Import WpSconfUartAccess.
+Local Open Scope Z_scope.
+
+Module UartgetcProof (Uart : UART).
+Module UAcc := UartAccessProof Uart.
+
+Section WpUartgetc.
+  Context `{!riscvGS Σ}.
+  Context `{!sieG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{CID : CpuId}.
+
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+  Notation Ra5 := (mword_of_int 15 : mword 5).
+
+  (* what the [c.andi a5,a5,1] leaves in a5, and the [beqz] that reads it *)
+  Definition rx_masked (b : bv 8) : mword 64 :=
+    and_vec (lsr_ldval_of b) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))).
+  Definition rx_empty (b : bv 8) : bool := eq_vec (rx_masked b) (zero_reg : mword 64).
+
+  (* a5's compressed-register index *)
+  Lemma ug_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx Ra5.
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (*  uartgetc, inlined.                                                    *)
+  (* -------------------------------------------------------------------- *)
+  Lemma wp_uartgetc_inline (γ : gname) (γd : uart_names) (γv : disk_names)
+      (Φ : mval -> iProp Σ) (m : regfile) (n : nat)
+      (rs_lsr rs_rhr : mword 5) (imm8 : mword 8)
+      (pcL pcA pcB pcR pcK pcNo : mword 64) :
+    (* the two bases: the LSR and the RHR, each already in a register *)
+    m !!! Regidx rs_lsr = uart_pa 5 ->
+    m !!! Regidx rs_rhr = uart_pa 0 ->
+    (* the RHR base must survive the [andi] that clobbers a5 *)
+    rs_rhr <> Ra5 ->
+    (* the block's own geometry, as literals *)
+    add_vec_int pcL 4 = pcA ->
+    add_vec_int pcA 2 = pcB ->
+    add_vec_int pcB 2 = pcR ->
+    add_vec_int pcR 4 = pcK ->
+    add_vec pcB (sign_extend' 64 (sign_extend' 13 (concat_vec imm8 ('b"0")))) = pcNo ->
+    eq_vec (access_vec_dec pcNo 0) ('b"0") = true ->
+    sie_cap_gpr γ m n -∗
+    pc_is pcL -∗
+    instr pcL false (LOAD (mword_of_int 0 : mword 12, Regidx rs_lsr, Regidx Ra5, true, 1)) -∗
+    instr pcA true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx Ra5, Regidx Ra5, ANDI)) -∗
+    instr pcB true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg,
+                           creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) -∗
+    instr pcR false (LOAD (mword_of_int 0 : mword 12, Regidx rs_rhr, Regidx Ra0, true, 1)) -∗
+    dev_inv γd γv -∗
+    (* the two returns, as a CONJUNCTION: exactly one is taken, and they must
+       share whatever the caller is carrying across the call *)
+    ( (* "return -1": the rx FIFO was empty *)
+      ( ∀ b : bv 8,
+          ⌜ rx_empty b = true ⌝ -∗
+          sie_cap_gpr γ (<[Regidx Ra5 := regval_into_reg (rx_masked b)]> m) n -∗
+          pc_is pcNo -∗
+          WP (Loop : expr riscv_lang) {{ Φ }})
+      ∧ (* "return the byte": it is in a0, zero-extended *)
+      ( ∀ b c : bv 8,
+          ⌜ rx_empty b = false ⌝ -∗
+          sie_cap_gpr γ (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
+                         (<[Regidx Ra5 := regval_into_reg (rx_masked b)]> m)) n -∗
+          pc_is pcK -∗
+          WP (Loop : expr riscv_lang) {{ Φ }}) ) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hlsr Hrhr Hne HA HB HR HK HNo Hal) "Hcg Hpc HiL HiA HiB HiR #Hdinv Hk".
+    (* --- the rx-ready poll: [lbu a5,0(s1)] --- *)
+    iApply (UAcc.wp_uart_read_free_s_sconf γ γd γv 5 Φ pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
+              m n ltac:(unfold uart_size; lia) ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hlsr; apply bv_eq; vm_compute; reflexivity)
+              with "Hcg Hpc HiL Hdinv [-]").
+    iIntros (b) "Hcg Hpc". iEval (rewrite HA) in "Hpc".
+    (* --- [c.andi a5,a5,1] --- *)
+    iApply (wp_candi_s_sconf γ Φ pcA Ra5 (mword_of_int 1 : mword 6)
+              (<[Regidx Ra5 := regval_into_reg (lsr_ldval_of b)]> m) n
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              with "Hcg Hpc HiA [-]").
+    iIntros "Hcg Hpc". iEval (rewrite HB) in "Hpc".
+    iEval (rewrite upd_eq upd_upd) in "Hcg".
+    change (and_vec (lsr_ldval_of b) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
+      with (rx_masked b) in *.
+    (* --- [c.beqz a5]: the C's [c == -1] --- *)
+    assert (Hlk : <[Regidx Ra5 := regval_into_reg (rx_masked b)]> m !!! Regidx Ra5 = rx_masked b)
+      by (rewrite upd_eq; reflexivity).
+    destruct (rx_empty b) eqn:Hempty.
+    - (* no input *)
+      iApply (wp_cbeqz_taken_s_sconf γ Φ pcB imm8 (Cregidx (mword_of_int 7)) Ra5
+                (<[Regidx Ra5 := regval_into_reg (rx_masked b)]> m) n
+                ug_cr7 ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hlk; exact Hempty)
+                ltac:(rewrite HNo; exact Hal)
+                with "Hcg Hpc HiB [-]").
+      iNext. iIntros "Hcg Hpc". iEval (rewrite HNo) in "Hpc".
+      iDestruct "Hk" as "[Hno _]".
+      iApply ("Hno" $! b with "[%] Hcg Hpc"). exact Hempty.
+    - (* a byte is waiting: [lbu a0,0(s2)] pops it *)
+      iApply (wp_cbeqz_fall_s_sconf γ Φ pcB imm8 (Cregidx (mword_of_int 7)) Ra5
+                (<[Regidx Ra5 := regval_into_reg (rx_masked b)]> m) n
+                ug_cr7 ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hlk; exact Hempty)
+                with "Hcg Hpc HiB [-]").
+      iIntros "Hcg Hpc". iEval (rewrite HR) in "Hpc".
+      assert (Hrhr' : <[Regidx Ra5 := regval_into_reg (rx_masked b)]> m !!! Regidx rs_rhr = uart_pa 0).
+      { rewrite upd_ne; [exact Hrhr | congruence]. }
+      iApply (UAcc.wp_uart_read_free_s_sconf γ γd γv 0 Φ pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
+                (<[Regidx Ra5 := regval_into_reg (rx_masked b)]> m) n
+                ltac:(unfold uart_size; lia) ltac:(vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hrhr'; apply bv_eq; vm_compute; reflexivity)
+                with "Hcg Hpc HiR Hdinv [-]").
+      iIntros (c) "Hcg Hpc". iEval (rewrite HK) in "Hpc".
+      iDestruct "Hk" as "[_ Hyes]".
+      iApply ("Hyes" $! b c with "[%] Hcg Hpc"). exact Hempty.
+  Qed.
+
+End WpUartgetc.
+End UartgetcProof.

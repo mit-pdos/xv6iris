@@ -30,6 +30,7 @@ Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import SpecUart.
+Require Import WpSmodeUart.
 Require Import WpUartPutcSync.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -45,14 +46,18 @@ Section WpSconfUartAccess.
      hands back the token and -- IF the read byte says THRE was set -- the
      [uart_out_lb] bound that makes the observation survive to a later THR
      write ([uart_tx_ready_persists], WpUart.v). *)
-  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
+  (* generalized over the DISPLACEMENT: gcc emits the LSR read either as
+     [lbu a5,0(a4)] off a base register already holding UART0+5
+     (uartputc_sync) or as [lbu a5,5(a5)] off one holding UART0 (uartintr).
+     The [imm = 0] restatement below keeps the original callers unchanged. *)
+  Lemma wp_uart_lsr_read_ea_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (l : list (bv 8)) :
     uint rd <> 0 ->
     rd <> csp_rs1 ->
-    m !!! Regidx rs1 = uart_pa 5 ->
+    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa 5 ->
     sie_cap_gpr γ m n -∗
-    pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
     ( ∀ b : bv 8,
       sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
@@ -63,7 +68,7 @@ Section WpSconfUartAccess.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdsp Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf γ γd γv 5 Φ pc false true rd rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_lb_uart_s_sconf γ γd γv 5 Φ pc false true rd rs1 imm
               m n (uart_tx_own γd l)
               (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
               ltac:(unfold uart_size; lia) Hrd Hrdsp
@@ -82,6 +87,99 @@ Section WpSconfUartAccess.
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
     - iIntros (b) "Hcg Hpc [Hown Hlb]".
       iApply ("Hcont" $! b with "Hcg Hpc Hown Hlb").
+  Qed.
+
+  (* the original, zero-displacement form (uartputc_sync's call site). *)
+  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
+      (m : regfile) (n : nat) (l : list (bv 8)) :
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    m !!! Regidx rs1 = uart_pa 5 ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗ uart_tx_own γd l -∗
+    ( ∀ b : bv 8,
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      uart_tx_own γd l -∗
+      (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hrd Hrdsp Haddr.
+    exact (wp_uart_lsr_read_ea_s_sconf γ γd γv Φ pc rd rs1 (mword_of_int 0 : mword 12)
+             m n l Hrd Hrdsp
+             ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* A UART register read with NO ghost obligation at all.                *)
+  (* ------------------------------------------------------------------ *)
+  (* No read moves any of the three tracked TX quantities: only the RHR read
+     advances the device, and it pops the RECEIVE FIFO, which appears in
+     neither [uart_acc] nor [u_out] nor [uart_dlab] ([DevModel.uart_read_stable]).
+     So a driver that merely wants the byte needs no transmitter token and no
+     [uart_out_lb] -- this one leaf serves uartintr's ISR acknowledge and both
+     of uartgetc's accesses (the rx-ready poll and the RHR pop), at ANY of the
+     eight register offsets and with the displacement in the INSTRUCTION
+     ([lbu a5,5(a5)] off a base register holding UART0, which is how gcc emits
+     them) rather than pre-added into the base. *)
+
+  (* the constant Sv39 geometry of the UART page, at every register offset:
+     the address is canonical, its vpn is [uart_vpn], and the leaf ppn
+     recomposes to the address.  Discharged by an eight-way case split, since
+     each offset is then a closed term. *)
+  Local Lemma uart_geom_ok (off : Z) :
+    (0 <= off < uart_size)%Z ->
+    let a8 := sign_extend' 64 (subrange_vec_dec (uart_pa off) (xlen - 0 - 1) 0) in
+    neq_vec (bits_of_virtaddr (Virtaddr a8))
+      (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false
+    /\ autocast (T := mword) (subrange_vec_dec
+         (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)
+         (Z.sub 39 1) pagesize_bits) = uart_vpn
+    /\ zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off.
+  Proof.
+    unfold uart_size. intro Hoff.
+    assert (Hc : off = 0 \/ off = 1 \/ off = 2 \/ off = 3 \/
+                 off = 4 \/ off = 5 \/ off = 6 \/ off = 7) by lia.
+    destruct Hc as [H|[H|[H|[H|[H|[H|[H|H]]]]]]]; subst off; cbn zeta;
+      (split; [vm_compute; reflexivity
+              | split; [apply bv_eq; vm_compute; reflexivity
+                       | apply bv_eq; vm_compute; reflexivity]]).
+  Qed.
+
+  Lemma wp_uart_read_free_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+      (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (n : nat) :
+    (0 <= off < uart_size)%Z ->
+    uint rd <> 0 ->
+    rd <> csp_rs1 ->
+    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa off ->
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    dev_inv γd γv -∗
+    ( ∀ b : bv 8,
+      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hoff Hrd Hrdsp Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
+    destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
+    iApply (Uart.wp_lb_uart_s_sconf γ γd γv off Φ pc false true rd rs1 imm
+              m n emp%I (fun _ => emp%I)
+              Hoff Hrd Hrdsp
+              ltac:(rewrite Haddr; exact Hg1)
+              ltac:(rewrite Haddr; exact Hg2)
+              ltac:(rewrite Haddr; exact Hg3)
+              with "Hcg Hpc Hinstr Hdinv [] [] [Hcont]").
+    - done.
+    - iIntros (u b u') "%Hread Hg _".
+      destruct (uart_read_stable u off b u' Hread) as (Ha & Ho & Hd).
+      iModIntro. iSplitL "Hg"; [| done].
+      iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg").
+    - iIntros (b) "Hcg Hpc _". iApply ("Hcont" $! b with "Hcg Hpc").
   Qed.
 
   (* The THR write (offset 0).  The caller brings the transmitter token, the

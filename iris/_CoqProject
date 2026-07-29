@@ -569,3 +569,10 @@ SpecUartwrite.v
 WpUartwriteDecode.v
 ProofUartwrite.v
 LinkUartwrite.v
+SpecConsoleintr.v
+LinkConsoleintr.v
+WpUartgetc.v
+SpecUartintr.v
+WpUartintrDecode.v
+ProofUartintr.v
+LinkUartintr.v
