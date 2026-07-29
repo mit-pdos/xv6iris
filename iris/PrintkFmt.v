@@ -182,6 +182,57 @@ Proof.
   repeat (match goal with |- context [if ?b then _ else _] => destruct b end); cbn; lia.
 Qed.
 
+(* A directive that consumed a SECOND (third) character really read one: the
+   1- and 2-consuming arms test c1 (c2) against d/u/x, none of which is the
+   terminator.  This is what keeps the loop's cursor inside the string: the
+   index it advances to is the index of a character the arm just matched. *)
+Lemma pk_dir_snd1_c1 (c0 c1 c2 : ascii) :
+  snd (pk_dir c0 c1 c2) = 1%nat -> c1 <> pk_nul.
+Proof.
+  unfold pk_dir.
+  destruct (Ascii.eqb c0 "d"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "u"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "x"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "p"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "c"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "s"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "l"); [ | cbn; discriminate].
+  destruct (Ascii.eqb c1 "d") eqn:Hd.
+  { intros _ He. subst c1. vm_compute in Hd. discriminate. }
+  destruct (Ascii.eqb c1 "u") eqn:Hu.
+  { intros _ He. subst c1. vm_compute in Hu. discriminate. }
+  destruct (Ascii.eqb c1 "x") eqn:Hx.
+  { intros _ He. subst c1. vm_compute in Hx. discriminate. }
+  destruct (Ascii.eqb c1 "l"); [ | cbn; discriminate].
+  destruct (Ascii.eqb c2 "d"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c2 "u"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c2 "x"); cbn; discriminate.
+Qed.
+
+Lemma pk_dir_snd2_c2 (c0 c1 c2 : ascii) :
+  snd (pk_dir c0 c1 c2) = 2%nat -> c2 <> pk_nul.
+Proof.
+  unfold pk_dir.
+  destruct (Ascii.eqb c0 "d"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "u"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "x"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "p"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "c"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "s"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c0 "l"); [ | cbn; discriminate].
+  destruct (Ascii.eqb c1 "d"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c1 "u"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c1 "x"); [cbn; discriminate | ].
+  destruct (Ascii.eqb c1 "l"); [ | cbn; discriminate].
+  destruct (Ascii.eqb c2 "d") eqn:Hd.
+  { intros _ He. subst c2. vm_compute in Hd. discriminate. }
+  destruct (Ascii.eqb c2 "u") eqn:Hu.
+  { intros _ He. subst c2. vm_compute in Hu. discriminate. }
+  destruct (Ascii.eqb c2 "x") eqn:Hx.
+  { intros _ He. subst c2. vm_compute in Hx. discriminate. }
+  cbn; discriminate.
+Qed.
+
 (* ONE turn of the format loop, as an equation on [pk_kinds]. *)
 Lemma pk_kinds_step (f : string) (p : nat) :
   nonul f = true -> (p < String.length f)%nat ->

@@ -109,13 +109,15 @@ are working on that effort — the relevant `projects/` file.
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
-  printint → consputc → uartputc_sync), verified on the PANIC path
-  (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it): consputc and
-  printint are proven — with the rejoining-arms epilogue shape, `StackBytes.v`'s
-  frame-resident char array, and the fuel induction that bounds printint's
-  digit loop inside `buf[20]` — and printk is specified, including
-  `PrintkFmt.v`, the pure model of which varargs a format string consumes,
-  which is what makes printk's variadic precondition statable.
+  printint → consputc → uartputc_sync), ALL PROVEN and linked on the PANIC
+  path (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it).
+  Keeps the rejoining-arms epilogue shape, `StackBytes.v`'s frame-resident
+  char array, the fuel inductions (printint's digit loop, printk's format
+  loop), `PrintkFmt.v` — the pure model of which varargs a format string
+  consumes, which is what makes printk's variadic precondition statable —
+  and the loop-assembly architecture (one-turn lemma at 0x86 with its two
+  futures as an `∧`-conjunction). Only the general (non-panic) path remains,
+  blocked on uartputc_sync's.
 - **[`sys-pipe.md`](projects/sys-pipe.md)** — sys_pipe, PROVEN (unlinked): the
   syscall where the file/proc model has to balance — two `fd_slot`s in, two out
   on all four exits, which is what forced filealloc's and pipealloc's failure

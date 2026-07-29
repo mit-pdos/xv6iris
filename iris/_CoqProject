@@ -515,6 +515,7 @@ ProofPrintint.v
 LinkPrintint.v
 WpPrintkDecode.v
 ProofPrintk.v
+LinkPrintk.v
 SpecArgaddr.v
 SpecFdalloc.v
 SpecSysPipe.v

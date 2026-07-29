@@ -64,6 +64,8 @@ Proof. lia. Qed.
    block. *)
 Local Strategy 1000 [pa_stk].
 
+Module PrintkProof (Consputc : CONSPUTC) (Printint : PRINTINT) : PRINTK.
+
 Section ProofPrintk.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
@@ -876,11 +878,11 @@ Section ProofPrintk.
     mc !!! Regidx csp_rs1 = spd ->
     mc !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ->
     mc !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) ->
+    mword_of_int (PK + B + 18) = (mword_of_int (PK + 0x260) : mword 64) ->
     sie_cap_gpr γ mc (K - 24)%nat -∗
     kernel_text -∗
     pk_restore_instrs B -∗
     pc_is (mword_of_int (PK + B + 0) : mword 64) -∗
-    ⌜ mword_of_int (PK + B + 18) = (mword_of_int (PK + 0x260) : mword 64) ⌝ -∗
     (pa_stk sp0 9) ↦₈ (m !!! Regidx ra_idx) -∗
     (pa_stk sp0 10) ↦₈ (m !!! Regidx s0_idx) -∗
     (pa_stk sp0 12) ↦₈ (m !!! Regidx s2_idx) -∗
@@ -898,8 +900,8 @@ Section ProofPrintk.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros sp0 spd HK Hpv Hsp Htp Hs9.
-    iIntros "Hcg #Htext Hinstrs Hpc %Hnext H9 H10 H12 Hsv Hrest Hpanicking HR Hcont".
+    intros sp0 spd HK Hpv Hsp Htp Hs9 Hnext.
+    iIntros "Hcg #Htext Hinstrs Hpc H9 H10 H12 Hsv Hrest Hpanicking HR Hcont".
     iApply (wp_printk_restore γ Φ mc K B sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) Hsp
               with "Hcg Hinstrs Hpc Hsv [-]").
     iIntros (mf) "%Hpost Hcg Hpc Hsv".
@@ -920,6 +922,85 @@ Section ProofPrintk.
        caller; the other nine are its own posts.  [Hkp] is applied at an
        EXPLICIT index -- with [_] the inline [mw_neq] would run against an
        evar. *)
+    assert (Hcsk : pk_cs_kept m mf).
+    { unfold pk_cs_kept. repeat split.
+      - rewrite (Hkp (mword_of_int 4 : mword 5) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Htp.
+      - exact E9.
+      - exact E19.
+      - exact E20.
+      - exact E21.
+      - exact E22.
+      - exact E23.
+      - exact E24.
+      - rewrite (Hkp (mword_of_int 25 : mword 5) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hs9.
+      - exact E26.
+      - exact E27. }
+    iApply (wp_printk_epi γ Φ m mf K pv pv dqm dqm R HK Hpv Hmfsp Hcsk
+              with "Hcg Htext Hpc Hfr Hpanicking HR Hcont").
+  Qed.
+
+  (* The SECOND restore block (0x276), the [c0 = 0] dispatch exit.  Unlike the
+     one at 0x24e it does not fall into the epilogue: a [c.j] at 0x288 jumps
+     back to 0x260.  One extra instruction, same tail. *)
+  Lemma wp_printk_exit276 (γ : gname) (Φ : mval -> iProp Σ)
+      (m mc : regfile) (K : nat) (pv : mword 32) (dqm : dfrac) (R : iProp Σ) :
+    let sp0 := m !!! Regidx csp_rs1 in
+    let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
+    (24 <= K)%nat ->
+    eq_vec (sign_extend' 64 pv) zero_reg = false ->
+    mc !!! Regidx csp_rs1 = spd ->
+    mc !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ->
+    mc !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) ->
+    sie_cap_gpr γ mc (K - 24)%nat -∗
+    kernel_text -∗
+    pc_is (mword_of_int (PK + 0x276) : mword 64) -∗
+    (pa_stk sp0 9) ↦₈ (m !!! Regidx ra_idx) -∗
+    (pa_stk sp0 10) ↦₈ (m !!! Regidx s0_idx) -∗
+    (pa_stk sp0 12) ↦₈ (m !!! Regidx s2_idx) -∗
+    pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) -∗
+    pk_slots_rest sp0 -∗
+    (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+    R -∗
+    ( ∀ mf,
+      sie_cap_gpr γ mf K -∗
+      pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
+      ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
+        /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
+      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+      R -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros sp0 spd HK Hpv Hsp Htp Hs9.
+    iIntros "Hcg #Htext Hpc H9 H10 H12 Hsv Hrest Hpanicking HR Hcont".
+    iPoseProof (pk_restore_at_276 with "Htext") as "Hinstrs".
+    iPoseProof (pki_288 with "Htext") as "Hi288".
+    iApply (wp_printk_restore γ Φ mc K 0x276 sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) Hsp
+              with "Hcg Hinstrs Hpc Hsv [-]").
+    iIntros (mf) "%Hpost Hcg Hpc Hsv".
+    destruct Hpost as (Hkeep & E9 & E19 & E20 & E21 & E22 & E23 & E24 & E26 & E27).
+    assert (Hp288 : mword_of_int (PK + 0x276 + 18) = (mword_of_int (PK + 0x288) : mword 64))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp288) in "Hpc".
+    (* +0x288 c.j 0x260 *)
+    iApply (wp_cj_s_sconf γ Φ (mword_of_int (PK + 0x288))
+              (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")))
+              mf (K - 24)%nat ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi288 [-]").
+    iNext. iIntros "Hcg Hpc".
+    assert (Htgt : add_vec (mword_of_int (PK + 0x288) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")))) = mword_of_int (PK + 0x260)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Htgt) in "Hpc".
+    iDestruct (pk_frame_of_saved sp0 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx)
+                 (m !!! Regidx s2_idx) (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) with "H9 H10 H12 Hsv Hrest") as "Hfr".
+    assert (Hkp : forall c : mword 5,
+              c <> mword_of_int 9 -> c <> mword_of_int 19 -> c <> mword_of_int 20 ->
+              c <> mword_of_int 21 -> c <> mword_of_int 22 -> c <> mword_of_int 23 ->
+              c <> mword_of_int 24 -> c <> mword_of_int 26 -> c <> mword_of_int 27 ->
+              mf !!! Regidx c = mc !!! Regidx c) by exact Hkeep.
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = spd).
+    { rewrite (Hkp csp_rs1 ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)
+                 ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)).
+      exact Hsp. }
     assert (Hcsk : pk_cs_kept m mf).
     { unfold pk_cs_kept. repeat split.
       - rewrite (Hkp (mword_of_int 4 : mword 5) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Htp.
@@ -1016,10 +1097,13 @@ Section ProofPrintk.
        ∃ w : mword 64, (pa_stk sp0 k) ↦₈ w) -∗
     R -∗
     (* (a) the empty format string: no lazy save has happened, so the frame is
-       already in [pk_frame] shape and the epilogue can run at once *)
+       already in [pk_frame] shape and the epilogue can run at once.  The
+       [beqz] at 0x34 was TAKEN, so the first byte is the terminator -- stated
+       so the caller can decide which of the two continuations is live. *)
     ( ∀ mf,
       sie_cap_gpr γ mf K -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
+      ⌜ pk_fbyte f 0%nat = (mword_of_int 0 : mword 8) ⌝ -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
@@ -1032,6 +1116,9 @@ Section ProofPrintk.
         /\ mq !!! Regidx s2_idx = fmt
         /\ mq !!! Regidx (mword_of_int 20 : mword 5) = zero_reg
         /\ mq !!! Regidx a0_idx = zero_extend' 64 (pk_fbyte f 0%nat)
+        (* the [beqz] at 0x34 fell through, so the first byte is a real
+           character -- which is what lets the loop start with i < |f| *)
+        /\ pk_fbyte f 0%nat <> (mword_of_int 0 : mword 8)
         /\ pk_consts mq
         /\ (forall c : mword 5, c <> csp_rs1 -> c <> s0_idx -> c <> s2_idx ->
               c <> mword_of_int 15 -> c <> a0_idx -> c <> mword_of_int 19 ->
@@ -1242,7 +1329,11 @@ Section ProofPrintk.
                 with "Hcg Htext Hpc Hfr Hpanicking [Hfmt HR] [-]").
       { iFrame "Hfmt HR". }
       iIntros (mf) "Hcg Hpc %Hfin Hpanicking [Hfmt HR]".
-      iApply ("Kend" $! mf with "Hcg Hpc [%] Hpanicking Hfmt HR"). exact Hfin.
+      iApply ("Kend" $! mf with "Hcg Hpc [%] [%] Hpanicking Hfmt HR").
+      { assert (HQ4a0 : Q4 !!! Regidx a0_idx = zero_extend' 64 (pk_fbyte f 0%nat))
+          by (rewrite /Q4 upd_eq; reflexivity).
+        rewrite HQ4a0 in Hz. exact (zext8_zero _ Hz). }
+      exact Hfin.
     - (* ---- f nonempty : the lazy saves, the constants, and into the loop ---- *)
       iApply (wp_beqz_x0_fall_s_sconf γ Φ (mword_of_int (PK + 0x34)) (mword_of_int 556 : mword 13)
                 a0_idx Q4 (K - 24)%nat ltac:(vm_compute; discriminate) Hz
@@ -1436,6 +1527,14 @@ Section ProofPrintk.
         { rewrite (Hpeel a0_idx ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)
                       ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)).
           rewrite /Q4 upd_eq. reflexivity. }
+        split.
+        { intro Hc.
+          assert (HQ4a0 : Q4 !!! Regidx a0_idx = zero_extend' 64 (pk_fbyte f 0%nat))
+            by (rewrite /Q4 upd_eq; reflexivity).
+          rewrite HQ4a0 Hc in Hz.
+          assert (Hz0 : eq_vec (zero_extend' 64 (mword_of_int 0 : mword 8)) (zero_reg : mword 64) = true)
+            by (vm_compute; reflexivity).
+          rewrite Hz0 in Hz. discriminate. }
         split.
         { unfold pk_consts. split_and!.
           { rewrite /C6 upd_ne; [| reg_neq]. rewrite /C5 upd_ne; [| reg_neq].
@@ -7105,4 +7204,700 @@ Section ProofPrintk.
       rewrite (Hcs (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact Hs1.
   Qed.
 
+  (* ================================================================== *)
+  (*  THE FORMAT LOOP.                                                   *)
+  (*                                                                     *)
+  (*  Everything below only ASSEMBLES proven pieces -- advance, char,    *)
+  (*  dispatch, the fifteen arms, the two exits.  The loop state is two  *)
+  (*  numbers: [p], the index of the last format character consumed, and *)
+  (*  [k], the varargs consumed so far; the invariant ties them together *)
+  (*  by [pk_kinds] on the remaining SUFFIX of the format string, and    *)
+  (*  [pk_kinds_step] is the equation one turn rewrites it by.           *)
+  (*                                                                     *)
+  (*  The fuel induction runs at the increment point 0x78                *)
+  (*  ([wp_printk_loop78]); one turn from the '%' test at 0x86 is its    *)
+  (*  own lemma ([wp_printk_body86]) so that the ENTRY from the setup    *)
+  (*  (which lands at 0x86, not 0x78) is the same proof as a turn from   *)
+  (*  inside the loop.  [wp_printk_body86] takes its two futures as ONE  *)
+  (*  [∧]-conjunction -- go round again, or exit through 0x276 -- since  *)
+  (*  which one runs is decided by the machine inside the lemma, while   *)
+  (*  the caller has only one copy of the final continuation to give     *)
+  (*  out; [∧] hands the same context to both.                           *)
+  (* ================================================================== *)
+
+  (* a character strictly inside the string, from its byte being nonzero *)
+  Lemma pk_ch_lt (g : string) (j : nat) :
+    pk_ch g j <> pk_nul -> (j < String.length g)%nat.
+  Proof.
+    intro Hnz. destruct (decide (String.length g <= j)%nat) as [Hle | Hgt].
+    - exfalso. apply Hnz. apply pk_ch_nul. exact Hle.
+    - lia.
+  Qed.
+
+  Lemma pk_ch_nonzero (g : string) (j : nat) :
+    nonul g = true -> (j < String.length g)%nat -> pk_ch g j <> pk_nul.
+  Proof.
+    intros Hn Hj He.
+    apply (pk_fbyte_nonzero g j Hn).
+    - rewrite string_bytes_length. exact Hj.
+    - rewrite (pk_fbyte_ch g j ltac:(lia)) He.
+      apply bv_eq; vm_compute; reflexivity.
+  Qed.
+
+  Section PrintkLoop.
+    Variables (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ).
+    Variables (m : regfile) (K : nat).
+    Variables (pv pkv : mword 32) (dqm dqm2 dqf : dfrac).
+    Variables (f : string) (descs : list pk_arg_desc).
+
+    Let sp0 : mword 64 := m !!! Regidx csp_rs1.
+    Let spd : mword 64 := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))).
+    Let s0v : mword 64 := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)).
+    Let fmtv : mword 64 := m !!! Regidx a0_idx.
+
+    Hypothesis HK : (38 <= K)%nat.
+    Hypothesis Hflen : (Z.of_nat (String.length f) < 2147483645)%Z.
+    Hypothesis Hnn : nonul f = true.
+    Hypothesis Hdlen : (length descs <= 7)%nat.
+    Hypothesis Hpv : eq_vec (sign_extend' 64 pv) zero_reg = false.
+    Hypothesis Hpkv : neq_vec (sign_extend' 64 pkv) zero_reg = false.
+
+    (* the frame as the loop carries it: everything the prologue and setup
+       built, with the va_list cursor at [k] arguments consumed *)
+    Definition pk_loop_frame (k : nat) : iProp Σ :=
+      ((pa_stk sp0 9) ↦₈ (m !!! Regidx ra_idx) ∗
+       (pa_stk sp0 10) ↦₈ (m !!! Regidx s0_idx) ∗
+       (pa_stk sp0 12) ↦₈ (m !!! Regidx s2_idx) ∗
+       pk_va sp0 m ∗
+       pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) ∗
+       (∃ w : mword 64, (pa_stk sp0 8) ↦₈ w) ∗
+       (∃ w : mword 64, (pa_stk sp0 19) ↦₈ w) ∗
+       (∃ w : mword 64, (pa_stk sp0 22) ↦₈ w) ∗
+       (pa_stk sp0 23) ↦₈ (pk_ap s0v k) ∗
+       (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w))%I.
+
+    (* what the whole loop owes at the end: the spec's continuation, relative
+       to the byte list [l] the UART held when the loop was entered *)
+    Definition pk_loop_post (l : list (bv 8)) : iProp Σ :=
+      (∀ (mf : regfile) (bs : list (bv 8)),
+        sie_cap_gpr γ mf K -∗
+        pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
+        ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
+          /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
+        fmtv ↦ₛ{ dqf } f -∗
+        ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
+        (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+        (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+        uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+
+    (* "go round again": what one turn from index [i] hands back to the loop
+       head at 0x78.  [p'] is the new last-consumed index, [k'] the new
+       vararg count, [bs] what the turn printed. *)
+    Definition pk_loop_head (i : nat) (l : list (bv 8)) : iProp Σ :=
+      (∀ (mk : regfile) (k' p' : nat) (bs : list (bv 8)),
+        ⌜ (i <= p')%nat /\ (p' < String.length f)%nat
+          /\ pk_kinds (str_drop (S p') f) = map pk_desc_kind (drop k' descs)
+          /\ mk !!! Regidx csp_rs1 = spd
+          /\ mk !!! Regidx s0_idx = s0v
+          /\ mk !!! Regidx s2_idx = fmtv
+          /\ mk !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat p')
+          /\ mk !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)
+          /\ mk !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)
+          /\ pk_consts mk ⌝ -∗
+        sie_cap_gpr γ mk (K - 24)%nat -∗
+        pc_is (mword_of_int (PK + 0x78) : mword 64) -∗
+        fmtv ↦ₛ{ dqf } f -∗
+        ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
+        (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+        (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+        uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
+        pk_loop_frame k' -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+
+    (* the unused frame slots, in the exit lemmas' shape *)
+    Lemma pk_slots_rest_of (w23 : mword 64) :
+      pk_va sp0 m -∗
+      (∃ w : mword 64, (pa_stk sp0 8) ↦₈ w) -∗
+      (∃ w : mword 64, (pa_stk sp0 19) ↦₈ w) -∗
+      (∃ w : mword 64, (pa_stk sp0 22) ↦₈ w) -∗
+      (pa_stk sp0 23) ↦₈ w23 -∗
+      (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w) -∗
+      pk_slots_rest sp0.
+    Proof.
+      iIntros "(V7 & V6 & V5 & V4 & V3 & V2 & V1) S8 S19 S22 Hap S24".
+      rewrite /pk_slots_rest. cbn [big_opL].
+      iSplitL "V1". { iExists (m !!! Regidx (mword_of_int 17 : mword 5)). iExact "V1". }
+      iSplitL "V2". { iExists (m !!! Regidx (mword_of_int 16 : mword 5)). iExact "V2". }
+      iSplitL "V3". { iExists (m !!! Regidx (mword_of_int 15 : mword 5)). iExact "V3". }
+      iSplitL "V4". { iExists (m !!! Regidx (mword_of_int 14 : mword 5)). iExact "V4". }
+      iSplitL "V5". { iExists (m !!! Regidx (mword_of_int 13 : mword 5)). iExact "V5". }
+      iSplitL "V6". { iExists (m !!! Regidx (mword_of_int 12 : mword 5)). iExact "V6". }
+      iSplitL "V7". { iExists (m !!! Regidx (mword_of_int 11 : mword 5)). iExact "V7". }
+      iFrame "S8 S19 S22 S24".
+      iExists w23. iExact "Hap".
+    Qed.
+
+    (* thread the loop's fixed registers through a turn: [Hgq] is whichever
+       "kept every callee-saved register except s1/s4/s5" fact the turn's
+       lemmas produced. *)
+    Lemma pk_head_regs (mq mg : regfile)
+        (Hgq : forall c : mword 5, is_cs_idx c = true ->
+                 c <> mword_of_int 9 -> c <> mword_of_int 20 -> c <> mword_of_int 21 ->
+                 mg !!! Regidx c = mq !!! Regidx c)
+        (Hsp : mq !!! Regidx csp_rs1 = spd)
+        (Hs0 : mq !!! Regidx s0_idx = s0v)
+        (Hs2 : mq !!! Regidx s2_idx = fmtv)
+        (Htp : mq !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5))
+        (Hs9 : mq !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5))
+        (Hcn : pk_consts mq) :
+      mg !!! Regidx csp_rs1 = spd /\ mg !!! Regidx s0_idx = s0v /\ mg !!! Regidx s2_idx = fmtv
+      /\ mg !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5)
+      /\ mg !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5)
+      /\ pk_consts mg.
+    Proof.
+      destruct Hcn as (A1 & A2 & A3 & A4 & A5 & A6).
+      refine (conj _ (conj _ (conj _ (conj _ (conj _ _))))).
+      - rewrite (Hgq csp_rs1 ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hsp.
+      - rewrite (Hgq s0_idx ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hs0.
+      - rewrite (Hgq s2_idx ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hs2.
+      - rewrite (Hgq (mword_of_int 4 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Htp.
+      - rewrite (Hgq (mword_of_int 25 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hs9.
+      - unfold pk_consts. split_and!.
+        + rewrite (Hgq (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact A1.
+        + rewrite (Hgq (mword_of_int 22 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact A2.
+        + rewrite (Hgq (mword_of_int 23 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact A3.
+        + rewrite (Hgq (mword_of_int 24 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact A4.
+        + rewrite (Hgq (mword_of_int 26 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact A5.
+        + rewrite (Hgq (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact A6.
+    Qed.
+
+    (* the dispatch's kept-set, weakened to the shape [pk_head_regs] takes *)
+    Lemma pk_disp_regs (mq mf : regfile) (Hkept : pk_disp_all mf mq) :
+      forall c : mword 5, is_cs_idx c = true ->
+        c <> mword_of_int 9 -> c <> mword_of_int 20 -> c <> mword_of_int 21 ->
+        mf !!! Regidx c = mq !!! Regidx c.
+    Proof.
+      intros c Hc N9 _ N21.
+      assert (N11 : c <> (mword_of_int 11 : mword 5)) by (intro He; subst c; vm_compute in Hc; discriminate).
+      assert (N12 : c <> (mword_of_int 12 : mword 5)) by (intro He; subst c; vm_compute in Hc; discriminate).
+      assert (N13 : c <> (mword_of_int 13 : mword 5)) by (intro He; subst c; vm_compute in Hc; discriminate).
+      assert (N14 : c <> (mword_of_int 14 : mword 5)) by (intro He; subst c; vm_compute in Hc; discriminate).
+      assert (N15 : c <> (mword_of_int 15 : mword 5)) by (intro He; subst c; vm_compute in Hc; discriminate).
+      exact (Hkept c N9 N11 N12 N13 N14 N15 N21).
+    Qed.
+
+    (* the advance block's kept-set, ditto *)
+    Lemma pk_adv_regs (mq mf : regfile) (Hkept : pk_adv_kept mf mq) :
+      forall c : mword 5, is_cs_idx c = true ->
+        c <> mword_of_int 9 -> c <> mword_of_int 20 -> c <> mword_of_int 21 ->
+        mf !!! Regidx c = mq !!! Regidx c.
+    Proof.
+      intros c Hc N9 N20 _.
+      assert (N10 : c <> (mword_of_int 10 : mword 5)) by (intro He; subst c; vm_compute in Hc; discriminate).
+      exact (Hkept c N9 N20 N10).
+    Qed.
+
+    (* ---------------------------------------------------------------- *)
+    (*  ONE TURN, from the '%' test at 0x86.                             *)
+    (* ---------------------------------------------------------------- *)
+
+    Lemma wp_printk_body86 (mq : regfile) (k i : nat) (l : list (bv 8)) :
+      (i < String.length f)%nat ->
+      pk_kinds (str_drop i f) = map pk_desc_kind (drop k descs) ->
+      mq !!! Regidx csp_rs1 = spd ->
+      mq !!! Regidx s0_idx = s0v ->
+      mq !!! Regidx s2_idx = fmtv ->
+      mq !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
+      mq !!! Regidx a0_idx = zero_extend' 64 (pk_fbyte f i) ->
+      mq !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ->
+      mq !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) ->
+      pk_consts mq ->
+      sie_cap_gpr γ mq (K - 24)%nat -∗
+      kernel_text -∗ kernel_data -∗
+      pc_is (mword_of_int (PK + 0x86) : mword 64) -∗
+      fmtv ↦ₛ{ dqf } f -∗
+      ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
+      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+      (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+      dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
+      pk_loop_frame k -∗
+      (pk_loop_head i l ∧ pk_loop_post l) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof using All.
+      intros Hilen Hinv Hsp Hs0 Hs2 Hs4 Ha0 Htp4 Hs9r Hconsts.
+      assert (HK24 : (24 <= K)%nat) by lia.
+      assert (HK30 : (30 <= K)%nat) by lia.
+      assert (Hc19 : mq !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 37 : mword 64))
+        by (destruct Hconsts as (X & _); exact X).
+      iIntros "Hcg #Htext #Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked #Hdev Htx #Hsent #Hdlab Hfr Hcont".
+      assert (Hfch : pk_fbyte f i = pk_byte (pk_ch f i)) by (apply pk_fbyte_ch; lia).
+      pose proof (pk_kinds_step f i Hnn Hilen) as Hstep.
+      case_eq (Ascii.eqb (pk_ch f i) "%"%char); intro Hpct.
+      - (* '%': the bne falls through into the dispatch *)
+        rewrite Hpct in Hstep. cbn [negb] in Hstep.
+        assert (Hne : neq_vec (mq !!! Regidx a0_idx) (mq !!! Regidx (mword_of_int 19 : mword 5)) = false).
+        { rewrite Ha0 Hc19 Hfch. unfold neq_vec.
+          rewrite (pk_eq_ascii (pk_ch f i) "%"%char (mword_of_int 37)
+                     ltac:(apply bv_eq; vm_compute; reflexivity)).
+          rewrite Hpct. reflexivity. }
+        iPoseProof (pki_86 with "Htext") as "Hi86".
+        iApply (wp_bne_fall_s_sconf γ Φ (mword_of_int (PK + 0x86)) (mword_of_int 8172 : mword 13)
+                  (mword_of_int 19 : mword 5) a0_idx mq (K - 24)%nat
+                  ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hne
+                  with "Hcg Hpc Hi86 [-]").
+        iIntros "Hcg Hpc".
+        assert (Hp8a : add_vec_int (mword_of_int (PK + 0x86) : mword 64) 4 = mword_of_int (PK + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
+        iEval (rewrite Hp8a) in "Hpc".
+        assert (Hlen1 : (S i < length (cstring_bytes f))%nat) by (rewrite cstring_bytes_length; lia).
+        assert (Hi31 : Z.of_nat i + 1 < 2^31) by (change (2^31) with 2147483648; lia).
+        iApply (wp_printk_dispatch γ Φ mq K fmtv dqf f i
+                  (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv ∗
+                   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                   uart_tx_own γd l ∗ pk_loop_frame k ∗ (pk_loop_head i l ∧ pk_loop_post l))%I
+                  Hlen1 Hi31 Hnn Hs4 Hs2 Hconsts
+                  with "Hcg Htext Hpc Hfmt [$Hdescs $Hpanicking $Hpanicked $Htx $Hfr $Hcont] [-]").
+        iIntros (mf) "%Hd Hcg Hpc Hfmt (Hdescs & Hpanicking & Hpanicked & Htx & Hfr & Hcont)".
+        destruct Hd as [Hkept Hs1f].
+        set (c0 := pk_ch f (S i)) in *.
+        set (c1 := pk_ch f (S (S i))) in *.
+        set (c2 := pk_ch f (S (S (S i)))) in *.
+        pose proof (pk_head_regs mq mf (pk_disp_regs mq mf Hkept) Hsp Hs0 Hs2 Htp4 Hs9r Hconsts)
+          as (Hfsp & Hfs0 & Hfs2 & Hftp & Hfs9 & Hfconsts).
+        destruct (decide (String.length f <= S i)%nat) as [Hend | Hnend].
+        + (* c0 = NUL: the format string is over -- leave through 0x276 *)
+          assert (Hc0 : c0 = pk_nul) by (apply pk_ch_nul; exact Hend).
+          assert (Hc1 : c1 = pk_nul) by (apply pk_ch_nul; lia).
+          assert (Hc2 : c2 = pk_nul) by (apply pk_ch_nul; lia).
+          assert (Hent : pk_entry c0 c1 c2 = 0x276)
+            by (rewrite Hc0 Hc1 Hc2; vm_compute; reflexivity).
+          iEval (rewrite Hent) in "Hpc".
+          iDestruct "Hcont" as "[_ Hfin]".
+          iEval (rewrite /pk_loop_frame) in "Hfr".
+          iDestruct "Hfr" as "(H9 & H10 & H12 & Hva & Hsv & S8 & S19 & S22 & Hap & S24)".
+          iDestruct (pk_slots_rest_of (pk_ap s0v k) with "Hva S8 S19 S22 Hap S24") as "Hrest".
+          iApply (wp_printk_exit276 γ Φ m mf K pv dqm
+                    (fmtv ↦ₛ{ dqf } f ∗
+                     ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                     uart_tx_own γd l)%I
+                    HK24 Hpv Hfsp Hftp Hfs9
+                    with "Hcg Htext Hpc H9 H10 H12 Hsv Hrest Hpanicking [$Hfmt $Hdescs $Hpanicked $Htx] [-]").
+          iIntros (mz) "Hcg Hpc %Hfin2 Hpanicking (Hfmt & Hdescs & Hpanicked & Htx)".
+          iEval (rewrite /pk_loop_post) in "Hfin".
+          iSpecialize ("Hfin" $! mz []).
+          iEval (rewrite (app_nil_r l)) in "Hfin".
+          iApply ("Hfin" with "Hcg Hpc [%] Hfmt Hdescs Hpanicking Hpanicked Htx Hsent").
+          exact Hfin2.
+        + (* a real directive *)
+          assert (Hlt1 : (S i < String.length f)%nat) by lia.
+          assert (Hc0nz : c0 <> pk_nul) by (apply pk_ch_nonzero; [exact Hnn | exact Hlt1]).
+          rewrite (proj2 (Ascii.eqb_neq c0 pk_nul) Hc0nz) in Hstep.
+          cbn [negb] in Hstep.
+          assert (Hplt : (S i + snd (pk_dir c0 c1 c2) < String.length f)%nat).
+          { pose proof (pk_dir_snd_le c0 c1 c2) as Hsle.
+            destruct (snd (pk_dir c0 c1 c2)) as [|[|[|n']]] eqn:Hsnd.
+            - lia.
+            - pose proof (pk_ch_lt f (S (S i)) (pk_dir_snd1_c1 c0 c1 c2 Hsnd)) as Hx. lia.
+            - pose proof (pk_ch_lt f (S (S (S i))) (pk_dir_snd2_c2 c0 c1 c2 Hsnd)) as Hx. lia.
+            - lia. }
+          assert (HzS : Z.of_nat (S i) = Z.of_nat i + 1) by lia.
+          rewrite HzS in Hs1f.
+          assert (Hi33 : Z.of_nat i + 3 < 2^31) by (change (2^31) with 2147483648; lia).
+          assert (Hf20 : mf !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i)).
+          { rewrite (Hkept (mword_of_int 20 : mword 5) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)
+                       ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)).
+            exact Hs4. }
+          assert (Hf22 : mf !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64))
+            by (destruct Hfconsts as (_ & X & _); exact X).
+          (* [case_eq], not [destruct eqn:]: the latter substitutes the
+             scrutinee into [Hstep], and the rewrite below then finds
+             nothing (the gotcha this file's dispatch chain recorded). *)
+          case_eq (fst (pk_dir c0 c1 c2)); [ intros kd Hfst; destruct kd | intro Hfst ].
+          * (* a NUMBER directive *)
+            rewrite Hfst in Hstep. cbn [pk_cons] in Hstep.
+               rewrite Hinv in Hstep.
+               destruct (drop k descs) as [|d0 rest] eqn:Hdk; [ discriminate Hstep | ].
+               cbn [List.map] in Hstep. injection Hstep as Hkd0 Htail.
+               assert (Hk0 : descs !! k = Some d0).
+               { rewrite -(Nat.add_0_r k) -lookup_drop Hdk. reflexivity. }
+               pose proof (lookup_lt_Some descs k d0 Hk0) as Hklen.
+               assert (Hk7 : (k < 7)%nat) by lia.
+               assert (Hdrop : drop (S k) descs = rest).
+               { pose proof (drop_S descs d0 k Hk0) as Hds. rewrite Hdk in Hds.
+                 injection Hds as Hds. symmetry. exact Hds. }
+               assert (Hinv' : pk_kinds (str_drop (S (S i) + snd (pk_dir c0 c1 c2)) f)
+                               = map pk_desc_kind (drop (S k) descs))
+                 by (rewrite Hdrop; symmetry; exact Htail).
+               iEval (rewrite /pk_loop_frame) in "Hfr".
+               iDestruct "Hfr" as "(H9 & H10 & H12 & Hva & Hsv & S8 & S19 & S22 & Hap & S24)".
+               iDestruct "Hcont" as "[Hhead _]".
+               iApply (wp_printk_arm_num γ γd γv Φ m mf K k i l pv pkv dqm dqm2 c0 c1 c2
+                         (fmtv ↦ₛ{ dqf } f ∗
+                          ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                          (pa_stk sp0 9) ↦₈ (m !!! Regidx ra_idx) ∗
+                          (pa_stk sp0 10) ↦₈ (m !!! Regidx s0_idx) ∗
+                          (pa_stk sp0 12) ↦₈ (m !!! Regidx s2_idx) ∗
+                          pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) ∗
+                          (∃ w : mword 64, (pa_stk sp0 8) ↦₈ w) ∗
+                          (∃ w : mword 64, (pa_stk sp0 22) ↦₈ w) ∗
+                          (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w) ∗
+                          pk_loop_head i l)%I
+                         HK Hk7 Hi33 Hpv Hpkv Hfst Hfsp Hfs0 Hf22 Hf20 Hs1f
+                         with "Hcg Htext Hkdata Hpc S19 Hap Hva Hpanicking Hpanicked Hdev Htx Hdlab [$Hfmt $Hdescs $H9 $H10 $H12 $Hsv $S8 $S22 $S24 $Hhead] [-]").
+               iIntros (mg bs) "%Hcs2 Hcg Hpc S19 Hap Hva Hpanicking Hpanicked Htx #Hsent2 (Hfmt & Hdescs & H9 & H10 & H12 & Hsv & S8 & S22 & S24 & Hhead)".
+               destruct Hcs2 as [Hcs2 Hs1g].
+               pose proof (pk_head_regs mf mg Hcs2 Hfsp Hfs0 Hfs2 Hftp Hfs9 Hfconsts)
+                 as (Hgsp & Hgs0 & Hgs2 & Hgtp & Hgs9 & Hgconsts).
+               iEval (rewrite /pk_loop_head) in "Hhead".
+               iApply ("Hhead" $! mg (S k) (S i + snd (pk_dir c0 c1 c2))%nat bs
+                         with "[%] Hcg Hpc Hfmt Hdescs Hpanicking Hpanicked Htx Hsent2 [-]").
+               { split_and!.
+                 - lia.
+                 - exact Hplt.
+                 - replace (S (S i + snd (pk_dir c0 c1 c2)))%nat
+                     with (S (S i) + snd (pk_dir c0 c1 c2))%nat by lia.
+                   exact Hinv'.
+                 - exact Hgsp.
+                 - exact Hgs0.
+                 - exact Hgs2.
+                 - exact Hs1g.
+                 - exact Hgtp.
+                 - exact Hgs9.
+                 - exact Hgconsts. }
+               rewrite /pk_loop_frame.
+               iFrame "H9 H10 H12 Hva Hsv S8 S19 S22 Hap S24".
+          * (* the STRING directive *)
+            rewrite Hfst in Hstep. cbn [pk_cons] in Hstep.
+               rewrite Hinv in Hstep.
+               destruct (drop k descs) as [|d0 rest] eqn:Hdk; [ discriminate Hstep | ].
+               cbn [List.map] in Hstep. injection Hstep as Hkd0 Htail.
+               assert (Hk0 : descs !! k = Some d0).
+               { rewrite -(Nat.add_0_r k) -lookup_drop Hdk. reflexivity. }
+               pose proof (lookup_lt_Some descs k d0 Hk0) as Hklen.
+               assert (Hk7 : (k < 7)%nat) by lia.
+               assert (Hdrop : drop (S k) descs = rest).
+               { pose proof (drop_S descs d0 k Hk0) as Hds. rewrite Hdk in Hds.
+                 injection Hds as Hds. symmetry. exact Hds. }
+               assert (Hinv' : pk_kinds (str_drop (S (S i) + snd (pk_dir c0 c1 c2)) f)
+                               = map pk_desc_kind (drop (S k) descs))
+                 by (rewrite Hdrop; symmetry; exact Htail).
+               iEval (rewrite /pk_loop_frame) in "Hfr".
+               iDestruct "Hfr" as "(H9 & H10 & H12 & Hva & Hsv & S8 & S19 & S22 & Hap & S24)".
+               iDestruct "Hcont" as "[Hhead _]".
+               iDestruct (big_sepL_lookup_acc (fun j d => pk_desc_res (pk_vararg m j) d) descs k d0 Hk0
+                            with "Hdescs") as "[Hdk0 Hdcl]".
+               iApply (wp_printk_arm_str γ γd γv Φ m mf K k i l pv pkv dqm dqm2 c0 c1 c2 d0
+                         (fmtv ↦ₛ{ dqf } f ∗
+                          (pk_desc_res (pk_vararg m k) d0 -∗
+                           ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d)) ∗
+                          (pa_stk sp0 9) ↦₈ (m !!! Regidx ra_idx) ∗
+                          (pa_stk sp0 10) ↦₈ (m !!! Regidx s0_idx) ∗
+                          (pa_stk sp0 12) ↦₈ (m !!! Regidx s2_idx) ∗
+                          pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) ∗
+                          (∃ w : mword 64, (pa_stk sp0 8) ↦₈ w) ∗
+                          (∃ w : mword 64, (pa_stk sp0 22) ↦₈ w) ∗
+                          (∃ w : mword 64, (pa_stk sp0 24) ↦₈ w) ∗
+                          pk_loop_head i l)%I
+                         HK30 Hk7 Hpv Hpkv Hfst Hkd0 Hfs0 Hs1f
+                         with "Hcg Htext Hkdata Hpc S19 Hap Hva Hdk0 Hpanicking Hpanicked Hdev Htx Hsent Hdlab [$Hfmt $Hdcl $H9 $H10 $H12 $Hsv $S8 $S22 $S24 $Hhead] [-]").
+               iIntros (mg bs) "%Hcs2 Hcg Hpc S19 Hap Hva Hdk0 Hpanicking Hpanicked Htx #Hsent2 (Hfmt & Hdcl & H9 & H10 & H12 & Hsv & S8 & S22 & S24 & Hhead)".
+               destruct Hcs2 as [Hcs2 Hs1g].
+               iDestruct ("Hdcl" with "Hdk0") as "Hdescs".
+               pose proof (pk_head_regs mf mg Hcs2 Hfsp Hfs0 Hfs2 Hftp Hfs9 Hfconsts)
+                 as (Hgsp & Hgs0 & Hgs2 & Hgtp & Hgs9 & Hgconsts).
+               iEval (rewrite /pk_loop_head) in "Hhead".
+               iApply ("Hhead" $! mg (S k) (S i + snd (pk_dir c0 c1 c2))%nat bs
+                         with "[%] Hcg Hpc Hfmt Hdescs Hpanicking Hpanicked Htx Hsent2 [-]").
+               { split_and!.
+                 - lia.
+                 - exact Hplt.
+                 - replace (S (S i + snd (pk_dir c0 c1 c2)))%nat
+                     with (S (S i) + snd (pk_dir c0 c1 c2))%nat by lia.
+                   exact Hinv'.
+                 - exact Hgsp.
+                 - exact Hgs0.
+                 - exact Hgs2.
+                 - exact Hs1g.
+                 - exact Hgtp.
+                 - exact Hgs9.
+                 - exact Hgconsts. }
+               rewrite /pk_loop_frame.
+               iFrame "H9 H10 H12 Hva Hsv S8 S19 S22 Hap S24".
+          * (* '%%' or an unknown directive: no vararg *)
+            rewrite Hfst in Hstep. cbn [pk_cons] in Hstep.
+            rewrite Hinv in Hstep.
+            assert (Hinv' : pk_kinds (str_drop (S (S i) + snd (pk_dir c0 c1 c2)) f)
+                            = map pk_desc_kind (drop k descs)) by (symmetry; exact Hstep).
+            assert (Hc0f : Ascii.eqb c0 pk_nul = false)
+              by (apply (proj2 (Ascii.eqb_neq c0 pk_nul)); exact Hc0nz).
+            iDestruct "Hcont" as "[Hhead _]".
+            iApply (wp_printk_arm_none γ γd γv Φ mf K i l pv pkv dqm dqm2 c0 c1 c2
+                      (fmtv ↦ₛ{ dqf } f ∗
+                       ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                       pk_loop_frame k ∗ pk_loop_head i l)%I
+                      HK30 Hpv Hpkv Hfst Hc0f Hs1f
+                      with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [$Hfmt $Hdescs $Hfr $Hhead] [-]").
+            iIntros (mg bs) "%Hcs2 Hcg Hpc Hpanicking Hpanicked Htx #Hsent2 (Hfmt & Hdescs & Hfr & Hhead)".
+            destruct Hcs2 as [Hcs2 Hs1g].
+            pose proof (pk_head_regs mf mg Hcs2 Hfsp Hfs0 Hfs2 Hftp Hfs9 Hfconsts)
+              as (Hgsp & Hgs0 & Hgs2 & Hgtp & Hgs9 & Hgconsts).
+            iEval (rewrite /pk_loop_head) in "Hhead".
+            iApply ("Hhead" $! mg k (S i + snd (pk_dir c0 c1 c2))%nat bs
+                      with "[%] Hcg Hpc Hfmt Hdescs Hpanicking Hpanicked Htx Hsent2 Hfr").
+            split_and!.
+            -- lia.
+            -- exact Hplt.
+            -- replace (S (S i + snd (pk_dir c0 c1 c2)))%nat
+                 with (S (S i) + snd (pk_dir c0 c1 c2))%nat by lia.
+               exact Hinv'.
+            -- exact Hgsp.
+            -- exact Hgs0.
+            -- exact Hgs2.
+            -- exact Hs1g.
+            -- exact Hgtp.
+            -- exact Hgs9.
+            -- exact Hgconsts.
+      - (* an ordinary character: print it and continue at i *)
+        rewrite Hpct in Hstep. cbn [negb] in Hstep.
+        rewrite Hstep in Hinv.
+        assert (Hne : neq_vec (mq !!! Regidx a0_idx) (mq !!! Regidx (mword_of_int 19 : mword 5)) = true).
+        { rewrite Ha0 Hc19 Hfch. unfold neq_vec.
+          rewrite (pk_eq_ascii (pk_ch f i) "%"%char (mword_of_int 37)
+                     ltac:(apply bv_eq; vm_compute; reflexivity)).
+          rewrite Hpct. reflexivity. }
+        iDestruct "Hcont" as "[Hhead _]".
+        iApply (wp_printk_char γ γd γv Φ mq K l pv pkv dqm dqm2
+                  (fmtv ↦ₛ{ dqf } f ∗
+                   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                   pk_loop_frame k ∗ pk_loop_head i l)%I
+                  HK30 Hpv Hpkv Hne
+                  with "Hcg Htext Hpc Hpanicking Hpanicked Hdev Htx Hdlab [$Hfmt $Hdescs $Hfr $Hhead] [-]").
+        iIntros (mk bs) "%Hcs2 Hcg Hpc Hpanicking Hpanicked Htx #Hsent2 (Hfmt & Hdescs & Hfr & Hhead)".
+        destruct Hcs2 as [Hcs2 Hs1k].
+        pose proof (pk_head_regs mq mk (fun c Hc N9 _ _ => Hcs2 c Hc N9) Hsp Hs0 Hs2 Htp4 Hs9r Hconsts)
+          as (Hgsp & Hgs0 & Hgs2 & Hgtp & Hgs9 & Hgconsts).
+        assert (Hs1k' : mk !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat i))
+          by (rewrite Hs1k; exact Hs4).
+        iEval (rewrite /pk_loop_head) in "Hhead".
+        iApply ("Hhead" $! mk k i bs with "[%] Hcg Hpc Hfmt Hdescs Hpanicking Hpanicked Htx Hsent2 Hfr").
+        split_and!.
+        + lia.
+        + exact Hilen.
+        + exact Hinv.
+        + exact Hgsp.
+        + exact Hgs0.
+        + exact Hgs2.
+        + exact Hs1k'.
+        + exact Hgtp.
+        + exact Hgs9.
+        + exact Hgconsts.
+    Qed.
+
+    (* ---------------------------------------------------------------- *)
+    (*  THE LOOP, by induction on the fuel [length f - p] at 0x78.       *)
+    (* ---------------------------------------------------------------- *)
+
+    Lemma wp_printk_loop78 (n : nat) (mq : regfile) (k p : nat) (l : list (bv 8)) :
+      (String.length f - p <= n)%nat ->
+      (p < String.length f)%nat ->
+      pk_kinds (str_drop (S p) f) = map pk_desc_kind (drop k descs) ->
+      mq !!! Regidx csp_rs1 = spd ->
+      mq !!! Regidx s0_idx = s0v ->
+      mq !!! Regidx s2_idx = fmtv ->
+      mq !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat p) ->
+      mq !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ->
+      mq !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) ->
+      pk_consts mq ->
+      sie_cap_gpr γ mq (K - 24)%nat -∗
+      kernel_text -∗ kernel_data -∗
+      pc_is (mword_of_int (PK + 0x78) : mword 64) -∗
+      fmtv ↦ₛ{ dqf } f -∗
+      ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
+      (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
+      (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
+      dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
+      pk_loop_frame k -∗
+      pk_loop_post l -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}.
+    Proof using All.
+      revert mq k p l.
+      induction n as [|n IH]; intros mq k p l Hfuel Hplen Hinv Hsp Hs0 Hs2 Hs1 Htp4 Hs9r Hconsts.
+      { exfalso. lia. }
+      assert (HK24 : (24 <= K)%nat) by lia.
+      iIntros "Hcg #Htext #Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked #Hdev Htx #Hsent #Hdlab Hfr Hfin".
+      assert (Hlen1 : (S p < length (cstring_bytes f))%nat) by (rewrite cstring_bytes_length; lia).
+      assert (Hp31 : Z.of_nat p + 1 < 2^31) by (change (2^31) with 2147483648; lia).
+      destruct (decide (pk_fbyte f (S p) = (mword_of_int 0 : mword 8))) as [Hz | Hnz].
+      - (* the string ends here: 0x24e, restore, epilogue *)
+        iApply (wp_printk_advance γ Φ mq K fmtv dqf f p
+                  (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv ∗
+                   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                   uart_tx_own γd l ∗ pk_loop_frame k ∗ pk_loop_post l)%I
+                  Hlen1 Hp31 Hs1 Hs2
+                  with "Hcg Htext Hpc Hfmt [$Hdescs $Hpanicking $Hpanicked $Htx $Hfr $Hfin] [-] []").
+        2: { iIntros (mfx) "%Hv Hcg Hpc Hfmt HR". exfalso.
+             destruct Hv as (_ & _ & _ & Hnzx). exact (Hnzx Hz). }
+        iIntros (mfe) "%Hv Hcg Hpc Hfmt (Hdescs & Hpanicking & Hpanicked & Htx & Hfr & Hfin)".
+        destruct Hv as [Hkept _].
+        pose proof (pk_head_regs mq mfe (pk_adv_regs mq mfe Hkept) Hsp Hs0 Hs2 Htp4 Hs9r Hconsts)
+          as (Hesp & _ & _ & Hetp & Hes9 & _).
+        iEval (rewrite /pk_loop_frame) in "Hfr".
+        iDestruct "Hfr" as "(H9 & H10 & H12 & Hva & Hsv & S8 & S19 & S22 & Hap & S24)".
+        iDestruct (pk_slots_rest_of (pk_ap s0v k) with "Hva S8 S19 S22 Hap S24") as "Hrest".
+        iPoseProof (pk_restore_at_24e with "Htext") as "Hres".
+        assert (Hnext : mword_of_int (PK + 0x24e + 18) = (mword_of_int (PK + 0x260) : mword 64))
+          by (apply bv_eq; vm_compute; reflexivity).
+        iApply (wp_printk_exit γ Φ m mfe K 0x24e pv dqm
+                  (fmtv ↦ₛ{ dqf } f ∗
+                   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                   uart_tx_own γd l)%I
+                  HK24 Hpv Hesp Hetp Hes9 Hnext
+                  with "Hcg Htext Hres Hpc H9 H10 H12 Hsv Hrest Hpanicking [$Hfmt $Hdescs $Hpanicked $Htx] [-]").
+        iIntros (mz) "Hcg Hpc %Hfin2 Hpanicking (Hfmt & Hdescs & Hpanicked & Htx)".
+        iEval (rewrite /pk_loop_post) in "Hfin".
+        iSpecialize ("Hfin" $! mz []).
+        iEval (rewrite (app_nil_r l)) in "Hfin".
+        iApply ("Hfin" with "Hcg Hpc [%] Hfmt Hdescs Hpanicking Hpanicked Htx Hsent").
+        exact Hfin2.
+      - (* another character: one turn of the body, then round again by IH *)
+        iApply (wp_printk_advance γ Φ mq K fmtv dqf f p
+                  (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
+                   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv ∗
+                   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                   uart_tx_own γd l ∗ pk_loop_frame k ∗ pk_loop_post l)%I
+                  Hlen1 Hp31 Hs1 Hs2
+                  with "Hcg Htext Hpc Hfmt [$Hdescs $Hpanicking $Hpanicked $Htx $Hfr $Hfin] [] [-]").
+        { iIntros (mfx) "%Hv Hcg Hpc Hfmt HR". exfalso.
+          destruct Hv as (_ & Hzx). exact (Hnz Hzx). }
+        iIntros (mfg) "%Hv Hcg Hpc Hfmt (Hdescs & Hpanicking & Hpanicked & Htx & Hfr & Hfin)".
+        destruct Hv as (Hkept & Hs4g & Ha0g & Hnzg).
+        assert (Hilen' : (S p < String.length f)%nat) by (exact (pk_fbyte_nz_lt f (S p) Hlen1 Hnzg)).
+        pose proof (pk_head_regs mq mfg (pk_adv_regs mq mfg Hkept) Hsp Hs0 Hs2 Htp4 Hs9r Hconsts)
+          as (Hgsp & Hgs0 & Hgs2 & Hgtp & Hgs9 & Hgconsts).
+        iApply (wp_printk_body86 mfg k (S p) l Hilen' Hinv Hgsp Hgs0 Hgs2 Hs4g Ha0g Hgtp Hgs9 Hgconsts
+                  with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked Hdev Htx Hsent Hdlab Hfr [Hfin]").
+        iSplit.
+        + (* go round again: the induction hypothesis *)
+          rewrite /pk_loop_head.
+          iIntros (mk k' p' bs) "%Hh Hcg Hpc Hfmt Hdescs Hpanicking Hpanicked Htx #Hsent2 Hfr".
+          destruct Hh as (Hip & Hplen' & Hinv' & Hksp & Hks0 & Hks2 & Hks1 & Hktp & Hks9 & Hkconsts).
+          iApply (IH mk k' p' ((l ++ bs)%list) ltac:(lia) Hplen' Hinv' Hksp Hks0 Hks2 Hks1 Hktp Hks9 Hkconsts
+                    with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked Hdev Htx Hsent2 Hdlab Hfr [Hfin]").
+          rewrite /pk_loop_post.
+          iIntros (mz bs') "Hcg Hpc %Hfin2 Hfmt Hdescs Hpanicking Hpanicked Htx #Hsent3".
+          iEval (rewrite /pk_loop_post) in "Hfin".
+          iSpecialize ("Hfin" $! mz ((bs ++ bs')%list)).
+          iEval (rewrite (app_assoc l bs bs')) in "Hfin".
+          iApply ("Hfin" with "Hcg Hpc [%] Hfmt Hdescs Hpanicking Hpanicked Htx Hsent3").
+          exact Hfin2.
+        + iExact "Hfin".
+    Qed.
+
+  End PrintkLoop.
+
+  (* ================================================================== *)
+  (*  THE WHOLE FUNCTION: prologue, setup, loop, exit.                   *)
+  (* ================================================================== *)
+
+  Lemma wp_printk_sconf_gen (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+      (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 dqf : dfrac)
+      (f : string) (descs : list pk_arg_desc)
+    : wp_printk_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs.
+  Proof using All.
+    cbv beta delta [wp_printk_sconf_body].
+    intros rai a0i pcE0 ra00 rtgt fmtv0 HK Hflen Hnn Hkinds Hdlen Hpv0 Hpkv0.
+    pose proof (pk_cap_bounds K HK) as [HK24 _].
+    iIntros "Hcg #Htext #Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked #Hdev Htx #Hsent #Hdlab Hcont".
+    iApply (wp_printk_prologue γ Φ m0 K HK24 with "Hcg Htext Hpc [-]").
+    iIntros (mp) "%Hpro Hcg Hpc H9 H10 H12 Hva Hrest".
+    destruct Hpro as (Hpsp & Hps0 & Hps2 & Hpkept).
+    destruct (decide (pk_fbyte f 0%nat = (mword_of_int 0 : mword 8))) as [Hf0z | Hf0nz].
+    - (* the empty format string: no loop at all, and nothing was printed *)
+      iApply (wp_printk_setup γ Φ m0 mp K pv dqm dqf f
+                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) ∗
+                 (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                 uart_tx_own γd l)%I
+                HK24 Hpv0 Hnn Hpsp Hps0 Hps2 Hpkept
+                with "Hcg Htext Hpc Hpanicking Hfmt H9 H10 H12 Hva Hrest [$Hdescs $Hpanicked $Htx] [-] []").
+      2: { iIntros (mq) "%Hb Hcg Hpc Hpanicking Hfmt H9b H10b H12b Hvab Hsvb S8b S19b S22b Hapb S24b HR".
+           exfalso. destruct Hb as (_ & _ & _ & _ & _ & Hnzb & _). exact (Hnzb Hf0z). }
+      iIntros (mf) "Hcg Hpc %Hz0 %Hfin Hpanicking Hfmt (Hdescs & Hpanicked & Htx)".
+      iSpecialize ("Hcont" $! mf []).
+      iEval (rewrite (app_nil_r l)) in "Hcont".
+      iApply ("Hcont" with "Hcg Hpc [%] Hfmt Hdescs Hpanicking Hpanicked Htx Hsent").
+      exact Hfin.
+    - (* a nonempty one: setup, then the loop with the string length as fuel *)
+      iApply (wp_printk_setup γ Φ m0 mp K pv dqm dqf f
+                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) ∗
+                 (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv ∗
+                 uart_tx_own γd l)%I
+                HK24 Hpv0 Hnn Hpsp Hps0 Hps2 Hpkept
+                with "Hcg Htext Hpc Hpanicking Hfmt H9 H10 H12 Hva Hrest [$Hdescs $Hpanicked $Htx] [] [-]").
+      { iIntros (mf) "Hcg Hpc %Hz0 %Hfin Hpanicking Hfmt HR". exfalso. exact (Hf0nz Hz0). }
+      iIntros (mq) "%Hb Hcg Hpc Hpanicking Hfmt H9 H10 H12 Hva Hsv S8 S19 S22 Hap S24 (Hdescs & Hpanicked & Htx)".
+      destruct Hb as (Hqsp & Hqs0 & Hqs2 & Hqs4 & Hqa0 & Hqnz & Hqconsts & Hqkept).
+      assert (Hqs4' : mq !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat 0)).
+      { rewrite Hqs4. apply bv_eq; vm_compute; reflexivity. }
+      assert (Hqtp : mq !!! Regidx (mword_of_int 4 : mword 5) = m0 !!! Regidx (mword_of_int 4 : mword 5))
+        by (apply Hqkept; mw_neq).
+      assert (Hqs9 : mq !!! Regidx (mword_of_int 25 : mword 5) = m0 !!! Regidx (mword_of_int 25 : mword 5))
+        by (apply Hqkept; mw_neq).
+      assert (Hilen0 : (0 < String.length f)%nat).
+      { apply (pk_fbyte_nz_lt f 0%nat); [ rewrite cstring_bytes_length; lia | exact Hqnz ]. }
+      assert (Hinv0 : pk_kinds (str_drop 0%nat f) = map pk_desc_kind (drop 0%nat descs))
+        by (exact Hkinds).
+      assert (Hap0 : add_vec (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (mword_of_int (-64) : mword 12))) (sign_extend' 64 (mword_of_int 8 : mword 12))
+                     = pk_ap (add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (mword_of_int (-64) : mword 12))) 0%nat).
+      { unfold pk_ap. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+      iEval (rewrite Hap0) in "Hap".
+      iApply (wp_printk_body86 γ γd γv Φ m0 K pv pkv dqm dqm2 dqf f descs
+                HK Hflen Hnn Hdlen Hpv0 Hpkv0
+                mq 0%nat 0%nat l Hilen0 Hinv0 Hqsp Hqs0 Hqs2 Hqs4' Hqa0 Hqtp Hqs9 Hqconsts
+                with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked Hdev Htx Hsent Hdlab [H9 H10 H12 Hva Hsv S8 S19 S22 Hap S24] [Hcont]").
+      { rewrite /pk_loop_frame. iFrame "H9 H10 H12 Hva Hsv S8 S19 S22 Hap S24". }
+      iSplit.
+      + (* go round: the loop, with the whole string's length as fuel *)
+        rewrite /pk_loop_head.
+        iIntros (mk k' p' bs) "%Hh Hcg Hpc Hfmt Hdescs Hpanicking Hpanicked Htx #Hsent2 Hfr".
+        destruct Hh as (_ & Hplen' & Hinv' & Hksp & Hks0 & Hks2 & Hks1 & Hktp & Hks9 & Hkconsts).
+        iApply (wp_printk_loop78 γ γd γv Φ m0 K pv pkv dqm dqm2 dqf f descs
+                  HK Hflen Hnn Hdlen Hpv0 Hpkv0
+                  (String.length f) mk k' p' ((l ++ bs)%list)
+                  ltac:(lia) Hplen' Hinv' Hksp Hks0 Hks2 Hks1 Hktp Hks9 Hkconsts
+                  with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hpanicking Hpanicked Hdev Htx Hsent2 Hdlab Hfr [Hcont]").
+        rewrite /pk_loop_post.
+        iIntros (mz bs') "Hcg Hpc %Hfin2 Hfmt Hdescs Hpanicking Hpanicked Htx #Hsent3".
+        iSpecialize ("Hcont" $! mz ((bs ++ bs')%list)).
+        iEval (rewrite (app_assoc l bs bs')) in "Hcont".
+        iApply ("Hcont" with "Hcg Hpc [%] Hfmt Hdescs Hpanicking Hpanicked Htx Hsent3").
+        exact Hfin2.
+      + (* the first directive already ended the string: e.g. f = "...%" *)
+        rewrite /pk_loop_post.
+        iIntros (mz bs) "Hcg Hpc %Hfin2 Hfmt Hdescs Hpanicking Hpanicked Htx #Hsent3".
+        iApply ("Hcont" $! mz bs with "Hcg Hpc [%] Hfmt Hdescs Hpanicking Hpanicked Htx Hsent3").
+        exact Hfin2.
+  Qed.
+
 End ProofPrintk.
+
+(* ===================================================================== *)
+(* THE SEALED FUNCTOR: instantiate the callees' WP hypotheses with their  *)
+(* proven specs, discharging the PRINTK Module Type.                      *)
+(* ===================================================================== *)
+  Definition wp_printk_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+      (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 dqf : dfrac}
+      (f : string) (descs : list pk_arg_desc)
+      : wp_printk_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs :=
+    wp_printk_sconf_gen
+      (fun γ' γd' γv' Φ' m' K' l' pv' pkv' dqm' dqm2' =>
+         Consputc.wp_consputc_sconf γ' γd' γv' Φ' m' K' l' pv' pkv' (dqm:=dqm') (dqm2:=dqm2'))
+      (fun γ' γd' γv' Φ' m' K' l' pv' pkv' dqm' dqm2' =>
+         Printint.wp_printint_sconf γ' γd' γv' Φ' m' K' l' pv' pkv' (dqm:=dqm') (dqm2:=dqm2'))
+      γ γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs.
+
+End PrintkProof.

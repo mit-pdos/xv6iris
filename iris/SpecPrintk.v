@@ -109,6 +109,11 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
   let fmt := m0 !!! Regidx a0_idx in
   (* printk's own 24-slot frame, over printint's 14 *)
   (38 <= K)%nat ->
+  (* printk's index [i] is a C [int], and the code computes [i + 1 .. i + 3]
+     with [addiw]; past 2^31 those wrap.  Not derivable from the points-to
+     (fractional bytes may alias), so it is a caller obligation -- met by
+     every real format string by ~nine orders of magnitude. *)
+  (Z.of_nat (String.length f) < 2147483645)%Z ->
   nonul f = true ->
   pk_kinds f = map pk_desc_kind descs ->
   (length descs <= 7)%nat ->

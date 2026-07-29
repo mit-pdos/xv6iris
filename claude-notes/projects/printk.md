@@ -5,8 +5,10 @@ The kernel's formatted-output path, verified bottom-up:
     printk  ->  printint  ->  consputc  ->  uartputc_sync   (proven)
             ->               consputc
 
-Status: **consputc and printint PROVEN** (both sealed and linked); **printk
-SPECIFIED** (`SpecPrintk.v` + `PrintkFmt.v` compile; no proof yet).
+Status: **the whole cone is PROVEN and linked** on the panic path -- consputc,
+printint and printk itself (`LinkPrintk.v` seals `PrintkProof Consputc
+Printint : PRINTK`).  What remains is only the general (non-panic) path; see
+the end of this file.
 
 ## The panic-path decision (read this first)
 
@@ -189,7 +191,7 @@ half the frame-address lemmas -- write `f_equal; try (apply bv_eq; vm_compute;
 reflexivity)`.  And a value bound out of an existential resource arrives as
 `bv 8`, so ascribe `(b : mword 8)` at every leaf that wants an `mword`.
 
-### printk -- the whole SHELL is done; the loop body and the arms are not
+### printk -- the shell (proven piece by piece, then assembled)
 
 `WpPrintkDecode.v` proves all **264** instruction facts (offsets 0x00..0x328)
 plus the 188 distinct decode words they rest on.  It was GENERATED from the
@@ -501,7 +503,7 @@ returns `snd = 0` (`pk_dir_nul1`) or at most 1 (`pk_dir_nul2`), and `str_drop`
 past the end is `""`.  `pk_dir_nul2` needs its third-character tests reduced
 BEFORE the case split, or the blind split asks for `2 <= 1`.
 
-Left, in order:
+The assembly, in order (all four steps DONE):
 
 1. **`wp_printk_arm_num` is proven** -- the eleven entries whose directive
    consumes a NUMBER (`%d %ld %lld %u %lu %llu %x %lx %llx %p %c`), selected
@@ -528,18 +530,16 @@ Left, in order:
    `eq_vec v zero_reg = false`.  `v ↦ₛ{dq} s` does not imply it -- nothing in
    the points-to rules out address 0 -- and the arm needs the `beqz` at 0x21e
    to fall through.
-2. **the loop induction.**  Everything it calls is now proven; what is left is
-   the threading.  The invariant, stated at 0x78 with `p` = the index of the
-   last character consumed and `k` = the varargs consumed:
+2. **the loop induction -- DONE.**  The invariant, stated at 0x78 with `p` =
+   the index of the last character consumed and `k` = the varargs consumed:
 
-       s1 = p,  s2 = fmt,  ap = pk_ap s0v k,  pk_consts,
-       pk_kinds (str_drop (S p) f) = map pk_desc_kind (drop k descs)
+       s1 = p,  s2 = fmt,  ap = pk_ap s0v k,  pk_consts,  sp/s0/tp/s9 pinned,
+       p < |f|,  pk_kinds (str_drop (S p) f) = map pk_desc_kind (drop k descs)
 
-   so the NEXT character to look at is `f[S p]`.  One turn, and which proven
-   lemma covers it:
+   so the NEXT character to look at is `f[S p]`.  One turn:
 
        0x78  wp_printk_advance          two outcomes
-             (a) f[S p] = 0   -> 0x24e  = EXIT
+             (a) f[S p] = 0   -> 0x24e  = EXIT (wp_printk_exit)
              (b) else         -> 0x86 with a0 = f[S p]
        0x86  bne a0,s3
              f[S p] <> '%'    -> wp_printk_char, s1 := S p, k unchanged
@@ -548,36 +548,95 @@ Left, in order:
              fst (pk_dir ..) = Some PkNum -> wp_printk_arm_num,  k := S k
              fst (pk_dir ..) = Some PkStr -> wp_printk_arm_str,  k := S k
              fst (pk_dir ..) = None, c0 <> NUL -> wp_printk_arm_none, k kept
-             c0 = NUL         -> pk_entry = 0x276 = EXIT
+             c0 = NUL         -> pk_entry = 0x276 = EXIT (wp_printk_exit276)
 
-   Both exits are `wp_printk_exit`, which is already parameterised by the
-   restore-block base `B` (`pk_restore_at_24e` / `pk_restore_at_276`) -- that
-   is what makes the two exits one case rather than two.
+   Termination: `p` strictly increases, so induct on the fuel
+   `String.length f - p`.  `pk_kinds_step` rewrites the invariant's equation
+   across the turn, and the descriptor `big_sepL` splits at `k`
+   (`big_sepL_lookup_acc`) -- the arms need only the k-th, and only `%s`
+   needs it at all.  The shape that landed (all in `ProofPrintk.v`, inside an
+   inner `Section PrintkLoop` whose Variables fix the ambient state and whose
+   `Let`s name sp0/spd/s0v/fmtv -- that is what keeps twenty-hypothesis
+   statements readable):
 
-   Termination: `p` strictly increases (by 1, or by `2 + snd d`), so induct on
-   the fuel `String.length f - p`.  `pk_kinds_step` rewrites the invariant's
-   equation across the turn, and the descriptor `big_sepL` splits at `k` --
-   the arms need only the k-th, and only `%s` needs it at all.
-3. the top-level statement (prologue + setup + loop + exit).  Its spec-side
-   prerequisite is **done**: `wp_printk_sconf_body` now takes `uart_sent γd l`
-   alongside `uart_tx_own γd l`, for the same reason the `%s` arm does -- an
-   empty format string prints nothing and still has to hand back the receipt,
-   which is a mono-list lower bound only the UART invariant can mint.
-4. the sealed functor over CONSPUTC/PRINTINT, and LinkPrintk.v.
+   - **`pk_loop_frame k`** -- the whole frame as the loop carries it, ONE
+     definition, so it rides through dispatch/char/arm `Rest`s folded and is
+     only destructured where an arm needs a slot.
+   - **`pk_loop_post l` / `pk_loop_head i l`** -- the two futures of a turn:
+     the function's final continuation (the spec's post relative to entry
+     list `l`), and "back to 0x78 with p', k', having printed bs".
+   - **`wp_printk_body86`** -- ONE turn from the '%' test at 0x86, taking
+     `(pk_loop_head i l ∧ pk_loop_post l)` -- an ADDITIVE conjunction,
+     because which future runs is decided by the machine inside the lemma
+     while the caller has only one copy of the final continuation; `∧` hands
+     the same context to both, and the prover picks with
+     `iDestruct "Hcont" as "[Hhead _]"` / `"[_ Hfin]"`.  Stating the turn
+     at 0x86 (not 0x78) is what lets the setup's loop entry (which lands at
+     0x86) reuse the same lemma as the in-loop turns.
+   - **`wp_printk_loop78`** -- the fuel induction; its body is advance +
+     body86, with the IH packaged into body86's `pk_loop_head`.  Both
+     advance continuations are provided per-case after a pure
+     `destruct (decide (pk_fbyte f (S p) = 0))`, the dead one discharged by
+     contradiction from its own premise (the three-continuation lesson).
+   - **`pk_head_regs` / `pk_disp_regs` / `pk_adv_regs`** -- the register
+     threading, factored ONCE: each turn-lemma's "kept" fact is weakened to
+     a common `is_cs_idx c = true -> c<>9 -> c<>20 -> c<>21` shape and
+     `pk_head_regs` turns that plus the entry facts into the whole invariant
+     register tuple.  Without this the ten-conjunct re-establishment would
+     be spelled out four times.
+3. **the top-level statement -- DONE** (`wp_printk_sconf_gen`): prologue,
+   then a pure `decide (pk_fbyte f 0 = 0)` chooses between setup's two
+   continuations (both now carry the deciding byte fact -- the empty-format
+   exit says `f[0] = 0`, the loop entry says `f[0] <> 0` -- exactly so the
+   caller CAN decide; neither did before, which made the split unusable).
+   The nonempty case enters body86 at i = 0, k = 0 with fuel
+   `String.length f`.
+4. **the sealed functor and `LinkPrintk.v` -- DONE.**  `ProofPrintk.v` is now
+   `Module PrintkProof (Consputc : CONSPUTC) (Printint : PRINTINT) : PRINTK`
+   around the section, mirroring PrintintProof.
 
-### printk: what the arms still need
+### printk: what closing the proof changed, and the traps it hit
 
-Each arm ends by jumping to 0x78 with `s1 = (next index) - 1`, so the shape of
-every one is: consume a vararg (the three-instruction `ap` bump), call
-printint/consputc, set s1, jump.  With `wp_printk_advance` proven, an arm's
-obligation is exactly:
-
-  - the `pk_kinds` equation one level down (which is why `pk_kinds` recurses on
-    syntactic tails), and
-  - `s1 = i + <what pk_dir says the arm consumed> ` at the jump.
-
-`%p` and `%s` are the two that are not of this shape: both contain their own
-inner loop, and `%p` additionally saves/restores s9 (slot 19) around it.
+- **`SpecPrintk.v` gained a length bound**:
+  `Z.of_nat (String.length f) < 2147483645` (2^31 - 3).  printk's `i` is a C
+  `int` and the dispatch computes `i+1..i+3` with `addiw`; the proven arm
+  lemmas need `Z.of_nat i + 3 < 2^31`, and the bound is NOT derivable from
+  `fmt ↦ₛ{dqf} f` (at fractional/discarded dq, bytes may alias, so the
+  points-to does not bound the length).  An honest caller obligation that
+  every real format string meets by nine orders of magnitude.
+- **`wp_printk_exit` only covers the 0x24e exit.**  Its premise
+  `PK + B + 18 = PK + 0x260` is FALSE at B = 0x276: that restore block does
+  not fall into the epilogue, it ends in a `c.j` at 0x288 back to 0x260.
+  `wp_printk_exit276` is the second exit: restore at 0x276, the `c.j`
+  (`wp_cj_s_sconf` + `pki_288`), then the same tail.  (The exit's pc-bridge
+  premise also moved from a `⌜⌝` wand to a plain Coq `->` while its call
+  sites were still zero.)
+- **`snd (pk_dir ..) = 1` (or 2) implies the consumed character is real**:
+  `pk_dir_snd1_c1` / `pk_dir_snd2_c2` (PrintkFmt.v) say c1 (c2) is not NUL,
+  because the 1- and 2-consuming arms matched it against d/u/x.  That is what
+  keeps the advanced cursor `S i + snd d` strictly inside the string, which
+  the next turn's `pk_kinds_step` needs.
+- `destruct (fst (pk_dir c0 c1 c2)) eqn:Hfst` SUBSTITUTES into the step
+  equation hypothesis, so the `rewrite Hfst in Hstep` that the arm split
+  needs finds nothing -- the same `destruct eqn:`-vs-`case_eq` trap the
+  dispatch chain recorded, striking a second time.  `case_eq` + `intros`.
+- **An argument to a LOCAL HYPOTHESIS parses with no scope information.**
+  `iApply (IH mk k' p' (l ++ bs) ...)`: for a global, `l ++ bs` would parse
+  in list_scope via the argument's type; for the induction hypothesis there
+  is no such binding, the open string_scope wins, and `++` elaborates as
+  String.append -- a type error pages away from the cause.  Annotate:
+  `((l ++ bs)%list)`.
+- **Do not rewrite `l` into `l ++ []` in a hypothesis** (the empty-format
+  paths): `rewrite -(app_nil_r l)` fails with an evar-scope error because
+  the replacement contains the pattern.  Instead SPECIALIZE the continuation
+  first (`iSpecialize ("Hfin" $! mz [])`), then rewrite the SHRINKING
+  direction in it (`iEval (rewrite (app_nil_r l)) in "Hfin"`); same recipe
+  with `app_assoc` for composing two turns' byte lists.
+- The loop lemmas are `Proof using All`, so their closed signatures
+  quantify over ALL of the inner section's variables and hypotheses in
+  declaration order -- which is what makes the positional applications in
+  `wp_printk_sconf_gen` deterministic rather than dependent on which
+  hypotheses a proof happened to use.
 
 ### The general (non-panic) path
 
