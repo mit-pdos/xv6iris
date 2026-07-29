@@ -150,47 +150,27 @@ Proof.
   apply Z.mod_mul. lia.
 Qed.
 
-(* ---- descriptor-page window alignments ------------------------------ *)
+(* ---- descriptor-page window alignments: RESTATEMENTS of [DiskInv]'s --- *)
 
 Lemma vdrwf_desc_align (pd : Arch.pa) (i : nat) :
   bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
   is_aligned_paddr (Physaddr (d_desc pd i)) 8 = true.
-Proof.
-  intros Hm Hi. unfold d_desc. apply (vdrwd_aligned_off pd (16 * i)%nat 8 Hm);
-    [ lia | lia | reflexivity |].
-  replace (Z.of_nat (16 * i)) with ((2 * Z.of_nat i) * 8)%Z by lia.
-  apply Z.mod_mul. lia.
-Qed.
+Proof. exact (d_desc_aligned8 pd i). Qed.
 
 Lemma vdrwf_dlen_align (pd : Arch.pa) (i : nat) :
   bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
   is_aligned_paddr (Physaddr (pa_add pd (16 * i + 8))) 4 = true.
-Proof.
-  intros Hm Hi. apply (vdrwd_aligned_off pd (16 * i + 8)%nat 4 Hm);
-    [ lia | lia | reflexivity |].
-  replace (Z.of_nat (16 * i + 8)) with ((2 + 4 * Z.of_nat i) * 4)%Z by lia.
-  apply Z.mod_mul. lia.
-Qed.
+Proof. exact (d_desc_len_aligned4 pd i). Qed.
 
 Lemma vdrwf_dflags_align (pd : Arch.pa) (i : nat) :
   bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
   is_aligned_paddr (Physaddr (pa_add pd (16 * i + 12))) 2 = true.
-Proof.
-  intros Hm Hi. apply (vdrwd_aligned_off pd (16 * i + 12)%nat 2 Hm);
-    [ lia | lia | reflexivity |].
-  replace (Z.of_nat (16 * i + 12)) with ((6 + 8 * Z.of_nat i) * 2)%Z by lia.
-  apply Z.mod_mul. lia.
-Qed.
+Proof. exact (d_desc_flags_aligned2 pd i). Qed.
 
 Lemma vdrwf_dnext_align (pd : Arch.pa) (i : nat) :
   bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
   is_aligned_paddr (Physaddr (pa_add pd (16 * i + 14))) 2 = true.
-Proof.
-  intros Hm Hi. apply (vdrwd_aligned_off pd (16 * i + 14)%nat 2 Hm);
-    [ lia | lia | reflexivity |].
-  replace (Z.of_nat (16 * i + 14)) with ((7 + 8 * Z.of_nat i) * 2)%Z by lia.
-  apply Z.mod_mul. lia.
-Qed.
+Proof. exact (d_desc_next_aligned2 pd i). Qed.
 
 (* ---- the immediates and jump targets ------------------------------- *)
 

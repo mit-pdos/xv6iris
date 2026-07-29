@@ -429,8 +429,10 @@ Proof.
      are discarded here. *)
   iMod (uart_ghosts_alloc g.(gdev).(duart)) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
   (* allocate the disk-protocol ghosts at the initial (not-live) device state;
-     the caller's half of the config tracker is discarded likewise *)
-  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive) as (γv) "[Hproto _]".
+     the caller's half of the config tracker is discarded likewise, and so are
+     the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
+     boot chain would thread through virtio_disk_init into main's [newlock]. *)
+  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive) as (γv) "(Hproto & _ & _ & _)".
   iMod (dev_inv_alloc _ γ γv with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto]") as "#Hinv".
   { rewrite /dev_inv_body.
     iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).

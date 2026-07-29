@@ -431,48 +431,29 @@ Proof.
   exact (vdrwd_dbl_small (bv_unsigned bno) Hnn Hb).
 Qed.
 
-(* ---- page-offset alignment (clone of ProofVirtioDiskIntr's) ---------- *)
+(* ---- page-offset alignment: RESTATEMENTS of [DiskInv]'s ---------------
+   The family lives in DiskInv.v now (it is the queue pages' geometry, and
+   three files had cloned it); these keep the local names so no call site
+   below had to change. *)
 
 Lemma vdrwd_wrap_off (x k : Z) :
   0 <= x -> x < 18446744073709551616 -> x mod 4096 = 0 ->
   0 <= k -> k < 4096 ->
   (x + k) mod 18446744073709551616 = x + k.
-Proof.
-  intros H0 H1 Hm Hk0 Hk1. apply Z.mod_small. split; [lia|].
-  apply Z.mod_divide in Hm; [| lia]. destruct Hm as [c ->]. lia.
-Qed.
+Proof. exact (pa_wrap_in_page x k). Qed.
 
 Lemma vdrwd_rem_off (x k d : Z) :
   0 <= x -> x < 18446744073709551616 -> x mod 4096 = 0 ->
   0 <= k -> k < 4096 -> 0 < d -> 4096 mod d = 0 -> k mod d = 0 ->
   Z.rem ((x + k) mod 18446744073709551616) d = 0.
-Proof.
-  intros H0 H1 Hm Hk0 Hk1 Hd Hdd Hkd.
-  rewrite (vdrwd_wrap_off x k H0 H1 Hm Hk0 Hk1).
-  rewrite Z.rem_mod_nonneg; [| lia | lia].
-  apply Z.mod_divide; [lia|].
-  apply Z.mod_divide in Hm; [| lia]. apply Z.mod_divide in Hdd; [| lia].
-  apply Z.mod_divide in Hkd; [| lia].
-  apply Z.divide_add_r; [ apply (Z.divide_trans d 4096 x Hdd Hm) | exact Hkd ].
-Qed.
+Proof. exact (pa_rem_in_page x k d). Qed.
 
 Lemma vdrwd_aligned_off (p : Arch.pa) (k : nat) (d : Z) :
   bv_unsigned (p : SailStdpp.Values.mword 64) `mod` 4096 = 0 ->
   (Z.of_nat k < 4096)%Z -> (0 < d)%Z -> (4096 mod d = 0)%Z ->
   (Z.of_nat k mod d = 0)%Z ->
   is_aligned_paddr (Physaddr (pa_add p k)) d = true.
-Proof.
-  intros Hm Hk Hd Hdd Hkd. unfold is_aligned_paddr. apply Z.eqb_eq.
-  rewrite uint_unsigned pa_add_unsigned.
-  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z.
-  change (2 ^ 64)%Z with 18446744073709551616%Z.
-  pose proof (bv_unsigned_in_range 64 p) as Hr.
-  unfold bv_modulus in Hr. change (Z.of_N 64) with 64%Z in Hr.
-  change (2 ^ 64)%Z with 18446744073709551616%Z in Hr.
-  apply vdrwd_rem_off;
-    [ exact (proj1 Hr) | exact (proj2 Hr) | exact Hm
-    | exact (Nat2Z.is_nonneg k) | exact Hk | exact Hd | exact Hdd | exact Hkd ].
-Qed.
+Proof. exact (pa_add_aligned_in_page p k d). Qed.
 
 Lemma vdrwd_two_add_lt (j : nat) : (j < 2)%nat -> (2 + j < 4096)%nat.
 Proof. intro Hj. lia. Qed.

@@ -177,6 +177,43 @@ Section ByteBuf.
     rewrite big_sepL_nil bi.sep_emp. reflexivity.
   Qed.
 
+  (* REGROUPING a buffer into equal-sized RECORDS.  A buffer of [k * n]
+     bytes is [k] records of [n] bytes, each re-anchored at its own base
+     [p + i*n] and named by the corresponding slice of [f].  This is what a
+     caller wants when the region is an ARRAY of structs (the eight
+     descriptor-table entries of a virtio queue, the eight avail-ring
+     entries) rather than one flat window: the per-record work is then a
+     single lemma applied under [big_sepL_mono], with no offset arithmetic
+     in the caller.  One direction only -- nobody has needed the join. *)
+  Lemma bb_chunk (n : nat) :
+    forall (k : nat) (p : mword 64) (f : nat -> bv 8),
+    ([∗ list] j ∈ seq 0 (k * n), pa_add p j ↦ₘ f j)
+    ⊢ [∗ list] i ∈ seq 0 k,
+        [∗ list] j ∈ seq 0 n, pa_add (pa_add p (i * n)) j ↦ₘ f (i * n + j)%nat.
+  Proof.
+    induction k as [| k IH]; intros p f.
+    - iIntros "_". done.
+    - replace (S k * n)%nat with (n + k * n)%nat by lia.
+      rewrite (bb_split p n (k * n) f).
+      iIntros "[Hh Ht]". cbn [seq]. rewrite big_sepL_cons.
+      iSplitL "Hh".
+      + rewrite Nat.mul_0_l.
+        iApply (big_sepL_mono with "Hh"). intros i j Hj.
+        apply lookup_seq in Hj as [-> _].
+        rewrite !pa_add_add !Nat.add_0_l. reflexivity.
+      + rewrite (bb_seq_shift
+                   (fun i => [∗ list] j ∈ seq 0 n,
+                      pa_add (pa_add p (i * n)) j ↦ₘ f (i * n + j)%nat)%I 1 k).
+        iDestruct (IH (pa_add p n) (fun j => f (n + j)%nat) with "Ht") as "Ht".
+        iApply (big_sepL_mono with "Ht"). intros i j Hj.
+        apply lookup_seq in Hj as [-> _].
+        iIntros "H". iApply (big_sepL_mono with "H"). intros i' j' Hj'.
+        apply lookup_seq in Hj' as [-> _].
+        rewrite !pa_add_add !Nat.add_0_l.
+        assert (He : (n + (i * n + i'))%nat = ((1 + i) * n + i')%nat) by lia.
+        rewrite He. reflexivity.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* ONE BYTE of a buffer, borrowed and put back.                        *)
   (* ------------------------------------------------------------------ *)

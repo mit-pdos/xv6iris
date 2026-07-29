@@ -1223,25 +1223,35 @@ Section VirtioProto.
 
   (* power-on: the queue is not live, nothing is owed (what adequacy runs).
      The caller keeps the config tracker's other half -- the boot chain needs
-     it to program the queue from inside the invariant. *)
+     it to program the queue from inside the invariant -- AND the two tokens
+     the vdisk_lock's resource ([DiskInv.disk_res]) wants at birth but that
+     [virtio_proto] itself never holds: the [dn_claim] ghost-map authority
+     (empty: nothing is published at power-on) and the persistent lower bound
+     [disk_done_lb _ 0] on the completed count.  Both are minted here because
+     this is where the gnames are chosen; discarding them (as this lemma used
+     to) left main() with no way to assemble [disk_res] for its [newlock]. *)
   Lemma disk_ghosts_alloc (v : virtio_state) :
     virtio_live (v_cfg v) = false ->
     ⊢ |==> ∃ γ : disk_names,
-        virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v).
+        virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
+        ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) ∗
+        disk_done_lb γ 0%nat.
   Proof.
     intro Hlive.
     iMod (ghost_map_alloc_empty (K:=Z) (V:=bv 8)) as (gimg) "Himg".
     iMod (ghost_map_alloc_empty (K:=nat)
             (V:=(vslot * gmap Arch.pa (bv 8))%type)) as (gslot) "Hslot".
-    iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc _]".
+    iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc Hlb]".
     iMod (ghost_var_alloc 0%nat) as (gnp) "Hnp".
-    iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "_".
+    iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "Hclaim".
     iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
     iDestruct (disk_cfg_is_split (DiskNames gimg gslot gnc gnp gclaim gcfg)
                  (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".
     { rewrite /disk_cfg_is. cbn [dn_cfg]. iExact "Hcfg". }
     iModIntro. iExists (DiskNames gimg gslot gnc gnp gclaim gcfg).
     iFrame "Hcfg2".
+    rewrite /disk_done_lb. cbn [dn_nc dn_claim].
+    iFrame "Hclaim Hlb".
     rewrite /virtio_proto. iExists ∅.
     cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg].
     iFrame "Himg". iSplitR.
@@ -1356,15 +1366,17 @@ Section VirtioProto.
     virtio_live (v_cfg v) = false ->
     ⊢ |==> ∃ γ : disk_names,
         virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
+        ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) ∗
+        disk_done_lb γ 0%nat ∗
         disk_bytes γ o (disk_read (v_disk v) o n).
   Proof.
     intro Hlive.
     iMod (ghost_map_alloc_empty (K:=Z) (V:=bv 8)) as (gimg) "Himg".
     iMod (ghost_map_alloc_empty (K:=nat)
             (V:=(vslot * gmap Arch.pa (bv 8))%type)) as (gslot) "Hslot".
-    iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc _]".
+    iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc Hlb]".
     iMod (ghost_var_alloc 0%nat) as (gnp) "Hnp".
-    iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "_".
+    iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "Hclaim".
     iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
     iDestruct (disk_cfg_is_split (DiskNames gimg gslot gnc gnp gclaim gcfg)
                  (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".
@@ -1377,7 +1389,10 @@ Section VirtioProto.
     iMod (disk_bytes_mint (DiskNames gimg gslot gnc gnp gclaim gcfg) ∅
             (v_disk v) o n Hv0 Hf0 with "Himg") as (dmap') "(Himg & Hbs & %Hdv)".
     iModIntro. iExists (DiskNames gimg gslot gnc gnp gclaim gcfg).
-    iFrame "Hbs Hcfg2". rewrite /virtio_proto. iExists dmap'.
+    iFrame "Hbs Hcfg2".
+    rewrite /disk_done_lb. cbn [dn_nc dn_claim].
+    iFrame "Hclaim Hlb".
+    rewrite /virtio_proto. iExists dmap'.
     cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg].
     iFrame "Himg". iSplitR; [iPureIntro; exact Hdv|].
     rewrite Hlive.

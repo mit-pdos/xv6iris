@@ -74,7 +74,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -94,6 +94,12 @@ Require Import SpecScheduler SpecFreerange SpecPrintkGen.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv KvmSpec BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
+(* [DiskInv] for the vdisk_lock's vocabulary: [d_used_idx] and
+   [disk_slot_raw] are cells of the static [struct disk] that main hands
+   over, and [VirtioProto] for the two disk ghosts adequacy mints
+   ([dn_claim]'s authority and [disk_done_lb]).  The [disk_res] these
+   assemble into is built by [DiskBoot.disk_res_boot], in main's PROOF. *)
+Require Import VirtioQueue VirtioProto DiskInv.
 (* the classes this statement's [Context] must bind for real: without these
    [Require Import]s the backtick generalization silently invents fresh binders
    named [lockG]/[fileG] instead, and [printk_env]/[procs_inv] then cannot
@@ -143,6 +149,15 @@ Section SpecMain.
   (* the 64 dormant processes and the WHOLE fd-slot supply, the buffer    *)
   (* cache, the inode sleeplocks, and the disk's three queue pointers +   *)
   (* [free[8]].                                                          *)
+  (*                                                                     *)
+  (* PLUS the cells of the static [struct disk] that virtio_disk_init      *)
+  (* never touches but the vdisk_lock's resource ([DiskInv.disk_res])      *)
+  (* owns: [used_idx], and per descriptor slot the [info[i]] pair and the  *)
+  (* [ops[i]] header ([DiskInv.disk_slot_raw]).  [used_idx] is CONCRETE    *)
+  (* zero -- it is a .bss cell the loader zeroed, and [disk_res] wants it  *)
+  (* at [wrap16 nr] with the completed count [nr = 0] at boot -- the same  *)
+  (* precedent as the [kmem+24 ↦₈ 0] conjunct above; the others stay       *)
+  (* contents-existential, which is all [free_slot_res] needs.            *)
   (* ------------------------------------------------------------------- *)
   Definition main_globals_raw : iProp Σ :=
     ((∃ r w : mword 64,
@@ -159,7 +174,9 @@ Section SpecMain.
      (∃ pd pav pu : mword 64,
         disk_desc ↦₈ pd ∗ disk_avail ↦₈ pav ∗ disk_used ↦₈ pu) ∗
      (∃ free0 : nat -> bv 8,
-        [∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j))%I.
+        [∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) ∗
+     d_used_idx ↦₂ wrap16 0%nat ∗
+     ([∗ list] i ∈ seq 0 8, disk_slot_raw i))%I.
 
   (* ------------------------------------------------------------------- *)
   (* This hart's own translation and trap resources.  [strans_bit bare]   *)
@@ -221,6 +238,15 @@ Section SpecMain.
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
+    (* ...and the two disk ghosts the protocol invariant does NOT hold, minted
+       with it at power-on ([VirtioProto.disk_ghosts_alloc]) and owed to the
+       vdisk_lock's resource at main's [newlock]: nothing has ever been
+       published (the [dn_claim] authority is at ∅) and the completed count is
+       at least 0 (persistent).  Together with [main_globals_raw]'s
+       [d_used_idx] / [disk_slot_raw] cells and virtio_disk_init's
+       postcondition these are exactly [DiskBoot.disk_res_boot]'s inputs. *)
+    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    disk_done_lb γv 0%nat -∗
     main_hart_raw tlbvec0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     (* ...and what the scheduler at the far end still wants, which main

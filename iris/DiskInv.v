@@ -75,6 +75,113 @@ Definition b_disk    (b : Arch.pa) : Arch.pa := pa_add b 4.
 Definition b_blockno (b : Arch.pa) : Arch.pa := pa_add b 12.
 Definition b_data    (b : Arch.pa) : Arch.pa := pa_add b 88.
 
+(* ---------------------------------------------------------------------- *)
+(* ALIGNMENT of an offset inside a queue page.                             *)
+(*                                                                         *)
+(* Every word-granular cell the driver owns on the three queue pages is    *)
+(* named by an offset from a 4096-aligned base, so its [is_aligned_paddr]  *)
+(* is one divisibility argument -- and one that has to be redone at each of *)
+(* the descriptor entry's four fields, at the avail-ring entry and at the  *)
+(* used-ring element.  THE lemma is [pa_add_aligned_in_page]; the named    *)
+(* instances below are the ones [desc_entry_own] / [ring_slots_res] need,  *)
+(* so that a consumer never re-derives them.  The arithmetic is factored   *)
+(* into [Z]-only helpers: [lia] is unreliable in a goal that mentions      *)
+(* [bv_unsigned] (durable-notes' zify-hook gotcha).                        *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma pa_wrap_in_page (x k : Z) :
+  0 <= x -> x < 18446744073709551616 -> x `mod` 4096 = 0 ->
+  0 <= k -> k < 4096 ->
+  (x + k) `mod` 18446744073709551616 = x + k.
+Proof.
+  intros H0 H1 Hm Hk0 Hk1. apply Z.mod_small. split; [lia|].
+  apply Z.mod_divide in Hm; [| lia]. destruct Hm as [c ->]. lia.
+Qed.
+
+Lemma pa_rem_in_page (x k d : Z) :
+  0 <= x -> x < 18446744073709551616 -> x `mod` 4096 = 0 ->
+  0 <= k -> k < 4096 -> 0 < d -> 4096 `mod` d = 0 -> k `mod` d = 0 ->
+  Z.rem ((x + k) `mod` 18446744073709551616) d = 0.
+Proof.
+  intros H0 H1 Hm Hk0 Hk1 Hd Hdd Hkd.
+  rewrite (pa_wrap_in_page x k H0 H1 Hm Hk0 Hk1).
+  rewrite Z.rem_mod_nonneg; [| lia | lia].
+  apply Z.mod_divide; [lia|].
+  apply Z.mod_divide in Hm; [| lia]. apply Z.mod_divide in Hdd; [| lia].
+  apply Z.mod_divide in Hkd; [| lia].
+  apply Z.divide_add_r; [ apply (Z.divide_trans d 4096 x Hdd Hm) | exact Hkd ].
+Qed.
+
+Lemma pa_add_aligned_in_page (p : Arch.pa) (k : nat) (d : Z) :
+  bv_unsigned (p : SailStdpp.Values.mword 64) `mod` 4096 = 0 ->
+  (Z.of_nat k < 4096)%Z -> (0 < d)%Z -> (4096 `mod` d = 0)%Z ->
+  (Z.of_nat k `mod` d = 0)%Z ->
+  is_aligned_paddr (Physaddr (pa_add p k)) d = true.
+Proof.
+  intros Hm Hk Hd Hdd Hkd. unfold is_aligned_paddr. apply Z.eqb_eq.
+  rewrite RiscvExtras.uint_unsigned pa_add_unsigned.
+  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z.
+  change (2 ^ 64)%Z with 18446744073709551616%Z.
+  pose proof (bv_unsigned_in_range 64 p) as Hr.
+  unfold bv_modulus in Hr. change (Z.of_N 64) with 64%Z in Hr.
+  change (2 ^ 64)%Z with 18446744073709551616%Z in Hr.
+  apply pa_rem_in_page;
+    [ exact (proj1 Hr) | exact (proj2 Hr) | exact Hm
+    | exact (Nat2Z.is_nonneg k) | exact Hk | exact Hd | exact Hdd | exact Hkd ].
+Qed.
+
+(* the four fields of descriptor-table entry [i] *)
+Lemma d_desc_aligned8 (pd : Arch.pa) (i : nat) :
+  bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
+  is_aligned_paddr (Physaddr (d_desc pd i)) 8 = true.
+Proof.
+  intros Hm Hi. unfold d_desc.
+  apply (pa_add_aligned_in_page pd (16 * i)%nat 8 Hm); [ lia | lia | reflexivity |].
+  replace (Z.of_nat (16 * i)) with ((2 * Z.of_nat i) * 8)%Z by lia.
+  apply Z.mod_mul. lia.
+Qed.
+
+Lemma d_desc_len_aligned4 (pd : Arch.pa) (i : nat) :
+  bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
+  is_aligned_paddr (Physaddr (pa_add pd (16 * i + 8))) 4 = true.
+Proof.
+  intros Hm Hi.
+  apply (pa_add_aligned_in_page pd (16 * i + 8)%nat 4 Hm); [ lia | lia | reflexivity |].
+  replace (Z.of_nat (16 * i + 8)) with ((2 + 4 * Z.of_nat i) * 4)%Z by lia.
+  apply Z.mod_mul. lia.
+Qed.
+
+Lemma d_desc_flags_aligned2 (pd : Arch.pa) (i : nat) :
+  bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
+  is_aligned_paddr (Physaddr (pa_add pd (16 * i + 12))) 2 = true.
+Proof.
+  intros Hm Hi.
+  apply (pa_add_aligned_in_page pd (16 * i + 12)%nat 2 Hm); [ lia | lia | reflexivity |].
+  replace (Z.of_nat (16 * i + 12)) with ((6 + 8 * Z.of_nat i) * 2)%Z by lia.
+  apply Z.mod_mul. lia.
+Qed.
+
+Lemma d_desc_next_aligned2 (pd : Arch.pa) (i : nat) :
+  bv_unsigned (pd : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (i < 8)%nat ->
+  is_aligned_paddr (Physaddr (pa_add pd (16 * i + 14))) 2 = true.
+Proof.
+  intros Hm Hi.
+  apply (pa_add_aligned_in_page pd (16 * i + 14)%nat 2 Hm); [ lia | lia | reflexivity |].
+  replace (Z.of_nat (16 * i + 14)) with ((7 + 8 * Z.of_nat i) * 2)%Z by lia.
+  apply Z.mod_mul. lia.
+Qed.
+
+(* avail-ring entry [j] *)
+Lemma d_ring_aligned2 (pav : Arch.pa) (j : nat) :
+  bv_unsigned (pav : SailStdpp.Values.mword 64) `mod` 4096 = 0 -> (j < 8)%nat ->
+  is_aligned_paddr (Physaddr (d_ring pav j)) 2 = true.
+Proof.
+  intros Hm Hj. unfold d_ring.
+  apply (pa_add_aligned_in_page pav (4 + 2 * j)%nat 2 Hm); [ lia | lia | reflexivity |].
+  replace (Z.of_nat (4 + 2 * j)) with ((2 + Z.of_nat j) * 2)%Z by lia.
+  apply Z.mod_mul. lia.
+Qed.
+
 Section DiskInv.
   Context `{!riscvGS Σ, !diskGhostG Σ}.
 
@@ -162,6 +269,24 @@ Section DiskInv.
     (desc_entry_own pd i ∗ ops_own i ∗
      (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
      (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
+
+  (* The part of [free_slot_res] that lives in [struct disk]'s .bss rather
+     than on the descriptor page: slot [i]'s [ops] header, its
+     [info[i].status] byte and its [info[i].b] pointer cell.  The loader
+     zeroes all three and [virtio_disk_init] never touches any of them, so
+     this is what a BOOT chain can honestly claim about them, and it is what
+     [SpecMain.main_globals_raw] hands over (contents existential, exactly
+     like the other raw-global cells).  Splitting it out is what makes
+     [free_slot_res] assemblable at boot: the other half,
+     [desc_entry_own pd i], comes off the freshly-zeroed descriptor page. *)
+  Definition disk_slot_raw (i : nat) : iProp Σ :=
+    (ops_own i ∗
+     (∃ sb : bv 8, d_info_status i ↦ₘ sb) ∗
+     (∃ w : SailStdpp.Values.mword 64, d_info_b i ↦₈ w))%I.
+
+  Lemma free_slot_res_split (pd : Arch.pa) (i : nat) :
+    free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗ disk_slot_raw i.
+  Proof. reflexivity. Qed.
 
   (* -- the linkage between a slot and its struct buf -------------------- *)
 

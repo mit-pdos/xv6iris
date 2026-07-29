@@ -549,6 +549,7 @@ SpecSysPipe.v
 WpSysPipeDecode.v
 ProofSysPipe.v
 DiskInv.v
+DiskBoot.v
 SpecFreeDesc.v
 WpFreeDescDecode.v
 ProofFreeDesc.v
