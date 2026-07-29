@@ -121,8 +121,33 @@ jobs:
           # the wall-clock goes.  `tee` keeps the per-file log for the profiler;
           # the job sets `shell: bash` (-eo pipefail), so a make failure still
           # fails here rather than being masked by tee's exit status.
-          opam exec -- make -C iris -f CoqMakefile -j"$(nproc)" TIMED=1 TIMING=1 \
+          #
+          # `--output-sync=target` is what keeps that log PARSEABLE.  Each TIMED
+          # record is written by its own `command time`, all to this one pipe, so
+          # without it two records interleave mid-line under -j (seen in run
+          # 30438637495: "SpecConsoleintr.vo (reaSlp:e cSysPipe.vo (real: ...,
+          # sys: 4.040.55,,") and the profiler loses both.  -O makes make buffer
+          # each target's output and emit it whole.  It changes nothing the
+          # profiler measures: per-file wall comes from the record itself and the
+          # parallelism chart from .vo mtimes, neither from log line order.
+          opam exec -- make -C iris -f CoqMakefile -j"$(nproc)" \
+            --output-sync=target TIMED=1 TIMING=1 \
             2>&1 | tee "$RUNNER_TEMP/iris-build.log"
+
+          # Grep the log as well as trusting the exit status, per
+          # claude-notes/durable-notes.md.  The exit status IS propagated here
+          # (verified: `command time` forwards a nonzero child status, and
+          # pipefail makes tee not mask it), so this is belt-and-braces against
+          # a future edit reintroducing the masking that b906a5b fixed.
+          # Bare "Error" (as in dead-imports.yml) catches BOTH Rocq's "Error:"
+          # and make's "*** [CoqMakefile:801: Foo.vo] Error 1"; verified
+          # false-positive-free against run 30438637495's green build output
+          # (0 matches in 1927 lines, and no iris file has "Error" in its name).
+          if grep -q "Error" "$RUNNER_TEMP/iris-build.log"; then
+            echo "::error::Errors in the iris build log despite a zero exit status."
+            grep -B5 "Error" "$RUNNER_TEMP/iris-build.log" | head -50
+            exit 1
+          fi
 
       # ---- 3b. Build profile (iris/, informational) ----
       # Consumes the TIMED log + the .v.timing files + coqdep's .CoqMakefile.d +
@@ -193,8 +218,10 @@ jobs:
       # just emitted and lists definitions/lemmas nothing references.  Its hits
       # are heuristic (hint-DB-only lemmas and not-yet-consumed top-level
       # theorems can appear), so the output is logged for a human to read and
-      # the step never fails the build.  Needs no opam env — it is plain Python
-      # over .glob/.v text.
+      # the step never fails the build — which is what `continue-on-error`
+      # below actually enforces; the comment alone used to claim it while a
+      # find_dead.py hiccup would have failed an otherwise-green proof build.
+      # Needs no opam env — it is plain Python over .glob/.v text.
       #
       # This runs only if the build succeeded (a step with no `if:` is skipped
       # once an earlier one fails), which is also what makes the report
@@ -203,5 +230,6 @@ jobs:
       # cheerful "0 unreferenced ... (of 0 globs scanned)".  Read the glob count
       # in the trailing == line before trusting a clean report.
       - name: Dead-code report (iris/, informational)
+        continue-on-error: true
         working-directory: iris
         run: python3 find_dead.py --dir . --triage

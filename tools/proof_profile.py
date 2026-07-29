@@ -41,24 +41,52 @@ from collections import defaultdict
 # ---------------------------------------------------------------------------
 
 def parse_build_log(path):
-    """`Foo.vo (real: 12.34, user: 11.9, ..)` -> (real, cpu) dicts.
+    """`Foo.vo (real: 12.34, user: 11.9, ..)` -> (real, cpu, dropped).
 
     real = wall clock (%e): what the file took start-to-finish, INCLUDING time
     lost to the -j build's concurrent compiles / other runner load -- so it is
     not comparable across runs.  cpu = user+sys (%U+%S): the actual computation,
     which contention adds *wait* to but not CPU, so it is load-robust and the
-    honest measure of a file's intrinsic cost."""
-    real, cpu = {}, {}
+    honest measure of a file's intrinsic cost.
+
+    A GARBLED LINE MUST BE DROPPED, NEVER PARSED.  Each record comes from its
+    own `command time`, and under `-j` they all write to the same pipe, so two
+    can interleave *within* one line:
+
+        SpecConsoleintr.vo (reaSlp:e cSysPipe.vo (real: 3.73, user: 3.18, sys: 4.040.55,,  ...
+
+    A lenient `[\\d.]+` field reads that smear's "4.040.55" as a number and
+    then dies in `float()` -- which is exactly how this informational step came
+    to fail a run (green, because it is `continue-on-error`, but leaving a
+    "Process completed with exit code 1" annotation that reads as a broken
+    build).  Hence strict `\\d+(?:\\.\\d+)?` fields, so a smear simply does not
+    match, plus a belt-and-braces `try` around the conversion.  Dropped records
+    are COUNTED and reported by the caller: losing timing rows silently would
+    understate every total in the report.  ci.yml also passes
+    `--output-sync=target` to stop the interleaving at source; this handles
+    logs produced without it."""
+    real, cpu, dropped = {}, {}, 0
     if not path or not os.path.exists(path):
-        return real, cpu
-    pat = re.compile(r'(\S+)\.vo \(real: ([\d.]+), user: ([\d.]+), sys: ([\d.]+),')
+        return real, cpu, dropped
+    num = r'\d+(?:\.\d+)?'
+    pat = re.compile(rf'(\S+)\.vo \(real: ({num}), user: ({num}), sys: ({num}),')
     with open(path, errors="replace") as f:
         for line in f:
+            if '.vo (real:' not in line:
+                continue
             m = pat.search(line)
-            if m and '/' not in m.group(1):
-                real[m.group(1)] = float(m.group(2))
-                cpu[m.group(1)] = float(m.group(3)) + float(m.group(4))
-    return real, cpu
+            if not m or '/' in m.group(1):
+                dropped += 1
+                continue
+            try:
+                r = float(m.group(2))
+                c = float(m.group(3)) + float(m.group(4))
+            except ValueError:
+                dropped += 1
+                continue
+            real[m.group(1)] = r
+            cpu[m.group(1)] = c
+    return real, cpu, dropped
 
 
 def parse_deps(path):
@@ -362,7 +390,7 @@ def main():
     deps_path = args.deps or os.path.join(iris, ".CoqMakefile.d")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    real, cpu = parse_build_log(args.build_log)
+    real, cpu, dropped = parse_build_log(args.build_log)
     deps, targets = parse_deps(deps_path)
     stmts, n_timing = parse_timings(iris)
 
@@ -400,7 +428,10 @@ def main():
         + (f" (of -j{args.jobs})" if args.jobs else "")
         + f"  ·  **~{serial:.0f}s effectively serial** (≤1 compile in flight)\n"
         f"- {len(real)} files timed · {n_timing} timing files · "
-        f"{len(stmts)} sentences\n")
+        f"{len(stmts)} sentences"
+        + (f" · **{dropped} timing line(s) dropped** (interleaved `-j` output,"
+           " so the totals above are short by that much)" if dropped else "")
+        + "\n")
 
     md.append("\n### Most expensive statements\n")
     rows = []
