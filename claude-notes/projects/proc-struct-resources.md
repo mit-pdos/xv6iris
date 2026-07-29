@@ -601,11 +601,25 @@ the evidence for every offset. This file is only the worklist.
          comment saying those callees are unverified is STALE: vm.c is
          20/20.  **But three real seams turned up when the specs were
          read, and they are the actual cost of this step:**
-         - `SpecUvmfree` is pinned at `cpu_own γ 0%nat` — the same
-           `lvl = 0` fossil uvmcreate and proc_pagetable just shed.
-           allocproc calls proc_pagetable with the proc lock HELD, so this
-           has to be generalized the same way (mappages/walk's
-           `Z.of_nat lvl + 1 < 2^31` shape).
+         - [x] ~~`SpecUvmfree` is pinned at `cpu_own γ 0%nat`~~ — **DONE.**
+           The teardown chain (`SpecFreewalk` / `SpecUvmunmap` — both its
+           `UVMUNMAP` and `UVMUNMAP_BARE` bodies — / `SpecUvmfree`) now takes
+           an `(ilvl : nat)` interrupt level with mappages' and walk's
+           `Z.of_nat ilvl + 1 < 2^31` premise.  The parameter is APPENDED to
+           each binder list, not slotted next to `K`: freewalk already uses
+           `lvl` for the page-table level, and a second `lvl` would have been
+           unreadable.  The two external callers (uvmdealloc, uvmcopy) pin
+           `0%nat` and keep their own contracts unchanged, so the sweep is
+           three specs + three proofs + two one-token call sites.
+           **The one trap, and it cost 20 minutes:** the `kfree` call inside
+           `fw_epilogue` and inside uvmunmap's free arm discharged kfree's
+           `Z.of_nat n + 1 < 2^31` premise with `ltac:(vm_compute;
+           reflexivity)` — fine at `n = 0`, but on a VARIABLE that does not
+           fail, it grinds (28.9 GB RSS and climbing after 11 minutes, with
+           no output).  This is durable-notes' "a `vm_compute` on a symbolic
+           term does not fail fast, it hangs".  `coqc -time` plus
+           `Set Printing Depth 40` pinned it to the exact sentence in one
+           run; pass the premise by name instead.
          - `SpecUvmfree` consumes `BarePt.bare_pt uroot um`, while
            mappages hands back `ptree_own 2 1 t'` + `pt_rep0`.  A bridge
            from the partially-grown tree to `bare_pt` is needed; `BarePt`'s

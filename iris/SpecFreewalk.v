@@ -73,12 +73,17 @@ Notation FW := KernelSyms.freewalk.
 Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) :=
+    (C : iProp Σ) (ilvl : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freewalk in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 6-slot frame per recursion level, [lvl]+1 levels deep, and kfree's 14
      on top of the deepest of them *)
   (6 * S lvl + 14 <= K)%nat ->
+  (* [ilvl] is the INTERRUPT nesting level (not the page-table [lvl] above):
+     kfree's acquire/release keep the transient noff increment in int range.
+     It used to be pinned at 0, which was an artifact of the boot-time
+     callers; proc_pagetable reaches this chain with a proc lock held. *)
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
   (* the kfree chain runs on the ambient CPU (push_off cid convention) *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the pagetable argument is the node [t] describes *)
@@ -86,14 +91,14 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (* the table maps nothing: the panic arm is dead *)
   pt_free_ok lvl t ->
   sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own γ ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own lvl (DfracOwn 1) t -∗
   kalloc_env γa None cid_word -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -104,6 +109,6 @@ Module Type FREEWALK.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ),
-      wp_freewalk_sconf_body γ γa Φ mm t lvl K eb p C.
+      (C : iProp Σ) (ilvl : nat),
+      wp_freewalk_sconf_body γ γa Φ mm t lvl K eb p C ilvl.
 End FREEWALK.

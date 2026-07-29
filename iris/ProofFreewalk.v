@@ -381,24 +381,25 @@ Section ProofFreewalk.
 
   Definition fw_rec (l : nat) : Prop :=
     forall (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-           (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_freewalk_sconf_body γ γa Φ mm t l K eb p C.
+           (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat),
+      wp_freewalk_sconf_body γ γa Φ mm t l K eb p C ilvl.
 
   (* ================================================================== *)
   (*  §3  THE EXIT (+0x48 .. +0x5a): kfree(pagetable), then the epilogue. *)
   (* ================================================================== *)
-  Local Lemma fw_epilogue (γ γa : gname) (Φ : mval -> iProp Σ)
+  Local Lemma fw_epilogue (ilvl : nat) (γ γa : gname) (Φ : mval -> iProp Σ)
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (b : mword 44)
       (eb : bool) (p : mword 64) (C : iProp Σ) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     (20 <= K)%nat ->
+    (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     mm !!! Regidx csp_rs1 = sp0 ->
     mj !!! Regidx csp_rs1 = spr ->
     mj !!! Regidx Rtp = cid_word ->
     mj !!! Regidx Rs3 = page_base b ->
     fw_thr mm mj ->
     sie_cap_gpr γ mj (K - 6) -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ ilvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x48) : mword 64) -∗
     kfree_pre (page_base b) -∗
@@ -411,13 +412,13 @@ Section ProofFreewalk.
     (∃ w : mword 64, pa_stk sp0 6 ↦₈ w) -∗
     ( ∀ mf : regfile,
       sie_cap_gpr γ mf K -∗
-      cpu_own γ 0%nat eb p C -∗
+      cpu_own γ ilvl eb p C -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros spr HK Hmmsp Hjsp Hjtp Hjs3 Hjthr.
+    intros spr HK Hilvl Hmmsp Hjsp Hjtp Hjs3 Hjthr.
     iIntros "Hcg Hcnt #Htext Hpc Hpre #Henv Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hcont".
     iDestruct "Hk6" as (u6) "Hk6".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -476,9 +477,8 @@ Section ProofFreewalk.
     assert (Hret4e : ret_pc (E1 !!! Regidx Rra) = mword_of_int (FW + 0x4e)).
     { rewrite /E1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iApply (Kfree.wp_kfree_sconf γ Φ γa γk (mword_of_int KernelSyms.kmem)
-              (mword_of_int (KernelSyms.kmem + 24)) E1 None 0%nat eb p C (K - 6)%nat
-              ltac:(lia) HE1tp ltac:(reflexivity) ltac:(reflexivity)
-              ltac:(vm_compute; reflexivity)
+              (mword_of_int (KernelSyms.kmem + 24)) E1 None ilvl eb p C (K - 6)%nat
+              ltac:(lia) HE1tp ltac:(reflexivity) ltac:(reflexivity) Hilvl
               with "Hcg Hcnt Htext Hpc Hlock [Hpre] Havail Hpanic [-]").
     { rewrite HE1a0. iExact "Hpre". }
     iIntros (mk) "Hcg Hcnt Hpc %Hkcs _".
@@ -621,8 +621,9 @@ Section ProofFreewalk.
   Local Lemma fw_loop (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
       (γ γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (spr : mword 64) :
+      (spr : mword 64) (ilvl : nat) :
     (6 * S lvl + 14 <= K)%nat ->
+    (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     (forall i : mword 9, fw_ok lvl t i) ->
     forall (rem : nat) (d : Z) (m : regfile),
     (1 <= rem)%nat -> (0 <= d)%Z -> (d + Z.of_nat rem = 512)%Z ->
@@ -633,7 +634,7 @@ Section ProofFreewalk.
     m !!! Regidx Rs3 = page_base (pt_base t) ->
     fw_thr mm m ->
     sie_cap_gpr γ m (K - 6) -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ ilvl eb p C -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x2a) : mword 64) -∗
     pt_node_claim (pt_base t) -∗
@@ -646,13 +647,13 @@ Section ProofFreewalk.
         /\ mj !!! Regidx Rs3 = page_base (pt_base t)
         /\ fw_thr mm mj ⌝ -∗
       sie_cap_gpr γ mj (K - 6) -∗
-      cpu_own γ 0%nat eb p C -∗
+      cpu_own γ ilvl eb p C -∗
       pc_is (mword_of_int (FW + 0x48) : mword 64) -∗
       fw_done (pt_base t) 512 -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hok.
+    intros HK Hilvl Hok.
     intro rem.
     induction rem as [| rem' IH];
       intros d m Hrem Hd0 Hsum Hsp Htp Hs1 Hs2 Hs3 Hthr;
@@ -681,7 +682,7 @@ Section ProofFreewalk.
           /\ mt !!! Regidx Rs3 = page_base (pt_base t)
           /\ fw_thr mm mt ⌝ -∗
         sie_cap_gpr γ mt (K - 6) -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ ilvl eb p C -∗
         pc_is (mword_of_int (FW + 0x24) : mword 64) -∗
         fw_done (pt_base t) (d + 1) -∗
         fw_todo lvl t (d + 1) -∗
@@ -942,7 +943,7 @@ Section ProofFreewalk.
     assert (Hlt : (l < lvl)%nat) by (exact (fw_kid_lt lvl t (mword_of_int d) l c Hkid)).
     assert (HKrec : (6 * S l + 14 <= K - 6)%nat) by lia.
     iEval (rewrite /fw_slot Hkid) in "Hch".
-    iApply (REC l Hlt γ γa Φ B6 c (K - 6)%nat eb p C HKrec HB6tp HB6a0 Hfok
+    iApply (REC l Hlt γ γa Φ B6 c (K - 6)%nat eb p C ilvl HKrec Hilvl HB6tp HB6a0 Hfok
               with "Hcg Hcnt Htext Hpc Hch Henv [-]").
     iIntros (mr) "Hcg Hcnt Hpc %Hrcs".
     iEval (rewrite Hret42) in "Hpc".
@@ -1007,9 +1008,9 @@ Section ProofFreewalk.
   (* ================================================================== *)
   Local Lemma fw_body (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l) : fw_rec lvl.
   Proof.
-    unfold fw_rec. intros γ γa Φ mm t K eb p C.
+    unfold fw_rec. intros γ γa Φ mm t K eb p C ilvl.
     cbv beta delta [wp_freewalk_sconf_body].
-    intros pcE ret_tgt HK Htp Ha0 Hfree.
+    intros pcE ret_tgt HK Hilvl Htp Ha0 Hfree.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc Hptree #Henv Hcont".
@@ -1200,14 +1201,14 @@ Section ProofFreewalk.
                  (concat_vec (mword_of_int 10 : mword 11) ('b"0"))))
             = mword_of_int (FW + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt2a) in "Hpc".
-    iApply (fw_loop lvl REC γ γa Φ mm t K eb p C spr HK (fw_ok_of lvl t Hfree)
+    iApply (fw_loop lvl REC γ γa Φ mm t K eb p C spr ilvl HK Hilvl (fw_ok_of lvl t Hfree)
               512%nat 0%Z R6 ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
               HR6sp HR6tp HR6s1 HR6s2 HR6s3 HR6thr
               with "Hcg Hcnt Htext Hpc Hclaim [] Htodo Henv [-]").
     { rewrite /fw_done. rewrite (seqZ_nil 0 0 ltac:(lia)). done. }
     iIntros (mj) "(%Hjsp & %Hjtp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hdone".
-    iApply (fw_epilogue γ γa Φ mm mj K sp0 (pt_base t) eb p C
-              ltac:(lia) Hspm Hjsp Hjtp Hjs3 Hjthr
+    iApply (fw_epilogue ilvl γ γa Φ mm mj K sp0 (pt_base t) eb p C
+              ltac:(lia) Hilvl Hspm Hjsp Hjtp Hjs3 Hjthr
               with "Hcg Hcnt Htext Hpc [Hdone] Henv Hk1 Hk2 Hk3 Hk4 Hk5 [Hk6] [-]").
     { iApply (pt_slots_kfree_pre (pt_base t) Hpv with "Hkmapb Hdone"). }
     { iExists u6. iExact "Hk6". }
@@ -1228,8 +1229,9 @@ Section ProofFreewalk.
 
   Lemma wp_freewalk_sconf (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    : wp_freewalk_sconf_body γ γa Φ mm t lvl K eb p C.
-  Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) γ γa Φ mm t K eb p C). Qed.
+      (ilvl : nat)
+    : wp_freewalk_sconf_body γ γa Φ mm t lvl K eb p C ilvl.
+  Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) γ γa Φ mm t K eb p C ilvl). Qed.
 
 End ProofFreewalk.
 

@@ -214,11 +214,11 @@ Section ProofUvmfree.
   Lemma wp_uvmfree_sconf
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    : wp_uvmfree_sconf_body γ γa Φ mm uroot um K eb p C.
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat)
+    : wp_uvmfree_sconf_body γ γa Φ mm uroot um K eb p C ilvl.
   Proof.
     cbv beta delta [wp_uvmfree_sconf_body].
-    intros pcE sz vpn0 n ret_tgt HK Htp Hroot Hbnd Hdom.
+    intros pcE sz vpn0 n ret_tgt HK Hilvl Htp Hroot Hbnd Hdom.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
@@ -390,7 +390,7 @@ Section ProofUvmfree.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr γ mj (K - 4)%nat -∗
-        cpu_own γ 0%nat eb p C -∗
+        cpu_own γ ilvl eb p C -∗
         pc_is (mword_of_int (UF + 0x0e) : mword 64) -∗
         bare_pt uroot ∅ -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
@@ -447,8 +447,8 @@ Section ProofUvmfree.
           [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
         apply Hjthr; assumption. }
       (* ---- freewalk() at lvl = 2 ---- *)
-      iApply (Freewalk.wp_freewalk_sconf γ γa Φ J1 t 2%nat (K - 4)%nat eb p C
-                HKfw HJ1tp HJ1a0 Hfree with "Hcg Hcpu Htext Hpc Ht Henv [-]").
+      iApply (Freewalk.wp_freewalk_sconf γ γa Φ J1 t 2%nat (K - 4)%nat eb p C ilvl
+                HKfw Hilvl HJ1tp HJ1a0 Hfree with "Hcg Hcpu Htext Hpc Ht Henv [-]").
       iIntros (mr) "Hcg Hcpu Hpc %Hcs".
       assert (Hret14 : ret_pc (J1 !!! Regidx Rra) = mword_of_int (UF + 0x14)).
       { rewrite HJ1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -812,8 +812,8 @@ Section ProofUvmfree.
       assert (Hz : uint (mword_of_int 0 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz. rewrite Z.add_0_l. exact Hnrange. }
     (* ---- uvmunmap(), at the BARE altitude ---- *)
-    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γ γa Φ B7 uroot um n (K - 4)%nat eb p C
-              HKuu HB7tp HB7a0 Halign HB7a2 Hdofree Hrange
+    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γ γa Φ B7 uroot um n (K - 4)%nat eb p C ilvl
+              HKuu Hilvl HB7tp HB7a0 Halign HB7a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv [-]").
     iIntros (mr) "Hcg Hcpu Hpc %Hcs Hpt".
     iEval (rewrite HB7a1) in "Hpt".

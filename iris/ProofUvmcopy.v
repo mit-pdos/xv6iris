@@ -570,8 +570,8 @@ Section ProofUvmcopy.
       rewrite Hu0. clear -Hjb. lia. }
     iAssert (kalloc_env γa None (N5 !!! Regidx Rtp)) as "#HenvU".
     { rewrite HN5tp. iExact "Henv". }
-    iApply (Uvmunmap.wp_uvmunmap_sconf γ γa Φ N5 Pj j (K - 10)%nat eb p C
-              HKuu HN5tp HN5a0 Hual HN5a2 Hua3 Hurng
+    iApply (Uvmunmap.wp_uvmunmap_sconf γ γa Φ N5 Pj j (K - 10)%nat eb p C 0%nat
+              HKuu ltac:(vm_compute; reflexivity) HN5tp HN5a0 Hual HN5a2 Hua3 Hurng
               with "Hcg Hcnt Htext Hpc Hpt HenvU [-]").
     iIntros (mu) "Hcg Hcnt Hpc %Hucs Hpt".
     iEval (rewrite HN5a1 Hvpn0) in "Hpt".

@@ -976,8 +976,8 @@ Section ProofUvmdealloc.
                       + Z.of_nat (uvmd_np oldsz newsz) * 4096 <= uvm_maxsz)%Z).
     { rewrite HB6a1 uint_unsigned Hmax Hqz. lia. }
     (* ---- uvmunmap() ---- *)
-    iApply (Uvmunmap.wp_uvmunmap_sconf γ γa Φ B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C
-              ltac:(lia) HB6tp HB6a0 Halign HB6a2 Hdofree Hrange
+    iApply (Uvmunmap.wp_uvmunmap_sconf γ γa Φ B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C 0%nat
+              ltac:(lia) ltac:(vm_compute; reflexivity) HB6tp HB6a0 Halign HB6a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv [-]").
     iIntros (mr) "Hcg Hcpu Hpc %Hcs Hpt".
     iEval (rewrite HB6a1) in "Hpt".

@@ -72,7 +72,7 @@ Notation UF := KernelSyms.uvmfree.
 Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-    (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmfree in
   let sz := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -80,6 +80,10 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 4-slot frame + freewalk's 32 (uvmunmap needs only 22) *)
   (36 <= K)%nat ->
+  (* [ilvl] is the interrupt nesting level: kfree's acquire/release keep the
+     transient noff increment in int range.  It used to be pinned at 0 --
+     an artifact of the boot-time callers. *)
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   mm !!! Regidx (mword_of_int 10) = page_base uroot ->
   (* the size stays inside the user region, so PGROUNDUP does not wrap and
@@ -88,14 +92,14 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* the table maps nothing above PGROUNDUP(sz): see the header *)
   dom um ⊆ vpn_run vpn0 n ->
   sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own γ ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None cid_word -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -106,6 +110,6 @@ Module Type UVMFREE.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_uvmfree_sconf_body γ γa Φ mm uroot um K eb p C.
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat),
+      wp_uvmfree_sconf_body γ γa Φ mm uroot um K eb p C ilvl.
 End UVMFREE.

@@ -75,13 +75,17 @@ Notation UU := KernelSyms.uvmunmap.
 Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) :=
+    (C : iProp Σ) (ilvl : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 8-slot frame + kfree's 14 (the no-alloc walk needs only 8) *)
   (22 <= K)%nat ->
+  (* [ilvl] is the interrupt nesting level: kfree's acquire/release keep the
+     transient noff increment in int range.  It used to be pinned at 0 --
+     an artifact of the boot-time callers. *)
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
   (* the kfree chain runs on the ambient CPU (push_off cid convention) *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the pagetable argument is the table [proc_pt P] describes *)
@@ -96,14 +100,14 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      [tf_vpn], so the tree spec survives. *)
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
   sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own γ ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None cid_word -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_del_run P vpn0 npages) -∗
@@ -115,8 +119,8 @@ Module Type UVMUNMAP.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ),
-      wp_uvmunmap_sconf_body γ γa Φ mm P npages K eb p C.
+      (C : iProp Σ) (ilvl : nat),
+      wp_uvmunmap_sconf_body γ γa Φ mm P npages K eb p C ilvl.
 End UVMUNMAP.
 
 (* --------------------------------------------------------------------- *)
@@ -136,12 +140,16 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) :=
+    (C : iProp Σ) (ilvl : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (22 <= K)%nat ->
+  (* [ilvl] is the interrupt nesting level: kfree's acquire/release keep the
+     transient noff increment in int range.  It used to be pinned at 0 --
+     an artifact of the boot-time callers. *)
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   mm !!! Regidx (mword_of_int 10) = page_base uroot ->
   subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
@@ -149,14 +157,14 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
   sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own γ ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None cid_word -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+    cpu_own γ ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗
@@ -169,6 +177,6 @@ Module Type UVMUNMAP_BARE.
       (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ),
-      wp_uvmunmap_bare_sconf_body γ γa Φ mm uroot um npages K eb p C.
+      (C : iProp Σ) (ilvl : nat),
+      wp_uvmunmap_bare_sconf_body γ γa Φ mm uroot um npages K eb p C ilvl.
 End UVMUNMAP_BARE.
