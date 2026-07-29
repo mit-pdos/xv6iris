@@ -541,6 +541,8 @@ LinkPrintint.v
 WpPrintkDecode.v
 ProofPrintk.v
 LinkPrintk.v
+SpecPrintkGen.v
+LinkPrintkGen.v
 SpecArgaddr.v
 SpecFdalloc.v
 SpecSysPipe.v
@@ -620,6 +622,8 @@ SpecSysSbrk.v
 WpSysSbrkDecode.v
 ProofSysSbrk.v
 LinkSysSbrk.v
+SpecUserinit.v
+LinkUserinit.v
 StartedInv.v
 WpMainDecode.v
 SpecMain.v
