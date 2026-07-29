@@ -1198,7 +1198,18 @@ Section VirtioProto.
           ([∗ map] p ↦ sl ∈ vp_pend pr, slot_pend_res γ sl) ∗
           ([∗ map] p ↦ sl ∈ vp_done pr, slot_done_res γ (v_cfg v) dma p sl)
       else
-        disk_cfg_is γ (DfracOwn 1) virtio_cfg0 ∗
+        (* THE CONFIG TRACKER (2026-07-29).  While the queue is not live the
+           invariant holds only HALF of the config cell, at the state's own
+           [v_cfg v]; the boot chain holds the other half.  That is what lets
+           [virtio_disk_init] run UNDER this invariant and still know
+           deterministically which configuration it has programmed so far --
+           the device never writes [v_cfg] ([virtio_req_step_cfg], and the
+           whole not-live arm is unreachable from a device step anyway), so
+           the pair is stable across device steps, and only a holder of BOTH
+           halves can move it.  At the live flip the halves rejoin into the
+           exclusive fraction [disk_cfg_set] consumes, which is where the
+           persistent [disk_cfg] of the live arm is minted. *)
+        disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
         ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) ∗
         mono_nat_auth_own (dn_nc γ) 1 0%nat ∗
         ghost_var (dn_np γ) 1 0%nat)%I.
@@ -1210,10 +1221,13 @@ Section VirtioProto.
   (* allocation and construction                                          *)
   (* ==================================================================== *)
 
-  (* power-on: the queue is not live, nothing is owed (what adequacy runs) *)
+  (* power-on: the queue is not live, nothing is owed (what adequacy runs).
+     The caller keeps the config tracker's other half -- the boot chain needs
+     it to program the queue from inside the invariant. *)
   Lemma disk_ghosts_alloc (v : virtio_state) :
     virtio_live (v_cfg v) = false ->
-    ⊢ |==> ∃ γ : disk_names, virtio_proto γ v.
+    ⊢ |==> ∃ γ : disk_names,
+        virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v).
   Proof.
     intro Hlive.
     iMod (ghost_map_alloc_empty (K:=Z) (V:=bv 8)) as (gimg) "Himg".
@@ -1222,14 +1236,18 @@ Section VirtioProto.
     iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc _]".
     iMod (ghost_var_alloc 0%nat) as (gnp) "Hnp".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "_".
-    iMod (disk_cfg_alloc virtio_cfg0) as (gcfg) "Hcfg".
+    iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
+    iDestruct (disk_cfg_is_split (DiskNames gimg gslot gnc gnp gclaim gcfg)
+                 (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".
+    { rewrite /disk_cfg_is. cbn [dn_cfg]. iExact "Hcfg". }
     iModIntro. iExists (DiskNames gimg gslot gnc gnp gclaim gcfg).
+    iFrame "Hcfg2".
     rewrite /virtio_proto. iExists ∅.
     cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg].
     iFrame "Himg". iSplitR.
     { iPureIntro. intros o b Hb. rewrite lookup_empty in Hb. discriminate. }
-    rewrite Hlive. rewrite /disk_cfg_is. cbn [dn_cfg].
-    iFrame "Hcfg Hslot Hnc Hnp".
+    rewrite Hlive.
+    iFrame "Hcfg1 Hslot Hnc Hnp".
   Qed.
 
   (* the live protocol, over an ABSTRACT configuration: the whole content of
@@ -1296,16 +1314,22 @@ Section VirtioProto.
     avail_idx_dom (virtio_init_cfg pd pav pu)
       ## used_page_pas (virtio_init_cfg pd pav pu) ->
     virtio_proto γ v0 -∗
+    (* the boot chain's half of the config tracker: it is what recombines
+       with the invariant's half into the exclusive fraction the freeze needs,
+       and holding it is what made the driver's knowledge of [v_cfg v0]
+       deterministic all the way to this point. *)
+    disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v0) -∗
     phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0) -∗
     phys_list pu (replicate 4096 byte_zero) -∗
     |==> virtio_proto γ v1 ∗ disk_pub γ 0 ∗
          disk_cfg γ (virtio_init_cfg pd pav pu).
   Proof.
-    intros Hlive0 Hv1 Hal Hdisj. iIntros "Hp Hidx Hpage".
+    intros Hlive0 Hv1 Hal Hdisj. iIntros "Hp Hmine Hidx Hpage".
     rewrite {1}/virtio_proto.
     iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
     rewrite Hlive0. iDestruct "Hrest" as "(Hcfg & Hslot & Hnc & Hnp)".
-    iMod (disk_cfg_set γ virtio_cfg0 (virtio_init_cfg pd pav pu) with "Hcfg")
+    iDestruct (disk_cfg_is_join with "Hcfg Hmine") as "Hcfg".
+    iMod (disk_cfg_set γ (v_cfg v0) (virtio_init_cfg pd pav pu) with "Hcfg")
       as "#Hcfg".
     iEval (rewrite -Qp.half_half) in "Hnp".
     iDestruct (ghost_var_split with "Hnp") as "[Hnp1 Hnp2]".
@@ -1331,7 +1355,8 @@ Section VirtioProto.
   Lemma disk_ghosts_alloc_mint (v : virtio_state) (o : Z) (n : nat) :
     virtio_live (v_cfg v) = false ->
     ⊢ |==> ∃ γ : disk_names,
-        virtio_proto γ v ∗ disk_bytes γ o (disk_read (v_disk v) o n).
+        virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
+        disk_bytes γ o (disk_read (v_disk v) o n).
   Proof.
     intro Hlive.
     iMod (ghost_map_alloc_empty (K:=Z) (V:=bv 8)) as (gimg) "Himg".
@@ -1340,7 +1365,10 @@ Section VirtioProto.
     iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc _]".
     iMod (ghost_var_alloc 0%nat) as (gnp) "Hnp".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "_".
-    iMod (disk_cfg_alloc virtio_cfg0) as (gcfg) "Hcfg".
+    iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
+    iDestruct (disk_cfg_is_split (DiskNames gimg gslot gnc gnp gclaim gcfg)
+                 (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".
+    { rewrite /disk_cfg_is. cbn [dn_cfg]. iExact "Hcfg". }
     assert (Hv0 : disk_view (∅ : gmap Z (bv 8)) (v_disk v))
       by (intros x b Hx; rewrite lookup_empty in Hx; discriminate).
     assert (Hf0 : forall j : nat, (j < n)%nat ->
@@ -1349,11 +1377,11 @@ Section VirtioProto.
     iMod (disk_bytes_mint (DiskNames gimg gslot gnc gnp gclaim gcfg) ∅
             (v_disk v) o n Hv0 Hf0 with "Himg") as (dmap') "(Himg & Hbs & %Hdv)".
     iModIntro. iExists (DiskNames gimg gslot gnc gnp gclaim gcfg).
-    iFrame "Hbs". rewrite /virtio_proto. iExists dmap'.
+    iFrame "Hbs Hcfg2". rewrite /virtio_proto. iExists dmap'.
     cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg].
     iFrame "Himg". iSplitR; [iPureIntro; exact Hdv|].
-    rewrite Hlive /disk_cfg_is. cbn [dn_cfg].
-    iFrame "Hcfg Hslot Hnc Hnp".
+    rewrite Hlive.
+    iFrame "Hcfg1 Hslot Hnc Hnp".
   Qed.
 
   (* ==================================================================== *)

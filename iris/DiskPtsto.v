@@ -134,7 +134,17 @@ Section DiskPtsto.
   (* [virtio_disk_init] freezes the configuration it programmed into this
      persistent fact.  A driver holding it and the copy the device invariant
      exports (from any accessor) learns [v_cfg v = the config it programmed],
-     hence the three queue-page addresses. *)
+     hence the three queue-page addresses.
+
+     BEFORE the freeze the SAME cell is the boot chain's CONFIG TRACKER: the
+     not-live arm of [virtio_proto] holds [disk_cfg_is γ (DfracOwn (1/2))
+     (v_cfg v)] and the driver holds the other half, so a boot chain that
+     programs the queue from inside the device invariant keeps deterministic
+     knowledge of the configuration it has written so far (the device never
+     touches [v_cfg], so the pair is stable across device steps), and the two
+     halves recombine to the exclusive fraction exactly at the live flip,
+     which is what [disk_cfg_set] consumes.  One cell serves both roles: a
+     separate ghost_var over the same object would be redundant. *)
   Definition disk_cfg_is (γ : disk_names) (dq : dfrac) (c : virtio_cfg)
     : iProp Σ := own (dn_cfg γ) (to_dfrac_agree dq (c : leibnizO virtio_cfg)).
 
@@ -153,6 +163,39 @@ Section DiskPtsto.
   Proof.
     iIntros "Ha Hb". rewrite /disk_cfg /disk_cfg_is.
     by iDestruct (own_valid_2 with "Ha Hb") as %[_ ?]%dfrac_agree_op_valid_L.
+  Qed.
+
+  (* the tracker form: any two views of the cell agree on the value.  This is
+     what makes the boot chain's half deterministic knowledge -- it is the one
+     lemma [virtio_disk_init]'s caller uses to identify the configuration it
+     was handed with the one the invariant currently holds. *)
+  Lemma disk_cfg_is_agree (γ : disk_names) (dq dq' : dfrac) (c c' : virtio_cfg) :
+    disk_cfg_is γ dq c -∗ disk_cfg_is γ dq' c' -∗ ⌜c = c'⌝.
+  Proof.
+    iIntros "Ha Hb". rewrite /disk_cfg_is.
+    by iDestruct (own_valid_2 with "Ha Hb") as %[_ ?]%dfrac_agree_op_valid_L.
+  Qed.
+
+  (* the exclusive fraction splits into the invariant's half and the driver's,
+     and rejoins for [disk_cfg_set] at the live flip *)
+  Lemma disk_cfg_is_split (γ : disk_names) (c : virtio_cfg) :
+    disk_cfg_is γ (DfracOwn 1) c -∗
+    disk_cfg_is γ (DfracOwn (1/2)) c ∗ disk_cfg_is γ (DfracOwn (1/2)) c.
+  Proof.
+    iIntros "H". rewrite /disk_cfg_is.
+    iEval (rewrite -Qp.half_half -dfrac_op_own dfrac_agree_op own_op) in "H".
+    iDestruct "H" as "[$ $]".
+  Qed.
+
+  Lemma disk_cfg_is_join (γ : disk_names) (c c' : virtio_cfg) :
+    disk_cfg_is γ (DfracOwn (1/2)) c -∗ disk_cfg_is γ (DfracOwn (1/2)) c' -∗
+    disk_cfg_is γ (DfracOwn 1) c.
+  Proof.
+    iIntros "Ha Hb".
+    iDestruct (disk_cfg_is_agree with "Ha Hb") as %<-.
+    rewrite /disk_cfg_is.
+    iEval (rewrite -Qp.half_half -dfrac_op_own dfrac_agree_op own_op).
+    iFrame "Ha Hb".
   Qed.
 
   Lemma disk_cfg_alloc (c : virtio_cfg) :

@@ -346,11 +346,9 @@ LinkFileinit.v
 WpUartinitDecode.v
 SpecUartinit.v
 SpecVirtioDiskInit.v
-ProofUartinit.v
 LinkUartinit.v
 WpConsoleinitDecode.v
 SpecConsoleinit.v
-ProofConsoleinit.v
 LinkConsoleinit.v
 SpecCpuid.v
 SpecPlicinit.v
@@ -363,7 +361,6 @@ LinkCpuid.v
 WpPlic.v
 WpVirtioMmio.v
 WpVirtioDev.v
-ProofPlicinit.v
 LinkPlicinit.v
 ProofPlicinithart.v
 LinkPlicinithart.v
@@ -570,7 +567,6 @@ WpVirtioDiskIntrDecode.v
 ProofVirtioDiskIntr.v
 LinkVirtioDiskIntr.v
 WpVirtioDiskInitDecode.v
-ProofVirtioDiskInit.v
 LinkVirtioDiskInit.v
 SpecStrlen.v
 WpStrlenDecode.v

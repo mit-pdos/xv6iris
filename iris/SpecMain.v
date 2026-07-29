@@ -35,6 +35,22 @@
    [p_sched]'s [cid_word], so hart 0's cannot be hart 1's.  See
    claude-notes/projects/main-boot.md (G5) for what has to move first.
 
+   THE DEVICES.  The three device invariants ([WpUart.uart_inv] /
+   [plic_inv] / [disk_inv], bundled as [dev_inv]) exist FROM TIME 0: they are
+   allocated in adequacy, before any thread runs.  They have to be -- the UART,
+   disk and PLIC threads are top-level threads of the system and each needs its
+   device fragment at EVERY step (a UART rx byte can arrive at step 0; the disk
+   thread must refute [DevStepDiskWild] at every step; the PLIC gateway latches
+   whenever an irq line is up), so no device fragment can ever sit raw in a
+   CPU's precondition.  main is therefore HANDED the bundle rather than
+   allocating it, and what it is handed alongside is the boot hart's TOKENS:
+   the exclusive transmitter [uart_tx_own γd l0] with its receipt and out-list
+   lower bound at the same [l0], the UNFROZEN DLAB half (uartinit performs the
+   divisor-latch dance and freezes the half at its final LCR write), and the
+   virtio config tracker's half at a not-live [c0] (virtio_disk_init programs
+   the queue under the invariant and keeps deterministic knowledge of the
+   configuration through this half).  See claude-notes/projects/main-boot.md G1.
+
    THE HANDOVER.  Everything the boot hart's initialisation gives the other
    harts crosses ONE channel, the invariant on [started]
    ([StartedInv.started_inv]): a one-shot escrow [∃ v, started ↦₄ v ∗
@@ -42,15 +58,17 @@
    harts read the flag and each wants the payload.  main's boot arm is the
    only writer, and paying [P] in is what its [sw a5,778(a4)] costs.
 
-   [P] rides here as a PARAMETER with [Persistent P] -- the boot hart is handed
-   the deposit and parks it.  The target shape is a WAND,
-   [□ (∀ γd γv γs …, <the init sequence's persistent output> -∗ P)], so that
-   hart 0 pays the deposit out of what it actually built rather than being
-   handed it; that awaits the device-invariant split (main-boot.md G1), because
-   until [dev_inv] is split into UART/PLIC and disk halves the init sequence's
-   output cannot be written down truthfully -- printk() runs twelve calls before
-   virtio_disk_init(), so the bundled invariant cannot exist where printk needs
-   it.  Everything else in this statement is settled.
+   [P] IS PAID OUT OF WHAT MAIN BUILT.  It rides as a parameter with
+   [Persistent P], but the boot hart is not handed it -- it is handed a WAND
+   [□ (∀ γpr γs, printk_env γpr γd γv -∗ procs_inv γ Φ γs -∗ P)] and applies it
+   at the [started = 1] store.  The two arguments are exactly the persistent
+   facts whose GHOST NAMES main chooses: [γpr] when it allocates the [pr] lock
+   out of printkinit's output (pr.lock protects the transmitter token --
+   SpecPrintkGen.v), and [γs] when it allocates the 64 proc locks out of
+   procinit's ([SpecProcinit.procs_inv_alloc]).  Everything else a secondary
+   hart wants is either already persistent in main's own precondition (the
+   device bundle) or, per G5, not statable yet.  main's proof therefore never
+   has to know what the secondaries want.
 
    Requires only Spec files and the definitional layer -- never a [Proof*] file. *)
 From Stdlib Require Import ZArith Lia List.
@@ -72,9 +90,16 @@ Require Import StartedInv.
 Require Import SpecConsoleinit SpecPrintkinit SpecKinit SpecKvminit.
 Require Import SpecProcinit SpecTrapinit SpecPlicinit.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
-Require Import SpecScheduler SpecFreerange.
-Require Import ProcGeom FdSlots CpuOwn.
+Require Import SpecScheduler SpecFreerange SpecPrintkGen.
+Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv KvmSpec BcacheInv SleepLock.
+Require Import DevModel VirtioModel DiskPtsto WpUart.
+(* the classes this statement's [Context] must bind for real: without these
+   [Require Import]s the backtick generalization silently invents fresh binders
+   named [lockG]/[fileG] instead, and [printk_env]/[procs_inv] then cannot
+   resolve their [lockG] instance (spec-modules.md's Link-file gotcha, in a
+   Spec file). *)
+Require Import WpLock FileInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
@@ -137,17 +162,6 @@ Section SpecMain.
         [∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j))%I.
 
   (* ------------------------------------------------------------------- *)
-  (* The three device fragments, all RAW: consoleinit programs the UART,  *)
-  (* plicinit the interrupt controller, virtio_disk_init resets the disk  *)
-  (* and publishes its queue.  Nothing is assumed about any of the three  *)
-  (* initial states.  The device INVARIANT is not a precondition -- main  *)
-  (* is what allocates it, out of these.                                  *)
-  (* ------------------------------------------------------------------- *)
-  Definition main_devices_raw (u0 : uart_state) (p0 : plic_state)
-      (v0 : virtio_state) : iProp Σ :=
-    (uart_frag u0 ∗ plic_frag p0 ∗ virtio_frag v0)%I.
-
-  (* ------------------------------------------------------------------- *)
   (* This hart's own translation and trap resources.  [strans_bit bare]   *)
   (* is the still-Bare receipt kvminithart's switch flips; [tlb] is the    *)
   (* cell it seals into the kernel-page-table arm; [trap_csrs] is what the *)
@@ -167,7 +181,8 @@ Section SpecMain.
       (m : regfile) (K : nat)
       (p0 : mword 64) (C : iProp Σ)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
-      (u0 : uart_state) (pl0 : plic_state) (v0 : virtio_state)
+      (γd : uart_names) (γv : disk_names)
+      (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -184,16 +199,28 @@ Section SpecMain.
     prun phystop s1entry ps ->
     (* enough pages for kvmmake's 102 nodes, the 64 kstacks and the disk's 3 *)
     (K_kvmmake + 64 + 3 < length ps)%nat ->
+    (* the disk's protocol is in its not-live arm at boot: virtio_disk_init
+       makes it live, and its config half [c0] is how main knows so *)
+    virtio_live c0 = false ->
     sie_cap_gpr γ m K -∗
     cpu_own γ 0 false p0 C -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     panic_wp -∗
-    (* the handover channel, and the deposit it will carry *)
-    started_inv P -∗ □ P -∗
+    (* the handover channel, and the RECIPE for the deposit it will carry:
+       main applies this wand at the [started = 1] store, to the [pr] lock and
+       the 64 proc locks it has just allocated. *)
+    started_inv P -∗
+    □ (∀ (γpr : gname) (γs : list gname),
+         printk_env γpr γd γv -∗ procs_inv γ Φ γs -∗ P) -∗
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
-    main_devices_raw u0 pl0 v0 -∗
+    (* the device fabric, which exists from time 0 (allocated in adequacy), and
+       the boot hart's tokens over it *)
+    dev_inv γd γv -∗
+    uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
+    uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+    disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     main_hart_raw tlbvec0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     (* ...and what the scheduler at the far end still wants, which main
@@ -212,9 +239,10 @@ Module Type MAIN.
       (m : regfile) (K : nat)
       (p0 : mword 64) (C : iProp Σ)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
-      (u0 : uart_state) (pl0 : plic_state) (v0 : virtio_state)
+      (γd : uart_names) (γv : disk_names)
+      (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ),
       wp_main_boot_sconf_body γ Φ m K p0 C ps s1entry phystop
-        u0 pl0 v0 tlbvec0 P.
+        γd γv l0 b0 c0 tlbvec0 P.
 End MAIN.

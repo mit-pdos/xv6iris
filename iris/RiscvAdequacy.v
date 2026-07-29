@@ -394,9 +394,12 @@ Qed.
 
 Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
-    (* [dev_inv] freezes DLAB, so the initial UART must already have it clear
-       -- i.e. the invariant is allocated after the divisor latch is set. *)
-    (Hdlab : uart_dlab g.(gdev).(duart) = false)
+    (* NOTE (2026-07-29): there is NO hypothesis about the power-on DLAB any
+       more.  [uart_ghosts_alloc] used to freeze the caller's half of the DLAB
+       agreement on the spot, which forced the initial value to be [false];
+       the freeze moved out to the boot chain (it happens at uartinit's final
+       LCR write), so the invariant is allocatable at ANY power-on DLAB and
+       uartinit is what makes it deterministic. *)
     (* [dev_inv] also maintains the kernel's PLIC plan (PlicPlan.v), so the
        initial PLIC must already satisfy it -- a reset PLIC (all S-context
        enable words clear) does. *)
@@ -419,10 +422,15 @@ Proof.
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
-  (* allocate the four UART ghosts at the initial device state *)
-  iMod (uart_ghosts_alloc g.(gdev).(duart) Hdlab) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
-  (* allocate the disk-protocol ghosts at the initial (not-live) device state *)
-  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive) as (γv) "Hproto".
+  (* allocate the four UART ghosts at the initial device state.  The
+     caller-side outputs -- the transmitter token, the accepted-trace receipt
+     and the (unfrozen) DLAB half -- are what a boot chain would thread through
+     uartinit; this corollary runs a thread pool of devices only, so all three
+     are discarded here. *)
+  iMod (uart_ghosts_alloc g.(gdev).(duart)) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
+  (* allocate the disk-protocol ghosts at the initial (not-live) device state;
+     the caller's half of the config tracker is discarded likewise *)
+  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive) as (γv) "[Hproto _]".
   iMod (dev_inv_alloc _ γ γv with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto]") as "#Hinv".
   { rewrite /dev_inv_body.
     iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).

@@ -13,17 +13,28 @@
    consoleinit is the first thing main() calls, and it is a pure composition:
    its contract is exactly initlock's on [cons.lock] (which sits at offset 0 of
    the [cons] global, so [&cons.lock = &cons]) + uartinit's, plus the two
-   function-pointer stores.  It therefore inherits uartinit's raw [uart_frag]
-   ownership -- consoleinit runs before [dev_inv] is allocated, and uartinit
-   RESETS the device, which no invariant could tolerate; the caller allocates
-   [dev_inv] over the returned [uartinit_post u0], whose DLAB is off
-   ([uartinit_post_dlab_off]).
+   function-pointer stores.  So it carries uartinit's DEVICE transit one level
+   up, verbatim: in come [WpUart.uart_inv], the "everything accepted has been
+   transmitted / the transmitter is mine" pair at [l], and the UNFROZEN DLAB
+   half at an arbitrary [b0]; out come the tokens at the same [l] (uartinit
+   writes no THR) and the frozen [uart_dlab_off].  See SpecUartinit.v for why
+   the raw [uart_frag] shape this contract used to have is not viable: the UART
+   thread runs from step 0, so the fragment can never sit raw in a CPU's
+   precondition, and the FIFO-clear / DLAB-set writes are discharged by ghost
+   arithmetic instead.
 
    The devsw[] slots are handed back as the raw 8-byte cells holding the two
    function addresses.  Nothing yet says what a [struct devsw] entry MEANS --
    consoleread/consolewrite are unproven and the fs-side dispatch that reads
    these slots does not exist -- so anything richer would be a predicate with no
-   consumer.  When one arrives it is built at the caller from these cells. *)
+   consumer.  When one arrives it is built at the caller from these cells.
+
+   THE PROOF IS TEMPORARILY ASSUMED (an [Axiom] in LinkConsoleinit.v), because
+   its uartinit callee's is: ProofConsoleinit.v was deleted with
+   ProofUartinit.v and is recoverable from git history.  Its script is nearly
+   unchanged by the rework -- consoleinit only threads the device resources
+   through -- so it comes back as soon as UARTINIT is discharged.  See
+   claude-notes/projects/main-boot.md, G1. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -41,6 +52,7 @@ Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import DevModel.
+Require Import WpUart.
 Require Import SpecUartinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -60,8 +72,10 @@ Definition cons_name_str : Z := 0x80007000%Z.
 Definition devsw_console_read : mword 64 := mword_of_int (KernelSyms.devsw + 16).
 Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24).
 
-Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state)
+Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
+    `{CID : CpuId}
+    (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
     (vtlock : bv 32) (vtname vtcpu : bv 64)
     (dread0 dwrite0 : mword 64) :=
@@ -82,7 +96,13 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
      addi a1] points at -- the name it hands to initlock -- and, through
      uartinit's own spec, the "uart" one. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  uart_frag u0 -∗
+  (* the UART fabric, borrowed from the invariant around each of uartinit's
+     seven writes; the token/receipt pair is what makes the FCR FIFO-clear
+     shrink nothing, and the unfrozen DLAB half is what survives the
+     divisor-latch dance (SpecUartinit.v). *)
+  uart_inv γd -∗
+  uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_sent γd l -∗
+  uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
   clk ↦₄ vclock -∗
   c_cname ↦₈ vcname -∗
   c_ccpu ↦₈ vccpu -∗
@@ -95,7 +115,9 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    uart_frag (uartinit_post u0) -∗
+    (* uartinit writes no THR, so the accepted trace is unchanged; its final
+       LCR write cleared DLAB, so the half is frozen for good. *)
+    uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
     (* both locks come back initialized; both are static globals that are never
        freed, so both name fields are DISCARDED for the persistent
        [lock_name], ready to be sealed into an [is_lock]. *)
@@ -112,10 +134,11 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (u0 : uart_state)
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
+      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
       (dread0 dwrite0 : mword 64),
-      wp_consoleinit_sconf_body γ Φ m K u0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0.
+      wp_consoleinit_sconf_body γ γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0.
 End CONSOLEINIT.

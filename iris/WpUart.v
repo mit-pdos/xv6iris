@@ -702,28 +702,33 @@ Section DevLoops.
   Qed.
 
   (* Allocate all four UART ghosts from an initial device state.  Hands back
-     the invariant's halves (as [dev_inv_body]'s ghost conjuncts) together
+     the invariant's halves (as [uart_inv_body]'s ghost conjuncts) together
      with the caller's own resources: the exclusive transmitter, the opening
-     accepted-trace bound, and -- IF the initial DLAB is already clear, which
-     is the caller's obligation to check -- the permanent [uart_dlab_off].
-     Freezing it here is what makes the fact usable as a precondition
-     downstream, and is exactly why device init must precede this call. *)
+     accepted-trace bound, and the caller's HALF of the DLAB agreement, at
+     whatever the power-on DLAB happens to be.
+     NOTE (2026-07-29): this allocation used to demand [uart_dlab u = false]
+     and freeze the caller's half into the persistent [uart_dlab_off] on the
+     spot.  It cannot: the UART thread runs from step 0, so [uart_frag] must
+     already live in [uart_inv] when [uartinit] runs -- and [uartinit] SETS
+     DLAB (the divisor-latch dance) before its final LCR write clears it
+     again.  So the freeze moves OUT to the boot chain, which threads
+     [uart_dlab_is γ (DfracOwn (1/2)) b] through the dance and mints
+     [uart_dlab_off] with [uart_dlab_freeze] after the last LCR write.
+     Power-on DLAB is therefore arbitrary, and no adequacy hypothesis
+     constrains it. *)
   Lemma uart_ghosts_alloc (u : uart_state) :
-    uart_dlab u = false ->
     ⊢ |==> ∃ γ, uart_sent_auth γ u ∗ uart_out_auth γ u ∗
                 uart_tx_auth γ u ∗ uart_dlab_auth γ u ∗
                 uart_tx_own γ (uart_acc u) ∗ uart_sent γ (uart_acc u) ∗
-                uart_dlab_off γ.
+                uart_dlab_is γ (DfracOwn (1/2)) (uart_dlab u).
   Proof.
-    intro Hdlab.
     iMod (own_alloc (●ML (uart_acc u : list (leibnizO (bv 8))))) as (γa) "Ha";
       [apply mono_list_auth_valid|].
     iMod (own_alloc (●ML (u_out u : list (leibnizO (bv 8))))) as (γb) "Hb";
       [apply mono_list_auth_valid|].
     iMod (ghost_var_alloc (uart_acc u)) as (γc) "Hc".
-    (* allocate DLAB directly at [false]: [Hdlab] says that IS the initial
-       value, and it keeps both halves in the shape the freeze wants *)
-    iMod (own_alloc (to_dfrac_agree (DfracOwn 1) (false : leibnizO bool)))
+    (* allocate DLAB at the state's OWN value; nothing is assumed about it *)
+    iMod (own_alloc (to_dfrac_agree (DfracOwn 1) (uart_dlab u : leibnizO bool)))
       as (γd) "Hd"; [done|].
     (* peel the caller's permanent accepted-trace bound off the authority *)
     iEval (rewrite {1}mono_list_auth_lb_op) in "Ha".
@@ -731,16 +736,13 @@ Section DevLoops.
     (* split the ghost_var into the invariant's half and the caller's token *)
     iEval (rewrite -Qp.half_half) in "Hc".
     iDestruct (ghost_var_split with "Hc") as "[Hc1 Hc2]".
-    (* split the DLAB agree into the invariant's half and one to freeze *)
+    (* split the DLAB agree into the invariant's half and the caller's *)
     iEval (rewrite -Qp.half_half -dfrac_op_own dfrac_agree_op own_op) in "Hd".
     iDestruct "Hd" as "[Hd1 Hd2]".
-    iMod (uart_dlab_freeze (UartNames γa γb γc γd) with "[Hd2]") as "#Hoff".
-    { rewrite /uart_dlab_is /=. iExact "Hd2". }
     iModIntro. iExists (UartNames γa γb γc γd).
     rewrite /uart_sent_auth /uart_out_auth /uart_tx_auth /uart_tx_own
             /uart_dlab_auth /uart_dlab_is /uart_sent /=.
-    rewrite Hdlab.
-    iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hoff".
+    iFrame "Ha Hb Hc1 Hd1 Hc2 Hsent Hd2".
   Qed.
 
   (* ------------------------------------------------------------------ *)
