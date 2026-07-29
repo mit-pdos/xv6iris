@@ -96,10 +96,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* ===================================================================== *)
 
 (* +0x10  addi a1,s0,-36   (-36 is 0xfdc in the 12-bit field) *)
-Lemma afdb_fdc40593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xfdc40593 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_fdc40593] -- shared, see KernelBaseDecode.v *)
 
 (* +0x14  jal ra,argint    (0x80004a18 -> 0x80002804 is -8724) *)
 Lemma afdb_dedfd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -108,10 +105,7 @@ Lemma afdb_dedfd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* +0x18 and +0x26  lw a4,-36(s0) *)
-Lemma afdb_fdc42703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xfdc42703 : mword 32)) s
-  = Some (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_fdc42703] -- shared, see KernelBaseDecode.v *)
 
 (* +0x1e  bltu a5,a4,+0x34 -- the fused [fd < 0 || fd >= NOFILE] test *)
 Lemma afdb_02e7ea63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -186,7 +180,7 @@ Section ArgfdInstrs.
 
   Lemma afi_10 : kernel_text -∗ instr (mword_of_int (AF + 0x10) : mword 64) false (ITYPE (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (AF + 0x10)%Z (mword_of_int 0xfdc40593 : mword 32)
-    (mword_of_int (AF + 0x10) : mword 64) (ITYPE (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)) afdb_fdc40593. Qed.
+    (mword_of_int (AF + 0x10) : mword 64) (ITYPE (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)) bdec_fdc40593. Qed.
 
   Lemma afi_14 : kernel_text -∗ instr (mword_of_int (AF + 0x14) : mword 64) false (JAL (mword_of_int 2088428 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (AF + 0x14)%Z (mword_of_int 0xdedfd0ef : mword 32)
@@ -194,7 +188,7 @@ Section ArgfdInstrs.
 
   Lemma afi_18 : kernel_text -∗ instr (mword_of_int (AF + 0x18) : mword 64) false (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_base (AF + 0x18)%Z (mword_of_int 0xfdc42703 : mword 32)
-    (mword_of_int (AF + 0x18) : mword 64) (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)) afdb_fdc42703. Qed.
+    (mword_of_int (AF + 0x18) : mword 64) (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)) bdec_fdc42703. Qed.
 
   Lemma afi_1c : kernel_text -∗ instr (mword_of_int (AF + 0x1c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 15 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (AF + 0x1c)%Z (mword_of_int 0x47bd : mword 16)
@@ -210,7 +204,7 @@ Section ArgfdInstrs.
 
   Lemma afi_26 : kernel_text -∗ instr (mword_of_int (AF + 0x26) : mword 64) false (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_base (AF + 0x26)%Z (mword_of_int 0xfdc42703 : mword 32)
-    (mword_of_int (AF + 0x26) : mword 64) (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)) afdb_fdc42703. Qed.
+    (mword_of_int (AF + 0x26) : mword 64) (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 14), false, 4)) bdec_fdc42703. Qed.
 
   Lemma afi_2a : kernel_text -∗ instr (mword_of_int (AF + 0x2a) : mword 64) false (SHIFTIOP (mword_of_int 3 : mword 6, Regidx (mword_of_int 14), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_base (AF + 0x2a)%Z (mword_of_int 0x00371793 : mword 32)

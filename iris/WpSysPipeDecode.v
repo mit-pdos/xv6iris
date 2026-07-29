@@ -120,10 +120,7 @@ Lemma spdb_dc2fc0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 (* addi a1,s0,-40    &fdarray *)
-Lemma spdb_fd840593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xfd840593 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0xfd8 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI), s).
-Proof. decode_bridge_ms. Qed.
+(* [bdec_fd840593] -- shared, see KernelBaseDecode.v *)
 
 (* jal ra,argaddr    (0x8000534e -> 0x80002820) *)
 Lemma spdb_cd2fd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -346,7 +343,7 @@ Section SysPipeInstrs.
   (* 0x10 fd840593  addi a1,s0,-40 *)
   Lemma spi_10 : kernel_text -∗ instr (mword_of_int (SP + 0x10) : mword 64) false (ITYPE (mword_of_int 0xfd8 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (SP + 0x10)%Z (mword_of_int 0xfd840593 : mword 32)
-    (mword_of_int (SP + 0x10) : mword 64) (ITYPE (mword_of_int 0xfd8 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)) spdb_fd840593. Qed.
+    (mword_of_int (SP + 0x10) : mword 64) (ITYPE (mword_of_int 0xfd8 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)) bdec_fd840593. Qed.
 
   (* 0x14 4501  c.li a0,0 *)
   Lemma spi_14 : kernel_text -∗ instr (mword_of_int (SP + 0x14) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).

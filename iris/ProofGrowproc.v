@@ -17,7 +17,7 @@
 
    2. THE THREE SIGNS OF [n] ARE THREE DIFFERENT ARITHMETICS.  [n > 0] is a
       SIGNED test and the range check that follows it is UNSIGNED, so the
-      grow arm has to bridge the two ([gp_add_unsigned]).  The [n < 0] arm
+      grow arm has to bridge the two ([RiscvExtras.add_vec_sint_unsigned]).  The [n < 0] arm
       bridges nothing: [sz + n] may WRAP, uvmdealloc is called at the
       wrapped value, and its guarded [uvmd_np] is what makes that arm say
       the truth (nothing was unmapped) instead of a falsehood.
@@ -73,55 +73,12 @@ Proof. lia. Qed.
 Lemma gp_perm_ok : uvm_perm_ok (Z.lor 4 18).
 Proof. change (Z.lor 4 18) with 22. exact uvm_perm_ok_22. Qed.
 
-(* A NON-NEGATIVE SIGNED VALUE IS ITS OWN UNSIGNED VALUE.  The [blez] at
-   +0x16 is signed and the [bltu] at +0x26 is not, so the grow arm has to
-   cross once; this is the crossing. *)
-Lemma gp_sint_uint (b : mword 64) : (0 <= sint b)%Z -> bv_unsigned b = sint b.
-Proof.
-  intros H.
-  assert (Hs : sint b = bv_signed b) by reflexivity.
-  rewrite Hs in H |- *.
-  pose proof (bv_unsigned_in_range _ b) as Hr.
-  assert (Hm : bv_modulus 64 = 18446744073709551616%Z) by (vm_compute; reflexivity).
-  rewrite Hm in Hr.
-  assert (Hh : bv_half_modulus 64 = 9223372036854775808%Z) by (vm_compute; reflexivity).
-  unfold bv_signed, bv_swrap, bv_wrap in H |- *.
-  rewrite Hh Hm in H |- *.
-  destruct (Z.lt_ge_cases (bv_unsigned b) 9223372036854775808%Z) as [Hlo | Hhi].
-  - rewrite (Z.mod_small (bv_unsigned b + 9223372036854775808) 18446744073709551616);
-      lia.
-  - exfalso.
-    assert (Hq : ((bv_unsigned b + 9223372036854775808) mod 18446744073709551616)%Z
-                 = (bv_unsigned b - 9223372036854775808)%Z).
-    { replace (bv_unsigned b + 9223372036854775808)%Z
-        with ((bv_unsigned b - 9223372036854775808) + 1 * 18446744073709551616)%Z by lia.
-      rewrite Z.mod_add; [| lia]. apply Z.mod_small. lia. }
-    rewrite Hq in H. lia.
-Qed.
+(* The [blez] at +0x16 is signed and the [bltu] at +0x26 is not, so the grow
+   arm has to cross once: [RiscvExtras.sint64_unsigned] /
+   [add_vec_sint_unsigned] / [sint64_range] are that crossing, shared with
+   sys_sbrk. *)
 
-Lemma gp_sint_bound (b : mword 64) :
-  (- 9223372036854775808 <= sint b < 9223372036854775808)%Z.
-Proof.
-  assert (Hs : sint b = bv_signed b) by reflexivity. rewrite Hs.
-  pose proof (bv_signed_in_range 64 b ltac:(discriminate)) as Hr.
-  assert (Hh : bv_half_modulus 64 = 9223372036854775808%Z) by (vm_compute; reflexivity).
-  rewrite Hh in Hr. exact Hr.
-Qed.
 
-(* ...and the sum that does not wrap. *)
-Lemma gp_add_unsigned (a b : mword 64) :
-  (0 <= sint b)%Z ->
-  (bv_unsigned a + sint b < 18446744073709551616)%Z ->
-  bv_unsigned (add_vec a b) = (bv_unsigned a + sint b)%Z.
-Proof.
-  intros Hb Hlt.
-  rewrite add_vec64_unsigned (gp_sint_uint b Hb).
-  pose proof (bv_unsigned_in_range _ a) as [Ha0 _].
-  pose proof (bv_unsigned_in_range _ b) as [Hb0 _].
-  assert (Hm : bv_modulus 64 = 18446744073709551616%Z) by (vm_compute; reflexivity).
-  apply bv_wrap_small. rewrite Hm.
-  pose proof (gp_sint_uint b Hb). lia.
-Qed.
 
 (* The two contradictions the grow arm needs, over plain [Z] -- [lia] will
    not look at a goal that mentions [bv_unsigned] (the zify-hook rule). *)
@@ -775,11 +732,11 @@ Section ProofGrowproc.
       { rewrite HA2s1 in Hblez. unfold zopz0zKzJ_s in Hblez.
         assert (Hz0 : sint (zero_reg : mword 64) = 0%Z) by reflexivity.
         rewrite Hz0 Z.geb_leb in Hblez. apply Z.leb_gt in Hblez. exact Hblez. }
-      pose proof (gp_sint_bound nv) as Hnb.
+      pose proof (sint64_range nv) as Hnb.
       pose proof (bv_unsigned_in_range _ (pv_sz V)) as [Hsz0 _].
       assert (Hnewu : bv_unsigned (add_vec (pv_sz V) nv)
                       = (bv_unsigned (pv_sz V) + sint nv)%Z)
-        by (apply gp_add_unsigned; lia).
+        by (apply add_vec_sint_unsigned; lia).
       assert (Hlesz : (bv_unsigned (pv_sz V) <= bv_unsigned (add_vec (pv_sz V) nv))%Z)
         by lia.
       iApply (wp_bge_x0_fall_s_sconf γ Φ (mword_of_int (KernelSyms.growproc + 0x16))

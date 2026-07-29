@@ -174,6 +174,68 @@ Proof.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* SIGNED AND UNSIGNED, AT WIDTH 64.                                       *)
+(*                                                                         *)
+(*   A branch on a C [int] is signed ([bge] against x0) while the range     *)
+(*   check that follows it is not ([bltu]), so any function that does both  *)
+(*   -- growproc, sys_sbrk -- has to cross once.  These three are the       *)
+(*   crossing.  [sint x = bv_signed x] holds by [reflexivity] (the stdpp    *)
+(*   MachineWord backend defines [word_to_Z := bv_signed]), which is what   *)
+(*   makes them provable at all.                                           *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma sint64_range (b : mword 64) :
+  (- 9223372036854775808 <= sint b < 9223372036854775808)%Z.
+Proof.
+  assert (Hs : sint b = bv_signed b) by reflexivity. rewrite Hs.
+  pose proof (bv_signed_in_range 64 b ltac:(discriminate)) as Hr.
+  assert (Hh : bv_half_modulus 64 = 9223372036854775808%Z) by (vm_compute; reflexivity).
+  rewrite Hh in Hr. exact Hr.
+Qed.
+
+(* a NON-NEGATIVE signed value is its own unsigned value *)
+Lemma sint64_unsigned (b : mword 64) : (0 <= sint b)%Z -> bv_unsigned b = sint b.
+Proof.
+  intros H.
+  assert (Hs : sint b = bv_signed b) by reflexivity.
+  rewrite Hs in H |- *.
+  pose proof (bv_unsigned_in_range _ b) as Hr.
+  assert (Hm : bv_modulus 64 = 18446744073709551616%Z) by (vm_compute; reflexivity).
+  rewrite Hm in Hr.
+  assert (Hh : bv_half_modulus 64 = 9223372036854775808%Z) by (vm_compute; reflexivity).
+  unfold bv_signed, bv_swrap, bv_wrap in H |- *.
+  rewrite Hh Hm in H |- *.
+  destruct (Z.lt_ge_cases (bv_unsigned b) 9223372036854775808%Z) as [Hlo | Hhi].
+  - rewrite (Z.mod_small (bv_unsigned b + 9223372036854775808) 18446744073709551616);
+      lia.
+  - exfalso.
+    assert (Hq : ((bv_unsigned b + 9223372036854775808) mod 18446744073709551616)%Z
+                 = (bv_unsigned b - 9223372036854775808)%Z).
+    { replace (bv_unsigned b + 9223372036854775808)%Z
+        with ((bv_unsigned b - 9223372036854775808) + 1 * 18446744073709551616)%Z by lia.
+      rewrite Z.mod_add; [| lia]. apply Z.mod_small. lia. }
+    rewrite Hq in H. lia.
+Qed.
+
+(* ...and the sum that does not wrap.  Note what the second premise costs a
+   caller: with [bv_unsigned a] inside the user region and [sint b] bounded
+   by [sint64_range] alone, it is arithmetic -- no 32-bit bound on [b] is
+   needed to rule the wrap out. *)
+Lemma add_vec_sint_unsigned (a b : mword 64) :
+  (0 <= sint b)%Z ->
+  (bv_unsigned a + sint b < 18446744073709551616)%Z ->
+  bv_unsigned (add_vec a b) = (bv_unsigned a + sint b)%Z.
+Proof.
+  intros Hb Hlt.
+  rewrite add_vec64_unsigned (sint64_unsigned b Hb).
+  pose proof (bv_unsigned_in_range _ a) as [Ha0 _].
+  pose proof (bv_unsigned_in_range _ b) as [Hb0 _].
+  assert (Hm : bv_modulus 64 = 18446744073709551616%Z) by (vm_compute; reflexivity).
+  apply bv_wrap_small. rewrite Hm.
+  pose proof (sint64_unsigned b Hb). lia.
+Qed.
+
 Lemma sint64_moi32 (z : Z) : (0 <= z < 2^31)%Z ->
   sint (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = z.
 Proof.

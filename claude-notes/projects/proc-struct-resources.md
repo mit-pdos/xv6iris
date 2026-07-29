@@ -341,13 +341,17 @@ the evidence for every offset. This file is only the worklist.
       in [`../completed/growproc.md`](../completed/growproc.md); read it
       before touching `proc_priv` or the uvm* contracts.
 
-- [ ] **S4 — the next syscalls.** `sys_sbrk` (the unlocked `p->sz` write that
-      is the whole reason the private block cannot be fractionally shared) —
-      now UNBLOCKED: it is `argint` + `myproc()->sz` + `growproc`, and every
-      premise growproc takes comes out of `proc_priv`.
-      `sys_close` is done; `sys_read`/`sys_write`/`sys_fstat` are the other
-      `argfd` callers and are cheap once `argfd` itself is linked — but note
-      they pass a NULL out-parameter (`sys_read` passes `pf = 0`), which
+- [x] **`sys_sbrk` PROVEN and LINKED** (over ARGINT + MYPROC + GROWPROC,
+      axiom-clean) — the unlocked `p->sz` write that is the whole reason the
+      private block cannot be fractionally shared.  This xv6 has the LAZY
+      variant, and its lazy path is what shows `um_below` had to be an
+      INEQUALITY: it raises `p->sz` and maps nothing, so its entire
+      coherence obligation is `um_below_mono`.  Account in
+      [`../completed/growproc.md`](../completed/growproc.md).
+
+- [ ] **S4 — the next syscalls.** `sys_read` / `sys_write` / `sys_fstat` are
+      the other `argfd` callers and are cheap once `argfd` itself is linked
+      — but note they pass a NULL out-parameter (`sys_read` passes `pf = 0`), which
       `SpecArgfd`'s both-non-null shape does not cover, so they want a second
       interface or a `pf`-optional generalization of this one.
 

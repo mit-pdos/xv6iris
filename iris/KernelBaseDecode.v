@@ -199,3 +199,31 @@ Lemma bdec_06048513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 96 : mword 12, Regidx (mword_of_int 9),
                  Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  The frame-relative [int] locals two or more syscalls take the address   *)
+(*  of.  Same discipline as the [auipc]s above: [s0] is the frame pointer,  *)
+(*  so these displacements recur verbatim across functions with the same    *)
+(*  frame layout (argfd, sys_pipe, sys_sbrk).                               *)
+(* ---------------------------------------------------------------------- *)
+
+(* addi a1,s0,-40 -- &<local at s0-40>: sys_pipe's fd[0], sys_sbrk's n *)
+Lemma bdec_fd840593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xfd840593 : mword 32)) s
+  = Some (ITYPE (mword_of_int 0xfd8 : mword 12, Regidx (mword_of_int 8),
+                 Regidx (mword_of_int 11), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* addi a1,s0,-36 -- &<local at s0-36>: argfd's fd, sys_sbrk's t *)
+Lemma bdec_fdc40593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xfdc40593 : mword 32)) s
+  = Some (ITYPE (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8),
+                 Regidx (mword_of_int 11), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* lw a4,-36(s0) -- reloading that local, sign-extended *)
+Lemma bdec_fdc42703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xfdc42703 : mword 32)) s
+  = Some (LOAD (mword_of_int 0xfdc : mword 12, Regidx (mword_of_int 8),
+                Regidx (mword_of_int 14), false, 4), s).
+Proof. decode_bridge_ms. Qed.

@@ -1,4 +1,4 @@
-# Project: growproc — and the `p->sz` ⇄ user-map coherence invariant
+# Project: growproc / sys_sbrk — and the `p->sz` ⇄ user-map coherence invariant
 
 `growproc` (proc.c, `0x80001c0a`, 98 B) is specified, proven and linked
 (`SpecGrowproc.v` / `WpGrowprocDecode.v` / `ProofGrowproc.v` /
@@ -191,11 +191,71 @@ allocpid / uvmcreate work, which landed in parallel). `Print Assumptions
 Growproc.wp_growproc_sconf`: the five Sail reservation/platform primitives
 plus `functional_extensionality_dep`, and nothing else.
 
-## What is left
+## sys_sbrk — the caller, and what the LAZY path proved about the invariant
 
-- **`sys_sbrk`** is the caller, and is now unblocked: it is `argint` +
-  `myproc()->sz` + `growproc`, and every premise growproc takes is either
-  discharged from `proc_priv` or is `m !!! Rtp = cid_word`.
+`sys_sbrk` (sysproc.c, `0x80002938`, 120 B) is specified, proven and linked
+(`SpecSysSbrk.v` / `WpSysSbrkDecode.v` / `ProofSysSbrk.v` / `LinkSysSbrk.v`,
+over ARGINT + MYPROC + GROWPROC; axiom-clean).  This xv6 has the LAZY
+variant, so it is not just a growproc wrapper:
+
+```c
+argint(0, &n); argint(1, &t); addr = myproc()->sz;
+if (t == SBRK_EAGER || n < 0) { if (growproc(n) < 0) return -1; }
+else { if (addr + n < addr) return -1;
+       if (addr + n > TRAPFRAME) return -1;
+       myproc()->sz += n; }
+return addr;
+```
+
+**The lazy path is the argument for `um_below` being an INEQUALITY.**  It
+raises `p->sz` and maps NOTHING — vmfault backs the pages later — so its
+whole coherence obligation is `ProcPtOwn.um_below_mono`.  Had the invariant
+been stated as an EQUALITY between `p->sz` and the mapped domain, this
+function would have been unprovable, and the "obvious" stronger invariant
+is the one that would have been wrong.
+
+The contract reuses `growproc_ok` for the eager path rather than restating
+its four arms, and says the useful thing about failure: `-1` means neither
+the size nor the table moved, on all three failure arms.  Success returns
+the OLD size, which is sbrk's contract with userspace.
+
+What it cost, and what is worth reusing:
+
+- **THE WRAP TEST AT +0x44 IS DEAD, and cheaply.**  `addr + n < addr` needs
+  the 64-bit sum to wrap; `p->sz <= TRAPFRAME` plus `sint n < 2^63`
+  (`RiscvExtras.sint64_range` — the generic range, no 32-bit bound needed)
+  puts it below 2^64 with room to spare.  Worth knowing because the `lw`
+  that loads `n` does not hand a 32-bit bound over in any convenient form,
+  so the cheap route is the only comfortable one.
+- **BOTH `int` LOCALS SHARE ONE FRAME SLOT.**  `n` is the LOWER word of slot
+  5 (`s0-40`) and `t` the UPPER (`s0-36`); `InstrBytes.word_pointsto_split4`
+  splits it once and the two halves go to the two argint calls separately.
+  It is rejoined only at the epilogue, where both are dead.  Look for this
+  whenever a function takes the address of more than one `int`.
+- **A SHARED BLOCK THAT ANOTHER SHARED BLOCK NEEDS MUST BE A LEMMA, not an
+  `iAssert`.**  The eager arm at +0x58 is entered from both tests, and the
+  epilogue at +0x64 from all five exits.  An `iAssert`ed eager block would
+  have consumed the epilogue block that the lazy path still needs, so
+  `ss_eager` is a `Local Lemma` with its own continuation and only the
+  epilogue is an `iAssert`.  This is the general form of the
+  one-`iAssert`-EXIT rule below.
+- **`myproc()` IS CALLED TWICE** and the lazy path re-reads `p->sz` rather
+  than using the saved `addr`.  Nothing between the two touches the cell, so
+  the values agree — but the proof has to say so, which is what makes
+  holding the `p_sz` cell across the whole body (rather than borrowing it
+  twice) the right shape.
+- Stack budget: `52 <= av` (6 for this frame, 46 for growproc's).
+- Decode: the frame is byte-identical to argfd's, so the whole prologue and
+  epilogue come from the catalog.  `fd840593` / `fdc40593` / `fdc42703` (the
+  `&local` and `lw local` words argfd and sys_pipe also use) moved into
+  `KernelBaseDecode.v` and their private copies retired; `4505` / `6524` /
+  `177d` / `0736` / `e53c` / `a039` / `54fd` are sys_sbrk's own.
+
+## What is left
+- **`sys_read` / `sys_write` / `sys_fstat`** are the other `argfd` callers
+  and are the natural next syscalls; they want the `pf`-optional
+  generalization of `SpecArgfd` noted in
+  [`../projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
 - **`allocproc` — the one producer of `proc_priv` — establishes both
   conjuncts for free.** `proc_priv_intro` gained the coherence premise, and
   allocproc discharges it with `um_below_empty`: the table it has just built
