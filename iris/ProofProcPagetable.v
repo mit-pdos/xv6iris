@@ -55,6 +55,10 @@ Lemma ppt_env_recomb (nb g1 g2 : nat) :
   Some (nb - 1 - g1 - g2)%nat = avail_sub (Some nb) (1 + g1 + g2)%nat.
 Proof. rewrite avail_sub_Some. f_equal. lia. Qed.
 
+(* the counted premise refutes uvmcreate's out-of-memory arm *)
+Lemma ppt_not_zero (nb : nat) : (3 < nb)%nat -> avail_zero (Some nb) -> False.
+Proof. unfold avail_zero. lia. Qed.
+
 Lemma ppt_nodes_sum (n1 n2 g1 g2 : nat) :
   n1 = (1 + g1)%nat -> n2 = (n1 + g2)%nat -> n2 = (1 + g1 + g2)%nat.
 Proof. lia. Qed.
@@ -246,11 +250,13 @@ Section ProofProcPagetable.
     assert (HcidJ : J !!! Regidx (mword_of_int 4 : mword 5) = cid_word) by (rewrite HJ4; exact Hcid).
     iEval (rewrite -HJ4) in "Henv".
     iApply (UV.wp_uvmcreate_sconf γ γa Φ J lvl (K - 4)%nat eb p C (Some nb)
-              Hlvl Hc18
-              (ex_intro _ nb (conj eq_refl (ppt_pos nb Hnb')))
-              HcidJ
+              Hlvl Hc18 HcidJ
               with "Hcg Hcnt Htext Hpc Henv [-]").
-    iIntros (mr0 b0) "Hcg Hcnt Hpc Hptree %Hroot0 %Hpv0 Henv %Hucs".
+    iIntros (mr0) "Hcg Hcnt Hpc %Hucs Hpost".
+    (* uvmcreate is now generic in the budget; the counted premise kills its
+       out-of-memory arm, so proc_pagetable's contract is unchanged. *)
+    iDestruct "Hpost" as "[(_ & %Hav0 & _) | (%b0 & %Hroot0 & %Hpv0 & Hptree & Henv)]";
+      [ exfalso; exact (ppt_not_zero nb Hnb' Hav0) |].
     iEval (rewrite HJ4) in "Henv".
     assert (Hret12 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (PPT + 0x12)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

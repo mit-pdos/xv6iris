@@ -555,14 +555,53 @@ the evidence for every offset. This file is only the worklist.
 
       So the work, smallest first:
 
-      1. **`uvmcreate` uncounted** -- drop `(exists nb, on = Some nb /\ 0 < nb)`
-         and add a second post arm (`a0 = 0`, budget unchanged).  Its only
-         failure is `kalloc() == 0`, one `c.beqz` taken arm plus the
-         epilogue.  Small and self-contained.
-      2. **`proc_pagetable` uncounted** -- prove its three failure tails
-         (`uvmcreate` returned 0; either `mappages` returned −1, which calls
-         `uvmunmap`/`uvmfree`).  `SpecProcPagetable.v`'s comment saying
-         those callees are unverified is STALE: vm.c is 20/20.
+      1. [x] **`uvmcreate` uncounted -- DONE.**  The `0 < nb` premise is
+         gone; the post is now `SpecUvmcreate.uvmcreate_post γa on tp rv`, a
+         disjunction indexed by the RETURNED POINTER whose failure arm
+         carries `⌜avail_zero on⌝`.  `ProofUvmcreate`'s epilogue
+         (+0x1a .. +0x24) is factored into one `iAssert`ed block taking
+         `(rv, payload)`, exactly the way allocproc's is, because the
+         `c.beqz` at +0x10 jumps STRAIGHT to it — the failure arm is the
+         epilogue and nothing else.  `ProofProcPagetable`'s call site grew
+         two lines: it destructs the disjunction and kills the failure arm
+         with `ppt_not_zero` from its own `3 < nb`, so proc_pagetable's
+         contract did not change.
+         *Reusable:* the instruction facts a factored-out epilogue block
+         needs must be re-`iPoseProof`ed from the persistent `#Htext`
+         INSIDE the `iAssert` — the outer `iPoseProof`s are spatial and the
+         `with "[...]"` clause does not carry them in.  And the
+         register-preservation peel inside such a block cannot use a
+         `vm_compute; discriminate`-style `reg_neq`: the register is a
+         VARIABLE there, so each `upd_ne` side goal has to go to
+         `congruence` against explicitly-derived `r <> <literal>` facts.
+      2. **`proc_pagetable` uncounted** -- it has only TWO tails to prove,
+         not three: the `beqz a0` after `uvmcreate` (+0x14) jumps straight
+         to the shared epilogue at +0x4c with `s1 = 0`, so that arm is free.
+         What is left is the two `bltz a0` mappages arms — +0x5a
+         (`uvmfree(pagetable, 0)`) and +0x66 (`uvmunmap(pagetable,
+         TRAMPOLINE, 1, 0)` then `uvmfree`).  `SpecProcPagetable.v`'s
+         comment saying those callees are unverified is STALE: vm.c is
+         20/20.  **But three real seams turned up when the specs were
+         read, and they are the actual cost of this step:**
+         - `SpecUvmfree` is pinned at `cpu_own γ 0%nat` — the same
+           `lvl = 0` fossil uvmcreate and proc_pagetable just shed.
+           allocproc calls proc_pagetable with the proc lock HELD, so this
+           has to be generalized the same way (mappages/walk's
+           `Z.of_nat lvl + 1 < 2^31` shape).
+         - `SpecUvmfree` consumes `BarePt.bare_pt uroot um`, while
+           mappages hands back `ptree_own 2 1 t'` + `pt_rep0`.  A bridge
+           from the partially-grown tree to `bare_pt` is needed; `BarePt`'s
+           `uptg` axis is where to look.
+         - `SpecUvmfree` requires `kalloc_env γa None` — it is stated only
+           in the allocator's STEADY state, because freewalk's recursion
+           returns a data-dependent number of pages and counting them is
+           not worth it.  That is fine for the uncounted regime (`on =
+           None` gives `avail_sub None g = None`) but it means the failure
+           arm is reachable ONLY at `on = None`.  So do NOT try to write
+           one spec with a disjunctive `(counted big enough) \/ (on = None)`
+           premise: use the `*Core` functor recipe from durable-notes and
+           seal ONE proof against TWO `Module Type`s — the counted contract
+           userinit wants and the steady-state one kfork wants.
       3. **`SpecFreeproc.v` + `LinkFreeproc.v`** (assumed, the allocpid
          shape).  At allocproc's two call sites `p->pagetable` is always 0,
          so freeproc never reaches `proc_freepagetable` -- but do not

@@ -39,28 +39,44 @@ Notation UVMC := KernelSyms.uvmcreate.
    and [page_valid] rides along so the caller can refute its own null test.
 
    stack_own bound 18 = own 4-slot frame + kalloc's 14 (memset needs 2). *)
+(* The postcondition, as a function of the RETURNED POINTER.  uvmcreate's
+   only failure is its [kalloc()] returning 0, and both arms leave through
+   the SAME epilogue ([mv a0,s1] at +0x1a), so indexing the post by the
+   returned value is what lets that epilogue be proved once.
+
+   GENERIC IN [on]: the failure arm records WHY it failed
+   ([avail_zero on]), so a COUNTED caller refutes it from its own budget
+   premise and an uncounted one (the fork path) handles it.  That is why
+   this spec has no [0 < nb] premise any more. *)
+Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    (γa : gname) (on : option nat) (tp : mword 64) (rv : mword 64) : iProp Σ :=
+  ( (* out of memory: nothing allocated, the budget untouched *)
+    (⌜rv = (zero_reg : mword 64)⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_env γa on tp)
+  ∨ (* an empty root node, one page spent *)
+    (∃ b : mword 44,
+       ⌜rv = zero_extend' 64 (concat_vec b (zeros' 12 : mword 12))⌝ ∗
+       ⌜page_valid rv⌝ ∗
+       ptree_own 2 (DfracOwn 1) (pt_empty_node b) ∗
+       kalloc_env γa (avail_sub on 1) tp))%I.
+
 Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (18 <= K)%nat ->
-  (exists nb, on = Some nb /\ (0 < nb)%nat) ->
   (* kalloc's push/pop addresses this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   sie_cap_gpr γ mm K -∗
   cpu_own γ lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗
   kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
-  ( ∀ (mr : regfile) (b : mword 44),
+  ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
     cpu_own γ lvl eb p C -∗
     pc_is ret_tgt -∗
-    ptree_own 2 (DfracOwn 1) (pt_empty_node b) -∗
-    ⌜mr !!! Regidx (mword_of_int 10)
-       = zero_extend' 64 (concat_vec b (zeros' 12 : mword 12))⌝ -∗
-    ⌜page_valid (mr !!! Regidx (mword_of_int 10))⌝ -∗
-    kalloc_env γa (avail_sub on 1) (mm !!! Regidx (mword_of_int 4)) -∗
     ⌜callee_saved mm mr⌝ -∗
+    uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4))
+      (mr !!! Regidx (mword_of_int 10)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
