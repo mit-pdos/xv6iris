@@ -159,6 +159,24 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* creg -> reg conversions.  An RVC expansion yields its register operands *)
+(* as [creg2reg_idx (Cregidx k)] while every WP leaf takes a plain          *)
+(* [Regidx j]; the two are convertible, and these are the equations a       *)
+(* decode file rewrites into the AST before handing it to a leaf.  They     *)
+(* are shared rather than per-function: [c1]/[c7] were also killed's,       *)
+(* [c6]/[c7] consoleinit's, [c2]/[c6]/[c7] main's.  ONE lemma per creg      *)
+(* index; add the missing indices here rather than privately.               *)
+(* ===================================================================== *)
+Lemma creg_c1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9 : mword 5).
+Proof. vm_compute. reflexivity. Qed.
+Lemma creg_c2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10 : mword 5).
+Proof. vm_compute. reflexivity. Qed.
+Lemma creg_c6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14 : mword 5).
+Proof. vm_compute. reflexivity. Qed.
+Lemma creg_c7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
+Proof. vm_compute. reflexivity. Qed.
+
+(* ===================================================================== *)
 (* Shared 16-byte stack-frame prologue/epilogue RVC decode templates       *)
 (* (c.addi sp / c.sdsp / c.addi4spn / c.ldsp / c.ret).  Any function that    *)
 (* uses the standard 16-byte frame                                          *)

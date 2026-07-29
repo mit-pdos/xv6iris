@@ -298,6 +298,14 @@ Notation "a ↦ₘ□ v" := (mem_pointsto a DfracDiscarded v)
 Notation "a ↦ₘ v" := (mem_pointsto a (DfracOwn 1) v)
   (at level 20, format "a  ↦ₘ  v") : bi_scope.
 
+(* TIMELESS -- registered, because typeclass search does not unfold the
+   [Definition] on its own: without this instance the [>] intro pattern on a
+   byte taken out of an invariant fails with "iMod: cannot eliminate modality"
+   on a hypothesis that visibly IS timeless. *)
+Global Instance mem_pointsto_timeless `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+  Timeless (mem_pointsto a dq v).
+Proof. rewrite /mem_pointsto. apply _. Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* SHARING a byte: agreement and the fractional split.  [↦ₘ] carries a real
    [dfrac], so a resource that is read-only-while-shared (a reference-counted
@@ -598,6 +606,13 @@ Notation "a ↦₄ w" := (word4_pointsto a (DfracOwn 1) w)
 (* discarded (persistent, duplicable) read-only ownership of the word. *)
 Notation "a ↦₄□ w" := (word4_pointsto a DfracDiscarded w)
   (at level 20, format "a  ↦₄□  w") : bi_scope.
+
+(* TIMELESS, for the same reason as [mem_pointsto_timeless] above: this is what
+   lets an invariant over a 4-byte cell ([StartedInv.started_body], the panic
+   flags) hand the cell out from under the [▷]. *)
+Global Instance word4_pointsto_timeless `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac) (w : bv 32) :
+  Timeless (word4_pointsto a dq w).
+Proof. rewrite /word4_pointsto. apply _. Qed.
 
 Section word4_pointsto.
   Context `{!riscvGS Σ}.

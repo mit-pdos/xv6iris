@@ -130,10 +130,6 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma cid_csd_imm24 :
   zero_extend' 12 (concat_vec (mword_of_int 3 : mword 5) ('b"000")) = (mword_of_int 24 : mword 12).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-Lemma cid_cr6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14).
-Proof. vm_compute. reflexivity. Qed.
-Lemma cid_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
 
 Section WpConsoleinitDecode.
   Context `{!riscvGS Σ}.
@@ -207,7 +203,7 @@ Section WpConsoleinitDecode.
 
   Lemma cii_30 : kernel_text -∗ instr (mword_of_int (CI + 0x30) : mword 64) true (STORE (mword_of_int 16 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 8)).
   Proof.
-    rewrite -cid_csd_imm16 -cid_cr6 -cid_cr7.
+    rewrite -cid_csd_imm16 -creg_c6 -creg_c7.
     mk_rvc (CI + 0x30)%Z (mword_of_int 0xeb98 : mword 16)
       (mword_of_int (CI + 0x30) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), 8)) cidc_eb98 exec_execute_C_SD.
   Qed.
@@ -222,7 +218,7 @@ Section WpConsoleinitDecode.
 
   Lemma cii_3a : kernel_text -∗ instr (mword_of_int (CI + 0x3a) : mword 64) true (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 8)).
   Proof.
-    rewrite -cid_csd_imm24 -cid_cr6 -cid_cr7.
+    rewrite -cid_csd_imm24 -creg_c6 -creg_c7.
     mk_rvc (CI + 0x3a)%Z (mword_of_int 0xef98 : mword 16)
       (mword_of_int (CI + 0x3a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), 8)) cidc_ef98 exec_execute_C_SD.
   Qed.

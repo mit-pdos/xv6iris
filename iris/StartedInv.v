@@ -84,23 +84,6 @@ Section StartedInv.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
-  (* TIMELESSNESS OF THE CELL.  Opening the invariant to serve a load/store
-     needs [↦₄] out from under the [▷], and neither [mem_pointsto] nor
-     [word4_pointsto] has a registered [Timeless] instance -- typeclass search
-     does not unfold either [Definition], so the [>] intro pattern fails with
-     "iMod: cannot eliminate modality" on a hypothesis that visibly is
-     timeless.  Both are one [rewrite] away; they are declared here rather
-     than in RiscvPtsto.v only to keep this change off the central file (fold
-     them in at the next touch of RiscvPtsto.v --
-     claude-notes/projects/main-boot.md). *)
-  Local Instance mem_pointsto_timeless_inst (a : mword 64) (dq : dfrac) (v : bv 8) :
-    Timeless (mem_pointsto a dq v).
-  Proof. rewrite /mem_pointsto. apply _. Qed.
-
-  Local Instance word4_pointsto_timeless_inst (a : mword 64) (dq : dfrac) (w : mword 32) :
-    Timeless (word4_pointsto a dq w).
-  Proof. rewrite /word4_pointsto. apply _. Qed.
-
   Definition startedN : namespace := nroot .@ "started".
 
   Definition started_body (P : iProp Σ) : iProp Σ :=

@@ -249,3 +249,18 @@ Lemma bdec_10016073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x10016073 : mword 32)) s
   = Some (CSRImm (Ox"100", mword_of_int 2, Regidx (mword_of_int 0), CSRRS), s).
 Proof. decode_bridge_ms_bv. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  fence rw,rw -- gcc's [__sync_synchronize] / [__atomic_thread_fence      *)
+(*  (SEQ_CST)].  Shared by main (+0x1c and +0xa2, the two arms' acquire /   *)
+(*  release barriers around the [started] handover), virtio_disk_intr        *)
+(*  (+0x2c, +0x3e) and virtio_disk_rw (+0x172, +0x182).  Needs               *)
+(*  [decode_bridge_ms_bv]: the pred/succ nibbles arrive as slices of the     *)
+(*  instruction word while the fence leaf (WpSconfCtl.v) phrases them as     *)
+(*  [mword_of_int 3], and only [bv_eq] closes that pair.                    *)
+(* ---------------------------------------------------------------------- *)
+Lemma bdec_0330000f s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0330000f : mword 32) : M instruction) s
+  = Some (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
+                 Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
+Proof. decode_bridge_ms_bv. Qed.

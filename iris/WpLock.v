@@ -418,9 +418,8 @@ Section Lock.
     iModIntro. by iFrame "Hword Hcpu HOut".
   Qed.
 
-  Global Instance mem_pointsto_timeless a dq b : Timeless (mem_pointsto a dq b).
-  Proof. rewrite /mem_pointsto. apply _. Qed.
-
+  (* [mem_pointsto]'s and [word4_pointsto]'s [Timeless] instances now live in
+     RiscvPtsto.v, beside the definitions. *)
   Global Instance lock_word_timeless lk v : Timeless (lock_word lk v).
   Proof. rewrite /lock_word /word4_pointsto. apply _. Qed.
 
@@ -483,6 +482,34 @@ Section Lock.
       [ by iNext | ].
     iModIntro. iExists γ.
     iApply (is_lock_intro with "Hnm Hinv").
+  Qed.
+
+  (* [newlock] with the two halves SEPARATED: the ghost name is chosen first
+     and the resource is supplied afterwards, so [R] may mention the name -- or,
+     which is what forced this lemma, the whole LIST of names an ARRAY of locks
+     is being built with.  [SchedCtx.proc_lock_res] is indexed by the [γs] of
+     all NPROC proc locks (through [p_sched]), so allocating the 64 locks with
+     [newlock] is circular and [SpecProcinit.procs_inv_alloc] runs this instead:
+     one pass to pick the 64 names, then one pass to pay each lock its
+     resource.  [newlock_d] is the same trick for a lock whose resource
+     mentions its own cancel gname; the difference is that this one lands on a
+     plain [is_lock] rather than the [∨ D] body. *)
+  Lemma newlock_delayed E (lk : mword 64) (s : string) :
+    lock_name lk s -∗
+    lk ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_cpu lk ↦₈ (zero_reg : mword 64) ==∗
+    ∃ γ : gname, ∀ R : iProp Σ, R ={E}=∗ is_lock γ lk s R.
+  Proof.
+    iIntros "#Hnm Hword Hcpu".
+    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
+                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iDestruct (own_op with "H") as "[Ha Hf]".
+    iModIntro. iExists γ. iIntros (R) "HR".
+    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
+    { iNext. iExists (mword_of_int 0 : mword 32), None.
+      rewrite /lock_word. iFrame "Hword Hcpu Ha".
+      iLeft. iFrame "Hf HR". done. }
+    iModIntro. iApply (is_lock_intro with "Hnm Hinv").
   Qed.
 
 End Lock.

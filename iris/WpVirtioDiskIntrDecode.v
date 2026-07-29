@@ -274,12 +274,6 @@ Lemma vtb_10001737 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x2c / +0x3e  fence rw,rw *)
-Lemma vtb_0330000f s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0330000f : mword 32) : M instruction) s
-  = Some (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
-Proof. decode_bridge_ms_bv. Qed.
-
 (* +0x32  lhu a4,32(s1) -- disk.used_idx *)
 Lemma vtb_0204d703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0204d703 : mword 32)) s
@@ -442,7 +436,7 @@ Section VirtioDiskIntrInstrs.
 
   Lemma vti_2c : kernel_text -∗ instr (mword_of_int (VDT + 0x2c) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).
   Proof. mk_base (VDT + 0x2c)%Z (mword_of_int 0x0330000f : mword 32)
-    (mword_of_int (VDT + 0x2c) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) vtb_0330000f. Qed.
+    (mword_of_int (VDT + 0x2c) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) bdec_0330000f. Qed.
 
   (* ---- the loop-entry test ---- *)
   Lemma vti_30 : kernel_text -∗ instr (mword_of_int (VDT + 0x30) : mword 64) true (LOAD (mword_of_int 16, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
@@ -464,7 +458,7 @@ Section VirtioDiskIntrInstrs.
   (* ---- the loop body ---- *)
   Lemma vti_3e : kernel_text -∗ instr (mword_of_int (VDT + 0x3e) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).
   Proof. mk_base (VDT + 0x3e)%Z (mword_of_int 0x0330000f : mword 32)
-    (mword_of_int (VDT + 0x3e) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) vtb_0330000f. Qed.
+    (mword_of_int (VDT + 0x3e) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) bdec_0330000f. Qed.
 
   Lemma vti_42 : kernel_text -∗ instr (mword_of_int (VDT + 0x42) : mword 64) true (LOAD (mword_of_int 16, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 8)).
   Proof. mk_rvc (VDT + 0x42)%Z (mword_of_int 0x6898 : mword 16)

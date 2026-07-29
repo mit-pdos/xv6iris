@@ -176,6 +176,141 @@ Section ProcinitSeals.
 
 End ProcinitSeals.
 
+(* ------------------------------------------------------------------ *)
+(*  procinit's output -> [SchedCtx.procs_inv]: the caller's ghost step. *)
+(*                                                                     *)
+(*  This is the assembly main() owes between procinit() and            *)
+(*  scheduler() (claude-notes/projects/main-boot.md), factored out of   *)
+(*  ProofMain.v because inlining it is 64 lock allocations.  It cannot  *)
+(*  live in SchedCtx.v -- that would need SchedCtx to import           *)
+(*  SpecProcinit for [proc_ready], and the dependency runs the other    *)
+(*  way -- so it sits here, one section down from the composition       *)
+(*  check [proc_ready_lock_res] it is the operational form of.          *)
+(*                                                                     *)
+(*  [γs] is EXISTENTIAL in the conclusion, so this section must not     *)
+(*  have it as a section variable (which is why it is not in            *)
+(*  ProcinitSeals).  That existential is also the whole difficulty:     *)
+(*  every proc lock's resource [proc_lock_res γ Φ γs _ _] mentions the   *)
+(*  list of all 64 names (through [p_sched]), so the names have to be    *)
+(*  chosen BEFORE any invariant is allocated -- hence                    *)
+(*  [WpLock.newlock_delayed] and the two passes below.                  *)
+(* ------------------------------------------------------------------ *)
+Section ProcinitProcsInv.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{CID : CpuId}.
+  Context (γ : gname) (Φ : mval -> iProp Σ).
+
+  (* [lk_fresh] in the three pieces [newlock]/[newlock_delayed] take.  The
+     only content is that [lk_cpu] and [WpLock.lock_cpu] are the same address
+     spelled twice (0x10 and 16). *)
+  Lemma lk_fresh_pieces (lk : mword 64) (s : string) :
+    lk_fresh lk s -∗
+    lock_name lk s ∗ lk ↦₄ (mword_of_int 0 : mword 32) ∗
+    lock_cpu lk ↦₈ (zero_reg : mword 64).
+  Proof. rewrite /lk_fresh /lk_cpu /lock_cpu. iIntros "($ & $ & $)". Qed.
+
+  (* what is left of one process once its lock word and name have gone into
+     the (delayed) allocation: exactly the cells [proc_lock_res] at UNUSED
+     wants, plus the [p_kstack] cell that becomes [is_kstack]. *)
+  Definition proc_res (i : nat) : iProp Σ :=
+    (p_kstack (proc_addr i) ↦₈ kstack_va i ∗
+     p_state (proc_addr i) ↦₄ UNUSED ∗
+     (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+     proc_pub (proc_addr i) ∗
+     proc_dormant (proc_addr i) UNUSED)%I.
+
+  Lemma proc_ready_split (i : nat) (ch : mword 64) :
+    proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
+    lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
+  Proof.
+    rewrite /proc_ready /proc_res.
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub".
+    iFrame "Hks Hst Hpub Hdorm". iExists ch. iExact "Hch".
+  Qed.
+
+  (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
+     will seal its (still unknown) resource.  Not specific to procs -- any
+     array of locks whose resource is indexed by the array's own names needs
+     exactly this. *)
+  Lemma delayed_locks_alloc (E : coPset) (nm : string) (addr : nat -> mword 64)
+      (Q : nat -> iProp Σ) (n : nat) :
+    ([∗ list] i ∈ seq 0 n, lk_fresh (addr i) nm ∗ Q i)
+    ==∗ ∃ γl : list gname, ⌜length γl = n⌝ ∗
+        ([∗ list] i ↦ g ∈ γl,
+           (∀ R : iProp Σ, R ={E}=∗ is_lock g (addr i) nm R) ∗ Q i).
+  Proof.
+    induction n as [|n IH].
+    { iIntros "_". iModIntro. iExists []. iSplit; [done|]. done. }
+    rewrite seq_S Nat.add_0_l.
+    rewrite (big_sepL_app (fun _ i => (lk_fresh (addr i) nm ∗ Q i)%I) (seq 0 n) [n]).
+    iIntros "[Hpre Hlast]".
+    iMod (IH with "Hpre") as (γl) "[%Hlen Hγl]".
+    iDestruct "Hlast" as "[[Hfresh HQ] _]".
+    iDestruct (lk_fresh_pieces with "Hfresh") as "(#Hnm & Hword & Hcpu)".
+    iMod (newlock_delayed E (addr n) nm with "Hnm Hword Hcpu") as (g) "Hmk".
+    iModIntro. iExists ((γl ++ [g])%list).
+    iSplit.
+    { iPureIntro. rewrite List.last_length. by rewrite Hlen. }
+    rewrite (big_sepL_app
+               (fun i g => ((∀ R : iProp Σ, R ={E}=∗ is_lock g (addr i) nm R) ∗ Q i)%I)
+               γl [g]).
+    iSplitL "Hγl"; [iExact "Hγl"|].
+    rewrite big_sepL_singleton Hlen Nat.add_0_r. iFrame "Hmk HQ".
+  Qed.
+
+  (* THE HELPER.  procinit's postcondition plus the two public cells it never
+     touches ([p_chan] and [proc_pub], exactly what [proc_ready_lock_res]
+     consumes) becomes the scheduler's [procs_inv]. *)
+  Lemma procs_inv_alloc (E : coPset) :
+    ([∗ list] i ∈ seq 0 NPROC,
+       proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+       proc_pub (proc_addr i))
+    ={E}=∗ ∃ γs : list gname, procs_inv γ Φ γs.
+  Proof.
+    iIntros "Hin".
+    (* 1. peel [lk_fresh] out of each [proc_ready] *)
+    iDestruct (big_sepL_impl
+                 (fun _ i => (proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+                              proc_pub (proc_addr i))%I)
+                 (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
+                 (seq 0 NPROC) with "Hin []") as "Hin".
+    { iIntros "!>" (k i _) "(Hrdy & Hch & Hpub)".
+      iDestruct "Hch" as (ch) "Hch".
+      iApply (proc_ready_split with "Hrdy Hch Hpub"). }
+    (* 2. choose the 64 ghost names; the resources are still owed *)
+    iMod (delayed_locks_alloc E "proc"%string proc_addr proc_res NPROC with "Hin")
+      as (γs) "[%Hlen Hmk]".
+    (* 3. γs is now fixed, so each lock can be paid its resource -- and the
+          [p_kstack] cell persisted into the (persistent) [is_kstack]. *)
+    iDestruct (big_sepL_impl
+                 (fun i g => ((∀ R : iProp Σ, R ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
+                              ∗ proc_res i)%I)
+                 (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string
+                                        (proc_lock_res γ Φ γs g (proc_addr i)) ∗
+                                      ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
+                 γs with "Hmk []") as "Hmk".
+    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm)]".
+      iMod (word_pointsto_persist with "Hks") as "#Hksp".
+      iDestruct "Hch" as (ch) "Hch".
+      iMod ("Hmk" $! (proc_lock_res γ Φ γs g (proc_addr i))
+              with "[Hst Hch Hpub Hdorm]") as "#Hlk".
+      { iApply (proc_lock_res_intro γ Φ γs g (proc_addr i) UNUSED ch
+                  with "Hst Hch Hpub [Hdorm]").
+        rewrite /proc_slots.
+        rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
+        rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
+        iSplitR; [done | iExact "Hdorm"]. }
+      iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }
+    iMod (big_sepL_fupd with "Hmk") as "Hmk".
+    rewrite (big_sepL_sep (PROP:=iPropI Σ)).
+    iDestruct "Hmk" as "[Hlocks Hks]".
+    iModIntro. iExists γs. rewrite /procs_inv.
+    iSplitR; [iPureIntro; exact Hlen |].
+    iFrame "Hlocks Hks".
+  Qed.
+
+End ProcinitProcsInv.
+
 Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
     (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in

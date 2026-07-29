@@ -754,11 +754,6 @@ Lemma rwb_00a69223 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 4 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 13), 2), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma rwb_0330000f s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0330000f : mword 32) : M instruction) s
-  = Some (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
-Proof. decode_bridge_ms_bv. Qed.
-
 Lemma rwb_00275783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00275783 : mword 32) : M instruction) s
   = Some (LOAD (mword_of_int 2 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), true, 2), s).
@@ -1368,7 +1363,7 @@ Section VirtioDiskRwInstrs.
 
   Lemma rwi_172 : kernel_text -∗ instr (mword_of_int (VRW + 0x172) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).
   Proof. mk_base (VRW + 0x172)%Z (mword_of_int 0x0330000f : mword 32)
-    (mword_of_int (VRW + 0x172) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) rwb_0330000f. Qed.
+    (mword_of_int (VRW + 0x172) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) bdec_0330000f. Qed.
 
   Lemma rwi_176 : kernel_text -∗ instr (mword_of_int (VRW + 0x176) : mword 64) true (LOAD (mword_of_int 8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), false, 8)).
   Proof. mk_rvc (VRW + 0x176)%Z (mword_of_int 0x6798 : mword 16)
@@ -1388,7 +1383,7 @@ Section VirtioDiskRwInstrs.
 
   Lemma rwi_182 : kernel_text -∗ instr (mword_of_int (VRW + 0x182) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).
   Proof. mk_base (VRW + 0x182)%Z (mword_of_int 0x0330000f : mword 32)
-    (mword_of_int (VRW + 0x182) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) rwb_0330000f. Qed.
+    (mword_of_int (VRW + 0x182) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) bdec_0330000f. Qed.
 
   Lemma rwi_186 : kernel_text -∗ instr (mword_of_int (VRW + 0x186) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VRW + 0x186)%Z (mword_of_int 0x100017b7 : mword 32)

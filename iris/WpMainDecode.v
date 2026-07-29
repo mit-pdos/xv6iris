@@ -28,11 +28,9 @@
    main NEVER RETURNS: there is no epilogue and no [jalr ra], so there is no
    [c.ldsp]/[c.addi16sp]/[c.jr] tail here -- 0xb0 is the last instruction.
 
-   Note [mndb_0330000f] (fence rw,rw) is also proved privately in
-   WpVirtioDiskIntrDecode.v; by the DECODE-WORD DEDUP rule it belongs in
-   KernelBaseDecode.v now that a second function needs it.  It is kept local
-   here so main's decode file can be checked without rebuilding the tree; see
-   claude-notes/projects/main-boot.md. *)
+   The fence rw,rw word and the three creg->reg conversions are SHARED
+   ([KernelBaseDecode.bdec_0330000f], [KernelRvcDecode.creg_c{2,6,7}]) -- three
+   functions decode that word and three name those conversions. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -102,13 +100,6 @@ Lemma mndb_3a670713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x3a670713 : mword 32)) s
   = Some (ITYPE (mword_of_int 934 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI), s).
 Proof. decode_bridge_ms. Qed.
-
-(* fence rw,rw -- __atomic_thread_fence(__ATOMIC_SEQ_CST), both arms *)
-Lemma mndb_0330000f s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0330000f : mword 32) : M instruction) s
-  = Some (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
-                 Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
-Proof. decode_bridge_ms_bv. Qed.
 
 (* the four format-string materializations: addi a0,a0,<off> off &etext *)
 Lemma mndb_1f450513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -278,12 +269,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma mnd_clw_imm0 :
   zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")) = (mword_of_int 0 : mword 12).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-Lemma mnd_cr6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14).
-Proof. vm_compute. reflexivity. Qed.
-Lemma mnd_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-Lemma mnd_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10).
-Proof. vm_compute. reflexivity. Qed.
 
 Section WpMainDecode.
   Context `{!riscvGS Σ}.
@@ -331,7 +316,7 @@ Section WpMainDecode.
 
   Lemma mni_16 : kernel_text -∗ instr (mword_of_int (MN + 0x16) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)).
   Proof.
-    rewrite -mnd_clw_imm0 -mnd_cr6 -mnd_cr7.
+    rewrite -mnd_clw_imm0 -creg_c6 -creg_c7.
     mk_rvc (MN + 0x16)%Z (mword_of_int 0x431c : mword 16)
       (mword_of_int (MN + 0x16) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) mndc_431c exec_execute_C_LW.
   Qed.
@@ -346,7 +331,7 @@ Section WpMainDecode.
 
   Lemma mni_1c : kernel_text -∗ instr (mword_of_int (MN + 0x1c) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).
   Proof. mk_base (MN + 0x1c)%Z (mword_of_int 0x0330000f : mword 32)
-    (mword_of_int (MN + 0x1c) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) mndb_0330000f. Qed.
+    (mword_of_int (MN + 0x1c) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) bdec_0330000f. Qed.
 
   (* ---- printk("hart %d starting\n", cpuid()) ---- *)
 
@@ -500,7 +485,7 @@ Section WpMainDecode.
 
   Lemma mni_a2 : kernel_text -∗ instr (mword_of_int (MN + 0xa2) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).
   Proof. mk_base (MN + 0xa2)%Z (mword_of_int 0x0330000f : mword 32)
-    (mword_of_int (MN + 0xa2) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) mndb_0330000f. Qed.
+    (mword_of_int (MN + 0xa2) : mword 64) (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))) bdec_0330000f. Qed.
 
   Lemma mni_a6 : kernel_text -∗ instr (mword_of_int (MN + 0xa6) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (MN + 0xa6)%Z (mword_of_int 0x4785 : mword 16)

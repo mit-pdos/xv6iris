@@ -243,6 +243,67 @@ Section WpSconfCtl.
   Qed.
 
   (* ------------------------------------------------------------------- *)
+  (* fence, LATER-EXPOSING.  Same statement as [wp_fence_gen_s_sconf]      *)
+  (* except that the continuation is under a [▷] -- as [wp_cj_s_sconf]      *)
+  (* below.  A fence IS a program step, so the later is there to be had;    *)
+  (* the plain leaf just does not hand it out, and a caller that has         *)
+  (* nothing to strip should keep using it.                                 *)
+  (*                                                                        *)
+  (* Who needs it: main()'s secondary arm.  Its spin loop EXITS through the  *)
+  (* fall-through of [beqz a5], and the [started] invariant's payload        *)
+  (* arrives under a [▷] (opening an invariant always yields its body that   *)
+  (* way, and the payload is persistent but not timeless).  Every leaf the   *)
+  (* arm then runs applies its continuation later-free, so without this one  *)
+  (* the [▷ P] can never be stripped.  The fence is also the semantically    *)
+  (* right place for it: [fence rw,rw] IS the acquire barrier, so the        *)
+  (* reading the proof wants is that the fence is where [▷ P] becomes [P].   *)
+  (* See claude-notes/projects/main-boot.md (G4).                            *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_fence_gen_later_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+      (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
+      (m : regfile) (n : nat) :
+    sie_cap_gpr γ m n -∗
+    pc_is pc -∗
+    instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
+    ( ▷ ( sie_cap_gpr γ m n -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf γ m n Φ pc false
+              (FENCE (fm, pred, succ, rs, rd))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lmenv_pc : register_lookup menvcfg s_pc.(sregs) = menvcfg0)
+      by (unfold s_pc; tmig; exact Lmenv).
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply (exec_execute_FENCE_S menvcfg0 fm pred succ rs rd s_pc
+               Lpriv_pc Lmenv_pc Hfiom). }
+    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
+      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iNext.
+    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
   (* c.j -- unconditional jump; a backward jump is a loop back edge, so   *)
   (* the continuation is UNDER A LATER (straight-line callers [iNext]).   *)
   (* ------------------------------------------------------------------- *)

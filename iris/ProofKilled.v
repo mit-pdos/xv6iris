@@ -62,10 +62,6 @@ Lemma kldec_jal_rel s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2091830 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma kl_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
-Lemma kl_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
 (* [c.mv rd,rs] is modelled as [add zero, rs]. *)
 Lemma kl_addv_zero_l (X : mword 64) : add_vec (zero_reg : mword 64) X = X.
@@ -343,7 +339,7 @@ Section ProofKilled.
     { rewrite (callee_saved_lookup Hcs_acq kl_s1 ltac:(vm_compute; reflexivity)).
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HA2s1. }
     iPoseProof (kli_12 with "Htext") as "Hi12".
-    iEval (rewrite kl_cr1; rewrite kl_cr7) in "Hi12".
+    iEval (rewrite creg_c1; rewrite creg_c7) in "Hi12".
     assert (Haddr : add_vec (macq !!! Regidx kl_s1)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))))
                     = p_killed (proc_addr j))
