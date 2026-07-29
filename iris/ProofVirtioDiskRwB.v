@@ -632,7 +632,7 @@ Section ProofVirtioDiskRwB.
          scheduler valid-context needs re-wrapping. *)
       iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) (proc_addr j))%I
         with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
+      { iApply bi.later_intro. iExact "Hsched". }
       iIntros (M1) "%Hcs1 %Hal Hcg Hout".
       rewrite /P1.vdrw_alloc_out. iDestruct "Hout" as "[Hok|Hfail]".
       { (* ============ all three won: hand the seam to P3 ============ *)

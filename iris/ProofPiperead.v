@@ -1530,9 +1530,7 @@ Section ProofPiperead.
         iApply (wp_bge_x0_taken_s_sconf γ Φ (mword_of_int (PR + 0x80)) (mword_of_int 66 : mword 13)
                   Rs5 G3 (av - 12)%nat ltac:(nz) ltac:(exact Hblez)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi80 [-]").
-        iNext. iIntros "Hcg Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hjbz : add_vec (mword_of_int (PR + 0x80) : mword 64)
                          (sign_extend' 64 (mword_of_int 66 : mword 13)) = mword_of_int (PR + 0xc2))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1645,9 +1643,7 @@ Section ProofPiperead.
                     Ra5 Ra4 K2 (av - 12)%nat ltac:(nz) ltac:(nz)
                     ltac:(rewrite HK2a4 HK2a5; exact Hemp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi8c [-]").
-          iNext. iIntros "Hcg Hpc".
-          iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-          { iNext. iExact "Hsched". }
+          iApply bi.later_intro. iIntros "Hcg Hpc".
           assert (Hjc2 : add_vec (mword_of_int (PR + 0x8c) : mword 64)
                            (sign_extend' 64 (mword_of_int 54 : mword 13)) = mword_of_int (PR + 0xc2))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -2019,9 +2015,7 @@ Section ProofPiperead.
                       ltac:(rewrite HD4s5 HD4s3; apply pr_moi_neq; lia)
                       ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hibe [-]").
-            iNext. iIntros "Hcg Hpc".
-            iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-            { iNext. iExact "Hsched". }
+            iApply bi.later_intro. iIntros "Hcg Hpc".
             assert (Hbk : add_vec (mword_of_int (PR + 0xbe) : mword 64)
                             (sign_extend' 64 (mword_of_int 8134 : mword 13)) = mword_of_int (PR + 0x84))
               by (apply bv_eq; vm_compute; reflexivity).
@@ -2052,9 +2046,7 @@ Section ProofPiperead.
                   Rs6 Ra0 mrc (av - 12)%nat ltac:(nz) ltac:(nz)
                   ltac:(rewrite Hrm1 Hmrcs6; apply eq_vec_true_iff; reflexivity)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiac [-]").
-        iNext. iIntros "Hcg Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hjea : add_vec (mword_of_int (PR + 0xac) : mword 64)
                          (sign_extend' 64 (mword_of_int 62 : mword 13)) = mword_of_int (PR + 0xea))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -2094,9 +2086,7 @@ Section ProofPiperead.
           iApply (wp_cj_s_sconf γ Φ (mword_of_int (PR + 0xf0))
                     (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")))
                     E1 (av - 12)%nat ltac:(vm_compute; reflexivity) with "Hcg Hpc Hif0 [-]").
-          iNext. iIntros "Hcg Hpc".
-          iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-          { iNext. iExact "Hsched". }
+          iApply bi.later_intro. iIntros "Hcg Hpc".
           assert (Hjf0 : add_vec (mword_of_int (PR + 0xf0) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
                          = mword_of_int (PR + 0xc2)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2124,9 +2114,7 @@ Section ProofPiperead.
                   Rs3 mrc (av - 12)%nat ltac:(nz)
                   ltac:(rewrite Hmrcs3; apply pr_moi_nz; lia)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiea [-]").
-        iNext. iIntros "Hcg Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hjeac : add_vec (mword_of_int (PR + 0xea) : mword 64)
                           (sign_extend' 64 (mword_of_int 8152 : mword 13)) = mword_of_int (PR + 0xc2))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -2233,9 +2221,7 @@ Section ProofPiperead.
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rewrite HL1a5; exact Hwoz) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi38 [-]").
-        iNext. iIntros "Hcg Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hj70 : add_vec (mword_of_int (PR + 0x38) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0"))))
                        = mword_of_int (PR + 0x70)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2357,9 +2343,7 @@ Section ProofPiperead.
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rewrite Hka0; exact Hkz) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi40 [-]").
-        iNext. iIntros "Hcg Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hj66 : add_vec (mword_of_int (PR + 0x40) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 19 : mword 8) ('b"0"))))
                        = mword_of_int (PR + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2431,9 +2415,7 @@ Section ProofPiperead.
         iApply (wp_cj_s_sconf γ Φ (mword_of_int (PR + 0x6e))
                   (sign_extend' 21 (concat_vec (mword_of_int 52 : mword 11) ('b"0")))
                   N3 (av - 12)%nat ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6e [-]").
-        iNext. iIntros "Hcg Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Hjd6 : add_vec (mword_of_int (PR + 0x6e) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 52 : mword 11) ('b"0"))))
                        = mword_of_int (PR + 0xd6)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2595,9 +2577,16 @@ Section ProofPiperead.
                   Ra5 Ra4 L8 (av - 12)%nat ltac:(nz) ltac:(nz)
                   ltac:(rewrite HL8a4 HL8a5; exact Hstill) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi52 [-]").
+        (* THE ONE SITE IN THIS FILE THAT STILL NEEDS A REAL [iNext]: the Löb
+           back edge below applies "IH" and "HEX", so the [▷] has to come off
+           THOSE, not just off the goal.  Stripping [▷ sched_vc] with them is
+           the price, hence the re-introduction on the next two lines.  Every
+           other instruction step here wants only the goal's later gone and
+           uses [iApply bi.later_intro], which never walks the context (~0.06 s
+           against [iNext]'s ~1.1 s — see optimization.md). *)
         iNext. iIntros "Hcg Hpc".
         iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        { iApply bi.later_intro. iExact "Hsched". }
         assert (Hbk34 : add_vec (mword_of_int (PR + 0x52) : mword 64)
                           (sign_extend' 64 (mword_of_int 8162 : mword 13)) = mword_of_int (PR + 0x34))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -2650,9 +2639,7 @@ Section ProofPiperead.
       iApply (wp_cj_s_sconf γ Φ (mword_of_int (PR + 0x5c))
                 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")))
                 L8 (av - 12)%nat ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5c [-]").
-      iNext. iIntros "Hcg Hpc".
-      iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
+      iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hj76 : add_vec (mword_of_int (PR + 0x5c) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                      = mword_of_int (PR + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2681,9 +2668,7 @@ Section ProofPiperead.
                 Ra5 Ra4 W0 (av - 12)%nat ltac:(nz) ltac:(nz)
                 ltac:(rewrite HW0a4 HW0a5; exact Hdisp) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi30 [-]").
-      iNext. iIntros "Hcg Hpc".
-      iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
+      iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hj5e : add_vec (mword_of_int (PR + 0x30) : mword 64)
                        (sign_extend' 64 (mword_of_int 46 : mword 13)) = mword_of_int (PR + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -2718,9 +2703,7 @@ Section ProofPiperead.
       iApply (wp_cj_s_sconf γ Φ (mword_of_int (PR + 0x64))
                 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")))
                 W0 (av - 12)%nat ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64 [-]").
-      iNext. iIntros "Hcg Hpc".
-      iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
+      iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hj76b : add_vec (mword_of_int (PR + 0x64) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0"))))
                       = mword_of_int (PR + 0x76)) by (apply bv_eq; vm_compute; reflexivity).

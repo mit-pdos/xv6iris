@@ -529,7 +529,7 @@ Section ProofVirtioDiskRwE.
         iEval (rewrite Hback) in "Hpc".
         iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) (proc_addr j))%I
           with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        { iApply bi.later_intro. iExact "Hsched". }
         iDestruct (vdrw_body_close γd pd pav pu with "Hbody") as "HR".
         iApply ("IH" $! L4 with
                   "[%] Hcg Hown Hpay Hpc Hctx Hsched Htok HR Hclaim Hrm Hrt Hidx

@@ -894,13 +894,11 @@ Section ProofSysPause.
                   (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) Qe (av - 8)%nat
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hz
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2a").
-        iNext. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htg70 : add_vec (mword_of_int (SP + 0x2a) : mword 64)
                           (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 35 : mword 8) ('b"0"))))
                         = mword_of_int (SP + 0x70)) by pcstep.
         iEval (rewrite Htg70) in "Hpc".
-        iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
         iDestruct ("Hjoin7" with "Hnc") as "Hx7".
         iApply ("Hexit0" $! Qe with "[%] Hs1 Hs2 Hfree Hx7 Htok HR Hcg Hown Hpay Hctx Hsched Hpc Htail").
         split; [exact HbQe | exact HsQe].
@@ -1199,13 +1197,11 @@ Section ProofSysPause.
           iApply (wp_cj_s_sconf γ Φ (mword_of_int (SP + 0xa0))
                     (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")))
                     K6 (av - 8)%nat ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia0 [-]").
-          iNext. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros "Hcg Hpc".
           assert (Htg7e : add_vec (mword_of_int (SP + 0xa0) : mword 64)
                             (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))
                           = mword_of_int (SP + 0x7e)) by pcstep.
           iEval (rewrite Htg7e) in "Hpc".
-          iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-          { iNext. iExact "Hsched". }
           (* the frame's scratch slots, and the callee-saved report *)
           assert (HK6thr : forall c : mword 5, c <> mword_of_int 10 -> c <> mword_of_int 9 ->
                     c <> mword_of_int 18 -> c <> mword_of_int 19 -> K6 !!! Regidx c = mrk !!! Regidx c).
@@ -1333,13 +1329,11 @@ Section ProofSysPause.
                       (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5) mfk (av - 8)%nat
                       ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hkz
                       ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi52").
-            iNext. iIntros "Hcg Hpc".
+            iApply bi.later_intro. iIntros "Hcg Hpc".
             assert (Htg8c : add_vec (mword_of_int (SP + 0x52) : mword 64)
                               (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 29 : mword 8) ('b"0"))))
                             = mword_of_int (SP + 0x8c)) by pcstep.
             iEval (rewrite Htg8c) in "Hpc".
-            iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-            { iNext. iExact "Hsched". }
             iDestruct ("Hjoin7" with "Hnc") as "Hy7".
             iApply ("Hexk" $! mfk with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hctx Hsched Hpc Htl").
             split; [exact HbKl | exact HlKl].
@@ -1482,13 +1476,18 @@ Section ProofSysPause.
                         (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) L7 (av - 8)%nat
                         ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hlt
                         ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi66").
+              (* The Löb back edge below applies "IH", so the [▷] has to come off THAT
+                 too -- the one site here that still needs a real [iNext] (which also
+                 strips [▷ sched_vc], hence the re-introduction).  Every other step in
+                 this file wants only the goal's later gone: [iApply bi.later_intro],
+                 which never walks the context.  See optimization.md. *)
               iNext. iIntros "Hcg Hpc".
               assert (Htg4a : add_vec (mword_of_int (SP + 0x66) : mword 64)
                                 (sign_extend' 64 (mword_of_int 8164 : mword 13))
                               = mword_of_int (SP + 0x4a)) by pcstep.
               iEval (rewrite Htg4a) in "Hpc".
               iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-              { iNext. iExact "Hsched". }
+              { iApply bi.later_intro. iExact "Hsched". }
               iApply ("IH" $! L7 with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hctx Hsched Hpc Hex0 Hexk Htl").
               split; [exact HbL7 | exact HlL7].
             * (* enough ticks: fall through, restore s1/s2/s3, take the 0 exit *)
@@ -1592,13 +1591,11 @@ Section ProofSysPause.
                 (mword_of_int 112 : mword 13) (mword_of_int 15 : mword 5) A1 (av - 8)%nat
                 ltac:(vm_compute; discriminate) Hneg ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi16").
-      iNext. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt86 : add_vec (mword_of_int (KernelSyms.sys_pause + 0x16) : mword 64)
                          (sign_extend' 64 (mword_of_int 112 : mword 13))
                        = mword_of_int (KernelSyms.sys_pause + 0x86)) by pcstep.
       iEval (rewrite Htgt86) in "Hpc".
-      iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
       (* +0x86 sw zero,-52(s0) : n = 0 *)
       assert (Haddrn1 : add_vec (A1 !!! Regidx (mword_of_int 8 : mword 5))
                           (sign_extend' 64 (mword_of_int 0xfcc : mword 12)) = pa_add (pa_stk sp0 7) 4)
@@ -1618,13 +1615,11 @@ Section ProofSysPause.
       iApply (wp_cj_s_sconf γ Φ (mword_of_int (KernelSyms.sys_pause + 0x8a))
                 (sign_extend' 21 (concat_vec (mword_of_int 1992 : mword 11) ('b"0")))
                 A1 (av - 8)%nat ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8a [-]").
-      iNext. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt1a : add_vec (mword_of_int (KernelSyms.sys_pause + 0x8a) : mword 64)
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1992 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.sys_pause + 0x1a)) by pcstep.
       iEval (rewrite Htgt1a) in "Hpc".
-      iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
       iApply ("Hacq" $! A1 (mword_of_int 0 : mword 32)
                 with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hctx Hsched Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }

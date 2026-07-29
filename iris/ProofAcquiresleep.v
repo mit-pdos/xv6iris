@@ -744,7 +744,7 @@ Section ProofAcquiresleep.
            opaque Definitions so their contents are untouched -- re-wrap only the
            scheduler valid-context. *)
         iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-        { iNext. iExact "Hsched". }
+        { iApply bi.later_intro. iExact "Hsched". }
         assert (Hbk : add_vec (mword_of_int (ASL + 0x26) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")))) = mword_of_int (ASL + 0x1c))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hbk) in "Hpc".
@@ -789,7 +789,7 @@ Section ProofAcquiresleep.
       iEval (rewrite Hv00) in "Hw0".
       (* iNext (from beqz-taken) strips [▷ sched_vc]; cpu_own/pay are opaque *)
       iAssert (▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj)%I with "[Hsched]" as "Hsched".
-      { iNext. iExact "Hsched". }
+      { iApply bi.later_intro. iExact "Hsched". }
       iApply ("Hexit" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRu Hw0 Hpid Hctx Hsched Hown Hpay Hcg Hpc").
       exact HaslMe.
     - (* HELD at entry: v0 <> 0 -> c.beqz falls through -> +0x1c (loop) *)
