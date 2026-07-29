@@ -98,22 +98,16 @@ both in `ProofVmfault.v`: `vf_ld80` was a verbatim copy of the existing
 `cshape_68a8` (the s1-based twin), and `vf_ld72` was already nothing but an
 alias for `cshape_653c`.  Net −90 lines.
 
-Two rules this sweep re-confirms:
+The two rules this sweep re-confirmed — grep the STATEMENT rather than the
+word, and diff every `*_<off>` instruction fact against HEAD afterwards — are
+now durable-notes' "decode-word dedup sweep" recipe, since they have held
+across two independent sweeps.
 
-- **grep the STATEMENT, not the word.**  Nothing here was offset-named, but
-  the shape lemmas were named per-function (`fa_`/`fs_`/`vf_`/`ec_ld80`), so
-  a word-keyed grep finds none of them.
-- **diff every `*_<off>` instruction fact against HEAD afterwards.**  All 510
-  statements across the eleven touched decode files came out identical; only
-  the decode lemma each is proved FROM changed.  A slip here is silent.
+## Who will consume these
 
-## Worklist
-
-- [x] specs, decode, both proofs, both links, `_CoqProject`, full build green.
-- [x] decode-word + shape-lemma dedup (above).
-- [ ] **The callers.**  Nothing in the tree consumes these yet.  The xv6
-      consumers are `consoleread`/`consolewrite` (which pass a literal 1, so
-      `user` instantiates to `true` and the premise is a `vm_compute`) and
-      `readi`/`writei`, which THREAD the flag — and therefore want it as a
-      ghost boolean of their own, which is exactly the shape these specs
-      take.
+Nothing in the tree does yet.  The xv6 callers are
+`consoleread`/`consolewrite`, which pass a literal 1 — so `user` instantiates
+to `true` and the flag premise is a `vm_compute` — and `readi`/`writei`,
+which THREAD the flag, and therefore want it as a ghost boolean of their own.
+That is exactly the shape these specs take, which is the argument for the
+ghost-boolean design surviving contact with its first real caller.
