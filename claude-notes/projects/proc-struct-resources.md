@@ -621,9 +621,32 @@ the evidence for every offset. This file is only the worklist.
            `Set Printing Depth 40` pinned it to the exact sentence in one
            run; pass the premise by name instead.
          - `SpecUvmfree` consumes `BarePt.bare_pt uroot um`, while
-           mappages hands back `ptree_own 2 1 t'` + `pt_rep0`.  A bridge
-           from the partially-grown tree to `bare_pt` is needed; `BarePt`'s
-           `uptg` axis is where to look.
+           mappages hands back `ptree_own 2 1 t'` + `pt_rep0`.  The bridge
+           is SMALL and it is the converse of `BarePt.bare_pt_empty_free`:
+           at tail #1 mappages failed with `k = 0`, so
+           `pt_insert_run ∅ … 0 = ∅` and the tree maps NOTHING —
+           `upt_pages_own ∅` is `emp` and `uptg_spec_of_rep0` supplies
+           `uptg_spec None uroot ∅ t'` from `pt_rep0 t' ∅` +
+           `pt_base t' = uroot`.  A handful of lines.
+
+         - **BUT TAIL #2 DOES NOT COMPOSE, AND THIS IS THE REAL REMAINING
+           OBSTACLE.**  After the SECOND mappages fails, proc_pagetable
+           calls `uvmunmap(pagetable, TRAMPOLINE, 1, 0)` before uvmfree —
+           and `SpecUvmunmap`'s range premise is
+           `uint va + npages*4096 <= uvm_maxsz` with
+           `uvm_maxsz = 2^38 - 8192`, while `TRAMPOLINE = 2^38 - 4096`.
+           That premise is not a technicality: it is what keeps every vpn
+           the loop clears different from `tramp_vpn` and `tf_vpn`, i.e.
+           what makes the table's spec survive the unmap.  Unmapping the
+           TRAMPOLINE entry itself is the one thing the contract is
+           deliberately built to forbid.
+           So a full uncounted proc_pagetable needs a THIRD uvmunmap
+           instance — a bare table, one page, at `tramp_vpn` — sealed off
+           the same `UvmunmapCore` proof.  Whether the loop's vpn reasoning
+           actually generalizes that far is the open question; check it
+           BEFORE committing to the rest of step 2.  If it does not, the
+           honest fallback is to leave proc_pagetable counted-only and give
+           `kfork` a budget, which pushes the same problem up one level.
          - `SpecUvmfree` requires `kalloc_env γa None` — it is stated only
            in the allocator's STEADY state, because freewalk's recursion
            returns a data-dependent number of pages and counting them is
