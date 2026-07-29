@@ -564,3 +564,8 @@ WpEitherCopyDecode.v
 ProofEitherCopy.v
 LinkEitherCopyout.v
 LinkEitherCopyin.v
+UartTxInv.v
+SpecUartwrite.v
+WpUartwriteDecode.v
+ProofUartwrite.v
+LinkUartwrite.v

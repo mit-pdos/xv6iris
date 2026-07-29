@@ -136,6 +136,14 @@ are working on that effort — the relevant `projects/` file.
   fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
   cursor and its `subw` pointer-difference return, and argstr's INLINED
   argaddr.
+- **[`uartwrite.md`](projects/uartwrite.md)** — uartwrite, the interrupt-driven
+  UART output path, PROVEN: the `tx_lock` invariant (`UartTxInv.v`) whose
+  implication "`tx_busy == 0` ⟹ everything accepted has been transmitted" is
+  what licenses a THR store with no THRE poll, why the transmitter token has to
+  live in that lock (and the resulting tension with uartputc_sync's caller-held
+  token), the `uart_sent_sub` SUBLIST output claim a driver that sleeps between
+  bytes can honestly make, and the induction-over-iLöb loop nest with its
+  `∧`-paired exits. Remaining: uartintr, consolewrite, boot wiring.
 - **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
   machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
   the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
