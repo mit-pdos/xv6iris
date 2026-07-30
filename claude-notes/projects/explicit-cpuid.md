@@ -201,6 +201,19 @@ hart-generic handler fact statable *without* a recursive definition —
 `□ ∀ c : CPU, ∃ h, intr_inv (CID := c) h` is persistent and hart-independent,
 so it survives a trap for free and `intr_handler_spec` never has to return it.
 
+## What the refactor has caught so far
+
+**`cpuid()` / `mycpu()` were silently over-specified.** Their contracts said the
+returned id is the ENTRY hart's. The `tp` read happens mid-function, so with
+interrupts enabled that is simply false — the value is the id of whichever hart
+ran that one instruction. xv6 documents the requirement in a comment
+("Interrupts must be disabled", proc.c above `mycpu`); the refactor turns it
+into a premise, and both contracts are now stated at `b = false`. Under the old
+ambient-`CpuId` shape this was not statable, let alone checkable.
+
+This is the refactor paying for itself: the falsehood was invisible before, and
+would have stayed invisible until `kerneltrap` was proved.
+
 ## Staging (the key economy)
 
 **The new leaf statements are strictly WEAKER than the current ones** — a

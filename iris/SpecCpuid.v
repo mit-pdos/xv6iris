@@ -45,8 +45,17 @@ Proof.
   exact (sext32_id_hart cid_word H).
 Qed.
 
+  (* INTERRUPTS MUST BE DISABLED -- xv6 says so in as many words above
+     mycpu() ("Interrupts must be disabled"), and the explicit-cpuid refactor
+     turns that comment into a premise.  The [tp] read happens MID-function, so
+     with interrupts enabled a migration before it would have the instruction
+     read the RESUMING hart's tp: the returned id would be neither the entry
+     hart's nor the exit hart's, and no [let] outside the continuation can name
+     it.  At [b = false] no trap is taken, the hart cannot move, and the id is
+     the entry hart's -- so the contract is stated at [false] and needs no
+     [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
 Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -58,22 +67,30 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      id regardless of which hart the continuation resumes on. *)
   let cret := cpuid_ret (rget m0 tp_idx) in
   (2 <= n)%nat ->
-  sie_cap_gpr m0 n b -∗
+  sie_cap_gpr m0 n false -∗
   kernel_text -∗ pc_is pcE -∗
-  wp_next b (fun (CID : CpuId) =>
     ∀ m' : regfile,
-    sie_cap_gpr m' n b -∗
+    sie_cap_gpr m' n false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = cret ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }} -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 (* the JAL-call form (mirror of [wp_call_mycpu_sconf_cs]): a caller at [P] with
    [instr P false (JAL (jimm, ra))] whose target is [cpuid] runs the callee and
    returns to [P+4]. *)
+  (* INTERRUPTS MUST BE DISABLED -- xv6 says so in as many words above
+     mycpu() ("Interrupts must be disabled"), and the explicit-cpuid refactor
+     turns that comment into a premise.  The [tp] read happens MID-function, so
+     with interrupts enabled a migration before it would have the instruction
+     read the RESUMING hart's tp: the returned id would be neither the entry
+     hart's nor the exit hart's, and no [let] outside the continuation can name
+     it.  At [b = false] no trap is taken, the hart cannot move, and the id is
+     the entry hart's -- so the contract is stated at [false] and needs no
+     [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
 Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (b : bool) :=
+    (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -85,25 +102,24 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   add_vec P (sign_extend' 64 jimm) = pcE ->
   eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n false -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-  wp_next b (fun (CID : CpuId) =>
     ∀ mo,
-    sie_cap_gpr mo n b -∗
+    sie_cap_gpr mo n false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
       mo !!! Regidx a0_idx = cret ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }} -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool),
-      wp_cpuid_sconf_body Φ m0 n b.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
+      wp_cpuid_sconf_body Φ m0 n.
   Parameter wp_call_cpuid_sconf_cs :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (b : bool),
-      wp_call_cpuid_sconf_cs_body Φ P jimm m n b.
+      (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat),
+      wp_call_cpuid_sconf_cs_body Φ P jimm m n.
 End CPUID.

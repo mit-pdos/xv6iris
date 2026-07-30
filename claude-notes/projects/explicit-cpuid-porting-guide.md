@@ -203,6 +203,26 @@ is the open design question in `explicit-cpuid.md`, to be settled against
 actually changes), so it is easy to build consumers that violate it and only
 find out at Stage 2. Don't.
 
+## A function that READS tp mid-body must be stated at `b = false`
+
+`cpuid()` / `mycpu()` are the case. The `c.mv a0,tp` executes in the MIDDLE of
+the function, so with interrupts enabled a migration before it has the
+instruction read the RESUMING hart's tp: the value returned is the id of
+whichever hart executed that one instruction — neither the entry hart's nor the
+exit hart's, and no `let` outside the continuation can name it. A contract that
+says `a0 = cpuid_ret (rget m0 tp_idx)` is therefore FALSE at Stage 2, and
+provable at Stage 1 only because no migration actually happens yet.
+
+xv6 already knew: `mycpu()` carries the comment "Interrupts must be disabled."
+This refactor turns that comment into a premise. Such contracts drop the `b`
+binder entirely and are stated at `false` — and then need no `wp_next` wrapper
+at all, since `wp_next_off` would collapse it, so they read exactly as they did
+before the refactor.
+
+**Generalize the test:** if a function's postcondition names a value READ from
+a per-hart source mid-body, it belongs at `b = false`. If it only threads
+per-hart resources through without reading one, it can stay `b`-generic.
+
 ## Discharge gotchas (all found the hard way)
 
 - **`$!` cannot skip an intervening wand or nested `∀`.** `iApply ("Hcont" $!
