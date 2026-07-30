@@ -143,6 +143,25 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      shared-kernel-table sweep (claude-notes/completed/kpt-share.md) needs
      every hart to flip its own bit at its own kvminithart. *)
   strans_name : CPU -> gname;
+  (* the SIE ghost, CANONICALLY per hart -- the same shape as [strans_name],
+     and for the same reason: mstatus.SIE is a per-hart register, so which
+     value a hart's SIE choreography (1/2 live-bit tie + 1/4 kernel-code token
+     + 1/4 invariant, IntrDefs.v §2) is at is a per-hart fact.
+
+     Making the name CANONICAL rather than an explicit parameter is what lets
+     the whole sconf tier -- [sconf] / [sie_cap] / [sie_cap_gpr] / [sie_arm] /
+     [intr_count] / [intr_off_tok] / [intr_inv] / [intr_handler_avail] -- drop
+     its [γ] argument entirely: the hart determines the ghost.  In particular a
+     step's continuation then quantifies only the HART (WpNext.v), and every
+     parking contract's [∀ h g] collapses to [∀ h].
+
+     NOT canonical, and deliberately so: the per-trap ghost [ProofKernelvec.v]
+     mints for the handler's own SIE tie.  During a trap the live bit is 0
+     while the interrupted thread's half still reads 1, so those two cannot
+     share a name; [wp_kernelvec] takes a raw [ghost_var γ (1/2) _] and stays
+     parameterized.  The functor instance comes from [sieG] at the use sites,
+     for the same reason spelled out for [strans_name] above. *)
+  sie_name : CPU -> gname;
 }.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is

@@ -5,22 +5,26 @@
    step ENGINES and imports high-altitude machinery no leaf may pull):
 
      - the SIE ghost choreography (1/2 live-bit tie + 1/4 kernel-code
-       token + 1/4 invariant quarter): [sie_ghost_alloc]/[sie_ghost_flip];
+       token + 1/4 invariant quarter): [sie_ghost_alloc]/[sie_ghost_flip].
+       The NAME is CANONICAL per hart -- [sie_gname] = [sie_name cpu_id]
+       (RiscvPtsto.v) -- which is why nothing in the sconf tier below takes
+       a ghost argument: the ambient hart determines the ghost;
      - the interrupts-ENABLED regime: [intr_ms_facts], [intr_config],
        [intr_frame] (+[intr_frame_retarget]), [intr_handler_spec],
        [intr_inv] (+allocation);
      - the SIE-AGNOSTIC v2 bundle (the smode_config successor):
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
        (SIE unpinned, ghost half tied to the live bit, menvcfg bundled),
-       the kernel-code capability [sie_cap γ m avail] -- the
+       the kernel-code capability [sie_cap m avail] -- the
        [kv_frame_slots + avail] free-stack slots below sp (sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
        SLOT [strans_inv] (Bare-with-stvec ∨ ∃root kernel-PT, consumed
        foldedly via the derived regime [strans_regime]), and the SIE arm
-       ('0' = the bare eighth; '1' adds the interrupt invariant + trap
-       CSRs); the ambient bundle [sie_cap_gpr] = hart_state ∗ sconf ∗
-       sie_cap ∗ gpr_file;
-     - the push/pop counting token [intr_count γ n eb] (§6b: eb = the
+       INDEX [sie_arm b] (b = false: the bare eighth; b = true adds the
+       interrupt invariant + trap CSRs); the ambient bundle
+       [sie_cap_gpr m avail b] = hart_state ∗ sconf ∗ sie_cap ∗
+       gpr_file (tp_pin m);
+     - the push/pop counting token [intr_count n eb] (§6b: eb = the
        saved base-enable state; eb=true payload is the persistent
        [intr_handler_avail]; the trap CSRs ride [trap_csrs_pay] on
        unbalanced specs only);
@@ -36,7 +40,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
 Require Import KptPt.
 Require Import MinstretInv InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
 Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *)
@@ -122,6 +126,25 @@ Section IntrDefs.
   (* token) + 1/4 (invariant).                                            *)
   (* =================================================================== *)
 
+  (* THE SIE GHOST NAME OF THE AMBIENT HART.  Canonical, exactly like
+     [reg_name] / [strans_name]: mstatus.SIE is a per-hart register, so which
+     value the choreography is at is a per-hart fact and the hart DETERMINES
+     the ghost.  That is what lets every resource below ([sconf], [sie_cap],
+     [sie_cap_gpr], [sie_arm], [intr_inv], [intr_count], [intr_off_tok],
+     [intr_handler_avail], [intr_restore], [intr_config]) be stated with no
+     ghost argument at all, and what lets a step's continuation (WpNext.v)
+     rebind the ghost by rebinding [CID] alone.
+
+     (Written without an explicit [`{CID : CpuId}] binder because the section
+     already fixes one and Rocq refuses to rebind a section variable's name;
+     the section closes it over exactly [riscvGS] and [CpuId] regardless.) *)
+  Definition sie_gname : gname := sie_name cpu_id.
+
+  (* [sie_ghost_alloc] / [sie_ghost_flip]* stay GHOST-GENERIC: they are
+     statements about a raw [ghost_var], with no sconf-tier resource in
+     sight, and one of their consumers (the per-trap tie ProofKernelvec.v
+     mints) is deliberately NOT the canonical name.  Callers in the sconf
+     tier instantiate them at [sie_gname]. *)
   Lemma sie_ghost_alloc (v : mword 1) :
     ⊢ |==> ∃ γ : gname,
         ghost_var γ (1/2) v ∗ ghost_var γ (1/4) v ∗ ghost_var γ (1/4) v.
@@ -198,12 +221,12 @@ Section IntrDefs.
   (* σ-callback (exactly as in [wp_exec_step_hart_active_inv]), so it     *)
   (* travels beside the bundle.                                           *)
   (* =================================================================== *)
-  Definition intr_config (γ : gname) : iProp Σ :=
+  Definition intr_config : iProp Σ :=
     (hw_config ∗ minstret_inv ∗
      cur_privilege ↦ᵣ Supervisor ∗
      (∃ ms : mword 64,
         mstatus ↦ᵣ ms ∗
-        ghost_var γ (1/2) (_get_Mstatus_SIE ms) ∗
+        ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         ⌜ intr_ms_facts ms ⌝) ∗
      (∃ mie_v mdv0 : mword 64,
         mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
@@ -323,31 +346,31 @@ Section IntrDefs.
 
   Definition intrN : namespace := nroot .@ "intr".
 
-  Definition intr_inv_body (γ : gname) (handler : mword 64) : iProp Σ :=
+  Definition intr_inv_body (handler : mword 64) : iProp Σ :=
     (∃ b : mword 1,
-       ghost_var γ (1/4) b ∗
+       ghost_var sie_gname (1/4) b ∗
        stvec ↦ᵣ handler ∗
        □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ intr_handler_spec handler))%I.
 
-  Definition intr_inv (γ : gname) (handler : mword 64) : iProp Σ :=
+  Definition intr_inv (handler : mword 64) : iProp Σ :=
     (⌜ trapVectorMode_forwards (_get_Mtvec_Mode handler) = TV_Direct ⌝ ∗
      ⌜ stvec_base handler = handler ⌝ ∗
-     inv intrN (intr_inv_body γ handler))%I.
+     inv intrN (intr_inv_body handler))%I.
 
-  Global Instance intr_inv_persistent γ handler :
-    Persistent (intr_inv γ handler).
+  Global Instance intr_inv_persistent handler :
+    Persistent (intr_inv handler).
   Proof. apply _. Qed.
 
-  Lemma intr_inv_alloc E (γ : gname) (b : mword 1) (handler : mword 64) :
+  Lemma intr_inv_alloc E (b : mword 1) (handler : mword 64) :
     trapVectorMode_forwards (_get_Mtvec_Mode handler) = TV_Direct ->
     stvec_base handler = handler ->
-    ghost_var γ (1/4) b -∗
+    ghost_var sie_gname (1/4) b -∗
     stvec ↦ᵣ handler -∗
     □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ intr_handler_spec handler) ={E}=∗
-    intr_inv γ handler.
+    intr_inv handler.
   Proof.
     iIntros (Htvd Hsb) "Hq Hstv #Hspec".
-    iMod (inv_alloc intrN E (intr_inv_body γ handler)
+    iMod (inv_alloc intrN E (intr_inv_body handler)
             with "[Hq Hstv]") as "#Hi".
     { iNext. rewrite /intr_inv_body. iExists b. iFrame "Hq Hstv". iExact "Hspec". }
     iModIntro. iSplit; [done |]. iSplit; [done |]. iExact "Hi".
@@ -355,15 +378,15 @@ Section IntrDefs.
 
   (* allocation with interrupts DISABLED needs no handler spec: the guarded
      implication is vacuous. *)
-  Lemma intr_inv_alloc_off E (γ : gname) (handler : mword 64) :
+  Lemma intr_inv_alloc_off E (handler : mword 64) :
     trapVectorMode_forwards (_get_Mtvec_Mode handler) = TV_Direct ->
     stvec_base handler = handler ->
-    ghost_var γ (1/4) ('b"0" : mword 1) -∗
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     stvec ↦ᵣ handler ={E}=∗
-    intr_inv γ handler.
+    intr_inv handler.
   Proof.
     iIntros (Htvd Hsb) "Hq Hstv".
-    iApply (intr_inv_alloc E γ _ handler Htvd Hsb with "Hq Hstv").
+    iApply (intr_inv_alloc E _ handler Htvd Hsb with "Hq Hstv").
     iModIntro. iIntros (Hb).
     exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
     vm_compute in Hb. discriminate.
@@ -373,15 +396,15 @@ Section IntrDefs.
   (* §6 THE V2 BUNDLE [sconf]: the SIE-AGNOSTIC smode_config successor.   *)
   (* [intr_config] + the menvcfg conjunct, SIE unpinned; full ownership   *)
   (* (the trap writes its cells); the trap CSRs are NOT bundled (they     *)
-  (* ride in [sie_cap]'s '1' arm -- SIE=0 code owns sepc explicitly).     *)
+  (* ride in [sie_cap]'s [b = true] arm -- SIE=0 code owns sepc itself).  *)
   (* [hart_state] travels beside the bundle, as in [intr_config].         *)
   (* =================================================================== *)
-  Definition sconf (γ : gname) : iProp Σ :=
+  Definition sconf : iProp Σ :=
     (hw_config ∗ minstret_inv ∗
      cur_privilege ↦ᵣ Supervisor ∗
      (∃ ms : mword 64,
         mstatus ↦ᵣ ms ∗
-        ghost_var γ (1/2) (_get_Mstatus_SIE ms) ∗
+        ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         ⌜ sconf_ms_facts ms ⌝) ∗
      (∃ mie_v mdv0 : mword 64,
         mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
@@ -394,18 +417,18 @@ Section IntrDefs.
         ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝ ∗
         ⌜ menvcfg0 = MENVCFG_S ⌝))%I.
 
-  (* [sie_cap] -- the kernel-code capability that DISCRIMINATES the SIE
-     mode by the ghost QUARTER's value (agreement with [sconf]'s tied
-     half pins the live bit).  It owns ALL the free stack below the
-     CURRENT sp -- [kv_frame_slots + avail] slots, factored OUT of the
-     disjunction and held at BOTH arms (harmless: the ABI never writes
+  (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
+     its index [b], backed by the ghost QUARTER's value (agreement with
+     [sconf]'s tied half pins the live bit).  It owns ALL the free stack
+     below the CURRENT sp -- [kv_frame_slots + avail] slots, factored OUT
+     of the arm and held at BOTH indices (harmless: the ABI never writes
      below sp).  [avail] is the number of slots AVAILABLE to kernel code;
      the other [kv_frame_slots] are reserved for a potential interrupt
      frame.  An sp DECREMENT by k slots consumes k from [avail] (k <=
      avail -- you cannot go below zero) and hands the freed frame region
      [sp', sp) to the client ([sie_cap_push]); an sp INCREMENT feeds the
-     frame back and returns k to [avail] ([sie_cap_pop]).  The '1' arm
-     carries the remaining extra obligations of interrupts-enabled
+     frame back and returns k to [avail] ([sie_cap_pop]).  The [b = true]
+     arm carries the remaining extra obligations of interrupts-enabled
      execution: the interrupt invariant (handler existential -- no client
      names the handler) and the trap-scratch CSRs (any trap scribbles
      them, so enabled code cannot pin their values). *)
@@ -413,18 +436,40 @@ Section IntrDefs.
      matching csrsi restore, kernel code holds this eighth; agreement
      with the capability's eighth (or the bundle's tied half) pins the
      arm at '0' wherever the token travels -- pop_off-style code needs
-     exactly this to refute its own panic checks.  At the '1' arm the
-     capability holds the FULL quarter (no token outstanding). *)
-  Definition intr_off_tok (γ : gname) : iProp Σ :=
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1).
+     exactly this to refute its own panic checks.  At the [b = true] arm
+     the capability holds the FULL quarter (no token outstanding). *)
+  Definition intr_off_tok : iProp Σ :=
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1).
 
-  Definition sie_arm (γ : gname) : iProp Σ :=
-    (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∨
-     (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
-      (∃ handler : mword 64, intr_inv γ handler) ∗
+  (* THE SIE ARM IS AN INDEX, NOT AN INTERNAL DISJUNCTION.  It used to be
+     [A ∨ B], which made every leaf SIE-agnostic at the price of hiding the
+     one fact a leaf statement now has to expose: whether an interrupt can be
+     taken at this instruction, and therefore whether execution can resume on
+     a DIFFERENT hart.  The old form is recoverable as [∃ b, sie_arm b], and
+     a leaf's case split on the disjunction becomes a case split on [b], so
+     nothing inside the leaves changed shape.  See [wp_next]. *)
+  Definition sie_arm (b : bool) : iProp Σ :=
+    (if b
+     then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+           (∃ handler : mword 64, intr_inv handler) ∗
+           (∃ v : mword 64, sepc ↦ᵣ v) ∗
+           (∃ v : mword 64, scause ↦ᵣ v) ∗
+           (∃ v : mword 64, stval ↦ᵣ v))
+     else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+
+  Lemma sie_arm_of_ex :
+    (∃ b : bool, sie_arm b) ⊣⊢
+    (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
+     (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+      (∃ handler : mword 64, intr_inv handler) ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
-      (∃ v : mword 64, stval ↦ᵣ v)))%I.
+      (∃ v : mword 64, stval ↦ᵣ v))).
+  Proof.
+    iSplit.
+    - iIntros "H". iDestruct "H" as ([]) "H"; [ iRight | iLeft ]; iExact "H".
+    - iIntros "[H|H]"; [ iExists false | iExists true ]; iExact "H".
+  Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread
@@ -590,10 +635,23 @@ Section IntrDefs.
   Lemma strans_regime_inv : sr_inv strans_regime ⊣⊢ strans_inv.
   Proof. reflexivity. Qed.
 
-  Definition sie_cap (γ : gname) (m : regfile) (avail : nat) : iProp Σ :=
+  Definition sie_cap (m : regfile) (avail : nat) (b : bool) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
      strans_inv ∗
-     sie_arm γ)%I.
+     sie_arm b)%I.
+
+  (* THE WRITE-SIDE PREMISE of every gpr-writing leaf.  Replaces the old
+     [rd <> csp_rs1] IN PLACE (same premise slot, so no call site changes
+     arity): [sie_cap] is keyed on sp, and the register file pins tp
+     (HartTp.v), so neither may be a generic write's destination.  Discharge
+     with [ltac:(rdok)] wherever [ltac:(vm_compute; discriminate)] used to sit. *)
+  Definition rd_ok (rd : mword 5) : Prop :=
+    rd <> csp_rs1 /\ Regidx rd <> Regidx Rtp.
+
+  Lemma rd_ok_sp (rd : mword 5) : rd_ok rd -> rd <> csp_rs1.
+  Proof. by intros [H _]. Qed.
+  Lemma rd_ok_tp (rd : mword 5) : rd_ok rd -> Regidx rd <> Regidx Rtp.
+  Proof. by intros [_ H]. Qed.
 
   (* [sie_cap_gpr] bundles [sie_cap] with the register file [gpr_file m], so a
      caller threads ONE resource carrying the register file [m] once, instead of
@@ -619,57 +677,63 @@ Section IntrDefs.
      UNWRITTEN stvec cell (no trap handler installed), the translation
      slot's Bare arm-bit half [strans_bit ('b"0")] (its twin is kept boot
      side as the still-Bare receipt), and the SIE ghost's kernel-code
-     eighth at '0'.  Nothing here requires the
+     eighth at '0' -- i.e. the capability comes out at the [b = false]
+     arm, interrupts off.  Nothing here requires the
      kernel page table, an interrupt handler, or the trap CSRs: this is
      what makes the whole sconf-tier (memset, the lock/kalloc cone via
      [cpu_own γ 0 false p C], ...) callable during early boot. *)
-  Lemma sie_cap_intro_bare (γ : gname) (m : regfile) (avail : nat)
+  Lemma sie_cap_intro_bare (m : regfile) (avail : nat)
       (v : mword 64) :
     stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) -∗
     strans_bit ('b"0") -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
-    sie_cap γ m avail.
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    sie_cap m avail false.
   Proof.
     iIntros "Hstk Hbit Hb Hstv Htok".
     iFrame "Hstk".
     iSplitL "Hbit Hb Hstv".
     { iApply (strans_inv_intro_bare with "Hbit Hb Hstv"). }
-    iLeft. iExact "Htok".
+    rewrite /sie_arm. iExact "Htok".
   Qed.
 
-  Definition sie_cap_gpr (γ : gname)
-      (m : regfile) (avail : nat) : iProp Σ :=
+  (* NOTE [gpr_file (tp_pin m)]: the bundle owns this hart's registers, whose
+     [tp] is [cid_word_of cpu_id] -- the map's [tp] slot is ignored (HartTp.v).
+     That is what lets a migration hand back the SAME map [m] at the new hart
+     instead of an [rf_upd m Rtp …] layer per instruction. *)
+  Definition sie_cap_gpr
+      (m : regfile) (avail : nat) (b : bool) : iProp Σ :=
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
-     sconf γ ∗
-     sie_cap γ m avail ∗
-     gpr_file m)%I.
+     sconf ∗
+     sie_cap m avail b ∗
+     gpr_file (tp_pin m))%I.
 
-  Global Instance sie_cap_gpr_into_sep γ m avail :
-    IntoSep (sie_cap_gpr γ m avail)
+  Global Instance sie_cap_gpr_into_sep m avail b :
+    IntoSep (sie_cap_gpr m avail b)
             (hart_state ↦ᵣ HART_ACTIVE tt)
-            (sconf γ ∗ sie_cap γ m avail ∗ gpr_file m).
+            (sconf ∗ sie_cap m avail b ∗ gpr_file (tp_pin m)).
   Proof. rewrite /IntoSep /sie_cap_gpr. by iIntros "($ & $ & $ & $)". Qed.
 
-  Global Instance sie_cap_gpr_from_sep γ m avail :
-    FromSep (sie_cap_gpr γ m avail)
+  Global Instance sie_cap_gpr_from_sep m avail b :
+    FromSep (sie_cap_gpr m avail b)
             (hart_state ↦ᵣ HART_ACTIVE tt)
-            (sconf γ ∗ sie_cap γ m avail ∗ gpr_file m).
+            (sconf ∗ sie_cap m avail b ∗ gpr_file (tp_pin m)).
   Proof. rewrite /FromSep /sie_cap_gpr. by iIntros "[$ [$ [$ $]]]". Qed.
 
   (* Foolproof split/join for the ports (no instance-resolution surprises). *)
-  Lemma sie_cap_gpr_split γ m avail :
-    sie_cap_gpr γ m avail -∗
-    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf γ ∗ sie_cap γ m avail ∗ gpr_file m.
+  Lemma sie_cap_gpr_split m avail b :
+    sie_cap_gpr m avail b -∗
+    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ sie_cap m avail b ∗
+    gpr_file (tp_pin m).
   Proof. by iIntros "$". Qed.
 
-  Lemma sie_cap_gpr_join γ m avail :
+  Lemma sie_cap_gpr_join m avail b :
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    sconf γ -∗
-    sie_cap γ m avail -∗
-    gpr_file m -∗
-    sie_cap_gpr γ m avail.
+    sconf -∗
+    sie_cap m avail b -∗
+    gpr_file (tp_pin m) -∗
+    sie_cap_gpr m avail b.
   Proof. iIntros "Hhs Hsc Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
 
   (* [hw_config] is persistent and rides at the head of [sconf]; a
@@ -677,13 +741,13 @@ Section IntrDefs.
      bundle intact) whenever it needs the ambient static-claims bundle for a
      ghost conversion between instructions (e.g. the walk's kalloc-page ->
      PT-node ↦ₘ→↦ₚ disassembly, which needs [kmap_static_claims]). *)
-  Lemma sie_cap_gpr_dup_hw_config γ m avail :
-    sie_cap_gpr γ m avail -∗ hw_config ∗ sie_cap_gpr γ m avail.
+  Lemma sie_cap_gpr_dup_hw_config m avail b :
+    sie_cap_gpr m avail b -∗ hw_config ∗ sie_cap_gpr m avail b.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
     iEval (rewrite /sconf) in "Hsc". iDestruct "Hsc" as "(#Hhw & Hrest)".
-    iAssert (sconf γ) with "[Hrest]" as "Hsc".
+    iAssert (sconf) with "[Hrest]" as "Hsc".
     { rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"]. }
     iSplitR; [iExact "Hhw"|].
     rewrite /sie_cap_gpr.
@@ -700,8 +764,8 @@ Section IntrDefs.
      copy of the bundle in its own geometry resource.  Both are persistent
      conclusions and CONSUME NOTHING -- the bundle is handed straight back, so
      the call is [iDestruct (… with "Hcg") as "[#Hkm Hcg]"]. *)
-  Lemma sconf_kmap_claims γ :
-    sconf γ -∗ kmap_static_claims ∗ sconf γ.
+  Lemma sconf_kmap_claims :
+    sconf -∗ kmap_static_claims ∗ sconf.
   Proof.
     iIntros "Hsc".
     iEval (rewrite /sconf) in "Hsc". iDestruct "Hsc" as "(#Hhw & Hrest)".
@@ -710,8 +774,8 @@ Section IntrDefs.
     rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"].
   Qed.
 
-  Lemma sie_cap_gpr_kmap_claims γ m avail :
-    sie_cap_gpr γ m avail -∗ kmap_static_claims ∗ sie_cap_gpr γ m avail.
+  Lemma sie_cap_gpr_kmap_claims m avail b :
+    sie_cap_gpr m avail b -∗ kmap_static_claims ∗ sie_cap_gpr m avail b.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
@@ -721,27 +785,33 @@ Section IntrDefs.
 
   (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof
      threading [sie_cap_gpr] can read the map's x0 slot and keep the bundle. *)
-  Lemma sie_cap_gpr_x0 γ m avail (i : mword 5) :
+  Lemma sie_cap_gpr_x0 m avail b (i : mword 5) :
     uint i = 0 ->
-    sie_cap_gpr γ m avail -∗
-    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr γ m avail.
+    sie_cap_gpr m avail b -∗
+    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr m avail b.
   Proof.
     intro Hi. iIntros "Hcg".
+    (* x0 is not tp, so the pinned file's x0 slot IS the map's. *)
+    assert (Hne : Regidx i <> Regidx Rtp).
+    { intro He. injection He as He2. rewrite He2 in Hi.
+      vm_compute in Hi. discriminate. }
+    pose proof (rget_ne m i Hne) as Hr. unfold rget in Hr.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct (gpr_file_x0 m i Hi with "Hfile") as "[%Hx Hfile]".
+    iDestruct (gpr_file_x0 (tp_pin m) i Hi with "Hfile") as "[%Hx Hfile]".
+    rewrite Hr in Hx.
     iSplitR; [ iPureIntro; exact Hx | ].
     iApply (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile").
   Qed.
 
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
-  Lemma sie_cap_acc (γ : gname)
-      (m : regfile) (avail : nat) :
-    sie_cap γ m avail ⊣⊢
+  Lemma sie_cap_acc
+      (m : regfile) (avail : nat) (b : bool) :
+    sie_cap m avail b ⊣⊢
     stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
     strans_inv ∗
-    sie_arm γ.
+    sie_arm b.
   Proof.
     rewrite /sie_cap stack_own_app. iSplit.
     - iIntros "[[Hkv Hdeep] [Htr Harm]]". iFrame.
@@ -749,10 +819,10 @@ Section IntrDefs.
   Qed.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
-  Lemma sie_cap_retarget (γ : gname)
-      (m m' : regfile) (avail : nat) :
+  Lemma sie_cap_retarget
+      (m m' : regfile) (avail : nat) (b : bool) :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    sie_cap γ m avail -∗ sie_cap γ m' avail.
+    sie_cap m avail b -∗ sie_cap m' avail b.
   Proof.
     iIntros (Hsp) "(Hstk & Htr & Harm)". iFrame "Htr Harm". rewrite Hsp. iExact "Hstk".
   Qed.
@@ -762,12 +832,12 @@ Section IntrDefs.
      can't-go-below-zero check) and the freed frame region [sp', sp) --
      the top k slots, ABOVE the new sp and therefore trap-stable --
      comes OUT for the client. *)
-  Lemma sie_cap_push (γ : gname)
-      (m m' : regfile) (avail k : nat) :
+  Lemma sie_cap_push
+      (m m' : regfile) (avail k : nat) (b : bool) :
     (k <= avail)%nat ->
     m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
-    sie_cap γ m avail -∗
-    sie_cap γ m' (avail - k) ∗ stack_own (m !!! Regidx csp_rs1) k.
+    sie_cap m avail b -∗
+    sie_cap m' (avail - k) b ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
     iIntros (Hk Hsp') "(Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + avail)%nat
@@ -779,12 +849,12 @@ Section IntrDefs.
   (* sp INCREMENT by k slots (sp' = sp + 8k, an epilogue's frame
      release): the function's frame [sp, sp') = the top k slots at sp'
      is fed back IN and k returns to [avail]. *)
-  Lemma sie_cap_pop (γ : gname)
-      (m m' : regfile) (avail k : nat) :
+  Lemma sie_cap_pop
+      (m m' : regfile) (avail k : nat) (b : bool) :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
     stack_own (m' !!! Regidx csp_rs1) k -∗
-    sie_cap γ m avail -∗
-    sie_cap γ m' (avail + k).
+    sie_cap m avail b -∗
+    sie_cap m' (avail + k) b.
   Proof.
     iIntros (Hsp) "Hframe (Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + (avail + k))%nat
@@ -794,22 +864,22 @@ Section IntrDefs.
 
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
-  Lemma sie_cap_grow (γ : gname)
-      (m : regfile) (avail k : nat) :
+  Lemma sie_cap_grow
+      (m : regfile) (avail k : nat) (b : bool) :
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
-    sie_cap γ m avail -∗
-    sie_cap γ m (avail + k).
+    sie_cap m avail b -∗
+    sie_cap m (avail + k) b.
   Proof.
     iIntros "Hdeep (Hstk & Htr & Harm)". iFrame "Htr Harm".
     rewrite Nat.add_assoc. iApply stack_own_app. iFrame "Hstk Hdeep".
   Qed.
 
   (* ... and release the k deepest slots back out. *)
-  Lemma sie_cap_shrink (γ : gname)
-      (m : regfile) (avail k : nat) :
+  Lemma sie_cap_shrink
+      (m : regfile) (avail k : nat) (b : bool) :
     (k <= avail)%nat ->
-    sie_cap γ m avail -∗
-    sie_cap γ m (avail - k) ∗
+    sie_cap m avail b -∗
+    sie_cap m (avail - k) b ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
   Proof.
     iIntros (Hk) "(Hstk & Htr & Harm)". iFrame "Htr Harm".
@@ -820,7 +890,7 @@ Section IntrDefs.
   Qed.
 
   (* =================================================================== *)
-  (* §6b THE PUSH/POP COUNTING TOKEN.  [intr_count γ n eb] is the       *)
+  (* §6b THE PUSH/POP COUNTING TOKEN.  [intr_count n eb] is the       *)
   (* per-cpu interrupt-disable bookkeeping token push_off/pop_off manage *)
   (* (n mirrors the noff nesting depth; [eb] is xv6's saved intena --    *)
   (* the BASE enable state recorded at the 0→1 push).  It carries the    *)
@@ -834,7 +904,7 @@ Section IntrDefs.
   (* re-enable flip consumes.  At eb = false the token is JUST the       *)
   (* eighth: push_off/pop_off from an interrupts-disabled base state are *)
   (* no-ops on SIE and need no handler, no stvec, no trap CSRs -- the    *)
-  (* early-boot discipline ([intr_count γ 0 false] = [intr_off_tok γ]).  *)
+  (* early-boot discipline ([intr_count 0 false] = [intr_off_tok]).  *)
   (* =================================================================== *)
   Definition sie_bit (eb : bool) : mword 1 := if eb then 'b"1" else 'b"0".
 
@@ -842,13 +912,13 @@ Section IntrDefs.
      is installed and its contract is available.  Persistent (intr_inv and
      the □ handler spec both are), hence duplicable -- a crossing retune
      (sched's intena restore) can drop or re-duplicate it freely. *)
-  Definition intr_handler_avail (γ : gname) : iProp Σ :=
+  Definition intr_handler_avail : iProp Σ :=
     (∃ handler : mword 64,
-        intr_inv γ handler ∗
+        intr_inv handler ∗
         ▷ intr_handler_spec handler)%I.
 
-  Global Instance intr_handler_avail_persistent γ :
-    Persistent (intr_handler_avail γ).
+  Global Instance intr_handler_avail_persistent :
+    Persistent (intr_handler_avail).
   Proof. rewrite /intr_handler_avail. apply _. Qed.
 
   (* the LINEAR half: the trap-scratch CSRs.  They live in the SIE arm's
@@ -868,46 +938,46 @@ Section IntrDefs.
      | S _ => emp
      end)%I.
 
-  Definition intr_restore (γ : gname) : iProp Σ :=
-    (intr_handler_avail γ ∗ trap_csrs)%I.
+  Definition intr_restore : iProp Σ :=
+    (intr_handler_avail ∗ trap_csrs)%I.
 
-  Definition intr_count (γ : gname) (n : nat) (eb : bool) : iProp Σ :=
+  Definition intr_count (n : nat) (eb : bool) : iProp Σ :=
     match n with
-    | O => ghost_var γ (1/4/2)%Qp (sie_bit eb)
-    | S _ => (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗
-              (if eb then intr_handler_avail γ else emp))%I
+    | O => ghost_var sie_gname (1/4/2)%Qp (sie_bit eb)
+    | S _ => (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗
+              (if eb then intr_handler_avail else emp))%I
     end.
 
   (* crossing retunes (the sched intena restore): the payload is
      persistent-or-empty, so both directions are loss-free. *)
-  Lemma intr_count_retune_off (γ : gname) (n : nat) (eb : bool) :
-    intr_count γ (S n) eb -∗ intr_count γ (S n) false.
+  Lemma intr_count_retune_off (n : nat) (eb : bool) :
+    intr_count (S n) eb -∗ intr_count (S n) false.
   Proof. iIntros "[Htok _]". iFrame. Qed.
 
-  Lemma intr_count_retune_on (γ : gname) (n : nat) (eb : bool) :
-    intr_handler_avail γ -∗
-    intr_count γ (S n) eb -∗ intr_count γ (S n) true.
+  Lemma intr_count_retune_on (n : nat) (eb : bool) :
+    intr_handler_avail -∗
+    intr_count (S n) eb -∗ intr_count (S n) true.
   Proof. iIntros "#Ha [Htok _]". iFrame "Htok Ha". Qed.
 
   (* enter the boot discipline: base state OFF, nothing but the eighth *)
-  Lemma intr_count_init_off (γ : gname) :
-    intr_off_tok γ -∗ intr_count γ 0 false.
+  Lemma intr_count_init_off :
+    intr_off_tok -∗ intr_count 0 false.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* n > 0 implies interrupts disabled: any fraction of '0' pins the arm *)
-  Lemma intr_count_pos_off (γ : gname) (n : nat) (eb : bool) :
-    intr_count γ (S n) eb -∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ (if eb then intr_handler_avail γ else emp).
+  Lemma intr_count_pos_off (n : nat) (eb : bool) :
+    intr_count (S n) eb -∗
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗ (if eb then intr_handler_avail else emp).
   Proof. iIntros "[Htok Hres]". iFrame. Qed.
 
   (* the '0'-arm PUSH (csrci with interrupts already off): the level just
      increments -- at n = 0 ghost agreement with the capability's '0'
      eighth pins eb = false, so the payload owed at level 1 is [emp]. *)
-  Lemma intr_count_push_off (γ : gname) (n : nat) (eb : bool) :
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
-    intr_count γ n eb -∗
+  Lemma intr_count_push_off (n : nat) (eb : bool) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    intr_count n eb -∗
     ⌜ n = 0%nat -> eb = false ⌝ ∗
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_count γ (S n) eb.
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗ intr_count (S n) eb.
   Proof.
     iIntros "Hcap Hcnt". destruct n.
     - iDestruct (ghost_var_agree with "Hcap Hcnt") as %Hb.
@@ -920,26 +990,26 @@ Section IntrDefs.
   Qed.
 
   (* the '0'-arm POP at eb = false (never re-enables): level decrement *)
-  Lemma intr_count_pop_off (γ : gname) (n : nat) :
-    intr_count γ (S n) false -∗ intr_count γ n false.
+  Lemma intr_count_pop_off (n : nat) :
+    intr_count (S n) false -∗ intr_count n false.
   Proof.
     iIntros "[Htok _]". destruct n; [iExact "Htok" | iFrame; done].
   Qed.
 
   (* an interior POP (n+1 ≥ 2 → n+1 ≥ 1): payload carried through *)
-  Lemma intr_count_dec (γ : gname) (n : nat) (eb : bool) :
-    intr_count γ (S (S n)) eb -∗ intr_count γ (S n) eb.
+  Lemma intr_count_dec (n : nat) (eb : bool) :
+    intr_count (S (S n)) eb -∗ intr_count (S n) eb.
   Proof. iIntros "[Htok Hres]". iFrame. Qed.
 
   (* at the '1' arm (cap-eighth-'1'), [intr_count n eb] forces n = 0 and
      eb = true, and yields the two '1' eighths -- the S-case and the
      n = 0 eb = false case both carry a '0' eighth, refuted by agreement. *)
-  Lemma intr_count_get_on (γ : gname) (n : nat) (eb : bool) :
-    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) -∗
-    intr_count γ n eb -∗
+  Lemma intr_count_get_on (n : nat) (eb : bool) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
+    intr_count n eb -∗
     ⌜ n = 0%nat /\ eb = true ⌝ ∗
-    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
-    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1).
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1).
   Proof.
     iIntros "Hcap Hcnt". destruct n.
     - destruct eb.
@@ -954,28 +1024,28 @@ Section IntrDefs.
   (* rebuild [intr_restore] from its pieces, re-introducing the later on
      the persistent handler spec (needed after a branch's [iNext] strips
      it). *)
-  Lemma intr_restore_intro (γ : gname) (h : mword 64) :
-    intr_inv γ h -∗
+  Lemma intr_restore_intro (h : mword 64) :
+    intr_inv h -∗
     intr_handler_spec h -∗
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_restore γ.
+    intr_restore.
   Proof.
     iIntros "#Hi #Hs Hsep Hsca Hstv". iFrame "Hsep Hsca Hstv".
     iExists h. iFrame "Hi". iNext. iExact "Hs".
   Qed.
 
   (* pack a count eighth-'0' + the persistent avail into level S n *)
-  Lemma intr_count_pack_S_on (γ : gname) (n : nat) :
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_handler_avail γ -∗
-    intr_count γ (S n) true.
+  Lemma intr_count_pack_S_on (n : nat) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗ intr_handler_avail -∗
+    intr_count (S n) true.
   Proof. iIntros "Hc0 #Ha". iFrame "Hc0 Ha". Qed.
 
   (* ... and the disabled-base level S n needs only the eighth *)
-  Lemma intr_count_pack_S_off (γ : gname) (n : nat) :
-    ghost_var γ (1/4/2)%Qp ('b"0" : mword 1) -∗
-    intr_count γ (S n) false.
+  Lemma intr_count_pack_S_off (n : nat) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    intr_count (S n) false.
   Proof. iIntros "Hc0". iFrame. Qed.
 
   (* =================================================================== *)
@@ -986,13 +1056,13 @@ Section IntrDefs.
   (* quarter and the menvcfg cell come back out (the absorbing engine     *)
   (* threads neither).                                                    *)
   (* =================================================================== *)
-  Lemma intr_config_of_v2 (γ : gname) :
-    sconf γ -∗
-    ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) -∗
+  Lemma intr_config_of_v2 :
+    sconf -∗
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_config γ ∗ ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S.
+    intr_config ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S.
   Proof.
     iIntros "Hsc Hq Hsepc Hscause Hstval".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -1006,10 +1076,10 @@ Section IntrDefs.
     rewrite Hb1. vm_compute. reflexivity.
   Qed.
 
-  Lemma v2_of_intr_config (γ : gname) :
-    intr_config γ -∗
+  Lemma v2_of_intr_config :
+    intr_config -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
-    sconf γ ∗
+    sconf ∗
     (∃ v : mword 64, sepc ↦ᵣ v) ∗
     (∃ v : mword 64, scause ↦ᵣ v) ∗
     (∃ v : mword 64, stval ↦ᵣ v).

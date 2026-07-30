@@ -108,6 +108,10 @@ are working on that effort — the relevant `projects/` file.
   later-stripping fence leaf, G5's three sweeps), the callee-by-callee
   resource inventory, the assemblies main performs, and what remains:
   the whole-system adequacy composition.
+- **[`explicit-cpuid.md`](projects/explicit-cpuid.md)** — removing the ambient
+  `CpuId` so a step's continuation is about the hart execution RESUMES on:
+  `wp_next`, the SIE-arm index `b`, tp pinned to the hart (`HartTp.v`), and the
+  two-stage plan. Prototype compiling on branch `explicit-cpuid`.
 - **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
   2: the parked-proc resumption contract (`p_sched`) quantifies the
   RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE

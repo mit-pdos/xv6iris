@@ -12,6 +12,8 @@ VirtioModel.v
 DevModel.v
 RiscvLang.v
 RegFile.v
+HartTp.v
+WpNext.v
 PtreeType.v
 RiscvPtsto.v
 PageGeom.v
