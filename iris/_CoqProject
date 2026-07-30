@@ -416,6 +416,11 @@ SpecBread.v
 WpBwriteDecode.v
 ProofBwrite.v
 LinkBwrite.v
+WpBpinDecode.v
+ProofBpin.v
+LinkBpin.v
+ProofBunpin.v
+LinkBunpin.v
 WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
