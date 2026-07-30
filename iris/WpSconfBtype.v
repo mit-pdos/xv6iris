@@ -24,7 +24,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import InstrBytes ExecCommon WpGpr RegFile.
+Require Import InstrBytes ExecCommon WpGpr RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
@@ -309,30 +309,31 @@ Section WpSconfBtype.
   (* ------------------------------------------------------------------- *)
   (* FALL-THROUGH leaves: [sconf]/[sie_cap] pass through untouched.       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_beq_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_beq_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    eq_vec (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -344,33 +345,35 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bne_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bne_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    neq_vec (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -382,33 +385,35 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bltu_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bltu_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zI_u (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -420,36 +425,38 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BLT-fall, the SIGNED twin of [wp_bltu_fall_s_sconf] at two general
      registers (free_desc's `i >= NUM` bound check).  The x0-specialized
      [wp_blt_x0_fall_s_sconf] below is the same leaf against zero. *)
-  Lemma wp_blt_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_blt_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zI_s (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zI_s (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLT)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -461,34 +468,36 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BGEU-fall (the freerange loop exit: no more full pages fit). *)
-  Lemma wp_bgeu_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bgeu_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zKzJ_u (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zKzJ_u (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -500,26 +509,28 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BLTU-taken (the freerange empty-page-list path skips the loop to the
      epilogue). *)
-  Lemma wp_bltu_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bltu_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    zopz0zI_u (rget m rs1) (rget m rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -534,11 +545,11 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -561,25 +572,27 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BGEU-taken (the freerange loop back-edge: another full page still fits). *)
-  Lemma wp_bgeu_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bgeu_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zKzJ_u (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    zopz0zKzJ_u (rget m rs1) (rget m rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -594,11 +607,11 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -621,7 +634,8 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BGE-fall / BGE-taken over TWO general registers -- the SIGNED twin of
@@ -629,30 +643,31 @@ Section WpSconfBtype.
      the copy is done when the signed index reaches the signed count).  The
      [_x0_] forms below are the [rs1 = x0] specializations gcc emits for
      [blez]; neither covers a general rs1. *)
-  Lemma wp_bge_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bge_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zKzJ_s (m !!! Regidx rs1) (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zKzJ_s (rget m rs1) (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -664,24 +679,26 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bge_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bge_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    zopz0zKzJ_s (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    zopz0zKzJ_s (rget m rs1) (rget m rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -696,11 +713,11 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -723,30 +740,32 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bge_x0_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bge_x0_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs2 <> 0 ->
-    zopz0zKzJ_s zero_reg (m !!! Regidx rs2) = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zKzJ_s zero_reg (rget m rs2) = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -761,34 +780,36 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BLT against x0 -- a [bltz rs1] error test (the -1 return of
      mappages / kvmmap).  x0 is not in the register file, so this is the
      x0-specialized twin of [wp_bltu_fall_s_sconf], as [wp_bge_x0_fall_s_sconf]
      is of [wp_bgeu_fall_s_sconf]. *)
-  Lemma wp_blt_x0_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_blt_x0_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    zopz0zI_s (m !!! Regidx rs1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zI_s (rget m rs1) zero_reg = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -803,27 +824,29 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* ...and its TAKEN twin: the [bltz rs1] error test that DID fire (the
      [argfd(...) < 0] arm of a syscall).  x0 is not in the register file, so
      this is the x0-specialized twin of [wp_bltu_taken_s_sconf]. *)
-  Lemma wp_blt_x0_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_blt_x0_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    zopz0zI_s (m !!! Regidx rs1) zero_reg = true ->
+    zopz0zI_s (rget m rs1) zero_reg = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -838,8 +861,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -865,7 +888,8 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -875,27 +899,28 @@ Section WpSconfBtype.
   (* the operand order is the whole difference and neither can serve for   *)
   (* the other, so both pairs exist.                                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_bgez_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bgez_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    zopz0zKzJ_s (m !!! Regidx rs1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
+    zopz0zKzJ_s (rget m rs1) zero_reg = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -910,24 +935,26 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bgez_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bgez_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    zopz0zKzJ_s (m !!! Regidx rs1) zero_reg = true ->
+    zopz0zKzJ_s (rget m rs1) zero_reg = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -942,8 +969,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -969,26 +996,28 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* BGE against x0 in the rs1 slot -- a [blez rs2] loop-guard (printint's
      [while (--i >= 0)]).  The taken twin of [wp_bge_x0_fall_s_sconf]. *)
-  Lemma wp_bge_x0_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bge_x0_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs2 <> 0 ->
-    zopz0zKzJ_s zero_reg (m !!! Regidx rs2) = true ->
+    zopz0zKzJ_s zero_reg (rget m rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1003,8 +1032,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1030,32 +1059,34 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_cbeqz_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cbeqz_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
-    eq_vec (m !!! Regidx rd1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
+    eq_vec (rget m rd1) zero_reg = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true
+    iApply (wp_instr_s_sconf m n b Φ pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1072,32 +1103,34 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_cbnez_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cbnez_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
-    neq_vec (m !!! Regidx rd1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
+    neq_vec (rget m rd1) zero_reg = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BNE)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true
+    iApply (wp_instr_s_sconf m n b Φ pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1114,7 +1147,8 @@ Section WpSconfBtype.
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1123,21 +1157,22 @@ Section WpSconfBtype.
   (* weaken with [iNext].  All four go through the Zca jump helper, so    *)
   (* only bit-0 alignment of the target is demanded.                      *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_beq_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_beq_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    eq_vec (rget m rs1) (rget m rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1152,11 +1187,11 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1179,24 +1214,26 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bne_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bne_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
-    neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true ->
+    neq_vec (rget m rs1) (rget m rs2) = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1211,11 +1248,11 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1238,27 +1275,29 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_cbeqz_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cbeqz_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     let imm : mword 13 := sign_extend' 13 (concat_vec imm8 ('b"0")) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
-    eq_vec (m !!! Regidx rd1) zero_reg = true ->
+    eq_vec (rget m rd1) zero_reg = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc true (BTYPE (imm, zreg, creg2reg_idx rs, BEQ)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros imm.
     iIntros (Hrs Hrd1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true
+    iApply (wp_instr_s_sconf m n b Φ pc true
               (BTYPE (imm, zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1273,8 +1312,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1301,27 +1340,29 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_cbnez_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cbnez_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     let imm : mword 13 := sign_extend' 13 (concat_vec imm8 ('b"0")) in
     creg2reg_idx rs = Regidx rd1 ->
     uint rd1 <> 0 ->
-    neq_vec (m !!! Regidx rd1) zero_reg = true ->
+    neq_vec (rget m rd1) zero_reg = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc true (BTYPE (imm, zreg, creg2reg_idx rs, BNE)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros imm.
     iIntros (Hrs Hrd1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true
+    iApply (wp_instr_s_sconf m n b Φ pc true
               (BTYPE (imm, zreg, creg2reg_idx rs, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1336,8 +1377,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1364,7 +1405,8 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
 
@@ -1372,21 +1414,22 @@ Section WpSconfBtype.
      instruction width differs -- the branch target's 2-alignment is what Zca
      licenses, and that is a fact about the TARGET, not about the size of the
      branch. *)
-  Lemma wp_beqz_x0_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_beqz_x0_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    eq_vec (m !!! Regidx rs1) zero_reg = true ->
+    eq_vec (rget m rs1) zero_reg = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BEQ)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, zreg, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1401,8 +1444,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1429,33 +1472,35 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* beqz (x0) fall-through -- moved here from ProofWalk.v. *)
-  Lemma wp_beqz_x0_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_beqz_x0_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    eq_vec (m !!! Regidx rs1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
+    eq_vec (rget m rs1) zero_reg = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BEQ)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, zreg, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+    assert (Hma : rf_to_gmap (tp_pin m) !! Regidx rs1 = Some (tp_pin m !!! Regidx rs1))
       by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_pt_value rs1 (tp_pin m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1470,31 +1515,33 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (gpr_file m) with "[Hfmap]" as "Hfile".
+    iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg'".
-    iApply ("Hcont" with "Hcg' [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg' [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* bnez (x0 as rs2), the uncompressed form -- the back-edge of printk's %p
      hex loop, whose counter is a full-width [addiw].  The [zreg] twins of
      [wp_bne_taken]/[wp_bne_fall]: with rs2 = x0 the model reads no second
      register, so the [uint rs2 <> 0] side condition of those cannot be met. *)
-  Lemma wp_bnez_x0_taken_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bnez_x0_taken_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    neq_vec (m !!! Regidx rs1) zero_reg = true ->
+    neq_vec (rget m rs1) zero_reg = true ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BNE)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
+    ▷ wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, zreg, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1509,8 +1556,8 @@ Section WpSconfBtype.
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc, set_reg; cbn [sregs].
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
@@ -1537,32 +1584,34 @@ Section WpSconfBtype.
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
-  Lemma wp_bnez_x0_fall_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_bnez_x0_fall_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
-    neq_vec (m !!! Regidx rs1) zero_reg = false ->
-    sie_cap_gpr γ m n -∗
+    neq_vec (rget m rs1) zero_reg = false ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BNE)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (BTYPE (imm, zreg, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : rf_to_gmap m !! Regidx rs1 = Some (m !!! Regidx rs1))
+    assert (Hma : rf_to_gmap (tp_pin m) !! Regidx rs1 = Some (tp_pin m !!! Regidx rs1))
       by (rewrite rf_lookup; apply rf_to_gmap_lookup).
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_pt_value rs1 (tp_pin m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1577,10 +1626,11 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (gpr_file m) with "[Hfmap]" as "Hfile".
+    iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg'".
-    iApply ("Hcont" with "Hcg' [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg' [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
 End WpSconfBtype.

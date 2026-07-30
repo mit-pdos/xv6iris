@@ -44,7 +44,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import DevModel RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import WpLoad WpGpr InstrBytes WpMmodeLeafBase.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import KptPt KMap.
 Require Import SmodeCore WpSmodeGpr.
 Require Import SmodeCorePt SRegime.
@@ -168,10 +168,10 @@ Existing Instance riscv_memGS.
    the register value out of the state.
    [wp_lw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
    restatement for the live driver, whose reads are state-independent. *)
-Lemma wp_lw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
+Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
-    (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 32 -> iProp Σ) :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 32 -> iProp Σ) (b : bool) :
+  let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let ldval := fun (w : bv 32) =>
         (extend_value is_unsigned
@@ -181,8 +181,8 @@ Lemma wp_lw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
   uint rd <> 0 ->
-  rd <> csp_rs1 ->
-  sie_cap_gpr γ m n -∗
+  rd_ok rd ->
+  sie_cap_gpr m n b -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   disk_inv γd -∗
   R -∗
@@ -190,16 +190,19 @@ Lemma wp_lw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
     virtio_proto γd v -∗ R ==∗
     ∃ w : bv 32, ⌜ virtio_read v (uint a8 - virtio_base)%Z = Some w ⌝ ∗
                  virtio_proto γd v ∗ S w ) -∗
-  ( ∀ w : bv 32,
-    sie_cap_gpr γ (<[Regidx rd := regval_into_reg (ldval w)]> m) n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ w : bv 32,
+    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S w -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp.
+  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok.
+  pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+  pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
-  iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -226,8 +229,8 @@ Proof.
   iMod ("Hacc" $! vst Hvok with "Hproto HR") as (w) "(%Hrd_v & Hproto & HS)".
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
-  iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
-  iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
   iDestruct ("Hfb1" with "Hspc") as "Hfmap".
   assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
   assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
@@ -298,7 +301,7 @@ Proof.
              ltac:(apply within_htif_false; exact Lhtif_tr)
              ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply dev_addr_virtio; exact Hrange)
              ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Hdrd_virtio)). }
-  iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (ldval w)) with "Hfmap") as "[Hrdc Hfins]".
+  iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (ldval w)) with "Hfmap") as "[Hrdc Hfins]".
   rewrite (gpr_pt_nz rd _ Hrdnz).
   iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval w)) with "Hreg Hrdc") as "[Hreg Hrdc]".
   iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
@@ -319,16 +322,21 @@ Proof.
   assert (Hsp : m !!! Regidx csp_rs1
                 = <[Regidx rd := regval_into_reg (ldval w)]> m !!! Regidx csp_rs1)
     by (symmetry; apply upd_ne; congruence).
-  iAssert (sconf γ) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
+  (* the leaf's own write commutes with the tp pin *)
+  tp_refold Hrdtp "Hfmap".
+  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
   { iFrame "Hhw Hminv Hpriv Hmiex".
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
-  iDestruct (sie_cap_retarget γ m
-               (<[Regidx rd := regval_into_reg (ldval w)]> m) n Hsp with "Hcap") as "Hcap".
+  iDestruct (sie_cap_retarget m
+               (<[Regidx rd := regval_into_reg (ldval w)]> m) n b Hsp with "Hcap") as "Hcap".
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+  (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
+     obligation is discharged by instantiating it here. *)
+  iSpecialize ("Hcont" $! cpu_id with "[]"); [ done | ].
   iApply ("Hcont" $! w with "Hcg [$Hpc' $Hnpc] HS").
 Qed.
 
@@ -348,17 +356,17 @@ Qed.
    ([virtio_proto_intro] pays in the DMA lease and mints the publisher token).
    [wp_sw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
    restatement for the first kind. *)
-Lemma wp_sw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
+Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ) :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) :
+  let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) in
+  let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
   (virtio_base <= uint a8 < virtio_base + virtio_size)%Z ->
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  sie_cap_gpr γ m n -∗
+  sie_cap_gpr m n b -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   disk_inv γd -∗
   R -∗
@@ -367,7 +375,8 @@ Lemma wp_sw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
     ∃ v' : virtio_state,
       ⌜ virtio_write v (uint a8 - virtio_base)%Z storeword = Some v' ⌝ ∗
       ⌜ virtio_isr_ok v' ⌝ ∗ virtio_proto γd v' ∗ S ) -∗
-  ( sie_cap_gpr γ m n -∗
+  wp_next b (fun (CID : CpuId) =>
+    sie_cap_gpr m n b -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -375,7 +384,7 @@ Lemma wp_sw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn.
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
-  iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -403,11 +412,11 @@ Proof.
     "(%Hvw & %Hvok' & Hproto & HS)".
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
-  iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
-  iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
   iDestruct ("Hfb1" with "Hspc") as "Hfmap".
-  iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
-  iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hr2c") as %Lv2.
+  iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
+  iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hr2c") as %Lv2.
   iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
   assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
   assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
@@ -493,15 +502,18 @@ Proof.
     rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
     unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
   iEval (rewrite Lnpc) in "Hpc'".
-  iAssert (sconf γ) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
+  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
   { iFrame "Hhw Hminv Hpriv Hmiex".
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-  iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] HS").
+  (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
+     obligation is discharged by instantiating it here. *)
+  iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc] HS").
+  iPureIntro. done.
 Qed.
 
 (* ===================================================================== *)
@@ -520,10 +532,10 @@ Qed.
    the state it was opened at (a virtio read does not advance the device) --
    what the caller gets is the property [P] it proved of the loaded word at
    EVERY state the invariant admits. *)
-Lemma wp_lw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names)
+Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
-    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
+  let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let ldval := fun (w : bv 32) =>
         (extend_value is_unsigned
@@ -533,33 +545,38 @@ Lemma wp_lw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
   uint rd <> 0 ->
-  rd <> csp_rs1 ->
+  rd_ok rd ->
   (forall v : virtio_state, virtio_isr_ok v ->
      exists w : bv 32, virtio_read v (uint a8 - virtio_base)%Z = Some w /\ P w) ->
-  sie_cap_gpr γ m n -∗
+  sie_cap_gpr m n b -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γu γd -∗
-  ( ∀ w : bv 32,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ w : bv 32,
     ⌜ P w ⌝ -∗
-    sie_cap_gpr γ (<[Regidx rd := regval_into_reg (ldval w)]> m) n -∗
+    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp Hread.
+  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok Hread.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   (* only the DISK half of the fabric is touched, and [↑diskN ⊆ ↑devN] *)
   iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
-  iApply (wp_lw_virtio_dinv_s_sconf γ γd Φ pc is_rvc is_unsigned rd rs1 imm m n
-            emp%I (fun w => ⌜P w⌝%I)
-            Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp
+  iApply (wp_lw_virtio_dinv_s_sconf γd Φ pc is_rvc is_unsigned rd rs1 imm m n
+            emp%I (fun w => ⌜P w⌝%I) b
+            Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
   { done. }
   { iIntros (v Hvok) "Hproto _".
     destruct (Hread v Hvok) as (w & Hrd & HPw).
     iModIntro. iExists w. iFrame "Hproto". iSplitR; [| iPureIntro; exact HPw ].
     iPureIntro. exact Hrd. }
+  (* the callee's continuation shape carries [S w] LAST; ours carries [⌜P w⌝]
+     FIRST -- reassemble across the wp_next/forall-w binders explicitly. *)
+  iIntros (CIDx) "%Hcid".
   iIntros (w) "Hcg Hpc %HPw".
+  iSpecialize ("Hcont" $! CIDx with "[]"); [ done | ].
   iApply ("Hcont" $! w with "[%] Hcg Hpc"). { exact HPw. }
 Qed.
 
@@ -570,12 +587,12 @@ Qed.
    alone, which is exactly what [VirtioProto.virtio_proto_stable] needs to
    carry the driver protocol across the store.  §0's
    [virtio_ack_write_ok] / [virtio_notify_write_ok] discharge it. *)
-Lemma wp_sw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names)
+Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) :
-  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    (m : regfile) (n : nat) (b : bool) :
+  let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) in
+  let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
   (virtio_base <= uint a8 < virtio_base + virtio_size)%Z ->
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
@@ -586,10 +603,11 @@ Lemma wp_sw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names
        /\ virtio_isr_ok v'
        /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
        /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
-  sie_cap_gpr γ m n -∗
+  sie_cap_gpr m n b -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
-  ( sie_cap_gpr γ m n -∗
+  wp_next b (fun (CID : CpuId) =>
+    sie_cap_gpr m n b -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -597,8 +615,8 @@ Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
-  iApply (wp_sw_virtio_dinv_s_sconf γ γd Φ pc is_rvc rs2 rs1 imm m n
-            emp%I emp%I Hrange Halign Hcanon Hdevvpn
+  iApply (wp_sw_virtio_dinv_s_sconf γd Φ pc is_rvc rs2 rs1 imm m n
+            emp%I emp%I b Hrange Halign Hcanon Hdevvpn
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
   { done. }
   { iIntros (v Hvok) "Hproto _".
@@ -609,7 +627,11 @@ Proof.
     iSplitR; [iPureIntro; exact Hvw|].
     iSplitR; [iPureIntro; exact Hvok'|].
     iFrame "Hproto". }
+  (* the callee's continuation carries a trailing [emp] wand (S := emp) that
+     ours does not -- discard it. *)
+  iIntros (CIDx) "%Hcid".
   iIntros "Hcg Hpc _".
+  iSpecialize ("Hcont" $! CIDx with "[]"); [ done | ].
   iApply ("Hcont" with "Hcg Hpc").
 Qed.
 

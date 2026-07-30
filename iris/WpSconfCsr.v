@@ -3,14 +3,15 @@
    install).
 
    [wp_csrr_sstatus_s_sconf] (push_off's intr_get) works at EITHER SIE
-   value: the read needs no SIE side condition, and the continuation
-   receives the capability DESTRUCTED into its arm PAIRED with the pure
-   fact that the read value's SIE bit matches that arm (ghost agreement
-   between the bundle's tied half and the capability quarter).  The
-   caller cases on the disjunct: bit 0 -> it holds the bare '0' quarter,
-   bit 1 -> it holds the quarter + the interrupt invariant + the trap
-   CSRs + the stack bound -- exactly what the upcoming csrci flip leaf
-   consumes or what pop_off's csrsi restore re-packs.
+   value (the arm INDEX [b] is a lemma parameter): the read needs no SIE
+   side condition, and the continuation receives the capability
+   DESTRUCTED into [sie_arm b] PAIRED with the pure fact that the read
+   value's SIE bit matches that index (ghost agreement between the
+   bundle's tied half and the capability quarter).  At [b = false] it
+   holds the bare '0' quarter; at [b = true] it holds the quarter + the
+   interrupt invariant + the trap CSRs + the stack bound -- exactly what
+   the upcoming csrci flip leaf consumes or what pop_off's csrsi restore
+   re-packs.
 
    The csrci/csrsi FLIP leaves themselves are NOT here yet: they need
    the SIE=1 characterization of
@@ -36,6 +37,7 @@ Require Import SmodeCore WpMmodeLeafBase.
 Require Import WpPopOff WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn.
+Require Import HartTp WpNext.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Import Defs.
@@ -107,36 +109,33 @@ Section WpSconfCsr.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_csrr_sstatus_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_sstatus_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sie_cap_gpr γ m n -∗
+    rd_ok rd ->
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
-    ( ∀ ms : mword 64,
+    wp_next b (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf γ -∗
+      sconf -∗
       strans_inv -∗
       pc_is (add_vec_int pc 4) -∗
-      gpr_file (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) -∗
+      gpr_file (tp_pin (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
       ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m
                      !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
-        ( (⌜ _get_Mstatus_SIE ms = ('b"0" : mword 1) ⌝ ∗
-           ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
-        ∨ (⌜ _get_Mstatus_SIE ms = ('b"1" : mword 1) ⌝ ∗
-           ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
-           (∃ handler : mword 64, intr_inv γ handler) ∗
-           (∃ v : mword 64, sepc ↦ᵣ v) ∗
-           (∃ v : mword 64, scause ↦ᵣ v) ∗
-           (∃ v : mword 64, stval ↦ᵣ v)) ) ) -∗
+        ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝ ∗
+        sie_arm b ) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -157,7 +156,7 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lms).
     assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
             (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
@@ -184,26 +183,26 @@ Section WpSconfCsr.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
       by (apply upd_ne; congruence).
+    tp_refold Hrdtp "Hfmap".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-    iAssert ( ghost_var γ (1/2) (_get_Mstatus_SIE ms0) ∗
+    iAssert ( ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms0) ∗
               ( stack_own (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m
                              !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
-                ( (⌜ _get_Mstatus_SIE ms0 = ('b"0" : mword 1) ⌝ ∗
-                   ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
-                ∨ (⌜ _get_Mstatus_SIE ms0 = ('b"1" : mword 1) ⌝ ∗
-                   ghost_var γ (1/4/2)%Qp ('b"1" : mword 1) ∗
-                   (∃ handler : mword 64, intr_inv γ handler) ∗
-                   (∃ v : mword 64, sepc ↦ᵣ v) ∗
-                   (∃ v : mword 64, scause ↦ᵣ v) ∗
-                   (∃ v : mword 64, stval ↦ᵣ v)) ) ) )%I
+                ⌜ _get_Mstatus_SIE ms0 = sie_bit b ⌝ ∗
+                sie_arm b ) )%I
       with "[Hstk Harm Hhalf]" as "[Hhalf Hpair]".
-    { iDestruct "Harm" as "[Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]".
-      - iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb.
+    { destruct b.
+      - iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)".
+        iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iLeft. iFrame "Hq0". iPureIntro. exact Hb.
-      - iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb.
+        iSplitR. { iPureIntro. exact Hb. }
+        iFrame "Hq1 Hhx Hsepcx Hscausex Hstvalx".
+      - iDestruct "Harm" as "Hq0".
+        iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb.
         iFrame "Hhalf". iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iRight. iFrame "Hq1 Hhx Hsepcx Hscausex Hstvalx". iPureIntro. exact Hb. }
+        iSplitR. { iPureIntro. exact Hb. }
+        iExact "Hq0". }
+    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
     iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hmiex Hmenvx] Htr
                           [$Hpc' $Hnpc] [Hfmap] Hpair").
     { exact Hmsf. }
@@ -293,27 +292,30 @@ Section WpSconfCsr.
   (* (trap CSRs + stack bound + a persistent intr_inv copy).  The '0'     *)
   (* arm is the idempotent write, ghosts untouched.                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_csrci_sstatus_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrci_sstatus_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (k : nat) (eb : bool)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
-    sie_cap_gpr γ m n -∗
-    intr_count γ k eb -∗
+    rd_ok rd ->
+    sie_cap_gpr m n b -∗
+    intr_count k eb -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
-    ( ∀ ms : mword 64,
+    wp_next b (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       ⌜ k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb ⌝ -∗
-      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n -∗
-      intr_count γ (S k) eb -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n false -∗
+      intr_count (S k) eb -∗
       trap_csrs_pay k eb -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp) "Hcg Hcnt Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iIntros (Hrd Hrdok) "Hcg Hcnt Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -341,52 +343,12 @@ Section WpSconfCsr.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
       by (apply upd_ne; congruence).
-    iDestruct "Hcap" as "(Hstk & Htr & [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)])".
-    - (* ---- '0' arm: the idempotent write; ghosts untouched ---- *)
-      iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
-      assert (Hcollapse : legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2)) = ms0)
-        by (apply WpGprCsrwC.legalize_sie_clear_idem; assumption).
-      iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
-      rewrite (gpr_pt_nz rd _ Hrd).
-      iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-              (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
-      iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-      { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-      iModIntro.
-      iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
-                 (regval_into_reg (sstatus_read ms0))).
-      iSplitR.
-      { iPureIntro. rewrite Hpceq. fold s_pc.
-        apply (exec_execute_csrrci_sstatus (mword_of_int 2) rd ms0 s_pc
-                 Lpriv_spc Lms_spc
-                 ltac:(rewrite Lmisa_spc; exact HmisaS)
-                 ltac:(rewrite Lmisa_spc; exact HmisaU)
-                 Himm2 Hrd Hcollapse). }
-      iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-      iIntros "Hhs' Hpc'".
-      assert (Lnpc : register_lookup nextPC
-               (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
-                  (regval_into_reg (sstatus_read ms0))).(sregs)
-               = add_vec_int pc 4).
-      { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-      iEval (rewrite Lnpc) in "Hpc'".
-      iDestruct (intr_count_push_off γ k eb with "Hq0 Hcnt") as "(%Heb0 & Hq0 & Hcnt)".
-      iAssert (sie_cap γ (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
-        with "[Hstk Htr Hq0]" as "Hcap".
-      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iFrame "Htr". iLeft. iExact "Hq0". }
-      iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
-      { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-        iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
-      iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-      iApply ("Hcont" $! ms0 with "[%] [%] Hcg Hcnt [] [$Hpc' $Hnpc]").
-      { exact Hmsf. }
-      { intros Hk. rewrite (Heb0 Hk). cbn [sie_bit]. exact Hb0. }
-      { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
-    - (* ---- '1' arm: the real flip ---- *)
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    destruct b.
+    - (* ---- b = true: the real flip ---- *)
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)".
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-      iDestruct (intr_count_get_on γ k eb with "Hq1 Hcnt") as "(%Hke & Hq1 & Hc1)".
+      iDestruct (intr_count_get_on k eb with "Hq1 Hcnt") as "(%Hke & Hq1 & Hc1)".
       destruct Hke as [-> ->].
       destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
@@ -395,11 +357,11 @@ Section WpSconfCsr.
       iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
       iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
         [solve_ndisj|].
-      iDestruct "Hbody" as (b) "(>Hqi & >Hstv & #Hguard)".
+      iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & #Hguard)".
       iDestruct (ghost_var_agree with "Hq1 Hqi") as %Hbq.
       iAssert (▷ intr_handler_spec handler)%I as "#Hspec".
       { iNext. iApply "Hguard". iPureIntro. symmetry. exact Hbq. }
-      iMod (sie_ghost_flip_off γ _ _ _ _ with "Hhalf Hq1 Hc1 Hqi") as "(Hhalf & Hq & Htok & Hqi)".
+      iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hc1 Hqi") as "(Hhalf & Hq & Htok & Hqi)".
       iMod ("Hclose" with "[Hqi Hstv]") as "_".
       { iNext. iExists ('b"0" : mword 1). iFrame "Hqi Hstv".
         iModIntro. iIntros "%Hb".
@@ -407,7 +369,7 @@ Section WpSconfCsr.
         vm_compute in Hb. discriminate. }
       (* the machine write: mstatus := ms1, rd := old S-view *)
       iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-      iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
+      iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
       rewrite (gpr_pt_nz rd _ Hrd).
       iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
               (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
@@ -437,14 +399,16 @@ Section WpSconfCsr.
         unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
-      iAssert (sie_cap γ (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n)
+      tp_refold Hrdtp "Hfmap".
+      iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n false)
         with "[Hstk Htr Hq]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iFrame "Htr". iLeft. iExact "Hq". }
-      iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
+        iFrame "Htr". iExact "Hq". }
+      iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+      iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
       iApply ("Hcont" $! ms0 with "[%] [%] Hcg
                             [Htok] [Hsepcx Hscausex Hstvalx] [$Hpc' $Hnpc]").
       { exact Hmsf. }
@@ -454,6 +418,51 @@ Section WpSconfCsr.
         iSplit; [iPureIntro; exact Htvd |].
         iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
       { iFrame "Hsepcx Hscausex Hstvalx". }
+    - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
+      iDestruct "Harm" as "Hq0".
+      iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
+      assert (Hcollapse : legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2)) = ms0)
+        by (apply WpGprCsrwC.legalize_sie_clear_idem; assumption).
+      iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
+      rewrite (gpr_pt_nz rd _ Hrd).
+      iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
+              (regval_into_reg (sstatus_read ms0)) with "Hreg Hrdc") as "[Hreg Hrdc]".
+      iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
+      { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+      iModIntro.
+      iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
+                 (regval_into_reg (sstatus_read ms0))).
+      iSplitR.
+      { iPureIntro. rewrite Hpceq. fold s_pc.
+        apply (exec_execute_csrrci_sstatus (mword_of_int 2) rd ms0 s_pc
+                 Lpriv_spc Lms_spc
+                 ltac:(rewrite Lmisa_spc; exact HmisaS)
+                 ltac:(rewrite Lmisa_spc; exact HmisaU)
+                 Himm2 Hrd Hcollapse). }
+      iSplitL "Hreg Hmem".
+      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      iIntros "Hhs' Hpc'".
+      assert (Lnpc : register_lookup nextPC
+               (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
+                  (regval_into_reg (sstatus_read ms0))).(sregs)
+               = add_vec_int pc 4).
+      { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+      iEval (rewrite Lnpc) in "Hpc'".
+      tp_refold Hrdtp "Hfmap".
+      iDestruct (intr_count_push_off k eb with "Hq0 Hcnt") as "(%Heb0 & Hq0 & Hcnt)".
+      iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n false)
+        with "[Hstk Htr Hq0]" as "Hcap".
+      { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
+        iFrame "Htr". iExact "Hq0". }
+      iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
+      { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+        iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+      iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+      iApply ("Hcont" $! ms0 with "[%] [%] Hcg Hcnt [] [$Hpc' $Hnpc]").
+      { exact Hmsf. }
+      { intros Hk. rewrite (Heb0 Hk). cbn [sie_bit]. exact Hb0. }
+      { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
   Qed.
 
 
@@ -527,18 +536,19 @@ Section WpSconfCsr.
   (* pop_off's restore: consumes the saved payload to re-arm the
      capability.  The already-enabled branch of [sie_cap] is refuted by
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
-  Lemma wp_csrsi_sstatus_x0_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrsi_sstatus_x0_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64)
-      (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
-    intr_count γ 1 true -∗
+      (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b -∗
+    intr_count 1 true -∗
     trap_csrs -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
-    ( ∀ ms : mword 64,
+    wp_next b (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr γ m n -∗
-      intr_count γ 0 true -∗
+      sie_cap_gpr m n true -∗
+      intr_count 0 true -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -546,7 +556,7 @@ Section WpSconfCsr.
     iIntros "Hcg Hcnt Hcsrs Hpc Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok Hhx]".
     iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx)".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -569,58 +579,61 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    iDestruct "Hcap" as "(Hstk & Htr & [Hq0 | (Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx')])".
-    2:{ (* already enabled: impossible -- the payload's sepc cell and the
-           '1' arm's sepc cell cannot coexist *)
-        iDestruct "Hsepcx" as (v1) "Hsepc1".
-        iDestruct "Hsepcx'" as (v2) "Hsepc2".
-        iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[]. }
-    (* ---- the real restore ---- *)
-    destruct (csrsi_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
-    set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
-    iDestruct "Hhx" as (handler) "[#Hintr #Hspec]".
-    iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
-      [solve_ndisj|].
-    iDestruct "Hbody" as (b) "(>Hqi & >Hstv & _)".
-    iMod (sie_ghost_flip_on γ _ _ _ _ with "Hhalf Hq0 Htok Hqi") as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-    iMod ("Hclose" with "[Hqi Hstv]") as "_".
-    { iNext. iExists ('b"1" : mword 1). iFrame "Hqi Hstv".
-      iModIntro. iIntros "%Hb". iExact "Hspec". }
-    iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-    iModIntro.
-    iExists (set_reg s_pc mstatus ms1).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_csrsi_sstatus_x0 (mword_of_int 2) ms0 s_pc
-               Lpriv_spc Lms_spc
-               ltac:(rewrite Lmisa_spc; exact HmisaS)
-               ltac:(rewrite Lmisa_spc; exact HmisaU)
-               Himm2). }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc mstatus ms1).(sregs)
-             = add_vec_int pc 4).
-    { unfold set_reg at 1; cbn [sregs]. tmig.
-      unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iEval (rewrite -Hsie') in "Hhalf".
-    iAssert (sie_cap γ m n)
-      with "[Hqcap Hsepcx Hscausex Hstvalx Hstk Htr]" as "Hcap".
-    { iSplitL "Hstk". { iExact "Hstk". }
-      iFrame "Htr".
-      iRight. iFrame "Hqcap Hsepcx Hscausex Hstvalx".
-      iExists handler. iSplit; [iPureIntro; exact Htvd |].
-      iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
-    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-      iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-    iApply ("Hcont" $! ms0 with "[%] Hcg [Hqcnt] [$Hpc' $Hnpc]").
-    { exact Hmsf. }
-    { iExact "Hqcnt". }
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    destruct b.
+    - (* ---- b = true: already enabled -- impossible.  The payload's sepc
+           cell and the '1' arm's sepc cell cannot coexist. ---- *)
+      iDestruct "Harm" as "(Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx')".
+      iDestruct "Hsepcx" as (v1) "Hsepc1".
+      iDestruct "Hsepcx'" as (v2) "Hsepc2".
+      iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[].
+    - (* ---- b = false: the real restore ---- *)
+      destruct (csrsi_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
+      set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
+      iDestruct "Hhx" as (handler) "[#Hintr #Hspec]".
+      iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
+      iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
+        [solve_ndisj|].
+      iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & _)".
+      iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi") as "(Hhalf & Hqcap & Hqcnt & Hqi)".
+      iMod ("Hclose" with "[Hqi Hstv]") as "_".
+      { iNext. iExists ('b"1" : mword 1). iFrame "Hqi Hstv".
+        iModIntro. iIntros "%Hb". iExact "Hspec". }
+      iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
+      iModIntro.
+      iExists (set_reg s_pc mstatus ms1).
+      iSplitR.
+      { iPureIntro. rewrite Hpceq. fold s_pc.
+        apply (exec_execute_csrsi_sstatus_x0 (mword_of_int 2) ms0 s_pc
+                 Lpriv_spc Lms_spc
+                 ltac:(rewrite Lmisa_spc; exact HmisaS)
+                 ltac:(rewrite Lmisa_spc; exact HmisaU)
+                 Himm2). }
+      iSplitL "Hreg Hmem".
+      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      iIntros "Hhs' Hpc'".
+      assert (Lnpc : register_lookup nextPC
+               (set_reg s_pc mstatus ms1).(sregs)
+               = add_vec_int pc 4).
+      { unfold set_reg at 1; cbn [sregs]. tmig.
+        unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+      iEval (rewrite Lnpc) in "Hpc'".
+      iEval (rewrite -Hsie') in "Hhalf".
+      iAssert (sie_cap m n true)
+        with "[Hqcap Hsepcx Hscausex Hstvalx Hstk Htr]" as "Hcap".
+      { iSplitL "Hstk". { iExact "Hstk". }
+        iFrame "Htr".
+        iFrame "Hqcap Hsepcx Hscausex Hstvalx".
+        iExists handler. iSplit; [iPureIntro; exact Htvd |].
+        iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+      iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
+      { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+        iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
+      iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+      iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+      iApply ("Hcont" $! ms0 with "[%] Hcg [Hqcnt] [$Hpc' $Hnpc]").
+      { exact Hmsf. }
+      { iExact "Hqcnt". }
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -688,9 +701,9 @@ Section WpSconfCsr.
   Qed.
 
   (* intr_on() at level 0, from EITHER base state.
-       eb = false: the real '0'->'1' flip.  [intr_count γ 0 false] is just
+       eb = false: the real '0'->'1' flip.  [intr_count 0 false] is just
      the count eighth at '0', so together with the persistent
-     [intr_handler_avail γ] it IS [intr_count γ 1 true] -- the pop_off
+     [intr_handler_avail] it IS [intr_count 1 true] -- the pop_off
      restore leaf applies verbatim (same four-piece ghost choreography:
      bundle half + capability eighth + count eighth + invariant quarter,
      with [trap_csrs] moving INTO the arm's '1' branch alongside an
@@ -702,18 +715,19 @@ Section WpSconfCsr.
      again satisfies [sconf_ms_facts], which is all the bundle needs.  The
      capability's '1' arm (trap CSRs + invariant copy) rides through
      untouched, and the caller's [if eb then emp else trap_csrs] is [emp]. *)
-  Lemma wp_csrsi_sstatus_x0_enable_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrsi_sstatus_x0_enable_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
-    intr_count γ 0 eb -∗
+    sie_cap_gpr m n eb -∗
+    intr_count 0 eb -∗
     (if eb then emp else trap_csrs) -∗
-    intr_handler_avail γ -∗
+    intr_handler_avail -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
-    ( ∀ ms : mword 64,
+    wp_next eb (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr γ m n -∗
-      intr_count γ 0 true -∗
+      sie_cap_gpr m n true -∗
+      intr_count 0 true -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -721,14 +735,14 @@ Section WpSconfCsr.
     destruct eb.
     2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
         iIntros "Hcg Hcnt Hcsrs #Havail Hpc Hinstr Hcont".
-        iApply (wp_csrsi_sstatus_x0_s_sconf γ Φ pc m n
+        iApply (wp_csrsi_sstatus_x0_s_sconf Φ pc m n false
                   with "Hcg [Hcnt] Hcsrs Hpc Hinstr Hcont").
-        iApply (intr_count_pack_S_on γ 0 with "Hcnt Havail"). }
+        iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
     (* ---- base state ENABLED: idempotent on SIE, ghosts stand still ---- *)
-    replace (intr_count γ 0 true) with (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1))
+    replace (intr_count 0 true) with (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1))
       by reflexivity.
     iIntros "Hcg Hcnt _ #Havail Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n true Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -751,11 +765,8 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    (* the count eighth at '1' pins the capability's arm at '1' *)
-    iDestruct "Hcap" as "(Hstk & Htr & [Hq0 | Harm1])".
-    { iDestruct (ghost_var_agree with "Hcnt Hq0") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate. }
+    (* [Hcap : sie_cap m n true] already -- the arm is untouched, no need
+       to destructure it. *)
     iDestruct (ghost_var_agree with "Hhalf Hcnt") as %Hb1.
     destruct (csrsi_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
@@ -779,15 +790,13 @@ Section WpSconfCsr.
     iEval (rewrite Lnpc) in "Hpc'".
     iEval (rewrite Hb1) in "Hhalf".
     iEval (rewrite -Hsie') in "Hhalf".
-    iAssert (sie_cap γ m n) with "[Hstk Htr Harm1]" as "Hcap".
-    { iSplitL "Hstk"; [iExact "Hstk" |].
-      iFrame "Htr". iRight. iExact "Harm1". }
-    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
+    iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
       iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
     iApply ("Hcont" $! ms0 with "[%] Hcg Hcnt [$Hpc' $Hnpc]").
-    exact Hmsf.
+    { exact Hmsf. }
   Qed.
 
   (* intr_off() at level 0, FROM enabled: the '1'->'0' flip of
@@ -799,28 +808,29 @@ Section WpSconfCsr.
      (level 0 with a now-disabled base owes them explicitly), the [intr_inv]
      copy is simply dropped (it is persistent, and the caller keeps its own
      [intr_handler_avail]), and the count eighth comes back at
-     [sie_bit false] -- i.e. [intr_count γ 0 false], not [intr_count γ 1 _]. *)
-  Lemma wp_csrci_sstatus_x0_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
-    intr_count γ 0 true -∗
+     [sie_bit false] -- i.e. [intr_count 0 false], not [intr_count 1 _]. *)
+  Lemma wp_csrci_sstatus_x0_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b -∗
+    intr_count 0 true -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
-    ( ∀ ms : mword 64,
+    wp_next b (fun (CID : CpuId) =>
+      ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr γ m n -∗
-      intr_count γ 0 false -∗
+      sie_cap_gpr m n false -∗
+      intr_count 0 false -∗
       trap_csrs -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    replace (intr_count γ 0 true) with (ghost_var γ (1/4/2)%Qp ('b"1" : mword 1))
+    replace (intr_count 0 true) with (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1))
       by reflexivity.
-    replace (intr_count γ 0 false) with (ghost_var γ (1/4/2)%Qp ('b"0" : mword 1))
+    replace (intr_count 0 false) with (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))
       by reflexivity.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -843,56 +853,62 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    (* the count eighth at '1' pins the capability's arm at '1' *)
-    iDestruct "Hcap" as "(Hstk & Htr & [Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)])".
-    { iDestruct (ghost_var_agree with "Hcnt Hq0") as %Hbad.
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    destruct b.
+    - (* ---- b = true: the count eighth at '1' agrees with the arm; the
+           real flip ---- *)
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)".
+      destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
+      set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
+      (* the trap-vector invariant: open it for the quarter, flip, reseal *)
+      iDestruct "Hhx" as (handler) "#Hintr".
+      iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
+      iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
+        [solve_ndisj|].
+      iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & _)".
+      iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt Hqi")
+        as "(Hhalf & Hq & Htok & Hqi)".
+      iMod ("Hclose" with "[Hqi Hstv]") as "_".
+      { iNext. iExists ('b"0" : mword 1). iFrame "Hqi Hstv".
+        iModIntro. iIntros "%Hb".
+        exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
+        vm_compute in Hb. discriminate. }
+      iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
+      iModIntro.
+      iExists (set_reg s_pc mstatus ms1).
+      iSplitR.
+      { iPureIntro. rewrite Hpceq. fold s_pc.
+        apply (exec_execute_csrrci_sstatus_x0 (mword_of_int 2) ms0 s_pc
+                 Lpriv_spc Lms_spc
+                 ltac:(rewrite Lmisa_spc; exact HmisaS)
+                 ltac:(rewrite Lmisa_spc; exact HmisaU)
+                 Himm2). }
+      iSplitL "Hreg Hmem".
+      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      iIntros "Hhs' Hpc'".
+      assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
+                     = add_vec_int pc 4).
+      { unfold set_reg at 1; cbn [sregs]. tmig.
+        unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+      iEval (rewrite Lnpc) in "Hpc'".
+      iEval (rewrite -Hsie') in "Hhalf".
+      iAssert (sie_cap m n false) with "[Hstk Htr Hq]" as "Hcap".
+      { iSplitL "Hstk"; [iExact "Hstk" |].
+        iFrame "Htr". iExact "Hq". }
+      iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
+      { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+        iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
+      iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+      iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+      iApply ("Hcont" $! ms0 with "[%] Hcg Htok
+                            [Hsepcx Hscausex Hstvalx] [$Hpc' $Hnpc]").
+      { exact Hmsf. }
+      { iFrame "Hsepcx Hscausex Hstvalx". }
+    - (* ---- b = false: impossible -- the count eighth at '1' contradicts
+           the capability's '0' eighth ---- *)
+      iDestruct (ghost_var_agree with "Hcnt Harm") as %Hbad.
       exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate. }
-    destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
-    set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
-    (* the trap-vector invariant: open it for the quarter, flip, reseal *)
-    iDestruct "Hhx" as (handler) "#Hintr".
-    iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
-      [solve_ndisj|].
-    iDestruct "Hbody" as (b) "(>Hqi & >Hstv & _)".
-    iMod (sie_ghost_flip_off γ _ _ _ _ with "Hhalf Hq1 Hcnt Hqi")
-      as "(Hhalf & Hq & Htok & Hqi)".
-    iMod ("Hclose" with "[Hqi Hstv]") as "_".
-    { iNext. iExists ('b"0" : mword 1). iFrame "Hqi Hstv".
-      iModIntro. iIntros "%Hb".
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
-      vm_compute in Hb. discriminate. }
-    iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
-    iModIntro.
-    iExists (set_reg s_pc mstatus ms1).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      apply (exec_execute_csrrci_sstatus_x0 (mword_of_int 2) ms0 s_pc
-               Lpriv_spc Lms_spc
-               ltac:(rewrite Lmisa_spc; exact HmisaS)
-               ltac:(rewrite Lmisa_spc; exact HmisaU)
-               Himm2). }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
-                   = add_vec_int pc 4).
-    { unfold set_reg at 1; cbn [sregs]. tmig.
-      unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iEval (rewrite -Hsie') in "Hhalf".
-    iAssert (sie_cap γ m n) with "[Hstk Htr Hq]" as "Hcap".
-    { iSplitL "Hstk"; [iExact "Hstk" |].
-      iFrame "Htr". iLeft. iExact "Hq". }
-    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-      iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-    iApply ("Hcont" $! ms0 with "[%] Hcg Htok
-                          [Hsepcx Hscausex Hstvalx] [$Hpc' $Hnpc]").
-    { exact Hmsf. }
-    { iFrame "Hsepcx Hscausex Hstvalx". }
+      vm_compute in Hbad. discriminate.
   Qed.
 
   (* ---- csrw stvec,rs1 -- installs the trap vector.  The [stvec] cell is
@@ -903,24 +919,25 @@ Section WpSconfCsr.
      [legalize_tvec] would otherwise silently rewrite.  Taking the value as
      an explicit [wval] (rather than leaving [m !!! Regidx rs1] in the
      post) keeps the stored term closed at the call site. ---- *)
-  Lemma wp_csrw_stvec_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrw_stvec_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (tv0 wval : mword 64) :
+      (m : regfile) (n : nat) (b : bool) (tv0 wval : mword 64) :
     uint rs1 <> 0 ->
-    m !!! Regidx rs1 = wval ->
+    rget m rs1 = wval ->
     trapVectorMode_forwards (_get_Mtvec_Mode wval) <> TV_Reserved ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     stvec ↦ᵣ tv0 -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       stvec ↦ᵣ wval -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -937,13 +954,13 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lpriv).
     assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    (* the rs1 value: the gpr file pins it in the step state *)
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
+    (* the rs1 value: the pinned gpr file has it in the step state *)
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
     iDestruct ("Hfb" with "Hr1c") as "Hfile".
     assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
                    = wval).
-    { rewrite -Hwval rf_lookup -Lva.
+    { rewrite -Hwval. unfold rget. rewrite rf_lookup. rewrite -Lva.
       replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
       reflexivity. }
     iMod (reg_update _ stvec _ wval with "Hreg Hstv") as "[Hreg Hstv]".
@@ -963,7 +980,8 @@ Section WpSconfCsr.
     { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hmsx $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg Hstv [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg Hstv [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
 End WpSconfCsr.
