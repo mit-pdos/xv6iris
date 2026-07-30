@@ -21,6 +21,13 @@ stale `.vo`).
   which costs everyone ~20 minutes and makes every other agent's compiles fail
   with errors that look like porting bugs but are not. The orchestrator runs
   the shared builds; you run `coqc` on your own files and nothing else.
+- **NEVER delete build artifacts.** No `rm *.vo`, no `rm *.glob`, no "cleaning
+  up" of any kind. The `.vo` tree is SHARED — deleting it from `iris/` is the
+  same catastrophe as `make clean-proofs`, just reached by a different route,
+  and that is exactly how it happened. You do not need to clean anything: a
+  stale `.vo` is fixed by RECOMPILING the named file unchanged, never by
+  deleting it. If you think you need to remove a file, you are wrong; report it
+  instead.
 - **If you see `Cannot find a physical path bound to logical path X`, or the
   `.vo` files have vanished: STOP AND WAIT.** Someone is rebuilding the shared
   tree. Do NOT edit your source in response — nothing is wrong with it. Sleep
