@@ -52,7 +52,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   sie_cap_gpr γ m av -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γ Φ γs -∗
-  proc_held j γl st ch -∗
+  proc_held cpu_id j γl st ch -∗
   (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:
      the parked-scheduler slot content is the ▷ sched_vc premise below.
      sched PRESERVES [eb] across the park -- its intena save/restore is
@@ -66,7 +66,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr γ mf av -∗
       pc_is ret_tgt -∗
-      proc_held j γl RUNNING ch' -∗
+      proc_held cpu_id j γl RUNNING ch' -∗
       cpu_own γ 1 eb pj emp -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗

@@ -19,9 +19,11 @@
      P, so per-direction predicates are impossible; the resumed party knows
      its own context address statically and elims the matching disjunct
      (address disjointness: cpus[] and proc[] are adjacent, ProcGeom.v).
-   - [tpv] is the resumer's tp; [⌜tpv = cid_word⌝] pins it to the ambient
-     hart id, which is what restores full [callee_saved] (incl. x4) in
-     sched's postcondition.
+   - [tpv] is the resumer's tp; [⌜tpv = cid_word_of h⌝] pins it to the
+     payload's own hart [h], which is what restores full [callee_saved]
+     (incl. x4) in sched's postcondition.  [h] is a PARAMETER of [p_sched];
+     [sched_vc] applies it at [cpu_id], so today's chain still runs entirely
+     on the ambient hart.
 
    The lock invariant's context slot is ▷-guarded: the scheduler re-stores a
    parked context from the ▷ valid_context its own swtch handed it, and
@@ -86,8 +88,13 @@ Section SchedCtx.
     (∃ (kl xs pid : mword 32),
        p_killed pa ↦₄ kl ∗ p_xstate pa ↦₄ xs ∗ p_pid pa ↦₄{DfracOwn (1/2)} pid)%I.
 
-  Definition proc_held (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
-    (locked γl cpu_id ∗
+  (* [i] is the hart the lock is held ON -- the hart whose scheduler chain
+     this payload half belongs to.  Every current user instantiates it at
+     [cpu_id]; the parameter is the seam the hart-generic protocol
+     (claude-notes/projects/sched-hart-generic.md) moves into the payload's
+     own binder. *)
+  Definition proc_held (i : CPU) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
+    (locked γl i ∗
      p_state (proc_addr j) ↦₄ st ∗
      p_chan (proc_addr j) ↦₈ ch ∗
      proc_pub (proc_addr j))%I.
@@ -101,28 +108,34 @@ Section SchedCtx.
   (* RESUMED scheduler identify the parking proc's existential [j] with   *)
   (* its own scan cursor (p_sched_at_cpu below).                          *)
   (* ------------------------------------------------------------------ *)
-  Definition p_sched : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ :=
+  (* [h] is the RESUMING hart: every per-hart address and the tp pin are
+     spelled through [cid_word_of h] rather than the ambient instance, so
+     the predicate itself is hart-parametric.  [sched_vc] below applies it
+     at [cpu_id] -- today's whole chain runs on one hart -- and that single
+     application is the seam the hart-generic protocol moves inside the
+     stored continuation's own ∀h binder. *)
+  Definition p_sched (h : CPU) : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ :=
     fun c cret tpv p =>
-    (⌜tpv = cid_word⌝ ∗
+    (⌜tpv = cid_word_of h⌝ ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states. *)
-       (⌜c = a_cpu_ctx cid_word⌝ ∗
+       (⌜c = a_cpu_ctx (cid_word_of h)⌝ ∗
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
           ⌜cret = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
-          proc_held j γl st ch)
+          proc_held h j γl st ch)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p. *)
        (∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
-           γs !! j = Some γl /\ cret = a_cpu_ctx cid_word⌝ ∗
-          proc_held j γl RUNNING ch)))%I.
+           γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h)⌝ ∗
+          proc_held h j γl RUNNING ch)))%I.
 
   (* the scheduler-chain valid context (fixed γ / Phi / P instantiation);
      [p] = the context's c->proc index (see SwtchCtx). *)
   Definition sched_vc (c p : mword 64) : iProp Σ :=
-    valid_context γ Φ p_sched c p.
+    valid_context γ Φ (p_sched cpu_id) c p.
 
   (* ------------------------------------------------------------------ *)
   (* Payload intro/elim.  Discrimination is by the resumed context's own  *)
@@ -131,10 +144,10 @@ Section SchedCtx.
 
   (* build the parking-proc payload (what sched supplies at its swtch;
      [p = proc_addr j] is sched's own cpu_own/premise tie). *)
-  Lemma p_sched_to_cpu (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) :
+  Lemma p_sched_to_cpu (i : CPU) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> needs_ctx st = true ->
-    proc_held j γl st ch -∗
-    p_sched (a_cpu_ctx cid_word) (p_context (proc_addr j)) cid_word (proc_addr j).
+    proc_held i j γl st ch -∗
+    p_sched i (a_cpu_ctx (cid_word_of i)) (p_context (proc_addr j)) (cid_word_of i) (proc_addr j).
   Proof.
     iIntros (Hj Hγl Hst) "Hheld".
     iSplit; [done|]. iLeft. iSplit; [done|].
@@ -144,10 +157,10 @@ Section SchedCtx.
   (* build the dispatch payload (what the scheduler supplies at its swtch;
      it has just written c->proc = proc_addr j, so its crossing index IS
      proc_addr j). *)
-  Lemma p_sched_to_proc (j : nat) (γl : gname) (ch : mword 64) :
+  Lemma p_sched_to_proc (i : CPU) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
-    proc_held j γl RUNNING ch -∗
-    p_sched (p_context (proc_addr j)) (a_cpu_ctx cid_word) cid_word (proc_addr j).
+    proc_held i j γl RUNNING ch -∗
+    p_sched i (p_context (proc_addr j)) (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
   Proof.
     iIntros (Hj Hγl) "Hheld".
     iSplit; [done|]. iRight.
@@ -156,17 +169,17 @@ Section SchedCtx.
 
   (* a resumed PROC context's payload: the resumer was this CPU's scheduler,
      the proc's own lock is held with state RUNNING. *)
-  Lemma p_sched_at_proc (j : nat) (cret tpv p : mword 64) :
+  Lemma p_sched_at_proc (i : CPU) (j : nat) (cret tpv p : mword 64) :
     (j < NPROC)%nat ->
-    p_sched (p_context (proc_addr j)) cret tpv p -∗
-    ⌜tpv = cid_word⌝ ∗ ⌜cret = a_cpu_ctx cid_word⌝ ∗ ⌜p = proc_addr j⌝ ∗
+    p_sched i (p_context (proc_addr j)) cret tpv p -∗
+    ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗ ⌜p = proc_addr j⌝ ∗
     ∃ (γl : gname) (ch : mword 64),
-      ⌜γs !! j = Some γl⌝ ∗ proc_held j γl RUNNING ch.
+      ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch.
   Proof.
     iIntros (Hj) "[%Htp Hpay]". iSplit; [done|].
     iDestruct "Hpay" as "[[%Hc _] | Hpay]".
     { exfalso.
-      exact (a_cpu_ctx_ne_p_context cid_word j tp_ok_cid Hj (eq_sym Hc)). }
+      exact (a_cpu_ctx_ne_p_context (cid_word_of i) j (tp_ok_cid_of i) Hj (eq_sym Hc)). }
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts Hpay]".
     destruct Hfacts as (Hc & Hp & Hj' & Hγl & Hcret).
     assert (j' = j) as -> by (apply (p_context_proc_addr_inj j' j Hj' Hj); congruence).
@@ -179,13 +192,13 @@ Section SchedCtx.
      so the payload's existential is pinned to its scan cursor by
      [proc_addr] injectivity -- this is what identifies the lock the
      payload delivers with the lock its release is about to give back. *)
-  Lemma p_sched_at_cpu (j : nat) (cret tpv : mword 64) :
+  Lemma p_sched_at_cpu (i : CPU) (j : nat) (cret tpv : mword 64) :
     (j < NPROC)%nat ->
-    p_sched (a_cpu_ctx cid_word) cret tpv (proc_addr j) -∗
-    ⌜tpv = cid_word⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
+    p_sched i (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) -∗
+    ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
       ⌜γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
-      proc_held j γl st ch.
+      proc_held i j γl st ch.
   Proof.
     iIntros (Hj) "[%Htp Hpay]". iSplit; [done|].
     iDestruct "Hpay" as "[[_ Hpay] | Hpay]".
@@ -195,7 +208,7 @@ Section SchedCtx.
       iSplit; [done|]. iExists γl, st, ch. iFrame. done. }
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts _]".
     destruct Hfacts as (Hc & _ & Hj' & _).
-    exfalso. exact (a_cpu_ctx_ne_p_context cid_word j' tp_ok_cid Hj' Hc).
+    exfalso. exact (a_cpu_ctx_ne_p_context (cid_word_of i) j' (tp_ok_cid_of i) Hj' Hc).
   Qed.
 
   (* ------------------------------------------------------------------ *)

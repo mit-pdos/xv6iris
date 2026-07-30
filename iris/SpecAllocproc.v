@@ -127,7 +127,7 @@ Definition allocproc_post
          pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
          pv_cwd V = (zero_reg : mword 64) /\
          length rest = 12%nat /\ (nc <= K_allocproc)%nat ⌝ ∗
-       proc_held j γl USED ch ∗
+       proc_held cpu_id j γl USED ch ∗
        proc_priv γf (proc_addr j) pid V ∗
        fd_slots FDSPARE ∗
        is_kstack (proc_addr j) ks ∗

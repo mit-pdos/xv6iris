@@ -1128,9 +1128,9 @@ Section ProofScheduler.
         (* the cpu context save area's cells go INTO the swtch *)
         iDestruct "Hown" as (ctxvs) "[%Hctxlen Hctxcells]".
         (* the dispatch payload *)
-        iPoseProof (p_sched_to_proc γs jj γl ch Hjj Hgl with "[Hlocked Hstate Hchan Hpub]") as "HP".
+        iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl with "[Hlocked Hstate Hchan Hpub]") as "HP".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
-        iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (a_cpu_ctx cid_word) (p_context (proc_addr jj))
+        iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs cpu_id) (a_cpu_ctx cid_word) (p_context (proc_addr jj))
                   Mc ctxvs (av - 10)%nat ebc (proc_addr jj)
                   Hctxlen Holdc Hnewc
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP] [-]").
@@ -1139,7 +1139,7 @@ Section ProofScheduler.
         iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
         (* the resume side: the payload identifies the parking proc with jj *)
         iDestruct "Hresume" as (cret) "[Hvc' Hpay2]".
-        iDestruct (p_sched_at_cpu γs jj cret (m' !!! Regidx Rtp) Hjj with "Hpay2")
+        iDestruct (p_sched_at_cpu γs cpu_id jj cret (m' !!! Regidx Rtp) Hjj with "Hpay2")
           as "(%Htpv & %Hcret & Hpay3)".
         iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts Hheld']".
         destruct Hfacts as [Hgl' Hneeds'].

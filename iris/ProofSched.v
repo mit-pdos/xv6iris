@@ -850,11 +850,11 @@ Section ProofSched.
     { rewrite /cpu_own. iFrame "Hnoff Hint Hcnt Hcur". iPureIntro; vm_compute; reflexivity. }
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
-    iPoseProof (p_sched_to_cpu γs j γl st ch Hj Hgl Hneeds
+    iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
                   with "[Hlocked Hstate Hchan Hpub]") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     (* apply swtch. *)
-    iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
+    iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs cpu_id) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj
               Hctxlen Holdc Hnewc
               with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP] [-]").
@@ -862,7 +862,7 @@ Section ProofSched.
     iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
     (* resume: elim the SECOND disjunct (dispatched proc). *)
     iDestruct "Hresume" as (cret) "[Hvc' Hpay]".
-    iDestruct (p_sched_at_proc γs j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
+    iDestruct (p_sched_at_proc γs cpu_id j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
       as "(%Htpv & %Hcret & %Hpidx & Hpay2)".
     iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
