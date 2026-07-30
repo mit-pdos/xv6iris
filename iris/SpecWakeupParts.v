@@ -13,7 +13,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import IntrDefs.
@@ -28,14 +28,15 @@ Notation WK := KernelSyms.wakeup.
    (SpecWakeup.v).  There is no myproc axiom. *)
 
 Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
-  ( ∀ (M : regfile) (vpad : mword 64),
+  wp_next b (fun (CID : CpuId) =>
+      ∀ (M : regfile) (vpad : mword 64),
       ⌜ M !!! Regidx (mword_of_int 9)  = proc_addr 0
       /\ M !!! Regidx (mword_of_int 18) = proc_addr NPROC
       /\ M !!! Regidx (mword_of_int 19) = (mword_of_int 2 : mword 64)
@@ -43,7 +44,6 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ M !!! Regidx (mword_of_int 20) = m !!! Regidx (mword_of_int 10)
       /\ M !!! Regidx csp_rs1 = spF
       /\ M !!! Regidx (mword_of_int 1)  = m !!! Regidx (mword_of_int 1)
-      /\ M !!! Regidx (mword_of_int 4)  = m !!! Regidx (mword_of_int 4)
       /\ M !!! Regidx (mword_of_int 22) = m !!! Regidx (mword_of_int 22)
       /\ M !!! Regidx (mword_of_int 23) = m !!! Regidx (mword_of_int 23)
       /\ M !!! Regidx (mword_of_int 24) = m !!! Regidx (mword_of_int 24)
@@ -51,7 +51,7 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ M !!! Regidx (mword_of_int 26) = m !!! Regidx (mword_of_int 26)
       /\ M !!! Regidx (mword_of_int 27) = m !!! Regidx (mword_of_int 27)
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap M)) ⌝ -∗
-      sie_cap_gpr γ M (K - 8) -∗
+      sie_cap_gpr M (K - 8) b -∗
       pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
       wk_fcell spF 7 ↦₈ (m !!! Regidx (mword_of_int 1)) -∗
       wk_fcell spF 6 ↦₈ (m !!! Regidx (mword_of_int 8)) -∗
@@ -65,18 +65,19 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) :=
+    (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) :=
   let spF := M !!! Regidx csp_rs1 in
   let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) in
   let rettgt := ret_pc vra in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
-  sie_cap_gpr γ M (K - 8) -∗
+  sie_cap_gpr M (K - 8) b -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗
   wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗
   wk_fcell spF 4 ↦₈ vs2 -∗ wk_fcell spF 3 ↦₈ vs3 -∗ wk_fcell spF 2 ↦₈ vs4 -∗
   wk_fcell spF 1 ↦₈ vs5 -∗ wk_fcell spF 0 ↦₈ vpad -∗
-  ( ∀ Mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+      ∀ Mf : regfile,
       ⌜ Mf !!! Regidx (mword_of_int 1)  = vra
       /\ Mf !!! Regidx (mword_of_int 8)  = vs0
       /\ Mf !!! Regidx (mword_of_int 9)  = vs1
@@ -85,7 +86,6 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ Mf !!! Regidx (mword_of_int 20) = vs4
       /\ Mf !!! Regidx (mword_of_int 21) = vs5
       /\ Mf !!! Regidx csp_rs1 = sp0
-      /\ Mf !!! Regidx (mword_of_int 4)  = M !!! Regidx (mword_of_int 4)
       /\ Mf !!! Regidx (mword_of_int 22) = M !!! Regidx (mword_of_int 22)
       /\ Mf !!! Regidx (mword_of_int 23) = M !!! Regidx (mword_of_int 23)
       /\ Mf !!! Regidx (mword_of_int 24) = M !!! Regidx (mword_of_int 24)
@@ -93,7 +93,7 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
       /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr γ Mf K -∗
+      sie_cap_gpr Mf K b -∗
       pc_is rettgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -101,10 +101,10 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
 Module Type WAKEUPPARTS.
   Parameter wp_wakeup_prologue_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat),
-      wp_wakeup_prologue_sconf_body γ Φ m K.
+      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool),
+      wp_wakeup_prologue_sconf_body Φ m K b.
   Parameter wp_wakeup_epilogue_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64),
-      wp_wakeup_epilogue_sconf_body γ Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad.
+      (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool),
+      wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b.
 End WAKEUPPARTS.

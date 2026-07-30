@@ -14,8 +14,17 @@ stale `.vo`).
 - `eval $(opam env --switch=/shared/xv6rocq)` first, always.
 - `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden <file>.v`
 - Compile **one file at a time**, only files you were assigned.
-- **NEVER** `make clean-proofs` (nukes the shared `.vo` tree, breaks every
-  sibling), and do not run a full `make`.
+- **NEVER run `make` in any form.** Not `make`, not `make -f CoqMakefile`, not
+  `make clean-proofs`, not "just to check". This has already happened once and
+  it wiped the shared `.vo` tree (641 files down to 10) out from under five
+  concurrently-running agents. `make` here can clean and rebuild from scratch,
+  which costs everyone ~20 minutes and makes every other agent's compiles fail
+  with errors that look like porting bugs but are not. The orchestrator runs
+  the shared builds; you run `coqc` on your own files and nothing else.
+- **If you see `Cannot find a physical path bound to logical path X`, or the
+  `.vo` files have vanished: STOP AND WAIT.** Someone is rebuilding the shared
+  tree. Do NOT edit your source in response — nothing is wrong with it. Sleep
+  60s and retry the same `coqc`. Report it if it persists past a few minutes.
 - Everything above `IntrDefs.v` is broken on this branch by design. Ignore
   breakage outside your assignment.
 - **"Compiled library X makes inconsistent assumptions over library Y" is
