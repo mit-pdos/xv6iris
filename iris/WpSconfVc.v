@@ -42,7 +42,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import VcGen VcGenS.
 Require Import StackOwn.
 Require Import IntrDefs.
@@ -165,20 +165,63 @@ Definition vc_store8_sp (st : vsstate) (pc' : Z) (a : sval) (v2 : sval)
       end
   end.
 
+(* [rd_tp_bad rd]: the executor's OWN gate against a generic write's two
+   forbidden destinations, sp AND tp -- exactly [IntrDefs.rd_ok]'s two
+   conjuncts negated, decided as a bool since every use here sits inside a
+   plain (non-Iris) match.  [VcGenS.vc_step_s] only ever excluded
+   [uint rd = 0]; tp becomes a second forbidden destination now that the
+   register file PINS it (HartTp.v), so a leaf write to it would falsify
+   the pin -- the guard has to reject that case here, at the executor,
+   since [rd] is a symbolic block-local register with no other place to
+   rule it out. *)
+Definition rd_tp_bad (rd : mword 5) : bool :=
+  orb (eq_vec rd csp_rs1) (eq_vec rd (mword_of_int 4 : mword 5)).
+
+Local Lemma rd_tp_bad_false (rd : mword 5) : rd_tp_bad rd = false -> rd_ok rd.
+Proof.
+  unfold rd_tp_bad, rd_ok. intro H. apply orb_false_iff in H. destruct H as [H1 H2].
+  pose proof (neq_of_eq_vec_false _ _ H1) as Hsp.
+  pose proof (neq_of_eq_vec_false _ _ H2) as Htp.
+  split; [exact Hsp | intro Heq; injection Heq as Heq2; exact (Htp Heq2)].
+Qed.
+
+(* [is_tp r]: the executor's gate against a generic READ source being tp.
+   [gpr_matches] relates the block's symbolic register map to the PLAIN
+   register file [m], not to [rget m _] -- so at [r = tp] the two can
+   disagree (the plain slot is whatever the caller's [m] happens to carry,
+   while the hardware always reads the pin). VcGenS.vc_step_s never guarded
+   against this because tp did not exist as a distinguished slot before the
+   pin; the guard has to reject it here for every opcode that reads a
+   variable (non-sp) register, since [rd]/[rs1]/[rs2] are symbolic
+   block-local registers with no other place to rule this out. *)
+Definition is_tp (r : mword 5) : bool := eq_vec r (mword_of_int 4 : mword 5).
+
+Local Lemma is_tp_false (r : mword 5) : is_tp r = false -> Regidx r <> Regidx Rtp.
+Proof.
+  unfold is_tp. intro H. pose proof (neq_of_eq_vec_false _ _ H) as Hne.
+  intro Heq. injection Heq as Heq2. exact (Hne Heq2).
+Qed.
+
 Definition vc_step_sp_s (st : vsstate) (op : vop_s) : option vsstate :=
   let pc' := (vsb st).(vpc) + vop_s_w op in
   match op with
   | VScaddi imm rd =>
       if eq_vec rd csp_rs1
       then vc_step_sp_move st pc' (zimm12 (sign_extend' 12 imm))
+      else if rd_tp_bad rd then None
       else lift_base st (vc_step_s (vsb st) op)
   | VScaddi16sp imm6 =>
       vc_step_sp_move st pc' (zimm12 (caddi16sp_imm imm6))
-  | VScaddi4spn _ _ rd | VScldsp _ rd | VSclw _ _ rd | VScaddiw _ rd =>
-      if eq_vec rd csp_rs1 then None else lift_base st (vc_step_s (vsb st) op)
-  | VSld _ _ _ rd =>
-      if eq_vec rd csp_rs1 then None else lift_base st (vc_step_s (vsb st) op)
+  | VScaddi4spn _ _ rd | VScldsp _ rd | VScaddiw _ rd =>
+      if rd_tp_bad rd then None else lift_base st (vc_step_s (vsb st) op)
+  | VSclw _ rs1 rd =>
+      if orb (rd_tp_bad rd) (is_tp rs1) then None
+      else lift_base st (vc_step_s (vsb st) op)
+  | VSld _ _ rs1 rd =>
+      if orb (rd_tp_bad rd) (is_tp rs1) then None
+      else lift_base st (vc_step_s (vsb st) op)
   | VScsdsp uimm rs2 =>
+      if is_tp rs2 then None else
       match (vsb st).(vregs) !! Regidx csp_rs1, (vsb st).(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
           if negb (sval_is64 v1) then None
@@ -186,14 +229,16 @@ Definition vc_step_sp_s (st : vsstate) (op : vop_s) : option vsstate :=
       | _, _ => None
       end
   | VSsd _ imm rs2 rs1 =>
+      if orb (is_tp rs1) (is_tp rs2) then None else
       match (vsb st).(vregs) !! Regidx rs1, (vsb st).(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
           if negb (sval_is64 v1) then None
           else vc_store8_sp st pc' (sval_addZ v1 (zimm12 imm)) v2
       | _, _ => None
       end
-  | VScsw _ _ _ =>
-      lift_base st (vc_step_s (vsb st) op)
+  | VScsw imm rs2 rs1 =>
+      if orb (is_tp rs1) (is_tp rs2) then None
+      else lift_base st (vc_step_s (vsb st) op)
   end.
 
 Fixpoint vc_block_sp_s (st : vsstate) (prog : list vop_s) : option vsstate :=
@@ -307,21 +352,23 @@ Proof.
     cbn [vc_step_sp_s] in H, Hlift.
   - destruct (eq_vec rd csp_rs1).
     + exact (vc_step_sp_move_ux _ _ _ _ H Hux).
-    + exact (Hlift H).
-  - destruct (eq_vec rd csp_rs1); [discriminate|]. exact (Hlift H).
-  - destruct (vregs (vsb st) !! Regidx csp_rs1) as [v1|]; [|discriminate].
+    + destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
+  - destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
+  - destruct (is_tp rs2); [discriminate|].
+    destruct (vregs (vsb st) !! Regidx csp_rs1) as [v1|]; [|discriminate].
     destruct (vregs (vsb st) !! Regidx rs2) as [v2|]; [|discriminate].
     destruct (negb (sval_is64 v1)); [discriminate|].
     destruct (vc_store8_sp_ux _ _ _ _ _ H) as [-> ->]. split; [exact Hux | lia].
-  - destruct (eq_vec rd csp_rs1); [discriminate|]. exact (Hlift H).
-  - destruct (eq_vec rd csp_rs1); [discriminate|]. exact (Hlift H).
-  - exact (Hlift H).
-  - destruct (eq_vec rd csp_rs1); [discriminate|]. exact (Hlift H).
-  - destruct (vregs (vsb st) !! Regidx rs1) as [v1|]; [|discriminate].
+  - destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
+  - destruct (orb (rd_tp_bad rd) (is_tp rs1)); [discriminate|]. exact (Hlift H).
+  - destruct (orb (is_tp rs1) (is_tp rs2)); [discriminate|]. exact (Hlift H).
+  - destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
+  - destruct (orb (is_tp rs1) (is_tp rs2)); [discriminate|].
+    destruct (vregs (vsb st) !! Regidx rs1) as [v1|]; [|discriminate].
     destruct (vregs (vsb st) !! Regidx rs2) as [v2|]; [|discriminate].
     destruct (negb (sval_is64 v1)); [discriminate|].
     destruct (vc_store8_sp_ux _ _ _ _ _ H) as [-> ->]. split; [exact Hux | lia].
-  - destruct (eq_vec rd csp_rs1); [discriminate|]. exact (Hlift H).
+  - destruct (orb (rd_tp_bad rd) (is_tp rs1)); [discriminate|]. exact (Hlift H).
   - exact (vc_step_sp_move_ux _ _ _ _ H Hux).
 Qed.
 
@@ -534,44 +581,66 @@ Section WpSconfVc.
     ⊢ stack_own spN k.
   Proof. intro Hb. rewrite stack_own_base Hb. done. Qed.
 
+  (* [wp_next_shift]: re-anchor a [wp_next] obligation from the hart it was
+     stated at ([CID]) to a hart reached mid-block ([CID1]), given the
+     conditional equality a leaf's own crossing produced.  This is what makes
+     the [induction prog] proof below work: [IH], instantiated at the fresh
+     hart a leaf's [wp_next] introduces, wants its OWN final continuation
+     anchored there, while the caller's ["Hcont"] is still anchored at
+     whatever hart THIS invocation started at.  Both are the SAME [K] (the
+     block's final state [st']/[m0]/[n] never change across a step), so only
+     the anchor needs to move -- exactly the composition [wp_next_trans]
+     proves pointwise, here packaged as a proposition-level rewrite so it
+     can be applied to a live "Hcont" resource with [iDestruct ... as]. *)
+  Lemma wp_next_shift {K : CpuId -> iProp Σ} {b : bool} {CIDa CIDb : CpuId}
+      (Hs : b = false -> (CIDb : CPU) = (CIDa : CPU)) :
+    wp_next (CID0 := CIDa) b K -∗ wp_next (CID0 := CIDb) b K.
+  Proof.
+    iEval (rewrite /wp_next). iIntros "H" (CID2 Hs2).
+    iEval (rewrite /wp_next) in "H". iApply "H". iPureIntro.
+    intro Hb. specialize (Hs2 Hb). specialize (Hs Hb). congruence.
+  Qed.
+
   (* ==================================================================== *)
   (* 4. THE block lemma: one symbolic run = one WP, sp moves included.     *)
   (* ==================================================================== *)
-  Lemma wp_vc_block_s_sconf_aux (γ : gname)
+  Lemma wp_vc_block_s_sconf_aux
       (prog : list vop_s) (Φ : mval -> iProp Σ)
       (st st' : vsstate) (ρ : nat -> mword 64)
-      (m m0 : regfile) (n : nat) :
+      (m m0 : regfile) (n : nat) (b : bool) :
     vc_block_sp_s st prog = Some st' ->
     (vsu st <= vsx st)%nat ->
     (vsx st' <= n)%nat ->
     gpr_matches ρ (vsb st).(vregs) m ->
     agree_off (vsb st).(vregs) m m0 ->
-    sie_cap_gpr γ m (n - vsu st) -∗
+    sie_cap_gpr m (n - vsu st) b -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
     vheap_own ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
-    ( ∀ mf : regfile,
+    wp_next b (fun (CID : CpuId) =>
+      (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m0 ⌝ -∗
-      sie_cap_gpr γ mf (n - vsu st') -∗
+      sie_cap_gpr mf (n - vsu st') b -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
       vframe_own ρ (vsf st') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    revert st m. induction prog as [|op rest IH]; intros st m Hblk Hux Hxn Hmatch Hao.
+    revert st m CID. induction prog as [|op rest IH]; intros st m CID Hblk Hux Hxn Hmatch Hao.
     - (* empty block *)
       simpl in Hblk. injection Hblk as <-.
       iIntros "Hcg Hpc _ Hheap Hheap4 Hfr Hcont".
+      iSpecialize ("Hcont" $! CID with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! m with "[//] Hcg Hpc Hheap Hheap4 Hfr").
     - cbn [vc_block_sp_s] in Hblk.
       destruct (vc_step_sp_s st op) as [st1|] eqn:Hstep; [|discriminate].
       pose proof (vc_step_sp_ux _ _ _ Hstep Hux) as [Hux1 _].
       pose proof (proj2 (vc_block_sp_ux _ _ _ Hblk Hux1)) as Hxmono.
-      destruct st as [b u x fr].
+      destruct st as [vb u x fr].
       cbn [vsu vsx vsb vsf] in Hux |- *.
       iIntros "Hcg Hpc [Hi Hbi] Hheap Hheap4 Hfr Hcont".
       destruct op as [imm rd|rdc nzimm rd|uimm rs2|uimm rd
@@ -583,7 +652,7 @@ Section WpSconfVc.
         * (* ---- c.addi sp, imm : an sp move ---- *)
           pose proof (proj1 (eq_vec_true_iff _ _) Hrdsp0) as Hrdeq. subst rd.
           unfold vc_step_sp_move in Hstep; cbn [vsb vsu vsx vsf] in Hstep.
-          destruct (vregs b !! Regidx csp_rs1) as [v|] eqn:Hrs1; [|discriminate].
+          destruct (vregs vb !! Regidx csp_rs1) as [v|] eqn:Hrs1; [|discriminate].
           destruct (sval_is64 v) eqn:H64; cbn [negb] in Hstep; [|discriminate].
           set (d := zimm12 (sign_extend' 12 imm)) in *.
           destruct (andb (Z.leb 0 d) (Z.ltb d vsp_wrap)) eqn:Hrange;
@@ -607,7 +676,7 @@ Section WpSconfVc.
             set (k := Z.to_nat (d / 8)) in *.
             destruct (Nat.leb k u) eqn:Hku0; cbn [negb] in Hstep; [|discriminate].
             apply Nat.leb_le in Hku0.
-            destruct (pop_absorb (vheap b) fr v (seq 0 k)) as [[h' fr']|] eqn:Habs;
+            destruct (pop_absorb (vheap vb) fr v (seq 0 k)) as [[h' fr']|] eqn:Habs;
               [|discriminate].
             injection Hstep as <-.
             cbn [vsu vsx] in Hux1, Hxmono.
@@ -617,21 +686,22 @@ Section WpSconfVc.
                          = pa_stk (add_vec (m !!! Regidx csp_rs1)
                                      (sign_extend' 64 (sign_extend' 12 imm))) k).
             { apply pop_addr_eq. rewrite Hek. unfold d, zimm12. reflexivity. }
-            iDestruct (pop_absorb_sound ρ v (seq 0 k) (vheap b) h' fr fr' H64 Habs
+            iDestruct (pop_absorb_sound ρ v (seq 0 k) (vheap vb) h' fr fr' H64 Habs
                          with "Hheap Hfr") as "(Hheap & Hfr & Hslots)".
             assert (Hb' : sval_den ρ v
                           = pa_stk (add_vec (m !!! Regidx csp_rs1)
                                       (sign_extend' 64 (sign_extend' 12 imm))) k)
               by (rewrite -Hm1; exact Hw).
             iDestruct (stack_of_absorbed ρ v _ k Hb' with "Hslots") as "Hframe".
-            iApply (wp_caddi_sp_pop_s_sconf γ Φ (mword_of_int (vpc b)) imm
-                      m (n - u) k Hw
+            iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (vpc vb)) imm
+                      m (n - u) k b Hw
                       with "Hcg Hpc Hi Hframe").
-            iIntros "Hcg Hpc".
+            iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc".
             iEval (rewrite avi_mword) in "Hpc".
             assert (Hnk : ((n - u) + k)%nat = (n - (u - k))%nat) by lia.
             iEval (rewrite Hnk) in "Hcg".
-            iApply (IH _ _ Hblk Hux1 Hxn
+            iDestruct (wp_next_shift Hs1 with "Hcont") as "Hcont".
+            iApply (IH _ _ CID1 Hblk Hux1 Hxn
                       (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                       (agree_off_step Hao)
                       with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont"). }
@@ -650,10 +720,10 @@ Section WpSconfVc.
                                  (sign_extend' 64 (sign_extend' 12 imm))
                          = pa_stk (m !!! Regidx csp_rs1) k).
             { apply push_addr_eq. rewrite Hek. unfold d, zimm12. reflexivity. }
-            iApply (wp_caddi_sp_push_s_sconf γ Φ (mword_of_int (vpc b)) imm
-                      m (n - u) k Hkle0 Hw
+            iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int (vpc vb)) imm
+                      m (n - u) k b Hkle0 Hw
                       with "Hcg Hpc Hi").
-            iIntros "Hcg Hframe Hpc".
+            iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hframe Hpc".
             iEval (rewrite avi_mword) in "Hpc".
             assert (Hnk : ((n - u) - k)%nat = (n - (u + k))%nat) by lia.
             iEval (rewrite Hnk) in "Hcg".
@@ -669,50 +739,56 @@ Section WpSconfVc.
                            <$> seq 0 k) ++ fr))
               with "[Hframe Hfr]" as "Hfr".
             { rewrite vframe_own_app. iFrame "Hframe Hfr". }
-            iApply (IH _ _ Hblk Hux1 Hxn
+            iDestruct (wp_next_shift Hs2 with "Hcont") as "Hcont".
+            iApply (IH _ _ CID2 Hblk Hux1 Hxn
                       (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                       (agree_off_step Hao)
                       with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont"). }
         * (* ---- ordinary c.addi rd, imm ---- *)
-          pose proof (neq_of_eq_vec_false _ _ Hrdsp0) as Hrdsp.
+          destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
+          pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
           unfold lift_base in Hstep; simpl in Hstep.
           destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
           apply Z.eqb_neq in Hrd0.
-          destruct (vregs b !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
+          destruct (vregs vb !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
           destruct (sval_is64 v1) eqn:H64; [|discriminate].
           injection Hstep as <-.
           pose proof (Hmatch _ _ Hrs1) as Hm1.
-          iApply (wp_caddi_s_sconf γ Φ (mword_of_int (vpc b)) rd imm m (n - u)
-                    Hrd0 Hrdsp
-                    with "Hcg Hpc Hi").
-          iIntros "Hcg Hpc".
-          iEval (rewrite avi_mword) in "Hpc".
           assert (Hval : regval_into_reg
-                      (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))
+                      (add_vec (rget m rd) (sign_extend' 64 (sign_extend' 12 imm)))
                   = sval_den ρ (sval_addZ v1 (zimm12 (sign_extend' 12 imm)))).
           { unfold regval_into_reg.
-            rewrite Hm1 (sval_den_add_imm ρ v1 (sign_extend' 12 imm) H64).
+            rewrite (rget_ne m rd (rd_ok_tp _ Hrdok)) Hm1
+              (sval_den_add_imm ρ v1 (sign_extend' 12 imm) H64).
             reflexivity. }
-          iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
-                    (agree_off_step Hao)
-                    with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
+          iApply (wp_caddi_s_sconf Φ (mword_of_int (vpc vb)) rd imm m (n - u) b
+                    Hrd0 Hrdok
+                    with "Hcg Hpc Hi").
+          iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc".
+          iEval (rewrite avi_mword) in "Hpc".
+          iDestruct (wp_next_shift Hs3 with "Hcont") as "Hcont".
+          epose proof (IH _ _ CID3 Hblk Hux1 Hxn
+                      (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+                      (agree_off_step Hao)) as IH1.
+          cbn [vsu vsx vsb vsf vpc vregs vheap vheap4] in IH1.
+          iApply (IH1 with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScaddi4spn *)
-        destruct (eq_vec rd csp_rs1) eqn:Hrdsp0; [discriminate|].
-        pose proof (neq_of_eq_vec_false _ _ Hrdsp0) as Hrdsp.
+        destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
+        pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
         unfold lift_base in Hstep; simpl in Hstep.
         destruct (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) eqn:Hrdc0;
           [|discriminate].
         pose proof (regidx_eqb_eq _ _ Hrdc0) as Hrdc. cbn [negb] in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
-        destruct (vregs b !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddi4spn_s_sconf γ Φ (mword_of_int (vpc b))
-                  rdc nzimm rd m (n - u) Hrdc Hrd0 Hrdsp
+        iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (vpc vb))
+                  rdc nzimm rd m (n - u) b Hrdc Hrd0 Hrdok
                   with "Hcg Hpc Hi").
-        iIntros "Hcg Hpc".
+        iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hcg Hpc".
         iEval (rewrite avi_mword) in "Hpc".
         assert (Hval : regval_into_reg
                     (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
@@ -720,12 +796,15 @@ Section WpSconfVc.
         { unfold regval_into_reg.
           rewrite Hm1 (sval_den_add_imm ρ v1 (caddi4spn_imm nzimm) H64).
           reflexivity. }
-        iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iDestruct (wp_next_shift Hs4 with "Hcont") as "Hcont".
+        iApply (IH _ _ CID4 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                   (agree_off_step Hao)
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScsdsp : store, cell overwrite or ledger-slot initialization *)
-        destruct (vregs b !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
-        destruct (vregs b !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
+        destruct (is_tp rs2) eqn:Hbad2; [discriminate|].
+        pose proof (is_tp_false _ Hbad2) as Hrs2ok.
+        destruct (vregs vb !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
         unfold vc_store8_sp in Hstep; cbn [vsb vsu vsx vsf] in Hstep.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
@@ -734,7 +813,8 @@ Section WpSconfVc.
                       = add_vec (m !!! Regidx csp_rs1)
                                 (zero_extend' 64 (concat_vec uimm ('b"000")))).
         { unfold zoff6. rewrite (sval_den_add_off ρ v1 _ H64) Hm1. reflexivity. }
-        destruct (vheap_find (vheap b) (sval_addZ v1 (zoff6 uimm)))
+        pose proof (rget_ne m rs2 Hrs2ok) as Hrget2.
+        destruct (vheap_find (vheap vb) (sval_addZ v1 (zoff6 uimm)))
           as [[i vold]|] eqn:Hfind.
         * (* existing cell *)
           injection Hstep as <-.
@@ -744,15 +824,16 @@ Section WpSconfVc.
             as "[Hcell Hheapk]".
           iEval (cbn [fst snd]) in "Hcell".
           iEval (rewrite Hea) in "Hcell".
-          iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (vpc b)) uimm rs2
-                    m (n - u) (sval_den ρ vold)
+          iApply (wp_csdsp_s_sconf Φ (mword_of_int (vpc vb)) uimm rs2
+                    m (n - u) (sval_den ρ vold) b
                     with "Hcg Hpc Hi Hcell").
-          iIntros "Hcg Hpc Hcell".
+          iEval (rewrite /wp_next). iIntros (CID5 Hs5) "Hcg Hpc Hcell".
           iEval (rewrite avi_mword) in "Hpc".
-          iEval (rewrite Hm2 -Hea) in "Hcell".
+          iEval (rewrite Hrget2 Hm2 -Hea) in "Hcell".
           iDestruct ("Hheapk" $! (sval_addZ v1 (zoff6 uimm), v2) with "[Hcell]")
             as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+          iDestruct (wp_next_shift Hs5 with "Hcont") as "Hcont".
+          iApply (IH _ _ CID5 Hblk Hux1 Hxn Hmatch Hao
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
         * (* fresh ledger slot *)
           destruct (frame_remove fr (sval_addZ v1 (zoff6 uimm))) as [fr1|] eqn:Hfrm;
@@ -762,26 +843,27 @@ Section WpSconfVc.
           iDestruct "Hfr" as "[Hslot Hfr]".
           iDestruct "Hslot" as (wold) "Hslot".
           iEval (rewrite Hea) in "Hslot".
-          iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (vpc b)) uimm rs2
-                    m (n - u) wold
+          iApply (wp_csdsp_s_sconf Φ (mword_of_int (vpc vb)) uimm rs2
+                    m (n - u) wold b
                     with "Hcg Hpc Hi Hslot").
-          iIntros "Hcg Hpc Hslot".
+          iEval (rewrite /wp_next). iIntros (CID6 Hs6) "Hcg Hpc Hslot".
           iEval (rewrite avi_mword) in "Hpc".
-          iEval (rewrite Hm2 -Hea) in "Hslot".
-          iAssert (vheap_own ρ (vheap b ++ [(sval_addZ v1 (zoff6 uimm), v2)]))
+          iEval (rewrite Hrget2 Hm2 -Hea) in "Hslot".
+          iAssert (vheap_own ρ (vheap vb ++ [(sval_addZ v1 (zoff6 uimm), v2)]))
             with "[Hheap Hslot]" as "Hheap".
           { rewrite vheap_own_snoc. iFrame "Hheap Hslot". }
-          iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+          iDestruct (wp_next_shift Hs6 with "Hcont") as "Hcont".
+          iApply (IH _ _ CID6 Hblk Hux1 Hxn Hmatch Hao
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScldsp *)
-        destruct (eq_vec rd csp_rs1) eqn:Hrdsp0; [discriminate|].
-        pose proof (neq_of_eq_vec_false _ _ Hrdsp0) as Hrdsp.
+        destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
+        pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
         unfold lift_base in Hstep; simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
-        destruct (vregs b !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
-        destruct (vheap_find (vheap b) (sval_addZ v1 (zoff6 uimm)))
+        destruct (vheap_find (vheap vb) (sval_addZ v1 (zoff6 uimm)))
           as [[i vv]|] eqn:Hfind; [|discriminate].
         injection Hstep as <-.
         pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
@@ -795,122 +877,142 @@ Section WpSconfVc.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (vpc b)) uimm rd
-                  m (n - u) (sval_den ρ vv) (dqm:=DfracOwn 1) Hrd0 Hrdsp
+        iApply (wp_cldsp_s_sconf Φ (mword_of_int (vpc vb)) uimm rd
+                  m (n - u) (sval_den ρ vv) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                   with "Hcg Hpc Hi Hcell").
-        iIntros "Hcg Hpc Hcell".
+        iEval (rewrite /wp_next). iIntros (CID7 Hs7) "Hcg Hpc Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite -Hea) in "Hcell".
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
         assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv)
           by reflexivity.
-        iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iDestruct (wp_next_shift Hs7 with "Hcont") as "Hcont".
+        iApply (IH _ _ CID7 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                   (agree_off_step Hao)
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VSclw *)
-        destruct (eq_vec rd csp_rs1) eqn:Hrdsp0; [discriminate|].
-        pose proof (neq_of_eq_vec_false _ _ Hrdsp0) as Hrdsp.
+        destruct (orb (rd_tp_bad rd) (is_tp rs1)) eqn:Hbad; [discriminate|].
+        apply orb_false_iff in Hbad as [Hbadrd Hbadrs1].
+        pose proof (rd_tp_bad_false _ Hbadrd) as Hrdok.
+        pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
         unfold lift_base in Hstep; simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
-        destruct (vregs b !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
-        destruct (vheap_find (vheap4 b) (sval_addZ v1 (zimm12 imm)))
+        destruct (vheap_find (vheap4 vb) (sval_addZ v1 (zimm12 imm)))
           as [[i w32]|] eqn:Hfind; [|discriminate].
         injection Hstep as <-.
         pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
-                      = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-        { rewrite (sval_den_add_imm ρ v1 imm H64) Hm1. reflexivity. }
+                      = add_vec (rget m rs1) (sign_extend' 64 imm)).
+        { rewrite (rget_ne m rs1 Hrs1ok) (sval_den_add_imm ρ v1 imm H64) Hm1.
+          reflexivity. }
         rewrite /vheap4_own.
         iDestruct (big_sepL_lookup_acc _ _ _ _ Hcell with "Hheap4")
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_clw_s_sconf γ Φ (mword_of_int (vpc b)) rd rs1 imm
-                  m (n - u) (sval32_den ρ w32) (dqm:=DfracOwn 1) Hrd0 Hrdsp
+        iApply (wp_clw_s_sconf Φ (mword_of_int (vpc vb)) rd rs1 imm
+                  m (n - u) (sval32_den ρ w32) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                   with "Hcg Hpc Hi Hcell").
-        iIntros "Hcg Hpc Hcell".
+        iEval (rewrite /wp_next). iIntros (CID8 Hs8) "Hcg Hpc Hcell".
         iEval (rewrite avi_mword) in "Hpc".
         iEval (rewrite -Hea) in "Hcell".
         iDestruct ("Hheapk" with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
         assert (Hval : regval_into_reg (sign_extend' 64 (sval32_den ρ w32))
                        = sval_den ρ (S32 w32)) by reflexivity.
-        iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+        iDestruct (wp_next_shift Hs8 with "Hcont") as "Hcont".
+        iApply (IH _ _ CID8 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                   (agree_off_step Hao)
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScsw *)
+        destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Hbad; [discriminate|].
+        apply orb_false_iff in Hbad as [Hbadrs1 Hbadrs2].
+        pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
+        pose proof (is_tp_false _ Hbadrs2) as Hrs2ok.
         unfold lift_base in Hstep; simpl in Hstep.
-        destruct (vregs b !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
-        destruct (vregs b !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
+        destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
-        destruct (vheap_find (vheap4 b) (sval_addZ v1 (zimm12 imm)))
+        destruct (vheap_find (vheap4 vb) (sval_addZ v1 (zimm12 imm)))
           as [[i wold]|] eqn:Hfind; [|discriminate].
         injection Hstep as <-.
         pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         pose proof (Hmatch _ _ Hrs2) as Hm2.
         assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
-                      = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-        { rewrite (sval_den_add_imm ρ v1 imm H64) Hm1. reflexivity. }
+                      = add_vec (rget m rs1) (sign_extend' 64 imm)).
+        { rewrite (rget_ne m rs1 Hrs1ok) (sval_den_add_imm ρ v1 imm H64) Hm1.
+          reflexivity. }
+        assert (Hsv : trunc32 (rget m rs2) = sval32_den ρ (sval_trunc32 v2)).
+        { rewrite (rget_ne m rs2 Hrs2ok) sval_trunc32_den Hm2. reflexivity. }
         rewrite /vheap4_own.
         iDestruct (big_sepL_insert_acc _ _ _ _ Hcell with "Hheap4")
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csw_s_sconf γ Φ (mword_of_int (vpc b)) rs2 rs1 imm
-                  m (n - u) (sval32_den ρ wold)
+        iApply (wp_csw_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+                  m (n - u) (sval32_den ρ wold) b
                   with "Hcg Hpc Hi Hcell").
-        iIntros "Hcg Hpc Hcell".
+        iEval (rewrite /wp_next). iIntros (CID9 Hs9) "Hcg Hpc Hcell".
         iEval (rewrite avi_mword) in "Hpc".
-        assert (Hsv : trunc32 (m !!! Regidx rs2) = sval32_den ρ (sval_trunc32 v2)).
-        { rewrite sval_trunc32_den Hm2. reflexivity. }
         iEval (rewrite Hsv -Hea) in "Hcell".
         iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), sval_trunc32 v2)
                      with "[Hcell]") as "Hheap4"; [iExact "Hcell"|].
-        iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+        iDestruct (wp_next_shift Hs9 with "Hcont") as "Hcont".
+        iApply (IH _ _ CID9 Hblk Hux1 Hxn Hmatch Hao
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScaddiw *)
-        destruct (eq_vec rd csp_rs1) eqn:Hrdsp0; [discriminate|].
-        pose proof (neq_of_eq_vec_false _ _ Hrdsp0) as Hrdsp.
+        destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
+        pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
         unfold lift_base in Hstep; simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
-        destruct (vregs b !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddiw_s_sconf γ Φ (mword_of_int (vpc b)) rd imm m (n - u)
-                  Hrd0 Hrdsp
-                  with "Hcg Hpc Hi").
-        iIntros "Hcg Hpc".
-        iEval (rewrite avi_mword) in "Hpc".
         assert (Hval : regval_into_reg
                     (sign_extend' 64 (subrange_vec_dec
-                       (add_vec (m !!! Regidx rd)
+                       (add_vec (rget m rd)
                                 (sign_extend' 64 (sign_extend' 12 imm))) 31 0))
                 = sval_den ρ (S32 (sval32_addZ (sval_trunc32 v1) (zimm32 imm)))).
-        { unfold regval_into_reg. rewrite Hm1.
+        { unfold regval_into_reg. rewrite (rget_ne m rd (rd_ok_tp _ Hrdok)) Hm1.
           cbn [sval_den].
           rewrite sval32_den_addZ.
           rewrite sval_trunc32_den.
           unfold zimm32. rewrite mword_of_int_uint32.
           rewrite -trunc32_add.
           rewrite trunc32_subrange. reflexivity. }
-        iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
-                  (agree_off_step Hao)
-                  with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
+        iApply (wp_caddiw_s_sconf Φ (mword_of_int (vpc vb)) rd imm m (n - u) b
+                  Hrd0 Hrdok
+                  with "Hcg Hpc Hi").
+        iEval (rewrite /wp_next). iIntros (CID10 Hs10) "Hcg Hpc".
+        iEval (rewrite avi_mword) in "Hpc".
+        iDestruct (wp_next_shift Hs10 with "Hcont") as "Hcont".
+        epose proof (IH _ _ CID10 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+                  (agree_off_step Hao)) as IH1.
+        cbn [vsu vsx vsb vsf vpc vregs vheap vheap4] in IH1.
+        iApply (IH1 with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VSsd : store, cell overwrite or ledger-slot initialization *)
-        destruct (vregs b !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
-        destruct (vregs b !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
+        destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Hbad; [discriminate|].
+        apply orb_false_iff in Hbad as [Hbadrs1 Hbadrs2].
+        pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
+        pose proof (is_tp_false _ Hbadrs2) as Hrs2ok.
+        destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
         unfold vc_store8_sp in Hstep; cbn [vsb vsu vsx vsf] in Hstep.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         pose proof (Hmatch _ _ Hrs2) as Hm2.
         assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
-                      = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-        { rewrite (sval_den_add_imm ρ v1 imm H64) Hm1. reflexivity. }
-        destruct (vheap_find (vheap b) (sval_addZ v1 (zimm12 imm)))
+                      = add_vec (rget m rs1) (sign_extend' 64 imm)).
+        { rewrite (rget_ne m rs1 Hrs1ok) (sval_den_add_imm ρ v1 imm H64) Hm1.
+          reflexivity. }
+        assert (Hsv : rget m rs2 = sval_den ρ v2).
+        { rewrite (rget_ne m rs2 Hrs2ok). exact Hm2. }
+        destruct (vheap_find (vheap vb) (sval_addZ v1 (zimm12 imm)))
           as [[i vold]|] eqn:Hfind.
         * (* existing cell *)
           injection Hstep as <-.
@@ -921,25 +1023,27 @@ Section WpSconfVc.
           iEval (cbn [fst snd]) in "Hcell".
           iEval (rewrite Hea) in "Hcell".
           destruct rvc.
-          -- iApply (wp_csd_s_sconf γ Φ (mword_of_int (vpc b)) rs2 rs1 imm
-                       m (n - u) (sval_den ρ vold)
+          -- iApply (wp_csd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+                       m (n - u) (sval_den ρ vold) b
                        with "Hcg Hpc Hi Hcell").
-             iIntros "Hcg Hpc Hcell".
+             iEval (rewrite /wp_next). iIntros (CID11 Hs11) "Hcg Hpc Hcell".
              iEval (rewrite avi_mword) in "Hpc".
-             iEval (rewrite Hm2 -Hea) in "Hcell".
+             iEval (rewrite Hsv -Hea) in "Hcell".
              iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
                as "Hheap"; [iExact "Hcell"|].
-             iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+             iDestruct (wp_next_shift Hs11 with "Hcont") as "Hcont".
+             iApply (IH _ _ CID11 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
-          -- iApply (wp_sd_s_sconf γ Φ (mword_of_int (vpc b)) rs2 rs1 imm
-                       m (n - u) (sval_den ρ vold)
+          -- iApply (wp_sd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+                       m (n - u) (sval_den ρ vold) b
                        with "Hcg Hpc Hi Hcell").
-             iIntros "Hcg Hpc Hcell".
+             iEval (rewrite /wp_next). iIntros (CID12 Hs12) "Hcg Hpc Hcell".
              iEval (rewrite avi_mword) in "Hpc".
-             iEval (rewrite Hm2 -Hea) in "Hcell".
+             iEval (rewrite Hsv -Hea) in "Hcell".
              iDestruct ("Hheapk" $! (sval_addZ v1 (zimm12 imm), v2) with "[Hcell]")
                as "Hheap"; [iExact "Hcell"|].
-             iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+             iDestruct (wp_next_shift Hs12 with "Hcont") as "Hcont".
+             iApply (IH _ _ CID12 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
         * (* fresh ledger slot *)
           destruct (frame_remove fr (sval_addZ v1 (zimm12 imm))) as [fr1|] eqn:Hfrm;
@@ -950,44 +1054,49 @@ Section WpSconfVc.
           iDestruct "Hslot" as (wold) "Hslot".
           iEval (rewrite Hea) in "Hslot".
           destruct rvc.
-          -- iApply (wp_csd_s_sconf γ Φ (mword_of_int (vpc b)) rs2 rs1 imm
-                       m (n - u) wold
+          -- iApply (wp_csd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+                       m (n - u) wold b
                        with "Hcg Hpc Hi Hslot").
-             iIntros "Hcg Hpc Hslot".
+             iEval (rewrite /wp_next). iIntros (CID13 Hs13) "Hcg Hpc Hslot".
              iEval (rewrite avi_mword) in "Hpc".
-             iEval (rewrite Hm2 -Hea) in "Hslot".
-             iAssert (vheap_own ρ (vheap b ++ [(sval_addZ v1 (zimm12 imm), v2)]))
+             iEval (rewrite Hsv -Hea) in "Hslot".
+             iAssert (vheap_own ρ (vheap vb ++ [(sval_addZ v1 (zimm12 imm), v2)]))
                with "[Hheap Hslot]" as "Hheap".
              { rewrite vheap_own_snoc. iFrame "Hheap Hslot". }
-             iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+             iDestruct (wp_next_shift Hs13 with "Hcont") as "Hcont".
+             iApply (IH _ _ CID13 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
-          -- iApply (wp_sd_s_sconf γ Φ (mword_of_int (vpc b)) rs2 rs1 imm
-                       m (n - u) wold
+          -- iApply (wp_sd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+                       m (n - u) wold b
                        with "Hcg Hpc Hi Hslot").
-             iIntros "Hcg Hpc Hslot".
+             iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hcg Hpc Hslot".
              iEval (rewrite avi_mword) in "Hpc".
-             iEval (rewrite Hm2 -Hea) in "Hslot".
-             iAssert (vheap_own ρ (vheap b ++ [(sval_addZ v1 (zimm12 imm), v2)]))
+             iEval (rewrite Hsv -Hea) in "Hslot".
+             iAssert (vheap_own ρ (vheap vb ++ [(sval_addZ v1 (zimm12 imm), v2)]))
                with "[Hheap Hslot]" as "Hheap".
              { rewrite vheap_own_snoc. iFrame "Hheap Hslot". }
-             iApply (IH _ _ Hblk Hux1 Hxn Hmatch Hao
+             iDestruct (wp_next_shift Hs14 with "Hcont") as "Hcont".
+             iApply (IH _ _ CID14 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VSld *)
-        destruct (eq_vec rd csp_rs1) eqn:Hrdsp0; [discriminate|].
-        pose proof (neq_of_eq_vec_false _ _ Hrdsp0) as Hrdsp.
+        destruct (orb (rd_tp_bad rd) (is_tp rs1)) eqn:Hbad; [discriminate|].
+        apply orb_false_iff in Hbad as [Hbadrd Hbadrs1].
+        pose proof (rd_tp_bad_false _ Hbadrd) as Hrdok.
+        pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
         unfold lift_base in Hstep; simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
-        destruct (vregs b !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
+        destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
-        destruct (vheap_find (vheap b) (sval_addZ v1 (zimm12 imm)))
+        destruct (vheap_find (vheap vb) (sval_addZ v1 (zimm12 imm)))
           as [[i vv]|] eqn:Hfind; [|discriminate].
         injection Hstep as <-.
         pose proof (vheap_find_lookup _ _ _ _ Hfind) as Hcell.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
         assert (Hea : sval_den ρ (sval_addZ v1 (zimm12 imm))
-                      = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-        { rewrite (sval_den_add_imm ρ v1 imm H64) Hm1. reflexivity. }
+                      = add_vec (rget m rs1) (sign_extend' 64 imm)).
+        { rewrite (rget_ne m rs1 Hrs1ok) (sval_den_add_imm ρ v1 imm H64) Hm1.
+          reflexivity. }
         rewrite /vheap_own.
         iDestruct (big_sepL_lookup_acc _ _ _ _ Hcell with "Hheap")
           as "[Hcell Hheapk]".
@@ -995,24 +1104,26 @@ Section WpSconfVc.
         iEval (rewrite Hea) in "Hcell".
         assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv) by reflexivity.
         destruct rvc.
-        * iApply (wp_cld_s_sconf γ Φ (mword_of_int (vpc b)) rd rs1 imm
-                    m (n - u) (sval_den ρ vv) (dqm:=DfracOwn 1) Hrd0 Hrdsp
+        * iApply (wp_cld_s_sconf Φ (mword_of_int (vpc vb)) rd rs1 imm
+                    m (n - u) (sval_den ρ vv) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                     with "Hcg Hpc Hi Hcell").
-          iIntros "Hcg Hpc Hcell".
+          iEval (rewrite /wp_next). iIntros (CID15 Hs15) "Hcg Hpc Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+          iDestruct (wp_next_shift Hs15 with "Hcont") as "Hcont".
+          iApply (IH _ _ CID15 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                     (agree_off_step Hao)
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
-        * iApply (wp_ld_s_sconf γ Φ (mword_of_int (vpc b)) rd rs1 imm
-                    m (n - u) (sval_den ρ vv) (dqm:=DfracOwn 1) Hrd0 Hrdsp
+        * iApply (wp_ld_s_sconf Φ (mword_of_int (vpc vb)) rd rs1 imm
+                    m (n - u) (sval_den ρ vv) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                     with "Hcg Hpc Hi Hcell").
-          iIntros "Hcg Hpc Hcell".
+          iEval (rewrite /wp_next). iIntros (CID16 Hs16) "Hcg Hpc Hcell".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite -Hea) in "Hcell".
           iDestruct ("Hheapk" with "[Hcell]") as "Hheap"; [iExact "Hcell"|].
-          iApply (IH _ _ Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
+          iDestruct (wp_next_shift Hs16 with "Hcont") as "Hcont".
+          iApply (IH _ _ CID16 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                     (agree_off_step Hao)
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScaddi16sp : an sp move -- invert over abstract d (sp_move_inv) *)
@@ -1039,21 +1150,22 @@ Section WpSconfVc.
                        = pa_stk (add_vec (m !!! Regidx csp_rs1)
                                    (sign_extend' 64 (caddi16sp_imm imm6))) k).
           { apply pop_addr_eq. rewrite Hek. unfold d, zimm12. reflexivity. }
-          iDestruct (pop_absorb_sound ρ v (seq 0 k) (vheap b) h' fr fr' H64 Habs
+          iDestruct (pop_absorb_sound ρ v (seq 0 k) (vheap vb) h' fr fr' H64 Habs
                        with "Hheap Hfr") as "(Hheap & Hfr & Hslots)".
           assert (Hb' : sval_den ρ v
                         = pa_stk (add_vec (m !!! Regidx csp_rs1)
                                     (sign_extend' 64 (caddi16sp_imm imm6))) k)
             by (rewrite -Hm1; exact Hw).
           iDestruct (stack_of_absorbed ρ v _ k Hb' with "Hslots") as "Hframe".
-          iApply (wp_caddi16sp_pop_s_sconf γ Φ (mword_of_int (vpc b)) imm6
-                    m (n - u) k Hw
+          iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (vpc vb)) imm6
+                    m (n - u) k b Hw
                     with "Hcg Hpc Hi Hframe").
-          iIntros "Hcg Hpc".
+          iEval (rewrite /wp_next). iIntros (CID17 Hs17) "Hcg Hpc".
           iEval (rewrite avi_mword) in "Hpc".
           assert (Hnk : ((n - u) + k)%nat = (n - (u - k))%nat) by lia.
           iEval (rewrite Hnk) in "Hcg".
-          iApply (IH _ _ Hblk Hux1 Hxn
+          iDestruct (wp_next_shift Hs17 with "Hcont") as "Hcont".
+          iApply (IH _ _ CID17 Hblk Hux1 Hxn
                     (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                     (agree_off_step Hao)
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
@@ -1067,10 +1179,10 @@ Section WpSconfVc.
                                (sign_extend' 64 (caddi16sp_imm imm6))
                        = pa_stk (m !!! Regidx csp_rs1) k).
           { apply push_addr_eq. rewrite Hek. unfold d, zimm12. reflexivity. }
-          iApply (wp_caddi16sp_push_s_sconf γ Φ (mword_of_int (vpc b)) imm6
-                    m (n - u) k Hkle0 Hw
+          iApply (wp_caddi16sp_push_s_sconf Φ (mword_of_int (vpc vb)) imm6
+                    m (n - u) k b Hkle0 Hw
                     with "Hcg Hpc Hi").
-          iIntros "Hcg Hframe Hpc".
+          iEval (rewrite /wp_next). iIntros (CID18 Hs18) "Hcg Hframe Hpc".
           iEval (rewrite avi_mword) in "Hpc".
           assert (Hnk : ((n - u) - k)%nat = (n - (u + k))%nat) by lia.
           iEval (rewrite Hnk) in "Hcg".
@@ -1086,7 +1198,8 @@ Section WpSconfVc.
                          <$> seq 0 k) ++ fr))
             with "[Hframe Hfr]" as "Hfr".
           { rewrite vframe_own_app. iFrame "Hframe Hfr". }
-          iApply (IH _ _ Hblk Hux1 Hxn
+          iDestruct (wp_next_shift Hs18 with "Hcont") as "Hcont".
+          iApply (IH _ _ CID18 Hblk Hux1 Hxn
                     (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                     (agree_off_step Hao)
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
@@ -1097,33 +1210,34 @@ Section WpSconfVc.
      empty ledger -- supply [vframe_own_nil]), premise [vsx st' <= n] a
      concrete literal vs the spec's stack bound, and [Nat.sub_0_r] to read
      [n - 0] back as [n]. *)
-  Lemma wp_vc_block_s_sconf (γ : gname)
+  Lemma wp_vc_block_s_sconf
       (prog : list vop_s) (Φ : mval -> iProp Σ)
       (st st' : vsstate) (ρ : nat -> mword 64)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     vc_block_sp_s st prog = Some st' ->
     (vsu st <= vsx st)%nat ->
     (vsx st' <= n)%nat ->
     gpr_matches ρ (vsb st).(vregs) m ->
-    sie_cap_gpr γ m (n - vsu st) -∗
+    sie_cap_gpr m (n - vsu st) b -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
     vheap_own ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
-    ( ∀ mf : regfile,
+    wp_next b (fun (CID : CpuId) =>
+      (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m ⌝ -∗
-      sie_cap_gpr γ mf (n - vsu st') -∗
+      sie_cap_gpr mf (n - vsu st') b -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
       vframe_own ρ (vsf st') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hblk Hux Hxn Hmatch.
     iIntros "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont".
-    iApply (wp_vc_block_s_sconf_aux γ prog Φ st st' ρ m m n
+    iApply (wp_vc_block_s_sconf_aux prog Φ st st' ρ m m n b
               Hblk Hux Hxn Hmatch (fun r _ => eq_refl)
               with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
   Qed.

@@ -18,7 +18,7 @@ Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import KallocInv.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import SpecFreerange.
 From Kernel Require KernelSyms.
@@ -27,7 +27,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Notation KI := KernelSyms.kinit.
 
 Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (vlock : bv 32) (vname vcpu : bv 64) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.kmem in
@@ -39,11 +39,9 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   let s1entry := add_vec (and_vec (add_vec endaddr (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (22 <= K)%nat ->
   ncnt = 0%nat ->
-  (* the tp register holds THIS cpu's id (freerange cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   prun phystop s1entry ps ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ ncnt eb pcur C -∗
+  sie_cap_gpr m K b -∗
+  cpu_own ncnt eb pcur C -∗
   (* [kernel_data] supplies the "kmem" string literal kinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -54,9 +52,10 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   c_cpu ↦₈ vcpu -∗
   fl ↦₈ (mword_of_int 0 : mword 64) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
-  ( ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ ncnt eb pcur C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own ncnt eb pcur C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     is_kmem γl γk lk fl -∗
@@ -67,6 +66,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
 Module Type KINIT.
   Parameter wp_kinit_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (vlock : bv 32) (vname vcpu : bv 64),
-      wp_kinit_sconf_body γ Φ m ps K ncnt eb pcur C vlock vname vcpu.
+      (Φ : mval -> iProp Σ) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (vlock : bv 32) (vname vcpu : bv 64) (b : bool),
+      wp_kinit_sconf_body Φ m ps K ncnt eb pcur C vlock vname vcpu b.
 End KINIT.

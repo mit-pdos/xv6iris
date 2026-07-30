@@ -23,7 +23,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import DevModel DiskPtsto WpUart.
@@ -50,33 +50,34 @@ Section WpSconfUartAccess.
      [lbu a5,0(a4)] off a base register already holding UART0+5
      (uartputc_sync) or as [lbu a5,5(a5)] off one holding UART0 (uartintr).
      The [imm = 0] restatement below keeps the original callers unchanged. *)
-  Lemma wp_uart_lsr_read_ea_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_lsr_read_ea_s_sconf (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) (l : list (bv 8)) :
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa 5 ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
-    ( ∀ b : bv 8,
-      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
-      (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l) -∗
+      (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf γ γd γv 5 Φ pc false true rd rs1 imm
+    iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
+    iApply (Uart.wp_lb_uart_s_sconf γd γv 5 Φ pc false true rd rs1 imm
               m n (uart_tx_own γd l)
-              (fun b => uart_tx_own γd l ∗ (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l))%I
-              ltac:(unfold uart_size; lia) Hrd Hrdsp
+              (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b
+              ltac:(unfold uart_size; lia) Hrd Hrdok
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hinstr Hdinv Hown [] [Hcont]").
-    - iIntros (u b u') "%Hread Hg Hown".
+    - iIntros (u bt u') "%Hread Hg Hown".
       rewrite uart_read_lsr in Hread. injection Hread as <- <-.
       iDestruct "Hg" as "(Hs & Hout & Htx & Hdl)".
       destruct (uart_thre u) eqn:Hthre.
@@ -85,31 +86,33 @@ Section WpSconfUartAccess.
         iModIntro. iFrame "Hs Hout Htx Hdl Hown". iIntros (_). iExact "Hlb".
       + iModIntro. iFrame "Hs Hout Htx Hdl Hown".
         iIntros (Hc). rewrite (uart_nothre_beqz u Hthre) in Hc. discriminate.
-    - iIntros (b) "Hcg Hpc [Hown Hlb]".
-      iApply ("Hcont" $! b with "Hcg Hpc Hown Hlb").
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc [Hown Hlb]".
+      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+      iApply ("Hcont" $! bt with "Hcg Hpc Hown Hlb").
   Qed.
 
   (* the original, zero-displacement form (uartputc_sync's call site). *)
-  Lemma wp_uart_lsr_read_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_lsr_read_s_sconf (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
-      (m : regfile) (n : nat) (l : list (bv 8)) :
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     m !!! Regidx rs1 = uart_pa 5 ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
-    ( ∀ b : bv 8,
-      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
-      (⌜ lsr_thre_clear b = false ⌝ -∗ uart_out_lb γd l) -∗
+      (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hrd Hrdsp Haddr.
-    exact (wp_uart_lsr_read_ea_s_sconf γ γd γv Φ pc rd rs1 (mword_of_int 0 : mword 12)
-             m n l Hrd Hrdsp
+    intros Hrd Hrdok Haddr.
+    exact (wp_uart_lsr_read_ea_s_sconf γd γv Φ pc rd rs1 (mword_of_int 0 : mword 12)
+             m n l b Hrd Hrdok
              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)).
   Qed.
 
@@ -149,37 +152,40 @@ Section WpSconfUartAccess.
                        | apply bv_eq; vm_compute; reflexivity]]).
   Qed.
 
-  Lemma wp_uart_read_free_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_read_free_s_sconf (γd : uart_names) (γv : disk_names)
       (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     (0 <= off < uart_size)%Z ->
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa off ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗
-    ( ∀ b : bv 8,
-      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (lsr_ldval_of b)]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      ∀ bt : bv 8,
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hoff Hrd Hrdsp Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
+    iIntros (Hoff Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
-    iApply (Uart.wp_lb_uart_s_sconf γ γd γv off Φ pc false true rd rs1 imm
-              m n emp%I (fun _ => emp%I)
-              Hoff Hrd Hrdsp
+    iApply (Uart.wp_lb_uart_s_sconf γd γv off Φ pc false true rd rs1 imm
+              m n emp%I (fun _ => emp%I) b
+              Hoff Hrd Hrdok
               ltac:(rewrite Haddr; exact Hg1)
               ltac:(rewrite Haddr; exact Hg2)
               ltac:(rewrite Haddr; exact Hg3)
               with "Hcg Hpc Hinstr Hdinv [] [] [Hcont]").
     - done.
-    - iIntros (u b u') "%Hread Hg _".
-      destruct (uart_read_stable u off b u' Hread) as (Ha & Ho & Hd).
+    - iIntros (u bt u') "%Hread Hg _".
+      destruct (uart_read_stable u off bt u' Hread) as (Ha & Ho & Hd).
       iModIntro. iSplitL "Hg"; [| done].
       iApply (uart_ghosts_stable γd u u' Ha Ho Hd with "Hg").
-    - iIntros (b) "Hcg Hpc _". iApply ("Hcont" $! b with "Hcg Hpc").
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1 bt) "Hcg Hpc _".
+      iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+      iApply ("Hcont" $! bt with "Hcg Hpc").
   Qed.
 
   (* The THR write (offset 0).  The caller brings the transmitter token, the
@@ -187,14 +193,15 @@ Section WpSconfUartAccess.
      [uart_tx_ready_persists] turns them into [uart_write_thr_acc]'s two
      premises at the write's own state, so the byte provably lands in the FIFO.
      Postcondition: the grown token plus a permanent [uart_sent] record. *)
-  Lemma wp_uart_thr_write_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
-      (m : regfile) (n : nat) (l : list (bv 8)) :
+      (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     m !!! Regidx rs1 = uart_pa 0 ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
       uart_sent γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
@@ -203,9 +210,9 @@ Section WpSconfUartAccess.
   Proof.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
     set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
-    iApply (Uart.wp_sb_uart_s_sconf γ γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
-              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I
+              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b
               ltac:(unfold uart_size; lia)
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
@@ -226,8 +233,9 @@ Section WpSconfUartAccess.
       iDestruct (uart_dlab_auth_stable γd u u' (uart_write_dlab_0 _ _ _ Hwrite) with "Hdl") as "Hdl".
       iEval (rewrite Hacc') in "Hown". iEval (rewrite Hacc') in "Hsent".
       iModIntro. rewrite /uart_ghosts. iFrame "Hs Hout Htx Hdl Hown Hsent".
-    - iIntros "Hcg Hpc [Hown Hsent]".
-      iApply ("Hcont" with "Hcg Hpc Hown Hsent").
+    - iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Hown Hsent]".
+      iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hown Hsent").
+      iPureIntro. exact Hs1.
   Qed.
 
 End WpSconfUartAccess.

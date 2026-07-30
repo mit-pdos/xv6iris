@@ -15,7 +15,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import IntrDefs.
@@ -201,13 +201,13 @@ Section SwtchCtx.
       (∀ (h : CPU) (g : gname) (m : regfile) (eb' : bool),
          ⌜adm A h g⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr (CID := h) g m av -∗
-         cpu_own (CID := h) g 1 eb' p emp -∗
+         sie_cap_gpr (CID := h) m av false -∗
+         cpu_own (CID := h) 1 eb' p emp -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
          (∃ (A' : ctx_adm) (cret : mword 64),
             ▷ rec A' cret p ∗
-            P h g A' c cret (m !!! Regidx (mword_of_int 4 : mword 5)) p) -∗
+            P h g A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
          WP (LoopE h : expr riscv_lang) {{ Phi }}))%I.
 
   Global Instance valid_context_pre_contractive Phi
@@ -260,17 +260,20 @@ Section Swconf.
      the target-context resource it feeds to the swtch, and the resumed
      party re-fills the slot from its own swtch's returned cells.
 
-     The SIE arm crosses as the BARE '0' EIGHTH [intr_off_tok γ], not the
-     [sie_arm] disjunction: a scheduler swtch always runs interrupts-off
-     (noff >= 1 on both sides), and the swtch proof needs the SIE=0 pin
-     for its block engine -- the '1' arm would be unrefutable here since
-     the conflicting count eighth rides opaquely inside the payload.  The
-     suspender refutes its arm's '1' branch against the level-1 count
-     eighth before packing; the resumed party rebuilds [sie_arm] via
-     [iLeft]. *)
-  Definition swconf (γ : gname) : iProp Σ :=
-    (sconf γ ∗
+     The SIE arm crosses as the BARE '0' EIGHTH [intr_off_tok], not the
+     indexed [sie_cap]/[sie_arm b]: a scheduler swtch always runs
+     interrupts-off (noff >= 1 on both sides), and the swtch proof needs
+     the SIE=0 pin for its block engine.  This is no longer merely a
+     convention: [cpu_own]'s own [1] level (the [S _] arm of
+     [IntrDefs.intr_count]) unconditionally holds the ghost eighth at
+     '0' REGARDLESS of [eb'], so a [sie_cap]/[sie_arm b] eighth held
+     alongside it is forced to agree at [b = false] by ghost_var
+     agreement -- [valid_context_pre]'s resume wand below states that
+     forced value directly (literal [false]) rather than re-deriving it
+     from a case split. *)
+  Definition swconf : iProp Σ :=
+    (sconf ∗
      hart_state ↦ᵣ HART_ACTIVE tt ∗
      strans_inv ∗
-     intr_off_tok γ)%I.
+     intr_off_tok)%I.
 End Swconf.
