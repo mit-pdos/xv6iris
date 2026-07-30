@@ -53,6 +53,96 @@ Proof.
   repeat split; etransitivity; eassumption.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* THE MIGRATABLE FORM: everything [callee_saved] says EXCEPT tp.           *)
+(*                                                                          *)
+(* tp is in the preserved set above only because this kernel pins it to the *)
+(* cpuid and no ORDINARY function touches it.  A function that can PARK,     *)
+(* though, may return on another hart ([SwtchCtx]'s migratable records):     *)
+(* swtch does not save tp, so the resumed thread inherits the resuming       *)
+(* hart's, and every such contract promises [callee_saved_notp m mf]         *)
+(* together with [mf !!! x4 = cid_word_of h] for the hart [h] its           *)
+(* continuation is quantified over -- which is strictly more informative     *)
+(* than the old conjunct (it names the hart) but no longer implies           *)
+(* [m !!! x4 = mf !!! x4].                                                   *)
+(*                                                                          *)
+(* Non-parking functions keep the strong form: [callee_saved_weaken_notp]    *)
+(* is the one-line bridge for a caller that composes a parking callee with   *)
+(* non-parking ones, and [callee_saved_of_notp] rebuilds the strong form      *)
+(* where the tp fact is independently known (the same-hart case).            *)
+(* ---------------------------------------------------------------------- *)
+Definition callee_saved_notp (m m' : regfile) : Prop :=
+  m' !!! Regidx csp_rs1 = m !!! Regidx csp_rs1 /\                            (* x2  sp  *)
+  m' !!! Regidx (mword_of_int 8 : mword 5)  = m !!! Regidx (mword_of_int 8 : mword 5)  /\  (* x8  s0 *)
+  m' !!! Regidx (mword_of_int 9 : mword 5)  = m !!! Regidx (mword_of_int 9 : mword 5)  /\  (* x9  s1 *)
+  m' !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 18 : mword 5) /\  (* x18 s2 *)
+  m' !!! Regidx (mword_of_int 19 : mword 5) = m !!! Regidx (mword_of_int 19 : mword 5) /\  (* x19 s3 *)
+  m' !!! Regidx (mword_of_int 20 : mword 5) = m !!! Regidx (mword_of_int 20 : mword 5) /\  (* x20 s4 *)
+  m' !!! Regidx (mword_of_int 21 : mword 5) = m !!! Regidx (mword_of_int 21 : mword 5) /\  (* x21 s5 *)
+  m' !!! Regidx (mword_of_int 22 : mword 5) = m !!! Regidx (mword_of_int 22 : mword 5) /\  (* x22 s6 *)
+  m' !!! Regidx (mword_of_int 23 : mword 5) = m !!! Regidx (mword_of_int 23 : mword 5) /\  (* x23 s7 *)
+  m' !!! Regidx (mword_of_int 24 : mword 5) = m !!! Regidx (mword_of_int 24 : mword 5) /\  (* x24 s8 *)
+  m' !!! Regidx (mword_of_int 25 : mword 5) = m !!! Regidx (mword_of_int 25 : mword 5) /\  (* x25 s9 *)
+  m' !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) /\  (* x26 s10 *)
+  m' !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5).     (* x27 s11 *)
+
+Lemma callee_saved_weaken_notp (m m' : regfile) :
+  callee_saved m m' -> callee_saved_notp m m'.
+Proof.
+  unfold callee_saved, callee_saved_notp.
+  intros (?&?&?&?&?&?&?&?&?&?&?&?&?&?). repeat split; assumption.
+Qed.
+
+Lemma callee_saved_of_notp (m m' : regfile) :
+  callee_saved_notp m m' ->
+  m' !!! Regidx (mword_of_int 4 : mword 5) = m !!! Regidx (mword_of_int 4 : mword 5) ->
+  callee_saved m m'.
+Proof.
+  unfold callee_saved, callee_saved_notp.
+  intros (?&?&?&?&?&?&?&?&?&?&?&?&?) Htp. repeat split; assumption.
+Qed.
+
+Lemma callee_saved_notp_refl (m : regfile) : callee_saved_notp m m.
+Proof. unfold callee_saved_notp. repeat split; reflexivity. Qed.
+
+Lemma callee_saved_notp_trans (m1 m2 m3 : regfile) :
+  callee_saved_notp m1 m2 -> callee_saved_notp m2 m3 -> callee_saved_notp m1 m3.
+Proof.
+  unfold callee_saved_notp.
+  intros (?&?&?&?&?&?&?&?&?&?&?&?&?) (?&?&?&?&?&?&?&?&?&?&?&?&?).
+  repeat split; etransitivity; eassumption.
+Qed.
+
+(* the mixed compositions a parking function's caller needs: a non-parking
+   hop before or after the park. *)
+Lemma callee_saved_notp_trans_l (m1 m2 m3 : regfile) :
+  callee_saved m1 m2 -> callee_saved_notp m2 m3 -> callee_saved_notp m1 m3.
+Proof. intros H1 H2. eapply callee_saved_notp_trans; [apply callee_saved_weaken_notp, H1 | exact H2]. Qed.
+
+Lemma callee_saved_notp_trans_r (m1 m2 m3 : regfile) :
+  callee_saved_notp m1 m2 -> callee_saved m2 m3 -> callee_saved_notp m1 m3.
+Proof. intros H1 H2. eapply callee_saved_notp_trans; [exact H1 | apply callee_saved_weaken_notp, H2]. Qed.
+
+(* the preserved set of the migratable form -- [is_cs_idx] minus tp. *)
+Definition is_cs_idx_notp (k : mword 5) : bool :=
+  existsb (fun c => bool_decide (k = (mword_of_int c : mword 5)))
+    [2;8;9;18;19;20;21;22;23;24;25;26;27]%Z.
+
+(* the uniform projection, exactly as [callee_saved_lookup] below: a
+   post-park half threads a register with one rewrite instead of an
+   alternation over the conjuncts. *)
+Lemma callee_saved_notp_lookup {m m' : regfile}
+      (Hcs : callee_saved_notp m m') (c : mword 5) :
+  is_cs_idx_notp c = true -> m' !!! Regidx c = m !!! Regidx c.
+Proof.
+  intros Hc. unfold callee_saved_notp in Hcs.
+  destruct Hcs as (H&H0&H1&H2&H3&H4&H5&H6&H7&H8&H9&H10&H11).
+  unfold is_cs_idx_notp in Hc. cbn [existsb] in Hc. rewrite !orb_true_iff in Hc.
+  repeat (destruct Hc as [Hc|Hc]); try discriminate;
+    apply bool_decide_eq_true in Hc; subst c;
+    first [ change (mword_of_int 2) with (csp_rs1 : mword 5); assumption | assumption ].
+Qed.
+
 (* [is_cs_idx k] : is register index [k] one of the fourteen callee-saved
    registers?  A [bool] so the side condition below discharges by [vm_compute]. *)
 Definition is_cs_idx (k : mword 5) : bool :=
