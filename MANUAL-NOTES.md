@@ -38,6 +38,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - gcc's 0x4fa4fa4fa4fa4fa5 optimization
 - printk spec: format string translates into precondition requirements on varargs
 - uartwrite needs to know the FIFO isn't full; uartintr guarantees this via is_txlock invariant
+- user PT coherence with p->sz: nothing mapped above p->sz (needed to prove growproc's uvmalloc doesn't panic)
+- some device invariant has to hold from power-up, not just after driver initialization, e.g., to conclude no stray DMA
 
 Big things that still need to be done/explored:
 
