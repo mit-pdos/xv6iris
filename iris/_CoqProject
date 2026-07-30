@@ -386,6 +386,7 @@ ProofReleasesleep.v
 LinkReleasesleep.v
 ProofHoldingsleep.v
 LinkHoldingsleep.v
+ProofAcquiresleep.v
 LinkAcquiresleep.v
 BcacheInv.v
 WpFileallocDecode.v
