@@ -64,6 +64,13 @@ Know this one: **`is_cs_idx (mword_of_int 4)` is now `false`**, so
 `rd_ok` instead — but a tp write no longer trips a side condition, so do not
 rely on one to catch it.
 
+`cid_word_of` / `cid_word` moved from `ProcGeom.v` to `HartTp.v` — every
+register-file resource mentions the hart id now, so the definition had to sit
+below the leaf layer. `ProcGeom` **re-exports** them, so the ~90 existing
+references through it are unchanged. There must be exactly ONE such constant:
+two convertible-but-distinct copies in scope together make every unification
+against them fail confusingly.
+
 **Add `HartTp WpNext` to your file's own `Require Import` line.** `Import` is
 not transitive, so `tp_pin` / `rget` / `wp_next` are not in scope just because
 `IntrDefs` imports them. This is the single most common first error.

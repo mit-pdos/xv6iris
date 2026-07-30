@@ -26,6 +26,8 @@ From iris.base_logic.lib Require Import gen_heap invariants.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so the
+                            ~90 existing references through ProcGeom keep working *)
 Require Import WpMycpu.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -440,8 +442,13 @@ Qed.
    lock-holder token is keyed by [i] and the field's value is [cpus_ptr i];
    the two injectivity/nonzeroness facts below are what let a NON-holder
    conclude that the field does not name it. *)
-Definition cid_word_of (i : CPU) : mword 64 :=
-  mword_of_int (Z.of_nat (fin_to_nat i)).
+(* [cid_word_of] and [cid_word] MOVED to HartTp.v: every register-file
+   resource now mentions the hart id (tp is pinned to the hart), so the
+   definition has to sit below the leaf layer rather than here.  Kept
+   re-exported through this file's [Require Import HartTp] so the ~90
+   existing references are unchanged -- but there must be exactly ONE
+   constant, or two convertible-but-distinct copies end up in scope
+   together and every unification against them fails confusingly. *)
 Definition cpus_ptr (i : CPU) : mword 64 := mycpu_ret (cid_word_of i).
 
 Lemma tp_ok_cid_of (i : CPU) : tp_ok (cid_word_of i).
@@ -482,7 +489,6 @@ Proof. apply mycpu_ret_nonzero, tp_ok_cid_of. Qed.
 
 (* the ambient hart id as a tp-register value.  mycpu()'s return for this
    hart is [mycpu_ret cid_word] = &cpus[cpu_id] = [cpus_ptr cpu_id]. *)
-Definition cid_word `{CID : CpuId} : mword 64 := cid_word_of cpu_id.
 
 Lemma cpus_ptr_cid `{CID : CpuId} : cpus_ptr cpu_id = mycpu_ret cid_word.
 Proof. reflexivity. Qed.
