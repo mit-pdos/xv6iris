@@ -114,6 +114,13 @@ are working on that effort — the relevant `projects/` file.
   mask-carrying `sr_absorb`, per-CPU `strans_name` — and the sequencing
   through `wp_main_secondary_sconf` and the all-harts
   `_entry`→`start`→`main` adequacy. Design approved.
+- **[`bare-inv-generic.md`](projects/bare-inv-generic.md)** — G5 part 3,
+  surfaced by kpt-share's final batch: `bare_inv` holds the global
+  `kmap_auth kmap_M0` at 1 as the Bare arm's refutation mechanism, so at
+  most one hart can ever be in Bare — secondaries cannot even spin on
+  `started`. The designed fix (an `sr_adm` claim-admissibility field on
+  `s_regime` + static-claims agreement replacing the auth) and why every
+  local patch fails. Lands before `wp_main_secondary_sconf`.
 - **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
   2: the parked-proc resumption contract (`p_sched`) quantifies the
   RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE
