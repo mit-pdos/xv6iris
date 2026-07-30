@@ -270,7 +270,6 @@ WpPopOff.v
 WpRelease.v
 WpKallocDecode.v
 WpMemsetPage.v
-WpKalloc.v
 WpKfree.v
 WpInitlock.v
 TrampPt.v
