@@ -81,7 +81,14 @@ parking contract is deleted outright: `tp_pin` makes it true by construction.
 - a raw map-to-map equality `⌜Mf !!! Regidx (mword_of_int 4) = M !!! Regidx
   (mword_of_int 4)⌝` sitting among the callee-saved-style conjuncts (e.g.
   `SpecWakeupParts.v`) — true but vacuous, since the slot it preserves is junk;
-- a tp conjunct inside a hand-rolled register-preservation predicate.
+- a tp conjunct inside a hand-rolled register-preservation predicate;
+- an ENTRY-side premise `⌜m !!! Regidx (mword_of_int 4) = cid_word⌝` ("the tp
+  register holds THIS cpu's id", push_off's/acquire's old convention). `tp_pin`
+  overwrites the INPUT map's tp slot too, so this constrains nothing
+  observable, and the callee no longer needs it: `rget_tp` gives
+  `rget m Rtp = cid_word_of cpu_id` by construction. Deleting a PREMISE
+  strengthens the contract rather than weakening it. Seen in 8 of 12 files in
+  one batch, so expect it.
 Deleting one is not weakening the contract: the real tp is `cid_word_of cpu_id`
 by construction, which is strictly more than the old premise said. If deleting
 one makes something else unprovable, STOP and report — that means a consumer

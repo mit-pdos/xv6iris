@@ -14,7 +14,8 @@
 
    The v = 0 arm inside the inner critical section is refuted by token
    exclusivity ([sl_res_open_held]); the pid comparison closes from the
-   agreement of the two pid resources.  Calls myproc(), so tp = cid_word. *)
+   agreement of the two pid resources.  Calls myproc().  (tp holds this hart's id by construction now --
+   HartTp.tp_pin -- so no contract states it.) *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -24,7 +25,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
@@ -40,18 +41,16 @@ Import Defs.
 Notation HSL := KernelSyms.holdingsleep.
 
 Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) :=
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  (* the hart id is the ambient CpuId *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (16 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ 0 eb p C -∗
+  sie_cap_gpr m av b -∗
+  cpu_own 0 eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle (returned untouched) *)
@@ -60,11 +59,12 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   panic_wp -∗
   (* the caller's own pid, agreeing with the lock's pid field *)
   p_pid p ↦₄{dq} pidv -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0 eb p C -∗
+      sie_cap_gpr mf av b -∗
+      cpu_own 0 eb p C -∗
       pc_is ret_tgt -∗
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
@@ -75,8 +75,8 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
 Module Type HOLDINGSLEEP.
   Parameter wp_holdingsleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac},
-      wp_holdingsleep_sconf_body γ Φ γl γsl s R m p pidv av eb C dq.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool),
+      wp_holdingsleep_sconf_body Φ γl γsl s R m p pidv av eb C dq b.
 End HOLDINGSLEEP.

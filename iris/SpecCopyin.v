@@ -51,7 +51,7 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -65,16 +65,14 @@ Import Defs.
 Notation CPI := KernelSyms.copyin.
 
 Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyin in
   let dst := mm !!! Regidx (mword_of_int 11) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 12-slot frame + vmfault's 38 (walkaddr needs 10, memmove 2) *)
   (50 <= K)%nat ->
-  (* the vmfault chain runs on the ambient CPU (push_off cid convention) *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the pagetable argument is the table [proc_pt P] describes -- the same
      table [p->pagetable] holds, which is what vmfault will map into *)
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
@@ -85,8 +83,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* vmfault's kalloc keeps its transient noff increment in int range;
      [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ lvl eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own lvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   p_sz p ↦₈{dqs} szv -∗
@@ -94,9 +92,10 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   proc_pt P -∗
   kalloc_env γa None cid_word -∗
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
-  ( ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ lvl eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
+    sie_cap_gpr mr K b -∗
+    cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -112,8 +111,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type COPYIN.
   Parameter wp_copyin_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac),
-      wp_copyin_sconf_body γ γa Φ mm P szv len dst_olds K lvl eb p C dqs dqp.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool),
+      wp_copyin_sconf_body γa Φ mm P szv len dst_olds K lvl eb p C dqs dqp b.
 End COPYIN.

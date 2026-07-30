@@ -11,7 +11,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText.
@@ -43,7 +43,7 @@ Fixpoint prun (pa_end s1 : mword 64) (ps : list (mword 64)) : Prop :=
   end.
 
 Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -51,21 +51,20 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   let s1entry := add_vec (and_vec (add_vec pa_start (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv in
   (20 <= K)%nat ->
   ncnt = 0%nat ->
-  (* the tp register holds THIS cpu's id (kfree cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ ncnt eb pcur C -∗
+  sie_cap_gpr m K b -∗
+  cpu_own ncnt eb pcur C -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
   panic_wp -∗
   kalloc_avail γk (Some 0%nat) -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ ncnt eb pcur C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b -∗
+    cpu_own ncnt eb pcur C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (Some (length ps)) -∗
@@ -75,6 +74,6 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 Module Type FREERANGE.
   Parameter wp_freerange_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ),
-      wp_freerange_sconf_body γ Φ γl γk lk fl m ps K ncnt eb pcur C.
+      (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool),
+      wp_freerange_sconf_body Φ γl γk lk fl m ps K ncnt eb pcur C b.
 End FREERANGE.

@@ -35,7 +35,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import FdSlots FileInv.
@@ -70,27 +70,26 @@ Section SpecFilealloc.
 End SpecFilealloc.
 
 Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
+    (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* filealloc's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
      below that. *)
   (14 <= K)%nat ->
-  (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m K b -∗
+  cpu_own n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   is_ftable γl γf -∗
   panic_wp -∗
   (* the new reference needs somewhere to live: one fd slot goes into the
      table and comes back out of fileclose. *)
   fd_slot -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ n eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b -∗
+    cpu_own n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     filealloc_post γf (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -100,7 +99,7 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_filealloc_sconf_body γ Φ γl γf m n eb p C K.
+      (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
+      wp_filealloc_sconf_body Φ γl γf m n eb p C K b.
 End FILEALLOC.

@@ -36,7 +36,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
@@ -63,23 +63,23 @@ Section SpecAllocpid.
 End SpecAllocpid.
 
 Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γp : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (Φ : mval -> iProp Σ) (γp : gname)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for acquire's / release's *)
   (14 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b -∗
+  cpu_own n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   panic_wp -∗
-  ( ∀ (mf : regfile),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b -∗
+      cpu_own n eb p C -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -87,7 +87,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cp
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_allocpid_sconf_body γ Φ γp m av n eb p C.
+      (Φ : mval -> iProp Σ) (γp : gname)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
+      wp_allocpid_sconf_body Φ γp m av n eb p C b.
 End ALLOCPID.

@@ -57,7 +57,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -70,9 +70,9 @@ Import Defs.
 Notation FW := KernelSyms.freewalk.
 
 Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freewalk in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 6-slot frame per recursion level, [lvl]+1 levels deep, and kfree's 14
@@ -83,21 +83,20 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      It used to be pinned at 0, which was an artifact of the boot-time
      callers; proc_pagetable reaches this chain with a proc lock held. *)
   (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-  (* the kfree chain runs on the ambient CPU (push_off cid convention) *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the pagetable argument is the node [t] describes *)
   mm !!! Regidx (mword_of_int 10) = page_base (pt_base t) ->
   (* the table maps nothing: the panic arm is dead *)
   pt_free_ok lvl t ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ ilvl eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own lvl (DfracOwn 1) t -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ ilvl eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -106,8 +105,8 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type FREEWALK.
   Parameter wp_freewalk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat),
-      wp_freewalk_sconf_body γ γa Φ mm t lvl K eb p C ilvl.
+      (C : iProp Σ) (ilvl : nat) (b : bool),
+      wp_freewalk_sconf_body γa Φ mm t lvl K eb p C ilvl b.
 End FREEWALK.
