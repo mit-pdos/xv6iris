@@ -715,7 +715,7 @@ Section ProofVirtioDiskRwF.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     vdrw_saved sp0 m -∗
-    b_blockno b ↦₄ bno -∗
+    b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
     (* the CALLER's own [trap_csrs_pay]: acquire mints a second one that
        release consumes, so this one is simply framed through the function
        and handed back with the postcondition. *)

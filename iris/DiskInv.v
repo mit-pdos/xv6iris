@@ -43,6 +43,7 @@ Require Import DiskPtsto.
 Require Import VirtioProto.
 Require Import KptPt.
 Require Import KMap.
+Require Export BufOwn.
 From Kernel Require KernelSyms.
 
 Local Open Scope Z_scope.
@@ -70,10 +71,8 @@ Definition d_desc (pd : Arch.pa) (i : nat) : Arch.pa := pa_add pd (16 * i).
 (* avail-ring entry j (j < 8) on the avail page *)
 Definition d_ring (pav : Arch.pa) (j : nat) : Arch.pa := pa_add pav (4 + 2 * j).
 
-(* struct buf fields (buf.h): disk flag @ +4, blockno @ +12, data @ +0x58 *)
-Definition b_disk    (b : Arch.pa) : Arch.pa := pa_add b 4.
-Definition b_blockno (b : Arch.pa) : Arch.pa := pa_add b 12.
-Definition b_data    (b : Arch.pa) : Arch.pa := pa_add b 88.
+(* struct buf fields (b_disk / b_blockno / b_data / ...) come from BufOwn.v,
+   re-exported above -- the common home shared with the bio.c layer. *)
 
 (* ---------------------------------------------------------------------- *)
 (* ALIGNMENT of an offset inside a queue page.                             *)

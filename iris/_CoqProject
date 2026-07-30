@@ -548,6 +548,7 @@ SpecFdalloc.v
 SpecSysPipe.v
 WpSysPipeDecode.v
 ProofSysPipe.v
+BufOwn.v
 DiskInv.v
 DiskBoot.v
 SpecFreeDesc.v

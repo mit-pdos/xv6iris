@@ -50,13 +50,9 @@ Import Defs.
 (* rw's own frame is 96 bytes (12 slots); its deepest callee is sleep (22). *)
 Definition K_virtio_disk_rw : nat := 34%nat.
 
-(* the caller's buffer: the three fields rw touches, byte-granular data *)
-Definition buf_own `{!riscvGS Σ} (b : Arch.pa) (bno : mword 32)
-    (dsk : mword 32) (bs : list (bv 8)) : iProp Σ :=
-  (b_blockno b ↦₄ bno ∗
-   b_disk b ↦₄ dsk ∗
-   ⌜length bs = 1024%nat⌝ ∗
-   ([∗ list] j ↦ byte ∈ bs, pa_add (b_data b) j ↦ₘ byte))%I.
+(* the caller's buffer bundle [buf_own] (blockno at 1/2, disk and data full)
+   now lives in BufOwn.v (via DiskInv's re-export): the bio.c layer shares
+   it, and the bcache scan is why the blockno half stays behind. *)
 
 Definition wp_virtio_disk_rw_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}

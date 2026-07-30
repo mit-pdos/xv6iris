@@ -125,7 +125,7 @@ Section ProofVirtioDiskRw.
     kernel_text -∗ pc_is (mword_of_int (VRW + 0x000) : mword 64) -∗
     panic_wp -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    b_blockno b ↦₄ bno -∗
+    b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
     ( ∀ M : regfile,
         ⌜vdrw_regs M sp0 b wr (vdrw_sector_raw bno) /\ vdrw_hi M m⌝ -∗
         sie_cap_gpr γ M (K - 12)%nat -∗
@@ -136,7 +136,7 @@ Section ProofVirtioDiskRw.
         disk_res γd pd pav pu -∗
         vdrw_saved sp0 m -∗
         vdrw_scratch sp0 -∗
-        b_blockno b ↦₄ bno -∗
+        b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -389,7 +389,7 @@ Section ProofVirtioDiskRw.
                     = (b_blockno b : mword 64)).
     { rewrite HR4a0 vdrw_sext_12. unfold b_blockno. reflexivity. }
     iApply (wp_lw_s_sconf γ Φ (mword_of_int (VRW + 0x01c) : mword 64) Rs7 Ra0
-              (mword_of_int 12 : mword 12) R4 (K - 12)%nat bno (dqm := DfracOwn 1)
+              (mword_of_int 12 : mword 12) R4 (K - 12)%nat bno (dqm := DfracOwn (1/2))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi01c [Hbno] [-]").
     { iEval (rewrite Hbnoa). iExact "Hbno". }

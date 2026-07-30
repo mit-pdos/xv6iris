@@ -169,6 +169,14 @@ are working on that effort — the relevant `projects/` file.
   is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
   boot wiring.
 
+- **[`bio.md`](projects/bio.md)** — the buffer cache: the settled ownership
+  design (the per-buffer content ESCROW — a namespace invariant with a
+  parked arm and a checked-out arm — over a sleeplock that protects only a
+  checkout token; the Arc-algebra refcount with real dev/blockno cell
+  fractions; the finite `bslot` supply that makes the unchecked refcnt++
+  provable), why the two obvious models fail, `BufOwn.v`'s ½-blockno
+  `buf_own`, the five function contracts, and the worklist (binit was
+  already proven; bget is inlined into bread).
 
 ### `completed/` — finished projects, archived for reference
 
