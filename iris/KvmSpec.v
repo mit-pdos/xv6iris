@@ -109,13 +109,15 @@ Section KvmSpecs.
   (* kalloc's ambient resources, bundled so callers can invoke kalloc
      REPEATEDLY: the kmem lock, the count ghost, and panic's contract (which
      acquire's "already holding" arm needs).  [tp] is the caller's thread
-     pointer (callee-saved, never written by the kvm chain), kept as a
-     parameter because the whole chain's specs are stated tp-indexed. *)
+     pointer.  It used to be a PARAMETER here -- unused in the body, kept only
+     because the whole chain's specs were stated tp-indexed.  That indexing is
+     gone: tp is pinned to the hart (HartTp.v), so a per-cpu key derived from a
+     register map says nothing, and the parameter was pure noise. *)
   (* The kvm chain runs in the allocator's STEADY STATE: the bundled count
      ghost is the persistent sealed witness [kalloc_avail γk None] (count
      unknown, kalloc may fail), so every kalloc call threads [on := None] and
      the bundle trivially re-establishes. *)
-  Definition kalloc_env (γ : gname) (on : option nat) (tp : mword 64) : iProp Σ :=
+  Definition kalloc_env (γ : gname) (on : option nat) : iProp Σ :=
     (∃ γk : gname * gname,
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
@@ -129,8 +131,8 @@ Section KvmSpecs.
      the sealed witness), so the steady-state bundle can be taken with [#]
      and re-supplied to EVERY kalloc-reaching call -- what a loop that calls
      copyin/copyout (whose contracts consume the bundle) lives on. *)
-  Global Instance kalloc_env_None_persistent (γ : gname) (tp : mword 64) :
-    Persistent (kalloc_env γ None tp).
+  Global Instance kalloc_env_None_persistent (γ : gname) :
+    Persistent (kalloc_env γ None).
   Proof. rewrite /kalloc_env. apply _. Qed.
 
   (* ------------------------------------------------------------------- *)

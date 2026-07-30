@@ -98,7 +98,7 @@ Definition wp_userinit_sconf_body
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv Φ γs -∗
-  kalloc_env γa on (m0 !!! Regidx (mword_of_int 4 : mword 5)) -∗
+  kalloc_env γa on -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
   ( ∀ mf : regfile,
@@ -106,8 +106,7 @@ Definition wp_userinit_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     cpu_own γ 0%nat eb pj C -∗
-    kalloc_env γa (avail_sub on userinit_pages)
-               (m0 !!! Regidx (mword_of_int 4 : mword 5)) -∗
+    kalloc_env γa (avail_sub on userinit_pages) -∗
     (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

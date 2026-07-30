@@ -670,7 +670,7 @@ Section KvmmakeHouse.
     pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
     (∃ v4 : bv 64, pa_stk sp0 4 ↦₈ v4) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on K_kvmmake) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on K_kvmmake) -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
     ( ∀ (mr : regfile) (t : ptree) (pas' : nat -> mword 44),
@@ -680,7 +680,7 @@ Section KvmmakeHouse.
          = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
       ⌜pt_rep0 t (kvm_map_full pas')⌝ -∗
       ⌜pt_nodes t = 102%nat⌝ -∗
-      kalloc_env γa (avail_sub on K_kvmmake) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on K_kvmmake) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
       ([∗ list] i ∈ seq 0 64,
@@ -929,13 +929,13 @@ Section KvmmakeBody.
     sie_cap_gpr γ mm K -∗
     cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int KMK) -∗
-    kalloc_env γa (Some nb) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (Some nb) -∗
     ( ∀ (M : regfile) (bppn : mword 44),
       sie_cap_gpr γ M (K - 4)%nat -∗
       cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x18)) -∗
       ptree_own 2 (DfracOwn 1) (pt_empty_node bppn) -∗
-      kalloc_env γa (avail_sub (Some nb) 1) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) 1) -∗
       pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
       pa_stk sp0 2 ↦₈ (mm !!! Regidx (mword_of_int 8)) -∗
       pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9)) -∗
@@ -1059,7 +1059,7 @@ Section KvmmakeBody.
     assert (Hav1 : Some (nb - 1)%nat = avail_sub (Some nb) 1).
     { rewrite avail_sub_Some. reflexivity. }
     iEval (rewrite Hav1) in "Havail2".
-    iAssert (kalloc_env γa (avail_sub (Some nb) 1) (mm !!! Regidx (mword_of_int 4)))
+    iAssert (kalloc_env γa (avail_sub (Some nb) 1))
       with "[Havail2]" as "Henv".
     { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
     set (root0 := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
@@ -1188,12 +1188,12 @@ Section KvmmakeBody.
     sie_cap_gpr γ M (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int (KMK + 0x18)) -∗
     ptree_own 2 (DfracOwn 1) (pt_empty_node bppn) -∗
-    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x28)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
       ⌜callee_saved M mr⌝ -∗
       ⌜mr !!! Regidx (mword_of_int 9) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
@@ -1337,12 +1337,12 @@ Section KvmmakeBody.
     sie_cap_gpr γ M (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int (KMK + 0x28)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x38)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
       ⌜callee_saved M mr⌝ -∗
       ⌜mr !!! Regidx (mword_of_int 9) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
@@ -1472,12 +1472,12 @@ Section KvmmakeBody.
     sie_cap_gpr γ M (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int (KMK + 0x38)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x4a)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
       ⌜callee_saved M mr⌝ -∗
       ⌜mr !!! Regidx (mword_of_int 9) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
@@ -1607,12 +1607,12 @@ Section KvmmakeBody.
     sie_cap_gpr γ M (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int (KMK + 0x4a)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x60)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
       ⌜callee_saved M mr⌝ -∗
       ⌜mr !!! Regidx (mword_of_int 9) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
@@ -1756,12 +1756,12 @@ Section KvmmakeBody.
     sie_cap_gpr γ M (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int (KMK + 0x60)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x82)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
       ⌜callee_saved M mr⌝ -∗
       ⌜mr !!! Regidx (mword_of_int 9) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
@@ -1929,12 +1929,12 @@ Section KvmmakeBody.
     sie_cap_gpr γ M (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗ kernel_text -∗
     pc_is (mword_of_int (KMK + 0x82)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr (K - 4)%nat -∗ cpu_own γ 0%nat eb p C -∗
       pc_is (mword_of_int (KMK + 0x9c)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
-      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
       ⌜callee_saved M mr⌝ -∗
       ⌜mr !!! Regidx (mword_of_int 9) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))⌝ -∗
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗

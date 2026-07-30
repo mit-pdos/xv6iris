@@ -1378,7 +1378,7 @@ Section ProofVmfault.
                 m_ad !! vpn_at (svpn_of (G6 !!! Regidx Ra1)) i = None).
       { intros i Hi. assert (Hi0 : i = 0%nat) by lia. subst i.
         rewrite vpn_at_0. rewrite HG6a1. exact Hnone. }
-      iAssert (kalloc_env γa None (G6 !!! Regidx Rtp)) as "#Henv2".
+      iAssert (kalloc_env γa None) as "#Henv2".
       { iExists γk. iFrame "Hlock Havail Hpanic". }
       (* ---- mappages(p->pagetable, va0, PGSIZE, mem, PTE_R|W|U) ----
          at the ambient [lvl]: mappages/walk are level-generic, and [Hlvl] is

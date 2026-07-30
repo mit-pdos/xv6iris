@@ -106,13 +106,13 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on q) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on q) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
       ⌜ptree_offpath_eq vpn t t'⌝ -∗
@@ -397,13 +397,13 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on q) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on q) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
       ⌜ptree_offpath_eq vpn t t'⌝ -∗
@@ -730,7 +730,7 @@ Section ProofWalk.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own N (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on g) -∗
     F -∗
     (* SUCCESS: page allocated, grafted; rejoin the loop at +0x40 *)
     ( ∀ (Mo : regfile) (b : mword 44),
@@ -749,7 +749,7 @@ Section ProofWalk.
       pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
       pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
       ptree_own N (DfracOwn 1) (tG b) -∗
-      kalloc_env γa (avail_sub on (S g)) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on (S g)) -∗
       F -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* FAILURE: kalloc returned 0; the tree is untouched, exit at +0x52 *)
@@ -769,7 +769,7 @@ Section ProofWalk.
       pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
       pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
       ptree_own N (DfracOwn 1) tf -∗
-      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) -∗
       F -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -830,8 +830,8 @@ Section ProofWalk.
     (* +0x7c c.beqz a0: the null/success split *)
     iDestruct "Hkpost" as "[(%Hnull & %Hz & Havail2) | (%Hpv & Hpage & Havail2)]".
     { (* ---- NULL: exit through the epilogue with a0 = 0 ---- *)
-      (* rebuild kalloc_env from the returned cpu cell, count unchanged *)
-      iAssert (kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)))
+      (* rebuild kalloc_env from the cpu cell, count unchanged *)
+      iAssert (kalloc_env γa (avail_sub on g))
         with "[Havail2]" as "Henv".
       { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
       assert (HN1a0 : N1 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10 : mword 5)).
@@ -860,8 +860,8 @@ Section ProofWalk.
       { rewrite HN1a0 Hnull; reflexivity. }
       { exact Hz. } }
     (* ---- SUCCESS: page p, memset(0), graft, store, rejoin ---- *)
-    (* rebuild kalloc_env from the returned cpu cell, count decremented one step *)
-    iAssert (kalloc_env γa (avail_sub on (S g)) (mm !!! Regidx (mword_of_int 4)))
+    (* rebuild kalloc_env from the cpu cell, count decremented one step *)
+    iAssert (kalloc_env γa (avail_sub on (S g)))
       with "[Havail2]" as "Henv".
     { rewrite avail_sub_S. iExists γk. iFrame "Hlock Havail2 Hqcpu". }
     iPoseProof (wi_7e with "Htext") as "Hi7e".
@@ -1147,13 +1147,13 @@ Section ProofWalk.
              ptree_leaf_lvl L curf vpn leaf -> ptree_leaf_lvl 2 tf vpn leaf⌝ ∗
           ⌜ptree_offpath_eq vpn t tf⌝ ∗
           ⌜pt_present_mono t tf⌝)) -∗
-    kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on g) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ptree_same_rep0 t t'⌝ -∗
       ⌜ptree_offpath_eq vpn t t'⌝ -∗

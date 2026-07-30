@@ -112,7 +112,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   pipe_ref γp w q -∗
   (* the process block (copyin's tier is reached via proc_priv_copy) *)
   proc_priv γf pj pid V -∗
-  kalloc_env γa None cid_word -∗
+  kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv Φ γs -∗
   panic_wp_any -∗

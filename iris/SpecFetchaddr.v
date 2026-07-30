@@ -123,7 +123,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
   cpu_own γ 0%nat eb p C -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
-  kalloc_env γa None cid_word -∗
+  kalloc_env γa None -∗
   ip ↦₈ oldv -∗
   ( ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗

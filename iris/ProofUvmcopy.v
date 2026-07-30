@@ -456,7 +456,7 @@ Section ProofUvmcopy.
     pc_is (mword_of_int (UC + 0x6c) : mword 64) -∗
     proc_pt Pold -∗
     proc_pt Pj -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     uc_exit γ Φ mm Pold Pnew vpn0 n K eb p C spr -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -568,7 +568,7 @@ Section ProofUvmcopy.
     { rewrite HN5a1 uvm_maxsz_val.
       assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z) by (vm_compute; reflexivity).
       rewrite Hu0. clear -Hjb. lia. }
-    iAssert (kalloc_env γa None (N5 !!! Regidx Rtp)) as "#HenvU".
+    iAssert (kalloc_env γa None) as "#HenvU".
     { rewrite HN5tp. iExact "Henv". }
     iApply (Uvmunmap.wp_uvmunmap_sconf γ γa Φ N5 Pj j (K - 10)%nat eb p C 0%nat
               HKuu ltac:(vm_compute; reflexivity) HN5tp HN5a0 Hual HN5a2 Hua3 Hurng
@@ -649,7 +649,7 @@ Section ProofUvmcopy.
     pc_is (mword_of_int (UC + 0x2a) : mword 64) -∗
     proc_pt Pold -∗
     proc_pt Pj -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     uc_exit γ Φ mm Pold Pnew vpn0 n K eb p C spr -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -666,7 +666,7 @@ Section ProofUvmcopy.
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hexit".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
-    iAssert (kalloc_env γa None cid_word) as "#Henv2".
+    iAssert (kalloc_env γa None) as "#Henv2".
     { iExists γk. iSplitR; [iExact "Hlock" |].
       iSplitR; [iExact "Havail" | iExact "Hpanic"]. }
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
@@ -1475,7 +1475,7 @@ Section ProofUvmcopy.
               m_c !! vpn_at (svpn_of (D6 !!! Regidx Ra1)) i = None).
     { intros i Hi. assert (Hi0 : i = 0%nat) by (clear -Hi; lia). subst i.
       rewrite vpn_at_0 HD6a1 Hvj. exact Hmcnone. }
-    iAssert (kalloc_env γa None (D6 !!! Regidx Rtp)) as "#HenvM".
+    iAssert (kalloc_env γa None) as "#HenvM".
     { rewrite HD6tp. iExact "Henv2". }
     iApply (Mappages.wp_mappages_sconf γ γa Φ D6 tc m_c 1%nat (pte_flags10 w0) 0%nat
               (K - 10)%nat eb p C None

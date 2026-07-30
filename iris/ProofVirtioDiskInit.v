@@ -2385,7 +2385,7 @@ Section ProofVirtioDiskInit.
     (* ===== hand the caller the post ===== *)
     assert (Havs : avail_sub (Some nb) 3 = Some (nb - 3)%nat)
       by (rewrite avail_sub_Some; reflexivity).
-    iAssert (kalloc_env γa (avail_sub (Some nb) 3) (m !!! Regidx (mword_of_int 4 : mword 5))) with "[Havl]" as "Henv".
+    iAssert (kalloc_env γa (avail_sub (Some nb) 3)) with "[Havl]" as "Henv".
     { rewrite Havs. iExists γk. iFrame "Hklock Havl Hpanic". }
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> (mword_of_int 1 : mword 5) -> c <> csp_rs1 ->

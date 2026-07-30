@@ -75,7 +75,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
-  kalloc_env γa on cid_word -∗
+  kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
     sie_cap_gpr mr K b -∗
@@ -87,7 +87,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
        = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
     ⌜pt_rep0 t (ppt_map tfp)⌝ -∗
     ⌜(pt_nodes t <= K_proc_pagetable)%nat⌝ -∗
-    kalloc_env γa (avail_sub on (pt_nodes t)) cid_word -∗
+    kalloc_env γa (avail_sub on (pt_nodes t)) -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

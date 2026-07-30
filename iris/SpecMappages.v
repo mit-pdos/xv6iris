@@ -52,7 +52,7 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.mappages) -∗
   ptree_own 2 (DfracOwn 1) t -∗
-  kalloc_env γa on cid_word -∗
+  kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (k : nat) (g : nat),
     sie_cap_gpr mr K b -∗
@@ -60,7 +60,7 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-    kalloc_env γa (avail_sub on g) cid_word -∗
+    kalloc_env γa (avail_sub on g) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜pt_base t' = pt_base t⌝ -∗
     ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k)⌝ -∗

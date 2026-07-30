@@ -352,7 +352,7 @@ Section ProofSysSbrk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x58) : mword 64) -∗
     proc_priv γf p pid V -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     word4_pointsto (pa_stk sp0 5) (DfracOwn 1) nw -∗
     ( ∀ (Mf : regfile) (P' : uptd) (szv' rv : mword 64),
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗

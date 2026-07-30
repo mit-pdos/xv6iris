@@ -48,7 +48,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   sie_cap_gpr mm K b -∗
   cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmake) -∗
-  kalloc_env γa on cid_word -∗
+  kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
     sie_cap_gpr mr K b -∗
@@ -59,7 +59,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
        = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
     ⌜pt_rep0 t (kvm_map_full pas)⌝ -∗
     ⌜pt_nodes t = 102%nat⌝ -∗
-    kalloc_env γa (avail_sub on K_kvmmake) cid_word -∗
+    kalloc_env γa (avail_sub on K_kvmmake) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜kvm_pas_ok pas⌝ -∗
     ([∗ list] i ∈ seq 0 64,

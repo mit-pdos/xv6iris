@@ -91,7 +91,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   p_sz p ↦₈{dqs} szv -∗
   p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
   proc_pt P -∗
-  kalloc_env γa None cid_word -∗
+  kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd),

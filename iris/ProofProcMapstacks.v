@@ -144,14 +144,14 @@ Section ProofPMS.
     pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
     pa_stk sp0 10 ↦₈ (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on (64 + g)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on (64 + g)) -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
-      kalloc_env γa (avail_sub on (64 + g')) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on (64 + g')) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
@@ -463,14 +463,14 @@ Section ProofPMS.
     pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
     pa_stk sp0 10 ↦₈ (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
-    kalloc_env γa (avail_sub (Some nb) (i + gk)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub (Some nb) (i + gk)) -∗
     ([∗ list] j ∈ seq 0 i,
        page_own (zero_extend' 64 (concat_vec (pas j) (zeros' 12 : mword 12)))) -∗
     ( ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
-      kalloc_env γa (avail_sub (Some nb) (64 + g')) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub (Some nb) (64 + g')) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
@@ -541,8 +541,8 @@ Section ProofPMS.
     assert (Hav1 : Some (nb - (i + gk) - 1)%nat = avail_sub (Some nb) (i + gk + 1)).
     { rewrite avail_sub_Some. f_equal. lia. }
     iEval (rewrite Hav1) in "Havail2".
-    (* rebuild kalloc_env at avail_sub (Some nb) (i+gk+1) *)
-    iAssert (kalloc_env γa (avail_sub (Some nb) (i + gk + 1)) (mm !!! Regidx (mword_of_int 4)))
+    (* rebuild kalloc_env at avail_sub (i+gk+1) *)
+    iAssert (kalloc_env γa (avail_sub (Some nb) (i + gk + 1)))
       with "[Havail2]" as "Henv".
     { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
     (* a0 = page, page_valid, nonzero *)

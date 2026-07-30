@@ -438,7 +438,7 @@ Section ProofUvmunmap.
     pc_is (mword_of_int (UU + 0x50) : mword 64) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     upt_pages_own (um_del_run um (svpn_of va) done) -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     ( ∀ mj : regfile,
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜uu_thr mm mj⌝ -∗
@@ -595,7 +595,7 @@ Section ProofUvmunmap.
       assert (Hp50 : add_vec_int (mword_of_int (UU + 0x4c) : mword 64) 4
                      = mword_of_int (UU + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp50) in "Hpc".
-      iAssert (kalloc_env γa None cid_word) as "Henv2".
+      iAssert (kalloc_env γa None) as "Henv2".
       { iExists γk. iFrame "Hlock Havail Hpanic". }
       iApply (IH (S done) T1 t' m' ltac:(lia) ltac:(lia) Htrep Htview Htbase
                 HT1sp HT1tp HT1s2 HT1s3 HT1s4 HT1s5 HT1s6 HT1thr
@@ -1097,7 +1097,7 @@ Section ProofUvmunmap.
     kernel_text -∗
     pc_is pcE -∗
     uptg otf uroot um -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     ( ∀ (mr : regfile),
       sie_cap_gpr γ mr K -∗
       cpu_own γ ilvl eb p C -∗

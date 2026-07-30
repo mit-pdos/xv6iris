@@ -487,7 +487,7 @@ Section ProofCopyin.
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
     proc_pt Pc -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ fd j) -∗
     ( ∀ (mj : regfile) (res : mword 64) (P' : uptd) (g : nat -> bv 8),
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
@@ -874,7 +874,7 @@ Section ProofCopyin.
           assert (Hp56 : add_vec_int (mword_of_int (CPI + 0x52) : mword 64) 4
                          = mword_of_int (CPI + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp56) in "Hpc".
-          iAssert (kalloc_env γa None cid_word) as "Henv".
+          iAssert (kalloc_env γa None) as "Henv".
           { iExists γk. iFrame "Hlock Havail Hpanic". }
           (* every premise pre-asserted and passed BY NAME (optimization.md's
              inline-[ltac:] rule) *)
@@ -1138,7 +1138,7 @@ Section ProofCopyin.
     assert (HV4ra : V4 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CPI + 0x6a) : mword 64) 4)
       by (rewrite /V4 upd_eq; reflexivity).
-    iAssert (kalloc_env γa None cid_word) as "Henv".
+    iAssert (kalloc_env γa None) as "Henv".
     { iExists γk. iFrame "Hlock Havail Hpanic". }
     iEval (rewrite -Hrootc) in "Hptc".
     iApply (Vmfault.wp_vmfault_sconf γ γa Φ V4 Pc szv (K - 12) lvl eb p C dqs dqp

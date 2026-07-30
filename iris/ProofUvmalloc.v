@@ -372,7 +372,7 @@ Section ProofUvmalloc.
     kernel_text -∗
     pc_is (mword_of_int (UA + 0x36) : mword 64) -∗
     proc_pt Pi -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     pa_stk sp0 3 ↦₈ (mm !!! Regidx Rs1) -∗
     pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
@@ -390,7 +390,7 @@ Section ProofUvmalloc.
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hk3 Hk5 Hk8 Hexit".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
-    iAssert (kalloc_env γa None cid_word) as "#Henv".
+    iAssert (kalloc_env γa None) as "#Henv".
     { iExists γk. iSplitR; [iExact "Hlock" |].
       iSplitR; [iExact "Havail" | iExact "Hpanic"]. }
     (* ---- the arithmetic of THIS iteration, all up front ---- *)
@@ -640,7 +640,7 @@ Section ProofUvmalloc.
         ua_thr_peel. apply Hmkthr; assumption. }
       assert (Hudo : (uint (N4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
         by (rewrite HN4a1; exact Hudold).
-      iAssert (kalloc_env γa None (N4 !!! Regidx Rtp)) as "#HenvN".
+      iAssert (kalloc_env γa None) as "#HenvN".
       { rewrite HN4tp. iExact "Henv". }
       iApply (Uvmdealloc.wp_uvmdealloc_sconf γ γa Φ N4 Pi (K - 10)%nat eb p C
                 HKud HN4tp HN4a0 Hudo
@@ -1014,7 +1014,7 @@ Section ProofUvmalloc.
               m_ad !! vpn_at (svpn_of (B11 !!! Regidx Ra1)) j = None).
     { intros j Hj. assert (Hj0 : j = 0%nat) by (clear -Hj; lia). subst j.
       rewrite vpn_at_0 HB11a1. exact Hmadnone. }
-    iAssert (kalloc_env γa None (B11 !!! Regidx Rtp)) as "#HenvM".
+    iAssert (kalloc_env γa None) as "#HenvM".
     { rewrite HB11tp. iExact "Henv". }
     iApply (Mappages.wp_mappages_sconf γ γa Φ B11 t m_ad 1%nat (Z.lor xperm 18) 0%nat
               (K - 10)%nat eb p C None
@@ -1417,7 +1417,7 @@ Section ProofUvmalloc.
       ua_thr_peel. apply Hfthr; assumption. }
     assert (Hudo2 : (uint (G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
       by (rewrite HG4a1; exact Hudold).
-    iAssert (kalloc_env γa None (G4 !!! Regidx Rtp)) as "#HenvG".
+    iAssert (kalloc_env γa None) as "#HenvG".
     { rewrite HG4tp. iExact "Henv". }
     iApply (Uvmdealloc.wp_uvmdealloc_sconf γ γa Φ G4 Pi (K - 10)%nat eb p C
               HKud HG4tp HG4a0 Hudo2

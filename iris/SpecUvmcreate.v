@@ -51,13 +51,13 @@ Notation UVMC := KernelSyms.uvmcreate.
 Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γa : gname) (on : option nat) (tp : mword 64) (rv : mword 64) : iProp Σ :=
   ( (* out of memory: nothing allocated, the budget untouched *)
-    (⌜rv = (zero_reg : mword 64)⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_env γa on tp)
+    (⌜rv = (zero_reg : mword 64)⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_env γa on)
   ∨ (* an empty root node, one page spent *)
     (∃ b : mword 44,
        ⌜rv = zero_extend' 64 (concat_vec b (zeros' 12 : mword 12))⌝ ∗
        ⌜page_valid rv⌝ ∗
        ptree_own 2 (DfracOwn 1) (pt_empty_node b) ∗
-       kalloc_env γa (avail_sub on 1) tp))%I.
+       kalloc_env γa (avail_sub on 1)))%I.
 
 Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
@@ -69,7 +69,7 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   sie_cap_gpr mm K b -∗
   cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗
-  kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
+  kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b -∗

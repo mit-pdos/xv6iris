@@ -691,7 +691,7 @@ Section ProofMain.
         pc_is (mword_of_int (MN + 0x7e) : mword 64) -∗
         ⌜ m' !!! Regidx (mword_of_int 4 : mword 5) = cid_word ⌝ -∗
         cpu_own γ 0 false p0 cpu_ctx_free -∗
-        kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) cid_word -∗
+        kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
         procs_inv Φ γs -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
         (* what kvminithart published about the kernel page table: all four
@@ -740,8 +740,8 @@ Section ProofMain.
     assert (Hmkitp : mki !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
     { rewrite (callee_saved_lookup Hcski (mword_of_int 4 : mword 5)
                  ltac:(vm_compute; reflexivity)). exact HV1tp. }
-    (* ---- ASSEMBLY 1: kalloc_env out of is_kmem + kalloc_avail ---- *)
-    iAssert (kalloc_env γl (Some (length ps)) cid_word) with "[Havail]" as "Hkenv".
+    (* ---- ASSEMBLY 1: kalloc_env out of + kalloc_avail ---- *)
+    iAssert (kalloc_env γl (Some (length ps))) with "[Havail]" as "Hkenv".
     { rewrite /kalloc_env. iExists γk. iSplitR; [iExact "Hkmem"|].
       iSplitL "Havail"; [iExact "Havail" | iExact "Hpanic"]. }
     (* ---- +0x72 jal kvminit ---- *)
@@ -1021,7 +1021,7 @@ Section ProofMain.
     pc_is (mword_of_int (MN + 0x8e) : mword 64) -∗
     cpu_own γ 0 false p0 cpu_ctx_free -∗
     procs_inv Φ γs -∗
-    kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) cid_word -∗
+    kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
     ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) -∗

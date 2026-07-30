@@ -1833,9 +1833,9 @@ Section ProofSysPipe.
       by (apply bv_eq; vm_compute; reflexivity).
     (* two [kalloc_env] bundles, one per copyout, built from the persistent
        pieces rather than re-derived *)
-    iAssert (kalloc_env γa None cid_word) with "[]" as "Henva".
+    iAssert (kalloc_env γa None) with "[]" as "Henva".
     { rewrite /kalloc_env. iExists γk. iFrame "Hkmem Hkav Hpanic". }
-    iAssert (kalloc_env γa None cid_word) with "[]" as "Henvb".
+    iAssert (kalloc_env γa None) with "[]" as "Henvb".
     { rewrite /kalloc_env. iExists γk. iFrame "Hkmem Hkav Hpanic". }
     (* the pure descriptor facts the tail needs *)
     assert (Hlk0' : pv_ofile (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)) !! fd0

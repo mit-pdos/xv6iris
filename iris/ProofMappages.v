@@ -106,13 +106,13 @@ Section ProofMappages.
     pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on q) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on q) -∗
     ( ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
@@ -448,13 +448,13 @@ Section ProofMappages.
     pa_stk sp0 9 ↦₈ (mm !!! Regidx (mword_of_int 23)) -∗
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
-    kalloc_env γa (avail_sub on consumed) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on consumed) -∗
     ( ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+      kalloc_env γa (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗

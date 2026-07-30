@@ -620,7 +620,7 @@ Section ProofAllocproc.
                    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
                sie_cap_gpr γ Mk (K - 4)%nat -∗
                cpu_own γ lvl eb pme C -∗
-               kalloc_env γa (Some nb) tp0 -∗
+               kalloc_env γa (Some nb) -∗
                pc_is (mword_of_int (AP + 0x1c)) -∗
                WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -983,7 +983,7 @@ Section ProofAllocproc.
           rewrite /F5 upd_ne; [| congruence].
           rewrite /F4 upd_ne; [| congruence].
           exact (Hka_rest r Hr Ncsp N8 N9 N18). }
-        iAssert (kalloc_env γa (Some nb') (F6 !!! Regidx ap_tp)) with "[Havail]" as "Henv".
+        iAssert (kalloc_env γa (Some nb')) with "[Havail]" as "Henv".
         { iExists γk. iFrame "Hkmem Havail Hpanic". }
         iApply (PPT.wp_proc_pagetable_sconf γ γa Φ F6 tfr (DfracOwn 1) (S lvl) (K - 4)%nat eb pme C (Some nb')
                   (ap_lvlS lvl Hlvl) (ap_K36 K HK)

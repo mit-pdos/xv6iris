@@ -402,7 +402,7 @@ Section ProofFreewalk.
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x48) : mword 64) -∗
     kfree_pre (page_base b) -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈ (mm !!! Regidx Rs0) -∗
     pa_stk sp0 3 ↦₈ (mm !!! Regidx Rs1) -∗
@@ -639,7 +639,7 @@ Section ProofFreewalk.
     pt_node_claim (pt_base t) -∗
     fw_done (pt_base t) d -∗
     fw_todo lvl t d -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     ( ∀ mj : regfile,
       ⌜ mj !!! Regidx csp_rs1 = spr
         /\ mj !!! Regidx Rtp = cid_word

@@ -116,7 +116,7 @@ Definition allocproc_post
   ( (* --- no free slot: a0 = 0, every lock released, budget untouched --- *)
     (⌜ rv = (zero_reg : mword 64) ⌝ ∗
      cpu_own γ lvl eb pme C ∗
-     kalloc_env γa on tp)
+     kalloc_env γa on)
   ∨ (* --- found: a0 = &proc[j], j's lock HELD, the private block built --- *)
     (∃ (j : nat) (γl : gname) (ch : mword 64) (pid : mword 32)
        (V : pprivate) (root tfp : mword 44) (ks : mword 64)
@@ -135,7 +135,7 @@ Definition allocproc_post
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
        cpu_own γ (S lvl) eb pme C ∗
        trap_csrs_pay lvl eb ∗
-       kalloc_env γa (avail_sub on nc) tp))%I.
+       kalloc_env γa (avail_sub on nc)))%I.
 
 Definition wp_allocproc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
@@ -157,7 +157,7 @@ Definition wp_allocproc_sconf_body
   panic_wp -∗
   procs_inv Φ γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-  kalloc_env γa on (m !!! Regidx (mword_of_int 4)) -∗
+  kalloc_env γa on -∗
   ( ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       sie_cap_gpr γ mr K -∗

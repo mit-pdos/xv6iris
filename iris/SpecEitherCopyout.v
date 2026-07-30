@@ -124,7 +124,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   sie_cap_gpr γ m av -∗
   cpu_own γ lvl eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  kalloc_env γa None cid_word -∗
+  kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
   (if user
    then proc_priv γf p pid V

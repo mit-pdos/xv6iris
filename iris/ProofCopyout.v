@@ -395,7 +395,7 @@ Section ProofCopyout.
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
     proc_pt Pc -∗
-    kalloc_env γa None cid_word -∗
+    kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
     ( ∀ (mj : regfile) (res : mword 64) (P' : uptd),
         ⌜ mj !!! Regidx csp_rs1 = spr

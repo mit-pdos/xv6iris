@@ -94,7 +94,7 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
-  kalloc_env γa None cid_word -∗
+  kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b -∗

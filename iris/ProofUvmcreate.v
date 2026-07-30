@@ -375,7 +375,7 @@ Section ProofUvmcreate.
       iSplit; [iPureIntro; rewrite Hnull; symmetry; exact Hnz|].
       iSplit; [iPureIntro; exact Hz|].
       iExists γk. iFrame "Hlock Havail2 Hpanic". }
-    iAssert (kalloc_env γa (avail_sub on 1) (mm !!! Regidx (mword_of_int 4)))
+    iAssert (kalloc_env γa (avail_sub on 1))
       with "[Havail2]" as "Henv".
     { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2 Hpanic". }
     iApply (wp_cbeqz_fall_s_sconf γ Φ (mword_of_int (UVC + 0x10)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)

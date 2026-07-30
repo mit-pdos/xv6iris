@@ -149,7 +149,7 @@ Definition vdi_post
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
-    kalloc_env γa (avail_sub on 3) (m !!! Regidx (mword_of_int 4 : mword 5)) -∗
+    kalloc_env γa (avail_sub on 3) -∗
     (* The device is LIVE and its queue is the three pages just allocated: the
        DMA lease has been paid into [disk_inv]'s [virtio_proto] at the final
        STATUS write, and what comes out is the publisher token at 0 -- nothing
@@ -202,7 +202,7 @@ Definition wp_virtio_disk_init_sconf_body
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  kalloc_env γa on (m !!! Regidx (mword_of_int 4 : mword 5)) -∗
+  kalloc_env γa on -∗
   (* the disk fabric, borrowed from the invariant around each MMIO access,
      plus the caller's half of the config tracker: the pair is what keeps the
      configuration this function programs deterministic while the state lives

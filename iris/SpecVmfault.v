@@ -19,7 +19,7 @@
    The new page's ZEROED contents are deliberately not exposed: [proc_pt]
    owns pages at existential bytes (the user-safety altitude).
 
-   Steady-state kalloc tier: [kalloc_env γa None _] is persistent (sealed
+   Steady-state kalloc tier: [kalloc_env γa None is persistent (sealed
    count witness), so it is taken once and not returned; kalloc may fail
    nondeterministically, which is folded into the failure arm.
 
@@ -78,7 +78,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   p_sz p ↦₈{dqs} szv -∗
   p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
   proc_pt P -∗
-  kalloc_env γa None cid_word -∗
+  kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b -∗

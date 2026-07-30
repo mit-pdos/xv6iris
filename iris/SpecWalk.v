@@ -51,14 +51,14 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
-  kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
+  kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr mr K b -∗ cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-    kalloc_env γa (avail_sub on g) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on g) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ptree_same_rep0 t t'⌝ -∗
     ⌜ptree_offpath_eq vpn t t'⌝ -∗
