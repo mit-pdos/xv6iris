@@ -2,7 +2,7 @@
 
 GOAL: make `SchedCtx.procs_inv` ONE hart-independent proposition, so the
 `started` payload can carry it and every secondary hart's `scheduler()` can
-consume it. Companion to [`kpt-share.md`](kpt-share.md) (G5 part 1); the two
+consume it. Companion to [`kpt-share.md`](../completed/kpt-share.md) (G5 part 1); the two
 are independent sweeps over disjoint files. Approved 2026-07-30.
 
 ## The problem

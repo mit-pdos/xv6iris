@@ -641,4 +641,7 @@ WpMainDecode.v
 SpecMain.v
 ProofMain.v
 LinkMain.v
+SpecMainSecondary.v
+ProofMainSecondary.v
+LinkMainSecondary.v
 BootBridge.v

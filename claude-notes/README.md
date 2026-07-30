@@ -94,26 +94,20 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
-- **[`main-boot.md`](projects/main-boot.md)** — `main()`. The BOOT ARM IS
+- **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `WpMainDecode.v`, `StartedInv.v` (the `started` flag as a
   one-shot escrow with a PERSISTENT payload), `SpecMain.v` (deposit as a
   □-wand main applies at the `started = 1` store), `ProofMain.v` (six
   bare-`WP Loop` call-group lemmas; no `callee_saved` threading — main
-  never returns). The file keeps the resolved-blocker record (G1's
-  time-0 device invariants + init-under-invariant rework, G2/G3 assumed
-  interfaces, G4's later-stripping fence leaf), the callee-by-callee
+  never returns), and the SECONDARY arm `SpecMainSecondary.v` (the
+  concrete deposit package `main_deposit`) / `ProofMainSecondary.v`
+  (the started spin loop + the ▷-stripping fence + the hart-generic
+  init-hart chain into scheduler). The file keeps the resolved-blocker
+  record (G1's time-0 device invariants, G2/G3 assumed interfaces, G4's
+  later-stripping fence leaf, G5's three sweeps), the callee-by-callee
   resource inventory, the assemblies main performs, and what remains:
-  the secondary arm (G5 — see [`kpt-share.md`](projects/kpt-share.md))
-  and the whole-system adequacy composition.
-- **[`kpt-share.md`](projects/kpt-share.md)** — sharing the kernel page
-  table across harts (G5 part 1) so `kvminithart` gets ONE hart-generic
-  contract: the `kpt_inv` invariant over the mutating tree, the
-  A/D-monotone `kpt_lb` ghost + `tlb_ok_pt_ad_mono` (stated modulo
-  A/D-growth: a load-walk entry's D can lag another hart's store), the
-  mask-carrying `sr_absorb`, per-CPU `strans_name` — and the sequencing
-  through `wp_main_secondary_sconf` and the all-harts
-  `_entry`→`start`→`main` adequacy. Design approved.
+  the whole-system adequacy composition.
 - **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
   2: the parked-proc resumption contract (`p_sched`) quantifies the
   RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE
@@ -172,6 +166,16 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`kpt-share.md`](completed/kpt-share.md)** — G5 part 1: the kernel page
+  table SHARED across harts, so `kvminithart` has ONE hart-generic contract
+  (consumes only the persistent `kpt_inv root` + the `↦₈□` root cell; the
+  publication — persist root, `kvm_M_mint`, `kpt_inv_alloc` — is a boot-hart
+  assembly in ProofMain's kvm group). Keeps why a fraction cannot work, the
+  one-shot-agreement `kpt_lb` ghost over the A/D-canonical tree (leaf-only
+  canonicalisation is load-bearing for soundness), the mask-carrying
+  `sr_absorb` call form, `kpt_inv_snapshot` (any tree serves an
+  empty-TLB re-entry), and the satp-window follow-up (the userret/uservec
+  island keeps the exclusive `tlb_inv_pt`).
 - **[`bare-inv-generic.md`](completed/bare-inv-generic.md)** — G5 part 3:
   the Bare translation arm made PER-HART (`bare_inv` holds only this hart's
   satp/PMP cells; the global `kmap_auth kmap_M0` became a boot token routed

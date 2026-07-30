@@ -180,7 +180,7 @@ Section WpSconfMem.
     rd <> csp_rs1 ->
     (* the data translation is absorbed WITH THE ACCESSOR OPEN, so the
        shared kernel table's namespace must be inside the accessor's inner
-       mask (claude-notes/projects/kpt-share.md).  Every supplier's [Em] is
+       mask (claude-notes/completed/kpt-share.md).  Every supplier's [Em] is
        [⊤ ∖ ↑minstretN] minus device/lock namespaces, so [solve_ndisj]. *)
     ↑kptN ⊆ Em ->
     sie_cap_gpr γ m n -∗

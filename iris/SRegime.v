@@ -214,7 +214,7 @@ Section SRegimeDef.
        with the output pa = ppn ++ pageoff.  The claim is supplied by the
        consumer's OWN resource (fetch [↦ₓ□] window / datum [↦ₘ] / device
        static bundle), so no identity or region premise rides here. *)
-    (* MASK-CARRYING (claude-notes/projects/kpt-share.md): the SHARED
+    (* MASK-CARRYING (claude-notes/completed/kpt-share.md): the SHARED
        kernel-table regime absorbs by OPENING the [kptN] invariant, so the
        field is a fupd at any mask containing [↑kptN].  The two exclusive
        instances below open nothing and merely weaken their [==∗].  Call

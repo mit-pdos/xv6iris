@@ -241,7 +241,7 @@ Qed.
    covered by [pte_set_ad_ext]).  PtTree's [pte_set_ad_leaf] /
    [pte_set_ad_valid] are one rewrite each off these; that stability is
    what lets an A/D-canonicalised page table AGREE with the live one
-   (claude-notes/projects/kpt-share.md). *)
+   (claude-notes/completed/kpt-share.md). *)
 Lemma pte_set_ad_flag_V (w : mword 64) (a d : mword 1) :
   _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
   = _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec w 7 0)).

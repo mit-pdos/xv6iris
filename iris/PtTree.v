@@ -1390,7 +1390,7 @@ Qed.
 (*      A/D-canonical form and leaves every base, child pointer and       *)
 (*      level-2/1 word alone.  Two facts make it the right notion for a   *)
 (*      kernel page table shared between harts                            *)
-(*      (claude-notes/projects/kpt-share.md):                              *)
+(*      (claude-notes/completed/kpt-share.md):                              *)
 (*        - it is INVARIANT under the Svadu write-back                    *)
 (*          ([ptree_canon_set_leaf]) -- the only mutation a running       *)
 (*          machine performs on an installed table -- so the harts can    *)

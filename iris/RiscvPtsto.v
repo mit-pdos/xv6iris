@@ -140,7 +140,7 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      typeclass resolution ambiguous between two functor slots).
      PER-HART, like [cpu_reg_name]: satp and tlb are per-hart registers, so
      which arm a hart's translation slot is in is a per-hart fact, and the
-     shared-kernel-table sweep (claude-notes/projects/kpt-share.md) needs
+     shared-kernel-table sweep (claude-notes/completed/kpt-share.md) needs
      every hart to flip its own bit at its own kvminithart. *)
   strans_name : CPU -> gname;
 }.

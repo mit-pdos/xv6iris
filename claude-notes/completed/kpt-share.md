@@ -1,8 +1,11 @@
-# Project: sharing the kernel page table across harts (G5, part 1)
+# Project: sharing the kernel page table across harts (G5, part 1) — DONE
 
-GOAL: make `kvminithart` callable on EVERY hart, so `wp_main_secondary_sconf`
-becomes statable. This is the first half of main-boot's G5; the second half
-(hart-generic `p_sched`/`procs_inv`) is an independent sweep.
+GOAL (ACHIEVED): make `kvminithart` callable on EVERY hart, so
+`wp_main_secondary_sconf` becomes statable — and it is now statable AND
+PROVEN (`SpecMainSecondary.v` / `ProofMainSecondary.v` /
+`LinkMainSecondary.v`; see [`main-boot.md`](../projects/main-boot.md)).
+This was the first half of main-boot's G5; the second half (hart-generic
+`p_sched`/`procs_inv`) was an independent sweep with its own file.
 
 ## Why a fraction cannot work
 
@@ -92,34 +95,39 @@ only for user-mode-under-shared-table.
    concretely and gained one `ltac:(solve_ndisj)` each. Zero
    whole-function spec statements changed.
 
-5. **`kvminithart` gets ONE hart-generic contract**: consumes `kpt_inv
-   root` (persistent) + this hart's own `strans_bit bare` / `tlb ↦ᵣ` /
-   satp / pmp cells; no exclusive tree anywhere. MAIN's boot arm gains an
-   assembly between kvminit and kvminithart: allocate `kpt_inv` from
-   kvminit's post (`ptree_own` + `kmap_auth` + spec fact) and persist
-   `kernel_pagetable ↦₈□`. The secondary arm receives `kpt_inv` through
-   the `started` payload P (persistent ✓).
+5. **`kvminithart` has ONE hart-generic contract (LANDED)**: consumes
+   `kpt_inv root` (persistent) + the `↦₈□` root cell + this hart's own
+   `strans_bit bare` / `tlb ↦ᵣ` / satp / pmp cells; no exclusive tree, no
+   boot token, no `ptree` anywhere in the statement — the contract is keyed
+   on the ROOT PPN alone. The switch re-enters the KPT arm with
+   `KptShare.kpt_inv_snapshot` (one `iMod`, no later — `kpt_body` is
+   timeless): both sfence.vmas leave the TLB empty, so `tlb_ok_pt_empty`
+   holds at ANY tree and the snapshot may be arbitrary. The PUBLICATION —
+   persist the root cell, `WpKvminithart.kvm_M_mint` the 65 claims out of
+   `kmap_auth kmap_M0`, `kpt_inv_alloc` out of kvminit's exclusive tree +
+   `kpt_unset` (spec fact via `KvmMap.kvm_bridge`) — is a boot-hart
+   assembly in ProofMain's kvm group, between kvminit and kvminithart.
+   The secondary arm receives `kpt_inv` + the root cell through the
+   `started` payload (`SpecMainSecondary.main_deposit`).
 
 6. **`strans_name : CPU -> gname`** (the 5-line change, 5 use sites:
    RiscvPtsto.v:122, IntrDefs.v:444,452, RiscvAdequacy.v:241,242) rides in
    this sweep — satp/tlb are per-hart, so their transit ghost must be too.
 
-## Sequencing (after the boot-bridge agent lands)
+## How it landed (sequencing items 1–3, all done)
 
-1. This project (one central sweep: SRegime + KptTree + the kpt ghost +
-   call-site mask plumbing + kvminithart respec/reproof + main's new
-   assembly — ProofMain's kvm group changes).
-2. Hart-generic `p_sched`/`procs_inv` (separate sweep, SchedCtx + scheduler
-   + yield/sleep consumers: the parking hart's identity becomes a VALUE in
-   the lock resource instead of the ambient `cid_word`).
-3. `SpecMainSecondary`/`ProofMainSecondary`: the spin loop (iLöb over
-   lw/sext.w/beqz), `wp_fence_gen_later_s_sconf` strips the `▷ P`,
-   printk("hart %d starting") out of P's `printk_env`, kvminithart (new
-   contract) / trapinithart / plicinithart, scheduler with the
-   hart-generic `procs_inv` from P + this hart's own cpu_own/trap_csrs.
-   The deposit wand in SpecMain grows what secondaries consume:
-   `kpt_inv root` and the hart-generic `procs_inv`.
-4. The whole-system adequacy with `cs = all harts`: hart 0 via
-   ENTRY ∘ boot-bridge ∘ MAIN-boot, harts ≠ 0 via
-   ENTRY ∘ boot-bridge ∘ MAIN-secondary; the image carve + `started_inv`
-   allocation + P instantiation inside the `={⊤}=∗`.
+1. The central sweep (SRegime mask-carrying absorb, the kpt ghost,
+   call-site plumbing) — landed earlier; see §4 above.
+2. Hart-generic `p_sched`/`procs_inv` — landed as its own sweep
+   ([`sched-hart-generic.md`](../projects/sched-hart-generic.md); five loop
+   sleepers remain axiomatized there, which does not gate main).
+3. The kvminithart respec/reproof + main's publication assembly + the
+   secondary arm itself — all landed; the secondary arm's record (deposit
+   shape, spin-loop recipe, fence later-strip) lives in
+   [`main-boot.md`](../projects/main-boot.md).
+
+Remaining (tracked in main-boot's worklist, not here): the whole-system
+adequacy with `cs = all harts` — hart 0 via ENTRY ∘ boot-bridge ∘
+MAIN-boot, harts ≠ 0 via ENTRY ∘ boot-bridge ∘ MAIN-secondary; the image
+carve + `started_inv` allocation at `P := main_deposit` (which discharges
+SpecMain's deposit wand by packing the existentials) inside the `={⊤}=∗`.

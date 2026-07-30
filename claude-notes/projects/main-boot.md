@@ -39,8 +39,7 @@ every callee, but nothing yet DRIVES them.
 
 **`ProofMain.v` / `LinkMain.v` — main() is PROVEN** (main.c 178/178 bytes; the
 axiom footprint is exactly its three assumed callees — printk-general,
-userinit, and kerneltrap via Kernelvec). Boot arm only; the secondary arm waits
-on G5. What the proof taught, worth keeping:
+userinit, and kerneltrap via Kernelvec). What the proof taught, worth keeping:
 
 - **A call-group helper lemma for a DIVERGING function concludes with a
   bare `WP Loop {{Φ}}`**, so it names only what it consumes/produces and
@@ -60,12 +59,51 @@ on G5. What the proof taught, worth keeping:
 - `main_globals_raw` additions the assemblies demanded: the
   panicking/panicked pair (printk_flags_inv allocation), the per-proc
   `p_chan` + `proc_pub` publics (procs_inv_alloc), `∃v, initproc ↦₈ v`.
-- The deposit wand delivers `printk_env`, `procs_inv`, AND the assembled
+- The deposit wand delivers `printk_env`, `procs_inv`, the assembled
   disk interface (`is_lock γk d_lock "virtio_disk" (disk_res …)` +
-  `disk_geom`) — so the proven virtio interface survives the handover
-  instead of being buried. Resources nothing consumes are DROPPED
-  (affine): the six unclaimed `lk_fresh`es, binit/iinit outputs,
-  kvminithart's `kmap_at`s, leftover pages.
+  `disk_geom`), AND the shared kernel table (`kpt_inv root`, the `↦₈□`
+  root cell, the 65 `kmap_at` claims) — so the proven interfaces survive
+  the handover instead of being buried. Resources nothing consumes are
+  DROPPED (affine): the six unclaimed `lk_fresh`es, binit/iinit outputs,
+  leftover pages.
+- **The table PUBLICATION is main's own assembly**, between kvminit and
+  kvminithart (persist the root cell → `WpKvminithart.kvm_M_mint` →
+  `KptShare.kpt_inv_alloc` over `KvmMap.kvm_bridge`), so kvminithart keeps
+  ONE hart-generic contract — see `completed/kpt-share.md`.
+
+**`SpecMainSecondary.v` / `ProofMainSecondary.v` / `LinkMainSecondary.v` —
+the SECONDARY ARM is PROVEN** (axiom footprint: printk-general + kerneltrap
+via Kernelvec — no userinit, secondaries never call it). What it settled:
+
+- **`main_deposit γd γv Φ`** (SpecMainSecondary.v) is the CANONICAL concrete
+  instantiation of SpecMain's abstract payload `P`: the existential package
+  of exactly the eight persistent facts the boot arm's □-wand takes as
+  arguments (printk_env, hart-generic `procs_inv`, disk lock + geometry,
+  `kpt_inv` + root cell + the 65 claims). Adequacy will allocate
+  `started_inv (main_deposit …)` and discharge SpecMain's wand by packing
+  the existentials. The ghost names / disk pages / root / kstack pas are
+  existential because a secondary genuinely cannot know them.
+- **The spin-loop recipe** (`ms_spin`): `iLöb as "IH" forall (m Htp Ha4)` —
+  iLöb auto-reverts the spatial context (including the exit continuation),
+  so the IH re-enters at the post-iteration register map; the reverted PURE
+  premises come back as `⌜φ⌝ -∗ …`, supplied with `[%]` spec patterns (a
+  `$!` cannot feed them). The branch is destructed on the eq_vec BOOLEAN of
+  the map lookup — NOT on the loaded word — so the only pure fact the exit
+  needs is a closed-term `vm_compute; discriminate` refuting the payload's
+  `⌜v = 0⌝` arm. The load is `wp_load_s_sconf_au` at width 4 with
+  `started_inv_load_au` as the AU (they plug together as designed), and the
+  loop-back `wp_cbeqz_taken`'s ▷-continuation is what strips the IH's later.
+- **G4 played out exactly as designed**: the payload rides `▷(⌜v=0⌝ ∨ P)`
+  through the fall-through branch, and `wp_fence_gen_later_s_sconf`'s
+  `iNext` at the acquire fence strips it (both IH-style laters and the
+  payload's in one step).
+- **`Proof using All`** on the top-level lemma: the proof never mentions
+  `kallocG`/`fileG`, so without it the section drops them and the sealed
+  Definition fails the Module Type check with a baffling component
+  mismatch. Any secondary-style contract whose Σ-classes outnumber the
+  proof's uses needs the same.
+- Secondary stack budget `K_main_secondary = 40` (printk's 38 + the 2-slot
+  frame; the arm never runs the kvminit cone that forced the boot arm's 52).
 
 ## The function
 
@@ -320,15 +358,19 @@ also the semantically right place — `fence rw,rw` IS the acquire barrier, so
 proof will use.
 
 ### G5 — the per-hart resources the secondary arm needs are globally unique
+### (RESOLVED — the secondary arm is proven over the three sweeps)
 
-STATUS: parts 1 and 3 are LANDED — the shared kernel table
+STATUS: all three parts LANDED — the shared kernel table
 (`completed/kpt-share.md`: `kpt_inv` + the per-hart residue `tlb_res_pt` +
-the mask-carrying `sr_absorb` + per-CPU `strans_name`) and the per-hart
-Bare arm (`completed/bare-inv-generic.md`: `bare_inv` holds only this
-hart's satp/PMP cells, the `kmap_auth` moved out to a boot token, claim
-honoring under Bare is the `sr_adm` premise the consumer's own datum
-supplies). Part 2 (`projects/sched-hart-generic.md`) is the remaining
-one. The two original instances, for the record:
+the mask-carrying `sr_absorb` + per-CPU `strans_name`, and the hart-generic
+kvminithart contract with the publication moved into main's boot arm), the
+hart-generic proc protocol (`projects/sched-hart-generic.md`: `procs_inv`
+is one hart-independent persistent proposition; that file stays open only
+for the five loop-sleeper re-proofs, which do not gate main), and the
+per-hart Bare arm (`completed/bare-inv-generic.md`: `bare_inv` holds only
+this hart's satp/PMP cells, the `kmap_auth` moved out to a boot token,
+claim honoring under Bare is the `sr_adm` premise the consumer's own datum
+supplies). The two original instances, for the record:
 
 - **`kvminithart`'s contract consumes the kernel page table exclusively.** Its
   precondition takes `ptree_own 2 (DfracOwn 1) t` and
@@ -352,7 +394,7 @@ one. The two original instances, for the record:
   ambient `cid_word`) is prior to any multi-hart `scheduler`, never mind main.
 
 Both halves now have their own project files —
-[`kpt-share.md`](kpt-share.md) and
+[`kpt-share.md`](../completed/kpt-share.md) and
 [`sched-hart-generic.md`](sched-hart-generic.md); read those before touching
 either.
 
@@ -448,21 +490,21 @@ half of SpecMain's precondition: `sie_cap_gpr γ mf K` + the tp fact +
 
 ## Worklist
 
-1. **G5**, the secondary arm's blocker, now two projects of its own:
-   [`kpt-share.md`](kpt-share.md) (sharing the kernel page table across harts —
-   the `kpt_inv` invariant over the mutating tree, the A/D-monotone `kpt_lb`
-   ghost, the mask-carrying `sr_absorb`, per-CPU `strans_name`) and
-   [`sched-hart-generic.md`](sched-hart-generic.md) (quantifying the resuming
-   hart inside `p_sched`'s payload so `procs_inv` becomes hart-independent).
-   Only then `wp_main_secondary_sconf`.
-2. **Adequacy** ([`../design/adequacy.md`](../design/adequacy.md)):
-   `started_inv_alloc` goes inside `riscv_system_adequacy`'s `={⊤}=∗`, beside
-   the device-ghost allocation. The device side is already there —
+1. **Adequacy** ([`../design/adequacy.md`](../design/adequacy.md)):
+   `started_inv_alloc` at `P := SpecMainSecondary.main_deposit γd γv Φ`
+   goes inside `riscv_system_adequacy`'s `={⊤}=∗`, beside the device-ghost
+   allocation (that instantiation also discharges SpecMain's deposit wand —
+   pack the existentials). The device side is already there —
    `riscv_device_adequacy` takes `plic_ok` / `virtio_live = false` /
    `v_seen = v_used_idx = 0` / `virtio_isr_ok` on the initial state (a reset
    machine satisfies all four) and allocates the invariants — so what is left
-   here is the multi-hart instantiation: a hart list, each hart's boot-config
-   registers in its `D c`, and the `started` cell.
-3. The two ASSUMED callees, each of which replaces exactly one file:
+   is the multi-hart instantiation: a hart list, each hart's boot-config
+   registers in its `D c`, the `started` cell, the per-hart premises of the
+   secondary contract (`cid_word ≠ 0`, `bv_unsigned cid_word < dev_ncpu`),
+   and hart 0 via ENTRY ∘ boot-bridge ∘ MAIN-boot vs harts ≠ 0 via
+   ENTRY ∘ boot-bridge ∘ MAIN-secondary.
+2. The two ASSUMED callees, each of which replaces exactly one file:
    printk-general ([`printk.md`](printk.md), blocked on uartputc_sync's general
-   path) and `userinit`.
+   path) and `userinit`. (The five loop-sleeper re-proofs in
+   [`sched-hart-generic.md`](sched-hart-generic.md) are that project's tail,
+   not main's.)
