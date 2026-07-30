@@ -33,9 +33,9 @@ Section ProofMemsetPage.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_memset_page_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (cval : mword 64)
-    : wp_memset_page_sconf_body γ Φ m0 n cval.
+  Lemma wp_memset_page_sconf (Φ : mval -> iProp Σ)
+      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool)
+    : wp_memset_page_sconf_body Φ m0 n cval b.
   Proof.
     cbv beta delta [wp_memset_page_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2.
@@ -48,11 +48,12 @@ Section ProofMemsetPage.
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* --- apply the general memset spec at len = 4096 --- *)
-    iApply (MemsetArray.wp_memset_sconf γ Φ m0 n 4096 cval olds
+    iApply (MemsetArray.wp_memset_sconf Φ m0 n 4096 cval olds b
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
-    iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
+    iIntros (CID1 Hs1 mfin) "Hcg Hpc Hbuf %Hcs".
+    iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
     (* rebuild page_own from the all-cbyte buffer *)
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iEval (rewrite /page_own /byte_any).

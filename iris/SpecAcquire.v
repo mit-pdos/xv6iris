@@ -62,7 +62,14 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
     Tc -∗
-    sie_cap_gpr mfin av b -∗
+    (* [false], NOT [b]: acquire is UNBALANCED -- it opens with push_off(),
+       which disables interrupts regardless of the entry state, and returns
+       still holding the lock.  The [wp_next] index stays [b] (a trap CAN land
+       on acquire's first instruction, before it disables), which is exactly
+       the resource-index / wp_next-index divergence documented in the porting
+       guide.  Threading [b] out made release -- whose entry is [false] --
+       uncallable. *)
+    sie_cap_gpr mfin av false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
@@ -86,7 +93,14 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   wp_next b (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
-    sie_cap_gpr mfin av b -∗
+    (* [false], NOT [b]: acquire is UNBALANCED -- it opens with push_off(),
+       which disables interrupts regardless of the entry state, and returns
+       still holding the lock.  The [wp_next] index stays [b] (a trap CAN land
+       on acquire's first instruction, before it disables), which is exactly
+       the resource-index / wp_next-index divergence documented in the porting
+       guide.  Threading [b] out made release -- whose entry is [false] --
+       uncallable. *)
+    sie_cap_gpr mfin av false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
