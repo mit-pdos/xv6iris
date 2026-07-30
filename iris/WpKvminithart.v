@@ -1,13 +1,21 @@
 (* WpKvminithart.v -- support lemmas for the whole-function proof of
    kvminithart (the Bare->Sv39 kernel-page-table switch).
 
-   The ghost-side switch fold is [kvm_M_mint]: the switch dissolves the
-   Bare arm's [kmap_auth kmap_M0]
-   and mints, in one update, the target auth [kmap_auth (kvm_M pas)] together
-   with the 65 persistent claims it hands the boot code -- the trampoline
-   claim + the 64 kstack claims.  Freshness comes purely from the KvmMap
-   characterizations (kmap_M0_lookup + the tramp/kstack classifiers +
-   kstack_vpn_inj); no map literal is ever normalized. *)
+   The ghost-side fold is [kvm_M_mint]: it turns the boot token
+   [kmap_auth kmap_M0] into the target auth [kmap_auth (kvm_M pas)] together
+   with the 65 persistent claims -- the trampoline claim + the 64 kstack
+   claims.  Freshness comes purely from the KvmMap characterizations
+   (kmap_M0_lookup + the tramp/kstack classifiers + kstack_vpn_inj); no map
+   literal is ever normalized.
+
+   ITS CALLER IS main's BOOT ARM, not kvminithart.  The one-way door that
+   publishes the kernel table -- mint the auth, allocate [KptShare.kpt_inv]
+   out of kvminit's exclusive tree, persist the root cell -- is a BOOT-HART
+   assembly (ProofMain's kvm group), so that kvminithart itself has ONE
+   hart-generic contract every hart can call (claude-notes/projects/
+   kpt-share.md §5).  What kvminithart uses from this file is the pure
+   [kvi_satp_*] family below, which is keyed on the ROOT PPN alone -- no
+   tree, which is exactly what makes the generic contract statable. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -25,15 +33,18 @@ Local Open Scope Z_scope.
 
 (* ===================================================================== *)
 (* Pure satp-value facts (rwx-kmap deliverable 1): the MAKE_SATP word     *)
-(* [kvi_satp_word t] assembled by kvminithart's ld/srli/li/slli/or chain  *)
-(* (a5 = (root_b >> 12) | (1<<63)) has Sv39 mode, zero ASID, and PPN =    *)
-(* [pt_base t].  Stated in the autocast shapes [tlb_inv_pt_intro] wants.   *)
+(* [kvi_satp_word root] assembled by kvminithart's ld/srli/li/slli/or      *)
+(* chain (a5 = (root_b >> 12) | (1<<63)) has Sv39 mode, zero ASID, and     *)
+(* PPN = [root].  Stated in the autocast shapes [tlb_res_pt_intro] wants.  *)
+(* KEYED ON THE ROOT PPN, not on a [ptree]: kvminithart's generic contract *)
+(* never names a tree (the table lives in [kpt_inv]), and every fact here  *)
+(* is about the WORD, which only ever sees the root.                       *)
 (* The arithmetic is packaged into mword-FREE Z helpers so [lia] is not    *)
 (* broken by the bitvector zify hook.                                      *)
 (* ===================================================================== *)
 
-Definition kvi_satp_word (t : ptree) : mword 64 :=
-  or_vec (shift_bits_right (zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)))
+Definition kvi_satp_word (root : mword 44) : mword 64 :=
+  or_vec (shift_bits_right (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)))
                            (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))
          (shift_bits_left (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))
                           (subrange_vec_dec (mword_of_int 63 : mword 6) (Z.sub log2_xlen 1) 0)).
@@ -95,13 +106,13 @@ Section KvmSatp.
   Proof. vm_compute. reflexivity. Qed.
 
   (* the left operand (srli of root_b by 12) recovers the ppn value P *)
-  Local Lemma kvi_L_unsigned (t : ptree) :
-    bv_unsigned (shift_bits_right (zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)))
+  Local Lemma kvi_L_unsigned (root : mword 44) :
+    bv_unsigned (shift_bits_right (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)))
                    (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))
-    = bv_unsigned (pt_base t).
+    = bv_unsigned root.
   Proof.
-    set (rb := zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
-    assert (Hrb : bv_unsigned rb = bv_unsigned (pt_base t) * 4096).
+    set (rb := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))).
+    assert (Hrb : bv_unsigned rb = bv_unsigned root * 4096).
     { unfold rb. rewrite zext64_concat44_12_unsigned kvi_zeros12_unsigned. lia. }
     assert (Hsh : shift_bits_right rb (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
                 = shiftr rb 12).
@@ -124,21 +135,21 @@ Section KvmSatp.
     = 9223372036854775808.
   Proof. vm_compute. reflexivity. Qed.
 
-  Lemma kvi_satp_word_unsigned (t : ptree) :
-    bv_unsigned (kvi_satp_word t) = bv_unsigned (pt_base t) + 9223372036854775808.
+  Lemma kvi_satp_word_unsigned (root : mword 44) :
+    bv_unsigned (kvi_satp_word root) = bv_unsigned root + 9223372036854775808.
   Proof.
     unfold kvi_satp_word.
     rewrite bv_or_unsigned kvi_L_unsigned kvi_S_unsigned.
     apply Z_lor_disjoint_add.
     apply z_land_bit63.
-    pose proof (bv_unsigned_in_range _ (pt_base t)) as Hr.
+    pose proof (bv_unsigned_in_range _ root) as Hr.
     assert (bv_modulus (MachineWord.MachineWord.Z_idx 44) = 17592186044416) as HM by (vm_compute; reflexivity).
     rewrite HM in Hr. lia.
   Qed.
 
-  Local Lemma pt_base_bound (t : ptree) : 0 <= bv_unsigned (pt_base t) < 17592186044416.
+  Local Lemma root_ppn_bound (root : mword 44) : 0 <= bv_unsigned root < 17592186044416.
   Proof.
-    pose proof (bv_unsigned_in_range _ (pt_base t)) as Hr.
+    pose proof (bv_unsigned_in_range _ root) as Hr.
     assert (bv_modulus (MachineWord.MachineWord.Z_idx 44) = 17592186044416) as HM by (vm_compute; reflexivity).
     rewrite HM in Hr. lia.
   Qed.
@@ -196,35 +207,35 @@ Section KvmSatp.
   Qed.
 
   (* the three field facts, in [tlb_inv_pt_intro]'s exact shapes *)
-  Lemma kvi_satp_mode (t : ptree) :
-    _get_Satp64_Mode (Mk_Satp64 (kvi_satp_word t)) = ('b"1000" : mword 4).
+  Lemma kvi_satp_mode (root : mword 44) :
+    _get_Satp64_Mode (Mk_Satp64 (kvi_satp_word root)) = ('b"1000" : mword 4).
   Proof.
     unfold _get_Satp64_Mode, Mk_Satp64. apply bv_eq.
     rewrite subrange64_unsigned_63_60 kvi_satp_word_unsigned.
     change (2 ^ 4) with 16.
-    rewrite (z_satp_mode (bv_unsigned (pt_base t)) (pt_base_bound t)).
+    rewrite (z_satp_mode (bv_unsigned root) (root_ppn_bound root)).
     vm_compute (bv_unsigned ('b"1000" : mword 4)). reflexivity.
   Qed.
 
-  Lemma kvi_satp_asid (t : ptree) :
-    zero_extend' 16 (satp_to_asid (autocast (T := mword) (kvi_satp_word t) : mword 64))
+  Lemma kvi_satp_asid (root : mword 44) :
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) (kvi_satp_word root) : mword 64))
     = (mword_of_int 0 : mword 16).
   Proof.
     rewrite satp64_asid_eq.
-    assert (Hz : subrange_vec_dec (kvi_satp_word t) 59 44 = (mword_of_int 0 : mword 16)).
+    assert (Hz : subrange_vec_dec (kvi_satp_word root) 59 44 = (mword_of_int 0 : mword 16)).
     { apply bv_eq. rewrite subrange64_unsigned_59_44 kvi_satp_word_unsigned.
-      rewrite (z_satp_asid (bv_unsigned (pt_base t)) (pt_base_bound t)).
+      rewrite (z_satp_asid (bv_unsigned root) (root_ppn_bound root)).
       vm_compute (bv_unsigned (mword_of_int 0 : mword 16)). reflexivity. }
     rewrite Hz. apply bv_eq. vm_compute. reflexivity.
   Qed.
 
-  Lemma kvi_satp_ppn (t : ptree) :
-    autocast (T := mword) (satp_to_ppn (autocast (T := mword) (kvi_satp_word t) : mword 64))
-    = pt_base t.
+  Lemma kvi_satp_ppn (root : mword 44) :
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) (kvi_satp_word root) : mword 64))
+    = root.
   Proof.
     rewrite satp64_ppn_eq. rewrite autocast_id. apply bv_eq.
     rewrite subrange64_unsigned_43_0 kvi_satp_word_unsigned.
-    exact (z_satp_ppn (bv_unsigned (pt_base t)) (pt_base_bound t)).
+    exact (z_satp_ppn (bv_unsigned root) (root_ppn_bound root)).
   Qed.
 
 End KvmSatp.
@@ -279,9 +290,10 @@ Section KvmMint.
       iFrame "Hclaims Hcl".
   Qed.
 
-  (* THE ghost fold (rwx-kmap deliverable 2): the Bare arm's exact static
-     auth becomes the target auth, releasing the trampoline claim + the 64
-     kstack claims.  [kvm_M pas] is definitionally
+  (* THE ghost fold (rwx-kmap deliverable 2): the static boot auth becomes
+     the target auth, releasing the trampoline claim + the 64
+     kstack claims.  Spent by main's boot arm, beside [kpt_inv_alloc].
+     [kvm_M pas] is definitionally
      [kvm_M_stacks pas 64 (<[tramp_vpn := (tramp_ppn, KP_rx)]> kmap_M0)]. *)
   Lemma kvm_M_mint (pas : nat -> mword 44) :
     kmap_auth kmap_M0 ==∗ kmap_auth (kvm_M pas) ∗

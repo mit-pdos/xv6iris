@@ -29,14 +29,15 @@
 
    THIS FILE STATES THE BOOT-HART CONTRACT ONLY ([fin_to_nat cpu_id = 0]), but
    nothing in the TRANSLATION story blocks the secondary contract any more.
-   The KERNEL PAGE TABLE is shared: kvminithart publishes it as
+   The KERNEL PAGE TABLE is shared: main's boot arm publishes it as
    [KptShare.kpt_inv] and every hart's Sv39 translation runs on the per-hart
    residue [tlb_res_pt], so the table rides to the secondaries in [P] below.
    And the PRE-SWITCH phase is now per-hart too (claude-notes/projects/
    bare-inv-generic.md): [SRegime.bare_inv] holds only this hart's satp/PMP
    cells -- the globally unique [kmap_auth kmap_M0] moved OUT of it, into
-   this precondition as a boot token spent inside kvminithart -- so every
-   hart can spin on [started] in its own Bare arm at once.
+   this precondition as a boot token spent in main's own publication
+   assembly, before the kvminithart call -- so every hart can spin on
+   [started] in its own Bare arm at once.
    [SchedCtx.procs_inv] is no longer an obstacle: since proc contexts became
    MIGRATABLE (claude-notes/projects/sched-hart-generic.md) it mentions
    neither a hart nor a per-hart SIE ghost, it is persistent, and it is
@@ -78,10 +79,13 @@
    here too, and the persistent [DiskInv.disk_geom] that names them travels
    alongside the lock.
 
-   ... and, out of kvminithart's post, THE KERNEL PAGE TABLE: the shared
-   invariant [KptShare.kpt_inv root], the root cell main PERSISTS after
+   ... and, out of MAIN'S OWN PUBLICATION ASSEMBLY -- the one-way door it
+   runs between kvminit and kvminithart -- THE KERNEL PAGE TABLE: the shared
+   invariant [KptShare.kpt_inv root] it allocates out of kvminit's exclusive
+   tree and the [kpt_unset] one-shot, the root cell it PERSISTS after
    kvminit wrote it ([kernel_pagetable ↦₈□ root_b]), and the 65 mapping
-   claims the switch minted (trampoline + the 64 kernel stacks).  The root
+   claims it mints out of [kmap_auth kmap_M0] (trampoline + the 64 kernel
+   stacks).  None of it comes from kvminithart's post any more.  The root
    and the kstack pas are kalloc-chosen inside kvminit, so [root] and [pas]
    are quantified in the wand exactly as the disk's pages are.  All of it is
    persistent, which is what lets it ride the one-shot escrow to every
@@ -222,8 +226,9 @@ Section SpecMain.
         (mword_of_int KernelSyms.panicked : mword 64) ↦₄ pkv) ∗
      (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) ∗
      (* the kernel page-table root: RAW here (kvminit writes it), and
-        PERSISTED by main once kvminithart has installed it -- the ↦₈□ form
-        is what the deposit wand hands the secondaries *)
+        PERSISTED by main in its publication assembly right after, before
+        the kvminithart call that reads it -- the ↦₈□ form is what the
+        deposit wand hands the secondaries *)
      (∃ kpt0 : mword 64,
         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) ∗
      ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
@@ -328,14 +333,17 @@ Section SpecMain.
     disk_done_lb γv 0%nat -∗
     main_hart_raw tlbvec0 -∗
     (* the shared kernel page table's one-shot, minted at adequacy beside the
-       per-hart strans halves and spent exactly once -- inside kvminithart,
-       which publishes the table it just installed as [kpt_inv].  It is
-       GLOBAL, not per-hart, so it travels beside the boot bridge rather
-       than through it. *)
+       per-hart strans halves and spent exactly once -- by MAIN'S OWN BOOT
+       ARM, in the publication assembly between kvminit and kvminithart,
+       which shares the table kvminit just built as [kpt_inv].  (kvminithart
+       itself is hart-generic and consumes only the persistent [kpt_inv] plus
+       the root cell.)  It is GLOBAL, not per-hart, so it travels beside the
+       boot bridge rather than through it. *)
     kpt_unset -∗
     (* the kernel-mapping auth, likewise a GLOBAL boot token minted at
-       adequacy and spent inside kvminithart (it retires into [kpt_inv] with
-       the tree): the Bare translation arm no longer carries it, which is
+       adequacy and spent in that same publication assembly in main's boot
+       arm (it retires into [kpt_inv] with the tree, after minting the 65
+       claims): the Bare translation arm no longer carries it, which is
        what makes every hart's Bare arm satisfiable at once. *)
     kmap_auth kmap_M0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗

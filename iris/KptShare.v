@@ -7,7 +7,7 @@
    help: the tree genuinely MUTATES (the Svadu/ADUE walk writes A/D bits
    back), and a memory write needs full ownership of the written bytes.
 
-   This file splits the bundle (claude-notes/projects/kpt-share.md):
+   This file splits the bundle (claude-notes/completed/kpt-share.md):
 
      [kpt_inv root]   -- an Iris INVARIANT holding the globally unique
                          parts: the tree, its A/D-monotone auth
@@ -89,6 +89,26 @@ Section KptShare.
     iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht HM]") as "#Hinv".
     { iNext. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hinv Hlb".
+  Qed.
+
+  (* A SNAPSHOT off the shared invariant: the persistent [kpt_lb] of
+     whatever tree is current.  This is the whole of what a hart needs to
+     re-enter the KPT arm without ever owning the table -- [tlb_res_pt_intro]
+     asks for a snapshot and nothing else -- and it is what makes
+     kvminithart's contract hart-generic (claude-notes/completed/kpt-share.md
+     §5): the switching hart's TLB is empty (both sfence.vmas), so
+     [tlb_ok_pt_empty] holds at ANY tree and the snapshot may be arbitrary.
+     [kpt_body] is Timeless, so this costs one [iMod] and no later. *)
+  Lemma kpt_inv_snapshot (E : coPset) (root_ppn : mword 44) :
+    ↑kptN ⊆ E ->
+    kpt_inv root_ppn ={E}=∗ ∃ t : ptree, kpt_lb t.
+  Proof.
+    iIntros (HE) "#Hinv".
+    iMod (inv_acc E kptN with "Hinv") as "[>Hbody Hclose]"; [ exact HE | ].
+    iDestruct "Hbody" as (t M) "(Ht & #Hlb & HM & %Hspec)".
+    iMod ("Hclose" with "[Ht HM]") as "_".
+    { iNext. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
+    iModIntro. iExists t. iExact "Hlb".
   Qed.
 
   (* ------------------------------------------------------------------- *)

@@ -43,13 +43,19 @@ Section KvminithartBody.
 
   Lemma wp_kvminithart_sconf_proof
       (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
-      (t : ptree) (pas : nat -> mword 44)
+      (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
-    wp_kvminithart_sconf_body γ Φ mm lvl K t pas tlbvec0.
+    wp_kvminithart_sconf_body γ Φ mm lvl K root tlbvec0.
   Proof.
     unfold wp_kvminithart_sconf_body.
-    intros Hlvl HK Hrep Hpas.
-    iIntros "Hcg Hbit #Htext Hpc Htlb Hcell Hptree Hunset Hauth Hcont".
+    intros Hlvl HK.
+    iIntros "Hcg Hbit #Htext Hpc Htlb #Hcell #Hkinv Hcont".
+    (* the snapshot off the shared invariant, taken UP FRONT: both
+       sfence.vma's leave the TLB empty, so any tree will do for the
+       re-entry coherence. *)
+    iApply fupd_wp.
+    iMod (KptShare.kpt_inv_snapshot ⊤ root ltac:(solve_ndisj) with "Hkinv") as (t0) "#Hlbt".
+    iModIntro.
     (* register disequalities for creg mapping *)
     assert (Hc6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14 : mword 5))
       by (vm_compute; reflexivity).
@@ -170,12 +176,12 @@ Section KvminithartBody.
     assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 764 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_ld_s_sconf γ Φ (mword_of_int (KVI + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 764 : mword 12)
-              A0 (K - 2)%nat (zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)))
+              A0 (K - 2)%nat (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi10 [Hcell] [-]").
+              with "Hcg Hpc Hi10 [] [-]").
     { iEval (rewrite Haddr). iExact "Hcell". }
-    iIntros "Hcg Hpc Hcell". iEval (rewrite Haddr) in "Hcell".
-    set (L := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)))]> A0).
+    iIntros "Hcg Hpc _".
+    set (L := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)))]> A0).
     assert (Hp14 : add_vec_int (mword_of_int (KVI + 0x10) : mword 64) 4 = mword_of_int (KVI + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
     (* ============ +0x14 srli a5,a5,0xc ============ *)
@@ -209,9 +215,9 @@ Section KvminithartBody.
     iEval (rewrite Hp1a) in "Hpc".
     (* ============ +0x1a or a5,a5,a4 : a5 := kvi_satp_word t ============ *)
     iEval (rewrite Hc6 Hc7) in "Hi1a".
-    assert (Hor : or_vec (S3 !!! Regidx (mword_of_int 15 : mword 5)) (S3 !!! Regidx (mword_of_int 14 : mword 5)) = kvi_satp_word t).
+    assert (Hor : or_vec (S3 !!! Regidx (mword_of_int 15 : mword 5)) (S3 !!! Regidx (mword_of_int 14 : mword 5)) = kvi_satp_word root).
     { assert (H15 : S3 !!! Regidx (mword_of_int 15 : mword 5)
-                    = shift_bits_right (zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))) (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)).
+                    = shift_bits_right (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)).
       { rewrite /S3 upd_ne; [| reg_neq]. rewrite /S2 upd_ne; [| reg_neq].
         rewrite /S1 upd_eq. rewrite /L upd_eq. reflexivity. }
       assert (H14 : S3 !!! Regidx (mword_of_int 14 : mword 5)
@@ -219,11 +225,11 @@ Section KvminithartBody.
       { rewrite /S3 upd_eq. rewrite /S2 upd_eq. reflexivity. }
       rewrite H15 H14. unfold kvi_satp_word. reflexivity. }
     iApply (wp_cor_s_sconf γ Φ (mword_of_int (KVI + 0x1a)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
-              (kvi_satp_word t) S3 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hor
+              (kvi_satp_word root) S3 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hor
               with "Hcg Hpc Hi1a [-]").
     iIntros "Hcg Hpc".
-    set (S4 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (kvi_satp_word t)]> S3).
-    assert (Ha5 : S4 !!! Regidx (mword_of_int 15 : mword 5) = kvi_satp_word t) by (rewrite /S4 upd_eq; reflexivity).
+    set (S4 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (kvi_satp_word root)]> S3).
+    assert (Ha5 : S4 !!! Regidx (mword_of_int 15 : mword 5) = kvi_satp_word root) by (rewrite /S4 upd_eq; reflexivity).
     assert (Hp1c : add_vec_int (mword_of_int (KVI + 0x1a) : mword 64) 2 = mword_of_int (KVI + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
     (* ============ +0x1c csrw satp,a5 : THE SWITCH ============ *)
@@ -261,39 +267,33 @@ Section KvminithartBody.
                   ltac:(rewrite Lmisa2p; exact HmisaS)
                   ltac:(rewrite Lms2p; exact HSXL2)) as Hex2.
     rewrite Lva2 in Hex2.
-    rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) (kvi_satp_word t) (kvi_satp_mode t)) in Hex2.
+    rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) (kvi_satp_word root) (kvi_satp_mode root)) in Hex2.
     (* open the Bare arm of the translation slot; do the switch *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct (strans_inv_acc_bare with "Hbit Htr") as "(Hbit & Hbit2 & Hbare & Hstv)".
     iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
-    iMod (reg_update _ satp _ (kvi_satp_word t) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
-    iMod (kvm_M_mint pas with "Hauth") as "(Hauth & #Htramp & #Hkstacks)".
-    (* THE PUBLICATION: the exclusive tree + the freshly grown auth go into
-       the shared invariant [kpt_inv], spending the one-shot; what this hart
-       keeps is the RESIDUE (its own satp/tlb/pmp cells + the persistent
-       snapshot [kpt_lb t] + [kpt_inv] riding along).  Same ghost step as
-       [KptShare.tlb_inv_pt_share], inlined so [kpt_inv] itself lands in
-       hand for the postcondition. *)
-    iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) _
-            (kvm_bridge pas t (pt_base t) Hpas eq_refl Hrep)
-            with "Hptree Hauth Hunset") as "[#Hkinv #Hlbt]".
-    iDestruct (tlb_res_pt_intro (pt_base t) (kvi_satp_word t) tlbz1 t
-                 (kvi_satp_mode t) (kvi_satp_asid t) (kvi_satp_ppn t)
-                 (tlb_ok_pt_empty (mword_of_int 0) t tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
+    iMod (reg_update _ satp _ (kvi_satp_word root) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
+    (* The table is ALREADY published (main's boot arm did it, once): all this
+       hart does is re-seal its own slot at the KPT arm, out of its own
+       satp/tlb/pmp cells plus the up-front snapshot [kpt_lb t0] and the
+       persistent [kpt_inv root] riding along. *)
+    iDestruct (tlb_res_pt_intro root (kvi_satp_word root) tlbz1 t0
+                 (kvi_satp_mode root) (kvi_satp_asid root) (kvi_satp_ppn root)
+                 (tlb_ok_pt_empty (mword_of_int 0) t0 tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
                  with "Hsatpc Htlb Hlbt [Hpmp] Hkinv") as "Htlbinv".
-    { iApply (pmp_config_reindex (mword_of_int 0) (pt_base t) with "Hpmp"). }
+    { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
     iMod (strans_bit_flip with "Hbit Hbit2") as "[Hbitkpt Hbitkpt2]".
-    iDestruct (strans_inv_intro (pt_base t) with "Hbitkpt2 Htlbinv") as "Htr".
+    iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
     iAssert (sie_cap γ S4 (K - 2)) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
-    iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word t)).
+    iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word root)).
     iSplitR.
     { iPureIntro. rewrite Hpceq2. fold s_pc2.
       rewrite Hzreg. exact Hex2. }
     iSplitL "Hreg Hmem".
     { unfold s_pc2, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc". iNext.
-    assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp (kvi_satp_word t)).(sregs)
+    assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp (kvi_satp_word root)).(sregs)
                     = mword_of_int (KVI + 0x20)).
     { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set.
       apply bv_eq; vm_compute; reflexivity. }
@@ -416,7 +416,7 @@ Section KvminithartBody.
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
     (* ---- hand the continuation the post-switch resources ---- *)
-    iApply ("Hcont" $! Efin with "Hcg Hpc [%] Hbitkpt [Hstv] Hcell Hkinv Htramp Hkstacks").
+    iApply ("Hcont" $! Efin with "Hcg Hpc [%] Hbitkpt [Hstv]").
     { (* callee_saved mm Efin *)
       unfold callee_saved.
       repeat split;
@@ -433,8 +433,8 @@ Module KvminithartProof : KVMINITHART.
   Definition wp_kvminithart_sconf
       `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
-      (t : ptree) (pas : nat -> mword 44)
+      (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      : wp_kvminithart_sconf_body γ Φ mm lvl K t pas tlbvec0 :=
-    wp_kvminithart_sconf_proof γ Φ mm lvl K t pas tlbvec0.
+      : wp_kvminithart_sconf_body γ Φ mm lvl K root tlbvec0 :=
+    wp_kvminithart_sconf_proof γ Φ mm lvl K root tlbvec0.
 End KvminithartProof.

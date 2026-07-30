@@ -29,7 +29,9 @@
                                    + the [pr] newlock, printk_flags_inv,
                                      printk_env assembly
      mn_grp_kvm     0x6e -> 0x7e   kinit kvminit kvminithart procinit
-                                   + kalloc_env, procs_inv_alloc
+                                   + kalloc_env, THE TABLE PUBLICATION
+                                     (persist root, kvm_M_mint,
+                                      kpt_inv_alloc), procs_inv_alloc
      mn_grp_trap    0x7e -> 0x8e   trapinit trapinithart plicinit plicinithart
                                    + intr_inv_alloc_off
      mn_grp_fs      0x8e -> 0xa2   binit iinit fileinit virtio_disk_init
@@ -62,9 +64,12 @@ Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr WpAuipc.
 Require Import WpLock.
 Require Import KallocInv KvmSpec PageGeom.
-(* the shared kernel page table: kvminithart's [kpt_unset] input and the
-   [kpt_inv] / 65-claim / root-cell outputs the deposit wand carries *)
+(* the shared kernel page table: main's OWN publication assembly spends
+   [kpt_unset] + [kmap_auth kmap_M0] here ([WpKvminithart.kvm_M_mint],
+   [KptShare.kpt_inv_alloc], [KvmMap.kvm_bridge]) and the deposit wand
+   carries the resulting [kpt_inv] / 65 claims / persistent root cell *)
 Require Import PtTree KptGhost KptShare KptExecMap KvmMap.
+Require Import WpKvminithart.
 Require Import ProcGeom CpuOwn SchedCtx FdSlots FileInv.
 Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
@@ -645,7 +650,13 @@ Section ProofMain.
 
   (* =================================================================== *)
   (* 0x6e .. 0x7a -- kinit(); kvminit(); kvminithart(); procinit(), with   *)
-  (* the [kalloc_env] and [procs_inv] assemblies.                          *)
+  (* the [kalloc_env] and [procs_inv] assemblies, and -- between kvminit    *)
+  (* and kvminithart -- THE TABLE PUBLICATION: the one-way door that        *)
+  (* persists the root cell, mints the 65 kernel-mapping claims out of the  *)
+  (* [kmap_auth kmap_M0] boot token, and allocates the shared [kpt_inv] out *)
+  (* of kvminit's exclusive tree + the [kpt_unset] one-shot.  It lives HERE *)
+  (* (boot-hart-only, once) so that kvminithart's own contract is           *)
+  (* hart-generic: it takes only the persistent [kpt_inv] + root cell.      *)
   (* =================================================================== *)
   Local Lemma mn_grp_kvm (γ : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (n : nat) (p0 : mword 64)
@@ -762,6 +773,18 @@ Section ProofMain.
     assert (Hmkvtp : mkv !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
     { rewrite (callee_saved_lookup Hcskv (mword_of_int 4 : mword 5)
                  ltac:(vm_compute; reflexivity)). exact HV2tp. }
+    (* ---- THE PUBLICATION: the one-way door that shares the kernel table.
+       Persist the root cell kvminit wrote, mint the 65 claims out of the
+       boot auth, and allocate [kpt_inv] out of kvminit's exclusive tree +
+       the one-shot -- so kvminithart below (and on every secondary hart)
+       needs only the persistent [kpt_inv] + root cell. ---- *)
+    iApply fupd_wp.
+    iMod (word_pointsto_persist with "Hkpt") as "#Hkptp".
+    iMod (kvm_M_mint pas with "Hkauth") as "(Hauth & #Htramp & #Hkstx)".
+    iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
+            (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
+            with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".
+    iModIntro.
     (* ---- +0x76 jal kvminithart ---- *)
     iApply (wp_jal_s_sconf γ Φ (mword_of_int (MN + 0x76)) (mword_of_int 1 : mword 5)
               (mword_of_int 60 : mword 21) mkv n
@@ -777,13 +800,10 @@ Section ProofMain.
     iEval (rewrite Htgtkh) in "Hpc".
     assert (HV3tp : V3 !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
       by (rewrite /V3 upd_ne; [exact Hmkvtp | reg_neq]).
-    iApply (Kvminithart.wp_kvminithart_sconf γ Φ V3 0%nat n t pas tlbvec0
-              eq_refl ltac:(lia) Hrep Hpasok
-              with "Hcg Hsbit Htext Hpc Htlb Hkpt Htree Hunset Hkauth").
-    iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec Hkpt #Hkinv #Htramp #Hkstx".
-    (* the root cell is immutable from here on: persist it, so the [started]
-       deposit can hand it to every secondary alongside [kpt_inv] *)
-    iMod (word_pointsto_persist with "Hkpt") as "#Hkptp".
+    iApply (Kvminithart.wp_kvminithart_sconf γ Φ V3 0%nat n (pt_base t) tlbvec0
+              eq_refl ltac:(lia)
+              with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
+    iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec".
     assert (Hretkh : ret_pc (V3 !!! Regidx (mword_of_int 1))
                      = (mword_of_int (MN + 0x7a) : mword 64)).
     { rewrite /V3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
