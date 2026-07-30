@@ -653,6 +653,17 @@ Section IntrDefs.
   Lemma rd_ok_tp (rd : mword 5) : rd_ok rd -> Regidx rd <> Regidx Rtp.
   Proof. by intros [_ H]. Qed.
 
+  (* THE sp BRIDGE.  The bundle owns [gpr_file (tp_pin m)] while [sie_cap] and
+     [intr_frame] are keyed on [m !!! Regidx csp_rs1], and a step engine takes
+     ONE map -- so every funnel that feeds an engine has to reconcile the two.
+     Hoisted here (rather than re-derived per file with a hand-rolled [Regidx]
+     disequality) because it is the single most repeated seam in the port. *)
+  Lemma tp_pin_sp (m : regfile) : tp_pin m !!! Regidx csp_rs1 = m !!! Regidx csp_rs1.
+  Proof.
+    apply (rget_ne m csp_rs1).
+    intro He. injection He as He2. vm_compute in He2. congruence.
+  Qed.
+
   (* [sie_cap_gpr] bundles [sie_cap] with the register file [gpr_file m], so a
      caller threads ONE resource carrying the register file [m] once, instead of
      [sie_cap] and [gpr_file] each re-carrying [m] separately.  Kept a FOLDED
@@ -1097,3 +1108,27 @@ Section IntrDefs.
   Qed.
 
 End IntrDefs.
+
+(* ==================================================================== *)
+(* THE PORT'S STANDARD TACTICS (outside the section: an [Ltac] defined   *)
+(* inside one is discharged over its variables and unusable downstream). *)
+(* ==================================================================== *)
+
+(* Re-fold a leaf's own gpr write under the tp pin, turning the engine's
+   output [<[Regidx rd := v]> (tp_pin m)] into the [tp_pin (<[Regidx rd := v]>
+   m)] the bundle wants.  Every gpr-WRITING leaf needs exactly this one line;
+   [Hrdtp] is [rd_ok_tp] applied to the leaf's [rd_ok] premise. *)
+Ltac tp_refold Hrdtp H := iEval (rewrite (tp_pin_upd _ _ _ Hrdtp)) in H.
+
+(* THE call-site discharge for [rd_ok], replacing the [ltac:(vm_compute;
+   discriminate)] that used to sit in the [rd <> csp_rs1] premise slot.
+   Written name-free: an Ltac body cannot reference a hypothesis by literal
+   name (durable-notes).  The two conjuncts need DIFFERENT scripts --
+   [rd <> csp_rs1] is an [mword 5] disequality [vm_compute; discriminate]
+   settles, while [Regidx rd <> Regidx Rtp] has to go through [Regidx]'s
+   injectivity first. *)
+Ltac rdok :=
+  split;
+  [ vm_compute; discriminate
+  | let H1 := fresh in let H2 := fresh in
+    intro H1; injection H1 as H2; vm_compute in H2; congruence ].
