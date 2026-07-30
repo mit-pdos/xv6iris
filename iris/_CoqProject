@@ -413,6 +413,9 @@ SpecBunpin.v
 SpecBwrite.v
 SpecBrelse.v
 SpecBread.v
+WpBwriteDecode.v
+ProofBwrite.v
+LinkBwrite.v
 WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
