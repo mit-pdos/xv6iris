@@ -17,12 +17,13 @@
    monotonicity witnesses, so nothing rides the auth: the old
    [kmap_M0 ⊆ M] / [kmap_wf] reification is GONE, and the auth is bare.
 
-   The auth lives in the translation slot's two arms (IntrDefs
-   [strans_inv]): the Bare arm holds [kmap_auth kmap_M0] EXACTLY, so every
-   claim honored under Bare is a static identity entry (a fragment agreeing
-   against auth-[kmap_M0] looks up in [kmap_M0], [kmap_M0_lookup]); the KPT
-   arm holds [kmap_auth M] for the existential [M] of [tlb_inv_pt].
-   See claude-notes/design/tlb-translation.md. *)
+   The auth is a GLOBAL BOOT TOKEN (claude-notes/projects/
+   bare-inv-generic.md): adequacy mints it, it travels through main's
+   precondition into kvminithart, which grows it by the trampoline + 64
+   kstack entries and retires it into [KptShare.kpt_inv].  It is NOT in the
+   translation slot's Bare arm any more -- that arm is per-hart and holds
+   nothing global, and honors exactly the IDENTITY claims (the [sr_adm]
+   field, SRegime.v).  See claude-notes/design/tlb-translation.md. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -109,10 +110,12 @@ Section KMap.
     rewrite kmap_M0_lookup. unfold kmap_static in Hs. rewrite Hs. reflexivity.
   Qed.
 
-  (* the Bare-arm honoring fact: against the EXACT static auth, a claim's
-     vpn is statically classified and its ppn is the identity leaf ppn.
-     (Also the one-way Bare->KPT guard: a persisted kstack fragment's vpn
-     has [kmap_class = None], contradicting the conclusion.) *)
+  (* KEEP-UNREFERENCED: against the EXACT static auth (i.e. before
+     kvminithart's mint), a claim's vpn is statically classified and its ppn
+     is the identity leaf ppn.  This used to be the Bare arm's honoring
+     mechanism; the Bare arm now takes the identity as an [sr_adm] premise
+     that the consumer's own resource supplies, so nothing global is
+     needed and every hart can be Bare at once. *)
   Lemma kmap_at_M0_static (vpn : mword 27) (ppn : mword 44) (pc : kperm) :
     kmap_auth kmap_M0 -∗ kmap_at vpn ppn pc -∗
     ⌜kmap_static vpn pc /\ ppn = kpt_leaf_ppn vpn⌝.

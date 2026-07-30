@@ -321,8 +321,14 @@ proof will use.
 
 ### G5 — the per-hart resources the secondary arm needs are globally unique
 
-Two independent instances, both about resources that are per-hart in the
-hardware but global in the model's ghost state:
+STATUS: parts 1 and 3 are LANDED — the shared kernel table
+(`completed/kpt-share.md`: `kpt_inv` + the per-hart residue `tlb_res_pt` +
+the mask-carrying `sr_absorb` + per-CPU `strans_name`) and the per-hart
+Bare arm (`completed/bare-inv-generic.md`: `bare_inv` holds only this
+hart's satp/PMP cells, the `kmap_auth` moved out to a boot token, claim
+honoring under Bare is the `sr_adm` premise the consumer's own datum
+supplies). Part 2 (`projects/sched-hart-generic.md`) is the remaining
+one. The two original instances, for the record:
 
 - **`kvminithart`'s contract consumes the kernel page table exclusively.** Its
   precondition takes `ptree_own 2 (DfracOwn 1) t` and

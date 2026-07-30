@@ -114,13 +114,6 @@ are working on that effort — the relevant `projects/` file.
   mask-carrying `sr_absorb`, per-CPU `strans_name` — and the sequencing
   through `wp_main_secondary_sconf` and the all-harts
   `_entry`→`start`→`main` adequacy. Design approved.
-- **[`bare-inv-generic.md`](projects/bare-inv-generic.md)** — G5 part 3,
-  surfaced by kpt-share's final batch: `bare_inv` holds the global
-  `kmap_auth kmap_M0` at 1 as the Bare arm's refutation mechanism, so at
-  most one hart can ever be in Bare — secondaries cannot even spin on
-  `started`. The designed fix (an `sr_adm` claim-admissibility field on
-  `s_regime` + static-claims agreement replacing the auth) and why every
-  local patch fails. Lands before `wp_main_secondary_sconf`.
 - **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
   2: the parked-proc resumption contract (`p_sched`) quantifies the
   RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE
@@ -178,6 +171,16 @@ are working on that effort — the relevant `projects/` file.
 
 
 ### `completed/` — finished projects, archived for reference
+
+- **[`bare-inv-generic.md`](completed/bare-inv-generic.md)** — G5 part 3:
+  the Bare translation arm made PER-HART (`bare_inv` holds only this hart's
+  satp/PMP cells; the global `kmap_auth kmap_M0` became a boot token routed
+  adequacy → main → kvminithart). The `s_regime` fields `sr_adm`/`sr_adm_id`,
+  why a claim's admissibility can never be *refuted* per-hart, and the move
+  that kept the premise out of every leaf statement: `↦ₘ`/`↦ₓ` carry the
+  identity `pa_of ppn va = va`. Also the consequence to know before touching
+  kernel stacks — a kstack byte is not a `↦ₘ`, and the way in is a
+  KPT-regime leaf family.
 
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
@@ -307,8 +310,9 @@ their durable design notes, gotchas, and reusable recipes.
 - **[`rwx-kmap.md`](completed/rwx-kmap.md)** — the R/W/X-accurate kernel page
   table and the kernel mapping model: one claim ghost for identity AND
   non-identity mappings, VA-based `↦ₘ`/`↦ₓ` (a store to kernel text is
-  unprovable), the physical tier `↦ₚ`, the boot switch, and
-  `page_own_kstack`. The live design is in
+  unprovable), the physical tier `↦ₚ` and the boot switch. (Its
+  `page_own_kstack` capstone is superseded — `↦ₘ` carries the identity
+  conjunct now, see `completed/bare-inv-generic.md`.) The live design is in
   [`design/tlb-translation.md`](design/tlb-translation.md); the archive keeps
   the decision record, including the two cleanups deliberately NOT done (the
   heap-domain invariant, and slot-generic `intr_frame`).

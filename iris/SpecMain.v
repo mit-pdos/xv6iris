@@ -27,16 +27,16 @@
    function; here the exit is the callee's entry symbol, exactly as in
    SpecEntry.v.
 
-   THIS FILE STATES THE BOOT-HART CONTRACT ONLY ([fin_to_nat cpu_id = 0]).  The
-   secondary-hart contract is not statable yet, but the KERNEL PAGE TABLE is no
-   longer what blocks it: kvminithart now publishes the table as the shared
-   invariant [KptShare.kpt_inv] and every hart's Sv39 translation runs on the
-   per-hart residue [tlb_res_pt], so the table itself is shareable and rides to
-   the secondaries in [P] below.  What still has to move (claude-notes/
-   projects/main-boot.md G5): [SRegime.bare_inv] carries the globally unique
-   [kmap_auth kmap_M0] -- it is the refutation that makes Bare-arm claim
-   honoring provable, so at most ONE hart can ever be in its Bare arm, and
-   every secondary spends its whole pre-switch phase there.
+   THIS FILE STATES THE BOOT-HART CONTRACT ONLY ([fin_to_nat cpu_id = 0]), but
+   nothing in the TRANSLATION story blocks the secondary contract any more.
+   The KERNEL PAGE TABLE is shared: kvminithart publishes it as
+   [KptShare.kpt_inv] and every hart's Sv39 translation runs on the per-hart
+   residue [tlb_res_pt], so the table rides to the secondaries in [P] below.
+   And the PRE-SWITCH phase is now per-hart too (claude-notes/projects/
+   bare-inv-generic.md): [SRegime.bare_inv] holds only this hart's satp/PMP
+   cells -- the globally unique [kmap_auth kmap_M0] moved OUT of it, into
+   this precondition as a boot token spent inside kvminithart -- so every
+   hart can spin on [started] in its own Bare arm at once.
    [SchedCtx.procs_inv] is no longer an obstacle: since proc contexts became
    MIGRATABLE (claude-notes/projects/sched-hart-generic.md) it mentions
    neither a hart nor a per-hart SIE ghost, it is persistent, and it is

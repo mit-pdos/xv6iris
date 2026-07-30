@@ -432,7 +432,11 @@ Section IntrDefs.
      consume the slot FOLDED through the derived regime instance
      [strans_regime] below.
        - BARE (boot): satp Mode = Bare, plus ownership of STVEC -- no trap
-         handler is installed yet.  The stvec cell is what refutes
+         handler is installed yet.  PER-HART and holding nothing global, so
+         EVERY hart can be in this arm at once (claude-notes/projects/
+         bare-inv-generic.md): what makes claim honoring provable here is
+         the regime's [sr_adm] premise ("the claim is the identity"), which
+         each consumer discharges from its own [↦ₘ]/[↦ₓ] datum.  The stvec cell is what refutes
          "interrupts enabled while Bare": the SIE arm's '1' branch carries
          [intr_inv], whose invariant owns [stvec ↦ᵣ handler], and two full
          cells conflict ([reg_pointsto_conflict]).  Installing the handler

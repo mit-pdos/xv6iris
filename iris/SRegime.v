@@ -5,7 +5,8 @@
 
    [sr_absorb] is the TrampStepPt-Habs shape, access-generic over the
    four access classes, keyed on a kernel-mapping CLAIM [kmap_at (svpn_of
-   va) ppn pc] + the class [pc] it must admit ([kperm_allows]), with the
+   va) ppn pc] + the class [pc] it must admit ([kperm_allows]) + the
+   regime's own ADMISSIBILITY of that claim ([sr_adm]), with the
    output pa = ppn ++ pageoff (rwx-kmap).  Every consumer presents the
    claim carried in its OWN resource (the fetch window's [↦ₓ□] bytes, a
    datum's [↦ₘ], a device vpn's static bundle claim), so there is no
@@ -16,9 +17,10 @@
        root_ppn], the per-hart residue of the SHARED kernel table -- the
        whole sconf tier's Sv39 instance.  Its absorb is the one that
        actually uses the mask (it opens [kptN]).
-     - [bare_regime]: satp pinned to Mode=Bare + pmp_config; translation
-       short-circuits to the identity before touching the TLB
-       ([exec_translateAddr_bare]), so absorption is trivial.
+     - [bare_regime]: satp pinned to Mode=Bare + pmp_config, ALL per-hart;
+       translation short-circuits to the identity before touching the TLB
+       ([exec_translateAddr_bare]), so absorption is trivial -- provided
+       the claim IS the identity, which is the [sr_adm] field below.
    There is deliberately NO instance over the EXCLUSIVE [tlb_inv_pt]: the
    userret/uservec island that still owns the kernel tree outright
    (TrampStepPt / UserretEntryPt / UservecExitPt) drives KptTree's

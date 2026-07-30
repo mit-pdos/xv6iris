@@ -4,8 +4,8 @@
    kvminithart() = sfence.vma ; w_satp(MAKE_SATP(kernel_pagetable)) ;
    sfence.vma, wrapped in a 2-slot frame.  The rwx-kmap STAGE 6c
    deliverable: it DISSOLVES the translation slot's Bare arm (recovering
-   the satp cell + the exact static auth [kmap_auth kmap_M0] + the stvec
-   cell) and RE-SEALS it at the kernel PT (KPT arm), minting the 65
+   the satp cell + the stvec cell) and RE-SEALS it at the kernel PT (KPT
+   arm), consuming the [kmap_auth kmap_M0] BOOT TOKEN to mint the 65
    persistent claims (trampoline + 64 kstacks) the rest of the kernel
    holds.  The receipt [strans_bit] flips '0 (Bare) -> '1 (KPT).
 
@@ -18,13 +18,12 @@
    the caller to deposit (main's [started] payload).
 
    The 65-claim mint and the [kpt_inv] allocation are ONE ghost step and
-   both live HERE, not in the caller, for a load-bearing reason: they
-   consume [kmap_auth kmap_M0], which lives inside [bare_inv], and once
-   it is spent the Bare arm can never be re-established -- so no caller
-   can run a single machine step between the mint and this csrw.  That is
-   also why this contract is still BOOT-HART-ONLY (it needs the exclusive
-   tree and the one-shot); a hart-generic contract additionally needs the
-   Bare arm itself to become per-hart, which is its own project.
+   both live HERE, not in the caller: they consume the [kmap_auth kmap_M0]
+   boot token together with [kpt_unset], and the resulting shared invariant
+   is what the postcondition publishes.  The contract is still
+   BOOT-HART-ONLY because of those two GLOBAL tokens (the exclusive tree,
+   the one-shot) -- not because of the Bare arm, which is per-hart now
+   (claude-notes/projects/bare-inv-generic.md).
 
    Resources CONSUMED into the slot: the tlb cell, the page table
    [ptree_own], the one-shot [kpt_unset], and the Bare-arm receipt's twin.

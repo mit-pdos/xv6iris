@@ -627,8 +627,12 @@ correspondence lemma; hand out
    + spec 47c622b, the pma fix + ProofKvminithart/Link 5a46a50).
    wp_kvminithart is sealed and linked; its post hands out the KPT
    receipt, the stvec cell, and the 65 persistent mapping claims.
-   STAGE 6 FULLY CLOSED (2026-07-26, capstone pushed e2c30c0):
-   page_own_kstack (WpKvminithart.v) SUBSUMES the old
+   STAGE 6 FULLY CLOSED (2026-07-26, capstone pushed e2c30c0).
+   SUPERSEDED 2026-07-30 by completed/bare-inv-generic.md: [↦ₘ] now
+   carries the IDENTITY conjunct (pa_of ppn va = va), so there is no
+   non-identity [↦ₘ] and page_own_kstack is GONE -- kstack pages stay
+   at the physical tier.  The paragraph below is the historical record.
+   page_own_kstack (WpKvminithart.v) SUBSUMED the old
    vmem/vcode-forms + demonstrator item (user: "not just a
    demonstrator but the complete result we need from the page
    table") -- page_own of a kvminit stack page at its identity
