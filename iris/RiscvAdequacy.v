@@ -409,6 +409,14 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
        while the queue is not live.  So the invariant must be allocated before
        the driver makes the queue ready; a reset device satisfies this. *)
     (Hvlive : virtio_live (v_cfg g.(gdev).(dvirtio)) = false)
+    (* ... and, for the same reason, the device has consumed nothing and
+       produced nothing yet: the not-live arm of [virtio_proto] records the
+       two ring counters at zero, which is what [virtio_disk_init] reads them
+       off at the live flip (the driver zeroes the rings in MEMORY; only the
+       invariant can say the DEVICE's counters agree).  A reset device
+       satisfies this too ([virtio_reset] zeroes both). *)
+    (Hvseen : v_seen g.(gdev).(dvirtio) = zero16)
+    (Hvuidx : v_used_idx g.(gdev).(dvirtio) = zero16)
     (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
        PLIC plan): the interrupt-status register holds only defined bits.  A
        reset device does. *)
@@ -432,7 +440,8 @@ Proof.
      the caller's half of the config tracker is discarded likewise, and so are
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
-  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive) as (γv) "(Hproto & _ & _ & _)".
+  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx)
+    as (γv) "(Hproto & _ & _ & _)".
   iMod (dev_inv_alloc _ γ γv with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto]") as "#Hinv".
   { rewrite /dev_inv_body.
     iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).

@@ -361,7 +361,6 @@ WpVirtioExec.v
 ProofCpuid.v
 LinkCpuid.v
 WpPlic.v
-WpVirtioMmio.v
 WpVirtioDev.v
 ProofPlicinit.v
 LinkPlicinit.v
@@ -571,6 +570,7 @@ WpVirtioDiskIntrDecode.v
 ProofVirtioDiskIntr.v
 LinkVirtioDiskIntr.v
 WpVirtioDiskInitDecode.v
+ProofVirtioDiskInit.v
 LinkVirtioDiskInit.v
 SpecStrlen.v
 WpStrlenDecode.v

@@ -213,6 +213,19 @@ Section DiskPtsto.
     iApply (own_update with "H"). apply dfrac_agree_persist.
   Qed.
 
+  (* MOVE the tracker without freezing it: the pre-flip half of [disk_cfg_set].
+     Every configuration write [virtio_disk_init] performs before the queue
+     goes live steps the tracker this way -- the two halves rejoin, the value
+     moves, and the pair splits again -- so the driver keeps deterministic
+     knowledge of what it has programmed while the state itself lives under
+     [disk_inv].  The freeze happens exactly once, at the live flip. *)
+  Lemma disk_cfg_is_move (γ : disk_names) (c c' : virtio_cfg) :
+    disk_cfg_is γ (DfracOwn 1) c ==∗ disk_cfg_is γ (DfracOwn 1) c'.
+  Proof.
+    iIntros "H". rewrite /disk_cfg_is.
+    iApply (own_update with "H"). apply cmra_update_exclusive. done.
+  Qed.
+
   (* -- the disk points-to ----------------------------------------------- *)
 
   Definition disk_byte (γ : disk_names) (o : Z) (b : bv 8) : iProp Σ :=

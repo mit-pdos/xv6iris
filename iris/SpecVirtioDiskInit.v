@@ -72,11 +72,10 @@
    throughout: it becomes [DiskInv.free_slot_res]).
    See claude-notes/projects/virtio-disk.md.
 
-   THE PROOF IS TEMPORARILY ASSUMED (an [Axiom] in LinkVirtioDiskInit.v): the
-   raw-frag proof (ProofVirtioDiskInit.v, deleted here, recoverable from git
-   history) is being re-worked over the invariant-opening ACCESSOR-form virtio
-   MMIO leaves, and the lease payment at the final STATUS write is new work.
-   See claude-notes/projects/main-boot.md, G1. *)
+   PROVEN against this statement in ProofVirtioDiskInit.v /
+   LinkVirtioDiskInit.v (a functor over [INITLOCK], [KALLOC] and [MEMSET]),
+   over the invariant-opening ACCESSOR-form virtio MMIO leaves of
+   WpVirtioDev.v. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.

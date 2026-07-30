@@ -1210,6 +1210,16 @@ Section VirtioProto.
            exclusive fraction [disk_cfg_set] consumes, which is where the
            persistent [disk_cfg] of the live arm is minted. *)
         disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
+        (* THE RING COUNTERS ARE PINNED AT ZERO.  A device that is not live
+           makes no step at all ([virtio_req_step_not_live]), and a device
+           BECOMES not-live only through the reset command, which zeroes both
+           counters ([virtio_reset]) -- so "not live" really does mean "has
+           consumed nothing and produced nothing".  Recording it is what lets
+           [virtio_disk_init] establish the live arm's [v_seen v = wrap16
+           (vp_nc pr)] / [v_used_idx v = wrap16 (vp_nc pr)] at the flip: the
+           driver zeroes the RINGS in memory, but only the invariant can tell
+           it that the DEVICE's own counters agree with them. *)
+        ⌜v_seen v = zero16⌝ ∗ ⌜v_used_idx v = zero16⌝ ∗
         ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) ∗
         mono_nat_auth_own (dn_nc γ) 1 0%nat ∗
         ghost_var (dn_np γ) 1 0%nat)%I.
@@ -1232,12 +1242,13 @@ Section VirtioProto.
      to) left main() with no way to assemble [disk_res] for its [newlock]. *)
   Lemma disk_ghosts_alloc (v : virtio_state) :
     virtio_live (v_cfg v) = false ->
+    v_seen v = zero16 -> v_used_idx v = zero16 ->
     ⊢ |==> ∃ γ : disk_names,
         virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
         ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) ∗
         disk_done_lb γ 0%nat.
   Proof.
-    intro Hlive.
+    intros Hlive Hsn Hui.
     iMod (ghost_map_alloc_empty (K:=Z) (V:=bv 8)) as (gimg) "Himg".
     iMod (ghost_map_alloc_empty (K:=nat)
             (V:=(vslot * gmap Arch.pa (bv 8))%type)) as (gslot) "Hslot".
@@ -1257,7 +1268,10 @@ Section VirtioProto.
     iFrame "Himg". iSplitR.
     { iPureIntro. intros o b Hb. rewrite lookup_empty in Hb. discriminate. }
     rewrite Hlive.
-    iFrame "Hcfg1 Hslot Hnc Hnp".
+    iSplitL "Hcfg1"; [iExact "Hcfg1"|].
+    iSplitR; [iPureIntro; exact Hsn|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iFrame "Hslot Hnc Hnp".
   Qed.
 
   (* the live protocol, over an ABSTRACT configuration: the whole content of
@@ -1309,17 +1323,30 @@ Section VirtioProto.
     rewrite Hpe Hde !big_sepM_empty. iSplit; done.
   Qed.
 
-  (* [virtio_disk_init]'s caller turns the raw-frag postcondition into the
-     live protocol: the freshly-zeroed avail-index bytes and the zeroed used
-     page seed the lease; nothing is pending; the publisher token comes out
-     for the vdisk_lock's resource; and the disk points-to for a caller-
-     chosen range of the (untouched) image is minted.
-     The state matches SpecVirtioDiskInit's postcondition:
-       VirtioState (virtio_init_cfg pd pav pu) zero32 zero16 zero16 dk. *)
+  (* [zero16] and [wrap16 0] are the same halfword; the not-live arm speaks the
+     model's vocabulary and the live arm the queue protocol's. *)
+  Lemma zero16_wrap16 : zero16 = wrap16 0%nat.
+  Proof. reflexivity. Qed.
+
+  (* THE LIVE FLIP.  This is the transition [virtio_disk_init] performs at its
+     LAST MMIO write (STATUS |= DRIVER_OK -- the write that makes
+     [virtio_live] true): the freshly-zeroed avail-index bytes and the zeroed
+     used page are paid in as the DMA lease, nothing is pending, the publisher
+     token comes out for the vdisk_lock's resource, and the configuration the
+     driver programmed is FROZEN into the persistent [disk_cfg] that
+     [DiskInv.disk_geom] is built on.
+
+     [v1] is given by PROJECTIONS rather than as a literal [VirtioState]: at
+     the flip the driver knows the write is config-only (so the counters and
+     the disk image ride through unchanged) but knows nothing about [v_isr],
+     which the live arm does not mention.  The counters being ZERO is read off
+     the not-live arm, which is exactly what that arm records it for. *)
   Lemma virtio_proto_intro (γ : disk_names) (v0 v1 : virtio_state)
       (pd pav pu : Arch.pa) :
     virtio_live (v_cfg v0) = false ->
-    v1 = VirtioState (virtio_init_cfg pd pav pu) zero32 zero16 zero16 (v_disk v0) ->
+    v_cfg v1 = virtio_init_cfg pd pav pu ->
+    v_seen v1 = v_seen v0 -> v_used_idx v1 = v_used_idx v0 ->
+    v_disk v1 = v_disk v0 ->
     virtio_pages_aligned (virtio_init_cfg pd pav pu) ->
     avail_idx_dom (virtio_init_cfg pd pav pu)
       ## used_page_pas (virtio_init_cfg pd pav pu) ->
@@ -1334,24 +1361,106 @@ Section VirtioProto.
     |==> virtio_proto γ v1 ∗ disk_pub γ 0 ∗
          disk_cfg γ (virtio_init_cfg pd pav pu).
   Proof.
-    intros Hlive0 Hv1 Hal Hdisj. iIntros "Hp Hmine Hidx Hpage".
+    intros Hlive0 Hc1 Hsn Hui Hdk Hal Hdisj. iIntros "Hp Hmine Hidx Hpage".
     rewrite {1}/virtio_proto.
     iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
-    rewrite Hlive0. iDestruct "Hrest" as "(Hcfg & Hslot & Hnc & Hnp)".
+    rewrite Hlive0.
+    iDestruct "Hrest" as "(Hcfg & %Hsn0 & %Hui0 & Hslot & Hnc & Hnp)".
     iDestruct (disk_cfg_is_join with "Hcfg Hmine") as "Hcfg".
     iMod (disk_cfg_set γ (v_cfg v0) (virtio_init_cfg pd pav pu) with "Hcfg")
       as "#Hcfg".
     iEval (rewrite -Qp.half_half) in "Hnp".
     iDestruct (ghost_var_split with "Hnp") as "[Hnp1 Hnp2]".
     iModIntro. rewrite /disk_pub. iFrame "Hnp2 Hcfg".
-    assert (Hc1 : v_cfg v1 = virtio_init_cfg pd pav pu)
-      by (rewrite Hv1; reflexivity).
-    assert (Hs1 : v_seen v1 = wrap16 0) by (rewrite Hv1; reflexivity).
-    assert (Hu1 : v_used_idx v1 = wrap16 0) by (rewrite Hv1; reflexivity).
-    assert (Hd1 : disk_view dmap (v_disk v1)) by (rewrite Hv1; exact Hdv).
+    assert (Hs1 : v_seen v1 = wrap16 0%nat)
+      by (rewrite Hsn Hsn0; exact zero16_wrap16).
+    assert (Hu1 : v_used_idx v1 = wrap16 0%nat)
+      by (rewrite Hui Hui0; exact zero16_wrap16).
+    assert (Hd1 : disk_view dmap (v_disk v1)) by (rewrite Hdk; exact Hdv).
     iApply (virtio_proto_intro_gen γ v1 (virtio_init_cfg pd pav pu) dmap
               Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj Hs1 Hu1 Hd1
               with "Hauth Hcfg Hslot Hnc Hnp1 Hidx Hpage").
+  Qed.
+
+  (* THE PRE-FLIP CONFIGURATION WRITE.  Each of the fourteen MMIO writes
+     [virtio_disk_init] performs before the flip moves the invariant from [v]
+     to [v'] while the queue stays not live -- and it can, because the
+     not-live arm holds nothing but the config tracker's half, the counter
+     facts and the three empty-protocol ghosts.  BOTH halves of the tracker
+     move together, which is what keeps the driver's knowledge of what it has
+     programmed so far deterministic. *)
+  Lemma virtio_proto_cfg_write (γ : disk_names) (v v' : virtio_state)
+      (c' : virtio_cfg) :
+    virtio_live (v_cfg v) = false ->
+    virtio_live c' = false ->
+    v_cfg v' = c' ->
+    v_seen v' = zero16 -> v_used_idx v' = zero16 ->
+    v_disk v' = v_disk v ->
+    virtio_proto γ v -∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ==∗
+    virtio_proto γ v' ∗ disk_cfg_is γ (DfracOwn (1/2)) c'.
+  Proof.
+    intros Hlive0 Hlive1 Hc1 Hsn Hui Hdk. iIntros "Hp Hmine".
+    rewrite {1}/virtio_proto.
+    iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
+    rewrite Hlive0.
+    iDestruct "Hrest" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    iDestruct (disk_cfg_is_join with "Hcfg Hmine") as "Hcfg".
+    iMod (disk_cfg_is_move γ (v_cfg v) c' with "Hcfg") as "Hcfg".
+    iDestruct (disk_cfg_is_split with "Hcfg") as "[Hcfg1 Hcfg2]".
+    iModIntro. iFrame "Hcfg2".
+    rewrite /virtio_proto. iExists dmap. iFrame "Hauth".
+    iSplitR; [iPureIntro; rewrite Hdk; exact Hdv|].
+    rewrite Hc1 Hlive1.
+    iFrame "Hcfg1".
+    iSplitR; [iPureIntro; exact Hsn|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iFrame "Hslot Hnc Hnp".
+  Qed.
+
+  (* ...and what the driver READS off the arm without consuming it: while the
+     queue is not live, the configuration is the one the tracker's other half
+     names.  This is the identification every MMIO access performs when it
+     opens [disk_inv] -- and it is also how the LIVE arm is refuted, since
+     that arm exports the persistent [disk_cfg γ (v_cfg v)] which agrees with
+     the caller's half just as well. *)
+  Lemma virtio_proto_cfg_agree (γ : disk_names) (v : virtio_state)
+      (c : virtio_cfg) :
+    virtio_proto γ v -∗ disk_cfg_is γ (DfracOwn (1/2)) c -∗ ⌜v_cfg v = c⌝.
+  Proof.
+    iIntros "Hp Hmine". rewrite /virtio_proto.
+    iDestruct "Hp" as (dmap) "(_ & _ & Hrest)".
+    destruct (virtio_live (v_cfg v)).
+    - iDestruct "Hrest" as (pr dma) "(#Hcfg & _)".
+      iApply (disk_cfg_is_agree with "Hcfg Hmine").
+    - iDestruct "Hrest" as "(Hcfg & _)".
+      iApply (disk_cfg_is_agree with "Hcfg Hmine").
+  Qed.
+
+  (* THE LIVE-ARM REFUTATION, and the not-live arm's whole pure content in one
+     accessor.  A driver that knows its tracked configuration is not live --
+     [virtio_disk_init] from its precondition, and thereafter from the
+     configuration it has itself programmed -- learns, at every opening of
+     [disk_inv], that the invariant is in the not-live arm and hence that the
+     device's two ring counters are still zero.  The refutation costs nothing:
+     the LIVE arm exports the persistent [disk_cfg γ (v_cfg v)], which
+     dfrac-agrees with the caller's half just as the not-live arm's own half
+     does, so [v_cfg v = c] either way -- and then [virtio_live c = false]
+     contradicts the live arm's own guard. *)
+  Lemma virtio_proto_not_live_cfg (γ : disk_names) (v : virtio_state)
+      (c : virtio_cfg) :
+    virtio_live c = false ->
+    virtio_proto γ v -∗ disk_cfg_is γ (DfracOwn (1/2)) c -∗
+    ⌜v_cfg v = c /\ v_seen v = zero16 /\ v_used_idx v = zero16⌝.
+  Proof.
+    iIntros (Hlive) "Hp Hmine". rewrite /virtio_proto.
+    iDestruct "Hp" as (dmap) "(_ & _ & Hrest)".
+    destruct (virtio_live (v_cfg v)) eqn:Hl.
+    - iDestruct "Hrest" as (pr dma) "(#Hcfg & _)".
+      iDestruct (disk_cfg_is_agree with "Hcfg Hmine") as %Hc.
+      rewrite Hc Hlive in Hl. discriminate.
+    - iDestruct "Hrest" as "(Hcfg & %Hsn & %Hui & _)".
+      iDestruct (disk_cfg_is_agree with "Hcfg Hmine") as %Hc.
+      iPureIntro. split_and!; [exact Hc | exact Hsn | exact Hui].
   Qed.
 
   (* STATEMENT ADJUSTED (2026-07-28).  The old [virtio_proto_mint] --
@@ -1364,13 +1473,14 @@ Section VirtioProto.
      story needs (the whole image [0, N*1024) is one contiguous range). *)
   Lemma disk_ghosts_alloc_mint (v : virtio_state) (o : Z) (n : nat) :
     virtio_live (v_cfg v) = false ->
+    v_seen v = zero16 -> v_used_idx v = zero16 ->
     ⊢ |==> ∃ γ : disk_names,
         virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
         ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) ∗
         disk_done_lb γ 0%nat ∗
         disk_bytes γ o (disk_read (v_disk v) o n).
   Proof.
-    intro Hlive.
+    intros Hlive Hsn Hui.
     iMod (ghost_map_alloc_empty (K:=Z) (V:=bv 8)) as (gimg) "Himg".
     iMod (ghost_map_alloc_empty (K:=nat)
             (V:=(vslot * gmap Arch.pa (bv 8))%type)) as (gslot) "Hslot".
@@ -1396,7 +1506,10 @@ Section VirtioProto.
     cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg].
     iFrame "Himg". iSplitR; [iPureIntro; exact Hdv|].
     rewrite Hlive.
-    iFrame "Hcfg1 Hslot Hnc Hnp".
+    iSplitL "Hcfg1"; [iExact "Hcfg1"|].
+    iSplitR; [iPureIntro; exact Hsn|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iFrame "Hslot Hnc Hnp".
   Qed.
 
   (* ==================================================================== *)
@@ -1642,7 +1755,7 @@ Section VirtioProto.
     iIntros "Hp Hpub". rewrite /virtio_proto /disk_pub.
     iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hrest" as "(Hcfg & Hslot & Hnc & Hnp)".
+    { iDestruct "Hrest" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hrest" as (pr dma)
@@ -1698,7 +1811,7 @@ Section VirtioProto.
     rewrite {1}/virtio_proto /disk_pub.
     iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hrest" as "(Hcfg & Hslot & Hnc & Hnp)".
+    { iDestruct "Hrest" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hrest" as (pr dma)
@@ -1914,7 +2027,7 @@ Section VirtioProto.
     iIntros "Hp Hpub Hlb0". rewrite /virtio_proto /disk_pub /disk_done_lb.
     iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hrest" as "(Hcfg & Hslot & Hnc & Hnp)".
+    { iDestruct "Hrest" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hrest" as (pr dma)
@@ -1982,7 +2095,7 @@ Section VirtioProto.
     rewrite {1}/virtio_proto /disk_pub /disk_receipt /disk_done_lb.
     iDestruct "Hp" as (dmap) "(Hauth & %Hdv & Hrest)".
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hrest" as "(Hcfg & Hslot & Hnc & Hnp)".
+    { iDestruct "Hrest" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hrest" as (pr dma)

@@ -102,44 +102,6 @@ R -∗
   WP (Loop : expr riscv_lang) {{ Φ }}) -∗
 WP (Loop : expr riscv_lang) {{ Φ }}.
 
-(* The raw-[uart_frag] device STORE leaf: it owns the client [uart_frag u] half
-   DIRECTLY rather than borrowing it from an invariant around the step, so there
-   is no invariant to open and no four-ghost accessor wand -- the leaf agrees
-   [u] against the auth half in [state_interp], performs the physical
-   [dev_write], and hands back [uart_frag u'] for the deterministic result [u']
-   of [uart_write].
-
-   NO CALLER REMAINS.  It was written for [uartinit], on the premise that device
-   init runs before the device invariant exists, and that premise is FALSE: the
-   UART thread is a top-level thread from step 0, so [uart_frag] can never sit
-   raw in a CPU's precondition while the system runs.  uartinit goes through
-   [wp_sb_uart_uinv_s_sconf] instead, discharging the FIFO-clear and the DLAB
-   set by ghost arithmetic (SpecUartinit.v).  What keeps this leaf here is that
-   it is the cheapest statement of "this store advances the UART
-   deterministically"; retire it if it is still unused when the analogous raw
-   virtio MMIO leaves (WpVirtioMmio.v) go. *)
-Definition wp_sb_uart_frag_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (u u' : uart_state) :=
-let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
-let lppn := kpt_leaf_ppn uart_vpn in
-(0 <= off < uart_size)%Z ->
-uart_write u off storebyte = Some u' ->
-(* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
-   ppn composes back to [uart_pa off] = [a8] (the UART identity mapping) *)
-neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
-autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
-zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-sie_cap_gpr γ m n -∗
-pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
-uart_frag u -∗
-( sie_cap_gpr γ m n -∗
-  pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-  uart_frag u' -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-WP (Loop : expr riscv_lang) {{ Φ }}.
-
 Module Type UART.
   Parameter wp_lb_uart_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
@@ -153,8 +115,4 @@ Module Type UART.
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
       (γ : gname) (γd : uart_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ),
       wp_sb_uart_uinv_s_sconf_body γ γd off Φ pc is_rvc rs2 rs1 imm m n R S.
-  Parameter wp_sb_uart_frag_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (u u' : uart_state),
-      wp_sb_uart_frag_s_sconf_body γ off Φ pc is_rvc rs2 rs1 imm m n u u'.
 End UART.

@@ -1,26 +1,27 @@
 (* WpVirtioDev.v -- the width-4 virtio-mmio LOAD and STORE weakest-precondition
-   leaves for code that runs while the DEVICE INVARIANT is live.
+   leaves.  EVERY virtio-mmio access in the kernel goes through them: the
+   [virtio_frag] half can never sit raw in a CPU's precondition, because the
+   disk thread runs from step 0 and has to REFUTE [DevStepDiskWild] at every
+   step, which only [virtio_proto] can do.  So the fragment lives inside
+   [WpUart.disk_inv] and these leaves borrow it by opening the invariant around
+   the (atomic) access -- for [virtio_disk_init]'s reset and queue programming
+   just as much as for [virtio_disk_intr]'s INTERRUPT_STATUS read and
+   INTERRUPT_ACK write and [virtio_disk_rw]'s QUEUE_NOTIFY write.
 
-   These are the [dev_inv]-BORROWING cousins of WpVirtioMmio.v's raw-fragment
-   leaves.  [virtio_disk_init] owns [virtio_frag v] outright (it resets the
-   device, which no invariant could tolerate); every LATER driver access --
-   [virtio_disk_intr]'s INTERRUPT_STATUS read and INTERRUPT_ACK write,
-   [virtio_disk_rw]'s QUEUE_NOTIFY write -- runs concurrently with the device
-   thread and with the other harts, so the [virtio_frag] half lives inside
-   [WpUart.dev_inv] and these leaves borrow it by opening the invariant around
-   the (atomic) access.  The shape is exactly WpPlic.v's
-   [wp_lw_plic_dev_s_sconf] / [wp_sw_plic_dev_s_sconf]:
+   §1/§2 are the GENERAL leaves, over the bare [disk_inv] and an ACCESSOR-form
+   ghost callback (the shape SpecUart's [wp_sb_uart_uinv_s_sconf] uses for the
+   UART): the caller cannot NAME the device state -- the invariant's [v] is
+   existentially quantified and the device thread moves it -- so it hands in a
+   resource [R], a callback that moves the protocol from [v] to [v'] however it
+   likes, and gets [S] back.  §3 restates the two for the LIVE driver, whose
+   reads are state-independent and whose writes are protocol-neutral, at the
+   [dev_inv]-bundle signatures their call sites were written against.
 
-   - the caller cannot NAME the device state (the invariant's [v] is
-     existentially quantified and the device thread moves it), so its
-     obligation is UNIVERSAL over every state the invariant admits -- i.e.
-     over every [v] with [virtio_isr_ok v] -- and in exchange it may name a
-     property [P] of the value read that holds at all of them;
-   - the invariant must be RE-CLOSABLE, so the store leaf's obligation also
-     demands that the write preserve [virtio_isr_ok] and leave the four
-     components [virtio_proto] depends on (cfg / seen / used_idx / disk)
-     alone; [VirtioProto.virtio_proto_stable] then rides the protocol
-     through the write untouched.
+   - the invariant must be RE-CLOSABLE, so the store callback's obligation
+     includes preserving [virtio_isr_ok]; for a protocol-neutral write, leaving
+     the four components [virtio_proto] depends on (cfg / seen / used_idx /
+     disk) alone is what lets [VirtioProto.virtio_proto_stable] ride the
+     protocol through untouched (§3).
 
    The two offsets the live driver writes -- QUEUE_NOTIFY (0x50) and
    INTERRUPT_ACK (0x64), i.e. exactly [VirtioModel.vio_cfg_stable] -- meet
@@ -120,8 +121,8 @@ Proof. intro Hok. exists (v_isr v). split; [ reflexivity | exact Hok ]. Qed.
 
 (* the width-4 store tower's store word is a double [autocast]/subrange of the
    register value; collapsing the redundant outer layer bridges it to the
-   caller-facing single-layer [storeword].  (WpVirtioMmio's twin; kept local so
-   the two files stay independent.) *)
+   caller-facing single-layer [storeword].  (WpPlic has the same fact for its
+   own tower; kept local so the two files stay independent.) *)
 Lemma vd_subrange32_31_0_id (x : mword 32) : subrange_vec_dec x 31 0 = x.
 Proof.
   apply bv_eq.
@@ -149,17 +150,27 @@ Context `{CID : CpuId}.
 Existing Instance riscv_memGS.
 
 (* ===================================================================== *)
-(* §1  the [dev_inv]-borrowing width-4 virtio-mmio LOAD                    *)
+(* §1  the width-4 virtio-mmio LOAD, ACCESSOR form over the BARE           *)
+(*     [disk_inv]                                                          *)
 (* ===================================================================== *)
 
-(* [virtio_disk_intr]'s [lw a5,96(a5)] of INTERRUPT_STATUS.  Nothing about the
-   device survives into the continuation -- the invariant is closed again at
-   the state it was opened at (a virtio read does not advance the device) --
-   what the caller gets is the property [P] it proved of the loaded word at
-   EVERY state the invariant admits. *)
-Lemma wp_lw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names)
+(* THE GENERAL LOAD LEAF.  The caller cannot NAME the device state (the
+   invariant's [v] is existentially quantified and the device thread moves
+   it), so its obligation is a GHOST CALLBACK, universal over every state the
+   invariant admits: given the protocol at [v] and the caller's own resource
+   [R], produce the word the read yields, hand the protocol back, and hand out
+   whatever the caller wants to know about the word ([S w]).  A virtio read
+   does not advance the device (WpVirtioExec's [dev_read_virtio] concludes at
+   the SAME [d]), so the invariant is closed at the state it was opened at and
+   the protocol travels through unchanged -- but it is the CALLBACK that says
+   so, because that is also where a caller holding a ghost fragment of the
+   protocol ([DiskPtsto.disk_cfg_is], the boot chain's config tracker) reads
+   the register value out of the state.
+   [wp_lw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
+   restatement for the live driver, whose reads are state-independent. *)
+Lemma wp_lw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
-    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
+    (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 32 -> iProp Σ) :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let ldval := fun (w : bv 32) =>
@@ -171,20 +182,23 @@ Lemma wp_lw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names
   kpt_dev_vpn (svpn_of a8) ->
   uint rd <> 0 ->
   rd <> csp_rs1 ->
-  (forall v : virtio_state, virtio_isr_ok v ->
-     exists w : bv 32, virtio_read v (uint a8 - virtio_base)%Z = Some w /\ P w) ->
   sie_cap_gpr γ m n -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
-  dev_inv γu γd -∗
+  disk_inv γd -∗
+  R -∗
+  ( ∀ (v : virtio_state) (_ : virtio_isr_ok v),
+    virtio_proto γd v -∗ R ==∗
+    ∃ w : bv 32, ⌜ virtio_read v (uint a8 - virtio_base)%Z = Some w ⌝ ∗
+                 virtio_proto γd v ∗ S w ) -∗
   ( ∀ w : bv 32,
-    ⌜ P w ⌝ -∗
     sie_cap_gpr γ (<[Regidx rd := regval_into_reg (ldval w)]> m) n -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    S w -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp Hread.
-  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp.
+  iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
   iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             with "Hcg Hpc Hinstr").
@@ -206,12 +220,10 @@ Proof.
   iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-  (* only the DISK half of the fabric is touched, and [↑diskN ⊆ ↑devN] *)
-  iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
   iInv "Hvinv" as ">Hdbody" "Hdclose".
   iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
   iDestruct (dev_interp_agree_virtio with "Hdev Hvf") as %Hveq.
-  destruct (Hread vst Hvok) as (w & Hrd_v & HPw).
+  iMod ("Hacc" $! vst Hvok with "Hproto HR") as (w) "(%Hrd_v & Hproto & HS)".
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
   iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
@@ -317,24 +329,28 @@ Proof.
   iDestruct (sie_cap_retarget γ m
                (<[Regidx rd := regval_into_reg (ldval w)]> m) n Hsp with "Hcap") as "Hcap".
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-  iApply ("Hcont" $! w with "[%] Hcg [$Hpc' $Hnpc]").
-  { exact HPw. }
+  iApply ("Hcont" $! w with "Hcg [$Hpc' $Hnpc] HS").
 Qed.
 
 (* ===================================================================== *)
-(* §2  the [dev_inv]-borrowing width-4 virtio-mmio STORE                  *)
+(* §2  the width-4 virtio-mmio STORE, ACCESSOR form over the BARE          *)
+(*     [disk_inv]                                                          *)
 (* ===================================================================== *)
 
-(* [virtio_disk_intr]'s [sw a5,100(a4)] of INTERRUPT_ACK and
-   [virtio_disk_rw]'s [sw zero,80(a5)] of QUEUE_NOTIFY.  The caller must show
-   the write is DEFINED and PROTOCOL-NEUTRAL at every state the invariant
-   admits: it keeps [virtio_isr_ok] and leaves cfg / seen / used_idx / disk
-   alone, which is exactly what [VirtioProto.virtio_proto_stable] needs to
-   carry the driver protocol across the store.  §0's
-   [virtio_ack_write_ok] / [virtio_notify_write_ok] discharge it. *)
-Lemma wp_sw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names)
+(* THE GENERAL STORE LEAF, the dual of §1: the ghost callback must show the
+   write is DEFINED at the state the invariant currently holds, keep
+   [virtio_isr_ok] (which is what makes the acknowledgement in
+   [virtio_disk_intr] provably effective) and re-establish the protocol at the
+   new state.  That is general enough for all three kinds of driver write:
+   a PROTOCOL-NEUTRAL one (notify / ack -- [VirtioProto.virtio_proto_stable]
+   carries the protocol across), a PRE-FLIP CONFIGURATION one
+   ([virtio_proto_cfg_write] steps the config tracker), and THE FLIP itself
+   ([virtio_proto_intro] pays in the DMA lease and mints the publisher token).
+   [wp_sw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
+   restatement for the first kind. *)
+Lemma wp_sw_virtio_dinv_s_sconf (γ : gname) (γd : disk_names)
     (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) :
+    (m : regfile) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -342,22 +358,23 @@ Lemma wp_sw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  (forall v : virtio_state, virtio_isr_ok v ->
-     exists v' : virtio_state,
-       virtio_write v (uint a8 - virtio_base)%Z storeword = Some v'
-       /\ virtio_isr_ok v'
-       /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
-       /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
   sie_cap_gpr γ m n -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-  dev_inv γu γd -∗
+  disk_inv γd -∗
+  R -∗
+  ( ∀ (v : virtio_state) (_ : virtio_isr_ok v),
+    virtio_proto γd v -∗ R ==∗
+    ∃ v' : virtio_state,
+      ⌜ virtio_write v (uint a8 - virtio_base)%Z storeword = Some v' ⌝ ∗
+      ⌜ virtio_isr_ok v' ⌝ ∗ virtio_proto γd v' ∗ S ) -∗
   ( sie_cap_gpr γ m n -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    S -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 Proof.
-  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
-  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn.
+  iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
   iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
@@ -379,12 +396,11 @@ Proof.
   iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
   iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
   iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-  (* only the DISK half of the fabric is touched, and [↑diskN ⊆ ↑devN] *)
-  iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
   iInv "Hvinv" as ">Hdbody" "Hdclose".
   iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
   iDestruct (dev_interp_agree_virtio with "Hdev Hvf") as %Hveq.
-  destruct (Hwrite vst Hvok) as (vst' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk').
+  iMod ("Hacc" $! vst Hvok with "Hproto HR") as (vst')
+    "(%Hvw & %Hvok' & Hproto & HS)".
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
   iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
@@ -464,8 +480,7 @@ Proof.
                      rewrite vd_wv32_collapse; exact Hwr_virtio)).
     subst s_x d'. reflexivity. }
   iMod (dev_interp_update_virtio σ.(mdev) vst vst' with "Hdev Hvf") as "[Hdev' Hvf']".
-  iDestruct (virtio_proto_stable γd vst vst' Hcfg' Hseen' Hused' Hdisk' with "Hproto") as "Hproto'".
-  iMod ("Hdclose" with "[Hvf' Hproto']") as "_".
+  iMod ("Hdclose" with "[Hvf' Hproto]") as "_".
   { iNext. iExists vst'. iFrame. iPureIntro. exact Hvok'. }
   iModIntro. iExists s_x.
   iSplitR.
@@ -486,7 +501,116 @@ Proof.
   iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-  iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+  iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] HS").
+Qed.
+
+(* ===================================================================== *)
+(* §3  the LIVE-DRIVER restatements, over the [dev_inv] bundle.            *)
+(*                                                                        *)
+(*     Verbatim the statements [virtio_disk_intr] and [virtio_disk_rw] were*)
+(*     written against (WRAPPER RECIPE, claude-notes/durable-notes.md), so *)
+(*     no call site changed when the leaves went accessor-form: a live     *)
+(*     driver's reads are state-independent and its writes are            *)
+(*     protocol-neutral, so [R = S = emp] and the ghost callback is just   *)
+(*     the pure premise plus [virtio_proto_stable].                        *)
+(* ===================================================================== *)
+
+(* [virtio_disk_intr]'s [lw a5,96(a5)] of INTERRUPT_STATUS.  Nothing about the
+   device survives into the continuation -- the invariant is closed again at
+   the state it was opened at (a virtio read does not advance the device) --
+   what the caller gets is the property [P] it proved of the loaded word at
+   EVERY state the invariant admits. *)
+Lemma wp_lw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names)
+    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
+    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
+  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+  let ldval := fun (w : bv 32) =>
+        (extend_value is_unsigned
+           (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) w) : mword 64) in
+  (virtio_base <= uint a8 < virtio_base + virtio_size)%Z ->
+  is_aligned_vaddr (Virtaddr a8) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+  kpt_dev_vpn (svpn_of a8) ->
+  uint rd <> 0 ->
+  rd <> csp_rs1 ->
+  (forall v : virtio_state, virtio_isr_ok v ->
+     exists w : bv 32, virtio_read v (uint a8 - virtio_base)%Z = Some w /\ P w) ->
+  sie_cap_gpr γ m n -∗
+  pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
+  dev_inv γu γd -∗
+  ( ∀ w : bv 32,
+    ⌜ P w ⌝ -∗
+    sie_cap_gpr γ (<[Regidx rd := regval_into_reg (ldval w)]> m) n -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+Proof.
+  intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp Hread.
+  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  (* only the DISK half of the fabric is touched, and [↑diskN ⊆ ↑devN] *)
+  iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+  iApply (wp_lw_virtio_dinv_s_sconf γ γd Φ pc is_rvc is_unsigned rd rs1 imm m n
+            emp%I (fun w => ⌜P w⌝%I)
+            Hrange Halign Hcanon Hdevvpn Hrdnz Hrdsp
+            with "Hcg Hpc Hinstr Hvinv [] [] [-]").
+  { done. }
+  { iIntros (v Hvok) "Hproto _".
+    destruct (Hread v Hvok) as (w & Hrd & HPw).
+    iModIntro. iExists w. iFrame "Hproto". iSplitR; [| iPureIntro; exact HPw ].
+    iPureIntro. exact Hrd. }
+  iIntros (w) "Hcg Hpc %HPw".
+  iApply ("Hcont" $! w with "[%] Hcg Hpc"). { exact HPw. }
+Qed.
+
+(* [virtio_disk_intr]'s [sw a5,100(a4)] of INTERRUPT_ACK and
+   [virtio_disk_rw]'s [sw zero,80(a5)] of QUEUE_NOTIFY.  The caller must show
+   the write is DEFINED and PROTOCOL-NEUTRAL at every state the invariant
+   admits: it keeps [virtio_isr_ok] and leaves cfg / seen / used_idx / disk
+   alone, which is exactly what [VirtioProto.virtio_proto_stable] needs to
+   carry the driver protocol across the store.  §0's
+   [virtio_ack_write_ok] / [virtio_notify_write_ok] discharge it. *)
+Lemma wp_sw_virtio_dev_s_sconf (γ : gname) (γu : uart_names) (γd : disk_names)
+    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+    (m : regfile) (n : nat) :
+  let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+  let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
+  let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 4 8) 1) 0) in
+  (virtio_base <= uint a8 < virtio_base + virtio_size)%Z ->
+  is_aligned_vaddr (Virtaddr a8) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
+  kpt_dev_vpn (svpn_of a8) ->
+  (forall v : virtio_state, virtio_isr_ok v ->
+     exists v' : virtio_state,
+       virtio_write v (uint a8 - virtio_base)%Z storeword = Some v'
+       /\ virtio_isr_ok v'
+       /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
+       /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
+  sie_cap_gpr γ m n -∗
+  pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
+  dev_inv γu γd -∗
+  ( sie_cap_gpr γ m n -∗
+    pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+Proof.
+  intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
+  iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
+  iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
+  iApply (wp_sw_virtio_dinv_s_sconf γ γd Φ pc is_rvc rs2 rs1 imm m n
+            emp%I emp%I Hrange Halign Hcanon Hdevvpn
+            with "Hcg Hpc Hinstr Hvinv [] [] [-]").
+  { done. }
+  { iIntros (v Hvok) "Hproto _".
+    destruct (Hwrite v Hvok) as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk').
+    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused' Hdisk'
+                 with "Hproto") as "Hproto".
+    iModIntro. iExists v'.
+    iSplitR; [iPureIntro; exact Hvw|].
+    iSplitR; [iPureIntro; exact Hvok'|].
+    iFrame "Hproto". }
+  iIntros "Hcg Hpc _".
+  iApply ("Hcont" with "Hcg Hpc").
 Qed.
 
 End WpVirtioDev.
