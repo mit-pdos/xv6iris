@@ -219,9 +219,21 @@ binder entirely and are stated at `false` — and then need no `wp_next` wrapper
 at all, since `wp_next_off` would collapse it, so they read exactly as they did
 before the refactor.
 
-**Generalize the test:** if a function's postcondition names a value READ from
-a per-hart source mid-body, it belongs at `b = false`. If it only threads
-per-hart resources through without reading one, it can stay `b`-generic.
+**The test is what the function RETURNS, not what it reads.** Ask whether the
+returned value is HART-dependent or THREAD-dependent:
+
+- `cpuid()` returns the hart id — hart-dependent. A migration changes it, so
+  the contract cannot name it unless interrupts are off. `b = false`.
+- `myproc()` returns the current proc pointer — thread-dependent. That travels
+  WITH the thread across a migration (it is still the same proc on the new
+  hart), so the postcondition is fine at any `b`.
+
+`myproc` is the worked counter-example, and it is worth internalising because
+the naive reading gets it backwards: it *does* read a per-hart source mid-body
+(`c->proc`), yet it stays `b`-GENERIC. It does its own `push_off()`/`pop_off()`,
+so only its INTERIOR is interrupts-off — which is precisely where it gets to
+call `mycpu()` at `false`. A function that brackets its own critical section is
+b-generic on the outside no matter what it does inside.
 
 ## Discharge gotchas (all found the hard way)
 
