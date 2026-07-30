@@ -42,7 +42,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpLock WpMycpu ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs.
 Require Import DevModel DiskPtsto WpUart.
-Require Import SpecUart WpSmodeUart WpUartPutcSync WpSconfUartAccess WpUartgetc.
+Require Import SpecUart WpUartPutcSync WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
 Require Import SpecPanic.
 Require Import SchedCtx.

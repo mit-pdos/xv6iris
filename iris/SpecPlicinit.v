@@ -45,7 +45,6 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import DevModel.
 Require Import WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.

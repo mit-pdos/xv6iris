@@ -111,7 +111,7 @@ Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
-Require Import KernelRvcDecode KernelBaseDecode.
+Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

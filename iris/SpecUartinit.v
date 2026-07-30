@@ -58,7 +58,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
-Require Import DevModel.
 Require Import WpUart.
 Require Import IntrDefs.
 Require Import RegFile.

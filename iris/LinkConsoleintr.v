@@ -23,7 +23,7 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
-Require Import FdSlots ProcGeom CpuOwn IntrDefs WpLock SchedCtx.
+Require Import FdSlots WpLock.
 Require Import SpecConsoleintr.
 
 Module Consoleintr : CONSOLEINTR.

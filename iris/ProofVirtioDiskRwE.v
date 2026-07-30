@@ -65,9 +65,6 @@ Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import WpVirtioDiskRwDecode.
 Require Import SpecVirtioDiskRw.
 Require Import VirtioDiskRwDefs.
-Require Import ProofVirtioDiskRw.
-Require Import ProofVirtioDiskRwB.
-Require Import ProofVirtioDiskRwC ProofVirtioDiskRwCSeam.
 Require Import ProofVirtioDiskRwD ProofVirtioDiskRwDSeam.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

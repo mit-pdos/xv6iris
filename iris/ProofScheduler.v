@@ -46,12 +46,10 @@ Require Import WpLock.
 Require Import WpMycpu.
 Require Import WpAuipc.
 Require Import FdSlots.
-Require Import ProcGeom ProcInv.
+Require Import ProcGeom.
 Require Import SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import KernelText.
-Require Import SpecPanic.
 Require Import WpSchedulerDecode.
 Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

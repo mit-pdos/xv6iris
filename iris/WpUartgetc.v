@@ -35,12 +35,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import SpecUart.
-Require Import WpSmodeUart.
 Require Import WpUartPutcSync.
 Require Import WpSconfAlu WpSconfBtype.
 Require Import WpSconfUartAccess.

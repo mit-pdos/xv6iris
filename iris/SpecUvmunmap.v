@@ -66,7 +66,7 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import PtFree BarePt.
+Require Import BarePt.
 From Kernel Require KernelSyms.
 Import Defs.
 

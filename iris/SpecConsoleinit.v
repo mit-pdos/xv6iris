@@ -48,9 +48,7 @@ Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import DevModel.
 Require Import WpUart.
-Require Import SpecUartinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 

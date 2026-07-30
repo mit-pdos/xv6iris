@@ -4,7 +4,6 @@
    [Allocpid] is the one ASSUMED callee (LinkAllocpid.v supplies its contract
    with an [Axiom]); everything else -- acquire, release, kalloc,
    proc_pagetable and the general array memset -- is a real proof. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import LinkAcquire LinkRelease LinkAllocpid LinkKalloc LinkProcPagetable LinkMemsetArray.
 Require Import ProofAllocproc.
 

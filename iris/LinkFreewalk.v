@@ -2,8 +2,6 @@
    proof (kfree; the recursive self-call is served by the induction inside
    ProofFreewalk, not by a functor argument).  Sealed, so this is the only
    place the two ever meet. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import SpecFreewalk SpecKfree.
 Require Import LinkKfree ProofFreewalk.
 
 Module Freewalk := FreewalkProof Kfree.

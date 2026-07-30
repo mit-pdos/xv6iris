@@ -71,12 +71,12 @@ Require Import ByteCursor.
 Require Import CommonWalk PtTree.
 Require Import KptTree.
 Require Import PtBuild.
-Require Import KptExecMap TrampPt.
-Require Import UptTree UserPtTree.
+Require Import TrampPt.
+Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PtFree BarePt.
+Require Import BarePt.
 Require Import WpUvmunmapDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalk SpecKfree.

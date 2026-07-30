@@ -99,18 +99,19 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import SpecPanic.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
-Require Import SpecConsoleinit SpecPrintkinit SpecKinit SpecKvminit.
-Require Import SpecProcinit SpecTrapinit SpecPlicinit.
-Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
-Require Import SpecScheduler SpecFreerange SpecPrintkGen.
+Require Import SpecConsoleinit.
+Require Import SpecProcinit.
+Require Import SpecIinit SpecVirtioDiskInit.
+Require Import SpecFreerange SpecPrintkGen.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv KvmSpec BcacheInv SleepLock.
-Require Import DevModel VirtioModel DiskPtsto WpUart.
+Require Import VirtioModel DiskPtsto WpUart.
+Require Import VirtioModel.
 (* [DiskInv] for the vdisk_lock's vocabulary: [d_used_idx] and
    [disk_slot_raw] are cells of the static [struct disk] that main hands
    over, and [VirtioProto] for the two disk ghosts adequacy mints

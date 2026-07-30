@@ -10,7 +10,7 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import SmodeCore.
@@ -18,7 +18,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr WpDecode WpDecodeBridge WpMycpu SpecMycpu WpPushOffTop WpPopOff.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr WpMycpu SpecMycpu WpPushOffTop WpPopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcGeom CpuOwn.
 Require Import WpPushOffBridges.

@@ -48,7 +48,7 @@ Require Import WpSmodeIntr.
 Require Import WpDecodeBridge.
 Require Import KernelRvcDecode WpRvcBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import DevModel PlicPlan WpPlic SpecPlicinit.
+Require Import PlicPlan WpPlic SpecPlicinit.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

@@ -59,10 +59,8 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
-Require Import PtTree PtBuild KvmSpec.
-Require Import UptTree UserPtTree.
+Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PtFree.
 Require Import BarePt.
 From Kernel Require KernelSyms.
 Import Defs.

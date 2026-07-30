@@ -88,8 +88,8 @@ Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import PtAdBits.
-Require Import PtTree PtBuild KvmSpec.
-Require Import UptTree UserPtTree.
+Require Import PtBuild KvmSpec.
+Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.

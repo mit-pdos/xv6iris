@@ -42,11 +42,8 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import KptPt KMap.
 Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText.
-Require Import WpLock.
-Require Import ProcGeom.
+Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import CpuOwn SchedCtx FdSlots.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import MinstretInv.
 Require Import MemAccessGen.
@@ -54,9 +51,7 @@ Require Import WpSmodeHalf.
 Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpUart.
-Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import WpVirtioDiskRwDecode.
-Require Import SwtchCtx.
 Require Import VirtioDiskRwDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

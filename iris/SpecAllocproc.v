@@ -79,7 +79,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
-Require Import PtTree.
 Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots FileInv.

@@ -51,17 +51,14 @@ Require Import SmodeCore.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
-Require Import WpMycpu.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
-Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
 
 Notation UI := KernelSyms.uartintr.

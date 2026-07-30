@@ -43,7 +43,6 @@ Require Import InstrBytes KernelText.
 Require Import WpMycpu.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.

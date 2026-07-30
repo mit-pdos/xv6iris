@@ -37,7 +37,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
 Require Import KernelDataInv.
-Require Import DevModel.
 Require Import WpUart.
 Require Import WpConsoleinitDecode.
 Require Import SpecInitlock SpecUartinit SpecConsoleinit.

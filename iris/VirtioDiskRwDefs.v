@@ -26,19 +26,12 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
-Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText.
-Require Import WpLock.
+Require Import RiscvExtras.
+Require Import StackOwn CalleeSaved.
 Require Import ProcGeom.
-Require Import IntrDefs WpSmodeIntr.
-Require Import CpuOwn FdSlots.
-Require Import WpAuipc.
-Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpUart.
+Require Import WpSconfMem.
 Require Import VirtioModel DiskPtsto DiskInv.
-Require Import SpecPanic.
-Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import WpVirtioDiskRwDecode.
+Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -411,19 +404,12 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
-Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText.
-Require Import WpLock.
+Require Import RiscvExtras.
+Require Import StackOwn CalleeSaved.
 Require Import ProcGeom.
-Require Import IntrDefs WpSmodeIntr.
-Require Import CpuOwn SchedCtx FdSlots.
-Require Import WpAuipc.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpUart.
+Require Import WpSconfMem.
 Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
-Require Import SpecPanic.
-Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import WpVirtioDiskRwDecode.
+Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -643,20 +629,13 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase ByteCursor.
 Require Import RegFile.
-Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText.
-Require Import WpLock.
+Require Import RiscvExtras.
+Require Import StackOwn CalleeSaved.
 Require Import ProcGeom.
-Require Import IntrDefs WpSmodeIntr.
-Require Import CpuOwn SchedCtx FdSlots.
-Require Import WpAuipc.
-Require Import WpSconfAlu WpSconfMem.
+Require Import WpSconfMem.
 Require Import WpSmodeHalf.
-Require Import WpUart.
 Require Import VirtioModel DiskPtsto DiskInv.
-Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import WpVirtioDiskRwDecode.
-Require Import SwtchCtx.
+Require Import SpecFreeDesc.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

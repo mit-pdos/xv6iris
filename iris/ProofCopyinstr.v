@@ -106,7 +106,6 @@ Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
-Require Import KallocInv.
 Require Import ByteCursor ByteBuf.
 Require Import PtTree.
 Require Import UserPtTree.

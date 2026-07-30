@@ -70,14 +70,13 @@ Require Import InstrBytes KernelText.
 Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import PageGeom.
 Require Import CommonWalk Pt4kWalk.
 Require Import PtTree PtBuild PtFree.
 Require Import KptTree.
-Require Import KMap.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

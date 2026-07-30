@@ -6,13 +6,6 @@
    the callee links are still ASSUMED contracts (an [Axiom] inside their own
    sealed module -- printk's general path, userinit, virtio_disk_init), which is
    exactly the axiom footprint [tools/proof_coverage.py] reports for main. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintkGen.
-Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
-Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
-Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
-Require Import SpecUserinit SpecScheduler SpecKernelvec.
-Require Import SpecMain.
 Require Import LinkCpuid LinkConsoleinit LinkPrintkinit LinkPrintkGen.
 Require Import LinkKinit LinkKvminit LinkKvminithart LinkProcinit.
 Require Import LinkTrapinit LinkTrapinithart LinkPlicinit LinkPlicinithart.

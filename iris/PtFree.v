@@ -38,18 +38,12 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
-Require Import RiscvExec RiscvTryStep.
+Require Import RiscvModelBytes RiscvPtsto.
 Require Import PageGeom.
-Require Import SmodePte.
-Require Import Pt4kWalk.
 Require Import CommonWalk.
-Require Import PtAdBits.
 Require Import PtTree.
 Require Import PtBuild.
 Require Import KMap.
-Require Import UptTree.
-Require Import UserPtTree.
 Require Import KallocInv.
 Require Import ProcPtOwn.
 Local Open Scope Z_scope.

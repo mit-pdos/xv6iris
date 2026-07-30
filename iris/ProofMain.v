@@ -62,7 +62,7 @@ Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr WpAuipc.
 Require Import WpLock.
 Require Import KallocInv KvmSpec PageGeom.
-Require Import ProcGeom ProcInv CpuOwn SchedCtx FdSlots FileInv.
+Require Import ProcGeom CpuOwn SchedCtx FdSlots FileInv.
 Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
 Require Import VirtioQueue VirtioProto DiskInv DiskBoot.

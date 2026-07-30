@@ -37,25 +37,19 @@ From iris.program_logic Require Import language weakestpre lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes WpMmodeLeafBase ByteCursor.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText.
+Require Import StackOwn KernelText.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import WpAuipc.
-Require Import WpSconfAlu WpSconfMem.
-Require Import WpSmodeHalf.
 Require Import WpUart.
-Require Import VirtioModel DiskPtsto DiskInv.
+Require Import DiskPtsto DiskInv.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import WpVirtioDiskRwDecode.
 Require Import SwtchCtx.
-Require Import ProofVirtioDiskRw.
 Require Import ProofVirtioDiskRwB.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
