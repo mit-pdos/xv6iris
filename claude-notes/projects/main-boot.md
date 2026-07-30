@@ -297,8 +297,28 @@ This is what ProofMain applies right before its disk-lock `newlock`.
 `ByteBuf.bb_chunk` (a k*n buffer as k records of n bytes) came out of
 rebuilding `desc_entry_own` from the desc page's bytes — reusable.
 
-Remaining under G1: the virtio_disk_init proof rework (bigger, can trail —
-the axiom stands in meanwhile).
+**G1 is CLOSED** (`459da64`): virtio_disk_init is re-proven under the
+time-0 disk invariant (virtio_disk.c back to 4/4; main's axiom footprint
+is now exactly printk-general + userinit + kerneltrap). What the rework
+added, worth keeping:
+
+- The live-arm refutation needs nothing new: the live arm's persistent
+  `disk_cfg γ (v_cfg v)` agrees with the caller's tracker half
+  (`DfracDiscarded ⋅ DfracOwn ½` is valid), contradicting
+  `virtio_live c0 = false` — packaged as
+  `VirtioProto.virtio_proto_not_live_cfg`.
+- The flip is the LAST write (`STATUS |= DRIVER_OK`), not QUEUE_READY —
+  `virtio_live` requires `virtio_driver_ok`.
+- One additive `virtio_proto` change: the not-live arm records
+  `⌜v_seen v = 0⌝ ∗ ⌜v_used_idx v = 0⌝` — the flip's
+  `virtio_proto_intro_gen` needs the DEVICE's own counters, which the
+  driver's ring-zeroing memsets cannot speak to. `disk_ghosts_alloc` takes
+  them as premises and `riscv_device_adequacy` gained the two honest
+  power-on hypotheses `Hvseen`/`Hvuidx`.
+- Bare-`disk_inv` accessor leaves `wp_{lw,sw}_virtio_dinv_s_sconf`
+  (WpVirtioDev.v), with the bundle leaves as restatements. The
+  zero-caller raw-fragment tier is RETIRED: `WpVirtioMmio.v` deleted,
+  `wp_sw_plic_s_sconf` and `wp_sb_uart_frag_s_sconf` removed.
 
 ### G2 — printk's only proven contract is the PANIC path
 
