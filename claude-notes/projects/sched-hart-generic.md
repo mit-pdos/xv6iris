@@ -197,3 +197,73 @@ annotation between `pc_is` and its address, because a parking contract's exit
 pin reads `pc_is (CID := h) ret_tgt`. Without that, sched/yield/sleep read as
 *partial* — a silent downgrade, exactly the failure mode the durable notes warn
 about. Check the report after touching any parking contract.
+
+### RE-PROOF PROGRESS + THE ONE SPEC BLOCKER FOUND
+
+Landed: **bwrite** (`0670a72`) and **acquiresleep** (`cc2e436`). Remaining
+axioms: sys_pause, piperead, pipewrite, uartwrite, virtio_disk_rw, **bread**.
+
+`acquiresleep` is the worked example for the four remaining LOOP sleepers —
+read `ProofAcquiresleep.v` rather than re-deriving the shape. Its lessons:
+
+- **The loop invariant is the thing that goes ∀h∀g, not a trailing half.**
+  `asl_loop` / `asl_exit` stay `Definition`s but move OUT of the CID-fixing
+  section and quantify `∀ (h : CPU) (g : gname) (M : regfile)`, so both are
+  hart-INDEPENDENT propositions. `iLöb` is taken on that ∀h form — that is
+  exactly what makes the IH re-enterable at the resuming hart.
+- **A register-map invariant takes the hart it is ABOUT.** `asl_regs h m M …`
+  has `M !!! x4 = cid_word_of h` and a tp-free preserved set, plus TWO
+  transport lemmas: `asl_regs_cs` (same hart, `callee_saved`, for leaf writes
+  and non-parking callees) and `asl_regs_notp` (the parking hop:
+  `callee_saved_notp` + the new hart's tp pin — literally sleep's post).
+- **One lemma with `CID` a BINDER per straight-line stretch**, the ∀h
+  propositions crossing between them: `asl_exit_body`, `asl_post_sleep_body`
+  (the stretch from the park to the branch) and `asl_loop_body` (loop head to
+  the park). The Löb IH rides `asl_loop_body`/`asl_post_sleep_body` as a `▷`
+  premise and is handed to the taken-branch leaf's later-bracket, whose
+  `iNext` strips it.
+- **DO NOT `subst eb` in a body that runs `iNext` over `cpu_own`.** This
+  REVERSES step 6 of the extraction recipe above for loop bodies. With `eb`
+  literal, `intr_count`'s `if eb` reduces, `iNext` descends into
+  `intr_handler_avail` and strips ITS `▷`; the resource can then no longer be
+  folded back to `cpu_own`, and `iSpecialize` fails with a baffling "cannot
+  instantiate" that prints the *unfolded* body. Keep `eb` a variable and
+  thread `eb = true` to the one consumer that needs it (the sleep call).
+
+#### BLOCKER: `trap_csrs_pay 0 eb` cannot cross a park unaided
+
+**`SpecVirtioDiskRw.v` and `SpecBread.v` are not provable as restated**, for
+one shared reason. `sleep` carries exactly ONE `trap_csrs_pay 0 eb` across the
+park (in at the parking hart, out at the resuming one) — the one the *pushing*
+acquire minted. A SECOND level-0 pay, held by the parking function itself,
+has no way across: it is `trap_csrs` at the old hart and the postcondition
+wants it at the new one. So:
+
+- **`virtio_disk_rw`**: its contract takes `trap_csrs_pay 0 eb` at entry and
+  returns it, while its own `acquire(&disk.vdisk_lock)` mints a second one that
+  its `release` spends (the old proof says so in as many words —
+  `git show 0cfc644^:iris/ProofVirtioDiskRwF.v`, the comment at the `Hpay0`
+  premise, and `Hpay0` is handed straight to the continuation across the
+  park). Under the ∀h continuation that hand-off is a hart mismatch.
+- **`bread`**: same, one level up. Its entry pay must reach the `virtio_disk_rw`
+  call in the shared tail, and the only thing between them is the
+  `acquiresleep` park; the pay `acquire(&bcache.lock)` minted is spent by the
+  `release(&bcache.lock)` that precedes it. (`bread_hit`/`bread_recyc` in the
+  old proof take `trap_csrs_pay 0 eb` TWICE for exactly this reason.)
+  Worse, at `eb = true` two `trap_csrs` at one hart are contradictory
+  (`sepc ↦ᵣ` is exclusive), so the restated premise set is *unsatisfiable* —
+  a proof of it would be vacuous, and the coverage tool would still read
+  "proven". Do not close it that way.
+
+**The fix (orchestrator's call): drop `trap_csrs_pay 0 eb` from
+`virtio_disk_rw`'s entry AND exit, and likewise from `bwrite` and `bread`.**
+All three acquire at level 0 and release before returning, so they are
+trap-CSR BALANCED — exactly what `acquiresleep` now is, and the reason
+`SpecAcquiresleep.v` correctly does not mention the pay. Dropping the pay
+makes all three contracts strictly stronger (one premise fewer) and turns
+bread's port back into the pure re-threading the worklist above predicts.
+`bwrite`'s landed proof only *forwards* the pay to rw, so it needs one
+`iIntros` name dropped and the rw call's argument list shortened; nothing
+structural. The general rule to record: **a level-0 `trap_csrs_pay` premise on
+a function that both acquires and parks is unimplementable — state the pay only
+where the function is genuinely push/pop-UNbalanced.**
