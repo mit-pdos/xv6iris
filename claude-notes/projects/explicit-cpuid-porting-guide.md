@@ -131,8 +131,21 @@ Rules:
   lemmas at a migrated hart — `Proof*.v` files split into block lemmas — and
   then make `CID` an *implicit* per-lemma binder `` `{CID : CpuId} ``, never
   explicit, so positional argument lists do not churn.
-- `let`-bound values computed from the entry map (`ret_tgt`, a frame base) stay
-  OUTSIDE the lambda; they are words, not hart-indexed resources.
+- **ANY VALUE THAT READS THE ENTRY MAP MUST BE `let`-BOUND OUTSIDE THE LAMBDA.
+  This is a hard rule, and violating it presents as an infinite loop.**
+  `rget` carries an implicit `{CID : CpuId}`, so a `rget m rd` written inside
+  the lambda elaborates at the LAMBDA's hart — semantically the wrong hart
+  (you would be reading the value on the hart you came from), and mechanically
+  fatal: the engine's `wval` binder lives OUTSIDE the lambda, so `iApply` has
+  to solve `?wval =?= add_vec (rget (CID:=bound) m rd) …` under a binder, and
+  instead unfolds `rget`/`tp_pin`/`rf_upd`/`bool_decide` without terminating.
+  Measured: >10 minutes of silence on one lemma. `coqc -time` pins it to the
+  `unshelve iApply` immediately — see durable-notes, "a failing tactic looks
+  like a hang".
+  So: `let wval := <value> in` ahead of the premises, `intros wval.` at the top
+  of the proof. **The lambda may contain only RESOURCES and binder-bound
+  values — never a term that reads the entry map.** (`ret_tgt`, frame bases and
+  store values are all in this class.)
 - Concrete-register statements (`mm !!! Regidx (mword_of_int 10)`) do **not**
   need `rget` — a0/ra/sp are never tp. Only leaves whose register index is a
   VARIABLE do.
@@ -167,6 +180,28 @@ Rules:
    ```
 6. Call sites of a `rd_ok` premise: `ltac:(rdok)` where
    `ltac:(vm_compute; discriminate)` used to sit.
+
+## Caller-supplied propositions must be hart-INDEPENDENT
+
+A leaf that carries an opaque caller payload through the step (`P` in
+`wp_gpr_write_s_sconf_cap`, `Ψ` in `wp_store_s_sconf_au`, `Ψ v` in
+`wp_load_s_sconf_au`, the `Hrecap` capability transformer) keeps the type
+`iProp Σ` — do NOT make it `CpuId -> iProp Σ`.
+
+This is the same rule, for the same reason, as the C-slot in
+`sched-hart-generic.md`: nothing in a crossing can turn `P` at the old hart
+into `P` at the new one, so a hart-indexed payload would need a transport
+bridge as an extra premise — and a `P` that admits one is exactly a
+hart-independent `P`.
+
+What follows, and it is a REAL constraint rather than a formality: at Stage 2 a
+caller may not carry hart-indexed state (a `cpu_own`, anything mentioning
+`sie_gname`, a per-hart lock fragment) across an interrupts-ENABLED step. Such
+state either stays at `b = false`, or it has to ride the crossing frame — which
+is the open design question in `explicit-cpuid.md`, to be settled against
+`kerneltrap`'s real contract. Stage 1 does not exercise this (the hart never
+actually changes), so it is easy to build consumers that violate it and only
+find out at Stage 2. Don't.
 
 ## The SIE arm
 

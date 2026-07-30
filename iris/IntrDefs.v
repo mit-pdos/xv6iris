@@ -1132,3 +1132,11 @@ Ltac rdok :=
   [ vm_compute; discriminate
   | let H1 := fresh in let H2 := fresh in
     intro H1; injection H1 as H2; vm_compute in H2; congruence ].
+
+(* The two projections are wanted TOGETHER in essentially every gpr-writing
+   leaf -- [Hrdsp] for the sp [congruence]s the old proofs already do, [Hrdtp]
+   to feed [tp_refold] -- so pose both at once.  The single most repeated pair
+   in the sweep. *)
+Ltac rdok_split Hrdok :=
+  pose proof (rd_ok_sp _ Hrdok);
+  pose proof (rd_ok_tp _ Hrdok).
