@@ -20,7 +20,7 @@
                                   are untouched (variants translate to the
                                   same page, cache the same pteAddr);
      - [pte_set_ad_nonleaf]     : leaf-ness is untouched.               *)
-From Stdlib Require Import ZArith Bool.
+From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import bitvector.definitions bitvector.tactics.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -233,6 +233,85 @@ Proof.
   unfold _get_PTE_Flags_G, Mk_PTE_Flags,
     pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
   mw_prep. tb1.
+Qed.
+
+(* ... and so are V / R / W / X.  These four are what make the model's
+   CLASSIFIERS A/D-stable: [pte_is_non_leaf] reads exactly X, W, R, and
+   [pte_is_invalid] reads V, R, W, X plus the extension bits (already
+   covered by [pte_set_ad_ext]).  PtTree's [pte_set_ad_leaf] /
+   [pte_set_ad_valid] are one rewrite each off these; that stability is
+   what lets an A/D-canonicalised page table AGREE with the live one
+   (claude-notes/projects/kpt-share.md). *)
+Lemma pte_set_ad_flag_V (w : mword 64) (a d : mword 1) :
+  _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+  = _get_PTE_Flags_V (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
+Proof.
+  unfold _get_PTE_Flags_V, Mk_PTE_Flags,
+    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
+  mw_prep. tb1.
+Qed.
+
+Lemma pte_set_ad_flag_R (w : mword 64) (a d : mword 1) :
+  _get_PTE_Flags_R (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+  = _get_PTE_Flags_R (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
+Proof.
+  unfold _get_PTE_Flags_R, Mk_PTE_Flags,
+    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
+  mw_prep. tb1.
+Qed.
+
+Lemma pte_set_ad_flag_W (w : mword 64) (a d : mword 1) :
+  _get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+  = _get_PTE_Flags_W (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
+Proof.
+  unfold _get_PTE_Flags_W, Mk_PTE_Flags,
+    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
+  mw_prep. tb1.
+Qed.
+
+Lemma pte_set_ad_flag_X (w : mword 64) (a d : mword 1) :
+  _get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0))
+  = _get_PTE_Flags_X (Mk_PTE_Flags (subrange_vec_dec w 7 0)).
+Proof.
+  unfold _get_PTE_Flags_X, Mk_PTE_Flags,
+    pte_set_ad, _update_PTE_Flags_D, _update_PTE_Flags_A.
+  mw_prep. tb1.
+Qed.
+
+(* ===================================================================== *)
+(* THE A/D-CANONICAL FORM.  [pte_canon w] zeroes A and D; two words have  *)
+(* the same canonical form exactly when each is an A/D variant of the     *)
+(* other.  This is the equivalence a SHARED page table is agreed upon     *)
+(* modulo: the Svadu write-back moves a leaf word inside its canonical    *)
+(* class and never between classes, so the canonical table is INVARIANT   *)
+(* (not merely monotone) under it.                                        *)
+(* ===================================================================== *)
+
+Definition pte_canon (w : mword 64) : mword 64 :=
+  pte_set_ad w (mword_of_int 0) (mword_of_int 0).
+
+Lemma pte_canon_set_ad (w : mword 64) (a d : mword 1) :
+  pte_canon (pte_set_ad w a d) = pte_canon w.
+Proof. unfold pte_canon. apply pte_set_ad_absorb. Qed.
+
+(* THE INVERSION: equal canonical forms means A/D-variance.  (Used to turn
+   an agreement between a hart's SNAPSHOT of the canonical table and the
+   live one back into the per-entry variance [tlb_ok_pt] speaks of.) *)
+Lemma pte_canon_inv (w w' : mword 64) :
+  pte_canon w' = pte_canon w -> exists a d : mword 1, w' = pte_set_ad w a d.
+Proof.
+  intros H.
+  destruct (pte_set_ad_refl w') as (a & d & Hw').
+  exists a, d. rewrite Hw'.
+  apply (bv_eq_testbit 64); intros k Hk.
+  assert (Hk' : 0 <= k < 64) by (change (Z.of_N 64) with 64 in Hk; lia).
+  rewrite !(pte_set_ad_testbit _ _ _ k Hk').
+  destruct (Z.eqb k 6) eqn:H6; [reflexivity |].
+  destruct (Z.eqb k 7) eqn:H7; [reflexivity |].
+  apply (f_equal (fun x : mword 64 => Z.testbit (bv_unsigned x) k)) in H.
+  unfold pte_canon in H.
+  rewrite !(pte_set_ad_testbit _ _ _ k Hk') in H.
+  rewrite H6 in H. rewrite H7 in H. cbv iota in H. exact H.
 Qed.
 
 

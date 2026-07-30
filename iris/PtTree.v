@@ -53,7 +53,7 @@
 
    Instances: the kernel S-mode table (KptTree.v) and, eventually, the
    user table (UserPt.v -- worklist).                                    *)
-From Stdlib Require Import ZArith Bool Lia.
+From Stdlib Require Import ZArith Bool Lia FunctionalExtensionality.
 From stdpp Require Import gmap relations bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
@@ -1462,6 +1462,184 @@ Proof.
   destruct Hstep as (vpn & p2 & p1 & p0 & a & d & Hmaps & Hv & Hl & Hnap & Hpb & ->).
   exact (tlb_ok_pt_set_leaf asid x tlbvec vpn p2 p1 p0 a d
            Hmaps Hv Hl Hnap Hpb Hok).
+Qed.
+
+(* ===================================================================== *)
+(* §7a2 THE A/D-CANONICAL TABLE, AND WHY A SHARED TABLE NEEDS NOTHING     *)
+(*      MORE.  [ptree_canon t] rewrites every LEVEL-0 slot word to its    *)
+(*      A/D-canonical form and leaves every base, child pointer and       *)
+(*      level-2/1 word alone.  Two facts make it the right notion for a   *)
+(*      kernel page table shared between harts                            *)
+(*      (claude-notes/projects/kpt-share.md):                              *)
+(*        - it is INVARIANT under the Svadu write-back                    *)
+(*          ([ptree_canon_set_leaf]) -- the only mutation a running       *)
+(*          machine performs on an installed table -- so the harts can    *)
+(*          simply AGREE on it (no monotone order, no ghost update at the  *)
+(*          write-back);                                                  *)
+(*        - it determines [tlb_ok_pt] ([tlb_ok_pt_canon]) -- a hart's     *)
+(*          cached entries stay coherent with any table having the same    *)
+(*          canonical form.                                               *)
+(* ===================================================================== *)
+
+(* the classification predicates are A/D-STABLE.  [pte_no_napot] /        *)
+(* [pte_pbmt0] read only the extension bits ([pte_set_ad_ext]); leafness   *)
+(* and validity read only V/R/W/X of the flag byte plus those extension    *)
+(* bits (PtAdBits's four flag laws).                                       *)
+Lemma pte_set_ad_leaf (w : mword 64) (a d : mword 1) :
+  pte_leaf (pte_set_ad w a d) <-> pte_leaf w.
+Proof.
+  unfold pte_leaf, pte_is_non_leaf.
+  rewrite pte_set_ad_flag_X pte_set_ad_flag_W pte_set_ad_flag_R.
+  reflexivity.
+Qed.
+
+Lemma pte_set_ad_ptr (w : mword 64) (a d : mword 1) :
+  pte_ptr (pte_set_ad w a d) <-> pte_ptr w.
+Proof.
+  unfold pte_ptr, pte_is_non_leaf.
+  rewrite pte_set_ad_flag_X pte_set_ad_flag_W pte_set_ad_flag_R.
+  reflexivity.
+Qed.
+
+(* VALIDITY IS A/D-STABLE ONLY FOR A LEAF -- and that is exactly where the
+   canonicalisation happens.  The model's [pte_is_invalid] treats A, D and U
+   as RESERVED in a NON-leaf PTE (the clause [pte_is_non_leaf && (A || D ||
+   U || ext<>0)]), so canonicalising a level-2/1 POINTER word would be
+   unsound: it could turn an invalid word into a valid one.  [ptree_canon]
+   rewrites level-0 words only, and [ptree_maps] requires the level-0 word
+   to be [pte_leaf], so the reserved-bit clause is dead on both sides. *)
+Lemma pte_set_ad_valid_leaf (w : mword 64) (a d : mword 1) :
+  pte_leaf w -> (pte_valid (pte_set_ad w a d) <-> pte_valid w).
+Proof.
+  intros Hl.
+  assert (Hl' : pte_is_non_leaf
+                  (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w a d) 7 0)) = false)
+    by (apply (proj2 (pte_set_ad_leaf w a d)); exact Hl).
+  unfold pte_leaf in Hl.
+  unfold pte_valid, pte_is_invalid.
+  rewrite pte_set_ad_ext.
+  rewrite pte_set_ad_flag_V pte_set_ad_flag_R pte_set_ad_flag_W pte_set_ad_flag_X.
+  rewrite Hl' Hl !andb_false_l.
+  reflexivity.
+Qed.
+
+Lemma pte_set_ad_no_napot (w : mword 64) (a d : mword 1) :
+  pte_no_napot (pte_set_ad w a d) <-> pte_no_napot w.
+Proof. unfold pte_no_napot. rewrite pte_set_ad_ext. reflexivity. Qed.
+
+Lemma pte_set_ad_pbmt0 (w : mword 64) (a d : mword 1) :
+  pte_pbmt0 (pte_set_ad w a d) <-> pte_pbmt0 w.
+Proof. unfold pte_pbmt0. rewrite pte_set_ad_ext. reflexivity. Qed.
+
+(* the canonical table: level 0 canonicalised, everything else verbatim *)
+Definition pt_canon_l0 (t : ptree) : ptree :=
+  PtNode (pt_base t) (fun i => pte_canon (pt_ents t i)) (pt_kids t).
+Definition pt_canon_l1 (t : ptree) : ptree :=
+  PtNode (pt_base t) (pt_ents t) (fun i => option_map pt_canon_l0 (pt_kids t i)).
+Definition ptree_canon (t : ptree) : ptree :=
+  PtNode (pt_base t) (pt_ents t) (fun i => option_map pt_canon_l1 (pt_kids t i)).
+
+Lemma ptree_maps_canon (t : ptree) (vpn : mword 27) (p2 p1 p0 : mword 64) :
+  ptree_maps t vpn p2 p1 p0 ->
+  ptree_maps (ptree_canon t) vpn p2 p1 (pte_canon p0).
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 &
+          Hv2 & Hp2 & Hv1 & Hp1 & Hv0 & Hl0 & Hn0 & Hb0').
+  exists (pt_canon_l1 c1), (pt_canon_l0 c0).
+  cbn [ptree_canon pt_canon_l1 pt_canon_l0 pt_base pt_ents pt_kids].
+  rewrite Hk2. cbn [option_map].
+  rewrite Hk1. cbn [option_map].
+  rewrite He0.
+  unfold pte_canon.
+  repeat split; try assumption.
+  - apply (proj2 (pte_set_ad_valid_leaf p0 _ _ Hl0)). exact Hv0.
+  - apply (proj2 (pte_set_ad_leaf p0 _ _)). exact Hl0.
+  - apply (proj2 (pte_set_ad_no_napot p0 _ _)). exact Hn0.
+  - apply (proj2 (pte_set_ad_pbmt0 p0 _ _)). exact Hb0'.
+Qed.
+
+Lemma ptree_maps_canon_inv (t : ptree) (vpn : mword 27) (p2 p1 w : mword 64) :
+  ptree_maps (ptree_canon t) vpn p2 p1 w ->
+  exists q0, ptree_maps t vpn p2 p1 q0 /\ w = pte_canon q0.
+Proof.
+  intros (d1 & d0 & Hk2 & Hk1 & He2 & He1 & He0 & Hb1 & Hb0 &
+          Hv2 & Hp2 & Hv1 & Hp1 & Hv0 & Hl0 & Hn0 & Hb0').
+  cbn [ptree_canon pt_base pt_ents pt_kids] in *.
+  destruct (pt_kids t (vpn_idx 2 vpn)) as [c1 |] eqn:Hc1; [| discriminate].
+  cbn [option_map] in Hk2. injection Hk2 as <-.
+  cbn [pt_canon_l1 pt_base pt_ents pt_kids] in *.
+  destruct (pt_kids c1 (vpn_idx 1 vpn)) as [c0 |] eqn:Hc0; [| discriminate].
+  cbn [option_map] in Hk1. injection Hk1 as <-.
+  cbn [pt_canon_l0 pt_base pt_ents pt_kids] in *.
+  exists (pt_ents c0 (vpn_idx 0 vpn)).
+  split; [| symmetry; exact He0].
+  exists c1, c0.
+  rewrite <- He0 in Hv0, Hl0, Hn0, Hb0'.
+  unfold pte_canon in Hv0, Hl0, Hn0, Hb0'.
+  assert (Hlq : pte_leaf (pt_ents c0 (vpn_idx 0 vpn)))
+    by exact (proj1 (pte_set_ad_leaf _ _ _) Hl0).
+  repeat split; try assumption; try reflexivity.
+  - exact (proj1 (pte_set_ad_valid_leaf _ _ _ Hlq) Hv0).
+  - exact (proj1 (pte_set_ad_no_napot _ _ _) Hn0).
+  - exact (proj1 (pte_set_ad_pbmt0 _ _ _) Hb0').
+Qed.
+
+(* node equality, extensionally (the description's slot/child fields are
+   FUNCTIONS, so this is where funext enters) *)
+Lemma ptnode_eq (b b' : mword 44) (e e' : mword 9 -> mword 64)
+    (k k' : mword 9 -> option ptree) :
+  b = b' -> (forall i, e i = e' i) -> (forall i, k i = k' i) ->
+  PtNode b e k = PtNode b' e' k'.
+Proof.
+  intros -> He Hk.
+  assert (e = e') as -> by (apply functional_extensionality; exact He).
+  assert (k = k') as -> by (apply functional_extensionality; exact Hk).
+  reflexivity.
+Qed.
+
+(* THE INVARIANCE: the Svadu write-back does not move the canonical table.
+   [ptree_set_leaf] rewrites exactly one level-0 slot, and its new word is
+   an A/D variant of the old one, whose canonical form is unchanged.       *)
+Lemma ptree_canon_set_leaf (t : ptree) (vpn : mword 27)
+    (p2 p1 p0 : mword 64) (a d : mword 1) :
+  ptree_maps t vpn p2 p1 p0 ->
+  ptree_canon (ptree_set_leaf t vpn (pte_set_ad p0 a d)) = ptree_canon t.
+Proof.
+  intros (c1 & c0 & Hk2 & Hk1 & He2 & He1 & He0 & _).
+  unfold ptree_set_leaf. rewrite Hk2 Hk1. cbn match.
+  unfold ptree_canon. apply ptnode_eq; [reflexivity | intros i; reflexivity |].
+  intros i2. cbn [pt_upd_kid pt_kids].
+  destruct (decide (i2 = vpn_idx 2 vpn)) as [-> | Hne2]; [| reflexivity].
+  rewrite Hk2. cbn [option_map]. f_equal.
+  unfold pt_canon_l1. apply ptnode_eq; [reflexivity | intros i; reflexivity |].
+  intros i1. cbn [pt_upd_kid pt_kids].
+  destruct (decide (i1 = vpn_idx 1 vpn)) as [-> | Hne1]; [| reflexivity].
+  rewrite Hk1. cbn [option_map]. f_equal.
+  unfold pt_canon_l0. apply ptnode_eq; [reflexivity | | intros i; reflexivity].
+  intros i0. cbn [pt_upd_ent pt_ents].
+  destruct (decide (i0 = vpn_idx 0 vpn)) as [-> | Hne0]; [| reflexivity].
+  rewrite <- He0. apply pte_canon_set_ad.
+Qed.
+
+(* THE TRANSFER: cached-entry coherence depends on the table only through
+   its canonical form.  This is what a hart's persistent agreement buys --
+   no order, no lower bound, no ghost update. *)
+Lemma tlb_ok_pt_canon (asid : mword 16) (t t' : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  ptree_canon t = ptree_canon t' ->
+  tlb_ok_pt asid t tlbvec -> tlb_ok_pt asid t' tlbvec.
+Proof.
+  intros Hcan Hok vpn' ent Hget.
+  destruct (Hok vpn' ent Hget)
+    as (vpn & p2 & p1 & p0 & a & d & Hmaps & Hh & Hent).
+  pose proof (ptree_maps_canon t vpn p2 p1 p0 Hmaps) as Hmc.
+  rewrite Hcan in Hmc.
+  destruct (ptree_maps_canon_inv t' vpn p2 p1 (pte_canon p0) Hmc)
+    as (q0 & Hmaps' & Hq).
+  destruct (pte_canon_inv q0 p0 Hq) as (a' & d' & Hp0).
+  exists vpn, p2, p1, q0, a, d.
+  split; [exact Hmaps' |]. split; [exact Hh |].
+  rewrite Hent Hp0 pte_set_ad_absorb. reflexivity.
 Qed.
 
 (* ===================================================================== *)
