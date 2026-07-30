@@ -40,6 +40,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - uartwrite needs to know the FIFO isn't full; uartintr guarantees this via is_txlock invariant
 - user PT coherence with p->sz: nothing mapped above p->sz (needed to prove growproc's uvmalloc doesn't panic)
 - some device invariant has to hold from power-up, not just after driver initialization, e.g., to conclude no stray DMA
+- sloppy UART ownership: printk can collide with uartwrite and cause FIFO overflow
 
 Big things that still need to be done/explored:
 
