@@ -41,6 +41,7 @@ Require Import WpSmodeMemGen.
 Require Import MemAccessGen.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
+Require Import KptGhost.   (* kptN: the accessor-mask premise below *)
 Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -177,6 +178,11 @@ Section WpSconfMem.
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd <> csp_rs1 ->
+    (* the data translation is absorbed WITH THE ACCESSOR OPEN, so the
+       shared kernel table's namespace must be inside the accessor's inner
+       mask (claude-notes/projects/kpt-share.md).  Every supplier's [Em] is
+       [⊤ ∖ ↑minstretN] minus device/lock namespaces, so [solve_ndisj]. *)
+    ↑kptN ⊆ Em ->
     sie_cap_gpr γ m n -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
@@ -190,7 +196,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hext pa Hrd Hrdsp.
+    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hext pa Hrd Hrdsp HkptEm.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
@@ -269,15 +275,15 @@ Section WpSconfMem.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Load Data) pa (pa_of ppn pa) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb strans_regime (Load Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_introl eq_refl)) I
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htr")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [exact HkptEm |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -418,7 +424,7 @@ Section WpSconfMem.
                     (autocast (T := mword) w)))
               (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN)
               Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hbytes]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hbytes]").
     { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
     iIntros (w) "Hcg Hpc [-> Hbw]".
     iEval (rewrite Hlv) in "Hcg".
@@ -740,6 +746,8 @@ Section WpSconfMem.
          (autocast (T := mword)
             (subrange_vec_dec (m !!! Regidx rs2) (width*8-1) 0) : mword (8*width))
          (8*(0+1)*width-1) (8*0*width)) = sv ->
+    (* see [wp_load_s_sconf_au]: the absorb runs with the accessor open *)
+    ↑kptN ⊆ Em ->
     let pa := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     sie_cap_gpr γ m n -∗
     pc_is pc -∗
@@ -753,7 +761,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv pa.
+    intros Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv HkptEm pa.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
@@ -835,15 +843,15 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htr")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [exact HkptEm |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -962,7 +970,7 @@ Section WpSconfMem.
     iApply (wp_store_s_sconf_au width c γ Φ pc rs2 rs1 imm m n sv
               (wordw_pointsto width pa (DfracOwn 1) sv) (⊤ ∖ ↑minstretN)
               Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv
-              with "Hcg Hpc Hinstr [Hbytes]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hbytes]").
     { iModIntro. iExists vold. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
     iIntros "Hcg Hpc Hbw". iApply ("Hcont" with "Hcg Hpc Hbw").
   Qed.
@@ -1222,15 +1230,15 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htr")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -1443,15 +1451,15 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htr")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -1623,15 +1631,15 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htr")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)

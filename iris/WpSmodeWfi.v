@@ -575,10 +575,10 @@ Section WpSmodeWfi.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σa.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the fetch, through the capability's translation slot (both arms) *)
-    iMod (s_regime_fetch strans_regime σa pc (F_Base w)
+    unshelve iMod (s_regime_fetch strans_regime σa pc (F_Base w) _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
             with "[$Hreg $Hmem] Htr Hbytes")
-      as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htr)".
+      as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htr)"; [solve_ndisj |].
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Hpriv_f.

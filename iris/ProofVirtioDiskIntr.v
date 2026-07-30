@@ -1098,7 +1098,7 @@ Section VtDevRam.
               (⊤ ∖ ↑minstretN ∖ ↑diskN) (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hpub] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
     { (* ---- the atomic update: open dev_inv, run the accessor ---- *)
       iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
@@ -1202,7 +1202,7 @@ Section VtDevRam.
               (⊤ ∖ ↑minstretN ∖ ↑diskN) (dqm := DfracOwn 1)
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hpub Hrcpt] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hrcpt] [Hcont]").
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".

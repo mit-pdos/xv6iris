@@ -107,7 +107,7 @@ Section WpSconfLock.
               (⊤ ∖ ↑minstretN ∖ ↑lockN)
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdsp
-              with "Hcg Hpc Hinstr [HTc] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [HTc] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) Tc with "[%] [] HTc")
         as "(Hbody & HTc & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & Hrest)".
@@ -154,7 +154,7 @@ Section WpSconfLock.
               (⊤ ∖ ↑minstretN ∖ ↑lockN)
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Htok] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Htok] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl cpu_id) with "[%] [] Htok")
         as "(Hbody & Htok & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
@@ -222,7 +222,7 @@ Section WpSconfLock.
               (⊤ ∖ ↑minstretN ∖ ↑lockN)
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (m !!! Regidx (mword_of_int 0 : mword 5)))
-              with "Hcg Hpc Hinstr [Htok HRes Hfin] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Htok HRes Hfin] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
         as "(Hbody & Htok & Hchoice)"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
@@ -275,7 +275,7 @@ Section WpSconfLock.
               (⊤ ∖ ↑minstretN ∖ ↑lockN)
               ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 data2_ext_8 Hrd Hrdsp
-              with "Hcg Hpc Hinstr [HT] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [HT] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
@@ -392,7 +392,7 @@ Section WpSconfLock.
               (m !!! Regidx rs2) T' (⊤ ∖ ↑minstretN ∖ ↑lockN)
               ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (m !!! Regidx rs2))
-              with "Hcg Hpc Hinstr [HT] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [HT] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
@@ -596,15 +596,15 @@ Section WpSconfLock.
                  (exec_get_pmlen_amo_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    iMod (sr_absorb strans_regime (Atomic (AMOSWAP, Data, Data)) pa (pa_of ppn pa) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb strans_regime (Atomic (AMOSWAP, Data, Data)) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_intror eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_amo s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htr")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)

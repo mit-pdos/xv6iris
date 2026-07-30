@@ -484,15 +484,15 @@ Section WpSmodePtLoad.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
-    iMod (sr_absorb R (Load Data) a8 (pa_of ppn a8) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb R (Load Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
             (or_intror (or_introl eq_refl)) I
             (lo_canonical a8 Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htlbinv")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htlbinv")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)
@@ -917,15 +917,15 @@ Section WpSmodePtStore.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
-    iMod (sr_absorb R (Store Data) a8 (pa_of ppn a8) ppn KP_rw s_pc
+    unshelve iMod (sr_absorb R (Store Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical a8 Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' with "Hk Hreg Hmem Htlbinv")
-      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)".
+            Lpma_pc' _ with "Hk Hreg Hmem Htlbinv")
+      as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
     assert (Lpriv_tr : register_lookup cur_privilege s_tr.(sregs) = Supervisor)

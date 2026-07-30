@@ -1306,7 +1306,7 @@ Section ProofMain.
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (S2 !!! Regidx (mword_of_int 15 : mword 5)))
-              with "Hcg Hpc Hiac [HP]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hiac [HP]").
     { rewrite Hsa Hsvst.
       iApply (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
                 with "Hsinv HP"). }

@@ -29,6 +29,8 @@ Require Import SmodePte KptPt.
 Require Import WpGpr WpMmodeLeafBase ExecCommon.
 Require Import SmodeCore KptTree.
 Require Import KMap.
+Require Import KptGhost.   (* kptN: the shared kernel table's namespace, named in [sr_absorb]'s mask premise *)
+Require Import KptShare.   (* the SHARED-table regime instance (§3) *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -176,8 +178,15 @@ Section SRegimeDef.
        with the output pa = ppn ++ pageoff.  The claim is supplied by the
        consumer's OWN resource (fetch [↦ₓ□] window / datum [↦ₘ] / device
        static bundle), so no identity or region premise rides here. *)
+    (* MASK-CARRYING (claude-notes/projects/kpt-share.md): the SHARED
+       kernel-table regime absorbs by OPENING the [kptN] invariant, so the
+       field is a fupd at any mask containing [↑kptN].  The two exclusive
+       instances below open nothing and merely weaken their [==∗].  Call
+       sites leave both the mask and its subset proof as holes:
+         unshelve iMod (sr_absorb R acc va pa ppn pc σ _ <pure args> _
+                          with "...") as ...; [solve_ndisj |].            *)
     sr_absorb : forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
-        (ppn : mword 44) (pc : kperm) (σ : mstate),
+        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
       s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -193,8 +202,9 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ==∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -241,7 +251,7 @@ Section SRegimeDef.
   (* SINGLE-PATH (rwx-kmap): the claim + [kperm_variant_check] dispatch
      replaces the old four-way region case bash. *)
   Lemma kpt_absorb (root_ppn : mword 44) :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ, s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -256,8 +266,9 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ==∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -267,7 +278,7 @@ Section SRegimeDef.
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
   Proof.
-    intros acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
     iIntros "Hat Hri Hgh Hinv".
     iAssert (|==> ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
@@ -326,7 +337,7 @@ Section SRegimeDef.
        kmap_auth kmap_M0)%I.
 
   Lemma bare_absorb :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ, s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -341,8 +352,9 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ==∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -352,7 +364,7 @@ Section SRegimeDef.
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
   Proof.
-    intros acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
     iIntros "Hat Hri Hgh Hinv".
     iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp & HM)".
     (* honoring: against the exact static auth, the claim is a static
@@ -399,3 +411,87 @@ Section SRegimeDef.
     SRegime bare_inv bare_absorb bare_transform.
 
 End SRegimeDef.
+
+(* ===================================================================== *)
+(* §3 THE SHARED-KERNEL-TABLE INSTANCE (claude-notes/projects/            *)
+(*    kpt-share.md).  [sr_inv := tlb_res_pt root_ppn] -- the per-hart     *)
+(*    residue: this hart's satp/tlb/pmp cells plus a persistent SNAPSHOT   *)
+(*    of the shared tree and the [kpt_inv] invariant holding it.  This is  *)
+(*    the one regime whose absorb actually USES the mask.                 *)
+(* ===================================================================== *)
+
+Section SRegimeShared.
+  Context `{!riscvGS Σ}.
+  Context `{!kptG Σ}.
+  Context `{CID : CpuId}.
+
+  Lemma res_transform (root_ppn : mword 44) :
+    forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
+      s_acc_ok acc ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
+      ⊢ reg_interp σ.(sregs) -∗ tlb_res_pt root_ppn -∗
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝.
+  Proof.
+    intros acc ea σ Hacc Hcp HSXL Heff Hpml.
+    iIntros "Hri Hres".
+    iDestruct (tlb_res_pt_open with "Hres") as (satp0 tlbvec)
+      "(Hsatp & %Hmode & _ & _ & _)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iPureIntro.
+    exact (exec_transform_effective_address_mode acc Sv39 ea σ Hcp Heff Hpml
+             (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode)).
+  Qed.
+
+  Lemma res_absorb (root_ppn : mword 44) :
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      ⊢ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
+  Proof.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "Hat Hri Hgh Hres".
+    iMod (tlb_res_pt_translateAddr_at acc root_ppn va pa ppn pc σ E HE
+            (fun a d mxr do_sum =>
+               kperm_variant_check ppn pc acc a d mxr do_sum Hacc Hallow)
+            Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+            with "Hat Hri Hgh Hres")
+      as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hres)".
+    iDestruct (tlb_res_pt_grant_facts root_ppn σ' with "Hri Hres") as %Hpmp.
+    iModIntro. iExists σ'. iFrame "Hri Hgh Hres". iPureIntro.
+    unfold pmp_grant_facts. tauto.
+  Qed.
+
+  Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
+    SRegime (tlb_res_pt root_ppn) (res_absorb root_ppn) (res_transform root_ppn).
+
+  Lemma kpt_share_regime_inv (root_ppn : mword 44) :
+    sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.
+  Proof. reflexivity. Qed.
+
+End SRegimeShared.

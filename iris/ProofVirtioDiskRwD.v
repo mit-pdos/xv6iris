@@ -645,7 +645,7 @@ Section VdrwdLeaves.
               ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
-              with "Hcg Hpc Hinstr [Hpub] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".
@@ -724,7 +724,7 @@ Section VdrwdLeaves.
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (m !!! Regidx rs2)); exact Hsv)
-              with "Hcg Hpc Hinstr [Hpub Hpin Hwrb Hpend] [Hcont]").
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hpin Hwrb Hpend] [Hcont]").
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
       iInv "Hvinv" as ">Hdbody" "Hdclose".
       iDestruct "Hdbody" as (vst) "(Hvf & Hproto & %Hvok)".

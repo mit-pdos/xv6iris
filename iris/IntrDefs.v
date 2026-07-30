@@ -40,6 +40,7 @@ Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
 Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *)
+Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import SRegime.
 Require Import MstatusBits WpIntrCore.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
@@ -514,7 +515,7 @@ Section IntrDefs.
   (* kept folded (no skolem-root open/repack at leaf level).               *)
   (* ------------------------------------------------------------------- *)
   Lemma strans_absorb :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ, s_acc_ok acc ->
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
       kperm_allows pc acc ->
       neq_vec (bits_of_virtaddr (Virtaddr va))
          (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
@@ -529,8 +530,9 @@ Section IntrDefs.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ==∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗
         ∃ σ' : mstate,
           ⌜ exec (translateAddr (Virtaddr va) acc) σ
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -540,15 +542,15 @@ Section IntrDefs.
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
   Proof.
-    intros acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
     iIntros "Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
-    - iMod (bare_absorb acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+    - iMod (bare_absorb acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
               with "Hat Hri Hgh Hb") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Hb)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
       iFrame "Hri Hgh". iLeft. iFrame "Hbit Hb Hstv".
     - iDestruct "Hk" as (root_ppn) "Ht".
-      iMod (kpt_absorb root_ppn acc va pa ppn pc σ Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
+      iMod (kpt_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
               with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].

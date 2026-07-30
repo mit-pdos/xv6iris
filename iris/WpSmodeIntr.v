@@ -137,10 +137,10 @@ Section WpSmodeIntr.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the unified fetch through the tree invariant (may write A/D back) *)
-    iMod (tlb_inv_pt_fetch root_ppn σ pc r
+    unshelve iMod (tlb_inv_pt_fetch root_ppn σ pc r _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
             with "[$Hreg $Hmem] Htlbinv Hbytes")
-      as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)".
+      as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)"; [solve_ndisj |].
     (* decode agreement + its side conditions, at σf *)
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".

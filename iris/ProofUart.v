@@ -119,15 +119,15 @@ Context `{CID : CpuId}.
     by (apply kmap_class_rw; right; exact Hdevvpn).
   iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
   pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
-  iMod (sr_absorb strans_regime (Store Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
-          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc
+  unshelve iMod (sr_absorb strans_regime (Store Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
+          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc _
           (or_intror (or_intror (or_introl eq_refl))) eq_refl Hcanon ltac:(reflexivity)
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_store s_pc)
-          Lpma_pc' with "Hclaim Hreg Hmem Htr")
-    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+          Lpma_pc' _ with "Hclaim Hreg Hmem Htr")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
   rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -283,15 +283,15 @@ Qed.
     by (apply kmap_class_rw; right; exact Hdevvpn).
   iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
   pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
-  iMod (sr_absorb strans_regime (Load Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
-          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc
+  unshelve iMod (sr_absorb strans_regime (Load Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
+          (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc _
           (or_intror (or_introl eq_refl)) I Hcanon ltac:(reflexivity)
           Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
           (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_load s_pc)
-          Lpma_pc' with "Hclaim Hreg Hmem Htr")
-    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)".
+          Lpma_pc' _ with "Hclaim Hreg Hmem Htr")
+    as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
   rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
   pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
