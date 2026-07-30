@@ -406,6 +406,12 @@ WpBinitDecode.v
 SpecBinit.v
 ProofBinit.v
 LinkBinit.v
+BioInv.v
+SpecBpin.v
+SpecBunpin.v
+SpecBwrite.v
+SpecBrelse.v
+SpecBread.v
 WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
