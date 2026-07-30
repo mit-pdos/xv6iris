@@ -850,20 +850,27 @@ Section ProofSched.
     { rewrite /cpu_own. iFrame "Hnoff Hint Hcnt Hcur". iPureIntro; vm_compute; reflexivity. }
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
-    iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
+    iPoseProof (p_sched_to_cpu γs cpu_id γ j γl st ch Hj Hgl Hneeds
                   with "[Hlocked Hstate Hchan Hpub]") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     (* apply swtch. *)
-    iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs cpu_id) (p_context (proc_addr j)) (a_cpu_ctx cid_word)
+    (* both records are PINNED at this hart and its ghost: the target is
+       cpus[cid].context, and sched's own record still is too (the sweep
+       flips THIS one to [None] when proc contexts go migratable). *)
+    iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (Some (cpu_id, γ)) (Some (cpu_id, γ))
+              (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj
-              Hctxlen Holdc Hnewc
+              Hctxlen Holdc Hnewc (adm_pin cpu_id γ)
               with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP] [-]").
     { iEval (rewrite Htp_Mc). iExact "HP". }
-    iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+    iIntros (h g m' eb') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+    (* the resumption's hart and ghost are pinned by our record's index. *)
+    destruct Hadm' as [-> ->].
     (* resume: elim the SECOND disjunct (dispatched proc). *)
-    iDestruct "Hresume" as (cret) "[Hvc' Hpay]".
-    iDestruct (p_sched_at_proc γs cpu_id j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
-      as "(%Htpv & %Hcret & %Hpidx & Hpay2)".
+    iDestruct "Hresume" as (A' cret) "[Hvc' Hpay]".
+    iDestruct (p_sched_at_proc γs cpu_id γ A' j cret (m' !!! Regidx (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
+      as "(%Htpv & %Hcret & %Hpidx & %HA' & Hpay2)".
+    subst A'.
     iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
     (* callee-image component equalities. *)

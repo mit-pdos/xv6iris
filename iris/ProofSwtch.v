@@ -25,9 +25,10 @@
      leaf [wp_cret_s_zca_r_later] (WpSmodePtCtl.v) -- the [iNext] there
      strips it.
 
-   - PAYLOAD: P is four-place (resumed ctx, resumer ctx, resumer tp, the
+   - PAYLOAD: P is seven-place (resuming hart + its SIE ghost, the resumer
+     record's admissibility index, resumed ctx, resumer ctx, resumer tp, the
      record's own c->proc index); the proof supplies
-     [P newc oldc (m0 !!! x4) p] and must show x4 threads
+     [P cpu_id γ Ao newc oldc (m0 !!! x4) p] and must show x4 threads
      through the block unchanged (x4 is not among swtch_regs1's keys), and
      hands the resumed party [ctx_cells newc new_vs] back through the wand
      (the block only reads new's cells; [swtch_heap1] returns them intact). *)
@@ -70,13 +71,15 @@ Section ProofSwtch.
   Qed.
 
   Lemma wp_swtch_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+           mword 64 -d> mword 64 -d> iPropO Σ)
+      (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body γ Φ P oldc newc m0 old_vs av eb p.
+    wp_swtch_sconf_body γ Φ P An Ao oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
-    iIntros (Hlen_old Holdc Hnewc)
+    iIntros (Hlen_old Holdc Hnewc Hadm)
       "#Ht Hcg Hcpuown Hpc Holdcells Hvalidnew HP Hwold".
     (* The record no longer parks [eb] or an avail copy: its resume wand is
        [∀ m eb'], so the resumer supplies cpu_own at ITS OWN [eb']; the
@@ -113,7 +116,7 @@ Section ProofSwtch.
        and its resume wand demands cpu_own at that SAME index p -- so the
        cpu_own we already hold fits with no retune, no equation. ---- *)
     iApply fupd_wp.
-    iEval (rewrite (valid_context_unfold γ Φ P newc p)
+    iEval (rewrite (valid_context_unfold Φ P An newc p)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
     iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
@@ -173,9 +176,9 @@ Section ProofSwtch.
        wand.  Pack p := the spec's [p] param; the caller continuation [Hwold]
        is already [∀ m eb', … cpu_own γ 1 eb' p emp …], matching the record's
        [∀ m eb'] wand at that same p. ---- *)
-    iAssert (valid_context γ Φ P oldc p)
+    iAssert (valid_context Φ P Ao oldc p)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold γ Φ P oldc p) /valid_context_pre.
+    { rewrite (valid_context_unfold Φ P Ao oldc p) /valid_context_pre.
       iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
@@ -237,10 +240,15 @@ Section ProofSwtch.
     { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iLeft. iExact "Hq0". }
     iDestruct (sie_cap_gpr_join γ (vregs_den rho swtch_regs1) av_t
                  with "Hhs Hsc Hcap_t Hfile") as "Hcg_t".
-    iApply ("Hnewwand" $! (vregs_den rho swtch_regs1) eb
-              with "[] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
+    (* the record's wand is [∀ h g m eb']; swtch resumes it HERE, so it is
+       applied at this hart and this hart's ghost, and the spec's [adm An
+       cpu_id γ] premise is exactly its admissibility obligation.  The
+       hand-off names the OLD record's own index [Ao]. *)
+    iApply ("Hnewwand" $! cpu_id γ (vregs_den rho swtch_regs1) eb
+              with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
+    { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }
-    iExists oldc. iSplitL "Hvoldc".
+    iExists Ao, oldc. iSplitL "Hvoldc".
     { iNext. iExact "Hvoldc". }
     { rewrite Hm4. iExact "HP". }
   Qed.

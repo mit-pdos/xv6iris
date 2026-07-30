@@ -1128,19 +1128,27 @@ Section ProofScheduler.
         (* the cpu context save area's cells go INTO the swtch *)
         iDestruct "Hown" as (ctxvs) "[%Hctxlen Hctxcells]".
         (* the dispatch payload *)
-        iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl with "[Hlocked Hstate Hchan Hpub]") as "HP".
+        iPoseProof (p_sched_to_proc γs cpu_id γ jj γl ch Hjj Hgl with "[Hlocked Hstate Hchan Hpub]") as "HP".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
-        iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs cpu_id) (a_cpu_ctx cid_word) (p_context (proc_addr jj))
+        (* the target is proc jj's record and this one is the scheduler's
+           own: both pinned at this hart for now (the sweep flips the proc
+           record to [None]). *)
+        iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (Some (cpu_id, γ)) (Some (cpu_id, γ))
+                  (a_cpu_ctx cid_word) (p_context (proc_addr jj))
                   Mc ctxvs (av - 10)%nat ebc (proc_addr jj)
-                  Hctxlen Holdc Hnewc
+                  Hctxlen Holdc Hnewc (adm_pin cpu_id γ)
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP] [-]").
         { iExact "Hvc". }
         { iEval (rewrite HMctp). iExact "HP". }
-        iIntros (m' eb') "%Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+        iIntros (h g m' eb') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+        (* cpus[cid].context is only ever resumed from this hart's own tp --
+           which is exactly what its pinned index says. *)
+        destruct Hadm' as [-> ->].
         (* the resume side: the payload identifies the parking proc with jj *)
-        iDestruct "Hresume" as (cret) "[Hvc' Hpay2]".
-        iDestruct (p_sched_at_cpu γs cpu_id jj cret (m' !!! Regidx Rtp) Hjj with "Hpay2")
-          as "(%Htpv & %Hcret & Hpay3)".
+        iDestruct "Hresume" as (A' cret) "[Hvc' Hpay2]".
+        iDestruct (p_sched_at_cpu γs cpu_id γ A' jj cret (m' !!! Regidx Rtp) Hjj with "Hpay2")
+          as "(%Htpv & %Hcret & %HA' & Hpay3)".
+        subst A'.
         iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts Hheld']".
         destruct Hfacts as [Hgl' Hneeds'].
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).

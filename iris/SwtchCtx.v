@@ -34,6 +34,47 @@ Definition ctx_regs : list (mword 5) :=
 Definition callee_img (m : regfile) : list (mword 64) :=
   map (fun r => m !!! Regidx r) ctx_regs.
 
+(* ---------------------------------------------------------------------- *)
+(* THE ADMISSIBILITY INDEX of a context record: at which (hart, SIE-ghost) *)
+(* pairs its stored continuation may be resumed.                          *)
+(*                                                                        *)
+(*   [None]          -- MIGRATABLE: resumable on ANY hart, against ANY     *)
+(*                      hart's SIE ghost name.  This is a PROC context:    *)
+(*                      real xv6 lets any hart's scheduler pick up any     *)
+(*                      RUNNABLE proc, and swtch does not even save tp --   *)
+(*                      the resumed thread inherits the resuming hart's,    *)
+(*                      and re-derives mycpu() from it.                     *)
+(*   [Some (h, g)]   -- PINNED at hart [h] with SIE ghost [g].  This is a   *)
+(*                      CPU/scheduler context: [cpus[h].context] can only   *)
+(*                      ever be resumed by a thread already running on      *)
+(*                      hart [h] (the resumer computes &c->context from     *)
+(*                      its own tp), and the parked scheduler's closure      *)
+(*                      holds hart-[h] register resources -- so the ∀h      *)
+(*                      obligation would be both unnecessary and            *)
+(*                      unprovable there.                                   *)
+(*                                                                          *)
+(* The index is what lets ONE fixpoint carry both, which is required        *)
+(* because the two kinds hand each other's records back along the chain     *)
+(* (a resumed party receives [▷ valid_context A' cret p] for its resumer's   *)
+(* record at the resumer's own index, and the payload pins [A']).           *)
+(* See claude-notes/projects/sched-hart-generic.md.                          *)
+(* ---------------------------------------------------------------------- *)
+Definition ctx_adm : Type := option (CPU * gname).
+
+Definition adm (A : ctx_adm) (h : CPU) (g : gname) : Prop :=
+  match A with
+  | None => True
+  | Some (h0, g0) => h = h0 /\ g = g0
+  end.
+
+Lemma adm_none (h : CPU) (g : gname) : adm None h g.
+Proof. exact I. Qed.
+Lemma adm_pin (h : CPU) (g : gname) : adm (Some (h, g)) h g.
+Proof. split; reflexivity. Qed.
+Lemma adm_pin_inv (h0 h : CPU) (g0 g : gname) :
+  adm (Some (h0, g0)) h g -> h = h0 /\ g = g0.
+Proof. intro H; exact H. Qed.
+
 (* The pc a coroutine resumes on is [ret_pc] of its saved return address
    (RiscvExtras): the [c.ret] the swtch epilogue executes clears bit 0. *)
 
@@ -70,20 +111,31 @@ Section SwtchCtx.
   Proof. rewrite /ctx_cells. apply _. Qed.
 
   (* -------------------------------------------------------------------- *)
-  (* valid_context sc Phi P c : the context saved at [c] admits a WP to     *)
-  (* run.  It owns c's 14 saved-register cells and is the wand from (config    *)
-  (* bundle [sc] + pc at c.ra + a gpr file whose callee-saved regs are c's    *)
-  (* saved values, caller-saved arbitrary) to a whole-machine [WP Loop        *)
-  (* {{Phi}}].  On resumption the continuation is handed, for the             *)
-  (* (existentially quantified) context [cret] that resumed c,                *)
-  (* [▷ valid_context sc Phi P cret] together with [P c cret tpv] -- a        *)
-  (* caller-chosen THREE-place payload predicate:                             *)
+  (* valid_context Phi P A c : the context saved at [c] admits a WP to       *)
+  (* run.  It owns c's 14 saved-register cells and its parked stack, and is    *)
+  (* the wand from (the resuming hart's bundle + pc at c.ra + a gpr file       *)
+  (* whose callee-saved regs are c's saved values, caller-saved arbitrary)     *)
+  (* to that hart's whole-machine [WP (LoopE h) {{Phi}}].  [A] is the          *)
+  (* admissibility index (top of file): which (hart, SIE-ghost) pairs may      *)
+  (* resume it.  On resumption the continuation is handed, for the             *)
+  (* (existentially quantified) context [cret] that resumed c and ITS OWN      *)
+  (* index [A'], [▷ valid_context Phi P A' cret] together with                 *)
+  (* [P h g A' c cret tpv p] -- a caller-chosen SEVEN-place payload:           *)
+  (*   [h] [g] the RESUMING hart and its SIE ghost name -- the payload is      *)
+  (*          the only channel that can tell the resumed party which hart it   *)
+  (*          woke up on, and it is what re-ties the received per-cpu cells    *)
+  (*          to the fresh register file's tp;                                 *)
+  (*   [A']  the RESUMER's admissibility index.  The resumed party has to      *)
+  (*          re-deposit its resumer's record (a parking proc stows the        *)
+  (*          scheduler's; the scheduler stows the proc's in its lock          *)
+  (*          invariant), and each destination demands a specific index, so    *)
+  (*          the payload PINS [A'] per direction (SchedCtx.p_sched);          *)
   (*   [c]    the context being resumed (statically known to the resumed      *)
   (*          party, so a single chain-global P can discriminate directions   *)
   (*          -- a chain rebuilds the suspended old context at the SAME P,    *)
   (*          so per-direction P's are impossible);                           *)
   (*   [cret] the resumer's context (existential: never pin a partner);       *)
-  (*   [p]    the record's own c->proc index (the fixpoint's second           *)
+  (*   [p]    the record's own c->proc index (the fixpoint's third            *)
   (*          argument, passed through to the payload).  Both crossing        *)
   (*          directions happen at the same index -- the dispatcher pre-sets  *)
   (*          c->proc and nobody else writes it -- so handing [p] to P is     *)
@@ -92,14 +144,12 @@ Section SwtchCtx.
   (*          to its own scan cursor, and [p = proc_addr j] in the payload    *)
   (*          (SchedCtx.p_sched) is that pin.                                 *)
   (*   [tpv]  the RESUMER's tp register value.  [callee_img] deliberately     *)
-  (*          does not pin tp (a context may in principle resume on another   *)
-  (*          CPU), but the resumed code recomputes every per-CPU cell        *)
-  (*          address from its own tp -- the payload is the only channel      *)
-  (*          that can tie the received cells to the new file's tp, so the    *)
-  (*          slot applies P at [m !!! x4] of the resumed register file.      *)
-  (* [P] is fixed along the whole chain.  The S-mode configuration is         *)
-  (* abstracted as the single resource [sc], so this definition does NOT      *)
-  (* depend on the individual CSR parameters.  Well-defined Iris [fixpoint]   *)
+  (*          does not pin tp (swtch does not save it, and a migratable       *)
+  (*          context resumes on whatever hart picked it up), but the resumed *)
+  (*          code recomputes every per-CPU cell address from its own tp, so  *)
+  (*          the slot applies P at [m !!! x4] of the resumed register file    *)
+  (*          and the payload ties it to [h].                                 *)
+  (* [P] is fixed along the whole chain.  Well-defined Iris [fixpoint]        *)
   (* because the recursive occurrence is under [▷].                           *)
   (*                                                                          *)
   (* The resume wand HANDS BACK [ctx_cells c vs]: swtch only READS the         *)
@@ -125,42 +175,68 @@ Section SwtchCtx.
      own epilogue intena store + ghost retune.  Level 1 = xv6's
      noff==1-at-swtch invariant; slot [emp]: the in-flight context cells
      ride separately.  The stack-free crossing remainder ([swconf] below)
-     is internal to the swtch proof; no [sc] parameter remains. *)
+     is internal to the swtch proof. *)
+  (* THE ∀h∀g RESUME WAND.  The record's owned pieces (its cells, its parked
+     stack) are hart-independent memory and sit OUTSIDE the quantifier -- which
+     is what makes a MIGRATABLE record affordable: one copy of the resources,
+     one continuation good at every hart.  Everything a resumption HANDS IN is
+     spelled at the resuming hart [h] and its SIE ghost [g] ([sie_cap_gpr],
+     [cpu_own] and [pc_is] are ambient-instance predicates, instantiated here
+     at [CID := h]), and the conclusion is that hart's own [WP (LoopE h)].
+     [g] is quantified alongside [h] because the SIE ghost is PER-HART (one
+     name's fractions are wholly consumed by one hart's sconf / arm / count),
+     so a migratable record cannot name any single hart's name -- and
+     [SchedCtx.procs_inv], which stores such records, must mention neither. *)
   Definition valid_context_pre
-      (γ : gname) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
-      (rec : mword 64 -d> mword 64 -d> iPropO Σ)
-      : mword 64 -d> mword 64 -d> iPropO Σ := fun c p =>
+      (Phi : mval -> iProp Σ)
+      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+           mword 64 -d> mword 64 -d> iPropO Σ)
+      (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
+      : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
     (∃ (vs : list (mword 64)) (av : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (nth 1 vs (mword_of_int 0)) (kv_frame_slots + av) ∗
-      (∀ (m : regfile) (eb' : bool),
+      (∀ (h : CPU) (g : gname) (m : regfile) (eb' : bool),
+         ⌜adm A h g⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr γ m av -∗
-         cpu_own γ 1 eb' p emp -∗
-         pc_is (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
+         sie_cap_gpr (CID := h) g m av -∗
+         cpu_own (CID := h) g 1 eb' p emp -∗
+         pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
-         (∃ cret : mword 64,
-            ▷ rec cret p ∗ P c cret (m !!! Regidx (mword_of_int 4 : mword 5)) p) -∗
-         WP (Loop : expr riscv_lang) {{ Phi }}))%I.
+         (∃ (A' : ctx_adm) (cret : mword 64),
+            ▷ rec A' cret p ∗
+            P h g A' c cret (m !!! Regidx (mword_of_int 4 : mword 5)) p) -∗
+         WP (LoopE h : expr riscv_lang) {{ Phi }}))%I.
 
-  Global Instance valid_context_pre_contractive γ Phi
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) :
-    Contractive (valid_context_pre γ Phi P).
-  Proof. solve_contractive. Qed.
+  Global Instance valid_context_pre_contractive Phi
+      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+           mword 64 -d> mword 64 -d> iPropO Σ) :
+    Contractive (valid_context_pre Phi P).
+  (* [solve_contractive] gets all the way to the recursive occurrence and
+     stops: the residual goal is [x A' cret p ≡{m}≡ y A' cret p] against a
+     [dist] on the THREE-argument discrete function, which is pointwise by
+     definition -- so finish by applying the hypothesis at those points. *)
+  Proof.
+    solve_proper_prepare.
+    repeat (f_contractive || f_equiv).
+    all: apply H.
+  Qed.
 
-  Definition valid_context (γ : gname) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ)
-      : mword 64 -d> mword 64 -d> iPropO Σ :=
-    fixpoint (valid_context_pre γ Phi P).
+  Definition valid_context (Phi : mval -> iProp Σ)
+      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+           mword 64 -d> mword 64 -d> iPropO Σ)
+      : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ :=
+    fixpoint (valid_context_pre Phi P).
 
-  Lemma valid_context_unfold (γ : gname) (Phi : mval -> iProp Σ)
-      (P : mword 64 -d> mword 64 -d> mword 64 -d> mword 64 -d> iPropO Σ) (c p : mword 64) :
-    valid_context γ Phi P c p ⊣⊢
-      valid_context_pre γ Phi P (valid_context γ Phi P) c p.
-  Proof. apply (fixpoint_unfold (valid_context_pre γ Phi P) c p). Qed.
+  Lemma valid_context_unfold (Phi : mval -> iProp Σ)
+      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+           mword 64 -d> mword 64 -d> iPropO Σ)
+      (A : ctx_adm) (c p : mword 64) :
+    valid_context Phi P A c p ⊣⊢
+      valid_context_pre Phi P (valid_context Phi P) A c p.
+  Proof. apply (fixpoint_unfold (valid_context_pre Phi P) A c p). Qed.
 
 End SwtchCtx.
 
