@@ -120,12 +120,6 @@ Proof.
   rewrite autocast_id in H. exact H.
 Qed.
 
-Lemma pw_sext_inj (x y : mword 32) :
-  (sign_extend' 64 x : mword 64) = (sign_extend' 64 y : mword 64) -> x = y.
-Proof.
-  intro H. rewrite <- (trunc32_sext64 x), <- (trunc32_sext64 y), H. reflexivity.
-Qed.
-
 (* the ADDIW of a small immediate onto a sign-extended 32-bit cell *)
 Lemma pw_z_addlow (z c u : Z) :
   (z mod 4294967296 = u)%Z ->

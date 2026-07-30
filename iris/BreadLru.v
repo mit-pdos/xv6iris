@@ -11,7 +11,7 @@
 
    * the two READ accessors on [BcacheInv.bcache_lru].  binit only ever
      SPLICED ([bcache_lru_splice]) and brelse only ever UNLINKED
-     ([BrelseLru.bcache_lru_unlink]); a scan merely reads one link field per
+     ([bcache_lru_unlink]); a scan merely reads one link field per
      iteration and must put it back untouched, at a position named by the same
      [l1 ++ a :: l2] decomposition.  Both accessors cover the sentinel's own
      two fields uniformly (the [l1 = []] / [l2 = []] boundary cases), so the
@@ -26,22 +26,11 @@
      reads zero exactly when the slot is free, which is what licenses the
      recycle block's [escrow_open_free].
 
-   The [bseg] toolkit the two accessors are built from is BrelseLru.v's
-   ([bseg_cons] / [bseg_app_split] / [bseg_app_join] plus its pure
-   [List.hd]/[List.last] lemmas): general by construction, already compiled
-   and in _CoqProject, so this file just Requires it rather than cloning it.
-
-   DEDUP CANDIDATES (reported, not acted on -- BcacheInv.v / BioInv.v are
-   shared files):
-     * BrelseLru.v's whole [bseg] toolkit is subsystem-general (its own
-       header says so) and belongs in BcacheInv.v, next to [bseg]; then
-       brelse and bread would share it without either Requiring the other's
-       file.
-     * [bd_word_zero] / [bd_word_nonzero] below are proved verbatim in
-       ProofBrelse.v ([br_word_zero] / [br_word_nonzero]); they are the
-       refcnt cell's word ties and belong in BioInv.v, next to [brc_word].
-     * [bd_sext_inj] is ProofScheduler.sc_sext_inj and ProofPipewrite's
-       [pw_sext_inj] -- THREE copies; it belongs in RiscvExtras.v.          *)
+   The [bseg] toolkit the two accessors are built from, the refcnt cell's word
+   ties ([BioInv.brc_word_zero_eqv] / [brc_word_nonzero_eqv]) and the
+   sign-extension injectivity the dev/blockno compares rest on
+   ([RiscvExtras.sext64_32_inj]) all live in the shared files below, so nothing
+   structural is restated here. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -55,7 +44,6 @@ Require Import RiscvExtras.
 Require Import ArrCursor.
 Require Import BufOwn.
 Require Import BcacheInv.
-Require Import BrelseLru.
 Require Import BioInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -207,62 +195,19 @@ Section BreadLru.
 End BreadLru.
 
 (* ==================================================================== *)
-(*  4.  The refcnt word's two ties (the backward scan's [beqz])          *)
-(* ==================================================================== *)
-
-Lemma bd_word_zero :
-  eq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) (zero_reg : mword 64) = true.
-Proof. apply eq_vec_true_iff. apply bv_eq. vm_compute. reflexivity. Qed.
-
-Lemma bd_word_nonzero (pz : positive) :
-  (Z.pos pz < 2 ^ 31)%Z ->
-  eq_vec (sign_extend' 64 (mword_of_int (Z.pos pz) : mword 32)) (zero_reg : mword 64) = false.
-Proof.
-  intro Hn.
-  (* [lia] cannot evaluate [2^k]; name the three literals first. *)
-  assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
-  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
-  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
-  rewrite E31 in Hn.
-  assert (Hu : bv_unsigned (mword_of_int (Z.pos pz) : mword 32) = Z.pos pz).
-  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-    rewrite Z_to_bv_unsigned. unfold bv_wrap, bv_modulus.
-    change (Z.of_N 32) with 32. rewrite E32.
-    rewrite Z.mod_small; [reflexivity | lia]. }
-  assert (Hs : bv_signed (mword_of_int (Z.pos pz) : mword 32) = Z.pos pz).
-  { unfold bv_signed. rewrite Hu. apply bv_swrap_small.
-    unfold bv_half_modulus, bv_modulus. change (Z.of_N 32) with 32.
-    assert (Ehalf : (2 ^ 32 / 2 = 2147483648)%Z) by (vm_compute; reflexivity).
-    rewrite Ehalf. lia. }
-  apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz in Hc. revert Hc.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
-  rewrite bv_sign_extend_unsigned. rewrite Hs.
-  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
-  rewrite E64. rewrite Z.mod_small; [lia|]. lia.
-Qed.
-
-(* ==================================================================== *)
-(*  5.  The dev / blockno compares                                       *)
+(*  4.  The dev / blockno compares                                       *)
 (* ==================================================================== *)
 
 (* [lw] yields the sign extension and the two arguments arrive sign-extended
-   (the RV64 ABI), so the 64-bit compare is exactly the 32-bit one. *)
-Lemma bd_sext_inj (a b : mword 32) : sign_extend' 64 a = sign_extend' 64 b -> a = b.
-Proof.
-  intro H. pose proof (trunc32_sext64 a) as Ha. pose proof (trunc32_sext64 b) as Hb.
-  rewrite H in Ha. rewrite Hb in Ha. exact (eq_sym Ha).
-Qed.
-
+   (the RV64 ABI), so the 64-bit compare is exactly the 32-bit one
+   ([RiscvExtras.sext64_32_inj] is the injectivity). *)
 Lemma bd_sext_eqv (a b : mword 32) :
   eq_vec (sign_extend' 64 a) (sign_extend' 64 b) = eq_vec a b.
 Proof.
   destruct (eq_vec a b) eqn:Hab.
   - apply eq_vec_true_iff in Hab. subst b. apply eq_vec_true_iff. reflexivity.
   - apply eq_vec_false_iff in Hab. apply eq_vec_false_iff.
-    intro Hc. apply Hab. exact (bd_sext_inj a b Hc).
+    intro Hc. apply Hab. exact (sext64_32_inj a b Hc).
 Qed.
 
 Lemma bd_sext_neqv (a b : mword 32) :
@@ -270,7 +215,7 @@ Lemma bd_sext_neqv (a b : mword 32) :
 Proof. unfold neq_vec. by rewrite bd_sext_eqv. Qed.
 
 (* ==================================================================== *)
-(*  6.  The two per-iteration slot borrows                               *)
+(*  5.  The two per-iteration slot borrows                               *)
 (* ==================================================================== *)
 
 Section BreadSlots.
@@ -322,12 +267,12 @@ Section BreadSlots.
     - iDestruct "Hslot" as "(%Hn & Hcell & Hsl & Hqr)".
       iExists (mword_of_int (Z.pos n) : mword 32). iFrame "Hcell".
       iSplitR.
-      { iPureIntro. right. split; [exact (bd_word_nonzero n Hn) | by eexists]. }
+      { iPureIntro. right. split; [exact (brc_word_nonzero_eqv n Hn) | by eexists]. }
       iIntros "Hcell". iSplitR; [by iPureIntro|]. iFrame "Hcell Hsl Hqr".
     - iDestruct "Hslot" as "(Hcell & Hdev & Hbno)".
       iExists (mword_of_int 0 : mword 32). iFrame "Hcell".
       iSplitR.
-      { iPureIntro. left. split; [exact bd_word_zero | reflexivity]. }
+      { iPureIntro. left. split; [exact brc_word_zero_eqv | reflexivity]. }
       iIntros "Hcell". iFrame "Hcell Hdev Hbno".
   Qed.
 

@@ -24,7 +24,7 @@
 
    Four things carry it.
 
-   * THE SCANS CARRY [ProofBreadParts.bcache_scan], the bcache resource with
+   * THE SCANS CARRY [BioInv.bcache_scan], the bcache resource with
      its existentials OPEN.  The forward scan's exit fact is [devs k = dev /\
      bnos k = bno] -- a statement about the functions [bcache_res] hides -- so
      re-packaging the resource per iteration would lose the tie the instant it
@@ -83,7 +83,7 @@ Require Import WpUart.
 Require Import ByteCursor ArrCursor.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
-Require Import BrelseLru BreadLru.
+Require Import BreadLru.
 Require Import ProofBreadParts.
 Require Import WpBreadDecode.
 Require Import SpecAcquire SpecRelease SpecAcquiresleep.
@@ -579,7 +579,7 @@ Section ProofBread.
       iPoseProof (bdi_d2 with "Htext") as "Hid2".
       iPoseProof (bdi_d4 with "Htext") as "Hid4".
       assert (Hbeqz : eq_vec (T1 !!! Regidx Ra5) zero_reg = true).
-      { rewrite HT1a5 Hz. exact bd_word_zero. }
+      { rewrite HT1a5 Hz. exact brc_word_zero_eqv. }
       iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (BD + 0xb6)) (mword_of_int 9 : mword 8)
                 (Cregidx (mword_of_int 7)) Ra5 T1 (K - 6)%nat
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -651,7 +651,7 @@ Section ProofBread.
         by (rewrite /T4; apply upd_eq).
       assert (Hkdata : forall kk : nat, (kk < 1024)%nat ->
                 addr_is_kdata (pa_add (b_data (T4 !!! Regidx Ra0)) kk)).
-      { intros kk Hkk. rewrite HT4a0. exact (bd_data_kdata k kk Hk Hkk). }
+      { intros kk Hkk. rewrite HT4a0. exact (bnode_data_kdata k kk Hk Hkk). }
       assert (HKrw : (K_virtio_disk_rw <= K - 6)%nat)
         by (unfold K_virtio_disk_rw, K_bread in *; lia).
       iApply (RW.wp_virtio_disk_rw_sconf γ Φ γs j γl γu γd γk pd pav pu T4

@@ -174,6 +174,17 @@ Proof.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
 
+(* ...and its immediate consequence: sign-extending to 64 bits is INJECTIVE,
+   [trunc32] being a left inverse.  This is what lets a compare of two
+   [lw]-loaded (hence sign-extended) words be read as the 32-bit compare of the
+   cells themselves -- the scheduler's pid compare, pipewrite's index compare,
+   bread's dev/blockno scan compare. *)
+Lemma sext64_32_inj (x y : mword 32) :
+  (sign_extend' 64 x : mword 64) = (sign_extend' 64 y : mword 64) -> x = y.
+Proof.
+  intro H. rewrite <- (trunc32_sext64 x), <- (trunc32_sext64 y), H. reflexivity.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* SIGNED AND UNSIGNED, AT WIDTH 64.                                       *)
 (*                                                                         *)

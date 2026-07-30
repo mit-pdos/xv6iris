@@ -232,11 +232,11 @@ caller-side ghost step main-boot.md's binit row anticipates.
 - [x] The five Spec files.
 - [x] bpin/bunpin proven+linked (one shared decode file; the two ghost arms
       joined before the load so the critical section is proved once).
-- [x] bwrite proven+linked (panic arm dead; bw_data_kdata discharges rw's
-      kdata premise for every bcache buffer).
+- [x] bwrite proven+linked (panic arm dead; BcacheInv.bnode_data_kdata
+      discharges rw's kdata premise for every bcache buffer).
 - [x] brelse proven+linked (the park swap at a prologue stack store — before
-      releasesleep; BrelseLru.v's bseg toolkit + bcache_lru_splice do the
-      LRU rotate).
+      releasesleep; BcacheInv.v's bseg toolkit + bcache_lru_unlink +
+      bcache_lru_splice do the LRU rotate).
 - [x] bread's decode (73 facts / 214 bytes), BreadLru.v (scan structure),
       ProofBreadParts.v (masked width-4 leaves, bcache_scan — the OPEN form
       of bcache_res the scans must carry, or the devs/bnos exit tie dies —
@@ -246,16 +246,35 @@ caller-side ghost step main-boot.md's binit row anticipates.
 
 ## Cleanup queue (post-landing; none blocks anything)
 
-- Widen `BioInv.bref_tok_lookup` with `(n ≠ 1 → q < qt)` and drop the two
-  local `bref_lt` copies (ProofBunpin, ProofBrelse).
-- Consider restating `BioInv.bcache_res` as `∃ …, bcache_scan …` so the open
-  form ProofBreadParts declares lives next to the closed one.
-- Promote: BrelseLru's `bseg` toolkit → BcacheInv.v; `word4_half`/`_join` →
-  RiscvPtsto.v (3 copies); `bd_sext_inj` → RiscvExtras.v (3 copies);
-  `*_word_zero/nonzero` refcnt-word lemmas → BioInv.v; `bw_data_kdata` →
-  BcacheInv.v (2 copies).
-- Decode dedup sweep → KernelRvcDecode.v/KernelBaseDecode.v: 0x4585 (3
-  files), 0x37fd (2), 0x40bc/0xc0bc (3), 0xc09c, 0xcb91, 0xa021,
-  0x0001e497 (5!), 0x0001e797 (3), 0x01048513 (2), 0x0004a023 (3).  Follow
-  the two sweep rules in durable-notes (grep the STATEMENT; diff every
-  `*_<off>` fact against HEAD when done).
+Everything except the decode sweep is DONE (one pass; full build green,
+`proof_coverage.py --check` rc=0, bio.c still 6/6):
+
+- [x] `BioInv.bref_tok_lookup` widened with a third conjunct
+      `(n ≠ 1 → q < qt)`; the two local `bref_lt` copies (ProofBunpin,
+      ProofBrelse) are gone — both decrements read the order out of the
+      lookup they already do, closing `n ≠ 1` with `Pos.succ_not_1`.
+- [x] `bcache_scan` (+ `bcache_res_to_scan` / `bcache_scan_to_res`) moved
+      ProofBreadParts.v → BioInv.v, and `bcache_res` restated as its closure
+      (`∃ M ord devs bnos, bcache_scan …`).  ZERO consumer churn: the five
+      sites that destructure or rebuild `bcache_res` by hand
+      (ProofBpin/ProofBunpin/ProofBrelse) compile untouched — Iris's
+      `IntoExist`/`IntoSep`/`FromExist` resolution unfolds the extra
+      transparent layer on its own, so wrapping a `∗`-tree in a named
+      definition needs no explicit `rewrite /…` at the use sites.
+- [x] Promotions, all consumers re-pointed and the duplicates deleted:
+      the `bseg` toolkit + `bcache_lru_unlink` + the six pure
+      `List.hd`/`List.last` lemmas → BcacheInv.v (which now owns the WHOLE
+      list ADT; **BrelseLru.v is deleted**, `_CoqProject` updated);
+      `word4_pointsto_half` / `_half_split` / `_half_join` → RiscvPtsto.v
+      (was `word4_half*` in ProcInv, BioInv, ProofBreadParts);
+      `sext64_32_inj` → RiscvExtras.v (was `sc_sext_inj` / `pw_sext_inj` /
+      `bd_sext_inj`); the refcnt-word ties → `BioInv.brc_word_{zero,
+      nonzero}_{eqv,neqv}` next to `brc_word` (both polarities: bread's
+      `beqz` takes `eq_vec`, brelse's `bnez` `neq_vec`);
+      `bnode_data_kdata` (+ `bnode_unsigned`) → BcacheInv.v (was
+      `bw_data_kdata` / `bd_data_kdata`).
+- [ ] Decode dedup sweep → KernelRvcDecode.v/KernelBaseDecode.v: 0x4585 (3
+      files), 0x37fd (2), 0x40bc/0xc0bc (3), 0xc09c, 0xcb91, 0xa021,
+      0x0001e497 (5!), 0x0001e797 (3), 0x01048513 (2), 0x0004a023 (3).
+      Follow the two sweep rules in durable-notes (grep the STATEMENT; diff
+      every `*_<off>` fact against HEAD when done).

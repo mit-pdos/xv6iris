@@ -2,17 +2,7 @@
    its instruction chain, factored out so the chain file stays about control
    flow.  (ProofBread.v is the chain; this file is its vocabulary.)
 
-   (1) [bd_data_kdata] -- rw's [addr_is_kdata] premise on b->data.  Every
-       buffer is an element of bio.c's static [bcache] at 0x80018190, which
-       lies well above [text_end] and well below PHYSTOP, and the address
-       arithmetic never wraps.  Restated here rather than taken from
-       ProofBwrite.bw_data_kdata: a whole-function proof must not depend on
-       another whole-function proof (design/spec-modules.md), and the fact is
-       forty lines of closed arithmetic.  DEDUP: the pair belongs in
-       BcacheInv.v next to [bnode] -- bwrite, bread and any future rw caller
-       inside bio.c need exactly this.
-
-   (2) The two MASK-CARRYING width-4 memory leaves.  bread opens the
+   (1) The two MASK-CARRYING width-4 memory leaves.  bread opens the
        per-buffer escrow around four single instructions -- the three field
        stores of the recycle block ([sw s2,8(s1)] / [sw s3,12(s1)] /
        [sw zero,0(s1)]) and the [lw a5,0(s1)] of the tail's checkout swap --
@@ -62,53 +52,7 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 (* ===================================================================== *)
-(*  (1) Every buffer's data area is kernel DATA.                          *)
-(* ===================================================================== *)
-
-Lemma bd_wrap64_z (a : Z) : bv_wrap 64 a = (a `mod` 18446744073709551616)%Z.
-Proof. unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z. reflexivity. Qed.
-
-Lemma bd_bnode_unsigned (k : nat) : (k < NBUF)%nat ->
-  bv_unsigned (bnode k) = buf_base + buf_stride * Z.of_nat k.
-Proof.
-  intro Hk. unfold bnode.
-  apply (acur_unsigned buf_base buf_stride k NBUF
-           buf_base_nonneg buf_stride_pos buf_end_fits).
-  lia.
-Qed.
-
-Lemma bd_kdata_z (b j : Z) :
-  (2147512320 <= b)%Z -> (0 <= j)%Z -> (b + j < 2281701376)%Z ->
-  (2147512320 <= ((b `mod` 18446744073709551616) + j) `mod` 18446744073709551616
-     < 2281701376)%Z.
-Proof.
-  intros H1 H2 H3.
-  rewrite (Z.mod_small b); [| lia].
-  rewrite Z.mod_small; lia.
-Qed.
-
-Lemma bd_data_kdata (k j : nat) : (k < NBUF)%nat -> (j < 1024)%nat ->
-  addr_is_kdata (pa_add (b_data (bnode k)) j).
-Proof.
-  intros Hk Hj. unfold addr_is_kdata, b_data, text_end, ram_base, ram_size.
-  rewrite RiscvExtras.uint_unsigned.
-  rewrite !ByteCursor.pa_add_unsigned.
-  rewrite !bd_wrap64_z.
-  rewrite (bd_bnode_unsigned k Hk).
-  change (0x80007000)%Z with 2147512320%Z.
-  change (0x80000000 + 0x8000000)%Z with 2281701376%Z.
-  apply bd_kdata_z.
-  - unfold buf_base, buf_stride, KernelSyms.bcache.
-    pose proof (Nat2Z.is_nonneg k). lia.
-  - exact (Nat2Z.is_nonneg j).
-  - unfold NBUF in Hk. unfold buf_base, buf_stride, KernelSyms.bcache.
-    assert (Hkz : (Z.of_nat k <= 29)%Z) by lia.
-    assert (Hjz : (Z.of_nat j <= 1023)%Z) by lia.
-    lia.
-Qed.
-
-(* ===================================================================== *)
-(*  (2) The mask-carrying width-4 load / store.                           *)
+(*  (1) The mask-carrying width-4 load / store.                           *)
 (* ===================================================================== *)
 
 Section BreadEscrowLeaves.
@@ -186,7 +130,7 @@ Section BreadEscrowLeaves.
 End BreadEscrowLeaves.
 
 (* ===================================================================== *)
-(*  (3) Fraction arithmetic, over Qp VARIABLES.                           *)
+(*  (2) Fraction arithmetic, over Qp VARIABLES.                           *)
 (*                                                                        *)
 (*  Stated at the top level so no solver ever runs inside the WP context   *)
 (*  (claude-notes/optimization.md); these are ProofBpin's [bp_*] family,   *)
@@ -221,49 +165,13 @@ Lemma bd_incr_tie (qt qr : Qp) :
 Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 
 (* ===================================================================== *)
-(*  (4) [bcache_scan]: the bcache resource with its EXISTENTIALS OPEN.    *)
-(*                                                                        *)
-(*  This is not cosmetic.  bread's forward scan establishes its exit fact  *)
-(*  by COMPARING the dev/blockno words it reads out of [bio_slot_res]      *)
-(*  against its arguments, i.e. the fact it leaves the loop with is        *)
-(*  [devs k = dev /\ bnos k = bno] -- a statement about the FUNCTIONS       *)
-(*  [bcache_res] hides under an existential.  If the loop re-packaged      *)
-(*  [bcache_res] at each iteration the tie would be lost the moment it     *)
-(*  was established, and the refcnt++ that follows could not hand back a   *)
-(*  [bref] at the REQUESTED key -- bread's postcondition would be          *)
-(*  unprovable.  (Same family as the virtio [vs_data] lesson in            *)
-(*  claude-notes/durable-notes.md: a resource that crosses a boundary must  *)
-(*  RECORD the value the other side needs to identify.)                    *)
-(*                                                                        *)
-(*  So both scans carry the open form, and only the release path closes it. *)
+(*  (3) The two ghost steps over [BioInv.bcache_scan] -- the OPEN form of  *)
+(*  the bcache resource (defined there, next to the closed one, because     *)
+(*  the scans must carry it or the devs/bnos exit tie dies).                *)
 (* ===================================================================== *)
 
 Section BreadScan.
   Context `{!riscvGS Σ, !lockG Σ, !bioG Σ}.
-
-  Definition bcache_scan (bn : bio_names) (M : gmap nat (Qp * positive))
-      (ord : list nat) (devs bnos : nat -> mword 32) : iProp Σ :=
-    (own (bn_auth bn) (● M) ∗
-     bslots_auth bn ∗
-     ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
-     ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
-     bcache_lru bhead (map bnode ord) ∗
-     [∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M k (devs k) (bnos k))%I.
-
-  Lemma bcache_res_to_scan (bn : bio_names) :
-    bcache_res bn -∗ ∃ M ord devs bnos, bcache_scan bn M ord devs bnos.
-  Proof.
-    rewrite /bcache_res /bcache_scan.
-    iIntros "H". iDestruct "H" as (M ord devs bnos) "H".
-    iExists M, ord, devs, bnos. iExact "H".
-  Qed.
-
-  Lemma bcache_scan_to_res (bn : bio_names) M ord devs bnos :
-    bcache_scan bn M ord devs bnos -∗ bcache_res bn.
-  Proof.
-    rewrite /bcache_res /bcache_scan. iIntros "H".
-    iExists M, ord, devs, bnos. iExact "H".
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  The HIT path's refcnt++.                                           *)
@@ -478,7 +386,7 @@ Section BreadScan.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  (5) The (c) swap: the recycle block's THREE field rewrites.         *)
+  (*  (4) The (c) swap: the recycle block's THREE field rewrites.         *)
   (*                                                                     *)
   (*  Each of [sw s2,8(s1)] / [sw s3,12(s1)] / [sw zero,0(s1)] opens       *)
   (*  [buf_escrow] around ITSELF, so the parked bundle is whole at every   *)
@@ -495,23 +403,6 @@ Section BreadScan.
   (*  Each lemma is used INSIDE one [iInv] of [buf_escrow] (mask           *)
   (*  ⊤ ∖ ↑minstretN ∖ ↑bioN) wrapped around one [wp_sw_au_s_sconf].       *)
   (* ------------------------------------------------------------------ *)
-
-  (* the join/split of a 4-byte cell at 1/2 + 1/2, in BOTH directions.
-     Written with the fractions PINNED: [rewrite -(Qp.div_2 1)] would also
-     match the [1] inside a [1/2] already in the goal and produce
-     [(1/2 + 1/2)/2] (durable-notes' "the pattern matches more than you
-     meant" family). *)
-  Local Lemma word4_half (a : Arch.pa) (w : bv 32) :
-    (a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w) ⊣⊢ a ↦₄ w.
-  Proof. rewrite -word4_pointsto_frac_split Qp.div_2. reflexivity. Qed.
-
-  Local Lemma word4_half_join (a : Arch.pa) (w : bv 32) :
-    a ↦₄{DfracOwn (1/2)} w -∗ a ↦₄{DfracOwn (1/2)} w -∗ a ↦₄ w.
-  Proof. iIntros "H1 H2". rewrite -word4_half. iFrame "H1 H2". Qed.
-
-  Local Lemma word4_half_split (a : Arch.pa) (w : bv 32) :
-    a ↦₄ w -∗ a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w.
-  Proof. iIntros "H". rewrite word4_half. iExact "H". Qed.
 
   (* dev: escrow half + slot half -> full; re-park at the stored value *)
   Lemma escrow_free_dev (bn : bio_names) (k : nat)
@@ -532,9 +423,9 @@ Section BreadScan.
     iDestruct (word4_pointsto_agree with "Hslot Hdev") as %Heq. subst de.
     iFrame "Hauth".
     iSplitL "Hslot Hdev".
-    { iApply (word4_half_join with "Hslot Hdev"). }
+    { iApply (word4_pointsto_half_join with "Hslot Hdev"). }
     iIntros (d') "Hfull".
-    iDestruct (word4_half_split with "Hfull") as "[Hd1 Hd2]".
+    iDestruct (word4_pointsto_half_split with "Hfull") as "[Hd1 Hd2]".
     iSplitR "Hd2"; [| iExact "Hd2"].
     iApply "Hclose". rewrite /buf_parked.
     iExists vld, d', bno, bs. iSplitR; [by iPureIntro|].
@@ -563,9 +454,9 @@ Section BreadScan.
     iDestruct (word4_pointsto_agree with "Hslot Hbno") as %Heq. subst bno.
     iFrame "Hauth".
     iSplitL "Hslot Hbno".
-    { iApply (word4_half_join with "Hslot Hbno"). }
+    { iApply (word4_pointsto_half_join with "Hslot Hbno"). }
     iIntros (b') "Hfull".
-    iDestruct (word4_half_split with "Hfull") as "[Hb1 Hb2]".
+    iDestruct (word4_pointsto_half_split with "Hfull") as "[Hb1 Hb2]".
     iSplitR "Hb2"; [| iExact "Hb2"].
     iApply "Hclose". rewrite /buf_parked.
     iExists vld, de, b', bs. iSplitR; [by iPureIntro|].

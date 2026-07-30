@@ -671,6 +671,26 @@ Section word4_pointsto.
     rewrite /word4_pointsto mem_bytes_frac_split.
     iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
   Qed.
+
+  (* THE 1/2 + 1/2 SPLIT, which is the fraction a shared 4-byte cell is
+     actually held at all over the kernel: [p->pid]'s permanent half in the
+     scheduler invariant against allocproc's (ProcInv.v), and the bio layer's
+     [b->dev] / [b->blockno], whose bcache half and escrow half are joined for
+     every write and re-split after it.  Stated with the fractions PINNED --
+     [rewrite -(Qp.div_2 1)] would also match the [1] inside a [1/2] already in
+     the goal and produce [(1/2 + 1/2)/2] -- and given in all three shapes,
+     because the join direction is used as a wand and the split as a rewrite. *)
+  Lemma word4_pointsto_half a w :
+    a ↦₄ w ⊣⊢ a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w.
+  Proof. rewrite -word4_pointsto_frac_split Qp.div_2. reflexivity. Qed.
+
+  Lemma word4_pointsto_half_split a w :
+    a ↦₄ w -∗ a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w.
+  Proof. rewrite word4_pointsto_half. iIntros "$". Qed.
+
+  Lemma word4_pointsto_half_join a w :
+    a ↦₄{DfracOwn (1/2)} w -∗ a ↦₄{DfracOwn (1/2)} w -∗ a ↦₄ w.
+  Proof. iIntros "H1 H2". rewrite word4_pointsto_half. iFrame "H1 H2". Qed.
 End word4_pointsto.
 
 (* ---------------------------------------------------------------------- *)

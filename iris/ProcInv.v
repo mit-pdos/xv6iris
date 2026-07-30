@@ -566,31 +566,25 @@ Section ProcInv.
     iApply (word4_pointsto_agree with "Hpid Hother").
   Qed.
 
-  (* The two halves of [p->pid], joined and split.  allocproc is the one
+  (* The two halves of [p->pid], joined and split ([RiscvPtsto]'s
+     [word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc is the one
      function that holds BOTH -- the invariant's permanent half out of
      [SchedCtx.proc_pub] and the dormant block's -- and so the one function
      that may WRITE the cell.  Joining first tells it the two halves agree,
      which is what [word4_pointsto_agree] is for; splitting after the store
      is what hands one half back to the invariant and one to [proc_priv]. *)
-  Local Lemma word4_half (a : mword 64) (w : mword 32) :
-    a ↦₄ w ⊣⊢ a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w.
-  Proof.
-    assert (Hq : DfracOwn 1 = DfracOwn (1/2 + 1/2)) by (f_equal; compute_done).
-    rewrite {1}Hq. apply word4_pointsto_frac_split.
-  Qed.
-
   Lemma p_pid_join (pa : mword 64) (p1 p2 : mword 32) :
     p_pid pa ↦₄{DfracOwn (1/2)} p1 -∗ p_pid pa ↦₄{DfracOwn (1/2)} p2 -∗
     ⌜p1 = p2⌝ ∗ p_pid pa ↦₄ p1.
   Proof.
     iIntros "H1 H2".
     iDestruct (word4_pointsto_agree with "H1 H2") as %<-.
-    iSplit; [done|]. rewrite word4_half. iFrame.
+    iSplit; [done|]. rewrite word4_pointsto_half. iFrame.
   Qed.
 
   Lemma p_pid_split (pa : mword 64) (v : mword 32) :
     p_pid pa ↦₄ v -∗ p_pid pa ↦₄{DfracOwn (1/2)} v ∗ p_pid pa ↦₄{DfracOwn (1/2)} v.
-  Proof. rewrite word4_half. iIntros "$". Qed.
+  Proof. rewrite word4_pointsto_half. iIntros "$". Qed.
 
   (* =================================================================== *)
   (* The DORMANT shape: what the lock invariant holds at UNUSED/ZOMBIE.   *)

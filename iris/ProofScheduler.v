@@ -168,13 +168,6 @@ Proof.
     vm_compute; reflexivity.
 Qed.
 
-(* [lw] yields the sign extension, and that map is injective on mword 32. *)
-Lemma sc_sext_inj (a b : mword 32) : sign_extend' 64 a = sign_extend' 64 b -> a = b.
-Proof.
-  intro H. pose proof (trunc32_sext64 a) as Ha. pose proof (trunc32_sext64 b) as Hb.
-  rewrite H in Ha. rewrite Hb in Ha. exact (eq_sym Ha).
-Qed.
-
 Lemma sc_neq_vec_false (n : Z) (x y : mword n) : neq_vec x y = false -> x = y.
 Proof.
   intro H. unfold neq_vec in H. apply negb_false_iff in H.
@@ -1030,7 +1023,7 @@ Section ProofScheduler.
             [ exact HpinsE | exact HtieE ].
       - (* RUNNABLE: dispatch it *)
         assert (Hst : st = RUNNABLE)
-          by (apply sc_sext_inj; apply (sc_neq_vec_false 64); exact Hcmp).
+          by (apply sext64_32_inj; apply (sc_neq_vec_false 64); exact Hcmp).
         subst st.
         iApply (wp_bne_fall_s_sconf γ Φ (mword_of_int (SC + 0x60)) (mword_of_int 8170 : mword 13)
                   Rs3 Ra5 M2 (av - 10)%nat

@@ -104,28 +104,6 @@ Section ProofBunpin.
             [vm_compute; reflexivity | assumption]
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
-  (* STRICT inclusion at a surviving entry.  [bref_tok_lookup] only exposes the
-     two sole-reference implications; the decrement needs the ORDER, which is
-     the same [singleton_included_l] reading one step further. *)
-  Local Lemma bref_lt bn (M : gmap nat (Qp * positive)) (k : nat)
-      (q qt : Qp) (nn : positive) :
-    M !! k = Some (qt, Pos.succ nn) ->
-    own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗ ⌜(q < qt)%Qp⌝.
-  Proof.
-    rewrite /bref_tok. iIntros (HM) "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
-    iPureIntro.
-    apply singleton_included_l in Hincl as [y [Hy Hle]].
-    apply leibniz_equiv in Hy. destruct y as [qt2 n2].
-    rewrite HM in Hy. apply Some_inj in Hy. injection Hy as Hq0 Hn0.
-    subst qt2 n2.
-    apply Some_included in Hle as [Heq | Hlt].
-    - exfalso. destruct Heq as [_ Hn]; cbn in Hn.
-      assert (Hn' : (1%positive) = Pos.succ nn) by exact Hn. lia.
-    - apply pair_included in Hlt as [Hq _]; cbn in Hq.
-      by apply frac_included in Hq.
-  Qed.
-
   (* the value [c.addiw a5,a5,-1] leaves for the store, as a function of the
      loaded word -- what joins the two arms of the critical section. *)
   Local Definition decr32 (cw : mword 32) : mword 32 :=
@@ -341,7 +319,8 @@ Section ProofBunpin.
       with "[HRres Href]" as (cw) "[Hcell Hclose]".
     { iDestruct "HRres" as (Mg ord devs bnos) "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
       iDestruct "Href" as "(Hrtok & Hrdev & Hrbno)".
-      iDestruct (bref_tok_lookup with "Hauth Hrtok") as %(qt & cnt & HMk & Hsole & _).
+      iDestruct (bref_tok_lookup with "Hauth Hrtok")
+        as %(qt & cnt & HMk & Hsole & _ & Hltn).
       iDestruct (bio_slots_acc bn Mg devs bnos k Hk with "Hslots") as "[Hslot Hback]".
       iEval (rewrite /bio_slot_res HMk) in "Hslot".
       iDestruct "Hslot" as "(%Hcnt & Hcell & Hfd & Hqr)".
@@ -387,7 +366,7 @@ Section ProofBunpin.
         assert (Hex : exists c', cnt = Pos.succ c').
         { exists (Pos.pred cnt). symmetry. by apply Pos.succ_pred. }
         destruct Hex as [cnt' Hcnt']. subst cnt.
-        iDestruct (bref_lt bn Mg k q qt cnt' HMk with "Hauth Hrtok") as %Hlt.
+        assert (Hlt : (q < qt)%Qp) by (apply Hltn; apply Pos.succ_not_1).
         assert (Hsub : exists qr', (qt - q)%Qp = Some qr').
         { apply Qp.lt_sum in Hlt as [r Hr]. exists r. by apply Qp.sub_Some. }
         destruct Hsub as [qr' Hsub].

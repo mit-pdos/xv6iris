@@ -422,11 +422,16 @@ Section BioInv.
   (* ------------------------------------------------------------------ *)
 
   (* a reference against the authority (fref_tok_lookup's mirror): the entry
-     exists, and the sole reference holds the whole outstanding fraction. *)
+     exists, and the sole reference holds the whole outstanding fraction.
+     The THIRD conjunct is the same [singleton_included_l] reading one step
+     further -- the STRICT order at a surviving entry, which is what
+     [bio_decr_step]'s [(qt - q) = Some qr] premise needs (brelse and bunpin
+     both take it on their non-last decrement). *)
   Lemma bref_tok_lookup bn M k q :
     own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗
     ⌜∃ qt n, M !! k = Some (qt, n) /\
-       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive)⌝.
+       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive) /\
+       (n ≠ 1%positive -> (q < qt)%Qp)⌝.
   Proof.
     rewrite /bref_tok. iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
@@ -436,12 +441,16 @@ Section BioInv.
     split; [exact Hy|].
     apply Some_included in Hle as [Heq | Hlt].
     - destruct Heq as [Hq Hn]; cbn in Hq, Hn.
-      split; intros _; [exact Hq | by rewrite -Hn].
+      split_and!.
+      + intros _. exact Hq.
+      + intros _. by rewrite -Hn.
+      + intros Hne. exfalso. apply Hne. by rewrite -Hn.
     - apply pair_included in Hlt as [Hq Hn]; cbn in Hq, Hn.
       apply frac_included in Hq. apply pos_included in Hn.
-      split; intros Hc.
-      + exfalso. rewrite Hc in Hn. lia.
-      + exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
+      split_and!.
+      + intros Hc. exfalso. rewrite Hc in Hn. lia.
+      + intros Hc. exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
+      + intros _. exact Hq.
   Qed.
 
   (* refcnt==0 -> refcnt:=1: allocate the entry, minting the first reference
@@ -513,6 +522,60 @@ Section BioInv.
     | Some (_, n) => (mword_of_int (Z.pos n) : mword 32)
     end.
 
+  (* ---- the refcnt word's two VALUE TIES (FileInv's fref_word_zero /
+     fref_word_nonzero at this cell) ----
+
+     The [lw] of the refcnt sign-extends, and both the [beqz] of bread's
+     backward scan and the [bnez] of brelse's/bunpin's decrement compare that
+     against x0: so the word is zero exactly when the slot is free, and a
+     slot-backed [positive] count (< 2^31, which is what the [bslot] supply
+     buys) is never zero.  Stated in BOTH polarities because the two branch
+     leaves take [eq_vec] (a [beqz]) and [neq_vec] (a [bnez]) respectively. *)
+  Lemma brc_word_zero_eqv :
+    eq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) (zero_reg : mword 64) = true.
+  Proof. apply eq_vec_true_iff. apply bv_eq. vm_compute. reflexivity. Qed.
+
+  Lemma brc_word_nonzero_eqv (pz : positive) :
+    (Z.pos pz < 2 ^ 31)%Z ->
+    eq_vec (sign_extend' 64 (mword_of_int (Z.pos pz) : mword 32)) (zero_reg : mword 64)
+    = false.
+  Proof.
+    intro Hn.
+    (* [lia] cannot evaluate [2^k]; name the three literals first. *)
+    assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+    assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+    assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
+    rewrite E31 in Hn.
+    assert (Hu : bv_unsigned (mword_of_int (Z.pos pz) : mword 32) = Z.pos pz).
+    { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+      rewrite Z_to_bv_unsigned. unfold bv_wrap, bv_modulus.
+      change (Z.of_N 32) with 32. rewrite E32.
+      rewrite Z.mod_small; [reflexivity | lia]. }
+    assert (Hs : bv_signed (mword_of_int (Z.pos pz) : mword 32) = Z.pos pz).
+    { unfold bv_signed. rewrite Hu. apply bv_swrap_small.
+      unfold bv_half_modulus, bv_modulus. change (Z.of_N 32) with 32.
+      assert (Ehalf : (2 ^ 32 / 2 = 2147483648)%Z) by (vm_compute; reflexivity).
+      rewrite Ehalf. lia. }
+    apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
+    assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
+    rewrite Hz in Hc. revert Hc.
+    cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+         to_word get_word MachineWord.MachineWord.sign_extend].
+    rewrite bv_sign_extend_unsigned. rewrite Hs.
+    unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
+    rewrite E64. rewrite Z.mod_small; [lia|]. lia.
+  Qed.
+
+  Lemma brc_word_zero_neqv :
+    neq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) (zero_reg : mword 64) = false.
+  Proof. unfold neq_vec. by rewrite brc_word_zero_eqv. Qed.
+
+  Lemma brc_word_nonzero_neqv (pz : positive) :
+    (Z.pos pz < 2 ^ 31)%Z ->
+    neq_vec (sign_extend' 64 (mword_of_int (Z.pos pz) : mword 32)) (zero_reg : mword 64)
+    = true.
+  Proof. intro Hn. unfold neq_vec. by rewrite (brc_word_nonzero_eqv pz Hn). Qed.
+
   (* one buffer's bcache-side state: the refcnt cell, and whatever fraction
      of dev/blockno has not been handed to references -- all of the bcache
      half (1/2) when free, the retainder qr (with q + qr = 1/2) when busy,
@@ -534,15 +597,42 @@ Section BioInv.
            b_blockno (bpa k) ↦₄{DfracOwn qr} bno)%I
     end.
 
+  (* THE OPEN FORM: the whole resource with its four existentials NAMED.
+     This is not cosmetic.  bread's forward scan establishes its exit fact by
+     COMPARING the dev/blockno words it reads out of [bio_slot_res] against
+     its arguments, i.e. what it leaves the loop with is [devs k = dev /\
+     bnos k = bno] -- a statement about the FUNCTIONS the closed form hides.
+     If a loop iteration re-packaged the closed form the tie would be lost the
+     moment it was established, and the refcnt++ that follows could not hand
+     back a [bref] at the REQUESTED key -- bread's postcondition would be
+     unprovable.  (Same family as the virtio [vs_data] lesson in
+     claude-notes/durable-notes.md: a resource that crosses a boundary must
+     RECORD the value the other side needs to identify.)  So both scans carry
+     the open form and only the release path closes it. *)
+  Definition bcache_scan (bn : bio_names) (M : gmap nat (Qp * positive))
+      (ord : list nat) (devs bnos : nat -> mword 32) : iProp Σ :=
+    (own (bn_auth bn) (● M) ∗
+     bslots_auth bn ∗
+     ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
+     ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
+     bcache_lru bhead (map bnode ord) ∗
+     [∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M k (devs k) (bnos k))%I.
+
+  (* ...and the CLOSED form the bcache spinlock is sealed over: its closure. *)
   Definition bcache_res (bn : bio_names) : iProp Σ :=
     (∃ (M : gmap nat (Qp * positive)) (ord : list nat)
        (devs bnos : nat -> mword 32),
-       own (bn_auth bn) (● M) ∗
-       bslots_auth bn ∗
-       ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
-       ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
-       bcache_lru bhead (map bnode ord) ∗
-       [∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M k (devs k) (bnos k))%I.
+       bcache_scan bn M ord devs bnos)%I.
+
+  Lemma bcache_res_to_scan (bn : bio_names) :
+    bcache_res bn -∗ ∃ M ord devs bnos, bcache_scan bn M ord devs bnos.
+  Proof. rewrite /bcache_res. iIntros "H". iExact "H". Qed.
+
+  Lemma bcache_scan_to_res (bn : bio_names) M ord devs bnos :
+    bcache_scan bn M ord devs bnos -∗ bcache_res bn.
+  Proof.
+    rewrite /bcache_res. iIntros "H". iExists M, ord, devs, bnos. iExact "H".
+  Qed.
 
   (* borrow one buffer's slot out of the big-sep and put it back, possibly
      under a different authority map (ftable_slots_acc's mirror). *)
@@ -623,13 +713,6 @@ Section BioInv.
 
   Local Lemma bio_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.
-
-  (* the split every buffer's dev/blockno cell undergoes exactly once: one
-     half into the escrow's parked bundle, one half into the bcache
-     resource, forever. *)
-  Local Lemma word4_half_split (a : Arch.pa) (w : bv 32) :
-    a ↦₄ w -∗ a ↦₄{DfracOwn (1/2)} w ∗ a ↦₄{DfracOwn (1/2)} w.
-  Proof. iIntros "H". rewrite -word4_pointsto_frac_split Qp.div_2. iFrame. Qed.
 
   (* GNAMES BEFORE THE RECORD.  [bio_names] cannot be built until all of the
      per-buffer gnames exist, and [bown bn k] -- the resource the sleeplocks
@@ -730,8 +813,11 @@ Section BioInv.
       with "[Hbufs]" as "[Hesc Hslots]".
     { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbufs").
       intros i k Hk. iIntros "(Hv & Hdk & Hdev & Hbno & Hrc & Hdata)".
-      iDestruct (word4_half_split with "Hdev") as "[Hdev1 Hdev2]".
-      iDestruct (word4_half_split with "Hbno") as "[Hbno1 Hbno2]".
+      (* the split every buffer's dev/blockno cell undergoes exactly once:
+         one half into the escrow's parked bundle, one half into the bcache
+         resource, forever. *)
+      iDestruct (word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+      iDestruct (word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
       iSplitR "Hrc Hdev2 Hbno2".
       - rewrite /buf_escrow.
@@ -745,7 +831,7 @@ Section BioInv.
     iMod (big_sepL_fupd with "Hesc") as "#Hescs".
     (* and seal the bcache lock over the assembled resource *)
     iMod ("Hmk" $! (bcache_res bn) with "[Hauth Hsa Hslots Hlru]") as "#Hlock".
-    { rewrite /bcache_res.
+    { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),
         (fun _ => (mword_of_int 0 : mword 32)).

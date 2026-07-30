@@ -33,9 +33,9 @@
      in whether the LRU splice runs.
 
    * THE SPLICE.  On the zero arm the buffer is first UNLINKED from wherever
-     it sits in the cycle and then spliced in after the head.  [BrelseLru.v]
-     supplies the unlink ([bcache_lru_unlink]); the reinsertion is
-     [BcacheInv.bcache_lru_splice], the very lemma binit's loop uses.  The
+     it sits in the cycle and then spliced in after the head.  Both halves are
+     BcacheInv.v's ([bcache_lru_unlink] and [bcache_lru_splice], the latter the
+     very lemma binit's loop uses).  The
      order [ord] the bcache resource carries goes from [o1 ++ k :: o2] to
      [k :: (o1 ++ o2)], still a permutation of [seq 0 NBUF] by
      [Permutation_middle].
@@ -75,7 +75,7 @@ Require Import FdSlots.
 Require Import IntrDefs.
 Require Import KernelText.
 Require Import InstrBytes.
-Require Import BufOwn BcacheInv BioInv BrelseLru.
+Require Import BufOwn BcacheInv BioInv.
 Require Import WpBrelseDecode.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
@@ -101,52 +101,6 @@ Local Lemma br_decr_tie (qt qr q qr' : Qp) :
 Proof.
   intros Htie Hsub. rewrite -Htie Hsub.
   rewrite (Qp.add_comm qr q) Qp.add_assoc (Qp.add_comm qr' q). reflexivity.
-Qed.
-
-(* ------------------------------------------------------------------ *)
-(*  The refcnt word and the [c.bnez] that reads it.                     *)
-(* ------------------------------------------------------------------ *)
-
-(* the DECREMENTED word is zero exactly at the last reference.  These two are
-   FileInv's [fref_word_zero] / [fref_word_nonzero] at the [n-1] forms brelse
-   branches on, and at [neq_vec] (the [c.bnez] test) rather than [eq_vec]. *)
-Local Lemma br_word_zero :
-  neq_vec (sign_extend' 64 (mword_of_int 0 : mword 32)) (zero_reg : mword 64) = false.
-Proof.
-  unfold neq_vec. rewrite negb_false_iff.
-  apply eq_vec_true_iff. apply bv_eq. vm_compute. reflexivity.
-Qed.
-
-Local Lemma br_word_nonzero (pz : positive) :
-  (Z.pos pz < 2 ^ 31)%Z ->
-  neq_vec (sign_extend' 64 (mword_of_int (Z.pos pz) : mword 32)) (zero_reg : mword 64) = true.
-Proof.
-  intro Hn.
-  unfold neq_vec. rewrite negb_true_iff.
-  (* [lia] cannot evaluate [2^k]; name the three literals first. *)
-  assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
-  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
-  assert (E64 : (2 ^ 64 = 18446744073709551616)%Z) by (vm_compute; reflexivity).
-  rewrite E31 in Hn.
-  assert (Hlt32 : (Z.pos pz < 2 ^ 32)%Z) by (rewrite E32; lia).
-  assert (Hu : bv_unsigned (mword_of_int (Z.pos pz) : mword 32) = Z.pos pz).
-  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-    rewrite Z_to_bv_unsigned. unfold bv_wrap, bv_modulus.
-    change (Z.of_N 32) with 32. rewrite E32.
-    rewrite Z.mod_small; [reflexivity | lia]. }
-  assert (Hs : bv_signed (mword_of_int (Z.pos pz) : mword 32) = Z.pos pz).
-  { unfold bv_signed. rewrite Hu. apply bv_swrap_small.
-    unfold bv_half_modulus, bv_modulus. change (Z.of_N 32) with 32.
-    assert (Ehalf : (2 ^ 32 / 2 = 2147483648)%Z) by (vm_compute; reflexivity).
-    rewrite Ehalf. lia. }
-  apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz in Hc. revert Hc.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
-       to_word get_word MachineWord.MachineWord.sign_extend].
-  rewrite bv_sign_extend_unsigned. rewrite Hs.
-  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64.
-  rewrite E64. rewrite Z.mod_small; [lia|]. lia.
 Qed.
 
 Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
@@ -212,32 +166,6 @@ Section ProofBrelse.
   Local Lemma buf_escrow_inv (bn : bio_names) (k : nat) :
     buf_escrow bn k -∗ inv bioN (buf_escrow_body bn k).
   Proof. iIntros "H". iExact "H". Qed.
-
-  (* ---------------------------------------------------------------- *)
-  (*  The count authority, one step further than [bref_tok_lookup]      *)
-  (* ---------------------------------------------------------------- *)
-
-  (* STRICT inclusion at a surviving entry: [bio_decr_step]'s [(qt - q) =
-     Some qr] premise needs the ORDER, which [bref_tok_lookup] does not
-     expose. *)
-  Local Lemma bref_lt bn (M : gmap nat (Qp * positive)) (k : nat)
-      (q qt : Qp) (nn : positive) :
-    M !! k = Some (qt, Pos.succ nn) ->
-    own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗ ⌜(q < qt)%Qp⌝.
-  Proof.
-    rewrite /bref_tok. iIntros (HM) "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
-    iPureIntro.
-    apply singleton_included_l in Hincl as [y [Hy Hle]].
-    apply leibniz_equiv in Hy. destruct y as [qt2 n2].
-    rewrite HM in Hy. apply Some_inj in Hy. injection Hy as Hq0 Hn0.
-    subst qt2 n2.
-    apply Some_included in Hle as [Heq | Hlt].
-    - exfalso. destruct Heq as [_ Hn]; cbn in Hn.
-      assert (Hn' : (1%positive) = Pos.succ nn) by exact Hn. lia.
-    - apply pair_included in Hlt as [Hq _]; cbn in Hq.
-      by apply frac_included in Hq.
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The [c.addiw a5,a5,-1] value, as a function of the loaded word    *)
@@ -956,7 +884,8 @@ Section ProofBrelse.
     iPoseProof (bri_30 with "Htext") as "Hi30".
     iPoseProof (bri_32 with "Htext") as "Hi32".
     iDestruct "HRres" as (Mg ord devs bnos) "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
-    iDestruct (bref_tok_lookup with "Hauth Hrtok") as %(qt & cnt & HMk & Hsole & _).
+    iDestruct (bref_tok_lookup with "Hauth Hrtok")
+      as %(qt & cnt & HMk & Hsole & _ & Hltn).
     iDestruct (bio_slots_acc bn Mg devs bnos k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /bio_slot_res HMk) in "Hslot".
     iDestruct "Hslot" as "(%Hcnt & Hcell & Hfd & Hqr)".
@@ -1040,7 +969,7 @@ Section ProofBrelse.
       iEval (change (Pos.to_nat 1) with 1%nat) in "Hfd".
       (* ===== +0x32 c.bnez a5 : NOT taken, the splice runs ===== *)
       assert (Hbnez : neq_vec (D2 !!! Regidx Ra5) zero_reg = false)
-        by (rewrite HD2a5; exact br_word_zero).
+        by (rewrite HD2a5; exact brc_word_zero_neqv).
       iApply (wp_cbnez_fall_s_sconf γ Φ (mword_of_int (BR + 0x32)) (mword_of_int 23 : mword 8)
                 (Cregidx (mword_of_int 7)) Ra5 D2 (K - 4)%nat
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hbnez
@@ -1331,7 +1260,7 @@ Section ProofBrelse.
     - assert (Hex : exists c', cnt = Pos.succ c').
       { exists (Pos.pred cnt). symmetry. by apply Pos.succ_pred. }
       destruct Hex as [cnt' Hcnt']. subst cnt.
-      iDestruct (bref_lt bn Mg k q qt cnt' HMk with "Hauth Hrtok") as %Hlt.
+      assert (Hlt : (q < qt)%Qp) by (apply Hltn; apply Pos.succ_not_1).
       assert (Hsub : exists qr', (qt - q)%Qp = Some qr').
       { apply Qp.lt_sum in Hlt as [r Hr]. exists r. by apply Qp.sub_Some. }
       destruct Hsub as [qr' Hsub].
@@ -1418,7 +1347,7 @@ Section ProofBrelse.
         iFrame "Hlru Hslots". }
       (* ===== +0x32 c.bnez a5 : TAKEN, straight to the release ===== *)
       assert (Hbnez : neq_vec (D2 !!! Regidx Ra5) zero_reg = true).
-      { rewrite HD2a5. apply br_word_nonzero.
+      { rewrite HD2a5. apply brc_word_nonzero_neqv.
         rewrite Pos2Z.inj_succ in Hcnt. lia. }
       iApply (wp_cbnez_taken_s_sconf γ Φ (mword_of_int (BR + 0x32)) (mword_of_int 23 : mword 8)
                 (Cregidx (mword_of_int 7)) Ra5 D2 (K - 4)%nat

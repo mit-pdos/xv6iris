@@ -21,7 +21,7 @@
    * rw's [addr_is_kdata] premise on [b->data].  [b] is [bnode k] for
      k < NBUF, i.e. an element of bio.c's static [bcache] object at
      0x80018190, which lies well above [text_end] and well below PHYSTOP --
-     [bw_data_kdata] below is that one arithmetic fact.
+     [BcacheInv.bnode_data_kdata] is that one arithmetic fact.
 
    The buffer's [valid] cell and its half of [dev] are untouched by both
    callees, so they are simply framed across the two calls and [bio_locked]
@@ -67,57 +67,6 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
-
-(* ===================================================================== *)
-(*  The one arithmetic fact: every buffer's data area is kernel DATA.      *)
-(*                                                                        *)
-(*  [bcache] is a .bss object at 0x80018190; buffer k's base is            *)
-(*  [buf_base + 1112*k] with buf_base = bcache+24 and k < NBUF = 30, so    *)
-(*  the whole object sits inside [text_end, ram_base+ram_size) and the     *)
-(*  address arithmetic never wraps.                                       *)
-(* ===================================================================== *)
-
-Lemma bw_wrap64_z (a : Z) : bv_wrap 64 a = (a `mod` 18446744073709551616)%Z.
-Proof. unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z. reflexivity. Qed.
-
-Lemma bw_bnode_unsigned (k : nat) : (k < NBUF)%nat ->
-  bv_unsigned (bnode k) = buf_base + buf_stride * Z.of_nat k.
-Proof.
-  intro Hk. unfold bnode.
-  apply (acur_unsigned buf_base buf_stride k NBUF
-           buf_base_nonneg buf_stride_pos buf_end_fits).
-  lia.
-Qed.
-
-Lemma bw_kdata_z (b j : Z) :
-  (2147512320 <= b)%Z -> (0 <= j)%Z -> (b + j < 2281701376)%Z ->
-  (2147512320 <= ((b `mod` 18446744073709551616) + j) `mod` 18446744073709551616
-     < 2281701376)%Z.
-Proof.
-  intros H1 H2 H3.
-  rewrite (Z.mod_small b); [| lia].
-  rewrite Z.mod_small; lia.
-Qed.
-
-Lemma bw_data_kdata (k j : nat) : (k < NBUF)%nat -> (j < 1024)%nat ->
-  addr_is_kdata (pa_add (b_data (bnode k)) j).
-Proof.
-  intros Hk Hj. unfold addr_is_kdata, b_data, text_end, ram_base, ram_size.
-  rewrite RiscvExtras.uint_unsigned.
-  rewrite !ByteCursor.pa_add_unsigned.
-  rewrite !bw_wrap64_z.
-  rewrite (bw_bnode_unsigned k Hk).
-  change (0x80007000)%Z with 2147512320%Z.
-  change (0x80000000 + 0x8000000)%Z with 2281701376%Z.
-  apply bw_kdata_z.
-  - unfold buf_base, buf_stride, KernelSyms.bcache.
-    pose proof (Nat2Z.is_nonneg k). lia.
-  - exact (Nat2Z.is_nonneg j).
-  - unfold NBUF in Hk. unfold buf_base, buf_stride, KernelSyms.bcache.
-    assert (Hkz : (Z.of_nat k <= 29)%Z) by lia.
-    assert (Hjz : (Z.of_nat j <= 1023)%Z) by lia.
-    lia.
-Qed.
 
 (* the [wr] flag rw's spec computes from a1: [li a1,1] makes it [true]. *)
 Lemma bw_wr_true (v : SailStdpp.Values.mword 64) (l1 l2 : list (bv 8)) :
@@ -413,7 +362,7 @@ Section ProofBwrite.
       by (rewrite /D3; apply upd_eq).
     assert (Hkdata : forall kk : nat, (kk < 1024)%nat ->
               addr_is_kdata (pa_add (b_data (D3 !!! Regidx Ra0)) kk)).
-    { intros kk Hkk. rewrite HD3a0. exact (bw_data_kdata k kk Hk Hkk). }
+    { intros kk Hkk. rewrite HD3a0. exact (bnode_data_kdata k kk Hk Hkk). }
     assert (HKrw : (K_virtio_disk_rw <= K - 4)%nat)
       by (unfold K_virtio_disk_rw; lia).
     iApply (RW.wp_virtio_disk_rw_sconf γ Φ γs j γl γu γd γk pd pav pu D3
