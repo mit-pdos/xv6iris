@@ -312,10 +312,11 @@ parameter would buy nothing.
 - **Symbol notations (`AQ`, `HD`, `MS`, …) live in the Spec file, not the proof
   file**, so a caller that needs one gets it from `Require Import Spec<F>`
   (`Import` is not transitive, so it must require the Spec directly).
-- **Pure spec vocabulary moves down into the Spec file.** `PGSIZEv`,
-  `negPGSIZEv` and `prun` moved out of `ProofFreerange`'s section, and the
-  `wp_myproc_sconf_any` axiom out of `ProofWakeup`, because callers' *statements*
-  mention them.
+- **Pure spec vocabulary belongs in the Spec file, not the Proof file.**
+  `PGSIZEv`, `negPGSIZEv` and `prun` live in `SpecFreerange` rather than
+  `ProofFreerange`'s section, because callers' *statements* mention them. Same
+  rule for an assumed callee's contract: it goes in the `Spec<F>.v` its callers
+  require.
 - Spec files must not `Require Export` (the ssreflect-`by` propagation hazard in
   [`code-organization.md`](code-organization.md) applies here too).
 

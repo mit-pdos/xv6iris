@@ -83,8 +83,8 @@ ends of the axis, so the uvmunmap proof is generic and gets **sealed twice**:
 (about USER EXECUTION — a bare table will never execute again) and the
 trapframe page's `page_valid`.
 
-**The bridge to the `Some` instance needs `upt_map_wf um`, and the first draft
-that omitted it was FALSE.** `uptg_map otf um = upt_fixed otf ∪ um` is
+**The bridge to the `Some` instance needs `upt_map_wf um` — omit it and the
+statement is FALSE.** `uptg_map otf um = upt_fixed otf ∪ um` is
 left-biased, so the fixed leaves win; if `um` itself mapped `tramp_vpn` or
 `tf_vpn` then `uptg_view (Some tfp) um m_ad` and `UptTree.upt_ad_view tfp um
 m_ad` disagree (the latter's `upt_leaf_at` disjunction is satisfied by `um`'s
@@ -155,8 +155,8 @@ and returns verbatim; the child grows by the pages the parent had mapped.
   the child along with the permission. The mapped case therefore reads "an A/D
   variant of `uvm_pte (pte_flags10 w) r`", not that leaf on the nose. Harmless
   for validity (every predicate quantifies over all A/D variants) but it has to
-  be *said*. Getting this wrong is easy: the first draft of the contract said
-  `= Some (uvm_pte (pte_flags10 w) r)` and was simply false.
+  be *said*. Getting this wrong is easy: `= Some (uvm_pte (pte_flags10 w) r)`
+  on the nose is the tempting statement, and it is false.
 - **The failure arm restores `proc_pt Pnew` exactly**, via
   `um_del_run_restore_sub` — the ⊆ form of `um_del_run_restore`, because
   uvmcopy maps only the vpns the parent had, not the whole run.

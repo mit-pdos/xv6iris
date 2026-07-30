@@ -14,8 +14,8 @@ The protocol layer, in place and green:
   descriptor-triple counting argument.
 - `DiskPtsto.v` — the disk points-to ghost (`disk_byte`/`disk_bytes`/
   `disk_block`), the `dclaim` record and the `disk_names` bundle.
-- `VirtioProto.v` — `virtio_proto` (which replaced `virtio_lease` in
-  `dev_inv_body`), the four protocol accessors (publish / observe-avail /
+- `VirtioProto.v` — `virtio_proto`, the disk's DRIVER PROTOCOL as it sits in
+  the invariant body, the four protocol accessors (publish / observe-avail /
   observe-used / reclaim) and the device-thread rules.
 - `WpSmodeHalf.v` (new, PROVEN) — `wp_lhu_s_sconf`/`wp_lh_s_sconf`/`wp_sh_s_sconf`
   width-2 RAM leaves, one line each off `WpSconfMem.wp_load_s_sconf_gen_u` (the
@@ -23,10 +23,11 @@ The protocol layer, in place and green:
   restatements). NOTE: `WpSconfMem.v`'s
   `wp_{load,store}_s_sconf_au` atomic-update parents are width/uns-generic —
   use THOSE (WpSconfLock pattern) for the dev_inv-opening leased-byte accesses.
-- `WpVirtioExec.v` + `WpVirtioMmio.v` (new, PROVEN) — window facts + raw-frag
-  width-4 MMIO store/load leaves (`wp_sw_virtio_frag_s_sconf`,
-  `wp_lw_virtio_frag_s_sconf`) for the init proof. WpPlicExec towers were
-  already window-generic; nothing cloned.
+- `WpVirtioExec.v` — the window facts (WpPlicExec's towers were already
+  window-generic; nothing cloned) — and `WpVirtioDev.v`, the width-4 MMIO
+  store/load leaves the init proof runs on: `wp_{lw,sw}_virtio_dinv_s_sconf`
+  open the bare `disk_inv`, with the `dev_inv`-bundle forms as restatements.
+  There is no raw-fragment leaf; see main-boot.md's G1 for why.
 
 ### Interfaces this effort added that other drivers should reuse
 
@@ -110,10 +111,10 @@ Remaining in the whole virtio effort:
   far; the natural statement is a `sector ↦ bytes` resource over `v_disk`,
   minted alongside the lease.
 
-The device model behind `kernel/virtio_disk.c`. The MACHINE side is done and
-proven: the disk exists as a third device on the fabric, it runs as part of the
-device execution context, its DMA is modelled honestly, and `wp_dev_loop`
-discharges the DMA step. What is left is the DRIVER side.
+The device model behind `kernel/virtio_disk.c`. The MACHINE side: the disk
+exists as a third device on the fabric, it runs as part of the device execution
+context, its DMA is modelled honestly, and `wp_dev_loop` discharges the DMA
+step.
 
 Read [`design/device.md`](../design/device.md) first — it describes the device
 fabric this plugs into.
@@ -217,11 +218,11 @@ shape and footprint predictable in the first place; without it the obligation
 would not survive its own step.
 
 **Why POSITIVE matters.** The obligation asserts that the reachable entries
-*are* well-formed requests. An earlier version stated it as an implication — if
-a step happens then its writes are inside the lease — and that version was
-unsound: a driver that misconfigured the queue made the step never fire, and
-then satisfied the obligation *vacuously with an empty lease* while the real
-device DMA'd into wild memory. `DevStepDiskWild` is the enforcement mechanism:
+*are* well-formed requests. Stating it as an implication instead — if a step
+happens then its writes are inside the lease — is UNSOUND: a driver that
+misconfigures the queue makes the step never fire, and then satisfies the
+obligation *vacuously with an empty lease* while the real device DMAs into wild
+memory. `DevStepDiskWild` is the enforcement mechanism:
 `wp_dev_loop` can only be proven by refuting it
 (`virtio_lease_not_stalled`), so a driver must positively establish
 well-formedness or be unverifiable.

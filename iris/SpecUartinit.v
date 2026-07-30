@@ -14,14 +14,13 @@
      off 1 = 0x03   enable tx/rx interrupts (IER)
    then [initlock(&tx_lock, "uart")].
 
-   STATED OVER THE TIME-0 DEVICE INVARIANT (2026-07-29).  This contract used to
-   own the RAW [uart_frag] half, on the premise that device init runs before
-   [dev_inv] is allocated.  That premise is false: the UART thread is a
-   top-level thread from step 0 and every one of its steps needs the fragment,
-   so [uart_frag] can never sit raw in a CPU's precondition while the system
-   runs.  The contract is therefore stated over [WpUart.uart_inv], and the two
-   writes the invariant was thought to forbid are both discharged by ghost
-   arithmetic rather than by running early:
+   STATED OVER THE TIME-0 DEVICE INVARIANT.  Device init does NOT run before
+   [dev_inv] is allocated: the UART thread is a top-level thread from step 0 and
+   every one of its steps needs the fragment, so [uart_frag] can never sit raw
+   in a CPU's precondition while the system runs.  The contract is therefore
+   stated over [WpUart.uart_inv], and the two writes that look incompatible with
+   an invariant are both discharged by ghost arithmetic rather than by running
+   early:
 
      - the FCR FIFO-CLEAR (off 2, bit 2) discards queued bytes, which a
        [mono_list] over [uart_acc] cannot do -- unless the FIFO is provably
@@ -66,11 +65,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
 Notation UART_INIT := KernelSyms.uartinit.
 
-(* NOTE: this file used to define [uartinit_post], the concrete UART state the
-   seven writes produce.  Nothing names it any more -- the state lives inside
-   [uart_inv], the contract talks only about the four ghosts, and the proof
-   goes write-by-write through the accessor leaf rather than composing a
-   closed-form successor -- so it is gone rather than kept as dead vocabulary. *)
+(* NOTE: there is deliberately no [uartinit_post] naming the concrete UART state
+   the seven writes produce.  The state lives inside [uart_inv], the contract
+   talks only about the four ghosts, and the proof goes write-by-write through
+   the accessor leaf rather than composing a closed-form successor, so nothing
+   would consume it. *)
 
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{CID : CpuId}

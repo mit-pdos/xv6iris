@@ -17,11 +17,10 @@
    up, verbatim: in come [WpUart.uart_inv], the "everything accepted has been
    transmitted / the transmitter is mine" pair at [l], and the UNFROZEN DLAB
    half at an arbitrary [b0]; out come the tokens at the same [l] (uartinit
-   writes no THR) and the frozen [uart_dlab_off].  See SpecUartinit.v for why
-   the raw [uart_frag] shape this contract used to have is not viable: the UART
-   thread runs from step 0, so the fragment can never sit raw in a CPU's
-   precondition, and the FIFO-clear / DLAB-set writes are discharged by ghost
-   arithmetic instead.
+   writes no THR) and the frozen [uart_dlab_off].  See SpecUartinit.v for why a
+   raw [uart_frag] shape is not viable here: the UART thread runs from step 0,
+   so the fragment can never sit raw in a CPU's precondition, and the
+   FIFO-clear / DLAB-set writes are discharged by ghost arithmetic instead.
 
    The devsw[] slots are handed back as the raw 8-byte cells holding the two
    function addresses.  Nothing yet says what a [struct devsw] entry MEANS --

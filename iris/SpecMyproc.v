@@ -8,8 +8,8 @@
    under push_off/pop_off.  The hart id is the ambient CpuId: the spec pins
    tp = [cid_word].
 
-   (SpecWakeup.v's [wp_myproc_sconf_any] axiom is the older, weaker ∃-j
-   interface used by wakeup, which threads no current-process resource.) *)
+   This is the only myproc interface: wakeup threads [cur_proc] and uses it
+   directly, so there is no current-process-free ∃-j variant anywhere. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.

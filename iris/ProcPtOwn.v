@@ -67,11 +67,9 @@
    pure side conditions is the same technique as memmove's non-overlap
    hypothesis (claude-notes/completed/memmove.md).
 
-   The trapframe PAGE's bytes are NOT owned here.  They used to be, as a
-   contents-existential [proc_tf_own] conjunct kept separate "precisely so
-   it can later gain STRUCTURE".  That day came: the syscall-argument path
-   needs the VALUE of [tf->aN], which a contents-existential page cannot
-   supply, so the page moved out to [ProcInv.tf_page], which carries all 36
+   The trapframe PAGE's bytes are NOT owned here: a contents-existential
+   page cannot supply the VALUE of [tf->aN], which the syscall-argument path
+   needs, so the bytes live in [ProcInv.tf_page], which carries all 36
    [struct trapframe] words with their values plus the rest of the 4K as
    anonymous bytes.  What stays here is the table's *description* of it --
    [upt_tree_spec] still maps TRAPFRAME to [ud_tfp], and [proc_pt_wf] still

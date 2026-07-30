@@ -586,8 +586,8 @@ that swap, so it can land on its own; see
 The nth syscall argument is word `tf_arg_idx n = 14 + n` — which is exactly the
 immediate field `argraw`'s `c.ld a0,<112+8n>(a5)` encodes.
 
-That page used to be `ProcPtOwn.proc_tf_own`, a contents-**existential**
-`phys_page_own` inside `proc_pt_own`. Two independent reasons it had to move:
+The trapframe page is NOT part of `proc_pt_own` (as a contents-**existential**
+`phys_page_own` would be). Two independent reasons it belongs here instead:
 
 - **Ownership.** `mem_pointsto` is *defined* in terms of `↦ₚ`
   (`phys_to_mem_map`'s proof: `rewrite /mem_pointsto. iExists ppn. iFrame`), so

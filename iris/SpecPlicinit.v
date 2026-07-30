@@ -13,12 +13,11 @@
    The two stores are S-mode 32-bit MMIO writes through the kernel page table's
    PLIC identity mapping.
 
-   STATED OVER THE TIME-0 DEVICE INVARIANT (2026-07-29).  This contract used to
-   own the RAW [plic_frag] half, on the premise that boot-time device init runs
-   before the device threads are live.  That premise is false -- the PLIC
-   gateway latches whenever an irq line is up, so [plic_frag] can never sit raw
-   in a CPU's precondition while the system runs -- so plicinit is stated over
-   [WpUart.plic_inv] and borrows the fragment around each of its two writes.
+   STATED OVER THE TIME-0 DEVICE INVARIANT.  Boot-time device init does NOT run
+   before the device threads are live -- the PLIC gateway latches whenever an
+   irq line is up, so [plic_frag] can never sit raw in a CPU's precondition
+   while the system runs.  plicinit is therefore stated over [WpUart.plic_inv]
+   and borrows the fragment around each of its two writes.
 
    NOTHING comes back on the device side, and the contract does not name the
    resulting PLIC state at all: no consumer needs the priorities recorded (a

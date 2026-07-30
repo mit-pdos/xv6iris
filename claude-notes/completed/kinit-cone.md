@@ -133,42 +133,6 @@ kinit takes `ps` + `prun PHYSTOP s1entry ps` + `[∗ list] page_own` as a
 precondition; the caller (the boot initialization sequence) supplies them when
 its proof reaches the kinit call.
 
-## kinit -- earlier notes (superseded by the DONE section above)
-
-prologue (ra@8/s0@0, 16-byte frame) → auipc/addi set a1="kmem" a0=&kmem →
-`jal initlock` (wp_initlock) → **`newlock` ghost step** building
-`is_kmem γ γk lk fl` from `lk ↦₄ 0` (initlock's output) + `fl ↦₈ 0`
-(kmem.freelist BSS-zero) + empty `freelist_chain nullp []` + the count ghost
-minted by `kalloc_avail_alloc 0` (`kalloc_avail γk (Some 0)` stays with the
-boot thread; `kmem_avail_auth γk 0` goes into the invariant) → li/slli set
-a1=PHYSTOP, auipc/addi a0=end → `jal freerange` → epilogue.  Precondition owns
-the `kmem` struct bytes (lock 3 fields + freelist word) + ALL physical pages
-`[PGROUNDUP(end), PHYSTOP)` + the cells (noff=0) + the `mycpu≠0` hypothesis.
-Post hands back `kalloc_avail γk (Some N)` (N = #pages freed) — the budget the
-rest of boot spends on guaranteed-success kallocs, then converts via
-`kalloc_avail_seal` into the persistent `kalloc_avail γk None` that seeds
-`kalloc_env`.
-
-Concrete pieces (all leaves already exist — no new leaf layer):
-- 16-byte frame is `c.addi sp,-16`/`c.addi sp,16` (NOT c.addi16sp; 0x1141/0x0141
-  decode to `C_ADDI`), so `wp_caddi_sp_s_sconf`/move_down 2 like initlock.
-  li=`wp_cli_s_sconf`, slli=`wp_cslli_s_sconf`, both present.  Decode facts:
-  a fresh `WpKinitDecode.v` (kii_00..kii_2e), ASTs via the `decode_c_pure`/
-  `ext_decode` probe (li a1,17 = `C_LI(17, Regidx 11)`; slli a1,a1,27 =
-  `C_SLLI(27, Regidx 11)`; addi4spn imm8 for +16 = 4; the two jals + 3 auipc/addi).
-- `is_kmem`/kmem_res empty build: `kalloc_avail_alloc 0` mints
-  `kalloc_avail γk (Some 0)` + `kmem_avail_auth γk 0`; `kmem_res_close γk fl nullp []`
-  builds `kmem_res γk fl` from `word_at fl nullp` (fl↦0) + `freelist_chain nullp []`
-  (= emp) + auth; then the spin-lock `newlock`/is_lock allocation over `lk ↦₄ 0`.
-  Find the exact is_lock-alloc lemma in WpLock (spin_lock.v newlock wrapper).
-- **THE hard new obligation**: a generative lemma turning "own every byte of
-  `[PGROUNDUP(end), PHYSTOP)`" into `∃ ps, ⌜prun PHYSTOP s1entry ps⌝ ∗
-  [∗ list] p ∈ ps, page_own p` with `length ps = N`.  Induct over the page
-  count (PHYSTOP-PGROUNDUP(end))/PGSIZE; each step peels one 4096-byte page into
-  `page_own` and extends `prun`.  This is the main proof effort left.
-- freerange is called with `on := Some 0`; its post `kalloc_avail γk (Some (length ps))`
-  = `Some N` flows straight into kinit's post.
-
 ## Robustness rails
 
 axiom check (`Print Assumptions`, baseline + funext + kerneltrap_returns) and

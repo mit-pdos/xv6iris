@@ -66,10 +66,10 @@ Section SchedCtx.
   (* The two payload halves shared by both swtch directions.              *)
   (* ------------------------------------------------------------------ *)
 
-  (* NOTE: this CPU's [struct cpu] no longer rides in the payload -- the
-     whole [cpu_own γ 1 eb p emp] bundle crosses at the [valid_context]
-     wand interface (SwtchCtx.v), at the RESUMER's [eb]/proc; the payload
-     below carries only the chain-protocol facts and the held lock. *)
+  (* NOTE: this CPU's [struct cpu] does NOT ride in the payload -- the whole
+     [cpu_own γ 1 eb p emp] bundle crosses at the [valid_context] wand
+     interface (SwtchCtx.v), at the RESUMER's [eb]/proc; the payload below
+     carries only the chain-protocol facts and the held lock. *)
 
   (* holding proc j's spinlock, contents out: the holder token and the state
      and chan cells.  The lock's own cpu word is inside [lock_inv] and the

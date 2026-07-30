@@ -108,11 +108,12 @@ c.mv, the c.bnez, and the two base jals decoded locally.  callee_saved recovered
 from callee_saved P6 (P6 = mm off the callee-saved set; only a2/a3/a5 clobbered).
 `kvmmap_spec_holds : ⊢ kvmmap_spec`.
 
-Axioms of all four = the 6 standard model stubs (+ panic_wp as a hypothesis).
+Axioms of all four = the baseline (5 model platform axioms + funext), with
+panic_wp a hypothesis rather than an axiom.
 
-## Remaining work
+## The whole-function layer
 
-### 1. Translation-regime parameterization (SRegime.v) — stage (d) remains
+### 1. Translation-regime parameterization (SRegime.v)
 
 Design (decided, no leaf duplication): the S-mode leaf layer's contact with
 translation is NARROW — every leaf threads a translation invariant as an opaque
@@ -191,10 +192,9 @@ execution never fills the TLB, kvminithart's first sfence zeroes it anyway, so
 after `csrw satp` the proof builds `tlb_inv_pt` directly from `pt_rep t kvm_map`
 + `tlb_ok_pt_empty`, and the second sfence is an ordinary Sv39 step.
 
-### 2. wp_kvmmake / wp_proc_mapstacks / wp_kvminit (ACTIVE — directed
-    2026-07-23; the rwx-kmap machinery that blocked this is DONE)
+### 2. wp_kvmmake / wp_proc_mapstacks / wp_kvminit
 
-USER DECISIONS (2026-07-23):
+The decisions this cone rests on:
 - NO panic arm anywhere in the cone: kalloc's counting ghost guarantees
   success — the kvminit cone takes a sufficiently large count as a
   PRECONDITION.  This REQUIRES re-specing the proven walk/mappages/
@@ -290,291 +290,19 @@ package arithmetic into mword-free top-level helper lemmas and apply
 them as closed facts.  NOTE: kvm_M_wf will be DELETED and
 kvm_M gains the tramp entry in the uniform-claims revision stage C
 (rwx-kmap.md).  (iii) proc_mapstacks/kvmmake/kvminit
-specs (KvmSpec.v) — sign-off shape below is superseded by the above;
-=====================================================================
-SESSION CHECKPOINT 2026-07-24 (usage-credit pause) — RESUME HERE
-=====================================================================
-Working tree should be CLEAN at or after commit 099294f except this
-notes commit; verify `git status` first (an interrupted session may
-have left ProofProcMapstacks.v/LinkProcMapstacks.v WIP — none existed
-at checkpoint time).
+specs (KvmSpec.v).
 
-LEDGER (all on main, each full-build green at its commit):
-  a0cd4d4  counted kalloc tier (item i)
-  9630265  KvmMap + kvm_bridge (item ii)
-  2af5603 / 705131e / 27ed01f / 713627a  uniform-claims A'/B'/pte8/C
-           (rwx-kmap.md — that project's model is COMPLETE)
-  1897bca  sharp pt_missing bound + ptree_offpath_eq walk export;
-           kvmmap's counted arm refutes its panic branch
-  06e0e80  the three cone specs (superseded surface — see 099294f)
-  099294f  decode catalogs (WpProcMapstacksInstr 62 / WpKvmmakeInstr
-           64+11, all frames/stride CONFIRMED) + specs restructured to
-           SpecProcMapstacks/SpecKvmmake/SpecKvminit.v (_body + Module
-           Type, sie_cap_gpr interface; KvmSpec's dead legacy trio and
-           Variable R deleted)
-
-STATUS 2026-07-26: items (v).0 through (v).3 are ALL DONE and pushed
-(ledger: pt_present_mono surgery 59ea448; wp_proc_mapstacks ee92d98
-+ the 9e8a90b interleaved-peel optimization; wp_kvmmake acb4655 —
-census-pinned 102 tables, exact 166-page consumption, K_kvmmake
-premise STRICT per the spare-page note below; wp_kvminit is the
-commit carrying this note).  The kvminit deliverable stands:
-kernel_pagetable ↦₈ root with pt_rep0 t (kvm_map_full pas), feeding
-kvm_bridge.  STAGE 6 CORE IS ALSO DONE (2026-07-26, 5a46a50):
-wp_kvminithart installs the table — see rwx-kmap.md's stage-6
-status block for what little remains there (demonstrator +
-cleanups).  This project's own worklist is EXHAUSTED; candidate to
-move to completed/ after the demonstrator lands.
-
-ORIGINAL WORKLIST (all done, kept for the design record):
-(v).0  THE pt_present_mono SPEC SURGERY (decided 2026-07-24; option B
-   of the proc_mapstacks agent's analysis — chosen over per-vpn
-   offpath threading per the one-general-abstraction principle):
-   - PtBuild: `pt_present_mono t t' : Prop` — every present L1/L0 node
-     of t is present in t' (kid-level, both levels).  Reflexive,
-     TRANSITIVE (composes across mappages' pages and proc_mapstacks'
-     64 calls), implied by pt_graft1/pt_graft2/pt_upd_kid-descend and
-     preserved by ptree_set_leaf; yields
-     `pt_missing t' v np <= pt_missing t v np` for ALL v, np
-     (subsumes the verified-in-isolation helper pt_missing_offpath_mono
-     whose statement is in the 2026-07-24 proc_mapstacks agent report:
-     offpath_eq + the two present-facts => per-vpn missing mono; that
-     helper's proof splits pt_missing_1_eq into l0/l1_absent components
-     and uses offpath_l{0,1}_flip — reuse the technique).
-   - Export `⌜pt_present_mono t t'⌝` from walk/mappages/kvmmap posts
-     (SpecWalk/SpecMappages/SpecKvmmap bodies + Module Types +
-     Proof*/Link*; sealed functors so no caller re-verifies), AND
-     forward mappages' existing ⌜g <= pt_missing t vpn0 npages⌝
-     through kvmmap's continuation (ProofKvmmap has %Hmiss in scope at
-     ~l.210 — just thread it).
-(v).1  ProofProcMapstacks.v + LinkProcMapstacks.v per the BLUEPRINT in
-   the same agent report (recorded here in essentials):
-   - three-part house pattern a la ProofMappages: Qed-sealed epilogue
-     (10-slot restore +0x80..+0x96, both exits funnel), fuel-inducted
-     loop on remaining proc count, prologue +0x00..+0x52 (frame +
-     &proc/TRAMPOLINE/magic-constant materialization).
-   - loop invariant: s1 = &proc + i*0x168 register column (+s8/s2/s3),
-     pt_base preserved, pt_rep0 tk (kvm_stacks pas i m), kalloc_env at
-     avail_sub on (i + g_so_far), budget
-     (i + g_so_far) + Σ_{j>=i} pt_missing tk (kstack_vpn j) 1
-       <= 64 + kstacks_missing t
-     (telescopes via pt_present_mono + the per-call sharp bound),
-     pas extension (fun j => if j <? i then pas_so_far j else new_pa),
-     accumulated [∗ list] page_own.
-   - per iteration: kalloc (counted null-arm REFUTED: avail_zero at a
-     positive counter; idiom at ProofWalk.v:813-885), arg setup,
-     SpecKvmmake... (no: SpecKvmmap) wp_kvmmap_sconf counted arm from
-     the budget, step s1, recurse.
-   - catalog anchors: kalloc jal pmsi_52, kvmmap jal pmsi_74,
-     null-panic beqz pmsi_58, stride addi pmsi_78, loop bne pmsi_7c.
-   - KSTACK index-recovery arithmetic (the magic-reciprocal multiply
-     s2 = 0x..4fa4fa4f chain, pmsdec_5a..6e) needs bridge lemmas
-     (analogues of mappages_pte_compute/mappages_s2_val).
-   - kvm_pas_ok from kalloc's page_valid; page addresses
-     zext(concat (pas i) 0^12).
-(v).2  ProofKvmmake + Link: root kalloc + memset (SpecMemset*) + the
-   six kvmmap calls chained DEFINITIONALLY through KvmMap.kvm_m1..
-   kvm_map (each post's pt_insert_run IS the next pre's pt_rep0) +
-   the proc_mapstacks call; pin ⌜pt_nodes t = 102⌝ by computing the
-   witness; budget K_kvmmake = 166 telescoped across the calls.
-   Catalog: WpKvmmakeInstr kmkdec_*/kmki_*.
-   OFF-BY-ONE FIX REQUIRED FIRST (found 2026-07-24 during the budget
-   telescope check; apply at the next green boundary): the strict-<
-   counted-arm convention makes every failure-arm refutation demand
-   ONE SPARE page beyond true consumption (kvmmap with missing=0 and
-   remaining=Some 0 has an unrefutable avail_zero failure arm).  True
-   consumption is exactly 166, and at the proc_mapstacks call
-   (consumed<=102, kstacks_missing t6 = 0 via the tramp entry's
-   pt_rep0 presence) the premise 64+0 < nb-102 forces nb >= 167.  So
-   SpecKvmmake/SpecKvminit keep K_kvmmake = 166 (the post's
-   avail_sub on 166 is the true consumption) but the PREMISE tightens
-   to STRICT: (K_kvmmake < nb)%nat — uniform with kvmmap's
-   missing < nb and proc_mapstacks' 64+kstacks_missing < nb.
-   PROOF-SIDE BUDGET LEDGER (per-call missing upper bounds, each
-   needing the presence facts from pt_rep0 t_j m_j at the ALREADY
-   MAPPED vpns): uart<=2, virtio<=0 (shares group 128 + l1 0 with
-   uart), plic<=32 (l1 0 present), text<=2, data<=63 (group 1024 +
-   l1 2 present from text), tramp<=2; sum 101, +root = 102, +64
-   stacks = 166.  Needs a small pt_missing upper-bound kit:
-   pt_rep0 + m!!vpn=Some w => l0_absent/l1_absent = 0 at vpn's
-   groups, and l0count/l1count interval bounds (<= length, minus one
-   per provably-present group).
-(v).3  ProofKvminit + Link: kvmmake call + the sd into
-   kernel_pagetable @ 0x8000a238 (identity ↦₈ cell; kidec_*/kii_*).
-THEN: rwx-kmap STAGE 6 (see rwx-kmap.md staging C→6): the kvminithart
-   switch — dissolve the Bare arm (recover kmap_auth kmap_M0 + satp),
-   build tlb_inv_pt from kvminit's post via KvmMap.kvm_bridge
-   (pt_rep0 t (kvm_map_full pas) -> kpt_tree_spec_gen root (kvm_M pas))
-   + tlb_ok_pt_empty after the sfence, fold 65 kmap_inserts (64
-   kstacks via kvm_M_stacks order + tramp), hand out the kstack claims
-   + tramp claim + stvec cell; then the ↦ᵥ-style kstack demonstrator.
-
-STANDING AGENT-BRIEF RULES (repeat in every subagent prompt): read
-durable-notes.md Build+gotchas first; opam switch eval; foreground
-builds, generous timeouts; NEVER any git command; never pkill -f coqc;
-no make clean-proofs; never normalize kmap_M0/kmap_static_claims/
-kvm literals/kernel image maps; statements frozen unless the brief
-authorizes; STOP-AND-REPORT design-level issues; no admits in
-deliverables; templates named per task.  Orchestration: Fable states
-specs/designs, Opus subagents prove; checkpoint-commit green stage
-boundaries to main AND PUSH TO origin/main before continuing (user
-directive 2026-07-26) — fetch + rebase over the user's concurrent
-commits, rebuild the affected cone honestly (touch the content-changed
-files so make recompiles them and their dependents), verify green,
-then push; commit from the repo ROOT — cwd often sits in iris/.
-
-OFF-PATH FRAME DECISION (2026-07-24): pt_missing + all telescope/flip
-lemmas are DONE and green (PtBuild §10-§12), but ptree_same_rep0 is
-node-presence-blind (a present all-zero L0 vs an absent one agree on
-rep0 yet differ in pt_missing), so mappages' loop cannot track the
-sharp bound through walk's current frame.  DECIDED: option (a) —
-same_rep0 STAYS (map-level frame, consumers untouched); walk's post
-ADDITIONALLY exports the structural off-path agreement
-`ptree_offpath_eq vpn t t'` (kid-level: l2 kids agree off vpn_idx 2;
-within vpn's l1 kid, kids agree off vpn_idx 1; a freshly grafted l1 kid
-has all-None other slots), threaded through wp_walk_loop_sconf's
-Hrestore continuation.  The predicate delivers exactly the telescope's
-four hypotheses; consumed per-iteration inside mappages' step (no
-cross-iteration transitivity needed — the loop invariant is the
-pt_missing INEQUALITY).
-
-ITEM (iii) DESIGN (2026-07-24 — the specs; RESOLVES the panic question):
-
-The 2·npages growth bound is USELESS for refuting the panic branch
-mid-chain (2·32761 exceeds the whole budget).  TRUE panic-freedom needs
-the SHARP bound:
-- NEW pure function `pt_missing t vpn0 npages : nat` (PtBuild): the
-  number of table pages the run's walks would ALLOCATE — absent-l1s +
-  absent-l0s along [vpn0, vpn0+npages).  Well-defined on 0-form trees.
-- walk/mappages posts gain `⌜g ≤ pt_missing t vpn0 npages⌝` (walk: its
-  one-page instance; mappages: the invariant telescopes
-  g_so_far + pt_missing(tk, rest) ≤ pt_missing(t0, all)).
-- kvmmap_spec's counted arm REFUTES the -1/panic branch internally:
-  hypothesis becomes `match on with None => panic_wp | Some n =>
-  ⌜pt_missing t vpn0 npages < n⌝ end` — with the sharp bound, the -1
-  arm's avail_zero(avail_sub (Some n) g) + g ≤ missing < n is a
-  contradiction, the branch is DEAD, and no panic_wp is needed.  None
-  mode is verbatim today's spec.
-
-THE THREE SPECS (KvmSpec.v):
-- proc_mapstacks_spec: pre = a0 = kpgtbl, ptree_own t + ⌜pt_rep0 t m⌝ +
-  ⌜∀ i<64, m !! kstack_vpn i = None⌝ + kalloc_env γ on tp + counted arm
-  ⌜Some n => 64 + pt_missing-of-the-64-runs < n⌝ (each kstack run is 1
-  page; missing ≤ 1 l0 shared + ...; concrete at kvm_map: compute).
-  Post: ∃ pas, ⌜kvm_pas_ok-shaped facts⌝ ∗ ptree_own t' ∗
-  ⌜pt_rep0 t' (kvm_stacks pas 64 m)⌝ ∗ ⌜pt_base t' = pt_base t⌝ ∗
-  ∃ g, ⌜pt_nodes t' = pt_nodes t + g⌝ ∗
-  kalloc_env γ (avail_sub on (64 + g)) tp ∗ the 64 pages' ownership
-  ([∗ list] page_own-form at pas i) ∗ callee_saved/stack_own etc. per
-  the house whole-function shape.  pas as a FUNCTION nat→mword 44.
-- kvmmake_spec: pre = kalloc_env γ on tp + counted ⌜Some n =>
-  K_kvmmake ≤ n⌝ with K_kvmmake = 166 (102 tables incl. root + 64
-  stacks; PIN by computing pt_nodes of the witness = 102 in the proof).
-  NO panic_wp anywhere (root kalloc: budget > 0; six kvmmap calls: the
-  sharp-bound arms; mapstacks: its counted arm).  Post: a0 = root
-  (fresh page, page-aligned), ∃ pas t, ptree_own 2 1 t ∗
-  ⌜pt_rep0 t (kvm_map_full pas)⌝ ∗ ⌜pt_base t = root-ppn⌝ ∗
-  ⌜pt_nodes t = 102⌝ ∗ kalloc_env γ (avail_sub on 166) tp ∗ stack pages'
-  ownership ∗ house post shape.  The six kvmmap posts chain
-  DEFINITIONALLY through kvm_m1..kvm_map (KvmMap's literals).
-- kvminit_spec: kvmmake + sd into the kernel_pagetable global cell
-  (KernelSyms; identity ↦₈).  Post: kernel_pagetable ↦₈ root ∗
-  everything from kvmmake's post minus a0.  UNCONDITIONAL success —
-  no failure arm, no panic_wp, budget premise K_kvminit = 166 ≤ n.
-  This is THE deliverable: the verified construction of the table the
-  stage-6 switch installs (its post feeds kvm_bridge directly).
-
-(iv) decode catalogs (WpProcMapstacksInstr ~90, WpKvmmakeInstr ~44 —
-2-ORIG (d) guidance stands: reuse KernelRvcDecode templates, JAL
-residues mod 2^21, probe ASTs before committing); (v) whole-function
-proofs (order: pt_missing machinery → proc_mapstacks → kvmmake →
-kvminit), each through a sealed epilogue + the Spec/sealed-functor/Link
-shape so the coverage report sees them.
-
-### 2-ORIG. wp_kvmmake / wp_proc_mapstacks / wp_kvminit (original checkpoint)
-
-A large, design-heavy NEW LAYER; walk + mappages + kvmmap are the building
-blocks.  Full design checkpoint:
-
-**(a) Constants to add** (most do NOT exist yet — only UART0/plic_base in
-DevModel, TRAMPOLINE in TrampPt, etext/proc in KernelSyms, NPROC in WpWakeup).
-From xv6-riscv/kernel/memlayout.h + riscv.h:
-  - KERNBASE = 0x80000000, PHYSTOP = KERNBASE + 128*1024*1024 = 0x88000000
-  - UART0 = 0x10000000, VIRTIO0 = 0x10001000, PLIC = 0x0c000000
-  - MAXVA = 1 << (9+9+9+12-1) = 0x4000000000; TRAMPOLINE = MAXVA - PGSIZE =
-    0x3FFFFFF000 (already in TrampPt.v)
-  - KSTACK(p) = TRAMPOLINE - (p+1)*2*PGSIZE  (guard page below each stack)
-  - proc array base = KernelSyms.proc = 0x80012778; sizeof(struct proc) for the
-    p++ stride (from the +0x78 addi in the proc_mapstacks loop: 0x168 = 360
-    bytes — CONFIRM against the dump).
-  - PTE flags: perm to kvmmap is WITHOUT V (mappages ORs V in): R|W = 6, R|X =
-    2|8 = 10.
-
-**(b) The [kvm_map] gmap literal** (kernel/vm.c kvmmake order; each region is a
-[pt_insert_run] applied to the accumulator so the six kvmmap posts chain
-DEFINITIONALLY — the k-th post [pt_insert_run m_prev vpn0_k ppn0_k perm_k
-npages_k] becomes the next call's precondition [pt_rep0 t m_k]):
-  1. UART0    va=pa=0x10000000, 1 page,             perm 6  (R|W)
-  2. VIRTIO0  va=pa=0x10001000, 1 page,             perm 6
-  3. PLIC     va=pa=0x0c000000, 0x4000000 B = 16384 pages, perm 6
-  4. text     va=pa=KERNBASE, (etext-KERNBASE)=0x7000 = 7 pages, perm 10 (R|X)
-  5. data     va=pa=etext, (PHYSTOP-etext)=0x7FF9000 = 31977 pages, perm 6
-  6. tramp    va=TRAMPOLINE, pa=trampoline (phys page), 1 page, perm 10
-  then proc_mapstacks: 64 KSTACK(i) pages → kalloc-chosen pas, perm 6.
-The existing bounds SUFFICE (no spec loosening): PLIC pa 0x0c000000 +
-16384*4096 = 0x10000000 ok; data va 0x80007000 + 31977*4096 = 0x88000000 < 2^38
-ok, pa same < 2^56 ok.  Each region start is page-aligned by construction (all
-constants multiples of 0x1000) so `subrange va 11 0 = 0` discharges by
-vm_compute; `mappages_perm_ok 6`/`mappages_perm_ok 10` are two fixed lemmas
-(pte_valid/leaf/no_napot/pbmt0 of mk_pte 0 (6|1) and mk_pte 0 (10|1), all
-vm_compute on the flag byte).  NO-REMAP obligation
-([forall i<npages, m_k !! vpn_at vpn0_k i = None]): the regions are DISJOINT in
-va (devices < 0x10002000, PLIC 0x0c.., text/data 0x8.., tramp at MAXVA, stacks
-just below tramp) — prove a per-region disjointness lemma (vpn ranges don't
-overlap) feeding pt_insert_run_lookup-style reasoning; the main NEW
-pure-arithmetic burden.
-
-**(c) Spec signatures to add to KvmSpec.v** (currently only sketched in
-comments):
-  - [proc_mapstacks_spec]: args kpgtbl=a0, tree t repr m, the 64 KSTACK vpns
-    unmapped, kalloc_env, panic_wp; post = ∃ (pas : nat → mword 44), tree t'
-    repr (m + {KSTACK i → mk_pte (pas i) 6 | i<64}), pt_base preserved,
-    kalloc_env restored.  Existential pas as a FUNCTION nat→pa (not a list)
-    keeps the induction clean.  Fuel = remaining proc count, invariant carries
-    the pas chosen so far.  Structurally = mappages' loop but per-iter body is
-    kalloc (env threading, null→panic) + kvmmap (needs panic_wp, aligned page
-    from kalloc, KSTACK(i) aligned+unmapped+bounded).
-  - [kvmmake_spec]: NO incoming tree (kallocs the root itself); pre = kalloc_env
-    with ENOUGH free pages.  SIMPLEST design: require panic_wp and make every
-    kalloc-null go to panic, so post is unconditional full kvm_map.  Post:
-    ret(a0) = root pa, ptree_own 2 1 t with pt_rep0 t kvm_map, root is a FRESH
-    page.  Stack: kvmmake frame is 4 slots (ra,s0,s1,s2 at +0x00 c.addi16sp
-    -32 — decode-check) but it CALLS mappages/walk (need 32), so n ≥ 32 +
-    kvmmake's own frame.
-  - [kvminit_spec]: kvmmake then [sd a0, kernel_pagetable]; needs the
-    kernel_pagetable global cell.  Post: kernel_pagetable points at kvm_map root.
-  Get Nickolai's sign-off on the kvm_map shape + the "panic on any kalloc-null"
-  simplification BEFORE building the proofs (spec-design preferences: constant
-  depth bounds, no ad-hoc arg coupling).
-
-**(d) Decode catalogs** (mechanical, ~90 + ~44 instrs; reuse KernelRvcDecode's
-shared frame templates mdec_ccc..cf0 as WpKvmmap did): WpProcMapstacksInstr.v
-(frame 0x715d = 80-byte = 10 slots [the old "11" here was wrong -- decode
-pass confirmed 10 saved regs ra,s0..s8], KSTACK arith auipc/lui/addi/mul-by-stride/
-sub, kalloc+kvmmap jals, the p<&proc[64] bne loop) and WpKvmmakeInstr.v
-(kalloc+memset+6*{auipc/lui/addi arg setup + kvmmap jal} + proc_mapstacks jal).
-Generate programmatically as in WpMappagesInstr; JAL residues = (target - pc) mod
-2^21.  WATCH the base ASTs for lui/mul/sub — probe with the vm_compute-on-decode
-trick only if rvc_oneshot/decode_bridge_ms rejects a guessed AST (each miss = a
-~minute compile, so get immediates right up front from the dump).
-
-**(e) Proof order**: proc_mapstacks FIRST (self-contained, unblocks kvmmake),
-then kvmmake (root kalloc + memset + zero_page_to_node at level 2 + the six
-chained kvmmap calls + the proc_mapstacks call), then kvminit (kvmmake + one sd).
-Each funnels through a sealed epilogue like the mappages/kvmmap ones.  The six
-kvmmap calls each want callee_saved recovery + the accumulator-tree transport
-(t_k repr m_k) between calls; the a0/a1/.. arg-register reloads between calls are
-the per-call auipc/lui/addi sequences already in the dump.
+BUDGET LEDGER (what makes K_kvmmake = 166 exact, and why the premise is
+STRICT).  Per-call upper bounds on `pt_missing`, each needing the presence
+facts from `pt_rep0 t_j m_j` at the already-mapped vpns: uart <= 2, virtio <= 0
+(shares group 128 + l1 0 with uart), plic <= 32 (l1 0 present), text <= 2, data
+<= 63 (group 1024 + l1 2 present from text), tramp <= 2 — sum 101, + root = 102,
++ 64 stacks = 166.  That 166 is TRUE consumption, so the post's `avail_sub on
+166` is exact; the PREMISE is `(K_kvmmake < nb)%nat`, strict, because the
+strict-< counted-arm convention makes every failure-arm refutation demand one
+spare page beyond true consumption (a kvmmap with missing = 0 and remaining =
+`Some 0` has an unrefutable `avail_zero` failure arm).  Uniform with kvmmap's
+`missing < nb` and proc_mapstacks' `64 + kstacks_missing < nb`.
 
 ### 3. Boot introduction — DONE (`wp_kvminithart`, 5a46a50)
 

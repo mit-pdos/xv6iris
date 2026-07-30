@@ -82,17 +82,21 @@ The pieces:
 ```
 proc_pt_wf P  := upt_map_wf ud_um ∧ upt_acc_wf ud_um
                ∧ um_pages_valid ud_um ∧ page_valid (page_base ud_tfp)
-proc_pt_own P := proc_tf_own ud_tfp ∗ upt_pages_own ud_um     (* what it OWNS *)
+proc_pt_own P := upt_pages_own ud_um                          (* what it OWNS *)
 proc_pt P     := ⌜proc_pt_wf P⌝ ∗ pt_frame (upt_tree_spec …) ∗ proc_pt_own P
 proc_pt_at pa P := p_pagetable pa ↦₈ page_base ud_root
                  ∗ p_trapframe pa ↦₈ page_base ud_tfp ∗ proc_pt P
 ```
 
-The trapframe page is its own conjunct (`proc_tf_own`, `phys_page_own ud_tfp`
-today) so it can later gain **structure** — the saved user registers,
-`kernel_satp`, `kernel_sp`, `epc`, which uservec/usertrapret read back —
-without disturbing the rest. Existential contents are all `wp_userret_pt`
-needs today; the eventual `stvec_handler_wp` discharge (uservec) is what
+The trapframe page's BYTES are not owned here at all: they carry structure —
+the saved user registers, `kernel_satp`, `kernel_sp`, `epc`, which
+uservec/usertrapret read back, and the argument words the syscall path needs by
+VALUE — which a contents-existential `phys_page_own` cannot supply, so they live
+in `ProcInv.tf_page`. What stays here is the table's description of the page
+(`upt_tree_spec` maps TRAMPOLINE/TRAPFRAME, `proc_pt_wf` demands
+`page_valid (page_base ud_tfp)`) and the `p->trapframe` cell in `proc_pt_at`.
+Existential contents are all `wp_userret_pt` needs today; the eventual
+`stvec_handler_wp` discharge (uservec) is what
 will force the structured form.
 
 Parked ⇄ installed differ in **exactly one conjunct** (`pt_frame` vs
@@ -117,7 +121,7 @@ uses neither, so the move is transparent.)
 **Step 2 — move `ProcPtOwn.v`'s §1–§3 into `UserPtTree.v`.** `pte_ppn`,
 `page_base`, `um_ppns`, `page_pas`, `um_pas`, `ud_pas`, `um_pages_valid`,
 `proc_pt_wf`, `phys_byte_any`, `phys_page_own`, `upt_pages_own`,
-`proc_tf_own`, `proc_pt_own`. `UserPtTree.v` owns `uptd`, so the descriptor
+`proc_pt_own`. `UserPtTree.v` owns `uptd`, so the descriptor
 and its footprint belong in one file; `ProcPtOwn.v` keeps only the parked form
 and the `struct proc` cells. (`ProcPtOwn.v` is written so this is a cut/paste —
 it requires nothing of `UserPtTree` that `UserPtTree` cannot state itself,
@@ -147,7 +151,7 @@ phys_bytes_udata  (S : gset Arch.pa) : ([∗ set] a ∈ S, phys_byte_any a) ⊣�
 phys_page_own_set (ppn)              : phys_page_own ppn ⊣⊢ [∗ set] a ∈ page_pas ppn, phys_byte_any a
 phys_pages_own_set (T)               : ([∗ set] ppn ∈ T, phys_page_own ppn) ⊣⊢ [∗ set] a ∈ pages_pas T, …
 upt_pages_udata   (um)               : upt_pages_own um ⊣⊢ udata_own (um_pas um)
-proc_pt_own_udata (P)                : proc_pt_own P ⊣⊢ proc_tf_own ud_tfp ∗ udata_own (ud_pas P)
+proc_pt_own_udata (P)                : proc_pt_own P ⊣⊢ udata_own (ud_pas P)
 ```
 
 Reusable bits: `phys_bytes_udata`'s → direction is a `set_ind_L` induction
@@ -159,21 +163,17 @@ All the disjointness comes from one arithmetic lemma
 `z_*` helpers are stated over plain `Z` so `lia` is never looking at a
 `bv_unsigned` goal.
 
-**Step 4b — the trapframe opener.** `wp_userret_pt` already takes its 35
-register slots as `↦ₚ₈{dqm}` words at `zero_extend' 64 (concat_vec tfp
-(pageoff (TRAPFRAME + k)))` — i.e. already the physical tier, at
-`pa_add (page_base tfp) k`. So decision (2) needs no conversion there
-either; what is needed is the split/rejoin pair
-
-```
-Lemma proc_tf_open (tfp : mword 44) :
-  proc_tf_own tfp -∗ (35 slots as ↦ₚ₈ with existential words) ∗ (rejoin wand)
-```
-
-i.e. a `phys_page_own` → aligned-8-word-window accessor (the `↦ₚ₈` body is
-`[∗ list] j ∈ seq 0 8, ↦ₚ`, so this is `big_sepL` regrouping over
-`seq 0 4096` plus the doubleword alignment `page_valid` gives). This is what
-turns userret's 35 loose premises into one conjunct.
+**Step 4b — the trapframe opener: DONE, and it lives in `ProcInv.v`.**
+`wp_userret_pt` takes its 35 register slots as `↦ₚ₈{dqm}` words at
+`zero_extend' 64 (concat_vec tfp (pageoff (TRAPFRAME + k)))` — already the
+physical tier, at `pa_add (page_base tfp) k` — so decision (2) needs no
+conversion there. The page itself is `ProcInv.tf_page tfp ws`: the 36
+`struct trapframe` words at their values (`tf_words`) plus the 3808-byte tail
+owned anonymously, with `page_own → ∃ ws, tf_page` to build it from a kalloc'd
+page and a per-word borrow accessor to read or write one slot. That is the
+regrouping this step wanted (`big_sepL` over `seq 0 4096` plus the doubleword
+alignment `page_valid` gives), and it is what turns userret's 35 loose premises
+into one conjunct.
 
 **Step 5 — the kalloc/kfree boundary: DONE** (`ProcPtOwn.v`, axiom-clean). The
 pair that moves a page in and out of a process page table — the ONE place a

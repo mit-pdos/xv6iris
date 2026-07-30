@@ -407,7 +407,7 @@ Section WpPopOffTopSec.
 
 
   (* [wp_cret_s_zca_scfg_pt] (the c.ret S-mode leaf) lives in WpSmodeJalr; used
-     here via that import.  (Formerly duplicated in this file.) *)
+     here via that import -- do not re-prove it locally. *)
 
   (* [smode_config] view of the mycpu() VCgen callee: the raw callee needs full
      config cells + the SIE ghost half, so unbundle here and rebundle on return

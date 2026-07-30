@@ -30,13 +30,12 @@
        short" test fires;
      - kalloc cannot return null, because the caller supplies three pages.
 
-   STATED OVER THE TIME-0 DEVICE INVARIANT (2026-07-29).  This contract used to
-   own the raw [virtio_frag] half, on the premise that device init runs before
-   the device invariant exists.  That premise is false: the disk thread must
-   REFUTE [DevStepDiskWild] at every step, and only [virtio_proto] can do that,
-   so [virtio_frag] can never sit raw in a CPU's precondition while the system
-   runs.  So the contract takes [WpUart.disk_inv] and borrows the fragment
-   around each MMIO access.  Two things make that work:
+   STATED OVER THE TIME-0 DEVICE INVARIANT.  Device init does NOT run before the
+   device invariant exists: the disk thread must REFUTE [DevStepDiskWild] at
+   every step, and only [virtio_proto] can do that, so [virtio_frag] can never
+   sit raw in a CPU's precondition while the system runs.  The contract
+   therefore takes [WpUart.disk_inv] and borrows the fragment around each MMIO
+   access.  Two things make that work:
 
      - THE CONFIG TRACKER.  [virtio_proto]'s not-live arm holds HALF of the
        config cell at [v_cfg v] (VirtioProto.v); the caller holds the other
@@ -51,11 +50,11 @@
      - THE LIVE FLIP.  [virtio_live] needs QUEUE_READY and DRIVER_OK, so the
        arm flips at the LAST MMIO write of the function (STATUS |= DRIVER_OK).
        That write is therefore where the DMA lease is paid in -- inside this
-       function, not at the caller as before ([VirtioProto.virtio_proto_intro]
-       is the transition) -- and the retired config halves are consumed by the
+       function rather than at the caller ([VirtioProto.virtio_proto_intro] is
+       the transition) -- and the retired config halves are consumed by the
        freeze that mints the persistent [disk_cfg].
 
-   THE POSTCONDITION consequently no longer hands back a device fragment.  What
+   THE POSTCONDITION consequently hands back no device fragment at all.  What
    it hands back instead is what a driver needs and can only get here: the
    publisher token [disk_pub γv 0] -- which is ALSO the witness that the queue
    is live, since [virtio_proto]'s not-live arm holds the [dn_np] ghost_var at

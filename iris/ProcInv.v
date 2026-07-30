@@ -35,9 +35,9 @@
 
    Also here: [tf_page], the whole trapframe PAGE that [p_trapframe]'s
    pointer names -- all 36 [struct trapframe] words with their values plus
-   the 3808-byte tail.  It used to be ProcPtOwn's contents-existential
-   [proc_tf_own]; the syscall path needs the VALUE of [tf->aN], which that
-   could not supply. *)
+   the 3808-byte tail.  It is here rather than in ProcPtOwn because the
+   syscall path needs the VALUE of [tf->aN], which a contents-existential
+   page cannot supply. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -185,11 +185,9 @@ Section ProcInv.
   (* =================================================================== *)
   (* The trapframe PAGE.                                                  *)
   (* =================================================================== *)
-  (* [ProcPtOwn] used to own these 4096 bytes as [proc_tf_own] = a
-     contents-EXISTENTIAL [phys_page_own].  That cannot serve the syscall
-     path, which needs the VALUE of [tf->aN], so the page moved here and
-     gained structure -- exactly the evolution ProcPtOwn's own comment
-     anticipated.
+  (* These 4096 bytes are owned HERE, not in [ProcPtOwn] as a
+     contents-EXISTENTIAL [phys_page_own]: that shape cannot serve the
+     syscall path, which needs the VALUE of [tf->aN].
 
      Covering the WHOLE page, not just the argument slots: the 36
      [struct trapframe] words carry values, and the 3808 bytes of tail
@@ -198,7 +196,7 @@ Section ProcInv.
      whole page back.
 
      Stated at the PHYSICAL tier, indexed by the ppn: that is the tier
-     kalloc hands out and the tier [proc_tf_own] used, and it is
+     kalloc hands out, and it is
      tier-neutral (no va inside), which matters because this page is
      reached from BOTH sides -- the kernel's identity map (argraw's
      [ld a0,112(a5)]) and the user table's TRAPFRAME va (uservec /

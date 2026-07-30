@@ -11,7 +11,7 @@ every callee, but nothing yet DRIVES them.
 
 ## Status
 
-**Landed (both compile, both in `_CoqProject`, full build green):**
+**In the tree (all in `_CoqProject`, full build green):**
 
 - **`WpMainDecode.v`** — the complete decode layer, 50/50 instructions
   (`mni_00` … `mni_b0`) plus the 5 compressed and 30 base decode facts they
@@ -22,13 +22,11 @@ every callee, but nothing yet DRIVES them.
   (WpSconfMem.v) at width 4.
 - **`SpecMain.v`** — the BOOT-HART contract (`wp_main_boot_sconf` +
   `Module Type MAIN`), precondition factored into `main_locks_raw` /
-  `main_globals_raw` / `main_devices_raw` / `main_hart_raw`. NOTE: the
-  `main_devices_raw` conjunct and the "main is what allocates the device
-  invariant" comment are known-wrong pending G1's rework (see below) — the
-  rest of the statement is settled.
+  `main_globals_raw` / `main_hart_raw` plus the device invariants and the boot
+  hart's device tokens (G1).
 - **`SpecPrintkGen.v` / `LinkPrintkGen.v`** and **`SpecUserinit.v` /
-  `LinkUserinit.v`** — the two assumed-callee interfaces (G2, G3 below,
-  both marked LANDED with their design decisions).
+  `LinkUserinit.v`** — the two assumed-callee interfaces (G2, G3 below, with
+  their design decisions).
 - **`wp_fence_gen_later_s_sconf`** (WpSconfCtl.v, G4) and
   **`procs_inv_alloc`** (SpecProcinit.v §ProcinitProcsInv — NOT SchedCtx.v:
   SchedCtx cannot import SpecProcinit, that would be a cycle). The alloc
@@ -39,11 +37,10 @@ every callee, but nothing yet DRIVES them.
   is the reusable tool for allocating any FAMILY of locks whose resources
   reference each other's names.
 
-**`ProofMain.v` / `LinkMain.v` — main() is PROVEN** (`ec9f325`; main.c
-178/178 bytes; the axiom footprint is exactly the assumed callees:
-printk-general, userinit, virtio_disk_init, and kerneltrap via Kernelvec).
-Boot arm only; the secondary arm waits on G5. What the proof taught,
-worth keeping:
+**`ProofMain.v` / `LinkMain.v` — main() is PROVEN** (main.c 178/178 bytes; the
+axiom footprint is exactly its three assumed callees — printk-general,
+userinit, and kerneltrap via Kernelvec). Boot arm only; the secondary arm waits
+on G5. What the proof taught, worth keeping:
 
 - **A call-group helper lemma for a DIVERGING function concludes with a
   bare `WP Loop {{Φ}}`**, so it names only what it consumes/produces and
@@ -146,179 +143,107 @@ invariant (it requires `↦₄` + `inv` + `KernelSyms` and nothing else), so a
 future `SpecMain.v` can require it without dragging in a WP layer. The consumer
 instantiates `Eo := ⊤ ∖ ↑minstretN`, which is what both AU leaves want.
 
-Also in `StartedInv.v`: `Timeless` instances for `mem_pointsto` and
-`word4_pointsto`. Typeclass search does not unfold either `Definition`, so a
-`>` intro pattern on the invariant's cell fails with *"iMod: cannot eliminate
-modality"* on a hypothesis that visibly IS timeless. Both are one `rewrite`
-away. They are `Local` here only to keep the change off `RiscvPtsto.v`; **fold
-them into `RiscvPtsto.v` at the next touch of that file** and delete them here.
+The `Timeless` instances for `mem_pointsto` and `word4_pointsto` live in
+`RiscvPtsto.v`, next to their definitions. Typeclass search does not unfold
+either `Definition`, so without them a `>` intro pattern on the invariant's cell
+fails with *"iMod: cannot eliminate modality"* on a hypothesis that visibly IS
+timeless; both instances are one `rewrite` away.
 
-## Blockers
+## The five hard parts (G1–G5)
 
-Ordered by what has to happen first. G1–G3 block the boot arm; G4–G5 additionally
-block the secondary arm.
+G1–G4 are settled and this is the record of how; G5 is what still blocks the
+secondary arm.
 
-### G1 — `dev_inv` bundles the disk with the UART, but printk runs 12 calls before `virtio_disk_init`
+### G1 — the device invariants exist from time 0 (SETTLED)
 
-`WpUart.dev_inv_body` is `∃ u p v, uart_frag u ∗ plic_frag p ∗ virtio_frag v ∗
-uart_ghosts ∗ virtio_proto ∗ ⌜plic_ok p⌝ ∗ ⌜virtio_isr_ok v⌝` — ONE invariant
-over all three device fragments. main cannot establish it where it is first
-needed:
+**No device fragment can ever sit raw in a CPU's precondition while the system
+runs**, so the device invariants are allocated in adequacy before any thread
+runs and every init function is proven UNDER them. The device thread
+(`wp_dev_loop`) is a top-level thread from step 0, and EVERY autonomous device
+step must update the ghost-var pair behind `dev_interp`: the lifting rule hands
+the thread the auth half, and the user half IS the fragment. A UART rx byte can
+arrive at step 0 (nothing gates it); the PLIC gateway latch fires whenever an
+irq line is up; and the disk thread must REFUTE `DevStepDiskWild` at every step,
+which only `virtio_proto` can do.
 
-- `printk` (0x52) and `plicinithart` (0x8a) both take `dev_inv γd γv`;
-- `virtio_disk_init` (0x9a) takes the RAW `virtio_frag v0` and says so
-  explicitly in its header ("no `dev_inv`, because this function resets the
-  device and programs its queue").
+The tempting alternatives both fail. "main allocates the invariant" cannot work
+— `printk` (0x52) and `plicinithart` (0x8a) need it long before
+`virtio_disk_init` (0x9a) has touched the disk. "Split it and allocate each half
+when its device is initialized" fails for the reason above: the raw window it
+leaves open is exactly the window in which the device thread is already running.
 
-So the disk fragment must still be raw at 0x9a while the invariant must already
-exist at 0x52.
+Each init function keeps its determinism through a per-device side ghost:
 
-**The first-draft fix ("split the invariant; allocate each half when its
-device is initialized") does NOT work, and neither does today's raw-frag init
-tier.** The device thread (`wp_dev_loop`) is a top-level thread of the whole
-system from step 0, and EVERY autonomous device step must update the
-ghost-var pair behind `dev_interp`: the lifting rule hands the thread the
-auth half, and the user half IS the fragment. A UART rx byte can arrive at
-step 0 (nothing gates it), so `uart_frag` must be reachable through an
-invariant at every step of the execution — and the same holds for
-`plic_frag` (the gateway latch fires whenever an irq line is up) and
-`virtio_frag` (the thread must REFUTE `DevStepDiskWild` at every step, which
-only `virtio_proto` can do). **No device fragment can ever sit raw in a
-CPU's precondition while the system runs.** Consequences: the raw-frag
-contracts of `consoleinit`/`uartinit`, `plicinit`, and `virtio_disk_init`
-are incompatible with the final wiring; so are `SpecMain.main_devices_raw`
-and its "main is what allocates the invariant" comment; today's
-`riscv_device_adequacy` only escapes because its thread pool is the device
-alone and its initial-state hypotheses (`Hdlab`, `Hvlive`) quietly assume a
-machine that xv6's own init code would un-assume.
-
-**The workable fix: the device invariant(s) exist from time 0 (allocated in
-adequacy, before any thread runs), and the three init functions are proven
-UNDER them, keeping their determinism through per-device side ghosts:**
-
-- **disk** — `virtio_proto` is ALREADY keyed on `virtio_live (v_cfg v)` (the
-  not-live arm is trivial; `disk_ghosts_alloc` works from any not-live
-  state), so the invariant is allocatable at power-on. Extend the not-live
-  arm with a config-tracking half (`ghost_var γc ½ (v_cfg v)`); the boot
-  chain holds the other half, so `virtio_disk_init` keeps deterministic
-  knowledge of the config it programs across its MMIO writes (the device
-  never touches `v_cfg`, so device steps preserve it). The `QUEUE_READY <- 1`
-  write is where the arm flips and the DMA lease is paid in; the retired
-  ghost halves come back to the driver. `_rw`/`_intr` are unaffected except
-  for spec re-pointing (they already run in the live arm).
-- **uart** — stop freezing DLAB inside `uart_ghosts_alloc`: return the raw
-  `dfrac_agree` half instead, let the boot chain thread it through
-  `uartinit`'s baud-latch dance and FREEZE it after the final LCR write
-  (dlab=false), which is when `uart_dlab_off` is minted. The FCR
+- **disk** — `virtio_proto` is keyed on `virtio_live (v_cfg v)`, so the
+  invariant is allocatable at power-on from any not-live state
+  (`disk_ghosts_alloc`). The not-live arm holds HALF of the existing
+  `dn_cfg`/`disk_cfg_is` cell at `v_cfg v` (no new gname, no Σ change) and the
+  caller holds the other half, so `virtio_disk_init` knows deterministically
+  which config it has programmed even though the state lives under an
+  invariant; the device never writes `v_cfg`, so the pair is stable across
+  device steps (`disk_cfg_is_agree` / `_split` / `_join`). The arm flips at the
+  LAST MMIO write, `STATUS |= DRIVER_OK` — not QUEUE_READY, since `virtio_live`
+  requires `virtio_driver_ok` — and that write is where the DMA lease is paid
+  in and the retired halves are consumed by the freeze minting the persistent
+  `disk_cfg`. The not-live arm also records `⌜v_seen v = 0⌝ ∗ ⌜v_used_idx v =
+  0⌝`, because the flip's `virtio_proto_intro_gen` needs the DEVICE's counters,
+  which the driver's ring-zeroing memsets cannot speak to: `disk_ghosts_alloc`
+  takes them as premises and `riscv_device_adequacy` carries the two honest
+  power-on hypotheses `Hvseen`/`Hvuidx`. At entry the live arm is refuted by
+  `VirtioProto.virtio_proto_not_live_cfg` — that arm's persistent `disk_cfg`
+  agrees with the caller's tracker half (`DfracDiscarded ⋅ DfracOwn ½` is
+  valid), contradicting `⌜virtio_live c0 = false⌝`. `_rw`/`_intr` are
+  unaffected; they already ran in the live arm.
+- **uart** — `uart_ghosts_alloc` does NOT freeze DLAB: it returns the
+  `dfrac_agree` half `uart_dlab_is γ ½ (uart_dlab u)`, the boot chain threads it
+  through `uartinit`'s baud-latch dance (`WpUart.uart_dlab_update` is the move
+  rule) and freezes it after the final LCR write, which is where
+  `uart_dlab_off` is minted. Adequacy needs no `Hdlab` hypothesis. The FCR
   FIFO-clear write is verifiable under the invariant because the boot chain
-  holds `uart_tx_own γ []`, which pins `uart_acc = []`, hence `u_tx = []`,
-  hence the clear does not shrink the accepted trace (adequacy hypothesis:
-  power-on FIFOs empty — honest). All other uartinit writes are
-  config-only and ghost-stable. `uartinit`/`consoleinit` re-proven over
-  accessor-form leaves (the raw-frag store leaf `wp_sb_uart_frag_s_sconf`
-  gets an invariant-opening sibling).
-- **plic** — `plicinit`/`plicinithart` re-proven over accessor leaves; their
-  writes (priorities, one hart's S-context enable word) preserve `plic_ok`;
-  no extra ghost (nothing reads config back, and no consumer yet needs
-  "the priorities are set").
+  holds `uart_tx_own γ []`, which pins `uart_acc = []`, hence `u_tx = []`, so
+  the clear shrinks nothing (adequacy hypothesis: power-on FIFOs empty —
+  honest). Every other uartinit write is config-only and ghost-stable, by the
+  per-offset `uart_write_*_stable` lemmas in DevModel.v.
+- **plic** — no side ghost at all: nothing reads the config back and no consumer
+  needs "the priorities are set", so both writes have only to preserve
+  `plic_ok` (`PlicPlan.plic_write_prio_ok`).
 
-The SPLIT (UART+PLIC invariant vs. disk invariant) is now an interface-
-hygiene choice, not a correctness need — still worth doing while every
-consumer is being touched anyway (printk should not drag `disk_names`).
-Consumers to re-point: `SpecPrintk`, `SpecPrintkGen`, `SpecPlicinithart`,
-`SpecConsputc`, `SpecUartwrite`, `SpecUartintr`, `SpecVirtioDiskRw`,
-`SpecVirtioDiskIntr`, `SpecConsoleintr`, and the `WpPlic`/`WpVirtioDev`/
-`WpUart` leaves that open it.
+**The invariant is SPLIT three ways**: `uart_inv γ` / `plic_inv` / `disk_inv γd`,
+sub-namespaces of `devN`, one per device thread — `UartLoop` / `DiskLoop` /
+`PlicLoop` have pairwise-decoupled step relations, each device latching its OWN
+interrupt into the PLIC ([`../design/device.md`](../design/device.md)). `dev_inv`
+stays as the compatibility bundle, so a consumer holding the bundle did not have
+to change. Every device access leaf therefore comes in two forms: the
+bare-invariant one (`wp_sb_uart_uinv_s_sconf`, `wp_sw_plic_pinv_s_sconf`,
+`wp_{lw,sw}_virtio_dinv_s_sconf`) and a bundle restatement. There is no
+raw-fragment leaf anywhere, and no init contract names a closed-form successor
+device state: the proofs go write-by-write through the accessors.
 
-**Staging so main is not blocked on the proof rework:** state the new
-invariant-form `Spec*` for the four init functions and AXIOMATIZE the
-reworked ones (assumed-callee shape, like G2/G3); `ProofMain` proceeds over
-the interfaces, and each raw-frag proof is then re-worked to discharge its
-axiom on its own schedule. `SpecMain` changes with this: `main_devices_raw`
-is replaced by the persistent invariant(s) plus the boot hart's tokens
-(`uart_tx_own γ []`, the unfrozen dlab half, the virtio config half).
+`SpecMain`'s device precondition is the `dev_inv` bundle plus the boot hart's
+tokens (`uart_tx_own/uart_out_lb/uart_sent γd l0`, `uart_dlab_is γd ½ b0`,
+`disk_cfg_is γv ½ c0` + `⌜virtio_live c0 = false⌝`), and the payload is the wand
+`□ (∀ γpr γs, printk_env -∗ procs_inv -∗ P)`.
 
-STATUS: direction approved and mostly LANDED.
+`vdi_post`'s shape, worth knowing at the caller: the DMA lease is paid in at the
+final DRIVER_OK write, so the `pu` page is forfeited and `pav` comes back as
+`seq 4 4092` (ring entries on; the two flags bytes go with the leased index).
+The rw/intr LIVE WITNESS is `disk_pub γv 0` — the not-live arm holds
+`ghost_var (dn_np γ) 1 0`, so the caller's half refutes it — and the config
+identity is the persistent `disk_cfg γv (virtio_init_cfg …)`.
 
-- The DECOUPLING (`7d9bf8f`): three device threads
-  (`UartLoop`/`DiskLoop`/`PlicLoop`) with pairwise-decoupled step relations
-  (each device latches its OWN interrupt into the PLIC), the three
-  invariants `uart_inv γ` / `plic_inv` / `disk_inv γd` (sub-namespaces of
-  `devN`), `dev_inv` retained as the compatibility bundle so no consumer
-  spec changed — see [`../design/device.md`](../design/device.md).
-- The INIT-UNDER-INVARIANT restatement (`2761f08`): `uart_ghosts_alloc` no
-  longer freezes DLAB (returns `uart_dlab_is γ ½ (uart_dlab u)`; adequacy's
-  `Hdlab` hypothesis is GONE); the virtio config tracker REUSES the existing
-  `dn_cfg`/`disk_cfg_is` cell — the not-live proto arm now holds
-  `disk_cfg_is γ ½ (v_cfg v)` and the halves rejoin into the exclusive
-  fraction `disk_cfg_set` consumes at the live flip (new: `disk_cfg_is_agree`
-  / `_split` / `_join`; no new gname, no Σ change); the four init contracts
-  are RESTATED over the invariants and AXIOMATIZED (uartinit, consoleinit,
-  plicinit, virtio_disk_init read `assumed` — intentional, temporary; their
-  old raw-frag proofs were deleted from the build, recoverable at
-  `git show 2761f08^:iris/Proof<F>.v` for the rework); `SpecMain` revised
-  (`main_devices_raw` gone → `dev_inv` bundle + boot tokens
-  `uart_tx_own/uart_out_lb/uart_sent γd l0`, `uart_dlab_is γd ½ b0`,
-  `disk_cfg_is γv ½ c0` + `⌜virtio_live c0 = false⌝`; payload now the WAND
-  `□ (∀ γpr γs, printk_env -∗ procs_inv -∗ P)`).
-- `vdi_post` reshape worth knowing: the DMA lease is paid in at the final
-  DRIVER_OK write, so the `pu` page is forfeited and `pav` comes back as
-  `seq 4 4092` (ring entries on; the 2 flags bytes go with the leased
-  index); the rw/intr LIVE WITNESS is `disk_pub γv 0` (the not-live arm
-  holds `ghost_var (dn_np γ) 1 0`, so the caller's half refutes it), and
-  the config identity is the persistent `disk_cfg γv (virtio_init_cfg …)`.
-
-uartinit/consoleinit/plicinit are RE-PROVEN against the new contracts
-(`269677c`, back to 100 proven): the store leaves went bare-invariant with
-the bundle names kept as restatements (`wp_sb_uart_uinv_s_sconf`,
-`wp_sw_plic_pinv_s_sconf`), `uart_dlab_update` (WpUart.v) is the new
-move-DLAB rule, and the per-offset `uart_write_*_stable` /
-`plic_write_prio_ok` pure lemmas live in DevModel.v / PlicPlan.v. The
-raw-fragment leaves `wp_sb_uart_frag_s_sconf` / `wp_sw_plic_s_sconf` now
-have ZERO callers — retire them together with the raw virtio MMIO leaves
-when virtio_disk_init's proof is reworked. `uartinit_post` and
-`plicinit_plic` were deleted (dead vocabulary — the new proofs go
-write-by-write through the accessor; recover from `269677c^` if ever
-needed).
-
-The disk-lock gap is CLOSED (`4da1fa5`): `disk_ghosts_alloc`/`_mint` now
-also return `ghost_map_auth (dn_claim γ) 1 ∅` and `disk_done_lb γ 0`;
-`main_globals_raw` gained `d_used_idx ↦₂ wrap16 0` AND — a discovery —
-`[∗ list] i ∈ seq 0 8, disk_slot_raw i` (the `disk` struct's `info[8]` +
-`ops[8]` cells at disk+40..295, which NOTHING previously supplied;
-`free_slot_res_split : free_slot_res pd i ⊣⊢ desc_entry_own pd i ∗
-disk_slot_raw i`). **`DiskBoot.disk_res_boot`** (new definitional file
-DiskBoot.v — it needs both DiskInv's and SpecVirtioDiskInit's vocabulary
-plus ByteBuf, so it sits above DiskInv) is the checked composition:
-vdi_post's device conjuncts + the boot tokens ⊢ `disk_res γ pd pav pu` at
-the empty state; feed its alignment premise with
-`init_cfg_pages_aligned_of_valid` from vdi_post's three `page_valid`s.
-This is what ProofMain applies right before its disk-lock `newlock`.
-`ByteBuf.bb_chunk` (a k*n buffer as k records of n bytes) came out of
-rebuilding `desc_entry_own` from the desc page's bytes — reusable.
-
-**G1 is CLOSED** (`459da64`): virtio_disk_init is re-proven under the
-time-0 disk invariant (virtio_disk.c back to 4/4; main's axiom footprint
-is now exactly printk-general + userinit + kerneltrap). What the rework
-added, worth keeping:
-
-- The live-arm refutation needs nothing new: the live arm's persistent
-  `disk_cfg γ (v_cfg v)` agrees with the caller's tracker half
-  (`DfracDiscarded ⋅ DfracOwn ½` is valid), contradicting
-  `virtio_live c0 = false` — packaged as
-  `VirtioProto.virtio_proto_not_live_cfg`.
-- The flip is the LAST write (`STATUS |= DRIVER_OK`), not QUEUE_READY —
-  `virtio_live` requires `virtio_driver_ok`.
-- One additive `virtio_proto` change: the not-live arm records
-  `⌜v_seen v = 0⌝ ∗ ⌜v_used_idx v = 0⌝` — the flip's
-  `virtio_proto_intro_gen` needs the DEVICE's own counters, which the
-  driver's ring-zeroing memsets cannot speak to. `disk_ghosts_alloc` takes
-  them as premises and `riscv_device_adequacy` gained the two honest
-  power-on hypotheses `Hvseen`/`Hvuidx`.
-- Bare-`disk_inv` accessor leaves `wp_{lw,sw}_virtio_dinv_s_sconf`
-  (WpVirtioDev.v), with the bundle leaves as restatements. The
-  zero-caller raw-fragment tier is RETIRED: `WpVirtioMmio.v` deleted,
-  `wp_sw_plic_s_sconf` and `wp_sb_uart_frag_s_sconf` removed.
+**`DiskBoot.disk_res_boot`** is the checked composition from vdi_post to the
+disk lock: vdi_post's device conjuncts + the boot tokens ⊢ `disk_res γ pd pav
+pu` at the empty state, with its alignment premise fed by
+`init_cfg_pages_aligned_of_valid` from vdi_post's three `page_valid`s. ProofMain
+applies it right before its disk-lock `newlock`. DiskBoot.v is its own
+definitional file because it needs DiskInv's and SpecVirtioDiskInit's vocabulary
+plus ByteBuf, so it sits above DiskInv. Two things it needed:
+`main_globals_raw` supplies `d_used_idx ↦₂ wrap16 0` AND `[∗ list] i ∈ seq 0 8,
+disk_slot_raw i` (the `disk` struct's `info[8]` + `ops[8]` cells at
+disk+40..295, which nothing else supplies; `free_slot_res_split : free_slot_res
+pd i ⊣⊢ desc_entry_own pd i ∗ disk_slot_raw i`), and `ByteBuf.bb_chunk` (a k*n
+buffer as k records of n bytes) came out of rebuilding `desc_entry_own` from the
+desc page's bytes — reusable.
 
 ### G2 — printk's only proven contract is the PANIC path
 
@@ -328,8 +253,8 @@ path (`panicking == 0`), where printk takes `pr.lock`, so the proven spec does
 not apply. See [`printk.md`](printk.md): "Only the general (non-panic) path
 remains, blocked on uartputc_sync's."
 
-**LANDED: `SpecPrintkGen.v` + `LinkPrintkGen.v`** in the assumed-callee
-shape (`Module Type` + `Axiom` in the link, as for `KERNELTRAP` —
+`SpecPrintkGen.v` + `LinkPrintkGen.v` state the general path in the
+assumed-callee shape (`Module Type` + `Axiom` in the link, as for `KERNELTRAP` —
 [`../design/spec-modules.md`](../design/spec-modules.md)), so main's proof is a
 functor over it and proving printk-general later replaces exactly one file. The
 interface is PERSISTENT-heavy (`printk_env` is proved `Persistent`), so it
@@ -340,9 +265,8 @@ printk_env γpr γd γv := is_lock γpr pr_lock "pr" (pr_res γd) ∗
                         uart_dlab_off γd ∗ dev_inv γd γv ∗ printk_flags_inv
 pr_res γd            := ∃ l, uart_tx_own γd l ∗ uart_sent γd l
 ```
-One deliberate deviation from this note's first draft, which said `R = emp`
-("the lock only serializes output"): **the `pr` lock protects the transmitter
-token.** A general-path printk transmits bytes, so its future proof needs
+**The `pr` lock protects the transmitter token**, rather than serializing output
+with `R = emp`. A general-path printk transmits bytes, so its future proof needs
 transmit rights from somewhere that a SECONDARY hart can also pay — and the
 persistent `is_lock` is the only such place (the caller-held-token shape of
 the panic path is unpayable post-boot, and `R = emp` would have axiomatized
@@ -364,7 +288,7 @@ the two flag cells live in their own invariant `printk_flags_inv` inside
 
 ### G3 — `userinit()` has no spec
 
-**LANDED: `SpecUserinit.v` + `LinkUserinit.v`**, same assumed-callee shape:
+`SpecUserinit.v` + `LinkUserinit.v`, same assumed-callee shape:
 the weakest interface main can pay — `sie_cap_gpr`, `cpu_own γ 0 …` net-zero,
 `kernel_text`/`kernel_data`, `panic_wp`, `procs_inv`, `kalloc_env` (consumed
 by `userinit_pages := 8`, provisional), the `initproc` cell (back
@@ -387,10 +311,10 @@ gets `▷ P`. The later must be stripped at a program step, and only
 continuation without a later. (The loop-BACK edge does expose one, which is why
 the iLöb recursion itself is fine.)
 
-**LANDED: `wp_fence_gen_later_s_sconf` (WpSconfCtl.v)** — the existing fence
-leaf's statement with the continuation under `▷` (WRAPPER RECIPE: new name,
-existing lemma untouched, zero call-site churn); the proof is the original
-plus one `iNext` inside `wp_instr_s_sconf`'s post-step callback. This is
+`wp_fence_gen_later_s_sconf` (WpSconfCtl.v) is the fence leaf's statement with
+the continuation under `▷` (WRAPPER RECIPE: new name, the plain leaf untouched,
+zero call-site churn); its proof is the plain one plus one `iNext` inside
+`wp_instr_s_sconf`'s post-step callback. This is
 also the semantically right place — `fence rw,rw` IS the acquire barrier, so
 "the fence is where `▷ P` becomes `P`" is the reading the secondary arm's
 proof will use.
@@ -420,6 +344,11 @@ hardware but global in the model's ghost state:
   the payload the other needs. Making the proc protocol hart-generic (the
   parking hart's identity as a *value* in the lock resource rather than the
   ambient `cid_word`) is prior to any multi-hart `scheduler`, never mind main.
+
+Both halves now have their own project files —
+[`kpt-share.md`](kpt-share.md) and
+[`sched-hart-generic.md`](sched-hart-generic.md); read those before touching
+either.
 
 Also worth recording: `strans_name : gname` in `riscvGS` is GLOBAL (5 use sites:
 `RiscvPtsto.v:122`, `IntrDefs.v:444,452`, `RiscvAdequacy.v:241,242`), so
@@ -451,7 +380,7 @@ Boot arm, the raw global inventory (each spinlock as
 
 | callee | consumes | produces |
 |---|---|---|
-| `consoleinit` | `lk_raw cons`, `lk_raw tx_lock`, `devsw_console_{read,write} ↦₈`, `uart_frag u0` | both locks `lk_fresh`, devsw slots set, `uart_frag (uartinit_post u0)` |
+| `consoleinit` | `lk_raw cons`, `lk_raw tx_lock`, `devsw_console_{read,write} ↦₈`, `uart_inv γd` + the boot UART tokens (`uart_tx_own`/`uart_out_lb`/`uart_sent` at `l0`, `uart_dlab_is γd ½ b0`) | both locks `lk_fresh`, devsw slots set, the tokens back at `l0` + the frozen `uart_dlab_off γd` |
 | `printkinit` | `lk_raw pr` | `lk_fresh pr "pr"` |
 | `printk` ×3 | `printk_env` (G2), format string `↦ₛ{dq}` | — |
 | `kinit` | `lk_raw kmem`, `kmem+24 ↦₈ 0`, `[∗list] p ∈ ps, page_own p` + `prun phystop s1entry ps` | `is_kmem γl γk`, `kalloc_avail γk (Some (length ps))` |
@@ -460,12 +389,12 @@ Boot arm, the raw global inventory (each spinlock as
 | `procinit` | `lk_raw pid_lock`, `lk_raw wait_lock`, 64 × `proc_raw`, `fd_slots (NPROC*(NOFILE+FDSPARE))` | both `lk_fresh`, 64 × `proc_ready` |
 | `trapinit` | `lk_raw tickslock` | `lk_fresh tickslock "time"` |
 | `trapinithart` | `stvec ↦ᵣ tv0` | `stvec ↦ᵣ kernelvec` |
-| `plicinit` | `plic_frag p` | `plic_frag (plicinit_plic p)` |
-| `plicinithart` | device invariant (G1) | — |
+| `plicinit` | `plic_inv` | — (the invariant's `plic_ok` is preserved, nothing is owed back) |
+| `plicinithart` | `dev_inv γd γv` | — |
 | `binit` | `lk_raw bcache`, `NBUF × sl_raw (buf_lock (bnode k))`, `NBUF × blink_raw`, `blink_raw bhead` | `lk_fresh`, `NBUF × sl_fresh "buffer"`, `bcache_lru bhead (blist 0 NBUF)` |
 | `iinit` | `lk_raw itable`, `NINODE × sl_raw (inode_lock i)` | `lk_fresh`, `NINODE × sl_fresh "inode"` |
 | `fileinit` | `lk_raw ftable` | `lk_fresh ftable "ftable"` |
-| `virtio_disk_init` | `lk_raw disk_lock`, `disk_{desc,avail,used} ↦₈`, 8 × `disk_free+j ↦ₘ`, `virtio_frag v0`, `kalloc_env` with ≥3 pages | `vdi_post` |
+| `virtio_disk_init` | `lk_raw disk_lock`, `disk_{desc,avail,used} ↦₈`, 8 × `disk_free+j ↦ₘ`, `disk_inv γv` + the config-tracker half `disk_cfg_is γv ½ c0` at `⌜virtio_live c0 = false⌝`, `kalloc_env` with ≥3 pages | `vdi_post` |
 | `userinit` | G3 | — |
 | `scheduler` | `procs_inv γ Φ γs`, `cpu_own γ 0 false p0 cpu_ctx_free`, `trap_csrs`, `intr_handler_avail γ` | never returns |
 
@@ -488,47 +417,46 @@ Secondary arm: `started_inv P` + this hart's own `strans_bit bare`, `tlb ↦ᵣ`
 `stvec` (via kvminithart), `cpu_own`, `trap_csrs` — and `P` must supply the
 device invariant, `printk_env`, the kernel table (G5), and `procs_inv` (G5).
 
+## The boot bridge (landed)
+
+`BootBridge.v`'s `boot_bridge` takes entry's post-state cells + the cpus[0]
+.bss cells + the adequacy-minted ghosts, and `==∗` (mask-free) the per-hart
+half of SpecMain's precondition: `sie_cap_gpr γ mf K` + the tp fact +
+`cpu_own` + the SIE spare quarter + `main_hart_raw`. What it settled:
+
+- `intr_count` at level 0 with `eb = false` IS the SIE ghost's eighth, and it
+  rides inside `cpu_own` — so interrupt-sweep item 8's
+  `intr_count_init`/`intr_restore_intro` step is unnecessary (it predates the
+  `eb` parameter).
+- sp at `<main>` is `sp0 − 16` (start()'s frame stays open across the mret),
+  and the whole boot needs 2 + 32 + 52 = 86 slots
+  (`boot_stack_slots_main`).
+- SIE=0 / MENVCFG_S / `mie ∧ ¬mideleg = 0` / satp-Bare at `<main>` are NOT
+  derivable from SpecEntry: they enter as reset-state premises, discharged at
+  power-on by `boot_csrs_reset`. (SIE=0 is worth lifting into `mmode_config`
+  some day.)
+- The ↦ₚ₈→↦₈ stack tier bridge costs two premises locating the stack in
+  `[text_end, PHYSTOP)`.
+- `reg_lookup` OOMs on the 40-deep `st_mout` tower — peel instead (second data
+  point for the durable-notes warning).
+
 ## Worklist
 
-1. ~~G2 + G3 + G4 + `procs_inv_alloc` + the Timeless fold + the
-   `0330000f`/`creg_c*` decode dedup~~ — DONE (commits `a1cafcf`, `81aa9ea`);
-   see Status.
-2. **G1**: the invariant-from-time-0 rework described above — the WpUart.v
-   invariant restructure (+ optional split), the `uart_ghosts_alloc` DLAB
-   unfreeze, the virtio not-live cfg tracker, the new invariant-form init
-   specs (axiomatized where the proof rework is deferred), the adequacy
-   allocation, and the `SpecMain` device-precondition revision.
-3. **`SpecMain.v` revision + `ProofMain.v`** — after G1: replace
-   `main_devices_raw` with the invariant(s) + boot-hart tokens, and switch
-   the payload to the wand shape — main's boot contract takes
-   `□ (∀ γd γv γs …, <init output> -∗ P)` and applies it at the store, so
-   main's proof never has to know what the secondaries want. Then
-   `ProofMain.v` as a functor over the eighteen callee interfaces, and the
-   one-line `LinkMain.v`.
-4. **G5** — its own project, and prior to any multi-hart claim: the mask-carrying
-   `sr_absorb` (so the kernel page table can be shared), `kmap_auth` at a
-   fraction, `kernel_pagetable ↦₈□`, `strans_name : CPU -> gname`, and a
-   hart-generic `p_sched`. Only then `wp_main_secondary_sconf`.
-5. **The boot bridge is LANDED** (`BootBridge.v`, `boot_bridge`): entry's
-   post-state cells + the cpus[0] .bss cells + adequacy-minted ghosts
-   `==∗` (mask-free) the per-hart half of SpecMain's precondition
-   (`sie_cap_gpr γ mf K` + tp fact + `cpu_own` + the SIE spare quarter +
-   `main_hart_raw`). Findings that supersede older notes: `intr_count` at
-   level 0 with `eb = false` IS the eighth and rides inside `cpu_own`, so
-   interrupt-sweep item 8's `intr_count_init`/`intr_restore_intro` step is
-   OBSOLETE (it predates the `eb` parameter); sp at `<main>` is `sp0 − 16`
-   (start()'s frame stays open across the mret) and the whole boot needs
-   2 + 32 + 52 = 86 slots (`boot_stack_slots_main`); SIE=0 / MENVCFG_S /
-   `mie ∧ ¬mideleg = 0` / satp-Bare at `<main>` are NOT derivable from
-   SpecEntry — they enter as reset-state premises, discharged at power-on
-   by `boot_csrs_reset` (worth lifting SIE=0 into `mmode_config` some day);
-   the ↦ₚ₈→↦₈ stack tier bridge costs two premises locating the stack in
-   `[text_end, PHYSTOP)`; and `reg_lookup` OOMs on the 40-deep `st_mout`
-   tower (peel instead — second data point for the durable-notes warning).
-6. Adequacy: `started_inv_alloc` goes inside `riscv_system_adequacy`'s
-   `={⊤}=∗`, beside the device-ghost allocation
-   ([`../design/adequacy.md`](../design/adequacy.md)), as does
-   `riscv_device_adequacy`'s `plic_ok` hypothesis — the invariant carries
-   `plic_ok` from power-on, which is what lets `plicinit` merely preserve it
-   (item 2). Both are the consumer-side items parked by
-   [`../completed/plic-init-spec.md`](../completed/plic-init-spec.md).
+1. **G5**, the secondary arm's blocker, now two projects of its own:
+   [`kpt-share.md`](kpt-share.md) (sharing the kernel page table across harts —
+   the `kpt_inv` invariant over the mutating tree, the A/D-monotone `kpt_lb`
+   ghost, the mask-carrying `sr_absorb`, per-CPU `strans_name`) and
+   [`sched-hart-generic.md`](sched-hart-generic.md) (quantifying the resuming
+   hart inside `p_sched`'s payload so `procs_inv` becomes hart-independent).
+   Only then `wp_main_secondary_sconf`.
+2. **Adequacy** ([`../design/adequacy.md`](../design/adequacy.md)):
+   `started_inv_alloc` goes inside `riscv_system_adequacy`'s `={⊤}=∗`, beside
+   the device-ghost allocation. The device side is already there —
+   `riscv_device_adequacy` takes `plic_ok` / `virtio_live = false` /
+   `v_seen = v_used_idx = 0` / `virtio_isr_ok` on the initial state (a reset
+   machine satisfies all four) and allocates the invariants — so what is left
+   here is the multi-hart instantiation: a hart list, each hart's boot-config
+   registers in its `D c`, and the `started` cell.
+3. The two ASSUMED callees, each of which replaces exactly one file:
+   printk-general ([`printk.md`](printk.md), blocked on uartputc_sync's general
+   path) and `userinit`.

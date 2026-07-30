@@ -296,35 +296,37 @@ domain disjointness.
   postcondition is about the fabric being re-closed, not about which requests
   completed — the per-request payoff reaches rw through `disk_res`.
 
-## Leaves to build (WpVirtioMmio.v / WpVirtioDma.v)
+## The leaves (WpVirtioDev.v, WpSmodeHalf.v)
 
-1. Width-4 S-mode MMIO leaves for the virtio window, cloned/generalized from
-   `wp_sw_plic_s_sconf` / `wp_lw_plic_dev_s_sconf` (WpPlic.v):
-   raw-`virtio_frag` store AND load (init); `dev_inv`-accessor store and load
-   (notify / isr-read / ack) with the ghost-step wand shape of the `_kpt` UART
-   leaves. The width-4 exec towers of WpPlicExec should generalize over the
-   device window rather than be cloned (accessor form over `dev_write`).
-2. `dev_inv`-opening S-mode RAM access leaves for LEASED bytes (the avail-idx
-   `lhu`/`sh`, the used-idx `lhu`, the used-element `lw`): open `dev_inv`
-   around the one memory step, materialize the bytes out of `dma_own` (they
-   sit behind `phys_pointsto`; the VA is identity — `mem_ident_phys`), take
-   the step, and hand the caller a view-shift slot into which the protocol
-   operation (publish/observe/reclaim) plugs. Width-2 plain RAM leaves
-   (`lhu`/`sh` on owned bytes) are also needed for the descriptor formatting
-   and exist only at widths 1/4/8 today.
+1. Width-4 S-mode MMIO leaves for the virtio window, in accessor form over
+   `dev_write`/`dev_read` with the ghost-step wand shape of the `_kpt` UART
+   leaves: `wp_{lw,sw}_virtio_dinv_s_sconf` open the bare `disk_inv`, and
+   `wp_{lw,sw}_virtio_dev_s_sconf` are their `dev_inv`-bundle restatements.
+   Every virtio MMIO access in the driver — init, notify, isr-read, ack — goes
+   through them; there is no raw-`virtio_frag` leaf. WpPlicExec's width-4 exec
+   towers are generic in the device window, so nothing was cloned for this.
+2. Invariant-opening S-mode RAM access leaves for LEASED bytes (the avail-idx
+   `lhu`/`sh`, the used-idx `lhu`, the used-element `lw`) come from
+   `WpSconfMem.wp_{load,store}_s_sconf_au`, the width- and uns-generic
+   ATOMIC-UPDATE parents (the WpSconfLock pattern): they open the invariant
+   around the one memory step, and the bytes are materialized out of `dma_own`
+   (they sit behind `phys_pointsto`; the VA is identity — `mem_ident_phys`)
+   with the protocol operation (publish/observe/reclaim) plugged into the
+   view-shift slot. Plain width-2 RAM leaves for the descriptor formatting are
+   `wp_{lhu,lh,sh}_s_sconf` (WpSmodeHalf.v).
 
 ## File map
 
 | file | contents | depends on |
 | --- | --- | --- |
-| `VirtioQueue.v` (new, iris-free) | wrap16, slot geometry, `vslot`, `slot_pin_ok`, `vproto_ok`, flat-derivation, publish/step/reclaim surgery, step determinism | VirtioModel |
-| `DiskPtsto.v` (new) | `γdk` ghost, `disk_byte/bytes/block`, `disk_view`, mint/agree/update | RiscvPtsto |
-| `VirtioProto.v` (new) | `disk_names`/`diskGhostG`, `virtio_proto`, the four protocol view shifts, `virtio_proto_intro/init/stable` | WpVirtio, VirtioQueue, DiskPtsto |
-| `WpVirtio.v` | unchanged base (`dma_own` etc.); `virtio_lease` retired once WpUart moves | — |
-| `WpUart.v` | `dev_inv_body` carries `virtio_proto`; `wp_dev_loop` disk case re-proven via `virtio_proto_step`/`_not_stalled` | VirtioProto |
-| `RiscvAdequacy.v` | allocate `disk_names`; initial `virtio_proto_init` | VirtioProto |
-| `WpVirtioMmio.v` / `WpVirtioDma.v` (new) | the leaves above | WpPlic(Exec), VirtioProto |
-| `DiskInv.v` (new) | `struct disk` geometry, `disk_res`, its open/close/alloc lemmas | VirtioProto, WpLock, ProcGeom |
+| `VirtioQueue.v` (iris-free) | wrap16, slot geometry, `vslot`, `slot_pin_ok`, `vproto_ok`, flat-derivation, publish/step/reclaim surgery, step determinism | VirtioModel |
+| `DiskPtsto.v` | `γdk` ghost, `disk_byte/bytes/block`, `disk_view`, mint/agree/update | RiscvPtsto |
+| `VirtioProto.v` | `disk_names`/`diskGhostG`, `virtio_proto`, the four protocol view shifts, `virtio_proto_intro/init/stable` | WpVirtio, VirtioQueue, DiskPtsto |
+| `WpVirtio.v` | the base (`dma_own` etc.); the unkeyed `virtio_lease` survives here, used by nothing | — |
+| `WpUart.v` | the device invariants; `disk_inv_body` carries `virtio_proto`; `wp_dev_loop`'s disk case runs on `virtio_proto_step`/`_not_stalled` | VirtioProto |
+| `RiscvAdequacy.v` | allocates `disk_names` and the initial `virtio_proto` | VirtioProto |
+| `WpVirtioDev.v` | the MMIO leaves above | WpPlic(Exec), VirtioProto |
+| `DiskInv.v` | `struct disk` geometry, `disk_res`, its open/close/alloc lemmas | VirtioProto, WpLock, ProcGeom |
 | `SpecFreeDesc/SpecVirtioDiskRw/SpecVirtioDiskIntr.v` + Proof/Link | the functions | the above |
 
 ## Why the alternatives were rejected

@@ -127,12 +127,8 @@ word is caller-threaded pinned `zero_reg` pre/post.
       for threading intr_count/▷sched_vc across a taken-leaf back edge —
       see design/kernel-proofs.md).
 - [x] Full clean build; coverage: sleeplock.c 4/4 proven, 254/254 bytes.
-      (releasesleep carries wakeup's PRE-EXISTING debt — the single
-      Admitted at ProofWakeupParts.v:479, a prologue proof whose script looks
-      complete but was left un-Qed'd — inherited via WAKEUP, out of
-      this project's scope.  The wp_myproc_sconf_any axiom is gone:
-      upstream rewired wakeup onto the proven myproc, which added
-      `cur_proc pme` + tp = cid_word to releasesleep's spec.)
+      (releasesleep inherits wakeup's spec via WAKEUP, so it carries
+      `cur_proc pme` + tp = cid_word — wakeup runs over the proven myproc.)
 
 Future (out of scope): a non-holder holdingsleep variant (needs a pid
 disequality resource; no xv6 call site wants it).

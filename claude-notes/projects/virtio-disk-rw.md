@@ -163,16 +163,15 @@ conjunct through its seam — forgetting it is invisible until P6's
 
 ## THE ONE SPEC CHANGE P6 FORCED — `vs_data` for READ requests
 
-`parked_res` used to give the woken publisher `disk_bytes γ (vs_sector_off sl)
-bs` for an EXISTENTIALLY quantified `bs`, tied to `vs_data sl` only for a
-write. For a read that made the postcondition **unprovable**: the publisher
-handed its `disk_block γd (uint bno) bs_disk` fragments into `slot_pend_res` at
-publish and got back a fragment about an opaque `bs`, with no way to identify
-the two. (The fragments are exclusive, the auth is inside the invariant, and
-the pend resource's existential erased the link.)
+`parked_res` must give the woken publisher `disk_bytes γ (vs_sector_off sl) bs`
+at a `bs` tied to `vs_data sl` in BOTH directions, not just for a write. Tie it
+only for writes and the READ postcondition is **unprovable**: the publisher
+hands its `disk_block γd (uint bno) bs_disk` fragments into `slot_pend_res` at
+publish and gets back a fragment about an existentially quantified `bs`, with no
+way to identify the two. (The fragments are exclusive, the auth is inside the
+invariant, and the pend resource's existential erases the link.)
 
-The fix — and it is a genuine improvement, not a workaround — is that
-**`vslot.vs_data` now records the block's content in BOTH directions**: a
+So **`vslot.vs_data` records the block's content in BOTH directions**: a
 write's payload (as before) or a read's *current disk content*, which the
 driver knows because it owns the points-to. Concretely:
 

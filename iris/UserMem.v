@@ -239,6 +239,6 @@ Proof.
   exact (pa_window _ va j ltac:(lia)).
 Qed.
 
-(* The upt-record word/mem-read layer that used to follow was superseded
-   by the ptree layer: [udata_fetch_word] / [udata_fetch_mem_read]
-   (UserFetchPt.v) source the fetched word from the [udata_own] pages.  *)
+(* The word/mem-read layer above this one is the PTREE layer:
+   [udata_fetch_word] / [udata_fetch_mem_read] (UserFetchPt.v) source the
+   fetched word from the [udata_own] pages.  *)

@@ -92,8 +92,7 @@ the evidence for every offset. This file is only the worklist.
       `proc_slots` is a function of `st` alone and `proc_slots_recast` holds in
       both directions within a guard class.
 - [x] **S2 — retiring the ad-hoc pid threading: NOT NEEDED, and would be
-      wrong.** The claim in the first draft of the design note was mistaken.
-      `SpecAcquiresleep` / `SpecHoldingsleep` take `p_pid pj ↦₄{dq} pidv` at a
+      wrong.** `SpecAcquiresleep` / `SpecHoldingsleep` take `p_pid pj ↦₄{dq} pidv` at a
       *universally quantified* `dq`, so they already compose with `proc_priv`
       unchanged at `dq := DfracOwn (1/4)` (checked: `proc_priv_pid`'s
       conclusion is literally their premise at that instantiation). Rewriting
@@ -226,13 +225,13 @@ the evidence for every offset. This file is only the worklist.
         Package them once as `sp_join7 sp0 := ∀ nv, <upper> ↦₄ nv -∗ ∃ w,
         <slot> ↦₈ w`; each exit cashes it in one `iDestruct`.
       * **`trap_csrs_pay` must NOT appear in the spec of a push/pop-balanced
-        function, even one that calls `sleep`.** The first draft of
-        `SpecSysPause` took `trap_csrs_pay 0 eb` in and gave it back, reasoning
-        that sleep needs it. It does — but sys_pause's own `acquire` produces
-        it and its `release` consumes it. Taking a second one is not merely
-        redundant: `trap_csrs` is exclusive register ownership, so at `eb =
-        true` the precondition is unsatisfiable and the spec is vacuous exactly
-        where interrupts are on. Removed; see the note in `SpecSysPause.v`.
+        function, even one that calls `sleep`.** Taking `trap_csrs_pay 0 eb`
+        in and giving it back looks right — sleep needs one — but sys_pause's
+        own `acquire` produces it and its `release` consumes it, so a second
+        one is not merely redundant: `trap_csrs` is exclusive register
+        ownership, so at `eb = true` the precondition is unsatisfiable and the
+        spec is vacuous exactly where interrupts are on. See the note in
+        `SpecSysPause.v`.
       * **`wp_subw_s_sconf`** (WpSconfAlu.v, over `exec_execute_RTYPEW_SUBW_gpr`
         in WpMmodeShiftiop.v) is new — the 4-byte 3-operand twin of the
         compressed `wp_addw_s_sconf`. `ticks - ticks0` was the first `subw` in
@@ -487,11 +486,10 @@ the evidence for every offset. This file is only the worklist.
         base words are fetchaddr's own.
 
 - [x] **S6 — `allocproc` PROVEN and LINKED, counted-only**
-      (`SpecAllocpid.v` / `LinkAllocpid.v` (assumed) / `SpecAllocproc.v` /
+      (`SpecAllocpid.v` / `LinkAllocpid.v` / `SpecAllocproc.v` /
       `WpAllocprocDecode.v` / `ProofAllocproc.v` / `LinkAllocproc.v`, over
       ACQUIRE / RELEASE / ALLOCPID / KALLOC / PROC_PAGETABLE / MEMSET;
-      **38 s**, `proof_coverage` reads it `proven`, resting on the one
-      `wp_allocpid_sconf` axiom).  Fifty-five instructions: a 32-byte
+      **38 s**, `proof_coverage` reads it `proven`).  Fifty-five instructions: a 32-byte
       ra/s0/s1/s2 frame, the proc[] scan, the allocation body, one shared
       epilogue.
 
@@ -657,8 +655,9 @@ the evidence for every offset. This file is only the worklist.
            premise: use the `*Core` functor recipe from durable-notes and
            seal ONE proof against TWO `Module Type`s — the counted contract
            userinit wants and the steady-state one kfork wants.
-      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** (assumed, the
-         `SpecAllocpid` + `Axiom` shape allocpid used before S8 proved it).  At allocproc's two call sites `p->pagetable` is always 0,
+      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** in the assumed-callee shape
+         (`Module Type` + `Axiom` in the link).  At allocproc's two call sites
+         `p->pagetable` is always 0,
          so freeproc never reaches `proc_freepagetable` -- but do not
          specialise the contract to that; state freeproc honestly and let
          allocproc's sites instantiate it.
@@ -674,8 +673,8 @@ the evidence for every offset. This file is only the worklist.
          WHY it failed, so no caller has to carry a budget it does not have.
 
 - [x] **S8 — `allocpid` PROVEN and LINKED** (`WpAllocpidDecode.v` /
-      `ProofAllocpid.v`; **11 s**), so `LinkAllocpid.v`'s `Axiom` is gone and
-      **the whole allocproc cone is axiom-free**.  Twenty-one instructions @
+      `ProofAllocpid.v`; **11 s**), which makes **the whole allocproc cone
+      axiom-free**.  Twenty-one instructions @
       0x800019d0, structurally `killed` with a store added: a 32-byte
       ra/s0/s1 frame, acquire(&pid_lock), `c.lw s1,0(a5)` / `addiw a4,s1,1` /
       `c.sw a4,0(a5)` on `<nextpid>`, release, `c.mv a0,s1`.  The counter's
@@ -714,10 +713,9 @@ the evidence for every offset. This file is only the worklist.
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates.
 
-## The unlinked chain: what is left after `argraw`
+## The unlinked chain: `fileclose` is the only blocker
 
-**`argraw` is no longer the blocker — `fileclose` is the only one left.**
-S3a landed `LinkArgraw.v` and `LinkArgint.v`, both of which build, and
+`argraw` and `argint` are both LINKED (`LinkArgraw.v` / `LinkArgint.v`), and
 `Print Assumptions Argraw.wp_argraw_sconf` shows only Sail primitives +
 functional extensionality. Current state:
 

@@ -224,8 +224,8 @@ intermediate wand. Reusable facts worth knowing for item D:
   live in `WpWalkInstr.v` with the rest of the `wi_*` catalog: `wi_96`
   (`cdec_4501`, C_LI a0,0) and `wi_98` over the local `wdec_98`. The +0x98
   branch is `j -0x46` (70 bytes back to +0x52), i.e.
-  `C_J (mword_of_int 2013 : mword 11)` — not `-0x92`, as that file's header
-  comment used to claim.
+  `C_J (mword_of_int 2013 : mword 11)` — NOT `-0x92`, which is the plausible
+  misreading.
 - `wkn_dec9_30`/`wkn_dec9_21` are the two concrete `addiw s4,-9` steps
   (30→21→12); the level-generic `walk_caddiw_dec9` is not needed when the loop is
   unrolled, and `walk_slot_addr2`/`walk_slot_addr1`/`walk_slot_addr0` apply

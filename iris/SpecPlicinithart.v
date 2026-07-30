@@ -20,13 +20,14 @@
    The two stores are S-mode 32-bit MMIO writes through the kernel page table's
    PLIC identity mapping.
 
-   WHY THIS SPEC OWNS NO PLIC STATE.  Unlike [plicinit] (which hart 0 runs alone
-   at boot, and which therefore threads the raw [plic_frag] half), plicinithart
-   runs CONCURRENTLY on every hart: no hart can own the PLIC state across its
-   two writes, because the others are writing their own contexts at the same
-   time.  So the shared [plic_frag] half stays in the device invariant
-   [dev_inv] (WpUart.v) and this spec takes that invariant -- persistent, hence
-   shareable -- instead.  Each store opens it, writes, and closes it.
+   WHY THIS SPEC OWNS NO PLIC STATE.  plicinithart runs CONCURRENTLY on every
+   hart: no hart can own the PLIC state across its two writes, because the
+   others are writing their own contexts at the same time.  So the shared
+   [plic_frag] half stays in the device invariant [dev_inv] (WpUart.v) and this
+   spec takes that invariant -- persistent, hence shareable -- instead.  Each
+   store opens it, writes, and closes it.  (This is the same reason [plicinit],
+   which hart 0 does run alone at boot, still cannot hold the fragment raw: the
+   PLIC gateway latches whenever an irq line is up.)
 
    What the caller gets back is therefore not this hart's PLIC context but the
    invariant itself: the kernel's PLIC plan [plic_ok] (PlicPlan.v) still holds.

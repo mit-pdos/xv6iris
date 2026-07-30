@@ -394,12 +394,11 @@ Qed.
 
 Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
-    (* NOTE (2026-07-29): there is NO hypothesis about the power-on DLAB any
-       more.  [uart_ghosts_alloc] used to freeze the caller's half of the DLAB
-       agreement on the spot, which forced the initial value to be [false];
-       the freeze moved out to the boot chain (it happens at uartinit's final
-       LCR write), so the invariant is allocatable at ANY power-on DLAB and
-       uartinit is what makes it deterministic. *)
+    (* NOTE: there is deliberately NO hypothesis about the power-on DLAB.
+       [uart_ghosts_alloc] hands the caller its half of the DLAB agreement
+       rather than freezing it, and the freeze happens in the boot chain (at
+       uartinit's final LCR write), so the invariant is allocatable at ANY
+       power-on DLAB and uartinit is what makes it deterministic. *)
     (* [dev_inv] also maintains the kernel's PLIC plan (PlicPlan.v), so the
        initial PLIC must already satisfy it -- a reset PLIC (all S-context
        enable words clear) does. *)

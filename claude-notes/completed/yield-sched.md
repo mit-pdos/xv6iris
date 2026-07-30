@@ -165,10 +165,9 @@ REPLACED by SchedCtx.v; SpecWakeup/ProofWakeup/LinkWakeup get
 the parameter rename (`proc_lock_res Rreg Φ γc bsie dq γk pa` →
 `proc_lock_res γ root_ppn Φ γs γk pa`, likewise procs_inv — the old
 Rreg/γc/bsie/dq params DISAPPEAR; γ/root_ppn are already in the loop's
-scope).  The old smode-level `wp_myproc` axiom in WpWakeup.v is unused —
-delete.  SpecWakeupParts's `wp_myproc_sconf` AXIOM is renamed
-`wp_myproc_sconf_any` (wakeup threads no current-process resource; wiring
-the proven myproc through wakeup is future work).
+scope).  Wakeup runs over the PROVEN myproc (S8 below): there is no myproc
+axiom anywhere in the tree, and wakeup's spec carries `cur_proc pme` with
+`pme` unconstrained.
 
 ### 6. Function specs (sconf-tier, spec-module shape)
 
@@ -300,7 +299,9 @@ upstream mid-project) against the tp = cid_word convention; lift the
 frame-bridge + addv arithmetic helpers duplicated across
 ProofSched/Yield/Sleep into a shared low-altitude home (StackOwn.v).
 
-Future (out of scope): the scheduler() loop proof (consumes p_sched's first
-disjunct / supplies the second), sleep(), wiring cur_proc through wakeup to
-discharge wp_myproc_sconf_any, boot-time establishment of procs_inv and the
-initial per-CPU ▷ sched_vc, and the boot-side "tp := mhartid = CpuId" wiring.
+Out of this project's scope, and all since done elsewhere: the scheduler() loop
+proof (consumes p_sched's first disjunct / supplies the second, see
+[`scheduler.md`](scheduler.md)), sleep(), threading cur_proc through wakeup,
+and the boot-side establishment of procs_inv, the initial per-CPU ▷ sched_vc
+and the "tp := mhartid = CpuId" convention (see
+[`../projects/main-boot.md`](../projects/main-boot.md)).

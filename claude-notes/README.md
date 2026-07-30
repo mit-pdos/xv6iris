@@ -323,12 +323,13 @@ their durable design notes, gotchas, and reusable recipes.
 - **[`plic-init-spec.md`](completed/plic-init-spec.md)** — plicinit /
   plicinithart / plic_claim / plic_complete specs & proofs (+ cpuid, + the
   width-4 PLIC S-mode device-access infrastructure, both directions); plic.c is
-  4/4. Keeps the establish-vs-preserve split — plicinit runs alone on hart 0 and
-  can establish a property of the PLIC, plicinithart runs on every hart and can
-  only open `dev_inv` and preserve one — which is why `WpPlic.v` has two width-4
-  store leaves. Its consumer-side items (`riscv_device_adequacy`'s `plic_ok`,
-  and re-proving plicinit over the accessor leaves) are parked in
-  [`main-boot.md`](projects/main-boot.md).
+  4/4. Keeps the reason no function here owns PLIC state — the gateway latches
+  whenever an irq line is up, so the fragment can never sit raw in a CPU's
+  precondition, not even during boot-time init on hart 0 — and the universal
+  obligation that follows (`∀ p, plic_ok p → …`), which is why `plic_ok` has to
+  be weak and per-hart-local: a hart preserves it from its OWN two writes,
+  knowing nothing about the others. `WpPlic.v`'s two width-4 store leaves differ
+  only in which invariant they open (`plic_inv` vs the `dev_inv` bundle).
 - **[`kinit-cone.md`](completed/kinit-cone.md)** — the kinit cone (kinit →
   initlock + freerange, over kfree), all proved axiom-clean over sconf. The
   page-count token is threaded through to kinit's postcondition; the caller

@@ -1463,14 +1463,14 @@ Section VirtioProto.
       iPureIntro. split_and!; [exact Hc | exact Hsn | exact Hui].
   Qed.
 
-  (* STATEMENT ADJUSTED (2026-07-28).  The old [virtio_proto_mint] --
+  (* MINTING HAPPENS ONCE, AT BIRTH, where the disk ghost map is still empty --
+     which is all the disk story needs (the whole image [0, N*1024) is one
+     contiguous range).  There is no sound mint rule at an ARBITRARY time: a
+     caller cannot know the range has not already been minted, and the
+     invariant does not expose [dmap].  Beware the shape
        virtio_proto γ v ==∗ virtio_proto γ v ∗ (∃ bs, …) ∨ True
-     -- is vacuous (∗ binds tighter than ∨, so the right disjunct proves it
-     with no content), and no sound non-vacuous version exists at an arbitrary
-     time: a caller cannot know the range has not already been minted, and the
-     invariant does not expose [dmap].  Minting therefore happens ONCE, at
-     BIRTH, where the disk ghost map is still empty -- which is all the disk
-     story needs (the whole image [0, N*1024) is one contiguous range). *)
+     if you are tempted to write one -- it is vacuous, since ∗ binds tighter
+     than ∨ and the right disjunct proves it with no content. *)
   Lemma disk_ghosts_alloc_mint (v : virtio_state) (o : Z) (n : nat) :
     virtio_live (v_cfg v) = false ->
     v_seen v = zero16 -> v_used_idx v = zero16 ->

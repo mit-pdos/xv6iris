@@ -3,8 +3,7 @@
 Whole-function WP specs and proofs for all four of xv6-riscv/kernel/plic.c's
 functions — `plicinit`, `plicinithart`, `plic_claim`, `plic_complete` — plus the
 `cpuid` proof they need and the width-4 PLIC S-mode device access
-infrastructure (both directions). All of it is proved and green; what remains is
-consumer-side wiring (see "Remaining" at the end).
+infrastructure (both directions). All of it is proved, linked and green.
 
 These are S-mode functions run from `main()` after `kvminithart()` (paging on),
 so their PLIC MMIO writes are **S-mode 32-bit (`sw`, width 4) stores through the
@@ -13,23 +12,26 @@ kernel page table's PLIC identity mapping** (`kpt_dev_vpn`, KptPt.v maps
 
 ## Key design decisions (own these before touching the proofs)
 
-- **plicinit *establishes* a property of the PLIC; plicinithart can only
-  *preserve* one.** Hart 0 runs `plicinit` alone during boot, so it threads the
-  `plic_frag` half itself (`plic_frag p` in, `plic_frag (plicinit_plic p)` out)
-  and establishes `plic_ok`. `plicinithart` runs **concurrently on every hart** —
-  no hart can own the PLIC state across its two writes while the others write
-  their own contexts — so its spec takes the **device invariant `dev_inv γd`**
-  (persistent, hence shareable) and each store opens it. This is why there are
-  two width-4 store leaves in `WpPlic.v`, not one; they are different *modes*
-  (establish vs. preserve), not a gratuitous cross-product.
-
-  The boot wiring narrows the first mode: no device fragment may sit raw in a
-  CPU's precondition while the system runs (the gateway latch can fire at step
-  0), so the device invariant is allocated in adequacy at power-on with
-  `plic_ok` as a hypothesis, and `plicinit` runs over the invariant-opening
-  accessor leaves like plicinithart — establishing nothing, showing only that
-  its priority writes PRESERVE `plic_ok`. See G1 of
-  [`../projects/main-boot.md`](../projects/main-boot.md).
+- **No function here owns PLIC state; all four borrow it from an invariant.**
+  The invariant exists from power-on (allocated in adequacy, with `plic_ok` as a
+  hypothesis on the initial state) because the PLIC gateway latches whenever an
+  irq line is up: `plic_frag` can never sit raw in a CPU's precondition while
+  the system runs, not even during boot-time init on hart 0. So every spec here
+  takes a persistent invariant and each access opens it, writes or reads, and
+  closes it — nothing PLIC-shaped survives into any continuation, and what the
+  caller gets back is that `plic_ok` still holds.
+- **The obligation is therefore UNIVERSAL, which is what forces `plic_ok` to be
+  weak.** A store's premise is `∀ p, plic_ok p → ∃ p', plic_write p off wv =
+  Some p' ∧ plic_ok p'`: the write must be defined and plan-preserving at EVERY
+  state the plan admits, because a hart cannot know what the others have
+  written. `plicinithart` runs concurrently on every hart, so this is the only
+  shape available to it; `plicinit` runs alone on hart 0 but gains nothing from
+  that and uses the same shape.
+- **Two width-4 store leaves in `WpPlic.v`, differing only in WHICH invariant
+  they open.** `wp_sw_plic_pinv_s_sconf` takes the bare `plic_inv` — the right
+  one for a function whose contract mentions only the PLIC (`plicinit`) —
+  and `wp_sw_plic_dev_s_sconf` is its restatement over the `dev_inv` bundle,
+  for consumers that hold the bundle anyway (`plicinithart`).
 - **`PlicPlan.v` is the software's plan, deliberately kept out of DevModel.**
   `DevModel.v` says what the PLIC *does*; which configuration xv6 *intends* is
   software. `plic_ok p := ∀ h, plic_senable_ok (p_enable p h)` — a hart's
@@ -57,9 +59,12 @@ kernel page table's PLIC identity mapping** (`kpt_dev_vpn`, KptPt.v maps
   this hart (`plic_write` returns `Some`), which is what pins the precondition
   `bv_unsigned tp < dev_ncpu`. Recovering "this hart's context is now enabled"
   would need the per-hart-token split the invariant deliberately avoids.
-- **Faithful post-states from the model's `plic_write` branches** (DevModel.v):
-  `plicinit_plic p` = both source priorities (`uart_irq_id`=10,
-  `virtio_irq_id`=1) set to 1 (the `off∈(0,4·nsrc)` priority branch).
+- **plicinit's postcondition says nothing about the PLIC either**, for the same
+  reason: no consumer needs the priorities recorded (a device-interrupt proof
+  reads the invariant's `plic_ok`, and priority writes preserve it), and the
+  PLIC ghost has no monotonicity constraint that would make a recorded value
+  useful later. Its two writes land in the model's `off ∈ (0, 4·nsrc)` priority
+  branch (DevModel.v), setting `uart_irq_id`=10 and `virtio_irq_id`=1 to 1.
 - **`cpuid` returns `cpuid_ret tp` = sign-extend of `tp[31:0]`** (the `-perf`
   image has `mv a0,tp; sext.w a0,a0`). For any legal hart id (`< NCPU`) the top
   bits are clear so `cpuid_ret tp = tp` (`cpuid_ret_hart`).
@@ -87,7 +92,7 @@ own bv-free lemma (`z_lt8_cases`). Same reason `zrange_vm`
 
 Specs (interface only — Require the definitional layer, never a proof file):
 `SpecCpuid.v` (`cpuid_ret`, `wp_call_cpuid_sconf_cs_body`, `Module Type CPUID`),
-`SpecPlicinit.v` (`plicinit_plic`, `Module Type PLICINIT`),
+`SpecPlicinit.v` (`Module Type PLICINIT`),
 `SpecPlicinithart.v` (`plic_senable_word`, `Module Type PLICINITHART`).
 
 - **`PlicPlan.v`** — the kernel's PLIC plan (`plic_dev_irq_mask`,
@@ -108,14 +113,14 @@ Specs (interface only — Require the definitional layer, never a proof file):
   so no function proof imports another's.
 - **`WpPlic.v`** — the Iris access WPs over `sconf`, all width 4 at a general
   PLIC address, sharing everything but the ghost reconciliation:
-  - `wp_sw_plic_s_sconf` — raw `plic_frag p` in / `plic_frag p'` out
-    (plicinit). Pulls `plic_auth` out of `state_interp`'s `dev_interp`,
-    `plic_agree`s it against the caller's half, `dev_interp_update_plic`.
-    Opens no invariant.
-  - `wp_sw_plic_dev_s_sconf` — takes `dev_inv γd`, opens it across the funnel
-    callback's step (exactly as the UART store does), and takes the universal
+  - `wp_sw_plic_pinv_s_sconf` — takes the bare `plic_inv`, borrows the shared
+    `plic_frag` half around the (atomic) write, and takes the universal
     obligation `∀ p, plic_ok p → ∃ p', plic_write p off wv = Some p' ∧ plic_ok p'`.
-    Nothing PLIC-shaped survives into the continuation.
+    Nothing PLIC-shaped survives into the continuation. Used by `plicinit`,
+    whose per-write obligation is `PlicPlan.plic_write_prio_ok`.
+  - `wp_sw_plic_dev_s_sconf` — the same leaf restated over the `dev_inv γd`
+    bundle, opened across the funnel callback's step exactly as the UART store
+    does, for consumers that hold the bundle.
   - `wp_lw_plic_dev_s_sconf` — the LOAD dual: also opens `dev_inv` (a claim read
     mutates the device), writes `rd` and retargets the capability, and lets the
     caller name a property `P` of the value read that holds at every state the
@@ -151,15 +156,10 @@ does not retain a single spatial input).
   `add a5,a5,a4`), so one of them lands on the mirror image of `ph_sthb` —
   `ph_add_comm` bridges it.
 
-## Remaining — nothing in plic.c; two items PARKED with the boot proof
+## Remaining
 
-All four functions plus `cpuid` are proven, linked and green. What is left
-belongs to `main`, not to this cone, and is tracked in
-[`../projects/main-boot.md`](../projects/main-boot.md): supplying
-`riscv_device_adequacy`'s `plic_ok` hypothesis (worklist item 5), and
-re-proving `plicinit` over the accessor leaves as part of the
-invariant-from-time-0 rework (G1, worklist item 2 — see the first design point
-above).
+Nothing. All four functions plus `cpuid` are proven, linked and green, over the
+time-0 invariant the boot proof allocates.
 
 ## Build discipline
 
