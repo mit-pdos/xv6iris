@@ -200,8 +200,10 @@ about. Check the report after touching any parking contract.
 
 ### RE-PROOF PROGRESS + THE ONE SPEC BLOCKER FOUND
 
-Landed: **bwrite** (`0670a72`) and **acquiresleep** (`cc2e436`). Remaining
-axioms: sys_pause, piperead, pipewrite, uartwrite, virtio_disk_rw, **bread**.
+Landed: **bwrite** (`0670a72`), **acquiresleep** (`cc2e436`) and **bread**
+(`72eb2b6` for the spec fix below, then the port). Remaining axioms are exactly
+the five loop sleepers: sys_pause, piperead, pipewrite, uartwrite,
+virtio_disk_rw.
 
 `acquiresleep` is the worked example for the four remaining LOOP sleepers —
 read `ProofAcquiresleep.v` rather than re-deriving the shape. Its lessons:
@@ -230,40 +232,58 @@ read `ProofAcquiresleep.v` rather than re-deriving the shape. Its lessons:
   instantiate" that prints the *unfolded* body. Keep `eb` a variable and
   thread `eb = true` to the one consumer that needs it (the sleep call).
 
-#### BLOCKER: `trap_csrs_pay 0 eb` cannot cross a park unaided
+#### RESOLVED: `trap_csrs_pay 0 eb` cannot cross a park unaided
 
-**`SpecVirtioDiskRw.v` and `SpecBread.v` are not provable as restated**, for
-one shared reason. `sleep` carries exactly ONE `trap_csrs_pay 0 eb` across the
-park (in at the parking hart, out at the resuming one) — the one the *pushing*
-acquire minted. A SECOND level-0 pay, held by the parking function itself,
-has no way across: it is `trap_csrs` at the old hart and the postcondition
-wants it at the new one. So:
+**The durable rule: a level-0 `trap_csrs_pay` premise on a function that both
+ACQUIRES and PARKS is unimplementable.** `sleep` carries exactly ONE
+`trap_csrs_pay 0 eb` across the park — the one the *pushing* acquire minted. A
+SECOND level-0 pay, held by the parking function itself, has no way across: it
+is `trap_csrs` at the old hart and the postcondition wants it at the new one.
+And at `eb = true` two `trap_csrs` at one hart are outright contradictory
+(`sepc ↦ᵣ` is exclusive), so such a premise set is *unsatisfiable* — a proof of
+it verifies vacuously while the coverage tool still reads "proven". State the
+pay only where the function is genuinely push/pop-UNbalanced (bare push_off /
+pop_off, acquire's post, release's pre, sleep).
 
-- **`virtio_disk_rw`**: its contract takes `trap_csrs_pay 0 eb` at entry and
-  returns it, while its own `acquire(&disk.vdisk_lock)` mints a second one that
-  its `release` spends (the old proof says so in as many words —
-  `git show 0cfc644^:iris/ProofVirtioDiskRwF.v`, the comment at the `Hpay0`
-  premise, and `Hpay0` is handed straight to the continuation across the
-  park). Under the ∀h continuation that hand-off is a hart mismatch.
-- **`bread`**: same, one level up. Its entry pay must reach the `virtio_disk_rw`
-  call in the shared tail, and the only thing between them is the
-  `acquiresleep` park; the pay `acquire(&bcache.lock)` minted is spent by the
-  `release(&bcache.lock)` that precedes it. (`bread_hit`/`bread_recyc` in the
-  old proof take `trap_csrs_pay 0 eb` TWICE for exactly this reason.)
-  Worse, at `eb = true` two `trap_csrs` at one hart are contradictory
-  (`sepc ↦ᵣ` is exclusive), so the restated premise set is *unsatisfiable* —
-  a proof of it would be vacuous, and the coverage tool would still read
-  "proven". Do not close it that way.
+This bit `virtio_disk_rw`, `bwrite` and `bread`, all of which acquire at level 0
+and release before returning — i.e. all three are trap-CSR BALANCED, exactly as
+`acquiresleep` is, which is why `SpecAcquiresleep.v` correctly never mentioned
+the pay. `72eb2b6` drops the pay from all three contracts (entry AND
+continuation), which makes them strictly stronger and bread provable. The old
+`virtio_disk_rw` proof said so in as many words: see the `Hpay0` premise comment
+in `git show 0cfc644^:iris/ProofVirtioDiskRwF.v`, where `Hpay0` is handed
+straight to the continuation across the park. **The rw re-proof therefore has
+one less resource to thread than the removed proof did.**
 
-**The fix (orchestrator's call): drop `trap_csrs_pay 0 eb` from
-`virtio_disk_rw`'s entry AND exit, and likewise from `bwrite` and `bread`.**
-All three acquire at level 0 and release before returning, so they are
-trap-CSR BALANCED — exactly what `acquiresleep` now is, and the reason
-`SpecAcquiresleep.v` correctly does not mention the pay. Dropping the pay
-makes all three contracts strictly stronger (one premise fewer) and turns
-bread's port back into the pure re-threading the worklist above predicts.
-`bwrite`'s landed proof only *forwards* the pay to rw, so it needs one
-`iIntros` name dropped and the rw call's argument list shortened; nothing
-structural. The general rule to record: **a level-0 `trap_csrs_pay` premise on
-a function that both acquires and parks is unimplementable — state the pay only
-where the function is genuinely push/pop-UNbalanced.**
+#### bread's port (the two-park shape)
+
+bread parks TWICE — `acquiresleep` in the hit/recycle arms, then
+`virtio_disk_rw` in the shared tail — so it is the example for a function whose
+blocks straddle more than one crossing:
+
+- **`bd_cont` is hart-INDEPENDENT and lives outside the CID section.** It is
+  established before the first park and consumed after the second, at a hart
+  neither side knows, so it quantifies `∀ h g mf k bs_out`, drops its `γ`, and
+  carries `callee_saved_notp` + the tp pin + the a0 fact.
+- **`bd_regs` excludes tp from its preserved set** (`c <> Rtp` on the threading
+  clause, so every consumer keeps using `callee_saved_lookup` unchanged), and
+  the tp fact travels as the separate `M !!! Rtp = cid_word` premise each block
+  already carried. `bd_notp_of` bridges `is_cs_idx c = true /\ c <> tp` to
+  `is_cs_idx_notp c = true` at the two parking hops. This is much cheaper than
+  flipping the clause to `is_cs_idx_notp`, which would have broken the
+  `callee_saved_lookup` and `is_cs_idx_true_neq` calls at eleven sites.
+- **Only the blocks that START after a park need `CID` as a binder** —
+  `bread_epi` (which also gains the tp premise) and `bread_tail`. The scan
+  loops, the hit and the recycle stay in the CID-fixed section and apply the
+  post-park block at `(CID := h)`. No iLöb invariant had to move: both scans
+  run before the first park.
+- **A handful of leaves after a park do NOT need their own lemma.** The three
+  instructions between rw's return and the epilogue take `(CID := h2) g2`
+  explicitly, which is cheaper than extracting a third block.
+- **`instr` is CID-indexed, so a decode fact `iPoseProof`ed before a park is
+  useless after it.** The symptom is an `iSpecialize: cannot instantiate` whose
+  expected and given `instr …` print IDENTICALLY. Re-derive at the resuming
+  hart: `iPoseProof (bdi_d0 (CID := h2) with "Htext") as "Hid0"`.
+- `panic_wp_any` replaces `panic_wp` on every block; the two consumers that
+  still want the ambient form (bcache's `acquire`, and bloop's "bget: no
+  buffers" arm) use `panic_wp_any_at cpu_id`.
