@@ -109,10 +109,19 @@ are working on that effort — the relevant `projects/` file.
 - **[`kpt-share.md`](projects/kpt-share.md)** — sharing the kernel page
   table across harts (G5 part 1) so `kvminithart` gets ONE hart-generic
   contract: the `kpt_inv` invariant over the mutating tree, the
-  A/D-monotone `kpt_lb` ghost + `tlb_ok_pt_ad_mono`, the mask-carrying
-  `sr_absorb`, per-CPU `strans_name` — and the sequencing through
-  hart-generic `p_sched`, `wp_main_secondary_sconf`, and the all-harts
-  `_entry`→`start`→`main` adequacy.
+  A/D-monotone `kpt_lb` ghost + `tlb_ok_pt_ad_mono` (stated modulo
+  A/D-growth: a load-walk entry's D can lag another hart's store), the
+  mask-carrying `sr_absorb`, per-CPU `strans_name` — and the sequencing
+  through `wp_main_secondary_sconf` and the all-harts
+  `_entry`→`start`→`main` adequacy. Design approved.
+- **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
+  2: the parked-proc resumption contract (`p_sched`) quantifies the
+  RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE
+  h)`) instead of pinning the ambient `cid_word`, so `procs_inv` becomes
+  one hart-independent proposition the `started` payload can carry. Keeps
+  the seam analysis (park/resume, the SLEEP interface's ∀h continuation,
+  allocproc's forkret deposit) and the blast-radius checklist. Design
+  approved.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`ProcPtOwn.v`): `proc_pt`, one
   predicate for a valid parked user table — trampoline + trapframe + the pages
