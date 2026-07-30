@@ -693,7 +693,7 @@ Section ProofScheduler.
         sie_cap_gpr γ Mt (av - 10)%nat -∗
         pc_is (mword_of_int (SC + 0x4a)) -∗
         locked γl cpu_id -∗
-        proc_lock_res γ Φ γs γl (proc_addr jj) -∗
+        proc_lock_res Φ γs γl (proc_addr jj) -∗
         cpu_own γ 1 ebx zero_reg emp -∗
         trap_csrs -∗
         own_ctx (a_cpu_ctx cid_word) -∗
@@ -731,7 +731,7 @@ Section ProofScheduler.
     { iModIntro.
       iIntros (jj γl Mt ebx) "%Hjj %Hgl %Hpins %Htie Hcg Hpc Hlocked HR Hcpu Hcsrs Hown Hcont".
       destruct Hpins as (Hp1 & Hp2 & Hp3 & Hp4 & Hp6 & Hp7 & Hp8 & Hptp).
-      iPoseProof (procs_inv_lookup γ Φ γs jj γl Hgl with "Hprocs") as "#Hislock".
+      iPoseProof (procs_inv_lookup Φ γs jj γl Hgl with "Hprocs") as "#Hislock".
       iPoseProof (schi_4a with "Htext") as "Hi4a".
       iPoseProof (schi_4c with "Htext") as "Hi4c".
       iPoseProof (schi_50 with "Htext") as "Hi50".
@@ -772,7 +772,7 @@ Section ProofScheduler.
           [ iSplitL "Hcsrs"; [iExact "Hcsrs" | done]
           | iSplitR "Hcsrs"; [done | iExact "Hcsrs"] ]. }
       iApply (Release.wp_release_sconf γ Φ γl (proc_addr jj) "proc"%string
-                (proc_lock_res γ Φ γs γl (proc_addr jj)) T1 0 ebx zero_reg emp (av - 10)%nat
+                (proc_lock_res Φ γs γl (proc_addr jj)) T1 0 ebx zero_reg emp (av - 10)%nat
                 Hlka HT1tp ltac:(lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay [-]").
       iIntros (mr) "Hcg Hpc %Hcsrl Hcpu".
@@ -897,7 +897,7 @@ Section ProofScheduler.
       destruct Hpins as (Hp1 & Hp2 & Hp3 & Hp4 & Hp6 & Hp7 & Hp8 & Hptp).
       assert (Hex : is_Some (γs !! jj)) by (apply lookup_lt_is_Some_2; rewrite Hlen; exact Hjj).
       destruct Hex as [γl Hgl].
-      iPoseProof (procs_inv_lookup γ Φ γs jj γl Hgl with "Hprocs") as "#Hislock".
+      iPoseProof (procs_inv_lookup Φ γs jj γl Hgl with "Hprocs") as "#Hislock".
       iPoseProof (schi_58 with "Htext") as "Hi58".
       iPoseProof (schi_5a with "Htext") as "Hi5a".
       iPoseProof (schi_5e with "Htext") as "Hi5e".
@@ -931,7 +931,7 @@ Section ProofScheduler.
       { rewrite /M1 upd_ne; [| vm_compute; discriminate].
         rewrite /M0 upd_ne; [| vm_compute; discriminate]. exact Hptp. }
       iApply (Acquire.wp_acquire_sconf γ Φ γl "proc"%string
-                (proc_lock_res γ Φ γs γl (proc_addr jj)) M1 0 ebc zero_reg emp (av - 10)%nat
+                (proc_lock_res Φ γs γl (proc_addr jj)) M1 0 ebc zero_reg emp (av - 10)%nat
                 HM1tp ltac:(lia) ltac:(lia)
                 with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
       { iEval (rewrite HM1a0). iExact "Hislock". }
@@ -951,7 +951,7 @@ Section ProofScheduler.
       assert (Hq1 : macq !!! Regidx Rs1 = proc_addr jj)
         by (rewrite (Hmq Rs1 ltac:(vm_compute; reflexivity)); exact Hp1).
       (* unpack the lock resource *)
-      iDestruct (proc_lock_res_elim γ Φ γs γl (proc_addr jj) with "HR")
+      iDestruct (proc_lock_res_elim Φ γs γl (proc_addr jj) with "HR")
         as (st ch) "(Hstate & Hchan & Hpub & Hslot)".
       (* +0x5e c.lw a5,24(s1) : read p->state *)
       assert (Hrec_st : add_vec (macq !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -1004,7 +1004,7 @@ Section ProofScheduler.
                        = mword_of_int (SC + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr4a) in "Hpc".
         (* the slot goes back UNTOUCHED *)
-        iAssert (proc_lock_res γ Φ γs γl (proc_addr jj)) with "[Hstate Hchan Hpub Hslot]" as "HR".
+        iAssert (proc_lock_res Φ γs γl (proc_addr jj)) with "[Hstate Hchan Hpub Hslot]" as "HR".
         { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hchan Hpub Hslot". }
         iApply ("Tail" $! jj γl M2 ebc with "[%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown [-]").
         { exact Hjj. }
@@ -1121,15 +1121,21 @@ Section ProofScheduler.
         (* the cpu context save area's cells go INTO the swtch *)
         iDestruct "Hown" as (ctxvs) "[%Hctxlen Hctxcells]".
         (* the dispatch payload *)
-        iPoseProof (p_sched_to_proc γs cpu_id γ jj γl ch Hjj Hgl with "[Hlocked Hstate Hchan Hpub]") as "HP".
+        (* the dispatch payload: the held lock, the trap CSRs this hart's
+           acquire produced, and this hart's [intr_handler_avail γ] -- the
+           dispatched thread's own intena retune runs under THIS ghost. *)
+        iPoseProof (p_sched_to_proc γs cpu_id γ jj γl ch Hjj Hgl
+                      with "Hcsrs Havail [Hlocked Hstate Hchan Hpub]") as "HP".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
-        (* the target is proc jj's record and this one is the scheduler's
-           own: both pinned at this hart for now (the sweep flips the proc
-           record to [None]). *)
-        iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) (Some (cpu_id, γ)) (Some (cpu_id, γ))
+        (* the TARGET is proc jj's record, which is MIGRATABLE ([None]) -- any
+           hart may dispatch any RUNNABLE proc, so its stored continuation is
+           good at every hart, and this hart's [adm] obligation is trivial.
+           The record the scheduler deposits for ITSELF stays PINNED: this
+           cpu context is only ever resumed from hart cid's own tp. *)
+        iApply (Swtch.wp_swtch_sconf γ Φ (p_sched γs) None (Some (cpu_id, γ))
                   (a_cpu_ctx cid_word) (p_context (proc_addr jj))
                   Mc ctxvs (av - 10)%nat ebc (proc_addr jj)
-                  Hctxlen Holdc Hnewc (adm_pin cpu_id γ)
+                  Hctxlen Holdc Hnewc (adm_none cpu_id γ)
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP] [-]").
         { iExact "Hvc". }
         { iEval (rewrite HMctp). iExact "HP". }
@@ -1140,7 +1146,7 @@ Section ProofScheduler.
         (* the resume side: the payload identifies the parking proc with jj *)
         iDestruct "Hresume" as (A' cret) "[Hvc' Hpay2]".
         iDestruct (p_sched_at_cpu γs cpu_id γ A' jj cret (m' !!! Regidx Rtp) Hjj with "Hpay2")
-          as "(%Htpv & %Hcret & %HA' & Hpay3)".
+          as "(%Htpv & %Hcret & %HA' & Hcsrs & Hpay3)".
         subst A'.
         iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts Hheld']".
         destruct Hfacts as [Hgl' Hneeds'].
@@ -1220,7 +1226,7 @@ Section ProofScheduler.
           rewrite (HMcthr Rs7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
           rewrite HM2s7. intro Hbad. discriminate. }
         (* rebuild the lock resource at the parked state *)
-        iAssert (proc_lock_res γ Φ γs γl (proc_addr jj)) with "[Hstate Hchan Hpub Hvc']" as "HR".
+        iAssert (proc_lock_res Φ γs γl (proc_addr jj)) with "[Hstate Hchan Hpub Hvc']" as "HR".
         { rewrite /proc_lock_res. iExists st', ch'. iFrame "Hstate Hchan Hpub".
           rewrite /proc_slots Hneeds' (sc_needs_ctx_not_dormant st' Hneeds').
           iSplitL "Hvc'".

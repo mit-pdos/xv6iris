@@ -2625,7 +2625,7 @@ Section VtLoopProof.
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (sp0 : mword 64) :
     (22 <= av)%nat -> length γs = NPROC -> (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-    kernel_text -∗ panic_wp -∗ procs_inv γ Φ γs -∗
+    kernel_text -∗ panic_wp -∗ procs_inv Φ γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     vt_loop γ Φ γd pd pav pu m av lvl eb pme C sp0.
   Proof.

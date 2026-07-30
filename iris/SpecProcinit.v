@@ -163,7 +163,7 @@ Section ProcinitSeals.
     proc_pub (proc_addr i) -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
-    proc_lock_res γ Φ γs γl (proc_addr i).
+    proc_lock_res Φ γs γl (proc_addr i).
   Proof.
     iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub".
     iFrame "Hlk Hks".
@@ -190,7 +190,7 @@ End ProcinitSeals.
 (*  [γs] is EXISTENTIAL in the conclusion, so this section must not     *)
 (*  have it as a section variable (which is why it is not in            *)
 (*  ProcinitSeals).  That existential is also the whole difficulty:     *)
-(*  every proc lock's resource [proc_lock_res γ Φ γs _ _] mentions the   *)
+(*  every proc lock's resource [proc_lock_res Φ γs _ _] mentions the   *)
 (*  list of all 64 names (through [p_sched]), so the names have to be    *)
 (*  chosen BEFORE any invariant is allocated -- hence                    *)
 (*  [WpLock.newlock_delayed] and the two passes below.                  *)
@@ -265,7 +265,7 @@ Section ProcinitProcsInv.
     ([∗ list] i ∈ seq 0 NPROC,
        proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
        proc_pub (proc_addr i))
-    ={E}=∗ ∃ γs : list gname, procs_inv γ Φ γs.
+    ={E}=∗ ∃ γs : list gname, procs_inv Φ γs.
   Proof.
     iIntros "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
@@ -286,15 +286,15 @@ Section ProcinitProcsInv.
                  (fun i g => ((∀ R : iProp Σ, R ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
                  (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string
-                                        (proc_lock_res γ Φ γs g (proc_addr i)) ∗
+                                        (proc_lock_res Φ γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
     { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm)]".
       iMod (word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
-      iMod ("Hmk" $! (proc_lock_res γ Φ γs g (proc_addr i))
+      iMod ("Hmk" $! (proc_lock_res Φ γs g (proc_addr i))
               with "[Hst Hch Hpub Hdorm]") as "#Hlk".
-      { iApply (proc_lock_res_intro γ Φ γs g (proc_addr i) UNUSED ch
+      { iApply (proc_lock_res_intro Φ γs g (proc_addr i) UNUSED ch
                   with "Hst Hch Hpub [Hdorm]").
         rewrite /proc_slots.
         rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].

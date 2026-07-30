@@ -102,6 +102,11 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   ws !! tf_arg_idx i = Some v ->
   (* 8 slots for this frame, 18 for argint's, 22 for sleep's *)
   (30 <= av)%nat ->
+  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
+     is [true].  Everything below sleeps, and a parking thread must hand the
+     trap CSRs across the crossing -- at level 0 with an enabled base the
+     pushing acquire produces exactly that set.  See SpecSched.v. *)
+  eb = true ->
   sie_cap_gpr γ m av -∗
   (* entered with no lock held *)
   cpu_own γ 0 eb pj C -∗
@@ -113,22 +118,23 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      rework, so nothing about it rides here. *)
   is_tickslock γt -∗
   (* the running-thread bundle killed() and sleep() need *)
-  procs_inv γ Φ γs -∗
-  panic_wp -∗
+  procs_inv Φ γs -∗
+  panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (mf : regfile) (r : mword 64),
-      ⌜ callee_saved m mf /\
+  ( ∀ (h : CPU) (g : gname) (mf : regfile) (r : mword 64),
+      ⌜ callee_saved_notp m mf /\
+        mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = r /\
         (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0 eb pj C -∗
-      pc_is ret_tgt -∗
+      sie_cap_gpr (CID := h) g mf av -∗
+      cpu_own (CID := h) g 0 eb pj C -∗
+      pc_is (CID := h) ret_tgt -∗
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SYSPAUSE.

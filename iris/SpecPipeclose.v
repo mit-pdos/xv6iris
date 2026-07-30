@@ -77,7 +77,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_lock γkl klk "kmem"%string (kmem_res γk kfl) -∗
   kalloc_avail γk on -∗
   (* wakeup's *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   panic_wp -∗
   ( ∀ mr,
     sie_cap_gpr γ mr av -∗

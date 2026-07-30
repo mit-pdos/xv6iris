@@ -33,12 +33,14 @@
    invariant [KptShare.kpt_inv] and every hart's Sv39 translation runs on the
    per-hart residue [tlb_res_pt], so the table itself is shareable and rides to
    the secondaries in [P] below.  What still has to move (claude-notes/
-   projects/main-boot.md G5): (i) [SRegime.bare_inv] carries the globally
-   unique [kmap_auth kmap_M0] -- it is the refutation that makes Bare-arm
-   claim honoring provable, so at most ONE hart can ever be in its Bare arm,
-   and every secondary spends its whole pre-switch phase there; (ii)
-   [SchedCtx.procs_inv] is indexed by the AMBIENT hart through [p_sched]'s
-   [cid_word], so hart 0's cannot be hart 1's.
+   projects/main-boot.md G5): [SRegime.bare_inv] carries the globally unique
+   [kmap_auth kmap_M0] -- it is the refutation that makes Bare-arm claim
+   honoring provable, so at most ONE hart can ever be in its Bare arm, and
+   every secondary spends its whole pre-switch phase there.
+   [SchedCtx.procs_inv] is no longer an obstacle: since proc contexts became
+   MIGRATABLE (claude-notes/projects/sched-hart-generic.md) it mentions
+   neither a hart nor a per-hart SIE ghost, it is persistent, and it is
+   exactly what the [started] payload can carry to every secondary.
 
    THE DEVICES.  The three device invariants ([WpUart.uart_inv] /
    [plic_inv] / [disk_inv], bundled as [dev_inv]) exist FROM TIME 0: they are
@@ -296,7 +298,7 @@ Section SpecMain.
     □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
-         procs_inv γ Φ γs -∗
+         procs_inv Φ γs -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗

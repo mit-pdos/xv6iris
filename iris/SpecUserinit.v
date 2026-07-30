@@ -97,7 +97,7 @@ Definition wp_userinit_sconf_body
   cpu_own γ 0%nat eb pj C -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   kalloc_env γa on (m0 !!! Regidx (mword_of_int 4 : mword 5)) -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗

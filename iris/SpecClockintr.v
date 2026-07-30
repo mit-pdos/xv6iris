@@ -78,7 +78,7 @@ Section SpecClockintr.
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
     ∨ ( is_tickslock γl ∗
-        procs_inv γ Φ γs ∗
+        procs_inv Φ γs ∗
         panic_wp ) )%I.
 
 End SpecClockintr.

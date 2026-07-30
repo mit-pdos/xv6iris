@@ -75,7 +75,7 @@ Definition wp_brelse_sconf_body
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   (* the locked buffer being released *)
   bio_locked bn k pidv dev bno bs -∗
   ( ∀ mf : regfile,

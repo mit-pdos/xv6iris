@@ -20,10 +20,20 @@
      its own context address statically and elims the matching disjunct
      (address disjointness: cpus[] and proc[] are adjacent, ProcGeom.v).
    - [tpv] is the resumer's tp; [⌜tpv = cid_word_of h⌝] pins it to the
-     payload's own hart [h], which is what restores full [callee_saved]
-     (incl. x4) in sched's postcondition.  [h] is a PARAMETER of [p_sched];
-     [sched_vc] applies it at [cpu_id], so today's chain still runs entirely
-     on the ambient hart.
+     payload's own hart [h].  That is no longer a statement about the
+     AMBIENT hart: proc contexts are MIGRATABLE ([ctx_adm = None]), so a
+     parked thread resumes on whichever hart's scheduler picked it up and
+     learns which one only from the payload.  It is what re-ties the
+     received per-cpu cells to the fresh register file's tp, and what makes
+     [callee_saved_notp m mf ∧ mf !!! x4 = cid_word_of h] (CalleeSaved.v)
+     the honest postcondition of every parking function.
+   - The payload also carries the PER-HART trap CSRs [trap_csrs (CID := h)]
+     -- yield/sleep hold them across the park (they take acquire's
+     [trap_csrs_pay] and spend it at their own release), and the scheduler
+     holds exactly one set at every dispatch -- and, on the DISPATCH
+     direction, the resuming hart's [intr_handler_avail g]: the resumed
+     thread's intena retune needs it under the FRESH ghost [g], and its own
+     entry stash (taken under its old hart's ghost) is worthless.
 
    The lock invariant's context slot is ▷-guarded: the scheduler re-stores a
    parked context from the ▷ valid_context its own swtch handed it, and
@@ -38,6 +48,7 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
+Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.
@@ -108,23 +119,32 @@ Section SchedCtx.
   (* RESUMED scheduler identify the parking proc's existential [j] with   *)
   (* its own scan cursor (p_sched_at_cpu below).                          *)
   (* ------------------------------------------------------------------ *)
-  (* [h] is the RESUMING hart: every per-hart address and the tp pin are
-     spelled through [cid_word_of h] rather than the ambient instance, so
-     the predicate itself is hart-parametric.  [sched_vc] below applies it
-     at [cpu_id] -- today's whole chain runs on one hart -- and that single
-     application is the seam the hart-generic protocol moves inside the
-     stored continuation's own ∀h binder. *)
+  (* [h] is the RESUMING hart: every per-hart address, the tp pin and the
+     trap CSRs are spelled through [h] rather than the ambient instance, so
+     the predicate itself is hart-parametric -- and, since proc records are
+     migratable, the payload is the resumed thread's ONLY channel for
+     learning [h].
+     [trap_csrs (CID := h)] rides on BOTH directions (factored out here):
+     the parking side is yield/sleep, which took the CSRs from acquire's
+     [trap_csrs_pay] and owes them to their own release, entirely inside the
+     function -- so the crossing must carry them; the dispatch side is the
+     scheduler, which provably holds exactly one set at every dispatch in
+     both [eb] arms.
+     [intr_handler_avail g] rides on the DISPATCH direction only: it is the
+     persistent half the resumed thread's intena restore needs, and it must
+     be named at the RESUMING hart's ghost [g] (the SIE ghost is per-hart,
+     so the thread's own pre-park stash is about the wrong name). *)
   Definition p_sched : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
                        mword 64 -d> mword 64 -d> iPropO Σ :=
     fun h g A' c cret tpv p =>
     (⌜tpv = cid_word_of h⌝ ∗
+     trap_csrs (CID := h) ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states.  [A'] -- the
-          resumer's own record index -- is the PARKING PROC's context: still
-          pinned here, [None] (migratable) once the sweep flips proc
-          contexts. *)
-       (⌜c = a_cpu_ctx (cid_word_of h)⌝ ∗ ⌜A' = Some (h, g)⌝ ∗
+          resumer's own record index -- is the PARKING PROC's context, and
+          it is MIGRATABLE: [None]. *)
+       (⌜c = a_cpu_ctx (cid_word_of h)⌝ ∗ ⌜A' = None⌝ ∗
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
           ⌜cret = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
@@ -134,18 +154,26 @@ Section SchedCtx.
           is the scheduler's own record, PINNED at (h, g) -- cpus[h].context
           can only ever be resumed from hart h's own tp, and the parked
           scheduler's closure holds hart-h register resources. *)
-       (∃ (j : nat) (γl : gname) (ch : mword 64),
+       (intr_handler_avail (CID := h) g ∗
+        ∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h) /\
            A' = Some (h, g)⌝ ∗
           proc_held h j γl RUNNING ch)))%I.
 
-  (* the scheduler-chain valid context (fixed Phi / P instantiation);
-     [p] = the context's c->proc index (see SwtchCtx).  Every record in
-     today's chain is PINNED at the ambient hart and its SIE ghost; the
-     hart-generic sweep flips the PROC records (proc_ctx below) to [None]. *)
-  Definition sched_vc (c p : mword 64) : iProp Σ :=
-    valid_context Φ p_sched (Some (cpu_id, γ)) c p.
+  (* the scheduler-chain valid context, PINNED at hart [h] and its SIE
+     ghost [g] (fixed Phi / P instantiation); [p] = the context's c->proc
+     index (see SwtchCtx).  This is the CPU/scheduler record: [cpus[h].context]
+     is only ever resumed from hart h's own tp, and the parked scheduler's
+     closure holds hart-h register resources.  [sched_vc] is the ambient
+     restatement -- the shape a thread running on THIS hart holds of ITS
+     scheduler -- and every crossing hands its partner's record back at the
+     partner's own hart, so a parking function's continuation states the
+     slot with [sched_vc_at h g]. *)
+  Definition sched_vc_at (h : CPU) (g : gname) (c p : mword 64) : iProp Σ :=
+    valid_context Φ p_sched (Some (h, g)) c p.
+
+  Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id γ c p.
 
   (* ------------------------------------------------------------------ *)
   (* Payload intro/elim.  Discrimination is by the resumed context's own  *)
@@ -153,53 +181,63 @@ Section SchedCtx.
   (* ------------------------------------------------------------------ *)
 
   (* build the parking-proc payload (what sched supplies at its swtch;
-     [p = proc_addr j] is sched's own cpu_own/premise tie). *)
+     [p = proc_addr j] is sched's own cpu_own/premise tie).  The parking
+     proc's own record is MIGRATABLE, and it hands over the trap CSRs it
+     took from its acquire. *)
   Lemma p_sched_to_cpu (i : CPU) (g : gname) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> needs_ctx st = true ->
+    trap_csrs (CID := i) -∗
     proc_held i j γl st ch -∗
-    p_sched i g (Some (i, g)) (a_cpu_ctx (cid_word_of i))
+    p_sched i g None (a_cpu_ctx (cid_word_of i))
       (p_context (proc_addr j)) (cid_word_of i) (proc_addr j).
   Proof.
-    iIntros (Hj Hgl Hst) "Hheld".
-    iSplit; [done|]. iLeft. iSplit; [done|]. iSplit; [done|].
+    iIntros (Hj Hgl Hst) "Htc Hheld".
+    iSplit; [done|]. iFrame "Htc". iLeft. iSplit; [done|]. iSplit; [done|].
     iExists j, γl, st, ch. iFrame. done.
   Qed.
 
   (* build the dispatch payload (what the scheduler supplies at its swtch;
      it has just written c->proc = proc_addr j, so its crossing index IS
-     proc_addr j). *)
+     proc_addr j).  It hands over its own trap CSRs and the persistent
+     handler-avail at ITS ghost -- the dispatched thread's intena restore
+     runs under [g]. *)
   Lemma p_sched_to_proc (i : CPU) (g : gname) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
+    trap_csrs (CID := i) -∗
+    intr_handler_avail (CID := i) g -∗
     proc_held i j γl RUNNING ch -∗
     p_sched i g (Some (i, g)) (p_context (proc_addr j))
       (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
   Proof.
-    iIntros (Hj Hgl) "Hheld".
-    iSplit; [done|]. iRight.
+    iIntros (Hj Hgl) "Htc Havail Hheld".
+    iSplit; [done|]. iFrame "Htc". iRight. iSplitL "Havail"; [iExact "Havail"|].
     iExists j, γl, ch. iFrame. done.
   Qed.
 
-  (* a resumed PROC context's payload: the resumer was this CPU's scheduler,
+  (* a resumed PROC context's payload: the resumer was hart [i]'s scheduler,
      the proc's own lock is held with state RUNNING, and the scheduler's
-     record comes back pinned at this hart. *)
+     record comes back pinned at that hart. *)
   Lemma p_sched_at_proc (i : CPU) (g : gname) (A' : ctx_adm) (j : nat)
       (cret tpv p : mword 64) :
     (j < NPROC)%nat ->
     p_sched i g A' (p_context (proc_addr j)) cret tpv p -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
     ⌜p = proc_addr j⌝ ∗ ⌜A' = Some (i, g)⌝ ∗
+    trap_csrs (CID := i) ∗ intr_handler_avail (CID := i) g ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch.
   Proof.
-    iIntros (Hj) "[%Htp Hpay]". iSplit; [done|].
+    iIntros (Hj) "(%Htp & Htc & Hpay)". iSplit; [done|].
     iDestruct "Hpay" as "[(%Hc & _ & _) | Hpay]".
     { exfalso.
       exact (a_cpu_ctx_ne_p_context (cid_word_of i) j (tp_ok_cid_of i) Hj (eq_sym Hc)). }
+    iDestruct "Hpay" as "(#Havail & Hpay)".
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts Hpay]".
     destruct Hfacts as (Hc & Hp & Hj' & Hgl & Hcret & HA).
     assert (j' = j) as -> by (apply (p_context_proc_addr_inj j' j Hj' Hj); congruence).
     iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
+    iFrame "Htc". iSplitR; [iApply "Havail"|].
     iExists γl, ch. iFrame. done.
   Qed.
 
@@ -216,17 +254,19 @@ Section SchedCtx.
     (j < NPROC)%nat ->
     p_sched i g A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
-    ⌜A' = Some (i, g)⌝ ∗
+    ⌜A' = None⌝ ∗ trap_csrs (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
       ⌜γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
       proc_held i j γl st ch.
   Proof.
-    iIntros (Hj) "[%Htp Hpay]". iSplit; [done|].
+    iIntros (Hj) "(%Htp & Htc & Hpay)". iSplit; [done|].
     iDestruct "Hpay" as "[(_ & %HA & Hpay) | Hpay]".
     { iDestruct "Hpay" as (j' γl st ch) "[%Hfacts Hpay]".
       destruct Hfacts as (Hcret & Hp & Hj' & Hgl & Hst).
       assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
-      iSplit; [done|]. iSplit; [done|]. iExists γl, st, ch. iFrame. done. }
+      iSplit; [done|]. iSplit; [done|]. iFrame "Htc".
+      iExists γl, st, ch. iFrame. done. }
+    iDestruct "Hpay" as "(_ & Hpay)".
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts _]".
     destruct Hfacts as (Hc & _ & Hj' & _).
     exfalso. exact (a_cpu_ctx_ne_p_context (cid_word_of i) j' (tp_ok_cid_of i) Hj' Hc).
@@ -239,8 +279,15 @@ Section SchedCtx.
   (* the valid-context obligation of a parked proc: its saved context is a
      member of the scheduler chain. *)
   (* a parked proc's context is indexed by its OWN proc address (it parked
-     right after the dispatcher set c->proc to it, and never wrote it). *)
-  Definition proc_ctx (pa : mword 64) : iProp Σ := sched_vc (p_context pa) pa.
+     right after the dispatcher set c->proc to it, and never wrote it), and
+     it is MIGRATABLE -- [ctx_adm = None].  This is the whole point of the
+     hart-generic protocol: real xv6 lets ANY hart's scheduler dispatch any
+     RUNNABLE proc, so the record stored in a proc's lock can name neither a
+     hart nor a per-hart SIE ghost.  Consequently [proc_lock_res] and
+     [procs_inv] below mention neither -- which is what lets ONE [procs_inv]
+     ride the [started] payload to every secondary hart. *)
+  Definition proc_ctx (pa : mword 64) : iProp Σ :=
+    valid_context Φ p_sched None (p_context pa) pa.
 
   (* the resource protected by [p->lock].  The context slot is ▷-guarded:
      its producer (the scheduler, releasing a freshly parked proc) only ever

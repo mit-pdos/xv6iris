@@ -69,7 +69,7 @@ Section ProofWakeup.
     (* the acquire/release + myproc push_off keep the transient +1 in range *)
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
-    procs_inv γ Φ γs -∗
+    procs_inv Φ γs -∗
     (* acquire's "already holding" arm sits above panic() *)
     panic_wp -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x58]. *)
@@ -314,7 +314,7 @@ Section ProofWakeup.
         iEval (rewrite Hpp40) in "Hpc".
         (* the per-proc lock for proc[k] and its protected resource. *)
         destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
-        iDestruct (procs_inv_lookup γ Φ γs k γk Hγk with "Hpinv") as "#Hlockk".
+        iDestruct (procs_inv_lookup Φ γs k γk Hγk with "Hpinv") as "#Hlockk".
         (* sp/tp preserved through myproc. *)
         assert (Hmret2 : mret !!! Regidx (mword_of_int 2 : mword 5) = spF).
         { rewrite (callee_saved_lookup Hpres (mword_of_int 2 : mword 5) ltac:(vm_compute; reflexivity)). exact HMjcsp. }
@@ -359,7 +359,7 @@ Section ProofWakeup.
         { rewrite /M42 upd_ne; [| vm_compute; discriminate].
           rewrite /M40 upd_ne; [| vm_compute; discriminate]. exact Hmret4. }
         (* acquire(&proc[k]->lock): cpu_own lvl -> S lvl; returns locked + proc_lock_res + pay. *)
-        iApply (Acquire.wp_acquire_sconf γ Φ γk "proc"%string (proc_lock_res γ Φ γs γk (proc_addr k)) M42
+        iApply (Acquire.wp_acquire_sconf γ Φ γk "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) M42
                   lvl eb pme C av
                   ltac:(etransitivity; [ exact HM42tp | exact Hrtp_cid ])
                   ltac:(lia)
@@ -372,7 +372,7 @@ Section ProofWakeup.
                         = mword_of_int (KernelSyms.wakeup + 0x46)).
         { rewrite HM42ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc46) in "Hpc".
-        iDestruct (proc_lock_res_elim γ Φ γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpch & Hpub & Hctx)".
+        iDestruct (proc_lock_res_elim Φ γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpch & Hpub & Hctx)".
         (* register-preservation through acquire (callee_saved M42 Macq). *)
         assert (HMacq9 : Macq !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
         { rewrite (callee_saved_lookup Hpins (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
@@ -400,7 +400,7 @@ Section ProofWakeup.
                      (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
                    sie_cap_gpr γ Mr av -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
-                   locked γk cpu_id -∗ proc_lock_res γ Φ γs γk (proc_addr k) -∗
+                   locked γk cpu_id -∗ proc_lock_res Φ γs γk (proc_addr k) -∗
                    WP (Loop : expr riscv_lang) {{ Φ }})%I
           with "[Hown Hpay Hframe Htail]"
           as "Hrel".
@@ -449,7 +449,7 @@ Section ProofWakeup.
           assert (HMr2c_tpc : Mr2c !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
             by (rewrite HMr2c_tp; exact Hrtp_cid).
           (* release(&proc[k]->lock): cpu_own S lvl -> lvl (pay consumed). *)
-          iApply (Release.wp_release_sconf γ Φ γk (proc_addr k) "proc"%string (proc_lock_res γ Φ γs γk (proc_addr k)) Mr2c
+          iApply (Release.wp_release_sconf γ Φ γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) Mr2c
                     lvl eb pme C av
                     Hlka2 HMr2c_tpc
                     ltac:(lia)
@@ -615,7 +615,7 @@ Section ProofWakeup.
                             (sign_extend' 64 (mword_of_int 8162 : mword 13))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite H48tgt) in "Hpc".
-          iDestruct (proc_lock_res_intro γ Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hpub Hctx") as "HR".
+          iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hpub Hctx") as "HR".
           iApply ("Hrel" $! M48 with "[%] Hcg Hpc Htok HR").
           repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_4 | exact HM48_18
                         | exact HM48_19 | exact HM48_20 | exact HM48_21
@@ -699,7 +699,7 @@ Section ProofWakeup.
                               (sign_extend' 64 (mword_of_int 8156 : mword 13))
                             = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite H4etgt) in "Hpc".
-            iDestruct (proc_lock_res_intro γ Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hpub Hctx") as "HR".
+            iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch with "Hpst Hpch Hpub Hctx") as "HR".
             iApply ("Hrel" $! M4e with "[%] Hcg Hpc Htok HR").
             repeat split; [exact HM4e_9 | exact HM4e_2 | exact HM4e_4 | exact HM4e_18
                           | exact HM4e_19 | exact HM4e_20 | exact HM4e_21
@@ -736,7 +736,7 @@ Section ProofWakeup.
             (* reassemble proc_lock_res via the wakeup transition. *)
             (* SLEEPING -> RUNNABLE stays in one guard class: the slots cross
                untouched, so no guard is opened (proc_slots_recast). *)
-            iDestruct (proc_lock_res_wakeup γ Φ γs γk (proc_addr k) st ch Hst_sl with "Hpst Hpch Hpub Hctx") as "HR".
+            iDestruct (proc_lock_res_wakeup Φ γs γk (proc_addr k) st ch Hst_sl with "Hpst Hpch Hpub Hctx") as "HR".
             (* ---- 0x56 c.j release ---- *)
             iPoseProof (wki_56 with "Htext") as "Hi56".
             assert (H56tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64)

@@ -3,12 +3,29 @@
    proof file -- so every function proof can be checked in parallel.
 
    yield() gives up the CPU: from a normally-running kernel thread (no locks
-   held, noff = 0, this CPU's current process is proc j, the scheduler
-   parked under ▷), it acquires p->lock, marks the process RUNNABLE, parks
-   through sched(), and -- once some scheduler dispatches the process again
-   -- releases the lock and returns.  The postcondition is the precondition
-   shape back (fresh scheduler context, lock free again, noff back to 0),
-   plus full callee_saved: a timer-interrupt path can call yield repeatedly. *)
+   held, noff = 0, interrupts enabled at the base -- [eb = true], which is
+   what makes the trap-CSR exchange across the park balanced; this CPU's
+   current process is proc j, the scheduler parked under ▷), it acquires
+   p->lock, marks the process RUNNABLE, parks through sched(), and -- once
+   some scheduler dispatches the process again -- releases the lock and
+   returns.
+
+   IT RETURNS ON THE HART THAT DISPATCHED IT, not necessarily the one it
+   parked from (SpecSched.v): the continuation is quantified over that hart
+   [h] and its SIE ghost [g], every resource comes back at [(h, g)], and the
+   register fact is [callee_saved_notp m mf] plus [mf !!! x4 = cid_word_of h]
+   (CalleeSaved.v).  The trap CSRs never appear: yield's own acquire takes
+   them and its own release gives them back, and the crossing in between
+   carries them inside the chain payload.
+
+   The context slot [C] stays ONE hart-independent proposition, carried out of
+   the entry bundle and back into the exit bundle unchanged.  A hart-INDEXED
+   slot [C : CPU -> iProp Σ] is not provable here and never could be: nothing
+   in the crossing can turn [C cpu_id] into [C h], so such a spec would need a
+   hart-transport bridge as an extra premise -- and a [C] that admits one is
+   exactly a hart-independent [C].  (Every real instantiation is [emp]: a
+   running thread's parked-scheduler obligation rides the separate
+   [▷ sched_vc] premise, not the slot.) *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -46,22 +63,24 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  eb = true ->
   (20 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ 0 eb pj C -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   panic_wp -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ mf : regfile,
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0 eb pj C -∗
-      pc_is ret_tgt -∗
+  ( ∀ (h : CPU) (g : gname) (mf : regfile),
+      ⌜callee_saved_notp m mf⌝ -∗
+      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+      sie_cap_gpr (CID := h) g mf av -∗
+      cpu_own (CID := h) g 0 eb pj C -∗
+      pc_is (CID := h) ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type YIELD.

@@ -679,7 +679,7 @@ Section ProofMain.
         ⌜ m' !!! Regidx (mword_of_int 4 : mword 5) = cid_word ⌝ -∗
         cpu_own γ 0 false p0 cpu_ctx_free -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) cid_word -∗
-        procs_inv γ Φ γs -∗
+        procs_inv Φ γs -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
         (* what kvminithart published about the kernel page table: all four
            PERSISTENT, and exactly what the [started] deposit carries *)
@@ -821,7 +821,7 @@ Section ProofMain.
                  (fun _ i => ((∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
                               proc_pub (proc_addr i))%I)
                  (seq 0 NPROC) with "Hready Hppub") as "Hin".
-    iMod (procs_inv_alloc γ Φ ⊤ with "Hin") as (γs) "#Hpinv".
+    iMod (procs_inv_alloc Φ ⊤ with "Hin") as (γs) "#Hpinv".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
               with "Hcg Hpc [] Hcpu Hkenv Hpinv Hstvec Hkinv Hkptp Htramp Hkstx").
@@ -998,7 +998,7 @@ Section ProofMain.
     kernel_text -∗ kernel_data -∗ panic_wp -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (MN + 0x8e) : mword 64) -∗
     cpu_own γ 0 false p0 cpu_ctx_free -∗
-    procs_inv γ Φ γs -∗
+    procs_inv Φ γs -∗
     kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) cid_word -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1252,7 +1252,7 @@ Section ProofMain.
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
-         procs_inv γ Φ γs' -∗
+         procs_inv Φ γs' -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
@@ -1262,7 +1262,7 @@ Section ProofMain.
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
          P) -∗
     printk_env γpr γd γv -∗
-    procs_inv γ Φ γs -∗
+    procs_inv Φ γs -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗

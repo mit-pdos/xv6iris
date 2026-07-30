@@ -95,6 +95,11 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   m !!! Regidx (mword_of_int 11 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
   (Z.of_nat n < 2 ^ 31)%Z ->
   (uartwrite_stack <= av)%nat ->
+  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
+     is [true].  Everything below sleeps, and a parking thread must hand the
+     trap CSRs across the crossing -- at level 0 with an enabled base the
+     pushing acquire produces exactly that set.  See SpecSched.v. *)
+  eb = true ->
   sie_cap_gpr γ m av -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
   cpu_own γ 0%nat eb pj C -∗
@@ -105,20 +110,21 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* the buffer, read-only *)
   ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
   (* the running-thread bundle (SpecSleep.v) *)
-  procs_inv γ Φ γs -∗
-  panic_wp -∗
+  procs_inv Φ γs -∗
+  panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (mf : regfile),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0%nat eb pj C -∗
-      pc_is ret_tgt -∗
+  ( ∀ (h : CPU) (g : gname) (mf : regfile),
+      ⌜callee_saved_notp m mf⌝ -∗
+      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+      sie_cap_gpr (CID := h) g mf av -∗
+      cpu_own (CID := h) g 0%nat eb pj C -∗
+      pc_is (CID := h) ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
       uart_sent_sub γu (f <$> seq 0 n) -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type UARTWRITE.

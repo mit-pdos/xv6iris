@@ -94,3 +94,106 @@ statable: spin loop (iLöb over lw/sext.w/beqz), `▷ P` stripped at the
 fence by `wp_fence_gen_later_s_sconf`, printk("hart %d starting") from
 P's `printk_env`, kvminithart (kpt-share's hart-generic contract),
 trapinithart, plicinithart, `jal scheduler` at the join.
+
+## STAGE 2 HAS LANDED: proc contexts are `A' = None`
+
+`SchedCtx.proc_ctx` is now `valid_context Φ p_sched None (p_context pa) pa`, so
+`proc_lock_res Φ γs γl pa` and **`procs_inv Φ γs`** mention neither a hart nor a
+per-hart SIE ghost: one persistent proposition, exactly what the `started`
+payload needs (S1). What that cost and how it is shaped:
+
+- **`p_sched` grew two conjuncts.** `trap_csrs (CID := h)` factored out next to
+  the tp pin (both directions carry them — S2), and
+  `intr_handler_avail (CID := h) g` on the DISPATCH disjunct only. The second
+  one is load-bearing and easy to miss: `intr_handler_avail` is itself
+  CID-indexed (through `intr_handler_spec`), and the resumed thread's intena
+  retune runs under the *resuming* hart's ghost, so its own pre-park stash is
+  about the wrong name. The parking disjunct pins `A' = None`.
+- **`sched_vc_at h g c p`** is the pinned CPU record at an explicit hart;
+  `sched_vc γ Φ γs` is `sched_vc_at cpu_id γ` (unchanged signature, so no caller
+  churned). Every parking contract's continuation states its slot with
+  `sched_vc_at h g`.
+- **`eb = true` is a parking premise** on sched/yield/sleep and the whole cone
+  above them. The payload demands `trap_csrs` unconditionally (the scheduler
+  always holds a set); a parking thread only *has* them at level 1 with an
+  enabled base, where the pushing acquire took them out of the SIE arm.
+- **`panic_wp_any`** (SpecPanic.v) = `□ ∀ h, panic_wp (CID := h)`. sleep's
+  post-resume half re-acquires the condition lock on the RESUMING hart and has
+  to close its holding-panic arm there. Every parking contract threads this
+  form; `panic_wp_any_at h` is the bridge. yield does not need it (its only
+  panic arm is pre-park).
+- **THE C-SLOT: `C : iProp Σ`, hart-independent — NOT `CPU -> iProp Σ`.** The
+  hart-indexed form is *unprovable*, not merely awkward: nothing in the
+  crossing can turn `C cpu_id` into `C h`, so it would need a hart-transport
+  bridge as an extra premise — and a `C` that admits one is exactly a
+  hart-independent `C`. The slot is simply carried out of the entry bundle and
+  back into the exit bundle. (Every real instantiation is `emp`: a running
+  thread's parked-scheduler obligation rides the separate `▷ sched_vc`
+  premise.)
+- **`lock_openable`'s dead-state refutations went ∀-hart** in `SLEEP_GEN`
+  (`forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False`, same for `locked_pre`): the
+  interior release runs on the parking hart, the re-acquire on the dispatching
+  one.
+
+### THE EXTRACTION RECIPE, as validated three times
+
+A parking proof's post-resume half cannot live in a section that fixes `CID` —
+a section variable cannot be instantiated from inside its own section. So:
+
+1. Put the half in **its own `Section` BEFORE the main one**, inside the same
+   `Module`, with `Context` that does NOT bind `CID`, and `CID` as a **lemma
+   binder**: `Lemma f_post_x `{CID : CpuId} (g : gname) … : …`.
+2. Its pure premises are the pre-half register tower's facts **restated at the
+   file the callee returned** (`m' !!! Regidx k = …`), plus `sp0 = m !!! sp` and
+   the frame-base equation `add_vec sp0 <imm> = spd` (from which the half
+   re-derives its own `Hb1..Hbk` slot bridges and the pop equation, so the
+   caller passes neither).
+3. Take the saved frame words at **`pa_stk sp0 k ↦₈ <value>`** and bridge them
+   inside; the caller does one `iEval (rewrite … -Hbk) in "Hrk"` each.
+4. Any `Local Ltac` the half uses must MOVE above it.
+5. Apply once: `iApply (f_post_x (CID := h) g … with "…")`. Bare `iApply`
+   resolves the section instance; `(CID := h)` works only on a lemma.
+6. `subst eb` in both halves (the `eb = true` premise), then spell the
+   remaining textual `eb`s in tactic arguments as `true` — a `subst` erases the
+   name and every later `iApply (… eb …)` fails with "variable eb was not
+   found".
+
+Landed: `ProofSched.sched_post_swtch`, `ProofYield.yield_post_sched`,
+`ProofSleep.sleep_post_sched`. `ProofScheduler` needs NO extraction — its own
+record stays pinned, so `destruct Hadm' as [-> ->]` keeps its post-swtch half
+verbatim; only the swtch's TARGET index moved to `None` (`adm_none`) and the
+payload gained/returned the trap CSRs.
+
+### THE SLEEPER ARMY IS TEMPORARILY AXIOMATIZED
+
+Eight contracts were restated to the new continuation shape and their proof
+towers taken out of the build, each supplied by an `Axiom` in its `Link` file
+(the assumed-callee shape of `design/spec-modules.md`): **acquiresleep,
+sys_pause, piperead, pipewrite, uartwrite, virtio_disk_rw, bwrite, bread**.
+The proof files are recoverable from git history. Their contracts CHANGING is
+correct and intended — do not restore the old shapes.
+
+Re-proof worklist (one per sleeper; every one is the same shape as the three
+that landed):
+
+| function | extraction point | what its post-resume half needs |
+|---|---|---|
+| `acquiresleep` | the `Sleep.wp_sleep_sconf` application | tp/sp/s\* facts about the returned file, `sleeplocked`/`sl_pid` rebuild, its own release at `h`; `panic_wp_any_at h` |
+| `sys_pause` | the `Sleep` application inside the tick loop | the loop invariant becomes ∀h∀g (it is an `iLöb` over ticks, so the Löb body itself has to be hart-generic — the only sleeper where the extraction is *inside* a loop) |
+| `piperead` / `pipewrite` | the `SleepGen` application | ∀h∀g `iLöb` again (the retry loop), plus `pipe_ref`/`proc_priv` are hart-free so only the register/cpu_own/pc tier moves |
+| `uartwrite` | the `Sleep` application in the ring-full wait | `iLöb` over the ring, `is_txlock` re-acquire at `h` |
+| `virtio_disk_rw` | the `Sleep` application in `while (b->disk == 1)` | the RwB/RwCSeam/RwDSeam/RwE/RwF seam chain is already cut at that point; the seam lemmas after it take `(CID := h)` |
+| `bwrite` | inherits from `virtio_disk_rw`'s contract | pure re-threading, no `iLöb` |
+| `bread` | the `ACQUIRESLEEP` application | pure re-threading, no `iLöb`; `bio_locked`/`disk_block` are hart-free |
+
+The recurring new work versus the three that landed: **the sleepers park inside
+`iLöb` loops**, so their loop invariants (not just a trailing half) have to be
+stated ∀h∀g. That is the one shape stage 2 did not have to solve.
+
+### The coverage tool's exit-pin rule
+
+`tools/proof_coverage.py`'s `runs_to_end` now skips an explicit ambient-hart
+annotation between `pc_is` and its address, because a parking contract's exit
+pin reads `pc_is (CID := h) ret_tgt`. Without that, sched/yield/sleep read as
+*partial* — a silent downgrade, exactly the failure mode the durable notes warn
+about. Check the report after touching any parking contract.

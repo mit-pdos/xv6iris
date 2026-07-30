@@ -72,17 +72,22 @@ Definition wp_bwrite_sconf_body
   (* a0 is the buffer *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
+     is [true].  Everything below sleeps, and a parking thread must hand the
+     trap CSRs across the crossing -- at level 0 with an enabled base the
+     pushing acquire produces exactly that set.  See SpecSched.v. *)
+  eb = true ->
   sie_cap_gpr γ m K -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
   cpu_own γ 0 eb pj C -∗
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗
+  panic_wp_any -∗
   bio_ctx bn -∗
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle rw's sleeps thread through *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   (* the disk fabric *)
@@ -92,19 +97,20 @@ Definition wp_bwrite_sconf_body
   (* the locked buffer and the disk block it names *)
   bio_locked bn k pidv dev bno bs -∗
   disk_block γd (uint bno) bs_disk -∗
-  ( ∀ mf : regfile,
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf K -∗
-      cpu_own γ 0 eb pj C -∗
-      trap_csrs_pay 0 eb -∗
-      pc_is ret_tgt -∗
+  ( ∀ (h : CPU) (g : gname) (mf : regfile),
+      ⌜callee_saved_notp m mf⌝ -∗
+      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+      sie_cap_gpr (CID := h) g mf K -∗
+      cpu_own (CID := h) g 0 eb pj C -∗
+      trap_csrs_pay (CID := h) 0 eb -∗
+      pc_is (CID := h) ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
       p_pid pj ↦₄{dq} pidv -∗
       bio_locked bn k pidv dev bno bs -∗
       (* the write-through: the disk now holds the buffer's bytes *)
       disk_block γd (uint bno) bs -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type BWRITE.

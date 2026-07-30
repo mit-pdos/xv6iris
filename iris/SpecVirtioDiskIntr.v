@@ -60,7 +60,7 @@ Definition wp_virtio_disk_intr_sconf_body
   sie_cap_gpr γ m K -∗
   cpu_own γ lvl eb pme C -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗ procs_inv γ Φ γs -∗
+  panic_wp -∗ procs_inv Φ γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗

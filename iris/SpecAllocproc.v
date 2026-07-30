@@ -155,7 +155,7 @@ Definition wp_allocproc_sconf_body
   cpu_own γ lvl eb pme C -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp -∗
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on (m !!! Regidx (mword_of_int 4)) -∗
   ( ∀ (mr : regfile),

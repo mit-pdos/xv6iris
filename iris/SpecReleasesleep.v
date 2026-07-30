@@ -65,7 +65,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   R -∗
   panic_wp -∗
   (* wakeup's resources *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr γ mf av -∗

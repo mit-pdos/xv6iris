@@ -321,7 +321,7 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M (pa_stk sp0 4) ⌝ -∗
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      kernel_text -∗ dev_inv γu γv -∗ procs_inv γ Φ γs -∗ panic_wp -∗
+      kernel_text -∗ dev_inv γu γv -∗ procs_inv Φ γs -∗ panic_wp -∗
       sie_cap_gpr γ M (av - 4) -∗
       cpu_own γ lvl eb pme C -∗
       pc_is (mword_of_int (UI + 0x44)) -∗
@@ -446,7 +446,7 @@ Section ProofUartintr.
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (uartintr_stack <= av)%nat ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
-    procs_inv γ Φ γs -∗ panic_wp -∗
+    procs_inv Φ γs -∗ panic_wp -∗
     sie_cap_gpr γ M (av - 4) -∗
     cpu_own γ (S lvl) eb pme C -∗ trap_csrs_pay lvl eb -∗
     pc_is (mword_of_int (UI + 0x2e)) -∗

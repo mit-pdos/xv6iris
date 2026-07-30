@@ -11,10 +11,30 @@
    clears chan, releases p->lock, REACQUIRES lk, and returns.
 
    The postcondition is the precondition shape back -- lk held again with
-   its resource Rk, the running-thread bundle (cur_proc, ▷ sched_vc, own
-   context cells) refreshed, noff back at 1 -- plus full callee_saved.
-   Nothing in the spec promises the wakeup HAPPENS (liveness); it promises
-   what holds when sleep returns. *)
+   its resource Rk, the running-thread bundle (▷ sched_vc, own context
+   cells) refreshed, noff back at 1.  Nothing in the spec promises the
+   wakeup HAPPENS (liveness); it promises what holds when sleep returns.
+
+   IT DOES NOT RETURN ON THE HART IT PARKED FROM (SpecSched.v): proc
+   contexts are migratable, so the continuation is quantified over the
+   DISPATCHING hart [h] and its per-hart SIE ghost [g], every resource comes
+   back at [(h, g)], the register fact weakens to [callee_saved_notp m mf]
+   plus [mf !!! x4 = cid_word_of h] (CalleeSaved.v), and the conclusion is
+   hart [h]'s own [WP (LoopE h)].  Consequences for the interface:
+     - the cpu context slot [C] stays ONE hart-independent proposition: it is
+       carried out of the entry bundle and back into the exit bundle
+       unchanged.  A hart-INDEXED slot could not work -- nothing in the
+       crossing turns [C cpu_id] into [C h], and a [C] admitting such a
+       bridge is exactly a hart-independent one;
+     - the lock tokens come back as [locked γk h] -- the re-acquire runs on
+       hart [h];
+     - [panic_wp_any] replaces [panic_wp]: the re-acquire's holding-panic arm
+       has to be discharged at the RESUMING hart;
+     - [eb = true] is now a premise.  At level 0 with an enabled base the
+       trap CSRs sit in the SIE arm and the pushing acquire hands them out,
+       so the parking thread genuinely holds the set the chain payload
+       demands.  [trap_csrs_pay 0 eb] therefore still rides both sides --
+       sleep's interior pop reaches level 0 -- but is now [trap_csrs]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -57,6 +77,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
+  eb = true ->
   (22 <= av)%nat ->
   sie_cap_gpr γ m av -∗
   cpu_own γ 1 eb pj C -∗
@@ -66,28 +87,29 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      re-acquire extracts them back -- the pay must ride the spec. *)
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
   is_lock γk lka sk Rk -∗
   locked γk cpu_id -∗
   Rk -∗
   (* the running-thread bundle *)
-  panic_wp -∗
+  panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ mf : regfile,
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 1 eb pj C -∗
-      trap_csrs_pay 0 eb -∗
-      pc_is ret_tgt -∗
-      (* lk reacquired, with its resource *)
-      locked γk cpu_id -∗
+  ( ∀ (h : CPU) (g : gname) (mf : regfile),
+      ⌜callee_saved_notp m mf⌝ -∗
+      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+      sie_cap_gpr (CID := h) g mf av -∗
+      cpu_own (CID := h) g 1 eb pj C -∗
+      trap_csrs_pay (CID := h) 0 eb -∗
+      pc_is (CID := h) ret_tgt -∗
+      (* lk reacquired ON HART [h], with its resource *)
+      locked γk h -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SLEEP.
@@ -135,40 +157,44 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
+  eb = true ->
   (22 <= av)%nat ->
-  (* the three refutations of the dead state *)
+  (* the three refutations of the dead state.  The two token refutations are
+     needed at EVERY hart: the interior release runs on the parking hart, the
+     re-acquire on the dispatching one. *)
   (⊢ Tk -∗ Dk -∗ False) ->
-  (⊢ locked γk cpu_id -∗ Dk -∗ False) ->
-  (⊢ locked_pre γk cpu_id -∗ Dk -∗ False) ->
+  (forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False) ->
+  (forall i : CPU, ⊢ locked_pre γk i -∗ Dk -∗ False) ->
   sie_cap_gpr γ m av -∗
   cpu_own γ 1 eb pj C -∗
   (* same pay note as [wp_sleep_sconf_body]: the interior pop reaches 0 *)
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   (* the caller's condition lock, HELD, with the credential *)
   lock_openable γk lka Rk Dk -∗
   Tk -∗
   locked γk cpu_id -∗
   Rk -∗
   (* the running-thread bundle *)
-  panic_wp -∗
+  panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ mf : regfile,
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 1 eb pj C -∗
-      trap_csrs_pay 0 eb -∗
-      pc_is ret_tgt -∗
-      (* lk reacquired, with its resource and the credential back *)
+  ( ∀ (h : CPU) (g : gname) (mf : regfile),
+      ⌜callee_saved_notp m mf⌝ -∗
+      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+      sie_cap_gpr (CID := h) g mf av -∗
+      cpu_own (CID := h) g 1 eb pj C -∗
+      trap_csrs_pay (CID := h) 0 eb -∗
+      pc_is (CID := h) ret_tgt -∗
+      (* lk reacquired ON HART [h], with its resource and the credential *)
       Tk -∗
-      locked γk cpu_id -∗
+      locked γk h -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SLEEP_GEN.

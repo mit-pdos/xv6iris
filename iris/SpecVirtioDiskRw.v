@@ -94,13 +94,18 @@ Definition wp_virtio_disk_rw_sconf_body
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
+     is [true].  Everything below sleeps, and a parking thread must hand the
+     trap CSRs across the crossing -- at level 0 with an enabled base the
+     pushing acquire produces exactly that set.  See SpecSched.v. *)
+  eb = true ->
   sie_cap_gpr γ m K -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
   cpu_own γ 0 eb pj C -∗
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗
-  procs_inv γ Φ γs -∗
+  panic_wp_any -∗
+  procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   (* the disk fabric *)
@@ -112,20 +117,21 @@ Definition wp_virtio_disk_rw_sconf_body
      the disk starts at 1024 * blockno. *)
   buf_own b bno dsk0 bs_buf -∗
   disk_block γd (uint bno) bs_disk -∗
-  ( ∀ mf : regfile,
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf K -∗
-      cpu_own γ 0 eb pj C -∗
-      trap_csrs_pay 0 eb -∗
-      pc_is ret_tgt -∗
+  ( ∀ (h : CPU) (g : gname) (mf : regfile),
+      ⌜callee_saved_notp m mf⌝ -∗
+      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+      sie_cap_gpr (CID := h) g mf K -∗
+      cpu_own (CID := h) g 0 eb pj C -∗
+      trap_csrs_pay (CID := h) 0 eb -∗
+      pc_is (CID := h) ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
       (* the exchange: a read fills the buffer from the block, a write
          moves the buffer's bytes onto the disk; b->disk ends at 0 *)
       buf_own b bno (mword_of_int 0 : mword 32)
               (if wr then bs_buf else bs_disk) -∗
       disk_block γd (uint bno) (if wr then bs_buf else bs_disk) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type VIRTIODISKRW.

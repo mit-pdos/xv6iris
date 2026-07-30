@@ -228,7 +228,14 @@ def runs_to_end(text: str, entry: str, local_defs: dict | None = None) -> bool:
     `names`, so it stays a fragment."""
     names = (return_targets(text) | {"ret_tgt", "rettgt", "ret_target"}
              | exit_targets(text, entry))
-    pc_of = lambda body, n: re.search(rf"pc_is\s+(?:\(\s*)?{re.escape(n)}\b", body)
+    # The continuation's `pc_is` may carry an EXPLICIT AMBIENT-HART annotation
+    # before its address: every contract above a park states its continuation
+    # at the hart that dispatched the process again, so the exit pin reads
+    # `pc_is (CID := h) ret_tgt` (SpecSched.v and the whole parking cone --
+    # claude-notes/projects/sched-hart-generic.md).  Skipping that annotation is
+    # what keeps such a fully-covering spec from silently reading as a fragment.
+    pc_of = lambda body, n: re.search(
+        rf"pc_is\s+(?:\(\s*CID\s*:=[^)]*\)\s*)?(?:\(\s*)?{re.escape(n)}\b", body)
     if any(pc_of(text, n) for n in names):
         return True
     for dname, dtext in (local_defs or {}).items():

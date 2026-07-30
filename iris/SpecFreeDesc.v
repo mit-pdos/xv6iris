@@ -56,7 +56,7 @@ Definition wp_free_desc_sconf_body
   sie_cap_gpr γ m K -∗
   cpu_own γ lvl eb pme C -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗ procs_inv γ Φ γs -∗
+  panic_wp -∗ procs_inv Φ γs -∗
   (* the descriptor-page pointer cell: free_desc RE-READS [disk.desc] (twice)
      to reach entry [i], so it needs the persistent half of [disk_geom] that
      names the page [pd] the four descriptor words below live on. *)

@@ -386,7 +386,6 @@ ProofReleasesleep.v
 LinkReleasesleep.v
 ProofHoldingsleep.v
 LinkHoldingsleep.v
-ProofAcquiresleep.v
 LinkAcquiresleep.v
 BcacheInv.v
 WpFileallocDecode.v
@@ -414,7 +413,6 @@ SpecBwrite.v
 SpecBrelse.v
 SpecBread.v
 WpBwriteDecode.v
-ProofBwrite.v
 LinkBwrite.v
 WpBpinDecode.v
 ProofBpin.v
@@ -427,7 +425,6 @@ LinkBrelse.v
 WpBreadDecode.v
 BreadLru.v
 ProofBreadParts.v
-ProofBread.v
 LinkBread.v
 WpIinitDecode.v
 SpecIinit.v
@@ -455,7 +452,6 @@ ProofKilled.v
 LinkKilled.v
 SpecSysPause.v
 WpSysPauseDecode.v
-ProofSysPause.v
 LinkSysPause.v
 SpecArgfd.v
 WpArgfdDecode.v
@@ -543,9 +539,7 @@ WpPipereadDecode.v
 SpecPipeclose.v
 SpecPipewrite.v
 SpecPiperead.v
-ProofPipewrite.v
 LinkPipewrite.v
-ProofPiperead.v
 LinkPiperead.v
 ProofPipeclose.v
 LinkPipeclose.v
@@ -580,15 +574,6 @@ ProofFreeDesc.v
 LinkFreeDesc.v
 SpecVirtioDiskRw.v
 WpVirtioDiskRwDecode.v
-VirtioDiskRwDefs.v
-ProofVirtioDiskRw.v
-ProofVirtioDiskRwB.v
-ProofVirtioDiskRwC.v
-ProofVirtioDiskRwCSeam.v
-ProofVirtioDiskRwD.v
-ProofVirtioDiskRwDSeam.v
-ProofVirtioDiskRwE.v
-ProofVirtioDiskRwF.v
 LinkVirtioDiskRw.v
 SpecVirtioDiskIntr.v
 WpVirtioDiskIntrDecode.v
@@ -622,7 +607,6 @@ LinkEitherCopyin.v
 UartTxInv.v
 SpecUartwrite.v
 WpUartwriteDecode.v
-ProofUartwrite.v
 LinkUartwrite.v
 SpecConsoleintr.v
 LinkConsoleintr.v

@@ -84,17 +84,22 @@ Definition wp_bread_sconf_body
      64-bit compares against the sign-extending [lw]s are then exact *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
+  (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
+     is [true].  Everything below sleeps, and a parking thread must hand the
+     trap CSRs across the crossing -- at level 0 with an enabled base the
+     pushing acquire produces exactly that set.  See SpecSched.v. *)
+  eb = true ->
   sie_cap_gpr γ m K -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own γ 0 eb pj C -∗
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗
+  panic_wp_any -∗
   bio_ctx bn -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
   (* the disk fabric *)
@@ -104,21 +109,22 @@ Definition wp_bread_sconf_body
   (* the requested block, and the slot unit backing the new reference *)
   disk_block γd (uint bno) bs_disk -∗
   bslot bn -∗
-  ( ∀ (mf : regfile) (k : nat) (bs_out : list (bv 8)),
-      ⌜callee_saved m mf
+  ( ∀ (h : CPU) (g : gname) (mf : regfile) (k : nat) (bs_out : list (bv 8)),
+      ⌜callee_saved_notp m mf
+       /\ mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
-      sie_cap_gpr γ mf K -∗
-      cpu_own γ 0 eb pj C -∗
-      trap_csrs_pay 0 eb -∗
-      pc_is ret_tgt -∗
+      sie_cap_gpr (CID := h) g mf K -∗
+      cpu_own (CID := h) g 0 eb pj C -∗
+      trap_csrs_pay (CID := h) 0 eb -∗
+      pc_is (CID := h) ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
+      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the locked buffer, keyed to the request *)
       bio_locked bn k pidv dev bno bs_out -∗
       (* the disk block, untouched (a read reads; a hit never goes near) *)
       disk_block γd (uint bno) bs_disk -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type BREAD.

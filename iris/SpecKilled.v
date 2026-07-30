@@ -69,7 +69,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   sie_cap_gpr γ m av -∗
   cpu_own γ n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   panic_wp -∗
   ( ∀ (mf : regfile) (kl : mword 32),
       ⌜ callee_saved m mf /\

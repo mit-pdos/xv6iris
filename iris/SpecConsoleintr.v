@@ -66,7 +66,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sie
   sie_cap_gpr γ m K -∗
   cpu_own γ lvl eb pme C -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
-  panic_wp -∗ procs_inv γ Φ γs -∗
+  panic_wp -∗ procs_inv Φ γs -∗
   ( ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr γ Mf K -∗

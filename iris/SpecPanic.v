@@ -37,3 +37,27 @@ Section Panic.
   Proof. apply _. Qed.
 
 End Panic.
+
+(* ---------------------------------------------------------------------- *)
+(* THE HART-GENERIC FORM.  panic() prints and spins forever on WHATEVER    *)
+(* hart reaches it, so its contract is available at every hart at once.    *)
+(* A function that can PARK does not return on the hart it entered on      *)
+(* (SwtchCtx.v's migratable records), so a post-resume half that still     *)
+(* has a panic arm to discharge -- sleep's re-acquire of the condition     *)
+(* lock is the one that does -- needs the contract at the RESUMING hart.   *)
+(* Every parking contract above sched threads this form instead of the     *)
+(* ambient one; non-parking callers use the bridge below.                  *)
+(* ---------------------------------------------------------------------- *)
+Definition panic_wp_any `{!riscvGS Σ, !sieG Σ} : iProp Σ :=
+  (□ ∀ h : CPU, panic_wp (CID := h))%I.
+
+Global Instance panic_wp_any_persistent `{!riscvGS Σ, !sieG Σ} :
+  Persistent panic_wp_any.
+Proof. rewrite /panic_wp_any. apply _. Qed.
+
+Lemma panic_wp_any_at `{!riscvGS Σ, !sieG Σ} (h : CPU) :
+  panic_wp_any -∗ panic_wp (CID := h).
+Proof.
+  iIntros "#H". rewrite /panic_wp_any.
+  iPoseProof (bi.forall_elim h with "H") as "H2". iExact "H2".
+Qed.

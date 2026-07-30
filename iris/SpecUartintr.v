@@ -88,7 +88,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   dev_inv γu γv -∗
   is_txlock γl γu -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   panic_wp -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗

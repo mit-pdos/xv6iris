@@ -58,7 +58,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   sie_cap_gpr γ m av -∗
   cpu_own γ 0 false p0 cpu_ctx_free -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv γ Φ γs -∗
+  procs_inv Φ γs -∗
   panic_wp -∗
   trap_csrs -∗
   intr_handler_avail γ -∗
