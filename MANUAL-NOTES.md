@@ -42,6 +42,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - some device invariant has to hold from power-up, not just after driver initialization, e.g., to conclude no stray DMA
 - sloppy UART ownership: printk can collide with uartwrite and cause FIFO overflow
 - swtch WP for a runnable proc must be for LoopE on any CPUID; not the "current" CPUID from ambient CpuId instance
+- KPT shared across cores: concurrent updates to A/D bits, so PT must be owned by invariant
+- TLB invariant must allow for page table to be updated by another core, so TLB has stale A/D bits
 
 Big things that still need to be done/explored:
 
