@@ -18,7 +18,7 @@
 
    The function sleeps twice (descriptor exhaustion; completion), so it
    threads the full sleep/wakeup plumbing of SpecSleep.v: the process
-   identity (γs, j), procs_inv, the running-thread bundle, trap_csrs_pay.
+   identity (γs, j), procs_inv, the running-thread bundle.
    It enters at noff 0 (acquire raises to 1, which is what sleep demands)
    and returns at noff 0. *)
 From Stdlib Require Import ZArith Lia List.
@@ -96,13 +96,21 @@ Definition wp_virtio_disk_rw_sconf_body
   γs !! j = Some γl ->
   (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
      is [true].  Everything below sleeps, and a parking thread must hand the
-     trap CSRs across the crossing -- at level 0 with an enabled base the
-     pushing acquire produces exactly that set.  See SpecSched.v. *)
+     trap CSRs across the crossing -- which only the interior acquire can mint,
+     and only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
   eb = true ->
   sie_cap_gpr γ m K -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
   cpu_own γ 0 eb pj C -∗
-  trap_csrs_pay 0 eb -∗
+  (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
+     before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
+     [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
+     [release] spends it.  A CALLER-held level-0 pay would be a second one, and
+     a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
+     one the pushing acquire minted, so the extra copy would be [trap_csrs] at
+     the parking hart with the postcondition wanting it at the resuming one
+     (and at [eb = true] two of them at one hart are outright contradictory).
+     See claude-notes/projects/sched-hart-generic.md. *)
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv Φ γs -∗
@@ -122,7 +130,6 @@ Definition wp_virtio_disk_rw_sconf_body
       ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
       sie_cap_gpr (CID := h) g mf K -∗
       cpu_own (CID := h) g 0 eb pj C -∗
-      trap_csrs_pay (CID := h) 0 eb -∗
       pc_is (CID := h) ret_tgt -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗

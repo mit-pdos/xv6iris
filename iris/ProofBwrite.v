@@ -154,7 +154,6 @@ Section BwritePostRw.
     kernel_text -∗
     sie_cap_gpr g mR (K - 4)%nat -∗
     cpu_own g 0 eb pj C -∗
-    trap_csrs_pay 0 eb -∗
     pc_is (mword_of_int (BW + 0x1c)) -∗
     own_ctx (p_context pj) -∗
     ▷ sched_vc_at Φ γs cpu_id g (a_cpu_ctx cid_word) pj -∗
@@ -171,7 +170,6 @@ Section BwritePostRw.
         ⌜mf !!! Regidx Rtp = cid_word_of h0⌝ -∗
         sie_cap_gpr (CID := h0) g0 mf K -∗
         cpu_own (CID := h0) g0 0 eb pj C -∗
-        trap_csrs_pay (CID := h0) 0 eb -∗
         pc_is (CID := h0) (ret_pc (m !!! Regidx Rra)) -∗
         own_ctx (p_context pj) -∗
         ▷ sched_vc_at Φ γs h0 g0 (a_cpu_ctx (cid_word_of h0)) pj -∗
@@ -183,7 +181,7 @@ Section BwritePostRw.
   Proof.
     intros pj HK Heb Hspd Hsp0 HmRtp HmRsp Hthr.
     subst eb.
-    iIntros "#Htext Hcg Hcnt Hpay Hpc Hoctx Hvc Hppid Hlocked Hdisk
+    iIntros "#Htext Hcg Hcnt Hpc Hoctx Hvc Hppid Hlocked Hdisk
               Hr24 Hr16 Hr8 Hg4 Hcont".
     iPoseProof (bwi_1c with "Htext") as "Hi1c".
     iPoseProof (bwi_1e with "Htext") as "Hi1e".
@@ -340,7 +338,7 @@ Section BwritePostRw.
     assert (Cs11 : P4 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (apply Hfin; bwidx).
     iApply ("Hcont" $! cpu_id g P4
-              with "[%] [%] Hcg Hcnt Hpay Hpc Hoctx Hvc Hppid Hlocked Hdisk").
+              with "[%] [%] Hcg Hcnt Hpc Hoctx Hvc Hppid Hlocked Hdisk").
     { unfold callee_saved_notp. repeat split; assumption. }
     { exact Ctp. }
   Qed.
@@ -369,7 +367,7 @@ Section ProofBwrite.
     unfold K_bwrite in HK.
     subst eb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hpay #Htext Hpc #Hpanicany #Hbio Hppid Hprocs Hoctx Hvc
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs Hoctx Hvc
               Hdev Hgeom Hdlock Hlocked Hdisk Hcont".
     iDestruct (panic_wp_any_at cpu_id with "Hpanicany") as "#Hpanic".
     iDestruct "Hlocked" as "(%Hk2 & Hstok & Hpid & Hvalid & Hbdev & Hbuf)".
@@ -615,11 +613,11 @@ Section ProofBwrite.
     iApply (RW.wp_virtio_disk_rw_sconf γ Φ γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bs_disk
               HKrw Hbno Hkdata HD3tp Hj Hgl eq_refl
-              with "Hcg Hcnt Hpay Htext Hpc Hpanicany Hprocs Hoctx Hvc Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
+              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hoctx Hvc Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
     (* VIRTIO_DISK_RW RETURNS ON HART [h], UNDER GHOST [g].  Everything below
        runs there, inside [bwrite_post_rw] at [(CID := h)]. *)
-    iIntros (h g mR) "%Hcs2 %Htp2 Hcg Hcnt Hpay Hpc Hoctx Hvc Hbuf Hdisk".
+    iIntros (h g mR) "%Hcs2 %Htp2 Hcg Hcnt Hpc Hoctx Hvc Hbuf Hdisk".
     iEval (rewrite (bw_wr_true _ bs bs_disk HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bs_disk HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
@@ -666,7 +664,7 @@ Section ProofBwrite.
               K true C bs sp0 spr vg4
               ltac:(lia) eq_refl ltac:(reflexivity) ltac:(reflexivity)
               Htp2 HmRsp HmRthr
-              with "Htext Hcg Hcnt Hpay Hpc Hoctx Hvc Hppid Hlocked Hdisk
+              with "Htext Hcg Hcnt Hpc Hoctx Hvc Hppid Hlocked Hdisk
                     Hr24 Hr16 Hr8 Hg4 Hcont").
   Qed.
 
