@@ -58,6 +58,19 @@ parking contract is deleted outright: `tp_pin` makes it true by construction.
 `ProofBread.v` (14), `ProofBwrite.v` / `ProofSleep.v` (8 each), `ProofYield.v`
 (6), plus the `Spec*` / `Link*` parking contracts.
 
+**ANY statement about the map's tp slot is now meaningless — delete it.**
+`tp_pin` overwrites index 4, so nothing ever observes `m !!! Regidx
+(mword_of_int 4)`. That covers three shapes, all of which go:
+- `⌜mf !!! Regidx (mword_of_int 4) = cid_word_of h⌝` (parking contracts);
+- a raw map-to-map equality `⌜Mf !!! Regidx (mword_of_int 4) = M !!! Regidx
+  (mword_of_int 4)⌝` sitting among the callee-saved-style conjuncts (e.g.
+  `SpecWakeupParts.v`) — true but vacuous, since the slot it preserves is junk;
+- a tp conjunct inside a hand-rolled register-preservation predicate.
+Deleting one is not weakening the contract: the real tp is `cid_word_of cpu_id`
+by construction, which is strictly more than the old premise said. If deleting
+one makes something else unprovable, STOP and report — that means a consumer
+was reading the slot, which is the one case this rule would be wrong about.
+
 Know this one: **`is_cs_idx (mword_of_int 4)` is now `false`**, so
 `callee_saved_insert_r` accepts a write to tp without complaint. That is sound
 (`callee_saved` says nothing about tp) — the guard against writing tp lives in
