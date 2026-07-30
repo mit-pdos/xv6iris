@@ -509,7 +509,23 @@ device invariant, `printk_env`, the kernel table (G5), and `procs_inv` (G5).
    `sr_absorb` (so the kernel page table can be shared), `kmap_auth` at a
    fraction, `kernel_pagetable ↦₈□`, `strans_name : CPU -> gname`, and a
    hart-generic `p_sched`. Only then `wp_main_secondary_sconf`.
-5. Adequacy: `started_inv_alloc` goes inside `riscv_system_adequacy`'s
+5. **The boot bridge is LANDED** (`BootBridge.v`, `boot_bridge`): entry's
+   post-state cells + the cpus[0] .bss cells + adequacy-minted ghosts
+   `==∗` (mask-free) the per-hart half of SpecMain's precondition
+   (`sie_cap_gpr γ mf K` + tp fact + `cpu_own` + the SIE spare quarter +
+   `main_hart_raw`). Findings that supersede older notes: `intr_count` at
+   level 0 with `eb = false` IS the eighth and rides inside `cpu_own`, so
+   interrupt-sweep item 8's `intr_count_init`/`intr_restore_intro` step is
+   OBSOLETE (it predates the `eb` parameter); sp at `<main>` is `sp0 − 16`
+   (start()'s frame stays open across the mret) and the whole boot needs
+   2 + 32 + 52 = 86 slots (`boot_stack_slots_main`); SIE=0 / MENVCFG_S /
+   `mie ∧ ¬mideleg = 0` / satp-Bare at `<main>` are NOT derivable from
+   SpecEntry — they enter as reset-state premises, discharged at power-on
+   by `boot_csrs_reset` (worth lifting SIE=0 into `mmode_config` some day);
+   the ↦ₚ₈→↦₈ stack tier bridge costs two premises locating the stack in
+   `[text_end, PHYSTOP)`; and `reg_lookup` OOMs on the 40-deep `st_mout`
+   tower (peel instead — second data point for the durable-notes warning).
+6. Adequacy: `started_inv_alloc` goes inside `riscv_system_adequacy`'s
    `={⊤}=∗`, beside the device-ghost allocation
    ([`../design/adequacy.md`](../design/adequacy.md)), as does
    `riscv_device_adequacy`'s `plic_ok` hypothesis — the invariant carries
