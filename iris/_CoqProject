@@ -425,6 +425,9 @@ BrelseLru.v
 WpBrelseDecode.v
 ProofBrelse.v
 LinkBrelse.v
+WpBreadDecode.v
+BreadLru.v
+ProofBreadParts.v
 WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
