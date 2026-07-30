@@ -38,7 +38,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -52,8 +52,8 @@ Import Defs.
 Notation UD := KernelSyms.uvmdealloc.
 
 Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-    (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmdealloc in
   let oldsz := mm !!! Regidx (mword_of_int 11) in
   let newsz := mm !!! Regidx (mword_of_int 12) in
@@ -68,15 +68,16 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
      the run empty -- which is what lets growproc call this at the wrapped
      [sz + n] an [sbrk] with a big negative argument computes. *)
   (uint oldsz <= uvm_maxsz)%Z ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own 0%nat eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own 0%nat eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ ((uint newsz >= uint oldsz)%Z /\
@@ -90,7 +91,7 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
 Module Type UVMDEALLOC.
   Parameter wp_uvmdealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_uvmdealloc_sconf_body γ γa Φ mm P K eb p C.
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
+      wp_uvmdealloc_sconf_body γa Φ mm P K eb p C b.
 End UVMDEALLOC.

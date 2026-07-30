@@ -69,12 +69,12 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (2 <= n)%nat ->
   sie_cap_gpr m0 n false -∗
   kernel_text -∗ pc_is pcE -∗
-    ∀ m' : regfile,
+  ( ∀ m' : regfile,
     sie_cap_gpr m' n false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = cret ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }} -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 (* the JAL-call form (mirror of [wp_call_mycpu_sconf_cs]): a caller at [P] with
@@ -105,12 +105,12 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr m n false -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    ∀ mo,
+  ( ∀ mo,
     sie_cap_gpr mo n false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
       mo !!! Regidx a0_idx = cret ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }} -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type CPUID.

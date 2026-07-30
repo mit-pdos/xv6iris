@@ -1133,6 +1133,25 @@ Ltac rdok :=
   | let H1 := fresh in let H2 := fresh in
     intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
+(* THE READ-SIDE TWIN of [rdok]: rewrite [rget m k] to [m !!! Regidx k] at a
+   non-tp index, discharging the [Regidx] injectivity side condition with the
+   same script.  A consumer needs this wherever an existing register-value fact
+   has to meet a leaf's [rget]-spelled premise; without it the script gets
+   copy-pasted into every proof file. *)
+Ltac rgne :=
+  rewrite rget_ne;
+  [ | let H1 := fresh in let H2 := fresh in
+      intro H1; injection H1 as H2; vm_compute in H2; congruence ].
+
+(* CAUTION, ORDER MATTERS in an endgame peel loop: a [rewrite Htp] for the tp
+   slot must come BEFORE [rgne].  Otherwise [rewrite rget_ne] instantiates at
+   the tp occurrence, its side condition fails, [first] falls through, and the
+   whole [repeat] stops early leaving the goal un-normalised:
+     repeat first [ rewrite upd_eq
+                  | rewrite upd_ne; [| vm_compute; discriminate]
+                  | rewrite Htp
+                  | rgne ]. *)
+
 (* The two projections are wanted TOGETHER in essentially every gpr-writing
    leaf -- [Hrdsp] for the sp [congruence]s the old proofs already do, [Hrdtp]
    to feed [tp_refold] -- so pose both at once.  The single most repeated pair

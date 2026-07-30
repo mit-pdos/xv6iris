@@ -30,7 +30,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import InstrBytes.
 Require Import MinstretInv.
 Require Import SmodeCore.
@@ -54,54 +54,67 @@ Notation RL := KernelSyms.release.
    made INSIDE the atomic store, so no other hart can see the window in which
    the lock is free but its storage already spoken for. *)
 Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* the arm on the way OUT: at n = 0 the level fully unwinds, so pop_off's
+     re-enable flip fires and the live SIE mode becomes exactly the saved
+     base [eb]; at any deeper n it stays disabled -- see
+     [CpuOwn.cpu_own]/[IntrDefs.intr_count]/[intr_count_dec], which pins the
+     ghost eighth at '0' unconditionally for every [S _] level. *)
+  let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
   (⊢ locked γl cpu_id -∗ Dc -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
-  sie_cap_gpr γ m av -∗
+  (* holding the lock forces the level to be at least 1, hence interrupts
+     disabled on entry -- this is not a choice, it is what [cpu_own (S n)]
+     already means *)
+  sie_cap_gpr m av false -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
   locked γl cpu_id -∗
   R -∗
   lock_finisher γl lka R Dc Out (⊤ ∖ ↑minstretN) -∗
-  cpu_own γ (S n) eb p C -∗
+  cpu_own (S n) eb p C -∗
   trap_csrs_pay n eb -∗
-  ( ∀ mr,
+  wp_next outb (fun (CID : CpuId) =>
+    ∀ mr,
     Out -∗
-    sie_cap_gpr γ mr av -∗
+    sie_cap_gpr mr av outb -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    cpu_own γ n eb p C -∗
+    cpu_own n eb p C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* see [wp_release_gen_sconf_body] for why this is the exit arm *)
+  let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av false -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
   R -∗
-  cpu_own γ (S n) eb p C -∗
+  cpu_own (S n) eb p C -∗
   trap_csrs_pay n eb -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr av -∗
+  wp_next outb (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr av outb -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    cpu_own γ n eb p C -∗
+    cpu_own n eb p C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -118,52 +131,55 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
    does not take.  So the certificate can only be completed inside the
    finisher, with [R] in hand.  See PipeInv.pipe_res_dead. *)
 Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* see [wp_release_gen_sconf_body] for why this is the exit arm *)
+  let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
   (⊢ locked γl cpu_id -∗ D -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ D -∗ False) ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av false -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R D -∗
   locked γl cpu_id -∗
   R -∗
   (* the licence to destroy, cashed inside the store *)
   (lock_frag γl None -∗ R ==∗ D ∗ Out) -∗
-  cpu_own γ (S n) eb p C -∗
+  cpu_own (S n) eb p C -∗
   trap_csrs_pay n eb -∗
-  ( ∀ mr,
+  wp_next outb (fun (CID : CpuId) =>
+    ∀ mr,
     lka ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lka ↦₈ (zero_reg : mword 64) -∗
     Out -∗
-    sie_cap_gpr γ mr av -∗
+    sie_cap_gpr mr av outb -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    cpu_own γ n eb p C -∗
+    cpu_own n eb p C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type RELEASE_GEN.
   Parameter wp_release_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_release_gen_sconf_body γ Φ γl lka R Dc Out m n eb p C av.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_release_gen_sconf_body Φ γl lka R Dc Out m n eb p C av.
 End RELEASE_GEN.
 
 Module Type RELEASE.
   Parameter wp_release_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_release_sconf_body γ Φ γl lka s R m n eb p C av.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_release_sconf_body Φ γl lka s R m n eb p C av.
 End RELEASE.
 
 Module Type RELEASE_CANCEL.
   Parameter wp_release_cancel_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_release_cancel_sconf_body γ Φ γl lka R D Out m n eb p C av.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_release_cancel_sconf_body Φ γl lka R D Out m n eb p C av.
 End RELEASE_CANCEL.

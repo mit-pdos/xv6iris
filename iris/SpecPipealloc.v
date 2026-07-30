@@ -64,6 +64,7 @@ Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import PipeInv.
 Require Import WpLock.
+Require Import HartTp WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -129,11 +130,11 @@ End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) :=
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipealloc in
   (* a0 = f0 (the read end's slot), a1 = f1 (the write end's slot).  They are
      SEPARATE conjuncts below, which is how the spec says the caller must pass
@@ -145,12 +146,10 @@ Definition wp_pipealloc_sconf_body
   (* pipealloc's own frame is 6 slots (c.addi16sp sp,-48); of its four callees
      fileclose is the deepest, wanting [fileclose_stack] = 18 below that. *)
   (24 <= K)%nat ->
-  (* the tp register holds THIS cpu's id (acquire/release cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m K b -∗
+  cpu_own n eb p C -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
   is_ftable γfl γf -∗
@@ -167,9 +166,10 @@ Definition wp_pipealloc_sconf_body
      their incoming contents are arbitrary *)
   pf0 ↦₈ v0 -∗
   pf1 ↦₈ v1 -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ n eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b -∗
+    cpu_own n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -179,9 +179,9 @@ Definition wp_pipealloc_sconf_body
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat),
-      wp_pipealloc_sconf_body γ Φ γfl γf γkl γk fl m v0 v1 on n eb p C K.
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
+      wp_pipealloc_sconf_body Φ γfl γf γkl γk fl m v0 v1 on n eb p C K b.
 End PIPEALLOC.

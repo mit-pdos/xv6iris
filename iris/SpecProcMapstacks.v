@@ -14,7 +14,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -39,7 +39,7 @@ Notation PMS := KernelSyms.proc_mapstacks.
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
      range; [lvl] is otherwise generic (the identity pin this replaced was
@@ -51,21 +51,19 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   pt_rep0 t m ->
   (forall i : nat, (i < 64)%nat -> m !! kstack_vpn i = None) ->
   (exists nb, on = Some nb /\ (64 + kstacks_missing t < nb)%nat) ->
-  (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
-     this cpu's cells through tp *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
   ptree_own 2 (DfracOwn 1) t -∗
-  kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
-  ( ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ lvl eb p C -∗
+  kalloc_env γa on cid_word -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
+    sie_cap_gpr mr K b -∗
+    cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-    kalloc_env γa (avail_sub on (64 + g)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on (64 + g)) cid_word -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜pt_base t' = pt_base t⌝ -∗
     ⌜kvm_pas_ok pas⌝ -∗
@@ -79,6 +77,6 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat),
-      wp_proc_mapstacks_sconf_body γ γa Φ mm t m lvl K eb p C on.
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_proc_mapstacks_sconf_body γa Φ mm t m lvl K eb p C on b.
 End PROC_MAPSTACKS.

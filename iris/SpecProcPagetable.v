@@ -14,7 +14,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -62,7 +62,7 @@ Definition K_proc_pagetable : nat := 3.
 
    stack_own bound 36 = own 4-slot frame + mappages' 32 (uvmcreate needs 18). *)
 Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -71,17 +71,15 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (exists nb, on = Some nb /\ (K_proc_pagetable < nb)%nat) ->
   subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->
   (uint tf + 4096 < 2 ^ 56)%Z ->
-  (* the kalloc cone runs on the ambient CPU: its push/pop reach this cpu's
-     cells through tp *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
-  kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
-  ( ∀ (mr : regfile) (t : ptree),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ lvl eb p C -∗
+  kalloc_env γa on cid_word -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (t : ptree),
+    sie_cap_gpr mr K b -∗
+    cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
     ptree_own 2 (DfracOwn 1) t -∗
@@ -89,7 +87,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
        = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
     ⌜pt_rep0 t (ppt_map tfp)⌝ -∗
     ⌜(pt_nodes t <= K_proc_pagetable)%nat⌝ -∗
-    kalloc_env γa (avail_sub on (pt_nodes t)) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on (pt_nodes t)) cid_word -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -97,6 +95,6 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat),
-      wp_proc_pagetable_sconf_body γ γa Φ mm tf dqtf lvl K eb p C on.
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_proc_pagetable_sconf_body γa Φ mm tf dqtf lvl K eb p C on b.
 End PROC_PAGETABLE.

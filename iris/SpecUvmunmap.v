@@ -58,7 +58,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -73,9 +73,9 @@ Import Defs.
 Notation UU := KernelSyms.uvmunmap.
 
 Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -99,15 +99,16 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      This is what keeps every vpn it clears different from [tramp_vpn] and
      [tf_vpn], so the tree spec survives. *)
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ ilvl eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ ilvl eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_del_run P vpn0 npages) -∗
@@ -117,10 +118,10 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type UVMUNMAP.
   Parameter wp_uvmunmap_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat),
-      wp_uvmunmap_sconf_body γ γa Φ mm P npages K eb p C ilvl.
+      (C : iProp Σ) (ilvl : nat) (b : bool),
+      wp_uvmunmap_sconf_body γa Φ mm P npages K eb p C ilvl b.
 End UVMUNMAP.
 
 (* --------------------------------------------------------------------- *)
@@ -137,10 +138,10 @@ End UVMUNMAP.
 (* --------------------------------------------------------------------- *)
 
 Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -156,15 +157,16 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
   mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ ilvl eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own ilvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ ilvl eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own ilvl eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗
@@ -174,9 +176,9 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
 Module Type UVMUNMAP_BARE.
   Parameter wp_uvmunmap_bare_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat),
-      wp_uvmunmap_bare_sconf_body γ γa Φ mm uroot um npages K eb p C ilvl.
+      (C : iProp Σ) (ilvl : nat) (b : bool),
+      wp_uvmunmap_bare_sconf_body γa Φ mm uroot um npages K eb p C ilvl b.
 End UVMUNMAP_BARE.

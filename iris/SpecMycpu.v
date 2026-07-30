@@ -37,12 +37,12 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (2 <= n)%nat ->
   sie_cap_gpr m0 n false -∗
   kernel_text -∗ pc_is pcE -∗
-    ∀ m' : regfile,
+  ( ∀ m' : regfile,
     sie_cap_gpr m' n false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = mycpu_ret (rget m0 tp_idx) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }} -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
   (* INTERRUPTS MUST BE DISABLED -- xv6 says so in as many words above
@@ -67,13 +67,13 @@ Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr m n false -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-    ∀ mo,
+  ( ∀ mo,
     sie_cap_gpr mo n false -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
       mo !!! Regidx (mword_of_int 10 : mword 5)
         = mycpu_ret (rget m (mword_of_int 4 : mword 5)) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }} -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type MYCPU.

@@ -14,6 +14,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -21,9 +22,16 @@ Import Defs.
 Notation PO := KernelSyms.push_off.
 Notation PP := KernelSyms.pop_off.
 
+(* push_off DISABLES interrupts, so it is entered with them in WHATEVER state
+   the caller had ([b] generic): a trap can be taken any time before the
+   [intr_off] instruction runs, so the continuation is [wp_next b] at the
+   ENTRY index, even though the capability it hands back is pinned at
+   [false] -- the resource index (what SIE now is) and the [wp_next] index
+   (whether a trap could have been taken during the call) are two different
+   things here, and this is the function where they diverge. *)
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
      unbundled mstatus0; the statement stays mstatus0-free.  The noff/intena
@@ -31,41 +39,50 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      level [n], the intena cell records [eb] once n ≥ 1, so no cell arguments
      and no level-mirror premises appear here. *)
   let caller_ret := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the tp register holds THIS cpu's id (the chain-wide convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (6 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b -∗
+  cpu_own n eb p C -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.push_off + 0x00) : mword 64) -∗
-  ( ∀ (ms : mword 64) (mfin : regfile),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
-    sie_cap_gpr γ mfin av -∗
-    cpu_own γ (S n) eb p C -∗
+    sie_cap_gpr mfin av false -∗
+    cpu_own (S n) eb p C -∗
     trap_csrs_pay n eb -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
+(* pop_off is the mirror: [cpu_own]'s own structure (the [S _] arm of
+   [intr_count]) already PINS entry at [false] -- level [S n ≥ 1] means SIE
+   is off throughout, so there is no [wp_next] at entry, exactly as for
+   [mycpu()].  But pop_off's LAST instruction conditionally re-enables
+   ([intr_on()], iff the unwound level is 0 and the saved base enable [eb]
+   was true), so a trap CAN be taken right there -- the exit index is
+   [match n with O => eb | S _ => false end], which is [eb] exactly in the
+   interesting (fully-unwound) case and collapses to [false] (no [wp_next]
+   needed, by [wp_next_off]) whenever the count does not reach 0. *)
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+    (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let bexit := match n with O => eb | S _ => false end in
   (* both panic checks (intr_get(), noff < 1) and the noff-1 == 0 branch are
      facts of [cpu_own]: the level is S n > 0, SIE is pinned '0' by the count
      eighth, and the final pop's re-enable branch reads intena = [eb]. *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (4 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ (S n) eb p C -∗
+  sie_cap_gpr m av false -∗
+  cpu_own (S n) eb p C -∗
   trap_csrs_pay n eb -∗
   kernel_text -∗ pc_is pcE -∗
-  ( ∀ mf,
-    sie_cap_gpr γ mf av -∗
-    cpu_own γ n eb p C -∗
+  wp_next bexit (fun (CID : CpuId) =>
+    ∀ mf,
+    sie_cap_gpr mf av bexit -∗
+    cpu_own n eb p C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mf ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -74,12 +91,12 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_push_off_sconf_body γ Φ m av n eb p C.
+      (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
+      wp_push_off_sconf_body Φ m av n eb p C b.
   Parameter wp_pop_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+      (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_pop_off_sconf_body γ Φ m av n eb p C.
+      wp_pop_off_sconf_body Φ m av n eb p C.
 End PUSHOFF.

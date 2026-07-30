@@ -14,7 +14,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KallocInv.
@@ -30,7 +30,7 @@ Import Defs.
 Notation WK := KernelSyms.walk.
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) :=
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -47,13 +47,14 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
      this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr γ mm K -∗ cpu_own γ lvl eb p C -∗
+  sie_cap_gpr mm K b -∗ cpu_own lvl eb p C -∗
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
-  ( ∀ (mr : regfile) (t' : ptree) (g : nat),
-    sie_cap_gpr γ mr K -∗ cpu_own γ lvl eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (t' : ptree) (g : nat),
+    sie_cap_gpr mr K b -∗ cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -74,8 +75,8 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
 Module Type WALK.
   Parameter wp_walk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat),
-      wp_walk_sconf_body γ γa Φ mm t m K lvl eb p C on.
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_walk_sconf_body γa Φ mm t m K lvl eb p C on b.
 End WALK.
 
 (* --------------------------------------------------------------------- *)
@@ -90,8 +91,8 @@ End WALK.
 (* --------------------------------------------------------------------- *)
 
 Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) :=
+    (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.walk in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
@@ -102,12 +103,13 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   mm !!! Regidx (mword_of_int 12) = mword_of_int 0 ->
   (uint va < 2 ^ 38)%Z ->
   pt_rep0 t m ->
-  sie_cap_gpr γ mm K -∗
+  sie_cap_gpr mm K b -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own 2 dq t -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ptree_own 2 dq t -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -123,7 +125,7 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type WALK_NOALLOC.
   Parameter wp_walk_noalloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac),
-      wp_walk_noalloc_sconf_body γ Φ mm t m K dq.
+      (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool),
+      wp_walk_noalloc_sconf_body Φ mm t m K dq b.
 End WALK_NOALLOC.

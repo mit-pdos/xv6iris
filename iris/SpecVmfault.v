@@ -38,7 +38,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -51,9 +51,9 @@ From Kernel Require KernelSyms.
 Notation VF := KernelSyms.vmfault.
 
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (dqs dqp : dfrac) :=
+    (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
   let va := mm !!! Regidx (mword_of_int 11) in
   let va0 : mword 64 := and_vec va (mword_of_int (-4096)) in
@@ -71,17 +71,18 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      [lvl] is otherwise generic -- vmfault runs at whatever nesting its
      caller holds (usertrap at 0, pipewrite/piperead's copies at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ lvl eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own lvl eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   p_sz p ↦₈{dqs} szv -∗
   p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
   proc_pt P -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ lvl eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
@@ -99,8 +100,8 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (dqs dqp : dfrac),
-      wp_vmfault_sconf_body γ γa Φ mm P szv K lvl eb p C dqs dqp.
+      (C : iProp Σ) (dqs dqp : dfrac) (b : bool),
+      wp_vmfault_sconf_body γa Φ mm P szv K lvl eb p C dqs dqp b.
 End VMFAULT.

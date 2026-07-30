@@ -98,7 +98,7 @@ Require Import DiskPtsto.
 Require Import VirtioProto.
 Require Import WpUart.
 Require Import IntrDefs.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -139,13 +139,13 @@ Definition K_virtio_disk_init : nat := 18%nat.
    while [rewrite /vdi_post] at the return still does. *)
 Definition vdi_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
+    (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
-    (ret_tgt c_cpu : mword 64) : iProp Σ :=
+    (ret_tgt c_cpu : mword 64) (b : bool) : iProp Σ :=
   ( ∀ (mr : regfile) (pd pav pu : mword 64),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb pp C -∗
+    sie_cap_gpr mr K b -∗
+    cpu_own 0%nat eb pp C -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
@@ -178,11 +178,11 @@ Global Typeclasses Opaque vdi_post.
 
 Definition wp_virtio_disk_init_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
+    (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
     (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-    (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) :=
+    (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_init in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let c_name := lock_name_field disk_lock in
@@ -197,8 +197,8 @@ Definition wp_virtio_disk_init_sconf_body
   (* the protocol is in its not-live arm at entry -- which is what the
      caller's config half [c0] identifies with the invariant's *)
   virtio_live c0 = false ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ 0%nat eb pp C -∗
+  sie_cap_gpr m K b -∗
+  cpu_own 0%nat eb pp C -∗
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -216,18 +216,18 @@ Definition wp_virtio_disk_init_sconf_body
   disk_avail ↦₈ pav0 -∗
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
-  vdi_post γ γv γa Φ m K eb pp C on ret_tgt c_cpu -∗
+  wp_next b (fun (CID : CpuId) => vdi_post γv γa Φ m K eb pp C on ret_tgt c_cpu b) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ}
       `{CID : CpuId}
-      (γ : gname) (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
+      (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8),
-      wp_virtio_disk_init_sconf_body γ γv γa Φ m K eb pp C on c0 vlock vname vcpu
-                                     pd0 pav0 pu0 free0.
+      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (b : bool),
+      wp_virtio_disk_init_sconf_body γv γa Φ m K eb pp C on c0 vlock vname vcpu
+                                     pd0 pav0 pu0 free0 b.
 End VIRTIODISKINIT.

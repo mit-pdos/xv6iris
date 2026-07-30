@@ -60,7 +60,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -74,9 +74,9 @@ Import Defs.
 Notation UA := KernelSyms.uvmalloc.
 
 Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) :=
+    (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
   let oldsz := mm !!! Regidx (mword_of_int 11) in
   let newsz := mm !!! Regidx (mword_of_int 12) in
@@ -101,15 +101,16 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (* the run is unmapped to begin with (mappages panics on a remap, and it
      is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> P.(ud_um) !! vpn_at vpn0 i = None) ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own 0%nat eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own 0%nat eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ( (* out of memory: rolled back to exactly the table we were given *)
@@ -130,8 +131,8 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type UVMALLOC.
   Parameter wp_uvmalloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ),
-      wp_uvmalloc_sconf_body γ γa Φ mm P xperm K eb p C.
+      (C : iProp Σ) (b : bool),
+      wp_uvmalloc_sconf_body γa Φ mm P xperm K eb p C b.
 End UVMALLOC.

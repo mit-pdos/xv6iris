@@ -265,6 +265,34 @@ So:
 `wp_next false` on pop_off would claim the hart cannot move when it can. Note
 this cannot be caught by compiling: at `eb = false` both spellings typecheck.
 
+## THE VACUITY TRAP — check every spec body you touch
+
+In `bi_scope` a `forall` extends **maximally**. So an unparenthesised `∀` inside
+the WAND CHAIN swallows the trailing `WP … {{ Φ }}` and the contract degenerates
+to something trivially provable:
+
+```coq
+(* what you meant *)                      (* what you wrote *)
+… -∗ (∀ m', R -∗ WP …) -∗ WP …            … -∗ ∀ m', (R -∗ WP … -∗ WP …)
+```
+
+**Nothing catches this.** It compiles, and the `Module Type` seal accepts it.
+It has already happened once, by dropping a `wp_next b (fun CID => …)` wrapper
+and its closing paren while re-indenting. The symptom, if you are lucky enough
+to get one, is remote from the cause: `iIntros "… Hcont"` failing with *"could
+not introduce Hcont, goal is not a wand or implication"* in the PROOF file.
+
+So: **when you remove a wrapper, remove its opening AND its closing paren, and
+keep the `∀` bracketed.** Then run the checker:
+
+```
+cd iris && python3 ../tools/spec_vacuity.py
+```
+
+It scans every `_body` in `Spec*.v`/`Wp*.v` for a `forall` reaching the wand
+chain at paren-depth 0. A `forall` BEFORE the first `-∗` is fine (ordinary Coq
+premises) — the checker knows the difference.
+
 ## Discharge gotchas (all found the hard way)
 
 - **`$!` cannot skip an intervening wand or nested `∀`.** `iApply ("Hcont" $!
@@ -302,10 +330,49 @@ this cannot be caught by compiling: at `eb = false` both spellings typecheck.
 Watch for a name collision: `iInv "…" as (b) …` where the invariant's ghost
 value was called `b` now clashes with the index. Rename it (`bq`).
 
-## Consumer side (straight-line proof stretches) — PROVISIONAL
+## Consumer side (straight-line proof stretches) — VALIDATED
 
-Validated on `ProtoCpuid.v` only; will be hardened on a real `Proof*.v` before
-the level-23 wave. Expect this section to change.
+Hardened on `ProofCpuid.v` and `ProofMycpu.v`, the two functions that read tp.
+Measured cost: **17 % / 24 % of proof lines touched**, and structurally nothing
+changed — no `destruct b`, no case split, no lemma split, no reordering, no
+`wp_next_chain`. Quote the per-site cost as **1 rewritten line + 1 new line per
+leaf application**, plus 1 rewritten line per map-chain entry whose value reads
+a variable index.
+
+The uniform per-call-site edit, in the order you hit it:
+
+```coq
+iApply (wp_cmv_s_sconf Φ pc a0_idx tp_idx m2 (n - 2)%nat false   (* γ dropped; b appended *)
+          ltac:(vm_compute; discriminate) ltac:(rdok)            (* rd_ok slot -> rdok     *)
+          with "Hcg Hpc Hi08 [-]").
+rewrite wp_next_off.                                             (* THE one new line       *)
+iIntros "Hcg Hpc".                                               (* byte-identical to before *)
+```
+
+- `rewrite wp_next_off` is the only structural addition at `b = false`, and the
+  `iIntros` pattern is unchanged at every site.
+- **The second-biggest edit class is map-chain respelling**, and the premise
+  list gives NO hint it is needed: a leaf whose written value reads a register
+  at a VARIABLE index now spells it `rget m k`, so the consumer's
+  `set (mk := <[…]> …)` chain, its `change … with mk` lines and its
+  `apply_writes` list must follow. `rd_ok` guards writes; reads carry no
+  premise. You have to read each leaf's statement.
+- **Steps 1 and 3 of "Proof edit" below (`rdok_split`, `tp_refold`) are
+  LEAF/ENGINE ONLY.** A consumer never touches `gpr_file`/`tp_pin`.
+- Use `rgne` (IntrDefs.v) to meet a leaf's `rget`-spelled premise from an
+  existing `m !!! Regidx k` fact. In an endgame peel loop **`rewrite Htp` must
+  come BEFORE `rgne`** or the `repeat` stops early — see the comment at `rgne`.
+- The tp read needs **no special tactic at the call site**; it is an ordinary
+  ALU leaf. Its tp-ness surfaces only in the map chain, and
+  `HartTp.rget_tp_all` / `rget_tp_agree` are the one-line bridge (the contract
+  names `rget m0 Rtp`, the instruction reads `rget mk Rtp` several instructions
+  later, and they agree because both are this hart's id).
+- Prefer `exact (rget_tp mm)` over `rewrite rget_tp` when the register index
+  arrives from the spec body as a `let`-bound local: it only matches up to δ,
+  and `exact` does that conversion silently.
+- `f_equal` now closes convertible value conjuncts that used to need
+  `reg_lookup`; a trailing `all: reg_lookup.` becomes a "No such goal" error
+  several lines later. Same family as durable-notes' `repeat split` trap.
 
 After each leaf application:
 

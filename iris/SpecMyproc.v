@@ -23,6 +23,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -30,24 +31,36 @@ Import Defs.
 
 Notation MP := KernelSyms.myproc.
 
+(* myproc() does its OWN push_off/pop_off around the [tp]-read inside
+   mycpu() (only ITS interior runs at [b = false]):
+
+     myproc(void) { push_off(); struct cpu *c = mycpu();
+                    struct proc *p = c->proc; pop_off(); return p; }
+
+   so the whole-function contract stays [b]-GENERIC: [p], the value it
+   returns, is the process ASSIGNED to this cpu -- a THREAD-dependent
+   quantity, not a hart-dependent one.  A migration mid-call changes which
+   hart resumes, but not which process cpus[cid].proc names once resumed
+   (the resource is re-established at the new hart by push_off/mycpu/pop_off
+   run there), so nothing here needs [b = false].  Contrast [cpuid()]/
+   [mycpu()] itself, whose returned hart id a migration WOULD invalidate. *)
 Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (Φ : mval -> iProp Σ)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.myproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  (* the hart id is the ambient CpuId *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* push_off's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b -∗
+  cpu_own n eb p C -∗
   kernel_text -∗ pc_is pcE -∗
-  ( ∀ (ms : mword 64) (mf : regfile),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (ms : mword 64) (mf : regfile),
       ⌜ sconf_ms_facts ms ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b -∗
+      cpu_own n eb p C -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = p ⌝ -∗
@@ -57,7 +70,7 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type MYPROC.
   Parameter wp_myproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_myproc_sconf_body γ Φ m av n eb p C.
+      (Φ : mval -> iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
+      wp_myproc_sconf_body Φ m av n eb p C b.
 End MYPROC.

@@ -64,6 +64,18 @@ Proof. intros Hk. unfold rget, tp_pin. by apply upd_ne. Qed.
 Lemma rget_tp `{CID : CpuId} (m : regfile) : rget m Rtp = cid_word_of cpu_id.
 Proof. unfold rget, tp_pin. by apply upd_eq. Qed.
 
+(* tp reads the SAME value at every map -- it is the hart's id, not anything the
+   map carries.  This is what an interrupts-off proof actually needs: the
+   contract names [rget m0 Rtp] (the entry map) while the instruction reads
+   [rget mk Rtp] several instructions later, and they agree because BOTH are
+   this hart's id.  Without it every push_off'd caller hand-rolls the same
+   [assert (forall mm, rget mm Rtp = cid_word)]. *)
+Lemma rget_tp_agree `{CID : CpuId} (m1 m2 : regfile) : rget m1 Rtp = rget m2 Rtp.
+Proof. by rewrite !rget_tp. Qed.
+
+Lemma rget_tp_all `{CID : CpuId} : forall m : regfile, rget m Rtp = cid_word_of cpu_id.
+Proof. exact rget_tp. Qed.
+
 (* A map already carrying this hart's id at tp is its own pin: the bridge for
    the boot / trampoline code that owns [tp] explicitly. *)
 Lemma tp_pin_id `{CID : CpuId} (m : regfile) :

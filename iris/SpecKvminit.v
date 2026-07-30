@@ -13,7 +13,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -34,29 +34,27 @@ Notation KVMI := KernelSyms.kvminit.
    [kvm_bridge].
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
 Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) :=
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (50 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
-  (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
-     this cpu's cells through tp *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own lvl eb p C -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvminit) -∗
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0 -∗
-  kalloc_env γa on (mm !!! Regidx (mword_of_int 4)) -∗
-  ( ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ lvl eb p C -∗
+  kalloc_env γa on cid_word -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
+    sie_cap_gpr mr K b -∗
+    cpu_own lvl eb p C -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64)
       ↦₈ zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) -∗
     ⌜pt_rep0 t (kvm_map_full pas)⌝ -∗
     ⌜pt_nodes t = 102%nat⌝ -∗
-    kalloc_env γa (avail_sub on K_kvmmake) (mm !!! Regidx (mword_of_int 4)) -∗
+    kalloc_env γa (avail_sub on K_kvmmake) cid_word -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜kvm_pas_ok pas⌝ -∗
     ([∗ list] i ∈ seq 0 64,
@@ -67,6 +65,6 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type KVMINIT.
   Parameter wp_kvminit_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64),
-      wp_kvminit_sconf_body γ γa Φ mm lvl K eb p C on kpt0.
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool),
+      wp_kvminit_sconf_body γa Φ mm lvl K eb p C on kpt0 b.
 End KVMINIT.

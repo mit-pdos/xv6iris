@@ -82,7 +82,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
@@ -97,9 +97,9 @@ Import Defs.
 Notation UC := KernelSyms.uvmcopy.
 
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) :=
+    (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -116,16 +116,17 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* the child's map is free over the run (mappages panics on a remap, and
      it is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
-  sie_cap_gpr γ mm K -∗
-  cpu_own γ 0%nat eb p C -∗
+  sie_cap_gpr mm K b -∗
+  cpu_own 0%nat eb p C -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt Pold -∗
   proc_pt Pnew -∗
   kalloc_env γa None cid_word -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
-    cpu_own γ 0%nat eb p C -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
+    cpu_own 0%nat eb p C -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     (* the parent's table comes back verbatim *)
@@ -155,8 +156,8 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ),
-      wp_uvmcopy_sconf_body γ γa Φ mm Pold Pnew K eb p C.
+      (C : iProp Σ) (b : bool),
+      wp_uvmcopy_sconf_body γa Φ mm Pold Pnew K eb p C b.
 End UVMCOPY.
