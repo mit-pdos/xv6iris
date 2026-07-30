@@ -421,6 +421,10 @@ ProofBpin.v
 LinkBpin.v
 ProofBunpin.v
 LinkBunpin.v
+BrelseLru.v
+WpBrelseDecode.v
+ProofBrelse.v
+LinkBrelse.v
 WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v
