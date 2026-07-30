@@ -238,12 +238,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
    (they arrive as a slice, and only [bv_eq] closes them), so that one word
    uses WpDecodeBridge's leafwise-[bv_eq] variant [decode_bridge_ms_bv]. *)
 
-(* +0x0a  auipc s1,0x1e *)
-Lemma vtb_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 (* +0x0e  addi s1,s1,-1364  -- s1 = &disk *)
 Lemma vtb_aac48493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xaac48493 : mword 32)) s
@@ -395,7 +389,7 @@ Section VirtioDiskIntrInstrs.
   (* ---- s1 := &disk ; a0 := &disk.vdisk_lock ; acquire ---- *)
   Lemma vti_0a : kernel_text -∗ instr (mword_of_int (VDT + 0x0a) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (VDT + 0x0a)%Z (mword_of_int 0x0001e497 : mword 32)
-    (mword_of_int (VDT + 0x0a) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) vtb_0001e497. Qed.
+    (mword_of_int (VDT + 0x0a) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_0001e497. Qed.
 
   Lemma vti_0e : kernel_text -∗ instr (mword_of_int (VDT + 0x0e) : mword 64) false (ITYPE (mword_of_int 0xaac : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (VDT + 0x0e)%Z (mword_of_int 0xaac48493 : mword 32)

@@ -54,15 +54,12 @@
      0x74 6105       c.addi16sp sp,32
      0x76 8082       c.ret
 
-   DECODE DEDUP (reported, not acted on -- KernelRvcDecode.v / KernelBaseDecode.v
-   are shared files near the bottom of the tree):
-     * 0x40bc / 0xc0bc / 0x37fd (the refcnt read/write/decrement) are also
-       proved in WpBpinDecode.v (bpin/bunpin do the same three instructions);
-       0x37fd additionally in WpPopOff.ppdec_addiwm1.
-     * 0x0001d797 (auipc a5,0x1d, the bcache+0x8000 base) is also proved in
-       WpBinitDecode.bidb_0001d797.
-   Each is restated here so this file requires no other function's decode
-   file; all six belong in the shared bit-keyed base at the next sweep.       *)
+   Four of these words are shared and come from the mid-tree decode bases:
+   0x40bc / 0xc0bc / 0x37fd (the refcnt read/write/decrement, which bpin,
+   bunpin, bread and pop_off also perform) from KernelRvcDecode.v, together
+   with the leaf-form expansions [cexec_40bc] / [cexec_c0bc]; and 0x0001d797
+   (auipc a5,0x1d, the bcache+0x8000 base, shared with binit) as
+   KernelBaseDecode.bdec_0001d797.                                          *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -96,24 +93,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma brdc_e79d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xe79d : mword 16)) s
   = Some (C_BNEZ (mword_of_int 23, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x40bc  c.lw a5,64(s1) -- the [b->refcnt] read (see the DEDUP note) *)
-Lemma brdc_40bc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x40bc : mword 16)) s
-  = Some (C_LW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xc0bc  c.sw a5,64(s1) -- the [b->refcnt] write *)
-Lemma brdc_c0bc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc0bc : mword 16)) s
-  = Some (C_SW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0x37fd  c.addiw a5,a5,-1 *)
-Lemma brdc_37fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x37fd : mword 16)) s
-  = Some (C_ADDIW (mword_of_int 63, Regidx (mword_of_int 15)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* the four link-field accesses of the unlink, and the three of the splice *)
@@ -162,16 +141,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ---- their leaf-form expansions: a literal [mword 12] displacement and
    plain [Regidx]es, which is the shape the WP load/store leaves take. ---- *)
-
-Lemma brcx_40bc s :
-  exec (execute (C_LW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (LOAD (mword_of_int 64, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
-
-Lemma brcx_c0bc s :
-  exec (execute (C_SW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
-  = Some (ExecuteAs (STORE (mword_of_int 64, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
-Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
 Lemma brcx_68b8 s :
   exec (execute (C_LD (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 6)))) s
@@ -250,12 +219,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma brdb_febfd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfebfd0ef : mword 32)) s
   = Some (JAL (mword_of_int 2088938 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
-
-(* auipc a5,0x1d / addi a5,a5,1300 -- a5 := bcache+0x8000 (the head base) *)
-Lemma brdb_0001d797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001d797 : mword 32)) s
-  = Some (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma brdb_51478793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -363,15 +326,15 @@ Section BrelseInstrs.
   (* ---- the refcnt decrement ---- *)
   Lemma bri_2c : kernel_text -∗ instr (mword_of_int (BR + 0x2c) : mword 64) true (LOAD (mword_of_int 64, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (BR + 0x2c)%Z (mword_of_int 0x40bc : mword 16)
-    (mword_of_int (BR + 0x2c) : mword 64) (LOAD (mword_of_int 64, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) brdc_40bc brcx_40bc. Qed.
+    (mword_of_int (BR + 0x2c) : mword 64) (LOAD (mword_of_int 64, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) cdec_40bc cexec_40bc. Qed.
 
   Lemma bri_2e : kernel_text -∗ instr (mword_of_int (BR + 0x2e) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (BR + 0x2e)%Z (mword_of_int 0x37fd : mword 16)
-    (mword_of_int (BR + 0x2e) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) brdc_37fd exec_execute_C_ADDIW. Qed.
+    (mword_of_int (BR + 0x2e) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_37fd exec_execute_C_ADDIW. Qed.
 
   Lemma bri_30 : kernel_text -∗ instr (mword_of_int (BR + 0x30) : mword 64) true (STORE (mword_of_int 64, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)).
   Proof. mk_rvc (BR + 0x30)%Z (mword_of_int 0xc0bc : mword 16)
-    (mword_of_int (BR + 0x30) : mword 64) (STORE (mword_of_int 64, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) brdc_c0bc brcx_c0bc. Qed.
+    (mword_of_int (BR + 0x30) : mword 64) (STORE (mword_of_int 64, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)) cdec_c0bc cexec_c0bc. Qed.
 
   Lemma bri_32 : kernel_text -∗ instr (mword_of_int (BR + 0x32) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 23 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (BR + 0x32)%Z (mword_of_int 0xe79d : mword 16)
@@ -401,7 +364,7 @@ Section BrelseInstrs.
   (* ---- the splice after head ---- *)
   Lemma bri_3e : kernel_text -∗ instr (mword_of_int (BR + 0x3e) : mword 64) false (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (BR + 0x3e)%Z (mword_of_int 0x0001d797 : mword 32)
-    (mword_of_int (BR + 0x3e) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC)) brdb_0001d797. Qed.
+    (mword_of_int (BR + 0x3e) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0001d797. Qed.
 
   Lemma bri_42 : kernel_text -∗ instr (mword_of_int (BR + 0x42) : mword 64) false (ITYPE (mword_of_int 1300 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (BR + 0x42)%Z (mword_of_int 0x51478793 : mword 32)

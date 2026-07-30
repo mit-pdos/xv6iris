@@ -67,16 +67,6 @@ Lemma bwc_c911 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_BEQZ (mword_of_int 10, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x14  0x4585  c.li a1,1 -- the WRITE flag.
-   NOTE (decode-dedup): this word is now proved privately in THREE files
-   (WpKallocDecode.kdc_4585, WpVirtioDiskRwDecode.rwc_4585, here), so by the
-   dedup rule it belongs in KernelRvcDecode.v.  Not moved here because that
-   file is shared with concurrently-running proof agents. *)
-Lemma bwc_4585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4585 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
 (* ===================================================================== *)
@@ -140,7 +130,7 @@ Section BwriteInstrs.
 
   Lemma bwi_14 : kernel_text -∗ instr (mword_of_int (BW + 0x14) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (BW + 0x14)%Z (mword_of_int 0x4585 : mword 16)
-    (mword_of_int (BW + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) bwc_4585 exec_execute_C_LI. Qed.
+    (mword_of_int (BW + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) cdec_4585 exec_execute_C_LI. Qed.
 
   Lemma bwi_16 : kernel_text -∗ instr (mword_of_int (BW + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (BW + 0x16)%Z (mword_of_int 0x8526 : mword 16)

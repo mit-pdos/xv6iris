@@ -241,12 +241,12 @@ caller-side ghost step main-boot.md's binit row anticipates.
       ProofBreadParts.v (masked width-4 leaves, bcache_scan — the OPEN form
       of bcache_res the scans must carry, or the devs/bnos exit tie dies —
       and the incr/recycle ghost steps + the three (c)-swaps).
-- [ ] ProofBread.v (the WP chain over the parts) + LinkBread.v; _CoqProject;
+- [x] ProofBread.v (the WP chain over the parts) + LinkBread.v; _CoqProject;
       coverage bio.c 6/6.
 
 ## Cleanup queue (post-landing; none blocks anything)
 
-Everything except the decode sweep is DONE (one pass; full build green,
+Everything here is DONE (two passes; full build green,
 `proof_coverage.py --check` rc=0, bio.c still 6/6):
 
 - [x] `BioInv.bref_tok_lookup` widened with a third conjunct
@@ -273,8 +273,25 @@ Everything except the decode sweep is DONE (one pass; full build green,
       `beqz` takes `eq_vec`, brelse's `bnez` `neq_vec`);
       `bnode_data_kdata` (+ `bnode_unsigned`) → BcacheInv.v (was
       `bw_data_kdata` / `bd_data_kdata`).
-- [ ] Decode dedup sweep → KernelRvcDecode.v/KernelBaseDecode.v: 0x4585 (3
-      files), 0x37fd (2), 0x40bc/0xc0bc (3), 0xc09c, 0xcb91, 0xa021,
-      0x0001e497 (5!), 0x0001e797 (3), 0x01048513 (2), 0x0004a023 (3).
-      Follow the two sweep rules in durable-notes (grep the STATEMENT; diff
-      every `*_<off>` fact against HEAD when done).
+- [x] Decode dedup sweep: **17 words promoted, 52 private lemmas retired**
+      across 22 consumer files (net −33 proofs), safety diff 0 statement
+      mismatches.  To `KernelRvcDecode.v` — `cdec_40bc`/`cdec_c0bc` (3 copies
+      each, plus their leaf-shape expansions as `cexec_40bc`/`cexec_c0bc`, 3
+      copies each), `cdec_37fd` (3, incl. `WpPopOff`), `cdec_4585` (3),
+      `cdec_cb91` (3), `cdec_a021` (3), `cdec_c09c` (2), `cdec_893e` (2),
+      `cdec_89ae` (2).  To `KernelBaseDecode.v` — `bdec_0001e497` (5),
+      `bdec_0001e797` (3), `bdec_0001e717` (3), `bdec_0004a023` (3),
+      `bdec_0001d797` (2), `bdec_00005597` (2), `bdec_01048513` (2),
+      `bdec_8b8fe0ef` (2).  The offset-named homes the word-keyed grep would
+      have missed: `WpPopOff.ppdec_addiwm1`, `WpRelease.rldec_sw_zero`,
+      `WpSleeplockDecode.sldec_sw_{zero,a5}_locked`,
+      `ProofKilled.kldec_mv_s2_a5`, `WpWalkInstr.wdec_16` — five of the
+      seventeen words are only findable by statement.  Four files needed a new
+      `Require` (`WpUartPutcSync` → KernelRvcDecode; `WpRelease`,
+      `WpSleeplockDecode`, `WpTrapinitDecode` → KernelBaseDecode); no cycle,
+      both bases sit below every WP leaf.  Still out of the bio scope and
+      worth a future sweep: the C_LD `0x6398` shape (3 copies:
+      WpFdallocDecode / WpFreeDescDecode / WpVirtioDiskRwDecode), `0x854e`
+      (5 copies), and `WpProcPagetableInstr` / `WpUvmcreateInstr`, which carry
+      private copies of ~12 words KernelRvcDecode already owns plus of
+      `WpMmodeLeafBase.exec_execute_C_{BEQZ,SRAI}`.

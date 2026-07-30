@@ -40,12 +40,6 @@ Import Defs.
 (* Compressed decode facts (one per distinct 16-bit encoding).            *)
 (* ===================================================================== *)
 
-(* 0x893e  c.mv s2,a5 *)
-Lemma bidc_893e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x893e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* 0x89ba  c.mv s3,a4 *)
 Lemma bidc_89ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x89ba : mword 16)) s
@@ -71,12 +65,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* decoder's POSITIVE RESIDUE (-1840 -> 2256, and so on).                  *)
 (* ===================================================================== *)
 
-(* auipc a1,0x5 / addi a1,a1,-1840 -- a1 := &"bcache" *)
-Lemma bidb_00005597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00005597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma bidb_8d058593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x8d058593 : mword 32)) s
   = Some (ITYPE (mword_of_int 2256 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
@@ -89,27 +77,9 @@ Lemma bidb_6c850513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1736 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* jal ra,initlock (backwards) *)
-Lemma bidb_8b8fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x8b8fe0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2089144 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
-
-(* auipc a5,0x1d / addi a5,a5,1724 -- a5 := the head-field base (bcache+0x8000) *)
-Lemma bidb_0001d797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001d797 : mword 32)) s
-  = Some (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma bidb_6bc78793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x6bc78793 : mword 32)) s
   = Some (ITYPE (mword_of_int 1724 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI), s).
-Proof. decode_bridge_ms. Qed.
-
-(* auipc a4,0x1e / addi a4,a4,-1764 -- a4 := &bcache.head *)
-Lemma bidb_0001e717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e717 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma bidb_91c70713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -160,12 +130,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma bidb_0534b423 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0534b423 : mword 32)) s
   = Some (STORE (mword_of_int 72 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 9), 8), s).
-Proof. decode_bridge_ms. Qed.
-
-(* addi a0,s1,16 -- a0 := &b->lock *)
-Lemma bidb_01048513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x01048513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
 (* jal ra,initsleeplock (forwards) *)
@@ -246,7 +210,7 @@ Section WpBinitDecode.
   (* ---- a1 := &"bcache", a0 := &bcache, jal initlock ---- *)
   Lemma bii_10 : kernel_text -∗ instr (mword_of_int (BI + 0x10) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (BI + 0x10)%Z (mword_of_int 0x00005597 : mword 32)
-    (mword_of_int (BI + 0x10) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)) bidb_00005597. Qed.
+    (mword_of_int (BI + 0x10) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00005597. Qed.
 
   Lemma bii_14 : kernel_text -∗ instr (mword_of_int (BI + 0x14) : mword 64) false (ITYPE (mword_of_int 2256 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (BI + 0x14)%Z (mword_of_int 0x8d058593 : mword 32)
@@ -262,12 +226,12 @@ Section WpBinitDecode.
 
   Lemma bii_20 : kernel_text -∗ instr (mword_of_int (BI + 0x20) : mword 64) false (JAL (mword_of_int 2089144 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (BI + 0x20)%Z (mword_of_int 0x8b8fe0ef : mword 32)
-    (mword_of_int (BI + 0x20) : mword 64) (JAL (mword_of_int 2089144 : mword 21, Regidx (mword_of_int 1))) bidb_8b8fe0ef. Qed.
+    (mword_of_int (BI + 0x20) : mword 64) (JAL (mword_of_int 2089144 : mword 21, Regidx (mword_of_int 1))) bdec_8b8fe0ef. Qed.
 
   (* ---- the head sentinel: a5 := head-field base, a4 := &head, both links ---- *)
   Lemma bii_24 : kernel_text -∗ instr (mword_of_int (BI + 0x24) : mword 64) false (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (BI + 0x24)%Z (mword_of_int 0x0001d797 : mword 32)
-    (mword_of_int (BI + 0x24) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC)) bidb_0001d797. Qed.
+    (mword_of_int (BI + 0x24) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0001d797. Qed.
 
   Lemma bii_28 : kernel_text -∗ instr (mword_of_int (BI + 0x28) : mword 64) false (ITYPE (mword_of_int 1724 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (BI + 0x28)%Z (mword_of_int 0x6bc78793 : mword 32)
@@ -275,7 +239,7 @@ Section WpBinitDecode.
 
   Lemma bii_2c : kernel_text -∗ instr (mword_of_int (BI + 0x2c) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (BI + 0x2c)%Z (mword_of_int 0x0001e717 : mword 32)
-    (mword_of_int (BI + 0x2c) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) bidb_0001e717. Qed.
+    (mword_of_int (BI + 0x2c) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_0001e717. Qed.
 
   Lemma bii_30 : kernel_text -∗ instr (mword_of_int (BI + 0x30) : mword 64) false (ITYPE (mword_of_int 2332 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_base (BI + 0x30)%Z (mword_of_int 0x91c70713 : mword 32)
@@ -300,7 +264,7 @@ Section WpBinitDecode.
 
   Lemma bii_44 : kernel_text -∗ instr (mword_of_int (BI + 0x44) : mword 64) true (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (BI + 0x44)%Z (mword_of_int 0x893e : mword 16)
-    (mword_of_int (BI + 0x44) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)) bidc_893e exec_execute_C_MV. Qed.
+    (mword_of_int (BI + 0x44) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)) cdec_893e exec_execute_C_MV. Qed.
 
   Lemma bii_46 : kernel_text -∗ instr (mword_of_int (BI + 0x46) : mword 64) true (RTYPE (Regidx (mword_of_int 14), zreg, Regidx (mword_of_int 19), ADD)).
   Proof. mk_rvc (BI + 0x46)%Z (mword_of_int 0x89ba : mword 16)
@@ -338,7 +302,7 @@ Section WpBinitDecode.
 
   Lemma bii_5c : kernel_text -∗ instr (mword_of_int (BI + 0x5c) : mword 64) false (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (BI + 0x5c)%Z (mword_of_int 0x01048513 : mword 32)
-    (mword_of_int (BI + 0x5c) : mword 64) (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) bidb_01048513. Qed.
+    (mword_of_int (BI + 0x5c) : mword 64) (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) bdec_01048513. Qed.
 
   Lemma bii_60 : kernel_text -∗ instr (mword_of_int (BI + 0x60) : mword 64) false (JAL (mword_of_int 4998 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (BI + 0x60)%Z (mword_of_int 0x386010ef : mword 32)

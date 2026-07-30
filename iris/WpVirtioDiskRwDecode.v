@@ -219,11 +219,6 @@ Lemma rwc_4741 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_LI (mword_of_int 16, Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma rwc_4585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4585 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 Lemma rwc_0712 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0712 : mword 16)) s
   = Some (C_SLLI (mword_of_int 4, Regidx (mword_of_int 14)), s).
@@ -504,11 +499,6 @@ Lemma rwb_05490c63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 88 : mword 13, Regidx (mword_of_int 20), Regidx (mword_of_int 18), BEQ), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma rwb_0001e717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e717 : mword 32) : M instruction) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma rwb_c6a70713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xc6a70713 : mword 32) : M instruction) s
   = Some (ITYPE (mword_of_int 3178 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI), s).
@@ -587,11 +577,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma rwb_00451693 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00451693 : mword 32) : M instruction) s
   = Some (SHIFTIOP (mword_of_int 4 : mword 6, Regidx (mword_of_int 10), Regidx (mword_of_int 13), SLLI), s).
-Proof. decode_bridge_ms. Qed.
-
-Lemma rwb_0001e797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e797 : mword 32) : M instruction) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma rwb_c1078793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -1019,7 +1004,7 @@ Section VirtioDiskRwInstrs.
 
   Lemma rwi_05e : kernel_text -∗ instr (mword_of_int (VRW + 0x05e) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (VRW + 0x05e)%Z (mword_of_int 0x0001e717 : mword 32)
-    (mword_of_int (VRW + 0x05e) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) rwb_0001e717. Qed.
+    (mword_of_int (VRW + 0x05e) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_0001e717. Qed.
 
   Lemma rwi_062 : kernel_text -∗ instr (mword_of_int (VRW + 0x062) : mword 64) false (ITYPE (mword_of_int 3178 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_base (VRW + 0x062)%Z (mword_of_int 0xc6a70713 : mword 32)
@@ -1123,7 +1108,7 @@ Section VirtioDiskRwInstrs.
 
   Lemma rwi_0b8 : kernel_text -∗ instr (mword_of_int (VRW + 0x0b8) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (VRW + 0x0b8)%Z (mword_of_int 0x0001e797 : mword 32)
-    (mword_of_int (VRW + 0x0b8) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) rwb_0001e797. Qed.
+    (mword_of_int (VRW + 0x0b8) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0001e797. Qed.
 
   Lemma rwi_0bc : kernel_text -∗ instr (mword_of_int (VRW + 0x0bc) : mword 64) false (ITYPE (mword_of_int 3088 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (VRW + 0x0bc)%Z (mword_of_int 0xc1078793 : mword 32)
@@ -1195,7 +1180,7 @@ Section VirtioDiskRwInstrs.
 
   Lemma rwi_0f0 : kernel_text -∗ instr (mword_of_int (VRW + 0x0f0) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).
   Proof. mk_rvc (VRW + 0x0f0)%Z (mword_of_int 0x4585 : mword 16)
-    (mword_of_int (VRW + 0x0f0) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) rwc_4585 exec_execute_C_LI. Qed.
+    (mword_of_int (VRW + 0x0f0) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) cdec_4585 exec_execute_C_LI. Qed.
 
   Lemma rwi_0f2 : kernel_text -∗ instr (mword_of_int (VRW + 0x0f2) : mword 64) false (STORE (mword_of_int 12 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 16), 2)).
   Proof. mk_base (VRW + 0x0f2)%Z (mword_of_int 0x00b81623 : mword 32)
@@ -1447,7 +1432,7 @@ Section VirtioDiskRwInstrs.
 
   Lemma rwi_1bc : kernel_text -∗ instr (mword_of_int (VRW + 0x1bc) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (VRW + 0x1bc)%Z (mword_of_int 0x0001e797 : mword 32)
-    (mword_of_int (VRW + 0x1bc) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) rwb_0001e797. Qed.
+    (mword_of_int (VRW + 0x1bc) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0001e797. Qed.
 
   Lemma rwi_1c0 : kernel_text -∗ instr (mword_of_int (VRW + 0x1c0) : mword 64) false (ITYPE (mword_of_int 2828 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (VRW + 0x1c0)%Z (mword_of_int 0xb0c78793 : mword 32)

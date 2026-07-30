@@ -113,11 +113,6 @@ Section WalkInstrs.
 
   (* the two ExecuteAs redirects not in WpMmodeLeafBase (Local copies,
      as in WpUartPutcSync) *)
-  
-  Lemma wdec_16 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0x89ae : mword 16)) s
-    = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 11)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
   Lemma wdec_1e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0x4a79 : mword 16)) s
     = Some (C_LI (mword_of_int 30, Regidx (mword_of_int 20)), s).
@@ -252,7 +247,7 @@ Section WalkInstrs.
   Lemma wi_14 : WLK 0x14 true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.walk + 0x14)%Z (mword_of_int 0x84aa : mword 16) (mword_of_int (KernelSyms.walk + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
   Lemma wi_16 : WLK 0x16 true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 19), ADD)).
-  Proof. mk_rvc (KernelSyms.walk + 0x16)%Z (mword_of_int 0x89ae : mword 16) (mword_of_int (KernelSyms.walk + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 19), ADD)) wdec_16 exec_execute_C_MV. Qed.
+  Proof. mk_rvc (KernelSyms.walk + 0x16)%Z (mword_of_int 0x89ae : mword 16) (mword_of_int (KernelSyms.walk + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 19), ADD)) cdec_89ae exec_execute_C_MV. Qed.
   Lemma wi_18 : WLK 0x18 true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 22), ADD)).
   Proof. mk_rvc (KernelSyms.walk + 0x18)%Z (mword_of_int 0x8b32 : mword 16) (mword_of_int (KernelSyms.walk + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 22), ADD)) cdec_8b32 exec_execute_C_MV. Qed.
   Lemma wi_1a : WLK 0x1a true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).

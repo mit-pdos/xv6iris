@@ -192,12 +192,6 @@ Lemma ucdc_6a05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 20)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x22  c.j +0x08  (offset/2 = 4) *)
-Lemma ucdc_a021 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa021 : mword 16)) s
-  = Some (C_J (mword_of_int 4), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* 0x24  c.add s1,s4  -- i += PGSIZE *)
 Lemma ucdc_94d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x94d2 : mword 16)) s
@@ -425,7 +419,7 @@ Section UvmcopyInstrs.
 
   Lemma uci_22 : kernel_text -∗ instr (mword_of_int (UC + 0x22) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UC + 0x22)%Z (mword_of_int 0xa021 : mword 16)
-    (mword_of_int (UC + 0x22) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)) ucdc_a021 exec_execute_C_J. Qed.
+    (mword_of_int (UC + 0x22) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)) cdec_a021 exec_execute_C_J. Qed.
 
   (* --- the loop back edge and its exit test ---------------------------- *)
 

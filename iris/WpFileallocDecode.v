@@ -96,11 +96,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* Base (4-byte) decode facts.                                            *)
 (* ===================================================================== *)
 
-Lemma fadb_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma fadb_0001f717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0001f717 : mword 32)) s
   = Some (UTYPE (mword_of_int 0x1f : mword 20, Regidx (mword_of_int 14), AUIPC), s).
@@ -207,7 +202,7 @@ Section FileallocInstrs.
 
   Lemma fai_16 : kernel_text -∗ instr (mword_of_int (FA + 0x16) : mword 64) false (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (FA + 0x16)%Z (mword_of_int 0x0001e497 : mword 32)
-    (mword_of_int (FA + 0x16) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 9), AUIPC)) fadb_0001e497. Qed.
+    (mword_of_int (FA + 0x16) : mword 64) (UTYPE (mword_of_int 0x1e : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_0001e497. Qed.
 
   Lemma fai_1a : kernel_text -∗ instr (mword_of_int (FA + 0x1a) : mword 64) false (ITYPE (mword_of_int 0x4aa : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (FA + 0x1a)%Z (mword_of_int 0x4aa48493 : mword 32)

@@ -1564,3 +1564,83 @@ Lemma cdec_855a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0x855a : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 22)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ===================================================================== *)
+(*  Words the bio.c (bread / bwrite / brelse / bpin / bunpin) sweep        *)
+(*  collapsed.  Each had two to three private copies before it landed      *)
+(*  here; per the dedup discipline in claude-notes/durable-notes.md a word  *)
+(*  proved in two or more Wp*Decode.v files belongs at this altitude.      *)
+(* ===================================================================== *)
+
+(* 0x40bc  c.lw a5,64(s1)   -- [b->refcnt], read by bread's LRU scan and by
+   bpin / bunpin / brelse (the same [struct buf] cursor lives in s1) *)
+Lemma cdec_40bc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x40bc : mword 16)) s
+  = Some (C_LW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_40bc]'s AST in the shape a WP load leaf takes: a literal [mword 12]
+   displacement and plain [Regidx]es. *)
+Lemma cexec_40bc s :
+  exec (execute (C_LW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 64, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* 0xc0bc  c.sw a5,64(s1)   -- the [b->refcnt] write-back: same four sites *)
+Lemma cdec_c0bc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xc0bc : mword 16)) s
+  = Some (C_SW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_c0bc]'s AST in the shape a WP store leaf takes. *)
+Lemma cexec_c0bc s :
+  exec (execute (C_SW (mword_of_int 16, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 64, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* 0xc09c  c.sw a5,0(s1)    -- bread's [b->valid = 1], initsleeplock's and
+   releasesleep's [lk->locked] store *)
+Lemma cdec_c09c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xc09c : mword 16)) s
+  = Some (C_SW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x37fd  c.addiw a5,a5,-1  (6-bit residue 63) -- brelse's and bunpin's
+   [refcnt--], pop_off's [c->noff--] *)
+Lemma cdec_37fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x37fd : mword 16)) s
+  = Some (C_ADDIW (mword_of_int 63, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x4585  c.li a1,1        -- bwrite's [write = 1] argument to
+   virtio_disk_rw, kfree's memset fill byte, virtio_disk_rw's own [li a1,1] *)
+Lemma cdec_4585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4585 : mword 16)) s
+  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 11)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xcb91  c.beqz a5,+0x14  -- bread's [refcnt == 0] recycle test, allocproc's
+   proc-scan test, uartputc_sync's THRE poll *)
+Lemma cdec_cb91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xcb91 : mword 16)) s
+  = Some (C_BEQZ (mword_of_int 10, Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0xa021  c.j +0x8         -- entry into a loop's test: bread, copyout,
+   uvmcopy *)
+Lemma cdec_a021 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa021 : mword 16)) s
+  = Some (C_J (mword_of_int 4 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x893e  c.mv s2,a5       -- binit, killed *)
+Lemma cdec_893e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x893e : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x89ae  c.mv s3,a1       -- the second argument parked in s3: bread, walk *)
+Lemma cdec_89ae s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x89ae : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 11)), s).
+Proof. intro H. rvc_oneshot s H. Qed.

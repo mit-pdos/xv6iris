@@ -44,12 +44,6 @@ Lemma kldec_lw_killed s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) 
   = Some (C_LW (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x14  0x893e  c.mv s2,a5 *)
-Lemma kldec_mv_s2_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x893e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x0e  0xab9fe0ef  jal ra,acquire  (0x80002150 -> 0x80000c08 = -5448) *)
 Lemma kldec_jal_acq s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xab9fe0ef : mword 32)) s
@@ -154,7 +148,7 @@ Section ProofKilled.
 
   Lemma kli_14 : KLI 0x14 true (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KL + 0x14)%Z (mword_of_int 0x893e : mword 16)
-    (mword_of_int (KL + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)) kldec_mv_s2_a5 exec_execute_C_MV. Qed.
+    (mword_of_int (KL + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)) cdec_893e exec_execute_C_MV. Qed.
 
   Lemma kli_16 : KLI 0x16 true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KL + 0x16)%Z (mword_of_int 0x8526 : mword 16)

@@ -32,6 +32,7 @@ Require Import WpDecode KernelText.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelRvcDecode.
+Require Import KernelBaseDecode.
 Require Import WpLock WpPopOff.
 (* subrange_full / mSIE_lower / sie_bit for the sstatus-SIE bridge; kept
    QUALIFIED so the WpGprCsrwC namespace doesn't shadow anything. *)
@@ -72,12 +73,6 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 Lemma rldec_sd_zero s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0004b823 : mword 32)) s
   = Some (STORE (mword_of_int 16, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; rl_dbase s Hpriv ]. Qed.
-
-(* +0x1a  0x0004a023  sw zero,0(s1) *)
-Lemma rldec_sw_zero s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0004a023 : mword 32)) s
-  = Some (STORE (mword_of_int 0, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; rl_dbase s Hpriv ]. Qed.
 
 (* ===================================================================== *)
@@ -131,7 +126,7 @@ Section WpReleaseInstr.
 
   Lemma rli_1a : kernel_text -∗ instr (mword_of_int (RL + 0x1a) : mword 64) false (STORE (mword_of_int 0, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)).
   Proof. mk_base (RL + 0x1a)%Z (mword_of_int 0x0004a023 : mword 32)
-    (mword_of_int (RL + 0x1a) : mword 64) (STORE (mword_of_int 0, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)) rldec_sw_zero. Qed.
+    (mword_of_int (RL + 0x1a) : mword 64) (STORE (mword_of_int 0, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)) bdec_0004a023. Qed.
 
   Lemma rli_1e : kernel_text -∗ instr (mword_of_int (RL + 0x1e) : mword 64) false (JAL (mword_of_int 0x1fff9a : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (RL + 0x1e)%Z (mword_of_int 0xf9bff0ef : mword 32)

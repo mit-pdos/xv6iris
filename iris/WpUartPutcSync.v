@@ -29,6 +29,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpUart.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 
 Import Defs.
 
@@ -121,12 +122,6 @@ Lemma updc_8787a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 0x878 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x9a6  cb91  c.beqz a5,0x9ba  (offset +20) *)
-Lemma uprvc_cb91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xcb91 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 10, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* [exec_execute_C_BEQZ] (compressed BEQZ -> base BTYPE/BEQ bridge) now lives
    in WpMmodeLeafBase.v alongside [exec_execute_C_BNEZ]. *)
 
@@ -214,7 +209,7 @@ Section WpUartPutcSync.
 
   Lemma upi_44 : kernel_text -∗ instr (mword_of_int (UPS + 0x44) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (UPS + 0x44)%Z (mword_of_int 0xcb91 : mword 16)
-    (mword_of_int (UPS + 0x44) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) uprvc_cb91 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (UPS + 0x44) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) cdec_cb91 exec_execute_C_BEQZ. Qed.
 
   (* [wp_lui_s_r] and [wp_andi_s_r] (the base LUI/ANDI S-mode gpr-write
      leaves) now live in WpSmodePtAlu.v with the rest of the ALU leaves. *)

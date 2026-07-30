@@ -114,12 +114,6 @@ Lemma ppdec_beqz1c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b
   = Some (C_BEQZ (mword_of_int 14, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x1a  0x37fd  c.addiw a5,-1 *)
-Lemma ppdec_addiwm1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x37fd : mword 16)) s
-  = Some (C_ADDIW (mword_of_int 63, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x20  0x5d7c  c.lw a5,124(a0) *)
 Lemma ppdec_lw124 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x5d7c : mword 16)) s
@@ -269,7 +263,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_1a : kernel_text -∗ instr (mword_of_int (PP + 0x1a) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (PP + 0x1a)%Z (mword_of_int 0x37fd : mword 16)
-    (mword_of_int (PP + 0x1a) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) ppdec_addiwm1 exec_execute_C_ADDIW. Qed.
+    (mword_of_int (PP + 0x1a) : mword 64) (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))) cdec_37fd exec_execute_C_ADDIW. Qed.
 
   Lemma ppi_1c : kernel_text -∗ instr (mword_of_int (PP + 0x1c) : mword 64) true (STORE (mword_of_int 120, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)).
   Proof. mk_rvc (PP + 0x1c)%Z (mword_of_int 0xdd3c : mword 16)

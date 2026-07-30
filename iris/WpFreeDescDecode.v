@@ -118,12 +118,6 @@ Lemma fdb_04a7ca63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 84 : mword 13, Regidx (mword_of_int 10), Regidx (mword_of_int 15), BLT), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x0e / +0x22  auipc a5,0x1e *)
-Lemma fdb_0001e797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e797 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 (* +0x12  addi a5,a5,-264 *)
 Lemma fdb_ef878793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xef878793 : mword 32)) s
@@ -226,7 +220,7 @@ Section FreeDescInstrs.
   (* ---- a5 := &disk ; read disk.free[i] ---- *)
   Lemma fdi_0e : kernel_text -∗ instr (mword_of_int (FD + 0x0e) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (FD + 0x0e)%Z (mword_of_int 0x0001e797 : mword 32)
-    (mword_of_int (FD + 0x0e) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) fdb_0001e797. Qed.
+    (mword_of_int (FD + 0x0e) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0001e797. Qed.
 
   Lemma fdi_12 : kernel_text -∗ instr (mword_of_int (FD + 0x12) : mword 64) false (ITYPE (mword_of_int 0xef8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (FD + 0x12)%Z (mword_of_int 0xef878793 : mword 32)
@@ -251,7 +245,7 @@ Section FreeDescInstrs.
 
   Lemma fdi_22 : kernel_text -∗ instr (mword_of_int (FD + 0x22) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (FD + 0x22)%Z (mword_of_int 0x0001e797 : mword 32)
-    (mword_of_int (FD + 0x22) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) fdb_0001e797. Qed.
+    (mword_of_int (FD + 0x22) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0001e797. Qed.
 
   Lemma fdi_26 : kernel_text -∗ instr (mword_of_int (FD + 0x26) : mword 64) false (ITYPE (mword_of_int 0xee4 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_base (FD + 0x26)%Z (mword_of_int 0xee478793 : mword 32)

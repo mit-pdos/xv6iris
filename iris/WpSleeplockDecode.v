@@ -33,6 +33,7 @@ From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 From iris.base_logic.lib Require Import invariants.
 Require Import KernelRvcDecode.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -72,12 +73,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma sldec_lw_s1_procpid s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x5904 : mword 16)) s
   = Some (C_LW (mword_of_int 12, Cregidx (mword_of_int 2), Cregidx (mword_of_int 1)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
-(* 0xc09c  c.sw a5,0(s1) *)
-Lemma sldec_sw_a5_locked s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc09c : mword 16)) s
-  = Some (C_SW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xd49c  c.sw a5,40(s1) *)
@@ -136,12 +131,6 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 Lemma sldec_sd_name s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0324b023 : mword 32)) s
   = Some (STORE (mword_of_int 0x20 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 9), 8), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-
-(* 0x0004a023  sw zero,0(s1)  (init +0x22, release +0x18) *)
-Lemma sldec_sw_zero_locked s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0004a023 : mword 32)) s
-  = Some (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* 0x0204a423  sw zero,40(s1)  (init +0x26, release +0x1c) *)
@@ -297,7 +286,7 @@ Section WpSleeplockDecode.
 
   Lemma isl_22 : kernel_text -∗ instr (mword_of_int (ISL + 0x22) : mword 64) false (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)).
   Proof. mk_base (ISL + 0x22)%Z (mword_of_int 0x0004a023 : mword 32)
-    (mword_of_int (ISL + 0x22) : mword 64) (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)) sldec_sw_zero_locked. Qed.
+    (mword_of_int (ISL + 0x22) : mword 64) (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)) bdec_0004a023. Qed.
 
   Lemma isl_26 : kernel_text -∗ instr (mword_of_int (ISL + 0x26) : mword 64) false (STORE (mword_of_int 0x28 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)).
   Proof. mk_base (ISL + 0x26)%Z (mword_of_int 0x0204a423 : mword 32)
@@ -404,7 +393,7 @@ Section WpSleeplockDecode.
 
   Lemma asl_2a : kernel_text -∗ instr (mword_of_int (ASL + 0x2a) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 4)).
   Proof. mk_rvc (ASL + 0x2a)%Z (mword_of_int 0xc09c : mword 16)
-    (mword_of_int (ASL + 0x2a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 4)) sldec_sw_a5_locked exec_execute_C_SW. Qed.
+    (mword_of_int (ASL + 0x2a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 4)) cdec_c09c exec_execute_C_SW. Qed.
 
   Lemma asl_2c : kernel_text -∗ instr (mword_of_int (ASL + 0x2c) : mword 64) false (JAL (mword_of_int 2087436 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (ASL + 0x2c)%Z (mword_of_int 0xa0dfd0ef : mword 32)
@@ -495,7 +484,7 @@ Section WpSleeplockDecode.
 
   Lemma rsl_18 : kernel_text -∗ instr (mword_of_int (RSL + 0x18) : mword 64) false (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)).
   Proof. mk_base (RSL + 0x18)%Z (mword_of_int 0x0004a023 : mword 32)
-    (mword_of_int (RSL + 0x18) : mword 64) (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)) sldec_sw_zero_locked. Qed.
+    (mword_of_int (RSL + 0x18) : mword 64) (STORE (mword_of_int 0x0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)) bdec_0004a023. Qed.
 
   Lemma rsl_1c : kernel_text -∗ instr (mword_of_int (RSL + 0x1c) : mword 64) false (STORE (mword_of_int 0x28 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4)).
   Proof. mk_base (RSL + 0x1c)%Z (mword_of_int 0x0204a423 : mword 32)

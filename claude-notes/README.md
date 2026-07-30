@@ -176,7 +176,13 @@ are working on that effort — the relevant `projects/` file.
   is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
   boot wiring.
 
-- **[`bio.md`](projects/bio.md)** — the buffer cache: the settled ownership
+
+### `completed/` — finished projects, archived for reference
+
+Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
+their durable design notes, gotchas, and reusable recipes.
+
+- **[`bio.md`](completed/bio.md)** — the buffer cache: the settled ownership
   design (the per-buffer content ESCROW — a namespace invariant with a
   parked arm and a checked-out arm — over a sleeplock that protects only a
   checkout token; the Arc-algebra refcount with real dev/blockno cell
@@ -184,12 +190,6 @@ are working on that effort — the relevant `projects/` file.
   provable), why the two obvious models fail, `BufOwn.v`'s ½-blockno
   `buf_own`, the five function contracts, and the worklist (binit was
   already proven; bget is inlined into bread).
-
-### `completed/` — finished projects, archived for reference
-
-Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
-their durable design notes, gotchas, and reusable recipes.
-
 - **[`virtio-disk.md`](completed/virtio-disk.md)** — the virtio disk device,
   end to end: the machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease,
   `wp_dev_loop`), the whole driver side (`virtio_disk_init`/`_rw`/`_intr` +

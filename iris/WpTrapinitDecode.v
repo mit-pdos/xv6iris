@@ -24,6 +24,7 @@ Require Import InstrBytes WpDecodeBridge.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
+Require Import KernelBaseDecode.
 Require Import SpecInitlockWrapper.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -33,12 +34,6 @@ Import Defs.
 (* ===================================================================== *)
 (* Base (32-bit) decode facts unique to trapinit.                        *)
 (* ===================================================================== *)
-
-(* auipc a1,0x5 *)
-Lemma tdb_00005597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00005597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* addi a1,a1,-450  -- a1 := &"time"  (the decoder's positive residue: 4096-450) *)
 Lemma tdb_e3e58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -88,7 +83,7 @@ Section WpTrapinitDecode.
 
   Lemma tri_08 : kernel_text -∗ instr (mword_of_int (TI + 0x08) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (TI + 0x08)%Z (mword_of_int 0x00005597 : mword 32)
-    (mword_of_int (TI + 0x08) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)) tdb_00005597. Qed.
+    (mword_of_int (TI + 0x08) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00005597. Qed.
 
   Lemma tri_0c : kernel_text -∗ instr (mword_of_int (TI + 0x0c) : mword 64) false (ITYPE (mword_of_int 3646 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (TI + 0x0c)%Z (mword_of_int 0xe3e58593 : mword 32)

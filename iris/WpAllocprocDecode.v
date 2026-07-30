@@ -93,12 +93,6 @@ Import Defs.
 
 (* +0x22  c.lw a5,24(s1) -- p->state -- is the shared KernelRvcDecode.cdec_4c9c *)
 
-(* +0x24  c.beqz a5,+0x14 *)
-Lemma apdc_cb91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xcb91 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 10, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* +0x34  c.li s1,0 *)
 Lemma apdc_4481 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4481 : mword 16)) s
@@ -349,7 +343,7 @@ Section AllocprocInstrs.
 
   Lemma api_24 : kernel_text -∗ instr (mword_of_int (AP + 0x24) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (AP + 0x24)%Z (mword_of_int 0xcb91 : mword 16)
-    (mword_of_int (AP + 0x24) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) apdc_cb91 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (AP + 0x24) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) cdec_cb91 exec_execute_C_BEQZ. Qed.
 
   Lemma api_26 : kernel_text -∗ instr (mword_of_int (AP + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (AP + 0x26)%Z (mword_of_int 0x8526 : mword 16)

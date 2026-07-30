@@ -227,12 +227,6 @@ Lemma codc_b755 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 2002 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x92  j     +0x9a *)
-Lemma codc_a021 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa021 : mword 16)) s
-  = Some (C_J (mword_of_int 4 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
-
 (* 0xb0  ld    s10,0(sp) *)
 Lemma codc_6d02 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x6d02 : mword 16)) s
@@ -606,7 +600,7 @@ Section CopyoutInstrs.
 
   Lemma coi_92 : COP 0x92 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)).  (* j     +0x9a -- -> +0x9a, the pop *)
   Proof. mk_rvc (CO + 0x92)%Z (mword_of_int 0xa021 : mword 16)
-    (mword_of_int (CO + 0x92) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)) codc_a021 exec_execute_C_J. Qed.
+    (mword_of_int (CO + 0x92) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)) cdec_a021 exec_execute_C_J. Qed.
 
   Lemma coi_94 : COP 0x94 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).  (* li    a0,0 -- the n == 0 exit: no frame to pop *)
   Proof. mk_rvc (CO + 0x94)%Z (mword_of_int 0x4501 : mword 16)

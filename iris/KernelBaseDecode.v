@@ -264,3 +264,67 @@ Lemma bdec_0330000f s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4,
                  Regidx (mword_of_int 0), Regidx (mword_of_int 0)), s).
 Proof. decode_bridge_ms_bv. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  Words the bio.c sweep collapsed (two to five private copies each).      *)
+(*  The [auipc]s are the 0x8001xxxx / 0x8002xxxx global relocations every   *)
+(*  function that reaches <bcache>, <disk>, <ftable> or <itable> emits.     *)
+(* ---------------------------------------------------------------------- *)
+
+(* auipc s1,0x1e -- the array-cursor relocation: bread (bcache.head.next /
+   .prev), iinit, filealloc, virtio_disk_init, virtio_disk_intr.  FIVE. *)
+Lemma bdec_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0001e497 : mword 32)) s
+  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a5,0x1e -- the same relocation into a5: bread, free_desc,
+   virtio_disk_rw *)
+Lemma bdec_0001e797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0001e797 : mword 32)) s
+  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a4,0x1e -- and into a4: binit, virtio_disk_init, virtio_disk_rw *)
+Lemma bdec_0001e717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0001e717 : mword 32)) s
+  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a5,0x1d -- the 0x8001xxxx globals into a5: binit, brelse (the
+   bcache.head list pointers) *)
+Lemma bdec_0001d797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0001d797 : mword 32)) s
+  = Some (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 15), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* auipc a1,0x5 -- a .rodata string address into a1: binit ("bcache"),
+   trapinit ("time") *)
+Lemma bdec_00005597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00005597 : mword 32)) s
+  = Some (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+(* addi a0,s1,16 -- &b->lock, the sleeplock inside [struct buf]: binit's
+   initsleeplock call and bread's two acquiresleep calls *)
+Lemma bdec_01048513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x01048513 : mword 32)) s
+  = Some (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9),
+                 Regidx (mword_of_int 10), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+
+(* sw zero,0(s1) -- clearing the word at the head of an s1-based struct:
+   bread's [b->valid = 0], release's and initsleeplock/releasesleep's
+   [lk->locked = 0] *)
+Lemma bdec_0004a023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0004a023 : mword 32)) s
+  = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0),
+                 Regidx (mword_of_int 9), 4), s).
+Proof. decode_bridge_ms. Qed.
+
+(* jal ra,acquire (JAL residue 2089144) -- from binit +0x20 and bread +0x1a,
+   which sit the same distance below <acquire> *)
+Lemma bdec_8b8fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x8b8fe0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2089144 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.

@@ -491,11 +491,6 @@ Lemma vdb_ce8fb0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2077928 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma vdb_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma vdb_dce48493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xdce48493 : mword 32)) s
   = Some (ITYPE (mword_of_int 3534 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
@@ -514,11 +509,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma vdb_0e050063 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0e050063 : mword 32)) s
   = Some (BTYPE (mword_of_int 224 : mword 13, zreg, Regidx (mword_of_int 10), BEQ), s).
-Proof. decode_bridge_ms. Qed.
-
-Lemma vdb_0001e717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e717 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma vdb_db873703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -897,7 +887,7 @@ Section WpVirtioDiskInitDecode.
 
   Lemma vdi_0c2 : kernel_text -∗ instr (mword_of_int (VDI + 0x0c2) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (VDI + 0x0c2)%Z (mword_of_int 0x0001e497 : mword 32)
-    (mword_of_int (VDI + 0x0c2) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) vdb_0001e497. Qed.
+    (mword_of_int (VDI + 0x0c2) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_0001e497. Qed.
 
   Lemma vdi_0c6 : kernel_text -∗ instr (mword_of_int (VDI + 0x0c6) : mword 64) false (ITYPE (mword_of_int 3534 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (VDI + 0x0c6)%Z (mword_of_int 0xdce48493 : mword 32)
@@ -937,7 +927,7 @@ Section WpVirtioDiskInitDecode.
 
   Lemma vdi_0e0 : kernel_text -∗ instr (mword_of_int (VDI + 0x0e0) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (VDI + 0x0e0)%Z (mword_of_int 0x0001e717 : mword 32)
-    (mword_of_int (VDI + 0x0e0) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) vdb_0001e717. Qed.
+    (mword_of_int (VDI + 0x0e0) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_0001e717. Qed.
 
   Lemma vdi_0e4 : kernel_text -∗ instr (mword_of_int (VDI + 0x0e4) : mword 64) false (LOAD (mword_of_int 3512 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 8)).
   Proof. mk_base (VDI + 0x0e4)%Z (mword_of_int 0xdb873703 : mword 32)
@@ -965,7 +955,7 @@ Section WpVirtioDiskInitDecode.
 
   Lemma vdi_0f4 : kernel_text -∗ instr (mword_of_int (VDI + 0x0f4) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (VDI + 0x0f4)%Z (mword_of_int 0x0001e497 : mword 32)
-    (mword_of_int (VDI + 0x0f4) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) vdb_0001e497. Qed.
+    (mword_of_int (VDI + 0x0f4) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_0001e497. Qed.
 
   Lemma vdi_0f8 : kernel_text -∗ instr (mword_of_int (VDI + 0x0f8) : mword 64) false (ITYPE (mword_of_int 3484 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (VDI + 0x0f8)%Z (mword_of_int 0xd9c48493 : mword 32)

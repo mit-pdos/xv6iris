@@ -59,12 +59,6 @@ Lemma iidb_b65fd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2087780 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* auipc s1,0x1e / addi s1,s1,-1936 -- s1 := &itable.inode[0].lock *)
-Lemma iidb_0001e497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0001e497 : mword 32)) s
-  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma iidb_87048493 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x87048493 : mword 32)) s
   = Some (ITYPE (mword_of_int 2160 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI), s).
@@ -169,7 +163,7 @@ Section WpIinitDecode.
   (* ---- loop setup: s1 := &inode[0].lock, s3 := end, s2 := &"inode" ---- *)
   Lemma iii_22 : kernel_text -∗ instr (mword_of_int (II + 0x22) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (II + 0x22)%Z (mword_of_int 0x0001e497 : mword 32)
-    (mword_of_int (II + 0x22) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) iidb_0001e497. Qed.
+    (mword_of_int (II + 0x22) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) bdec_0001e497. Qed.
 
   Lemma iii_26 : kernel_text -∗ instr (mword_of_int (II + 0x26) : mword 64) false (ITYPE (mword_of_int 2160 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (II + 0x26)%Z (mword_of_int 0x87048493 : mword 32)
