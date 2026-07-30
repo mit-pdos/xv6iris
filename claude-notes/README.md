@@ -108,6 +108,8 @@ are working on that effort — the relevant `projects/` file.
   later-stripping fence leaf, G5's three sweeps), the callee-by-callee
   resource inventory, the assemblies main performs, and what remains:
   the whole-system adequacy composition.
+- **[`explicit-cpuid-porting-guide.md`](projects/explicit-cpuid-porting-guide.md)** —
+  the mechanical per-file recipe for that sweep (read it before porting a file).
 - **[`explicit-cpuid.md`](projects/explicit-cpuid.md)** — removing the ambient
   `CpuId` so a step's continuation is about the hart execution RESUMES on:
   `wp_next`, the SIE-arm index `b`, tp pinned to the hart (`HartTp.v`), and the
