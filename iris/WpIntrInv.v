@@ -2,8 +2,10 @@
    interrupt-absorbing step engine (the tick-aware redesign of the old
    pinned-cell interrupt capstone).
 
-   THE DESIGN.  The SIE ghost variable [γ] (the same [γ] that is the argument
-   of [smode_config]) is split into THREE pieces:
+   THE DESIGN.  The SIE ghost variable is CANONICAL per hart --
+   [IntrDefs.sie_gname] = [sie_name cpu_id], exactly like [reg_name] /
+   [strans_name] -- so nothing in this tier carries a ghost argument: the
+   ambient [CpuId] determines the ghost.  It is split into THREE pieces:
 
      - 1/2 rides with the mstatus cell, tied to the LIVE [mstatus.SIE] bit
        (this is the half [smode_config] bundles; in the interrupts-ENABLED
@@ -221,20 +223,20 @@ Section WpIntrInv.
   (* threaded resource comes back to the callback UNCHANGED; the          *)
   (* callback's obligation is [wp_exec_step_hart_active_inv]'s.           *)
   (* =================================================================== *)
-  Lemma wp_exec_step_intr (γ : gname) (handler pc0 : mword 64)
+  Lemma wp_exec_step_intr (handler pc0 : mword 64)
       (root_ppn : mword 44)
       (m : regfile)
       (Φ : mval -> iProp Σ) :
     ret_pc pc0 = pc0 ->
-    intr_inv γ handler -∗
+    intr_inv handler -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    intr_config γ -∗
+    intr_config -∗
     pc_is pc0 -∗
     gpr_file m -∗
     intr_frame root_ppn m -∗
     (∀ σ,
        ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
-       intr_config γ -∗
+       intr_config -∗
        pc_is pc0 -∗
        gpr_file m -∗
        intr_frame root_ppn m -∗

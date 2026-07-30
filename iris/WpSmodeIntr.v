@@ -11,10 +11,11 @@
    been taken and fully handled (trap + handler + sret round trips)
    before the callback runs -- NOT from SIE=0.  Differences forced by
    the absorbing step rule: the config travels as the ONE bundle
-   [intr_config]; the caller threads [gpr_file m] and the per-trap
-   frame [intr_frame] (each interrupt consumes and re-establishes
-   them); the interrupted pc must be a legal sret target; the callback
-   receives the nextPC cell explicitly (the whole [pc_is pc] is
+   [intr_config] (no ghost argument -- the SIE ghost is the hart's
+   canonical [sie_gname]); the caller threads [gpr_file m] and the
+   per-trap frame [intr_frame] (each interrupt consumes and
+   re-establishes them); the interrupted pc must be a legal sret
+   target; the callback receives the nextPC cell explicitly (the whole [pc_is pc] is
    threaded through the absorbing engine; the PC half stays here for
    the retire obligation); and this engine assembles the full
    [run_hart_active] retire witness itself (via
@@ -23,13 +24,15 @@
    borrowed from [intr_frame].
 
    LAYER 2 [wp_instr_s_sconf]: THE SIE-AGNOSTIC FUNNEL.  Takes the v2
-   bundle [sconf] + the capability [sie_cap] (IntrDefs.v) and
-   case-splits on the capability's disjunct -- ghost agreement between
-   the bundle's tied half and the capability's quarter pins the live
-   SIE bit, replacing every pure SIE premise:
-     - quarter-'0': today's dispatch-None body -- delegates to
-       [wp_instr_s_config_tlbinv_pt] with SIE=0 derived from the ghost;
-     - quarter-'1': delegates to [wp_instr_s_intr], assembling
+   bundle [sconf] + the capability [sie_cap m n b] (IntrDefs.v) and
+   cases on the capability's SIE INDEX [b] -- the arm is an index, not
+   an internal disjunction, so a caller can say which one it is in; at
+   the '0' arm ghost agreement between the bundle's tied half and the
+   capability's eighth then pins the live SIE bit, replacing every pure
+   SIE premise:
+     - [b = false]: today's dispatch-None body -- delegates to
+       [wp_instr_s_config_regime] with SIE=0 derived from the ghost;
+     - [b = true]: delegates to [wp_instr_s_intr], assembling
        [intr_config]/[intr_frame] from the bundle + capability via
        [intr_config_of_v2] and disassembling them back around the
        σ-callback; the sret-target premise is DERIVED from
@@ -37,15 +40,20 @@
        no call site carries it.
    Both arms present the SAME σf-callback, so everything above is
    SIE-blind; the perf-hot σ-level fetch drive is not duplicated (each
-   arm reuses its engine's existing one).
+   arm reuses its engine's existing one).  The bundle owns
+   [gpr_file (tp_pin m)] (HartTp.v), so the two engines below it are fed
+   [tp_pin m] as THEIR map; [sie_cap] / [intr_frame] stay stated at [m]
+   (they depend on it only through sp, which the pin does not move).
 
    On top: the agnostic gpr-write engines [wp_gpr_write_s_sconf{,_base}]
-   (premise [rd <> csp_rs1]: [sie_cap]'s '1' arm is keyed on sp and
-   transported by [sie_cap_retarget]; sp-moving instructions re-carve
-   their stack explicitly), pilot leaves [wp_addi_s_sconf] /
-   [wp_cli_s_sconf], and the straight-line pilot [wp_sconf_pilot3] --
-   three chained instructions that run UNCHANGED whether interrupts are
-   enabled (arbitrary interrupts absorbed at every step) or disabled.  *)
+   (premise [rd_ok rd], which replaces the old [rd <> csp_rs1] in the
+   same slot: [sie_cap] is keyed on sp and transported by
+   [sie_cap_retarget], sp-moving instructions re-carve their stack
+   explicitly, and tp is pinned to the hart), and the pilot leaf
+   [wp_cli_s_sconf].  All three hand their continuation back through
+   [wp_next b] -- with interrupts enabled the instruction can be trapped
+   and the thread resumed on a DIFFERENT hart, and the rebound [CID]
+   binder makes every resource in the continuation about that hart.  *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -54,7 +62,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import RegFile WpGpr MinstretInv InstrBytes WpMmodeLeafBase StackOwn.
+Require Import RegFile HartTp WpNext WpGpr MinstretInv InstrBytes WpMmodeLeafBase StackOwn.
 Require Import SmodeCore SmodeCorePt.
 Require Import AlignBits.
 Require Import IntrDefs WpIntrInv.
@@ -71,19 +79,21 @@ Section WpSmodeIntr.
   (* §1 THE STEP ENGINE at SIE=1: the [wp_instr_s_tlbinv_pt] callback     *)
   (* shape over [wp_exec_step_intr].                                      *)
   (* =================================================================== *)
-  Lemma wp_instr_s_intr (γ : gname) (handler : mword 64) (root_ppn : mword 44)
+  (* [m] is the map the register file is held at -- the CALLER passes
+     [tp_pin m] (HartTp.v); nothing here needs to know that. *)
+  Lemma wp_instr_s_intr (handler : mword 64) (root_ppn : mword 44)
       (m : regfile) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     ret_pc pc = pc ->
-    intr_inv γ handler -∗
+    intr_inv handler -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    intr_config γ -∗
+    intr_config -∗
     pc_is pc -∗
     gpr_file m -∗
     intr_frame root_ppn m -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       intr_config γ -∗
+       intr_config -∗
        gpr_file m -∗
        intr_frame root_ppn m -∗
        nextPC ↦ᵣ pc -∗
@@ -106,7 +116,7 @@ Section WpSmodeIntr.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_intr γ handler pc root_ppn m Φ Hpc0
+    iApply (wp_exec_step_intr handler pc root_ppn m Φ Hpc0
               with "Hintr Hhs Hcfg Hpc Hfile HF").
     iIntros (σ) "%Hdisp Hcfg Hpc Hfile HF Hsi".
     (* unbundle the config for the σ-level fetch lookups *)
@@ -196,19 +206,21 @@ Section WpSmodeIntr.
   Qed.
 
   (* =================================================================== *)
-  (* §2 THE SIE-AGNOSTIC FUNNEL over [sconf] + [sie_cap]: ghost agreement *)
-  (* picks the arm; both arms present the same σf-callback.               *)
+  (* §2 THE SIE-AGNOSTIC FUNNEL over [sconf] + [sie_cap]: the capability's *)
+  (* SIE INDEX [b] picks the arm (ghost agreement with the bundle's tied   *)
+  (* half then pins the live bit at the '0' arm); both arms present the    *)
+  (* same σf-callback.                                                     *)
   (* =================================================================== *)
-  Lemma wp_instr_s_sconf (γ : gname)
-      (m : regfile) (n : nat) Φ
+  Lemma wp_instr_s_sconf
+      (m : regfile) (n : nat) (b : bool) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
-       sconf γ -∗
-       sie_cap γ m n -∗
-       gpr_file m -∗
+       sconf -∗
+       sie_cap m n b -∗
+       gpr_file (tp_pin m) -∗
        nextPC ↦ᵣ pc -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
@@ -223,10 +235,68 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "Hcg Hpc Hinstr H".
+    (* sp is not tp, so the PINNED register file's sp slot IS the map's --
+       the bridge between [sie_cap]/[intr_frame] (stated at [m]) and the
+       file the bundle actually owns, [gpr_file (tp_pin m)]. *)
+    assert (Hsppin : tp_pin m !!! Regidx csp_rs1 = m !!! Regidx csp_rs1).
+    { exact (rget_ne m csp_rs1
+               ltac:(intro He; injection He as He2; vm_compute in He2; congruence)). }
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-    iDestruct "Harm" as "[Hq0 | (Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)]".
-    - (* ---- quarter-'0': the dispatch-None engine, SIE=0 from ghost ---- *)
+    destruct b.
+    - (* ---- b = true: the interrupt-absorbing engine.  [sie_arm true]
+           needs no unfolding: the [if] reduces by conversion, so
+           [iDestruct] / [iFrame] / [iExact] see through it. ---- *)
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)".
+      iDestruct "Hhx" as (handler) "#Hintr".
+      (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
+         inside its invariant, and the Bare slot owns the same cell. *)
+      iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
+      { iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
+        iApply fupd_wp.
+        iInv "Hinv_i" as (bq) "(>Hq & >Hstv & Hspec)" "Hclose".
+        iDestruct "Hbstv" as (v0) "Hbstv".
+        iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
+      iDestruct "Hkpt" as (root_ppn) "Htlbinv".
+      (* split the exact reserved carve off for [intr_frame]; the deep
+         [n] available slots ride framed through the absorbing engine *)
+      iEval (rewrite stack_own_app) in "Hstk".
+      iDestruct "Hstk" as "[Hstk Hdeep]".
+      iAssert (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝)%I as %Hal2.
+      { iDestruct "Hinstr" as "[%Hnlpad Hr]".
+        iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
+        iEval (rewrite /instr_bytes) in "Hbytes".
+        iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
+      assert (Hpc0 : ret_pc pc = pc)
+        by (unfold ret_pc; exact (update_bit0_zero_of_aligned2 pc Hal2)).
+      iDestruct (intr_config_of_v2 with "Hsc Hq1 Hsepcx Hscausex Hstvalx")
+        as "(Hic & Hq1 & Hmenv)".
+      (* the engine runs at the PINNED map: its [gpr_file] / [intr_frame]
+         are the bundle's, retargeted along [Hsppin]. *)
+      iAssert (intr_frame root_ppn (tp_pin m)) with "[Hmenv Htlbinv Hstk]" as "HF".
+      { iApply (intr_frame_retarget root_ppn m (tp_pin m) (eq_sym Hsppin)).
+        iFrame "Hmenv Htlbinv Hstk". }
+      iApply (wp_instr_s_intr handler root_ppn (tp_pin m) Φ pc is_rvc i
+                Hpc0
+                with "Hintr Hhs Hic Hpc Hfile HF Hinstr").
+      iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
+      iDestruct (intr_frame_retarget root_ppn (tp_pin m) m Hsppin with "HF") as "HF".
+      iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
+      iDestruct (v2_of_intr_config with "Hic Hmenv")
+        as "(Hsc & Hsepcx & Hscausex & Hstvalx)".
+      iMod ("H" $! σ Hpceq
+              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
+        as (s_exec) "(%Hexec & Hsi' & Hcont)".
+      { iSplitL "Hstk Hdeep".
+        { iApply stack_own_app. iFrame "Hstk Hdeep". }
+        iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
+        iFrame "Hq1 Hsepcx Hscausex Hstvalx".
+        iExists handler. iExact "Hintr". }
+      iModIntro. iExists s_exec.
+      iSplitR; [iPureIntro; exact Hexec |].
+      iFrame "Hsi'". iExact "Hcont".
+    - (* ---- b = false: the dispatch-None engine, SIE=0 from ghost ---- *)
+      iRename "Harm" into "Hq0".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
       iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
       pose proof Hmsf as Hmsf'.
@@ -252,99 +322,64 @@ Section WpSmodeIntr.
         { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      { iFrame "Hstk". iFrame "Htr". iLeft. iExact "Hq0". }
-      iModIntro. iExists s_exec.
-      iSplitR; [iPureIntro; exact Hexec |].
-      iFrame "Hsi'". iExact "Hcont".
-    - (* ---- quarter-'1': the interrupt-absorbing engine ---- *)
-      (* split the exact reserved carve off for [intr_frame]; the deep
-         [n] available slots ride framed through the absorbing engine *)
-      iDestruct "Hhx" as (handler) "#Hintr".
-      (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
-         inside its invariant, and the Bare slot owns the same cell. *)
-      iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-      { iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-        iApply fupd_wp.
-        iInv "Hinv_i" as (b) "(>Hq & >Hstv & Hspec)" "Hclose".
-        iDestruct "Hbstv" as (v0) "Hbstv".
-        iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
-      iDestruct "Hkpt" as (root_ppn) "Htlbinv".
-      iEval (rewrite stack_own_app) in "Hstk".
-      iDestruct "Hstk" as "[Hstk Hdeep]".
-      iAssert (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝)%I as %Hal2.
-      { iDestruct "Hinstr" as "[%Hnlpad Hr]".
-        iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
-        iEval (rewrite /instr_bytes) in "Hbytes".
-        iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
-      assert (Hpc0 : ret_pc pc = pc)
-        by (unfold ret_pc; exact (update_bit0_zero_of_aligned2 pc Hal2)).
-      iDestruct (intr_config_of_v2 with "Hsc Hq1 Hsepcx Hscausex Hstvalx")
-        as "(Hic & Hq1 & Hmenv)".
-      iApply (wp_instr_s_intr γ handler root_ppn m Φ pc is_rvc i
-                Hpc0
-                with "Hintr Hhs Hic Hpc Hfile [Hmenv Htlbinv Hstk] Hinstr").
-      { iFrame "Hmenv Htlbinv Hstk". }
-      iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
-      iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
-      iDestruct (v2_of_intr_config with "Hic Hmenv")
-        as "(Hsc & Hsepcx & Hscausex & Hstvalx)".
-      iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
-        as (s_exec) "(%Hexec & Hsi' & Hcont)".
-      { iSplitL "Hstk Hdeep".
-        { iApply stack_own_app. iFrame "Hstk Hdeep". }
-        iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
-        iRight. iFrame "Hq1 Hsepcx Hscausex Hstvalx".
-        iExists handler. iExact "Hintr". }
+      { iFrame "Hstk". iFrame "Htr". iExact "Hq0". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".
   Qed.
 
   (* =================================================================== *)
-  (* §3 The generic gpr-write engines over the funnel.  [rd <> csp_rs1]:  *)
-  (* [sie_cap]'s '1' arm is keyed on sp and transported across non-sp     *)
-  (* writes by [sie_cap_retarget]; sp-moving instructions re-carve their  *)
-  (* stack explicitly instead.                                            *)
+  (* §3 The generic gpr-write engines over the funnel.  [rd_ok rd] (which *)
+  (* replaces the old [rd <> csp_rs1] IN THE SAME PREMISE SLOT): [sie_cap] *)
+  (* is keyed on sp and transported across non-sp writes by               *)
+  (* [sie_cap_retarget] (sp-moving instructions re-carve their stack       *)
+  (* explicitly instead), and the register file PINS tp (HartTp.v), so a   *)
+  (* generic write may target neither.  The continuation is wrapped in     *)
+  (* [wp_next b]: at [b = true] the instruction can be trapped and the     *)
+  (* thread resumed on a DIFFERENT hart, and every resource inside the     *)
+  (* lambda is then about THAT hart (the binder is named [CID]).           *)
   (* =================================================================== *)
-  Lemma wp_gpr_write_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = rget m rsa ->
        (if Z.eqb (uint rsb) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = rget m rsb ->
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc true base -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Hbexec)
+    iIntros (Hrd Hrdok Hbexec)
       "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true base
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n b Φ pc true base
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iDestruct (gpr_file_lookup_acc m (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rsa (m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rsa (tp_pin m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
     iDestruct ("Hfba" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rsb) with "Hfile") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rsb (m (Regidx rsb)) s_pc with "Hreg Hrbc") as %Lvb0.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rsb) with "Hfile") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rsb (tp_pin m (Regidx rsb)) s_pc with "Hreg Hrbc") as %Lvb0.
     iDestruct ("Hfbb" with "Hrbc") as "Hfile".
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg wval) with "Hfile") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg wval) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg wval)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
@@ -366,51 +401,59 @@ Section WpSmodeIntr.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ m
-                 (<[Regidx rd := regval_into_reg wval]> m) n Hsp with "Hcap") as "Hcap".
+    (* the leaf's own write commutes with the tp pin *)
+    iEval (rewrite (tp_pin_upd m rd (regval_into_reg wval) Hrdtp)) in "Hfile".
+    iDestruct (sie_cap_retarget m
+                 (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap") as "Hcap".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
+       obligation is discharged by instantiating it here. *)
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* the 4-byte (base-encoding) variant: pc advances by 4 *)
-  Lemma wp_gpr_write_s_sconf_base (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_sconf_base (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = m !!! Regidx rsa ->
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsa))) s_pc.(sregs)) = rget m rsa ->
        (if Z.eqb (uint rsb) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = m !!! Regidx rsb ->
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rsb))) s_pc.(sregs)) = rget m rsb ->
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false base -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Hbexec)
+    iIntros (Hrd Hrdok Hbexec)
       "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false base
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n b Φ pc false base
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
-    iDestruct (gpr_file_lookup_acc m (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rsa (m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
+    iDestruct (gpr_pt_value rsa (tp_pin m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
     iDestruct ("Hfba" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc m (Regidx rsb) with "Hfile") as "[Hrbc Hfbb]".
-    iDestruct (gpr_pt_value rsb (m (Regidx rsb)) s_pc with "Hreg Hrbc") as %Lvb0.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rsb) with "Hfile") as "[Hrbc Hfbb]".
+    iDestruct (gpr_pt_value rsb (tp_pin m (Regidx rsb)) s_pc with "Hreg Hrbc") as %Lvb0.
     iDestruct ("Hfbb" with "Hrbc") as "Hfile".
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg wval) with "Hfile") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg wval) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg wval)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
@@ -432,10 +475,15 @@ Section WpSmodeIntr.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ m
-                 (<[Regidx rd := regval_into_reg wval]> m) n Hsp with "Hcap") as "Hcap".
+    (* the leaf's own write commutes with the tp pin *)
+    iEval (rewrite (tp_pin_upd m rd (regval_into_reg wval) Hrdtp)) in "Hfile".
+    iDestruct (sie_cap_retarget m
+                 (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap") as "Hcap".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
+       obligation is discharged by instantiating it here. *)
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* =================================================================== *)
@@ -445,25 +493,26 @@ Section WpSmodeIntr.
   (* menvcfg premises (both derived inside the funnel).                   *)
   (* =================================================================== *)
 
-  Lemma wp_cli_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cli_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 6) (wval : mword 64)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg wval]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf γ Φ pc rd
+    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd
               (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
-              (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m n
-              Hrd Hrdsp _
+              (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m n b
+              Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
