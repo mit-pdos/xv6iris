@@ -235,6 +235,29 @@ so only its INTERIOR is interrupts-off — which is precisely where it gets to
 call `mycpu()` at `false`. A function that brackets its own critical section is
 b-generic on the outside no matter what it does inside.
 
+## Two different indices: the resource's, and `wp_next`'s
+
+For a function that merely threads the SIE state through, both are `b` and
+there is nothing to think about. For a function that FLIPS it — push_off,
+pop_off, acquire, release — they differ, and conflating them is a silent
+falsehood of exactly the kind this refactor exists to remove.
+
+- **The resource index** is what the SIE state IS at that point.
+  `push_off : sie_cap_gpr m n b -∗ … sie_cap_gpr m' n false -∗ …`
+- **`wp_next`'s index is whether interrupts were enabled at ANY point DURING
+  the call** — not the state at either end.
+
+So:
+
+| function | entry | exit | `wp_next` index | why |
+|---|---|---|---|---|
+| push_off | `b` | `false` | **`b`** | at `b = true` it can trap on its first instruction, before it disables |
+| pop_off / release | `false` | `eb` | **`eb`** | it re-enables at its LAST instruction, so it can trap there |
+| threading function | `b` | `b` | `b` | — |
+
+`wp_next false` on pop_off would claim the hart cannot move when it can. Note
+this cannot be caught by compiling: at `eb = false` both spellings typecheck.
+
 ## Discharge gotchas (all found the hard way)
 
 - **`$!` cannot skip an intervening wand or nested `∀`.** `iApply ("Hcont" $!
