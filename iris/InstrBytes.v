@@ -529,11 +529,13 @@ Section InstrBytes.
      branch of run_hart_active has no lpad-instruction check) but is kept for
      symmetry/robustness; it is free for constructors (vm_compute).
 
-     Decoding is phrased against an arbitrary [state_interp σ], but only as a
-     PURE implication from the two state facts the per-instruction decode
-     lemmas need (a NON-VIRTUAL privilege for the Zicfilp LPAD guard's
-     [get_xLPE]; misa.C for the compressed decoders) -- so [instr] is
-     CONSTRUCTIBLE from the code bytes alone, without owning those registers.
+     Decoding is phrased against an arbitrary [state_interp σ] AT AN ARBITRARY
+     HART, but only as a PURE implication from the two state facts the
+     per-instruction decode lemmas need (a NON-VIRTUAL privilege for the
+     Zicfilp LPAD guard's [get_xLPE]; misa.C for the compressed decoders) -- so
+     [instr] is CONSTRUCTIBLE from the code bytes alone, without owning those
+     registers.
+
      The privilege hypothesis is MEMBERSHIP in {Machine, Supervisor, User}
      ([priv_mSU .. = true], see RiscvFetchExec): [get_xLPE] succeeds in any of
      those (M reads mseccfg.MLPE, S reads menvcfg.LPE, U reads
@@ -541,13 +543,24 @@ Section InstrBytes.
      only the virtualized modes hit internal_error.  So the SAME [instr]
      predicate serves M-mode and S-mode code; only the LIFT differs
      ([instr_lift] holds cur_privilege = Machine and weakens it to membership;
-     an S-mode lift does the same from Supervisor). *)
+     an S-mode lift does the same from Supervisor).
+
+     WHY THE HART IS QUANTIFIED INSIDE THAT CLAUSE ([∀ σ (CID : CpuId), ...])
+     rather than read off the ambient instance: [mstate_interp] is the ONLY
+     CID-indexed thing [instr] mentions, and the obligation is a conditional
+     statement about σ's own config registers, so it holds at every hart
+     uniformly.  Together with [instr_bytes] (global, persistent [↦ₓ□] code
+     bytes) that makes [instr] -- and [kernel_text], which it is built from --
+     HART-INDEPENDENT, i.e. carrying no [CpuId] argument at all.  That is what
+     a step whose continuation only QUANTIFIES the resuming hart needs: a
+     decode fact derived BEFORE the step is still usable after it, at a hart
+     the consumer cannot name and so could never re-derive it at. *)
   Definition instr (pc : mword 64) (is_rvc : bool) (i : instruction) : iProp Σ :=
     (⌜ is_lpad_instruction i = false ⌝ ∗
      ∃ r : FetchResult,
        ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
        instr_bytes pc r ∗
-       (∀ σ, mstate_interp σ -∗
+       (∀ σ (CID : CpuId), mstate_interp σ -∗
           ⌜ priv_mSU (register_lookup cur_privilege σ.(sregs)) = true ->
             eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ->
             eq_vec (_get_Misa_A (register_lookup misa σ.(sregs))) ('b"1") = true ->

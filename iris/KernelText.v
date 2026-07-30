@@ -45,7 +45,6 @@ Definition kb_word_at (A : Z) : mword 32 :=
 
 Section KernelText.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
 
   (* ================================================================= *)
   (*  The kernel TEXT image + per-instruction [instr] constructors.    *)
@@ -55,7 +54,15 @@ Section KernelText.
      address -> byte value), each byte resident at its physical address.  The
      code points-to facts are DfracDiscarded (`↦ₓ□`), hence persistent and
      duplicable: a fetch window can be extracted while [kernel_text] stays
-     intact — no borrow/return. *)
+     intact — no borrow/return.
+
+     It is also HART-INDEPENDENT: [↦ₓ□] is global memory, so neither
+     [kernel_text] nor the [instr]/[instr_bytes] facts derived from it mention
+     a [CpuId] at all (that is why this section fixes no hart).  A decode fact
+     derived at one hart is therefore usable verbatim at another -- which is
+     what a step whose continuation only QUANTIFIES the hart needs, since no
+     consumer could otherwise re-derive its instruction facts after the
+     step. *)
   Definition kernel_text : iProp Σ :=
     ([∗ map] a↦b ∈ KernelInstrs.kernel_bytes, (mword_of_int a : Arch.pa) ↦ₓ□ b)%I.
 
@@ -202,7 +209,7 @@ Ltac mk_rvc A h pc ast decname expname :=
   iSplitL "";
   [ iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub);
     iApply (kernel_window_pc A (kb_word_at A) 4 pc eq_refl Hbytes with "Ht")
-  | iIntros (?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
+  | iIntros (? ?) "_"; iPureIntro; intros; cbn [fetch_is_rvc];
     eexists; (split; [ close_dec decname
                      | split; [ vm_compute; reflexivity
                               | intro; apply expname ] ]) ].
@@ -224,4 +231,4 @@ Ltac mk_base A w pc ast decname :=
   iSplitL "";
   [ iApply (instr_bytes_base pc w H2al Hnrvc);
     iApply (kernel_window_pc A w 4 pc eq_refl Hbytes with "Ht")
-  | iIntros (?) "_"; iPureIntro; intros; close_dec decname ].
+  | iIntros (? ?) "_"; iPureIntro; intros; close_dec decname ].

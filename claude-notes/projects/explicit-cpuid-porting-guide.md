@@ -40,6 +40,30 @@ The SIE ghost is now canonical per hart (`IntrDefs.sie_gname := sie_name
 cpu_id`), which is why `γ` disappeared. The one place an explicit ghost
 survives is the per-trap tie `ProofKernelvec.v` mints — leave it alone.
 
+**`instr` and `kernel_text` are now fully HART-FREE** — no `CID` implicit at
+all. So a decode fact derived before a step is usable after it, at any hart,
+with no re-derivation and no annotation. If you catch yourself wanting to
+re-derive one at a new hart, stop: something else is wrong.
+
+**The `callee_saved_notp` family is DELETED** — `callee_saved` *is* the tp-free
+relation now. Nine names are gone: `callee_saved_notp`,
+`callee_saved_weaken_notp`, `callee_saved_of_notp`, `callee_saved_notp_refl`,
+`callee_saved_notp_trans{,_l,_r}`, `is_cs_idx_notp`, `callee_saved_notp_lookup`.
+Porting rule: **every `callee_saved_notp` becomes a plain `callee_saved`, and
+the bridge applications are deleted rather than replaced** — `_weaken_notp` /
+`_of_notp` / `_trans_l` / `_trans_r` all collapse into `callee_saved_trans`.
+Likewise every `⌜mf !!! Regidx (mword_of_int 4) = cid_word_of h⌝` premise in a
+parking contract is deleted outright: `tp_pin` makes it true by construction.
+~78 mentions across 23 files, concentrated in `ProofAcquiresleep.v` (18),
+`ProofBread.v` (14), `ProofBwrite.v` / `ProofSleep.v` (8 each), `ProofYield.v`
+(6), plus the `Spec*` / `Link*` parking contracts.
+
+Know this one: **`is_cs_idx (mword_of_int 4)` is now `false`**, so
+`callee_saved_insert_r` accepts a write to tp without complaint. That is sound
+(`callee_saved` says nothing about tp) — the guard against writing tp lives in
+`rd_ok` instead — but a tp write no longer trips a side condition, so do not
+rely on one to catch it.
+
 **Add `HartTp WpNext` to your file's own `Require Import` line.** `Import` is
 not transitive, so `tp_pin` / `rget` / `wp_next` are not in scope just because
 `IntrDefs` imports them. This is the single most common first error.
