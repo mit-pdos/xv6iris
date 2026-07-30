@@ -36,7 +36,7 @@ pointer and maps it.
   `uvmfree` → `freewalk` and `uvmunmap`, none of which is verified, and
   verifying them is a project of its own (a recursive whole-table free).  It is
   also the standing convention of the kalloc cone (see
-  [`../projects/kvm-spec.md`](../projects/kvm-spec.md), user decision
+  [`../projects/kvm-spec.md`](kvm-spec.md), user decision
   2026-07-23: "NO panic arm anywhere in the cone").  A `None`-mode spec would
   need those three functions first.
 - **The budget is 3, not 5, because TRAPFRAME is free.**  `tf_vpn` sits one

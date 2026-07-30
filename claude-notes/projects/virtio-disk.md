@@ -105,6 +105,10 @@ Remaining in the whole virtio effort:
   that `virtio_disk_rw` and `virtio_disk_intr` consume, so the three whole-
   function contracts are not yet composed into a single "the disk works"
   statement reachable from `main`.  That is the last structural piece.
+- **a disk-contents spec**: nothing says what a block device *is* from the file
+  system's point of view. `disk_read_write` (VirtioModel.v) is the only fact so
+  far; the natural statement is a `sector ↦ bytes` resource over `v_disk`,
+  minted alongside the lease.
 
 The device model behind `kernel/virtio_disk.c`. The MACHINE side is done and
 proven: the disk exists as a third device on the fabric, it runs as part of the
@@ -273,14 +277,19 @@ One thing the model is deliberately silent about: the request HEADER
 the buffer either way — but a future disk-CONTENTS spec will need the header
 pinned to predict which sector is touched.
 
-## `virtio_disk_init` (in progress)
+## `virtio_disk_init`
 
-The SPECIFICATION is written and compiling: `SpecVirtioDiskInit.v`. Design
-points worth knowing before touching it:
+Proven and linked (`SpecVirtioDiskInit.v` / `WpVirtioDiskInitDecode.v` /
+`ProofVirtioDiskInit.v` / `LinkVirtioDiskInit.v`). Design points to own before
+touching it:
 
 - It owns the **raw `virtio_frag`**, not `dev_inv` — like `wp_uartinit_sconf`,
   and for the same reason squared: it *resets* the device, which no invariant
-  could tolerate.
+  could tolerate. This is the one contract in the cone that the boot wiring
+  will have to change: no device fragment may sit raw in a CPU's precondition
+  while the system runs, so the invariant-form re-proof (with a config-tracking
+  ghost half keeping the reset deterministic) is G1 of
+  [`main-boot.md`](main-boot.md).
 - **Every one of the six panic paths is refuted, so the spec needs no
   `panic_wp`.** The four identification reads are constants of the model
   (`virtio_ident_reads`), `QUEUE_NUM_MAX` is 8 (`virtio_queue_num_max_read`,
@@ -302,57 +311,13 @@ points worth knowing before touching it:
   `kalloc_avail`, the mycpu scratch cell); use it rather than threading the
   pieces, as `wp_kvmmake_sconf` does.
 - `K_virtio_disk_init = 18`: this function's 4-slot frame plus kalloc's 14.
-
-Still to do, in order:
-
-1. **The width-4 S-mode virtio MMIO leaves** over the raw `virtio_frag`: a
-   store and — new, the PLIC never needed one — a raw-frag *load*. The shape to
-   follow is `wp_sw_plic_s_sconf` (WpPlic.v): same S-mode translation/PMP tower,
-   with the window predicate and the device half swapped. Prefer generalizing
-   that lemma into an accessor form (device premise `dev_write d a 4 sw = Some
-   d'` + a ghost-step wand) over cloning it a third time; the `_kpt` UART leaves
-   already use that shape.
-2. **A lease-construction lemma in WpVirtio**: three zeroed pages + a live
-   `virtio_init_cfg` ⟹ `virtio_lease`, with `S = ∅`, `ai = 0`, `ctl` = the
-   descriptor and available pages. With `S = ∅` the only clause with content is
-   the `ai` pinning, which the zeroed available page discharges.
-3. **`ProofVirtioDiskInit.v`**: ~100 instructions, straight-line apart from the
-   six refuted branches, three `kalloc` calls and three `memset` calls. Use the
-   general `wp_memset_sconf` (not `wp_memset_page_sconf`) — the page-shaped one
-   returns a contents-AGNOSTIC `page_own`, and the spec needs to know the pages
-   are zero.
-4. `LinkVirtioDiskInit.v`.
-
-## Remaining work (the rest of the driver), in dependency order
-
-1. **S-mode width-4 virtio MMIO leaves.** The virtio registers are all 32-bit,
-   so this is the PLIC's shape, not the UART's byte shape: reuse the width-4
-   S-mode device store/load infrastructure from the plic-init effort
-   (`WpPlic.v`/`WpPlicExec.v`, see [`plic-init-spec.md`](plic-init-spec.md))
-   with the address window swapped, plus the `kvmmake` virtio mapping
-   (`virtio_vpn`/`virtio_ppn`, already in `KvmMap.v` — the kernel PT maps this
-   page, so there is no tlb-invariant switch, exactly as for the UART; see
-   `WpUartPutcSyncFull.v`).
-2. **`virtio_disk_init`.** Run it against the RAW `virtio_frag`, pre-invariant,
-   the way `wp_uartinit_sconf` runs against the raw `uart_frag` — it does a
-   device RESET, and it is also where the queue becomes live, which is where the
-   lease must be established. Note it calls `kalloc` three times and `memset`;
-   the queue pages it allocates are what it must hand into the lease. The
-   obligation it has to discharge at the QUEUE_READY / DRIVER_OK writes is
-   `virtio_queue_ok` with `S = ∅` and `ai = 0`: the rings are freshly zeroed and
-   nothing is published yet, so `v_seen = ai = 0` and there is no slot to prove
-   well formed. That is the cheapest non-trivial instance of the obligation and
-   the right place to start.
-3. **The lease-transfer protocol on the driver side.** `virtio_disk_rw` gives
-   the device a buffer (`b->data`, inside the static `bcache`) and takes it back
-   at completion; `virtio_disk_intr` reads the used ring. Expect the used-ring
-   page and the descriptor/avail pages to stay leased for the machine's whole
-   life, and only the per-request buffer + status byte to move.
-4. **`virtio_disk_intr`.** Needs the completion side of the interrupt chain
-   (`virtio_irq → plic_latch … virtio_irq_id → plic_eip → s_dispatch_seip_fires`),
-   which is the same pure chain WpUart.v already has for the UART — the latch is
-   now per-source, so it should generalize rather than clone.
-5. **A disk-contents spec.** Nothing yet says what a block device *is* from the
-   file system's point of view. `disk_read_write` (VirtioModel.v) is the only
-   fact so far. The natural statement is a `sector ↦ bytes` resource over
-   `v_disk`, minted alongside the lease.
+- The queue obligation at the QUEUE_READY / DRIVER_OK writes is
+  `virtio_queue_ok` with `S = ∅` and `ai = 0`: the rings are freshly zeroed and
+  nothing is published yet, so `v_seen = ai = 0` and there is no slot to prove
+  well formed. It is the cheapest non-trivial instance of that obligation, and
+  the lease-construction lemma has the same shape — with `S = ∅` the only
+  clause with content is the `ai` pinning, which the zeroed available page
+  discharges.
+- The three `memset` calls go through the general `wp_memset_sconf`, NOT
+  `wp_memset_page_sconf`: the page-shaped one returns a contents-AGNOSTIC
+  `page_own`, and the spec has to know the pages are zero.

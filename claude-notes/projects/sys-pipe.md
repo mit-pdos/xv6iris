@@ -2,8 +2,8 @@
 
 `sys_pipe` is **proven** (`ProofSysPipe.v`, axiom-free, `Qed`), over the
 contracts of myproc / argaddr / pipealloc / fdalloc / fileclose / copyout. It
-is not *linked*, and cannot be until `argaddr`, `fdalloc` and `fileclose` have
-implementations — see "What is left" below.
+is not *linked*, and cannot be until `fileclose` has a proof — the one callee
+that lacks one; see "What is left" below.
 
 Rocq: `SpecSysPipe.v` (contract), `WpSysPipeDecode.v` (71 instruction facts),
 `ProofSysPipe.v` (the functor). Supporting specs written for it:
@@ -123,18 +123,14 @@ They are lifted into [`../durable-notes.md`](../durable-notes.md) and
 
 ## What is left
 
-- **`argaddr` is specified but not proven.** It is byte-identical to `argint`
-  except for the `c.sd` in place of the `c.sw`, so `ProofArgint.v` is the
-  template and the proof is a near-copy; it needs `WpArgaddrDecode.v` (13
-  facts, twelve of them argint's).
-- **`fdalloc` is specified but not proven.** 22 instructions with a pointer-
-  walking loop over `p->ofile`; the loop invariant is `fd_frees_from` at the
-  current index, which is why the fixpoint is indexed. This is the
-  "`p_ofile` loop lemmas" item from
-  [`proc-struct-resources.md`](proc-struct-resources.md).
-- **No `LinkSysPipe.v`,** and there cannot be one until argaddr, fdalloc and
-  `fileclose` are proven; `tools/proof_coverage.py` therefore reports sys_pipe
-  as *assumed*, which is honest — exactly pipealloc's situation.
+- **`fileclose` is the only missing callee.** It has a spec
+  (`SpecFileclose.v`) and no proof, so there is no `LinkSysPipe.v` and
+  `tools/proof_coverage.py` reports sys_pipe as *assumed*, which is honest.
+  Everything else sys_pipe calls is proven and linked, argaddr
+  (`ProofArgaddr.v`, argint's proof with `c.sd` for `c.sw`) and fdalloc
+  (`ProofFdalloc.v`, the indexed `fd_frees_from` loop invariant — the
+  "`p_ofile` loop lemmas" item of
+  [`proc-struct-resources.md`](proc-struct-resources.md)) included.
 - `sys_pipe_stack` is 58 (8 slots of its own over copyout's 50); it will move
   if `fileclose_stack` grows past 50 when pipeclose/begin_op/iput/end_op get
   specs.

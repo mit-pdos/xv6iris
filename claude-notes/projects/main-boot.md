@@ -511,4 +511,8 @@ device invariant, `printk_env`, the kernel table (G5), and `procs_inv` (G5).
    hart-generic `p_sched`. Only then `wp_main_secondary_sconf`.
 5. Adequacy: `started_inv_alloc` goes inside `riscv_system_adequacy`'s
    `={⊤}=∗`, beside the device-ghost allocation
-   ([`../design/adequacy.md`](../design/adequacy.md)).
+   ([`../design/adequacy.md`](../design/adequacy.md)), as does
+   `riscv_device_adequacy`'s `plic_ok` hypothesis — the invariant carries
+   `plic_ok` from power-on, which is what lets `plicinit` merely preserve it
+   (item 2). Both are the consumer-side items parked by
+   [`../completed/plic-init-spec.md`](../completed/plic-init-spec.md).

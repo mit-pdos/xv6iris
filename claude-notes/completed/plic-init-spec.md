@@ -13,15 +13,23 @@ kernel page table's PLIC identity mapping** (`kpt_dev_vpn`, KptPt.v maps
 
 ## Key design decisions (own these before touching the proofs)
 
-- **plicinit owns the raw `plic_frag`; plicinithart must NOT.** Hart 0 runs
-  `plicinit` alone during boot, so it can thread the RAW `plic_frag` half
-  (`plic_frag p` in, `plic_frag (plicinit_plic p)` out) and *establish* a
-  property. `plicinithart` runs **concurrently on every hart** — no hart can own
-  the PLIC state across its two writes while the others write their own
-  contexts — so its spec takes the **device invariant `dev_inv γd`** (persistent,
-  hence shareable) and each store opens it. This is why there are two width-4
-  store leaves in `WpPlic.v`, not one; they are different *modes* (establish vs.
-  preserve), not a gratuitous cross-product.
+- **plicinit *establishes* a property of the PLIC; plicinithart can only
+  *preserve* one.** Hart 0 runs `plicinit` alone during boot, so it threads the
+  `plic_frag` half itself (`plic_frag p` in, `plic_frag (plicinit_plic p)` out)
+  and establishes `plic_ok`. `plicinithart` runs **concurrently on every hart** —
+  no hart can own the PLIC state across its two writes while the others write
+  their own contexts — so its spec takes the **device invariant `dev_inv γd`**
+  (persistent, hence shareable) and each store opens it. This is why there are
+  two width-4 store leaves in `WpPlic.v`, not one; they are different *modes*
+  (establish vs. preserve), not a gratuitous cross-product.
+
+  The boot wiring narrows the first mode: no device fragment may sit raw in a
+  CPU's precondition while the system runs (the gateway latch can fire at step
+  0), so the device invariant is allocated in adequacy at power-on with
+  `plic_ok` as a hypothesis, and `plicinit` runs over the invariant-opening
+  accessor leaves like plicinithart — establishing nothing, showing only that
+  its priority writes PRESERVE `plic_ok`. See G1 of
+  [`../projects/main-boot.md`](../projects/main-boot.md).
 - **`PlicPlan.v` is the software's plan, deliberately kept out of DevModel.**
   `DevModel.v` says what the PLIC *does*; which configuration xv6 *intends* is
   software. `plic_ok p := ∀ h, plic_senable_ok (p_enable p h)` — a hart's
@@ -143,12 +151,15 @@ does not retain a single spatial input).
   `add a5,a5,a4`), so one of them lands on the mirror image of `ph_sthb` —
   `ph_add_comm` bridges it.
 
-## Remaining
+## Remaining — nothing in plic.c; two items PARKED with the boot proof
 
-Consumer-side wiring only, in the boot proof (`main` → `plicinit` →
-allocate `dev_inv` → every hart's `plicinithart`): the sequencing that lets
-`plicinit` finish with the raw `plic_frag` before that half is frozen into
-`dev_inv_body`, and supplying `riscv_device_adequacy`'s new `plic_ok` hypothesis.
+All four functions plus `cpuid` are proven, linked and green. What is left
+belongs to `main`, not to this cone, and is tracked in
+[`../projects/main-boot.md`](../projects/main-boot.md): supplying
+`riscv_device_adequacy`'s `plic_ok` hypothesis (worklist item 5), and
+re-proving `plicinit` over the accessor leaves as part of the
+invariant-from-time-0 rework (G1, worklist item 2 — see the first design point
+above).
 
 ## Build discipline
 

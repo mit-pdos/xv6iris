@@ -94,8 +94,6 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
-- **[`plic-init-spec.md`](projects/plic-init-spec.md)** — plicinit / plicinithart
-  specs & proofs (+ cpuid, + the width-4 PLIC S-mode device-store infrastructure).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, the consumer end of
   interrupt-sweep's parked boot wiring. LANDED: `WpMainDecode.v` (all 50
   instructions) and `StartedInv.v` — the `started` flag as a one-shot escrow
@@ -120,8 +118,6 @@ are working on that effort — the relevant `projects/` file.
   the worklist for folding `UserPtTree.user_pt_inv` onto it. The CONSTRUCTION
   side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md); they
   meet at `ProcPtOwn.proc_pt_intro_ppt`.
-- **[`lock-cancel-pipeclose.md`](completed/lock-cancel-pipeclose.md)** — moved
-  to `completed/`.
 - **[`uservec.md`](projects/uservec.md)** — uservec (the user-mode trap
   handler), PROVEN — trampoline.S is 100% covered: the boundary specs
   (SpecUserret/SpecUservec/SpecUsertrap, the userret→user-exec dovetail
@@ -144,19 +140,9 @@ are working on that effort — the relevant `projects/` file.
   on all four exits, which is what forced filealloc's and pipealloc's failure
   arms to start returning their units. Keeps `SpecFdalloc.v`'s `fd_frees` pure
   layer (what makes two successive fdalloc calls compose), the two
-  shared-block lemmas, what the contract deliberately does not say, and the
-  remaining work (proving argaddr and fdalloc).
-- **[`string-args.md`](projects/string-args.md)** — the string-argument cone
-  (argstr → argraw + fetchstr → myproc + copyinstr + strlen), all four proven
-  and linked: `ByteBuf`'s `bb_nonul`/`bb_cstr` vocabulary (a NUL-terminated
-  string as a property of the buffer's NAMING FUNCTION, which is what makes
-  copyinstr's and strlen's contracts compose with nothing in between), why a
-  CONTENTS postcondition forbids the `bb_join3` chunk-split copyin uses and
-  wants `bb_byte_acc` instead, copyinstr's two nested loops (the outer counter
-  recovered from two POINTERS, the inner cursor indexed off the chunk base,
-  fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
-  cursor and its `subw` pointer-difference return, and argstr's INLINED
-  argaddr.
+  shared-block lemmas, what the contract deliberately does not say, and the one
+  thing standing between sys_pipe and a `LinkSysPipe.v`: `fileclose`, its only
+  callee without a proof.
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
   `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹
@@ -232,6 +218,19 @@ their durable design notes, gotchas, and reusable recipes.
   exactly the descriptor it was handed; and the measured finding that a
   helper-relocation sweep over cheap `lia`/`rvc_oneshot` helpers is
   compile-time NEUTRAL — structural payoff only, unlike the copy-inout sweep.
+- **[`string-args.md`](completed/string-args.md)** — the string-argument cone
+  (argstr → argraw + fetchstr → myproc + copyinstr + strlen), all four proven
+  and linked: `ByteBuf`'s `bb_nonul`/`bb_cstr` vocabulary (a NUL-terminated
+  string as a property of the buffer's NAMING FUNCTION, which is what makes
+  copyinstr's and strlen's contracts compose with nothing in between), why a
+  CONTENTS postcondition forbids the `bb_join3` chunk-split copyin uses and
+  wants `bb_byte_acc` instead, copyinstr's two nested loops (the outer counter
+  recovered from two POINTERS, the inner cursor indexed off the chunk base,
+  fuel-outside/`nat`-inside induction, the dead `beqz`), strlen's off-by-one
+  cursor and its `subw` pointer-difference return, and argstr's INLINED
+  argaddr. The consumers (`sys_open`, `sys_exec`, …) are the syscall worklist
+  in [`proc-struct-resources.md`](projects/proc-struct-resources.md), not this
+  cone.
 - **[`pipe-rw.md`](completed/pipe-rw.md)** — piperead / pipewrite, both proven
   and linked: the queue-coupling conjunct in `pipe_res`, the SLEEP_GEN
   generalization (sleeping on a cancellable lock — the sleeper's own reference
@@ -309,6 +308,15 @@ their durable design notes, gotchas, and reusable recipes.
   push/pop specs (`wp_caddi{,16}sp_{push,pop}_s_sconf`), the sp-aware VCgen
   executor, and the whole function tier (mycpu … kvmmap, plus the kinit cone)
   ported off the separate deep-`stack_own` conjunct. Full clean build green.
+- **[`plic-init-spec.md`](completed/plic-init-spec.md)** — plicinit /
+  plicinithart / plic_claim / plic_complete specs & proofs (+ cpuid, + the
+  width-4 PLIC S-mode device-access infrastructure, both directions); plic.c is
+  4/4. Keeps the establish-vs-preserve split — plicinit runs alone on hart 0 and
+  can establish a property of the PLIC, plicinithart runs on every hart and can
+  only open `dev_inv` and preserve one — which is why `WpPlic.v` has two width-4
+  store leaves. Its consumer-side items (`riscv_device_adequacy`'s `plic_ok`,
+  and re-proving plicinit over the accessor leaves) are parked in
+  [`main-boot.md`](projects/main-boot.md).
 - **[`kinit-cone.md`](completed/kinit-cone.md)** — the kinit cone (kinit →
   initlock + freerange, over kfree), all proved axiom-clean over sconf. The
   page-count token is threaded through to kinit's postcondition; the caller

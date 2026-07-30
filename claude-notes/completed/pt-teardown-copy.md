@@ -44,7 +44,7 @@ contracts that pass the ownership around.
 `page_in_range_addr_is_kdata`/`nth_byte_assemble8`), requiring only
 `RiscvModelBytes`/`RiscvPtsto`. `KallocInv.v` and `PtTree.v` both
 `Require Export` it, so every existing consumer is untouched. This is step 1
-of [`proc-pagetable-ownership.md`](proc-pagetable-ownership.md), done in the
+of [`proc-pagetable-ownership.md`](../projects/proc-pagetable-ownership.md), done in the
 smaller form (the `page_own` family itself stayed in `KallocInv.v`).
 
 - **`page_base` moved to `PageGeom.v`** (from `ProcPtOwn.v`) because
@@ -484,7 +484,7 @@ by qualified name from another file** (`PtTree.pte_s0`,
 - **`p->sz` coherence with `dom um`.** uvmfree's `dom um ⊆ vpn_run 0 n` premise
   is the first contract to NAME the fact that xv6 keeps `p->sz` an upper bound
   on the user map. It is still not part of table validity
-  ([`proc-pagetable-ownership.md`](proc-pagetable-ownership.md) step 7); whoever
+  ([`proc-pagetable-ownership.md`](../projects/proc-pagetable-ownership.md) step 7); whoever
   proves `proc_freepagetable` will have to supply it.
 - **`proc_freepagetable`'s two `do_free = 0` unmaps** are what produce
   `bare_pt` from `proc_pt`, and they are still unproven — a third uvmunmap
