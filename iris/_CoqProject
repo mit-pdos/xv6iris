@@ -113,12 +113,14 @@ Pt4kWalk.v
 KptPt.v
 KMap.v
 PtTree.v
+KptGhost.v
 KstackArith.v
 KvmMap.v
 UserBits.v
 SmodeCore.v
 PtTreeAdue.v
 KptTree.v
+KptShare.v
 SmodeCorePt.v
 WpSmodeGpr.v
 WpSmodeMemGen.v

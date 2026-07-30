@@ -118,8 +118,12 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      the kvminithart switch flips it with both halves.  The [ghost_varG Σ
      (mword 1)] functor instance comes from [sieG] at the use sites (NOT a
      field here -- a second [ghost_varG Σ (mword 1)] instance would make
-     typeclass resolution ambiguous between two functor slots). *)
-  strans_name : gname;
+     typeclass resolution ambiguous between two functor slots).
+     PER-HART, like [cpu_reg_name]: satp and tlb are per-hart registers, so
+     which arm a hart's translation slot is in is a per-hart fact, and the
+     shared-kernel-table sweep (claude-notes/projects/kpt-share.md) needs
+     every hart to flip its own bit at its own kvminithart. *)
+  strans_name : CPU -> gname;
 }.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
@@ -1286,4 +1290,18 @@ End pointsto_persist.
 Typeclasses Opaque mem_pointsto.
 Typeclasses Opaque text_pointsto.
 Typeclasses Opaque phys_pointsto.
+
+(* ... and re-supply the TIMELESS instances the seals hide.  A page-table
+   node's ownership must be timeless for the SHARED kernel table to live in
+   an Iris [inv] (KptShare.v): opening the invariant yields the body under a
+   [▷], and the Svadu A/D write-back needs the slot NOW. *)
+Global Instance text_pointsto_timeless `{!riscvGS Σ} a dq b :
+  Timeless (text_pointsto a dq b).
+Proof. rewrite /text_pointsto. apply _. Qed.
+Global Instance phys_pointsto_timeless `{!riscvGS Σ} a dq b :
+  Timeless (phys_pointsto a dq b).
+Proof. rewrite /phys_pointsto. apply _. Qed.
+Global Instance phys_word_pointsto_timeless `{!riscvGS Σ} a dq w :
+  Timeless (phys_word_pointsto a dq w).
+Proof. rewrite /phys_word_pointsto. apply _. Qed.
 

@@ -448,8 +448,11 @@ Section IntrDefs.
      flips it with both halves.  In practice the flip is one-way: the boot
      receipt is the only outside half ever minted, so the arm only ever
      moves Bare→KPT. *)
+  (* PER-HART (strans_name is a [CPU -> gname]): this is the AMBIENT hart's
+     translation-slot arm bit, exactly as [reg_pointsto] is the ambient
+     hart's register. *)
   Definition strans_bit (b : mword 1) : iProp Σ :=
-    ghost_var strans_name (1/2)%Qp b.
+    ghost_var (strans_name cpu_id) (1/2)%Qp b.
 
   Definition strans_inv : iProp Σ :=
     ((strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
