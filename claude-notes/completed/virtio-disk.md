@@ -4,8 +4,10 @@
 
 All three driver functions (`virtio_disk_init`, `virtio_disk_intr`,
 `virtio_disk_rw`) and `free_desc` are proven, sealed and linked;
-`virtio_disk.c` reads **4/4 fns proven**.  What remains is listed at the end of
-this section.
+`virtio_disk.c` reads **4/4 fns proven**, and `main` composes them into one
+"the disk works" interface it hands to the secondary harts.  Nothing in this
+effort is outstanding; the one thing it deliberately does not say is at the end
+of this section.
 
 The protocol layer, in place and green:
 - `claude-notes/design/virtio-driver.md` — the driver-side protocol design (READ IT FIRST).
@@ -97,19 +99,22 @@ The protocol layer, in place and green:
     its three descriptors were not recycled, and `dc_pin` is what lets it split
     the parked payoff back into the cells `free_desc` wants.
 
-Remaining in the whole virtio effort:
-- the two currently-unused primed lemmas
-  `ProofVirtioDiskRwB.{disk_window_le',mod8_set_seq_fresh'}` — P4 and P6 both
-  ended up using the weaker `vdrwd_window_le2` route, so these can be deleted;
-- **the boot wiring**: `virtio_disk_init` is proven and linked, but nothing yet
-  ties its post-state to the `disk_geom` / `is_lock γk d_lock … (disk_res …)`
-  that `virtio_disk_rw` and `virtio_disk_intr` consume, so the three whole-
-  function contracts are not yet composed into a single "the disk works"
-  statement reachable from `main`.  That is the last structural piece.
-- **a disk-contents spec**: nothing says what a block device *is* from the file
-  system's point of view. `disk_read_write` (VirtioModel.v) is the only fact so
-  far; the natural statement is a `sector ↦ bytes` resource over `v_disk`,
-  minted alongside the lease.
+**The boot seam is closed**: `DiskBoot.disk_res_boot` assembles
+`virtio_disk_init`'s post-state (its device conjuncts + the boot tokens) into
+the `disk_res γv pd pav pu` that `virtio_disk_rw` and `virtio_disk_intr`
+consume, and `ProofMain.v` applies it right before the disk-lock `newlock`, so
+what leaves `main` is `is_lock γk d_lock "virtio_disk" (disk_res …)` ∗
+`disk_geom` — see [`main-boot.md`](../projects/main-boot.md).
+
+**What this effort deliberately does not say: what a block device IS to the
+file system.** `disk_read_write` (VirtioModel.v) is the only fact about disk
+contents here; the natural statement is a `sector ↦ bytes` resource over
+`v_disk`, minted alongside the lease. That spec is being built as its own
+effort — it faces bio.c/log.c, not the driver. Two things it will need from
+this side: the request HEADER is NOT pinned by the current model (see the end
+of the modelling-choices section) and has to be, to predict which sector is
+touched; and `vs_data` already records the block's content in both directions,
+which is the hook a contents claim attaches to.
 
 The device model behind `kernel/virtio_disk.c`. The MACHINE side: the disk
 exists as a third device on the fabric, it runs as part of the device execution
@@ -290,7 +295,7 @@ touching it:
   will have to change: no device fragment may sit raw in a CPU's precondition
   while the system runs, so the invariant-form re-proof (with a config-tracking
   ghost half keeping the reset deterministic) is G1 of
-  [`main-boot.md`](main-boot.md).
+  [`main-boot.md`](../projects/main-boot.md).
 - **Every one of the six panic paths is refuted, so the spec needs no
   `panic_wp`.** The four identification reads are constants of the model
   (`virtio_ident_reads`), `QUEUE_NUM_MAX` is 8 (`virtio_queue_num_max_read`,

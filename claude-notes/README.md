@@ -169,21 +169,27 @@ are working on that effort — the relevant `projects/` file.
   is the cone's one assumption. Remaining: consolewrite, consoleintr, devintr,
   boot wiring.
 
-- **[`virtio-disk.md`](projects/virtio-disk.md)** — the virtio disk device: the
-  machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease, `wp_dev_loop`) and
-  the whole driver side (`virtio_disk_init`/`_rw`/`_intr` + `free_desc`, all
-  proven and linked, `virtio_disk.c` 4/4) are done; the boot wiring that ties
-  init's post-state to the contracts `_rw`/`_intr` consume is what remains.
-- **[`virtio-disk-rw.md`](projects/virtio-disk-rw.md)** — the record of the
-  headline driver proof `virtio_disk_rw` (DONE): the phase map (P1..P6), the
-  seam each phase hands the next, the one protocol-spec change P6 forced
-  (`vs_data` for READ requests), and ~30 gotchas already paid for.
 
 ### `completed/` — finished projects, archived for reference
 
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`virtio-disk.md`](completed/virtio-disk.md)** — the virtio disk device,
+  end to end: the machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease,
+  `wp_dev_loop`), the whole driver side (`virtio_disk_init`/`_rw`/`_intr` +
+  `free_desc`, `virtio_disk.c` 4/4), and the boot seam
+  (`DiskBoot.disk_res_boot` → main's disk-lock `newlock`, so what leaves `main`
+  is `is_lock … (disk_res …)` ∗ `disk_geom`). Keeps the DMA-lease design and
+  the rule it came from — model undefined device behaviour as "anything", never
+  as "nothing", or a driver satisfies its obligation vacuously — plus the
+  modelling choices and why each is safe. What it deliberately does not say is
+  what a block device IS to the file system; that spec is its own effort.
+- **[`virtio-disk-rw.md`](completed/virtio-disk-rw.md)** — the record of the
+  headline driver proof `virtio_disk_rw`: the phase map (P1..P6), the seam each
+  phase hands the next, the one protocol-spec change P6 forced (`vs_data` for
+  READ requests — an invariant that takes an exclusive ghost fragment across a
+  sleep must RECORD its value), and ~30 gotchas already paid for.
 - **[`scheduler.md`](completed/scheduler.md)** — scheduler(), the per-CPU
   dispatch loop, PROVEN: the tree's first DIVERGING whole-function spec (no
   continuation; proof_coverage.py learned the shape), the 4-place

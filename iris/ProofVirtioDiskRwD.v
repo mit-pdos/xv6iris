@@ -112,7 +112,7 @@ Qed.
 (* [tri_card_8] already bounds the number of RECORDED triples by two, so
    the live window is at most two positions wide -- and three consecutive
    positions are pairwise distinct mod 8, which is all the ring-slot
-   freshness argument needs.  (The sharper [disk_window_le'] bound of one
+   freshness argument needs.  (A sharper bound of ONE is provable, but it
    needs the publisher's own triple to be disjoint from every recorded one;
    this weaker route needs nothing beyond [disk_res]'s own conjuncts.) *)
 

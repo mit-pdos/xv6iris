@@ -4,7 +4,7 @@ This is the design for specifying and proving the four driver functions of
 `kernel/virtio_disk.c` — `virtio_disk_init`, `free_desc`, `virtio_disk_rw`,
 `virtio_disk_intr` (`alloc_desc`/`free_chain`/`alloc3_desc` are inlined by the
 compiler) — over the machine-side model that already exists
-([`device.md`](device.md), [`../projects/virtio-disk.md`](../projects/virtio-disk.md)).
+([`device.md`](device.md), [`../completed/virtio-disk.md`](../completed/virtio-disk.md)).
 The machine side (VirtioModel.v / WpVirtio.v / `wp_dev_loop`) is done; this
 file is about the DRIVER's ownership story.
 

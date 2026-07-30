@@ -4,8 +4,7 @@ The headline proof of the virtio effort. `virtio_disk_rw` is **proven, sealed
 and linked**: `tools/proof_coverage.py` reports `virtio_disk.c 4/4 fns proven`.
 Read [`../design/virtio-driver.md`](../design/virtio-driver.md) for the design;
 this file is the record of how the proof is cut up and the gotchas it paid for.
-Nothing is left to do here — the file can move to `completed/` when the
-remaining virtio-effort cleanups (see [`virtio-disk.md`](virtio-disk.md)) land.
+Nothing is left to do.
 
 ## Files (all registered in `_CoqProject`, all Qed-clean, zero `Admitted`)
 

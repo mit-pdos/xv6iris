@@ -583,37 +583,6 @@ Section VdrwbDefs.
 
 End VdrwbDefs.
 
-(* the window bound and the ring-slot freshness, WITHOUT the [nr <= np]
-   hypothesis: [disk_res] does not carry it (it follows from the protocol,
-   which the lock holder cannot see), and both facts are vacuous when the
-   subtraction underflows. *)
-Lemma disk_window_le' {A : Type} (np nr : nat) (fl pk : gmap nat A)
-    (tr : gmap nat (nat * nat * nat)) (T0 : nat * nat * nat) :
-  dom fl = set_seq nr (np - nr) ->
-  (forall p, p ∈ dom pk -> (p < nr)%nat) ->
-  dom tr = dom fl ∪ dom pk ->
-  (forall p T, tr !! p = Some T -> tri_ok T) ->
-  (forall p q Tp Tq, p <> q -> tr !! p = Some Tp -> tr !! q = Some Tq ->
-     tri_set Tp ## tri_set Tq) ->
-  tri_ok T0 ->
-  (forall p T, tr !! p = Some T -> tri_set T ## tri_set T0) ->
-  (np - nr <= 1)%nat.
-Proof.
-  intros Hfl Hpk Htr Hok Hdisj HT0 Hdisj0.
-  destruct (Nat.le_gt_cases nr np) as [Hle|Hgt].
-  - exact (disk_window_le np nr fl pk tr T0 Hle Hfl Hpk Htr Hok Hdisj HT0 Hdisj0).
-  - lia.
-Qed.
-
-Lemma mod8_set_seq_fresh' (nr np : nat) :
-  (np - nr <= 1)%nat -> (np `mod` 8)%nat ∉ mod8 (set_seq nr (np - nr)).
-Proof.
-  intro Hw. destruct (Nat.le_gt_cases nr np) as [Hle|Hgt].
-  - exact (mod8_set_seq_fresh nr np Hle Hw).
-  - replace (np - nr)%nat with 0%nat by lia.
-    rewrite /mod8 /set_seq set_map_empty. apply not_elem_of_empty.
-Qed.
-
 (* ===================================================================== *)
 
 (* ---- from ProofVirtioDiskRwC.v ---- *)

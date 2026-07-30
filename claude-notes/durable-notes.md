@@ -246,7 +246,7 @@ extra structure.
   ("if the device acts, its writes are bounded") be satisfied vacuously. State
   such obligations POSITIVELY instead. Config-time misuse is the one case that
   belongs elsewhere: refuse the offending MMIO write, so a stuck CPU store makes
-  it the driver's obligation. Worked example: `claude-notes/projects/virtio-disk.md`.
+  it the driver's obligation. Worked example: `claude-notes/completed/virtio-disk.md`.
 - **A caller obligation that the caller cannot actually discharge is a design smell — absorb the arm with the contract of the code that handles it.** xv6's `acquire` re-checks `holding(lk)` and panics; a non-holder provably knows nothing about `lk->cpu`, so proving that arm dead would need callers to thread a per-(lock,hart) "I don't hold it" ticket. The right shape is the `panic_wp` convention (SpecPanic.v): `panic` never returns, so a `□`-persistent safety WP for it closes the arm at zero cost to callers, and the spec honestly reads "acquires, or panics".
 - **An invariant that takes an EXCLUSIVE ghost fragment across a sleep must
   RECORD the fragment's value.** If the invariant stores it under an
@@ -257,5 +257,5 @@ extra structure.
   Put the value in whatever per-position record the invariant already keys on
   (worked example: `VirtioQueue.vslot.vs_data` was extended to record a READ
   request's block content, which is what makes `virtio_disk_rw`'s read
-  postcondition provable — claude-notes/projects/virtio-disk-rw.md).
+  postcondition provable — claude-notes/completed/virtio-disk-rw.md).
 - Avoid ad-hoc argument couplings in preconditions (e.g. a precondition like `eq_vec (m0!!!a2) zero_reg = Nat.eqb N 0` that ties an argument to a branch condition). Prefer deriving branch conditions internally / a natural contract; if a coupling is genuinely unavoidable, flag it and confirm the form before building it out.
