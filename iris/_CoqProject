@@ -428,6 +428,8 @@ LinkBrelse.v
 WpBreadDecode.v
 BreadLru.v
 ProofBreadParts.v
+ProofBread.v
+LinkBread.v
 WpIinitDecode.v
 SpecIinit.v
 ProofIinit.v

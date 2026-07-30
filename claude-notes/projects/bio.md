@@ -221,14 +221,41 @@ caller-side ghost step main-boot.md's binit row anticipates.
 
 ## Worklist
 
-- [ ] BufOwn.v (field geometry + buf_own with ½ blockno); rewire DiskInv.v +
-      SpecVirtioDiskRw.v; mechanical rw-proof fix; full build green.
-- [ ] BcacheInv.v: bufUR + bref mint/burn/agree; bslot supply; bown;
-      brefcnt + word lemmas; buf_escrow + swap lemmas (a)/(b)/(c);
-      bslot_res/bcache_res; bio_names/bio_ctx/bio_init; bcache_lru
-      splice-out + bseg split lemmas.
-- [ ] SpecBpin.v SpecBunpin.v SpecBwrite.v SpecBrelse.v SpecBread.v.
-- [ ] WpBioDecode.v (+ per-function decode as needed).
-- [ ] ProofBpin/ProofBunpin + Links (validates bcache_res first).
-- [ ] ProofBwrite + Link; ProofBrelse + Link; ProofBread (+parts) + Link.
-- [ ] _CoqProject, full build, proof_coverage (bio.c 6/6), README pointer.
+- [x] BufOwn.v; DiskInv.v/SpecVirtioDiskRw.v rewired; rw proof cone took the
+      ½ at four sites; full build green.
+- [x] BioInv.v (the ghost layer went to a NEW file, keeping BcacheInv.v's
+      import footprint light for binit): bufUR + the four auth steps; bslot
+      supply; bown; buf_escrow + the swaps; bio_slot_res/bcache_res;
+      bio_names/bio_ctx/bio_init.  bio_first_ref_step carries a ✓qn premise
+      (an arbitrary Qp is not valid).  buf_parked pins vld ∈ {0,1} — bread's
+      hit path turns "nonzero" into "= 1" with it.
+- [x] The five Spec files.
+- [x] bpin/bunpin proven+linked (one shared decode file; the two ghost arms
+      joined before the load so the critical section is proved once).
+- [x] bwrite proven+linked (panic arm dead; bw_data_kdata discharges rw's
+      kdata premise for every bcache buffer).
+- [x] brelse proven+linked (the park swap at a prologue stack store — before
+      releasesleep; BrelseLru.v's bseg toolkit + bcache_lru_splice do the
+      LRU rotate).
+- [x] bread's decode (73 facts / 214 bytes), BreadLru.v (scan structure),
+      ProofBreadParts.v (masked width-4 leaves, bcache_scan — the OPEN form
+      of bcache_res the scans must carry, or the devs/bnos exit tie dies —
+      and the incr/recycle ghost steps + the three (c)-swaps).
+- [ ] ProofBread.v (the WP chain over the parts) + LinkBread.v; _CoqProject;
+      coverage bio.c 6/6.
+
+## Cleanup queue (post-landing; none blocks anything)
+
+- Widen `BioInv.bref_tok_lookup` with `(n ≠ 1 → q < qt)` and drop the two
+  local `bref_lt` copies (ProofBunpin, ProofBrelse).
+- Consider restating `BioInv.bcache_res` as `∃ …, bcache_scan …` so the open
+  form ProofBreadParts declares lives next to the closed one.
+- Promote: BrelseLru's `bseg` toolkit → BcacheInv.v; `word4_half`/`_join` →
+  RiscvPtsto.v (3 copies); `bd_sext_inj` → RiscvExtras.v (3 copies);
+  `*_word_zero/nonzero` refcnt-word lemmas → BioInv.v; `bw_data_kdata` →
+  BcacheInv.v (2 copies).
+- Decode dedup sweep → KernelRvcDecode.v/KernelBaseDecode.v: 0x4585 (3
+  files), 0x37fd (2), 0x40bc/0xc0bc (3), 0xc09c, 0xcb91, 0xa021,
+  0x0001e497 (5!), 0x0001e797 (3), 0x01048513 (2), 0x0004a023 (3).  Follow
+  the two sweep rules in durable-notes (grep the STATEMENT; diff every
+  `*_<off>` fact against HEAD when done).
