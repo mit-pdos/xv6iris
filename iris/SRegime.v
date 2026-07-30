@@ -422,7 +422,6 @@ End SRegimeDef.
 
 Section SRegimeShared.
   Context `{!riscvGS Σ}.
-  Context `{!kptG Σ}.
   Context `{CID : CpuId}.
 
   Lemma res_transform (root_ppn : mword 44) :

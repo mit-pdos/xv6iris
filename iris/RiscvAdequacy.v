@@ -58,7 +58,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
 Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans arm bit *)
-Require Import KptGhost.   (* kptG / kpt_ad_none: the shared kernel table's snapshot ghost *)
+Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
 Require Import PlicPlan DiskPtsto VirtioProto WpUart.
 
@@ -85,11 +85,11 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      Bare translation slot *)
   riscv_pre_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                         (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
-  (* the A/D-monotone snapshot ghost of the SHARED kernel page table
-     (KptGhost.v): capacity only -- adequacy mints it UNINITIALISED
-     ([kpt_ad_none]) and the boot client spends it in main's kvm assembly,
-     where the tree kvminit actually built is known. *)
-  riscv_pre_kptGS :: kptGpreS Σ;
+  (* the SHARED kernel page table's one-shot agreement (KptGhost.v):
+     capacity only -- adequacy mints the UNSET token ([kpt_unset]) and the
+     boot client spends it in main's kvm assembly, where the tree kvminit
+     actually built is known. *)
+  riscv_pre_kptGS :: inG Σ kptR;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -103,7 +103,7 @@ Definition riscvΣ : gFunctors :=
      diskGhostΣ;
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
-     kptΣ ].
+     GFunctor kptR ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -253,7 +253,7 @@ Definition cpu_pool (cs : list CPU) : list (expr riscv_lang) :=
 Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
     (cs : list CPU) (g : gstate) (D : CPU -> gset register)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) :
-  (forall (HR : riscvGS Σ) (HK : kptG Σ),
+  (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
             reg_pointsto_at c r (DfracOwn 1) (register_lookup r (g.(gregs) c))) ∗
@@ -278,9 +278,9 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           ghost_var (strans_name c) (1/2)%Qp strans_bit_bare ∗
           ghost_var (strans_name c) (1/2)%Qp strans_bit_bare) ∗
-       (* the shared kernel page table's A/D snapshot ghost, UNINITIALISED:
-          spent once, in main's kvm assembly, to allocate [kpt_inv]. *)
-       kpt_ad_none ∗
+       (* the shared kernel page table's one-shot agreement, UNSET: spent
+          once, in main's kvm assembly, to allocate [kpt_inv]. *)
+       kpt_unset ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio))
        ={⊤}=∗
@@ -319,10 +319,9 @@ Proof.
      both halves of each are handed to the boot client below *)
   iMod (ghost_var_alloc_halves_cpus strans_bit_bare (enum CPU) (NoDup_enum CPU))
     as (γs) "Hs".
-  (* the shared kernel table's A/D snapshot ghost, uninitialised *)
+  (* the shared kernel table's one-shot agreement, unset *)
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk γs).
-  set (HK := KptG Σ _ γkpt).
+  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk _ γkpt γs).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
@@ -377,7 +376,7 @@ Proof.
               with "Hkbundle [Hb]").
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
-  iPoseProof (Hwp HR HK) as "Hwand".
+  iPoseProof (Hwp HR) as "Hwand".
   iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hkpt HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
@@ -469,7 +468,7 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
 Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
-  intros HR HK.
+  intros HR.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt

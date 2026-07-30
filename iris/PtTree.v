@@ -60,6 +60,7 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
+Require Export PtreeType.
 Require Export PageGeom.   (* [page_valid] / [page_base]: a node page is a kalloc page *)
 Require Import SmodePte.
 Require Import PtAdBits.
@@ -366,17 +367,11 @@ Qed.
 (*    (ownership) and [ptree_maps]/[ptree_blocks] (per-vpn walk facts).   *)
 (* ===================================================================== *)
 
-Inductive ptree : Type :=
-  | PtNode (base : mword 44)
-           (ents : mword 9 -> mword 64)
-           (kids : mword 9 -> option ptree).
-
-Definition pt_base (t : ptree) : mword 44 :=
-  match t with PtNode b _ _ => b end.
-Definition pt_ents (t : ptree) : mword 9 -> mword 64 :=
-  match t with PtNode _ e _ => e end.
-Definition pt_kids (t : ptree) : mword 9 -> option ptree :=
-  match t with PtNode _ _ k => k end.
+(* the type itself lives in PtreeType.v, BELOW RiscvPtsto.v, so that
+   [riscvGS] can name it (the shared kernel table's ghost is an agreement
+   over [leibnizO ptree]).  Re-exported here: every consumer keeps saying
+   [PtTree.ptree]. *)
+(* [Inductive ptree] / [pt_base] / [pt_ents] / [pt_kids] : PtreeType.v *)
 
 (* The identity vpn of a node page at ppn [b]: all 512 slots
    ([u_pte_addr b idx], idx*8 < 4096) sit in the SAME page, so share this
@@ -1387,81 +1382,6 @@ Proof.
   intros Hmaps Hv Hl Hnap Hpb Hok vpn' ent Hget.
   exact (tlb_cache_of_set_leaf asid t vpn' ent vpn p2 p1 p0 a d
            Hmaps Hv Hl Hnap Hpb (Hok vpn' ent Hget)).
-Qed.
-
-(* ===================================================================== *)
-(* §7a THE A/D-MONOTONE ORDER ON TREES.  The only way a running machine   *)
-(*     mutates an INSTALLED page table is the Svadu/ADUE write-back:      *)
-(*     one mapped vpn's leaf slot is replaced by an A/D variant of        *)
-(*     itself ([ptree_set_leaf t vpn (pte_set_ad p0 a d)]) -- exactly the *)
-(*     shape [ptree_translateAddr_own]'s O3 arm produces.  [ptree_ad_le]  *)
-(*     is the reflexive-transitive closure of that step: "t' is t after   *)
-(*     some run of A/D write-backs".  It is a PREORDER (so it can index a *)
-(*     monotone ghost, KptGhost.v) and every fact a hart's cached TLB     *)
-(*     rests on is stable along it ([tlb_ok_pt_ad_mono]) -- which is what *)
-(*     lets ONE shared kernel table serve many harts: a hart's TLB        *)
-(*     coherence is stated against a SNAPSHOT [t0], and the other harts'  *)
-(*     write-backs can only move the shared tree UP this order.           *)
-(*                                                                        *)
-(*     Note there is no separate "A/D bits grow" reading to prove: the     *)
-(*     step relation quantifies the new bits (a,d) freely, which is both   *)
-(*     what the model's [update_PTE_Bits] produces and all that any        *)
-(*     consumer needs -- [tlb_ok_pt] already ties a cached entry to the    *)
-(*     tree's leaf only MODULO A/D.                                        *)
-(* ===================================================================== *)
-
-Definition ptree_ad_step (t t' : ptree) : Prop :=
-  exists (vpn : mword 27) (p2 p1 p0 : mword 64) (a d : mword 1),
-    ptree_maps t vpn p2 p1 p0 /\
-    pte_valid (pte_set_ad p0 a d) /\ pte_leaf (pte_set_ad p0 a d) /\
-    pte_no_napot (pte_set_ad p0 a d) /\ pte_pbmt0 (pte_set_ad p0 a d) /\
-    t' = ptree_set_leaf t vpn (pte_set_ad p0 a d).
-
-Definition ptree_ad_le : relation ptree := rtc ptree_ad_step.
-
-Lemma ptree_ad_le_refl (t : ptree) : ptree_ad_le t t.
-Proof. apply rtc_refl. Qed.
-
-Lemma ptree_ad_le_trans (t1 t2 t3 : ptree) :
-  ptree_ad_le t1 t2 -> ptree_ad_le t2 t3 -> ptree_ad_le t1 t3.
-Proof. apply rtc_transitive. Qed.
-
-Global Instance ptree_ad_le_preorder : PreOrder ptree_ad_le.
-Proof. split; [exact ptree_ad_le_refl | exact ptree_ad_le_trans]. Qed.
-
-Lemma ptree_ad_le_once (t t' : ptree) : ptree_ad_step t t' -> ptree_ad_le t t'.
-Proof. apply rtc_once. Qed.
-
-(* THE write-back IS a step: the O3 arm of [ptree_translateAddr_own] moves
-   the tree up the order.  Stated at the shape that arm returns (the new
-   leaf word is an A/D variant of the canonical leaf [w], and the current
-   leaf is another variant of the same [w] -- [pte_set_ad_absorb] makes the
-   two spellings agree). *)
-Lemma ptree_ad_le_set_leaf (t : ptree) (vpn : mword 27)
-    (p2 p1 p0 : mword 64) (a d : mword 1) :
-  ptree_maps t vpn p2 p1 p0 ->
-  pte_valid (pte_set_ad p0 a d) -> pte_leaf (pte_set_ad p0 a d) ->
-  pte_no_napot (pte_set_ad p0 a d) -> pte_pbmt0 (pte_set_ad p0 a d) ->
-  ptree_ad_le t (ptree_set_leaf t vpn (pte_set_ad p0 a d)).
-Proof.
-  intros Hmaps Hv Hl Hnap Hpb.
-  apply ptree_ad_le_once. exists vpn, p2, p1, p0, a, d. tauto.
-Qed.
-
-(* THE PRESERVATION LEMMA the sharing rests on: TLB consistency against a
-   SNAPSHOT survives every later A/D write-back, at FULL granularity (per
-   resident entry).  [tlb_ok_pt]'s per-entry tie needs no weakening --
-   it already reads "the cached leaf is SOME A/D variant of the tree's
-   leaf", and [pte_set_ad_absorb] collapses variant-of-variant. *)
-Lemma tlb_ok_pt_ad_mono (asid : mword 16) (t t' : ptree)
-    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
-  ptree_ad_le t t' -> tlb_ok_pt asid t tlbvec -> tlb_ok_pt asid t' tlbvec.
-Proof.
-  induction 1 as [| x y z Hstep Hrest IH]; [tauto |].
-  intros Hok. apply IH.
-  destruct Hstep as (vpn & p2 & p1 & p0 & a & d & Hmaps & Hv & Hl & Hnap & Hpb & ->).
-  exact (tlb_ok_pt_set_leaf asid x tlbvec vpn p2 p1 p0 a d
-           Hmaps Hv Hl Hnap Hpb Hok).
 Qed.
 
 (* ===================================================================== *)

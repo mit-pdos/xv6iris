@@ -11,9 +11,10 @@
 
      [kpt_inv root]   -- an Iris INVARIANT holding the globally unique
                          parts: the tree, its A/D-monotone auth
-                         ([KptGhost.kpt_ad_auth]), the mapping auth, and
-                         the representation fact.  Persistent, allocated
-                         once out of kvminit's exclusive post.
+                         ([KptGhost.kpt_lb], the one-shot agreement on
+                         its A/D-canonical form), the mapping auth, and the
+                         representation fact.  Persistent, allocated once
+                         out of kvminit's exclusive post.
 
      [tlb_res_pt root] -- the PER-HART residue: this hart's satp cell (+
                          the three Sv39/asid/root facts), this hart's tlb
@@ -52,7 +53,6 @@ Import Defs.
 
 Section KptShare.
   Context `{!riscvGS Σ}.
-  Context `{!kptG Σ}.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -60,12 +60,12 @@ Section KptShare.
   (* ------------------------------------------------------------------- *)
 
   (* [kptN] itself lives in KptGhost.v -- SRegime's absorb field names it in
-     its mask premise and must not need [kptG Σ] in context to do so. *)
+     its mask premise. *)
 
   Definition kpt_body (root_ppn : mword 44) : iProp Σ :=
     (∃ (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)),
        ptree_own 2 (DfracOwn 1) t ∗
-       kpt_ad_auth t ∗
+       kpt_lb t ∗
        kmap_auth M ∗
        ⌜ kpt_tree_spec_gen root_ppn M t ⌝)%I.
 
@@ -81,13 +81,13 @@ Section KptShare.
   Lemma kpt_inv_alloc (root_ppn : mword 44)
       (t : ptree) (M : gmap (mword 27) (mword 44 * kperm)) (E : coPset) :
     kpt_tree_spec_gen root_ppn M t ->
-    ptree_own 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_ad_none ={E}=∗
+    ptree_own 2 (DfracOwn 1) t -∗ kmap_auth M -∗ kpt_unset ={E}=∗
     kpt_inv root_ppn ∗ kpt_lb t.
   Proof.
-    intros Hspec. iIntros "Ht HM Hnone".
-    iMod (kpt_ad_init t with "Hnone") as "[Hauth #Hlb]".
-    iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht Hauth HM]") as "#Hinv".
-    { iNext. iExists t, M. iFrame "Ht Hauth HM". iPureIntro. exact Hspec. }
+    intros Hspec. iIntros "Ht HM Hunset".
+    iMod (kpt_shoot t with "Hunset") as "#Hlb".
+    iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht HM]") as "#Hinv".
+    { iNext. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hinv Hlb".
   Qed.
 
@@ -164,7 +164,7 @@ Section KptShare.
   (* ------------------------------------------------------------------- *)
 
   Lemma tlb_inv_pt_share (root_ppn : mword 44) (E : coPset) :
-    tlb_inv_pt root_ppn -∗ kpt_ad_none ={E}=∗ tlb_res_pt root_ppn.
+    tlb_inv_pt root_ppn -∗ kpt_unset ={E}=∗ tlb_res_pt root_ppn.
   Proof.
     iIntros "Hinv Hnone".
     iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M)
@@ -185,7 +185,6 @@ End KptShare.
 
 Section KptShareTranslate.
   Context `{!riscvGS Σ}.
-  Context `{!kptG Σ}.
   Context `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
@@ -268,12 +267,13 @@ Section KptShareTranslate.
     (* ---- open the shared table ---- *)
     iInv "Hkinv" as ">Hbody" "Hclose".
     iEval (rewrite /kpt_body) in "Hbody".
-    iDestruct "Hbody" as (t M) "(Ht & Hauth & HM & %Hspec)".
+    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
     iDestruct (kmap_at_lookup with "HM Hat") as %HMlk.
-    iDestruct (kpt_lb_valid t t0 with "Hauth Hlb0") as %Hle0.
-    (* the hart's cached entries are coherent with the LIVE tree *)
+    iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan0.
+    (* the hart's cached entries are coherent with the LIVE tree: coherence
+       depends on the table only through its canonical form *)
     assert (Htlbok : tlb_ok_pt (mword_of_int 0) t tlbvec)
-      by exact (tlb_ok_pt_ad_mono (mword_of_int 0) t0 t tlbvec Hle0 Htlbok0).
+      by exact (tlb_ok_pt_canon (mword_of_int 0) t0 t tlbvec Hcan0 Htlbok0).
     set (vpn := svpn_of va) in *.
     pose proof Hspec as (Hbase & Hmapspec).
     pose proof (Hmapspec vpn) as Hmapv. rewrite HMlk in Hmapv.
@@ -289,18 +289,15 @@ Section KptShareTranslate.
             HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
             with "Hri Hgh Htlb Ht")
       as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
-    (* ---- the tree moved up the A/D order; bump the auth, re-snapshot ---- *)
-    assert (Hle' : ptree_ad_le t t').
-    { destruct Htsh as [-> | (a1 & d1 & ->)]; [apply ptree_ad_le_refl |].
+    (* ---- the write-back does NOT move the canonical table, so the
+       snapshot is re-derived by a rewrite: no ghost update at all ---- *)
+    assert (Hcan' : ptree_canon t = ptree_canon t').
+    { destruct Htsh as [-> | (a1 & d1 & ->)]; [reflexivity |].
       rewrite <- (pte_set_ad_absorb (mk_pte ppn (kperm_flags pc)) a0 d0 a1 d1).
-      apply (ptree_ad_le_set_leaf t vpn p2 p1
-               (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) a1 d1 Hmaps);
-        rewrite (pte_set_ad_absorb (mk_pte ppn (kperm_flags pc)) a0 d0 a1 d1).
-      - apply kperm_variant_valid.
-      - apply kperm_variant_leaf.
-      - apply kperm_variant_no_napot.
-      - apply kperm_variant_pbmt0. }
-    iMod (kpt_ad_update t t' Hle' with "Hauth") as "[Hauth #Hlb']".
+      symmetry.
+      exact (ptree_canon_set_leaf t vpn p2 p1
+               (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) a1 d1 Hmaps). }
+    iDestruct (kpt_lb_canon t t' Hcan' with "Hlbt") as "#Hlb'".
     assert (Hspec' : kpt_tree_spec_gen root_ppn M t').
     { destruct Htsh as [-> | (a1 & d1 & ->)]; [exact Hspec |].
       rewrite <- (pte_set_ad_absorb (mk_pte ppn (kperm_flags pc)) a0 d0 a1 d1).
@@ -308,8 +305,8 @@ Section KptShareTranslate.
                (pte_set_ad (mk_pte ppn (kperm_flags pc)) a0 d0) a1 d1
                Hspec Hmaps HMlk).
       exists a0, d0. rewrite Hlf. reflexivity. }
-    iMod ("Hclose" with "[Ht Hauth HM]") as "_".
-    { iNext. iExists t', M. iFrame "Ht Hauth HM". iPureIntro. exact Hspec'. }
+    iMod ("Hclose" with "[Ht HM]") as "_".
+    { iNext. iExists t', M. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
     iModIntro. iExists σ'.
     iSplit; [iPureIntro; exact Htrans |].
     iSplit; [iPureIntro; exact Hmdev |].

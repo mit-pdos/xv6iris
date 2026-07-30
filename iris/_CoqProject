@@ -12,6 +12,7 @@ VirtioModel.v
 DevModel.v
 RiscvLang.v
 RegFile.v
+PtreeType.v
 RiscvPtsto.v
 PageGeom.v
 KptExecMap.v

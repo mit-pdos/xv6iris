@@ -3,11 +3,13 @@ From Stdlib Require Import Eqdep_dec ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
+From iris.algebra Require Import csum excl agree.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.
+Require Import PtreeType.   (* [ptree]: the carrier of the shared kernel table's ghost *)
 Local Open Scope Z_scope.
 
 (* Name [mword] locally (qualified target) rather than [Require Import
@@ -79,6 +81,10 @@ Inductive kperm : Set := KP_rx | KP_rw.
 Global Instance kperm_eq_dec : EqDecision kperm.
 Proof. solve_decision. Defined.
 
+(* the shared kernel page table's resource algebra: one-shot agreement on
+   the A/D-canonical table. *)
+Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
+
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_invGS :: invGS Σ;
   riscv_regGS :: ghost_mapG Σ register (sigT type_of_register);
@@ -111,6 +117,19 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   kmap_name : gname;
+  (* THE SHARED KERNEL PAGE TABLE's ghost (claude-notes/projects/
+     kpt-share.md): a ONE-SHOT agreement on the table's A/D-CANONICAL form
+     ([PtTree.ptree_canon]).  Adequacy mints the unset token [Cinl (Excl ())];
+     main's kvm assembly shoots it, at the tree kvminit built, to the
+     PERSISTENT [Cinr (to_agree …)] every hart then carries in its
+     translation residue.  Agreement is enough -- not an order -- because
+     the Svadu A/D write-back leaves the canonical table INVARIANT
+     ([PtTree.ptree_canon_set_leaf]), so a write-back needs no ghost update
+     at all.  Lives HERE, not in a separate class, for exactly the reason
+     [kmap_name] does: the residue rides inside [sie_cap]/[intr_frame], so a
+     class would have to be threaded through every sconf-tier file. *)
+  riscv_kptGS :: inG Σ kptR;
+  kpt_name : gname;
   (* the S-mode translation-slot arm bit ('b"0" = Bare, 'b"1" = kernel PT
      installed): a global ghost name (like [kmap_name]) tracking which arm
      of [strans_inv] the capability's translation slot is in.  A client
