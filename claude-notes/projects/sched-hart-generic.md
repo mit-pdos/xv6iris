@@ -20,27 +20,51 @@ proof era, not of the code: real xv6 lets any hart's scheduler pick up any
 RUNNABLE proc, and `swtch` does not even save `tp` — the resumed thread
 inherits the resuming hart's.
 
-## The fix: quantify the resuming hart INSIDE the stored payload
+## The fix, AS REFINED BY THE SEAM SURVEY (the naive ∀h does NOT close)
 
-The stored continuation becomes, schematically,
+First checkpoint (`c890e7f`): `p_sched (h : CPU) …` / `proc_held (i :
+CPU) …` re-indexed by the hart they are ABOUT (pure re-spelling,
+`sched_vc` applies at `cpu_id`, zero proof rework).
 
-```
-∀ h : CPU, ⟨resumption resources at h⟩ -∗ WP (LoopE h) {{ … }}
-```
+The approved final shape is an ADMISSIBILITY-INDEXED fixpoint, forced by
+four seams the naive ∀h missed:
 
-with the resumption resources exactly what the crossing hands over today,
-re-indexed by `h` instead of the ambient instance: the register map with
-`tp = cid_word_of h`, hart-h's scheduler-context cell
-(`a_cpu_ctx (cid_word_of h)`), hart-h's `cpu_own` pieces, the c->proc
-cursor. This is statable because EVERY lemma in the tree is already
-∀-quantified over `CpuId` at the top (Section Context): `WP (LoopE h)` for
-a variable `h` is the lemma instantiated at `CID := h`. The work is moving
-the hart from the section context into the payload's binder at the two
-seams (park and resume) and making the post-swtch halves of the parking
-proofs draw their tp/mycpu facts FROM THE PAYLOAD rather than from the
-ambient instance — the code cooperates (xv6 re-derives `mycpu()` from `tp`
-after every resumption; the proofs' facts all flow through the register
-map).
+- **S1 — the SIE ghost γ is per-hart** (one γ's fractions are fully
+  consumed by one hart's sconf/intr_inv/sie_arm/intr_count), so the
+  resume wand quantifies `∀ h γ`, and `procs_inv Φ γs` LOSES γ — it must,
+  to ride the single `started_inv` payload. The crossing DELIVERS
+  `intr_handler_avail γ_new` (resumer and resumed are on the same hart at
+  the swtch instant, so the resumer's γ is the one the resumed gets).
+- **S2 — `trap_csrs` are per-hart cells held ACROSS parks** (yield/sleep
+  take acquire's `trap_csrs_pay` and spend it at their release, entirely
+  inside the function), so hart-h's trap CSRs ride the payload — and the
+  balanced exchange needs **`eb = true` as a parking precondition**
+  (honest: user processes' kernel threads park with intena saved true;
+  the scheduler holds the CSRs in both eb arms).
+- **S3 — cpu contexts are PINNED, proc contexts migrate.** The scheduler
+  re-derives its per-cpu addresses from saved callee-saved registers (s4
+  = `a_cpu_proc` of ITS hart), so a uniform ∀h resume wand is unprovable
+  for it — and unnecessary (`cpus[h].context` is only ever resumed from
+  hart h's own tp). Hence `A : option (CPU * gname)` on
+  `valid_context`: `None` = resumable anywhere (proc contexts, what
+  `procs_inv` stores), `Some (h,γ)` = pinned (each hart's `sched_vc`).
+- **S4 — `callee_saved` includes tp**, which genuinely changes across a
+  migrating park: sched/yield/sleep and every contract above a potential
+  park weaken to a no-tp `callee_saved` form + `⌜mf !!! x4 =
+  cid_word_of h⌝` (wrapper recipe keeps the strong form for
+  non-sleepers).
+- **S5 — the sleeper cone is bigger than first listed**: uartwrite,
+  the virtio_disk_rw tower (~8.5k lines) and bwrite also park.
+  allocproc is a no-op today (raw ctx_cells only; the proc_ctx deposit
+  is future work). wakeup confirmed unaffected. ~24k proof lines in the
+  cone.
+
+The validated mechanics: `iApply (lem (CID := h) …)` works (bare iApply
+resolves the section instance); extract each parking proof's post-resume
+half as its OWN section lemma applied once at `(CID := h)` — one seam per
+proof instead of thousands of leaf edits. `stack_own`/`ctx_cells` are
+`Arch.pa` memory, already hart-independent — the parked stack re-attaches
+at h for free.
 
 ## Blast radius (the sweep's checklist)
 
