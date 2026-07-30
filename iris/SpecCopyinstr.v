@@ -61,7 +61,7 @@ Require Import InstrBytes KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import ByteBuf.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
@@ -78,8 +78,8 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   \/ r = (mword_of_int (-1) : mword 64).
 
 Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-    (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) :=
+    (Φ : mval -> iProp Σ) (mm : regfile)
+    (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
   let dst := mm !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -89,13 +89,14 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   mm !!! Regidx (mword_of_int 10 : mword 5) = page_base P.(ud_root) ->
   mm !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat maxn) : mword 64) ->
   (Z.of_nat maxn < 2 ^ 64)%Z ->
-  sie_cap_gpr γ mm K -∗
+  sie_cap_gpr mm K b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_olds j) -∗
-  ( ∀ (mr : regfile) (dst_new : nat -> bv 8),
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (dst_new : nat -> bv 8),
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     proc_pt P -∗
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_new j) -∗
@@ -107,7 +108,7 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type COPYINSTR.
   Parameter wp_copyinstr_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat),
-      wp_copyinstr_sconf_body γ Φ mm P maxn dst_olds K.
+      (Φ : mval -> iProp Σ) (mm : regfile)
+      (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool),
+      wp_copyinstr_sconf_body Φ mm P maxn dst_olds K b.
 End COPYINSTR.

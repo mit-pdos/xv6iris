@@ -47,7 +47,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText KernelDataInv.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.
@@ -57,8 +57,8 @@ From Kernel Require KernelSyms.
 Notation PIN := KernelSyms.printint.
 
 Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
-    (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) :=
+    (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) (b : bool) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let pcE := mword_of_int KernelSyms.printint in
@@ -69,13 +69,14 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !di
   (10 <= uint (m0 !!! Regidx a1_idx) <= 16)%Z ->
   eq_vec (sign_extend' 64 pv) zero_reg = false ->
   neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-  sie_cap_gpr γ m0 K -∗
+  sie_cap_gpr m0 K b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
   dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-  ( ∀ mf bs,
-    sie_cap_gpr γ mf K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf bs,
+    sie_cap_gpr mf K b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
@@ -87,7 +88,7 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !di
 Module Type PRINTINT.
   Parameter wp_printint_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
-      (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac},
-      wp_printint_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2.
+      (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+      (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac} (b : bool),
+      wp_printint_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 b.
 End PRINTINT.

@@ -33,7 +33,7 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -42,22 +42,21 @@ Import Defs.
 Notation HD := KernelSyms.holding.
 
 Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (* the tp register holds THIS cpu's id (the mycpu convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (6 <= n)%nat ->
   (⊢ Tc -∗ Dc -∗ False) ->
-  sie_cap_gpr γ m n -∗
+  sie_cap_gpr m n b -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
   Tc -∗
-  ( ∀ mh,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mh,
     Tc -∗
-    sie_cap_gpr γ mh n -∗
+    sie_cap_gpr mh n b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
       (mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) \/
@@ -66,34 +65,40 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* the holder token is about a FIXED cpu identity -- the one recorded at
+     acquire time -- so it is bound here, at the entry hart, and threaded
+     through [wp_next] BY NAME rather than re-read as [cpu_id] inside the
+     continuation (which would resolve to whatever hart the thread resumes
+     on). *)
+  let held_cpu := cpu_id in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (6 <= n)%nat ->
-  (⊢ locked γl cpu_id -∗ Dc -∗ False) ->
-  sie_cap_gpr γ m n -∗
+  (⊢ locked γl held_cpu -∗ Dc -∗ False) ->
+  sie_cap_gpr m n b -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
-  locked γl cpu_id -∗
-  ( ∀ mh,
-    sie_cap_gpr γ mh n -∗
+  locked γl held_cpu -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mh,
+    sie_cap_gpr mh n b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
       mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-    locked γl cpu_id -∗
+    locked γl held_cpu -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type HOLDING.
   Parameter wp_holding_lockinv_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat),
-      wp_holding_lockinv_s_sconf_body γ Φ γl lka R Tc Dc m n.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (b : bool),
+      wp_holding_lockinv_s_sconf_body Φ γl lka R Tc Dc m n b.
   Parameter wp_holding_lockinv_locked_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat),
-      wp_holding_lockinv_locked_s_sconf_body γ Φ γl lka R Dc m n.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (b : bool),
+      wp_holding_lockinv_locked_s_sconf_body Φ γl lka R Dc m n b.
 End HOLDING.

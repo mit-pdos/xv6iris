@@ -25,7 +25,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
-Require Import ProcGeom PlicHart IntrDefs.
+Require Import ProcGeom PlicHart IntrDefs HartTp WpNext.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -46,21 +46,26 @@ Proof.
 Qed.
 
 Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.cpuid in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
+  (* the tp READ happens on the entry hart, before any possible migration --
+     [cret] is computed here, outside [wp_next], so it names the entry hart's
+     id regardless of which hart the continuation resumes on. *)
+  let cret := cpuid_ret (rget m0 tp_idx) in
   (2 <= n)%nat ->
-  sie_cap_gpr γ m0 n -∗
+  sie_cap_gpr m0 n b -∗
   kernel_text -∗ pc_is pcE -∗
-  ( ∀ m' : regfile,
-    sie_cap_gpr γ m' n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ m' : regfile,
+    sie_cap_gpr m' n b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
-      m' !!! Regidx a0_idx = cpuid_ret (m0 !!! Regidx tp_idx) ⌝ -∗
+      m' !!! Regidx a0_idx = cret ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -68,7 +73,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
    [instr P false (JAL (jimm, ra))] whose target is [cpuid] runs the callee and
    returns to [P+4]. *)
 Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (b : bool) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -76,27 +81,29 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   let pcE := mword_of_int KernelSyms.cpuid in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
+  let cret := cpuid_ret (rget m tp_idx) in
   add_vec P (sign_extend' 64 jimm) = pcE ->
   eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sie_cap_gpr γ m n -∗
+  sie_cap_gpr m n b -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
-  ( ∀ mo,
-    sie_cap_gpr γ mo n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mo,
+    sie_cap_gpr mo n b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
-      mo !!! Regidx a0_idx = cpuid_ret (m !!! Regidx tp_idx) ⌝ -∗
+      mo !!! Regidx a0_idx = cret ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_cpuid_sconf_body γ Φ m0 n.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool),
+      wp_cpuid_sconf_body Φ m0 n b.
   Parameter wp_call_cpuid_sconf_cs :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat),
-      wp_call_cpuid_sconf_cs_body γ Φ P jimm m n.
+      (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (b : bool),
+      wp_call_cpuid_sconf_cs_body Φ P jimm m n b.
 End CPUID.

@@ -40,7 +40,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile InstrBytes.
+Require Import RegFile InstrBytes HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
@@ -56,19 +56,20 @@ Notation PLICINIT := KernelSyms.plicinit.
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
 Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
   (2 <= n)%nat ->
-  sie_cap_gpr γ m0 n -∗
+  sie_cap_gpr m0 n b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      both writes preserve [plic_ok], so nothing is owed back to the caller *)
   plic_inv -∗
-  ( ∀ m' : regfile,
-    sie_cap_gpr γ m' n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ m' : regfile,
+    sie_cap_gpr m' n b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -77,6 +78,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_plicinit_sconf_body γ Φ m0 n.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool),
+      wp_plicinit_sconf_body Φ m0 n b.
 End PLICINIT.

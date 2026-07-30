@@ -9,7 +9,7 @@
        backward jump is a loop back edge exactly like a taken branch
        (the `_pt` original absorbed it); jal/c.ret keep the later-free
        shape (call/return sites are straight-line);
-     - jal carries the sweep's [rd <> csp_rs1] premise (link-register
+     - jal carries the sweep's [rd_ok rd] premise (link-register
        write); c.j and c.ret write no register, so [sconf]/[sie_cap]
        pass through (c.j untouched, c.ret opened only for the
        LPE/priv/misa side conditions).
@@ -24,7 +24,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import InstrBytes WpDecode ExecCommon WpGpr WpGprCsrwCommon RegFile.
+Require Import InstrBytes WpDecode ExecCommon WpGpr WpGprCsrwCommon RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import WpSmodePtCtl.
 Require Import WpMmodeLeafBase.
@@ -181,19 +181,20 @@ Section WpSconfCtl.
   (* [__sync_synchronize] (the virtio driver), and both are this leaf.    *)
   (* [wp_fence_s_sconf] below is the rw,w restatement (WRAPPER RECIPE).   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_fence_gen_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_fence_gen_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
-      (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
+      (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (FENCE (fm, pred, succ, rs, rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -217,29 +218,33 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    iAssert sconf with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    (* STAGE 1: the funnel resumes on the SAME hart (fence is not a trap
+       boundary), so the step's [wp_next] obligation is discharged here. *)
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
      restatement of the generic leaf (WRAPPER RECIPE), so the existing call
      sites do not change. *)
-  Lemma wp_fence_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (pc : mword 64) (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
+  Lemma wp_fence_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
                            Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    exact (wp_fence_gen_s_sconf γ Φ pc (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
-             (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) m n).
+    exact (wp_fence_gen_s_sconf Φ pc (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
+             (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) m n b).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -259,19 +264,20 @@ Section WpSconfCtl.
   (* reading the proof wants is that the fence is where [▷ P] becomes [P].   *)
   (* See claude-notes/projects/main-boot.md (G4).                            *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_fence_gen_later_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_fence_gen_later_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
-      (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
+      (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    wp_next b (fun (CID : CpuId) =>
+      ▷ ( sie_cap_gpr m n b -∗
+        pc_is (add_vec_int pc 4) -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (FENCE (fm, pred, succ, rs, rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -295,10 +301,15 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    iAssert sconf with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    (* STAGE 1: same-hart resume -- pin [wp_next] at [cpu_id] first (the
+       pure obligation is [eq_refl], closed by [//]), THEN [iNext] so it
+       strips the later from the now-concrete continuation AND the goal
+       together. *)
+    iSpecialize ("Hcont" $! cpu_id with "[//]").
     iNext.
     iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
@@ -307,21 +318,22 @@ Section WpSconfCtl.
   (* c.j -- unconditional jump; a backward jump is a loop back edge, so   *)
   (* the continuation is UNDER A LATER (straight-line callers [iNext]).   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cj_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cj_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (jimm : mword 21)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc true (JAL (jimm, zreg)) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
-      pc_is tgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    wp_next b (fun (CID : CpuId) =>
+      ▷ ( sie_cap_gpr m n b -∗
+        pc_is tgt -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros tgt Hal0.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true (JAL (jimm, zreg))
+    iApply (wp_instr_s_sconf m n b Φ pc true (JAL (jimm, zreg))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
@@ -356,8 +368,11 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf γ) with "[$Hhw $Hsc2]" as "Hsc".
+    iAssert sconf with "[$Hhw $Hsc2]" as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    (* STAGE 1: c.j resumes on the SAME hart (the absorbing engine already
+       took/handled any pending traps before this callback runs). *)
+    iSpecialize ("Hcont" $! cpu_id with "[//]").
     iNext.
     iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
   Qed.
@@ -365,21 +380,24 @@ Section WpSconfCtl.
   (* ------------------------------------------------------------------- *)
   (* jal rd -- link write + jump.                                         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_jal_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_jal_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc false (JAL (imm, Regidx rd)) -∗
-    ( sie_cap_gpr γ (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc false (JAL (imm, Regidx rd))
+    iIntros (Hrd Hrdok Hal0) "Hcg Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n b Φ pc false (JAL (imm, Regidx rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
@@ -401,7 +419,7 @@ Section WpSconfCtl.
       rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
             with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (add_vec_int pc 4))
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (add_vec_int pc 4))
                  with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
@@ -438,32 +456,37 @@ Section WpSconfCtl.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ m
-                 (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n Hsp with "Hcap") as "Hcap".
-    iAssert (sconf γ) with "[$Hhw $Hsc2]" as "Hsc".
+    (* the leaf's own write commutes with the tp pin *)
+    tp_refold Hrdtp "Hfile".
+    iDestruct (sie_cap_retarget m
+                 (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b Hsp with "Hcap") as "Hcap".
+    iAssert sconf with "[$Hhw $Hsc2]" as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    (* STAGE 1: jal resumes on the SAME hart. *)
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* ------------------------------------------------------------------- *)
   (* c.ret (jalr x0, 0(ra)) -- no register write; the bundle is opened    *)
   (* for the LPE/priv/misa side conditions and reassembled.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cret_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_cret_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (ra : mword 5)
-      (m : regfile) (n : nat) :
-    let tgt := ret_pc (m !!! Regidx ra) in
+      (m : regfile) (n : nat) (b : bool) :
+    let tgt := ret_pc (rget m ra) in
     uint ra <> 0 ->
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros tgt Hra.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf γ m n Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
+    iApply (wp_instr_s_sconf m n b Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -476,10 +499,10 @@ Section WpSconfCtl.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc m (Regidx ra) with "Hfile") as "[Hrac Hfb]".
-    iDestruct (gpr_pt_value ra (m (Regidx ra)) s_pc with "Hreg Hrac") as %Lra.
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx ra) with "Hfile") as "[Hrac Hfb]".
+    iDestruct (gpr_pt_value ra (tp_pin m (Regidx ra)) s_pc with "Hreg Hrac") as %Lra.
     iDestruct ("Hfb" with "Hrac") as "Hfile".
-    assert (Lra' : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs) = m !!! Regidx ra).
+    assert (Lra' : register_lookup (R_bitvector_64 (gpr_of_Z (uint ra))) s_pc.(sregs) = rget m ra).
     { pose proof Lra as H.
       replace (Z.eqb (uint ra) 0) with false in H by (symmetry; apply Z.eqb_neq; exact Hra).
       cbn match in H. exact H. }
@@ -517,11 +540,13 @@ Section WpSconfCtl.
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
       by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf γ) with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    iAssert sconf with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    (* STAGE 1: c.ret resumes on the SAME hart. *)
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
 End WpSconfCtl.

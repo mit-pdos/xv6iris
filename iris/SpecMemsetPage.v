@@ -11,7 +11,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore KernelText.
 Require Import CalleeSaved.
 Require Import KallocInv.
@@ -22,7 +22,7 @@ From Kernel Require KernelSyms.
 Notation MS := KernelSyms.memset.
 
 Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -34,11 +34,12 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   page_valid p ->
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-  sie_cap_gpr γ m0 n -∗
+  sie_cap_gpr m0 n b -∗
   kernel_text -∗ pc_is pcE -∗
   page_own p -∗
-  ( ∀ mfin,
-    sie_cap_gpr γ mfin n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mfin,
+    sie_cap_gpr mfin n b -∗
     pc_is ret_tgt -∗
     page_own p -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
@@ -48,6 +49,6 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type MEMSETPAGE.
   Parameter wp_memset_page_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64),
-      wp_memset_page_sconf_body γ Φ m0 n cval.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool),
+      wp_memset_page_sconf_body Φ m0 n cval b.
 End MEMSETPAGE.

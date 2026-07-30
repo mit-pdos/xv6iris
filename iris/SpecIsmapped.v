@@ -20,7 +20,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
@@ -33,8 +33,8 @@ Import Defs.
 Notation IM := KernelSyms.ismapped.
 
 Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) :=
+    (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ismapped in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
@@ -44,12 +44,13 @@ Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) ->
   (uint va < 2 ^ 38)%Z ->
   pt_rep0 t m ->
-  sie_cap_gpr γ mm K -∗
+  sie_cap_gpr mm K b -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own 2 dq t -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ptree_own 2 dq t -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -62,7 +63,7 @@ Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type ISMAPPED.
   Parameter wp_ismapped_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac),
-      wp_ismapped_sconf_body γ Φ mm t m K dq.
+      (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool),
+      wp_ismapped_sconf_body Φ mm t m K dq b.
 End ISMAPPED.

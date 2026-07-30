@@ -46,7 +46,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import PtTree.
@@ -59,15 +59,15 @@ Notation KVMIH := KernelSyms.kvminithart.
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
 Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
+    (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
     (root : mword 44)
-    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :=
+    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
   (2 <= K)%nat ->
-  sie_cap_gpr γ mm K -∗
+  sie_cap_gpr mm K b -∗
   strans_bit strans_bit_bare -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -78,8 +78,9 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□ root_b -∗
   (* the shared table, likewise persistent *)
   kpt_inv root -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     strans_bit strans_bit_kpt -∗
@@ -90,8 +91,8 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
+      (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
-      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_kvminithart_sconf_body γ Φ mm lvl K root tlbvec0.
+      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool),
+      wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b.
 End KVMINITHART.

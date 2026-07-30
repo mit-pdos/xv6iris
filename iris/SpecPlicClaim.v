@@ -39,7 +39,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile InstrBytes.
+Require Import RegFile InstrBytes HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
@@ -58,23 +58,24 @@ Definition plic_claim_a0_ok (v : mword 64) : Prop :=
   v = (mword_of_int (Z.of_N virtio_irq_id) : mword 64).
 
 Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (γv : disk_names)
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
+    (γd : uart_names) (γv : disk_names)
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.plic_claim in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
-  bv_unsigned (m0 !!! Regidx tp_idx) < Z.of_nat dev_ncpu ->
+  bv_unsigned (rget m0 tp_idx) < Z.of_nat dev_ncpu ->
   (* plic_claim's own max depth: its 16-byte frame (2 slots) plus the two
      slots cpuid's frame needs below it. *)
   (4 <= n)%nat ->
-  sie_cap_gpr γ m0 n -∗
+  sie_cap_gpr m0 n b -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
-  ( ∀ m' : regfile,
-    sie_cap_gpr γ m' n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ m' : regfile,
+    sie_cap_gpr m' n b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 /\
       plic_claim_a0_ok (m' !!! Regidx a0_idx) ⌝ -∗
@@ -84,7 +85,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !
 Module Type PLIC_CLAIM.
   Parameter wp_plic_claim_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_plic_claim_sconf_body γ γd γv Φ m0 n.
+      (γd : uart_names) (γv : disk_names)
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool),
+      wp_plic_claim_sconf_body γd γv Φ m0 n b.
 End PLIC_CLAIM.

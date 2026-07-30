@@ -36,7 +36,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import InstrBytes KernelText.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
@@ -48,8 +48,8 @@ Local Open Scope Z_scope.
 Notation SL := KernelSyms.strlen.
 
 Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-    (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) :=
+    (Φ : mval -> iProp Σ) (mm : regfile)
+    (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.strlen in
   let s := mm !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -58,12 +58,13 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (k < n)%nat ->
   bb_cstr f k ->
   (Z.of_nat k < 2 ^ 31)%Z ->
-  sie_cap_gpr γ mm K -∗
+  sie_cap_gpr mm K b -∗
   kernel_text -∗
   pc_is pcE -∗
   ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
-  ( ∀ mr : regfile,
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr : regfile,
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -75,7 +76,7 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type STRLEN.
   Parameter wp_strlen_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac),
-      wp_strlen_sconf_body γ Φ mm n k f K dq.
+      (Φ : mval -> iProp Σ) (mm : regfile)
+      (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool),
+      wp_strlen_sconf_body Φ mm n k f K dq b.
 End STRLEN.

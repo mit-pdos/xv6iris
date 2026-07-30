@@ -36,6 +36,7 @@ Require Import MinstretInv InstrBytes WpGpr ExecCommon.
 Require Import WpGprCsrrCommon WpGprCsrrB.
 Require Import WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
+Require Import HartTp WpNext.
 Require Import IntrDefs WpSmodeIntr.
 Require Import TimerCap.
 Local Open Scope Z_scope.
@@ -215,25 +216,28 @@ Section WpSconfTimer.
   Context `{CID : CpuId}.
 
   (* ---- rdtime rd: rd := (an arbitrary) mtime reading ---- *)
-  Lemma wp_csrr_time_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_time_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     timer_cap -∗
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
     ( ∀ tv : mword 64,
-      sie_cap_gpr γ (<[Regidx rd := regval_into_reg tv]> m) n -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      wp_next b (fun (CID : CpuId) =>
+        sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b -∗
+        pc_is (add_vec_int pc 4) -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdsp) "#Htcap Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hrdok) "#Htcap Hcg Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iDestruct "Htcap" as "[Hen _]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRReg (csr_time, zreg, Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -247,7 +251,7 @@ Section WpSconfTimer.
     assert (Lmcen_spc : register_lookup mcounteren s_pc.(sregs) = mcen)
       by (unfold s_pc; tmig; exact Lmcen).
     set (tv := time_rdval s_pc).
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg tv) with "Hfile") as "[Hrdc Hfins]".
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg tv) with "Hfile") as "[Hrdc Hfins]".
     rewrite (gpr_pt_nz rd _ Hrd).
     iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg tv)
             with "Hreg Hrdc") as "[Hreg Hrdc]".
@@ -272,25 +276,28 @@ Section WpSconfTimer.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg tv]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget γ m
-                 (<[Regidx rd := regval_into_reg tv]> m) n Hsp with "Hcap") as "Hcap".
+    tp_refold Hrdtp "Hfile".
+    iDestruct (sie_cap_retarget m
+                 (<[Regidx rd := regval_into_reg tv]> m) n b Hsp with "Hcap") as "Hcap".
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hrest] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! tv with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! tv cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
   (* ---- csrw stimecmp,rs1.  The deadline cell is NOT threaded: it lives in
      [timer_cap]'s invariant, opened across this one instruction step and
      resealed at the new deadline, so the whole precondition is persistent and
      the postcondition says nothing about the timer at all. ---- *)
-  Lemma wp_csrw_stimecmp_s_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_csrw_stimecmp_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) :
+      (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
     timer_cap -∗
-    sie_cap_gpr γ m n -∗
+    sie_cap_gpr m n b -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
-    ( sie_cap_gpr γ m n -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m n b -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -298,7 +305,7 @@ Section WpSconfTimer.
     iIntros (Hrs1) "#Htcap Hcg Hpc Hinstr Hcont".
     iDestruct "Htcap" as "[Hen #Hsinv]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf γ m n Φ pc false
+    iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -328,21 +335,24 @@ Section WpSconfTimer.
       by (unfold s_pc; tmig; exact Lmcen).
     assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
       by (unfold s_pc; tmig; exact Lmisa).
-    (* the rs1 value: the gpr file pins it in the step state *)
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
+    (* the rs1 value: the PINNED gpr file gives it in the step state ([rs1] is a
+       variable index, so the fact is stated at [rget m rs1] -- the value
+       [tp_pin] actually pins into the register file -- rather than
+       [m !!! Regidx rs1], which would be wrong should [rs1] name tp. *)
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
     iDestruct ("Hfb" with "Hr1c") as "Hfile".
     assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                   = m !!! Regidx rs1).
-    { rewrite rf_lookup -Lva.
+                   = rget m rs1).
+    { rewrite /rget rf_lookup -Lva.
       replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
       reflexivity. }
-    iMod (reg_update _ stimecmp _ (stimecmp_legalized sc0 (m !!! Regidx rs1))
+    iMod (reg_update _ stimecmp _ (stimecmp_legalized sc0 (rget m rs1))
             with "Hreg Hstc") as "[Hreg Hstc]".
     iMod ("Hclose" with "[Hstc]") as "_".
     { iNext. iApply (stimecmp_free_intro with "Hstc"). }
     iModIntro.
-    iExists (set_reg s_pc stimecmp (stimecmp_legalized sc0 (m !!! Regidx rs1))).
+    iExists (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))).
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc.
       rewrite (exec_execute_csrw_stimecmp_S rs1 s_pc Hrs1 Lpriv_spc
@@ -354,7 +364,7 @@ Section WpSconfTimer.
     { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc stimecmp (stimecmp_legalized sc0 (m !!! Regidx rs1))).(sregs)
+             (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))).(sregs)
              = add_vec_int pc 4).
     { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
@@ -362,7 +372,8 @@ Section WpSconfTimer.
     { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
       iExists menvcfg0. iFrame "Hmenv". iPureIntro.
       repeat split; assumption. }
-    iApply ("Hcont" with "Hcg [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
   Qed.
 
 End WpSconfTimer.

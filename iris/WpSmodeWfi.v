@@ -42,9 +42,8 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import RegFile WpGpr MinstretInv InstrBytes.
+Require Import RegFile HartTp WpGpr MinstretInv InstrBytes.
 Require Import SmodeCore SmodeCorePt.
-Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -494,25 +493,30 @@ Section WpSmodeWfi.
   Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* THE LEAF.  [intr_count γ 0 false] is the caller's eighth at '0';      *)
+  (* THE LEAF.  [intr_count 0 false] is the caller's eighth at '0';        *)
   (* agreement with [sconf]'s mstatus-tied half pins the live SIE bit to   *)
   (* 0, which (with [mie & ~mideleg = 0] out of [sconf]) kills the ENTER    *)
   (* step's [dispatchInterrupt Supervisor].  The fetch is driven through   *)
   (* the caller's [sie_cap] translation slot, consumed FOLDED as           *)
   (* [strans_regime] -- so BOTH regime arms (Bare and kernel-PT) are       *)
   (* served by the one [s_regime_fetch] call, with no skolem-root          *)
-  (* open/repack.  The continuation is under a [▷]: the WAKE step's own    *)
+  (* open/repack.  [sie_cap]'s arm index [b] rides through completely      *)
+  (* OPAQUE: nothing here inspects it (the SIE=0 fact comes from ghost      *)
+  (* agreement with [intr_count], not from [b]), so it is threaded          *)
+  (* unchanged from premise to continuation with no case split -- a wfi     *)
+  (* never migrates the hart, so there is no [wp_next] wrapper either.      *)
+  (* The continuation is under a [▷]: the WAKE step's own                  *)
   (* later pays for it, which is what lets an outer iLöb loop (scheduler's *)
   (* 0x1e00 head) strip its IH across the wfi.                            *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_wfi_s_sconf (γ : gname) (Φ : mval -> iProp Σ) (pc : mword 64)
-      (m : regfile) (n : nat) :
-    sie_cap_gpr γ m n -∗
-    intr_count γ 0 false -∗
+  Lemma wp_wfi_s_sconf (Φ : mval -> iProp Σ) (pc : mword 64)
+      (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b -∗
+    intr_count 0 false -∗
     pc_is pc -∗
     instr pc false (WFI tt) -∗
-    ( ▷ ( sie_cap_gpr γ m n -∗
-          intr_count γ 0 false -∗
+    ( ▷ ( sie_cap_gpr m n b -∗
+          intr_count 0 false -∗
           pc_is (add_vec_int pc 4) -∗
           WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -549,12 +553,12 @@ Section WpSmodeWfi.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hhs") as %Lhs0.
     destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iAssert (mstate_interp (set_reg σ (R_bool minstret_increment) b))
+                (register_lookup cur_privilege σ.(sregs)) σ) as [mib Hsi].
+    iMod (reg_update _ (R_bool minstret_increment) _ mib with "Hreg Hmi") as "[Hreg Hmi]".
+    iAssert (mstate_interp (set_reg σ (R_bool minstret_increment) mib))
       with "[Hreg Hmem]" as "Hsi".
     { rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
-    set (σa := set_reg σ (R_bool minstret_increment) b).
+    set (σa := set_reg σ (R_bool minstret_increment) mib).
     (* the ENTER step goes through run_hart_active: dispatch must be None *)
     iDestruct (dispatchInterrupt_none_S_from_regs σa misa0 ms mie_v mdv0
                  HmisaS Hmm HSIE with "Hsi Hmisa Hms Hmie Hmdl") as %Hdisp.
@@ -617,14 +621,14 @@ Section WpSmodeWfi.
     iSplitR.
     { iPureIntro.
       exact (exec_riscv_step_wfi_enter σ (set_reg σf nextPC (add_vec_int pc 4))
-               (zero_extend' 32 w) b Hsi Lhs0 Hha). }
+               (zero_extend' 32 w) mib Hsi Lhs0 Hha). }
     iNext. iModIntro.
     rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
-    iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
+    iSplitL "Hmst Hmi". { iExists mst, mib. iFrame. }
     (* ---- and now the WAIT phase, with everything the client is owed
        riding through as [R] ---- *)
     iApply (wp_wfi_wait Φ pc (zero_extend' 32 w)
-              (sconf γ ∗ sie_cap γ m n ∗ gpr_file m ∗ intr_count γ 0 false)%I
+              (sconf ∗ sie_cap m n b ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
               with "Hminv Hhs Hpcr Hnpc
                     [Hpriv Hms Hhalf Hmie Hmdl Hmenv Hstk Htr Harm Hfile Hcnt]
                     [Hcont]").

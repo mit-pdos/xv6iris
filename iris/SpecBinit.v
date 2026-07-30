@@ -34,7 +34,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile InstrBytes SmodeCore CalleeSaved KernelText KernelDataInv IntrDefs.
+Require Import RegFile InstrBytes SmodeCore CalleeSaved KernelText KernelDataInv IntrDefs HartTp WpNext.
 Require Import WpLock SleepLock.
 Require Import BcacheInv.
 From Kernel Require KernelSyms.
@@ -51,8 +51,8 @@ Definition bcache_name_str : Z := 0x80007390.
 Definition buffer_name_str : Z := 0x80007398.
 
 Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-    (vlock : mword 32) (vname vcpu : mword 64) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (vlock : mword 32) (vname vcpu : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.binit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   let lk : mword 64 := bcache_addr in
@@ -61,7 +61,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   (* binit's own frame is 6 slots and its deepest callee (initsleeplock) wants
      6 more below that. *)
   (12 <= K)%nat ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
@@ -69,8 +69,9 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
   ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) -∗
   blink_raw bhead -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -84,7 +85,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
 Module Type BINIT.
   Parameter wp_binit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-      (vlock : mword 32) (vname vcpu : mword 64),
-      wp_binit_sconf_body γ Φ m K vlock vname vcpu.
+      (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (vlock : mword 32) (vname vcpu : mword 64) (b : bool),
+      wp_binit_sconf_body Φ m K vlock vname vcpu b.
 End BINIT.

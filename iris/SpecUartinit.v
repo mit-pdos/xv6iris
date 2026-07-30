@@ -59,7 +59,7 @@ Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import WpUart.
 Require Import IntrDefs.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -73,15 +73,15 @@ Notation UART_INIT := KernelSyms.uartinit.
 
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-    (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) :=
+    (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.tx_lock in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 0x10 : mword 12)) in
   (4 <= K)%nat ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b -∗
   (* [kernel_data] supplies the "uart" string literal uartinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -95,8 +95,9 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* no THR write, so the accepted trace is untouched *)
@@ -114,7 +115,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64),
-      wp_uartinit_sconf_body γ γd Φ m K l b0 vlock vname vcpu.
+      (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (b : bool),
+      wp_uartinit_sconf_body γd Φ m K l b0 vlock vname vcpu b.
 End UARTINIT.

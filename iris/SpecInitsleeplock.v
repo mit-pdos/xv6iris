@@ -17,7 +17,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
@@ -35,17 +35,17 @@ Notation ISL := KernelSyms.initsleeplock.
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007548.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
-    (av : nat) :=
+    (av : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initsleeplock in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (6 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
@@ -58,8 +58,9 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
   sl_lkcpu slk ↦₈ vcpu -∗
   sl_name_field slk ↦₈ vname -∗
   sl_pid slk ↦₄ vpid -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr av -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr av b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -76,9 +77,9 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
-      (av : nat),
-      wp_initsleeplock_sconf_body γ Φ m s vlocked vlk vpid vlkname vcpu vname av.
+      (av : nat) (b : bool),
+      wp_initsleeplock_sconf_body Φ m s vlocked vlk vpid vlkname vcpu vname av b.
 End INITSLEEPLOCK.

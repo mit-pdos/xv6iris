@@ -45,7 +45,7 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import WpUart.
 From Kernel Require KernelSyms.
@@ -68,11 +68,11 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
 
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
     (vtlock : bv 32) (vtname vtcpu : bv 64)
-    (dread0 dwrite0 : mword 64) :=
+    (dread0 dwrite0 : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* &cons.lock = &cons: the spinlock is the first field of the [cons] struct *)
@@ -85,7 +85,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
      which needs 4. *)
   (6 <= K)%nat ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
      uartinit's own spec, the "uart" one. *)
@@ -105,8 +105,9 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   c_tcpu ↦₈ vtcpu -∗
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
@@ -129,10 +130,10 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
-      (dread0 dwrite0 : mword 64),
-      wp_consoleinit_sconf_body γ γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0.
+      (dread0 dwrite0 : mword 64) (b : bool),
+      wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 b.
 End CONSOLEINIT.

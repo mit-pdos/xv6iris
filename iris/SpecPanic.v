@@ -15,7 +15,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import InstrBytes KernelText.
 Require Import SmodeCore.
 Require Import IntrDefs.
@@ -29,8 +29,8 @@ Section Panic.
 
   (* a0 = msg.  Everything else the caller still holds is simply dropped. *)
   Definition panic_wp : iProp Σ :=
-    (□ ∀ (Φ : mval -> iProp Σ) (γ : gname) (m : regfile) (avail : nat),
-       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr γ m avail -∗
+    (□ ∀ (Φ : mval -> iProp Σ) (m : regfile) (avail : nat) (b : bool),
+       kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗ sie_cap_gpr m avail b -∗
        WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   Global Instance panic_wp_persistent : Persistent panic_wp.
@@ -47,6 +47,20 @@ End Panic.
 (* lock is the one that does -- needs the contract at the RESUMING hart.   *)
 (* Every parking contract above sched threads this form instead of the     *)
 (* ambient one; non-parking callers use the bridge below.                  *)
+(*                                                                          *)
+(* EXPLICIT-CPUID NOTE (kept, not collapsed here): [panic_wp] already      *)
+(* quantifies [CID] via its section [Context], so inside a [wp_next]       *)
+(* continuation it resolves at the REBOUND hart with no annotation and no  *)
+(* need to go through this wrapper -- a post-resume half reached that way  *)
+(* can apply [panic_wp] directly.  [panic_wp_any] / [panic_wp_any_at] were *)
+(* the bridge needed only because [CID] used to be ambient (fixed at the   *)
+(* ENTRY hart for the whole file); that reason is gone.  They are left in  *)
+(* place because 13 consumer files (ProofAcquiresleep.v, ProofBread.v,     *)
+(* ProofBwrite.v, ProofSleep.v, SpecAcquiresleep.v, SpecBread.v,           *)
+(* SpecBwrite.v, SpecPiperead.v, SpecPipewrite.v, SpecSleep.v,             *)
+(* SpecSysPause.v, SpecUartwrite.v, SpecVirtioDiskRw.v) still thread this  *)
+(* form and are out of this port's scope; retiring it is a consumer-side   *)
+(* cleanup for whoever ports those files, not a change owed here.          *)
 (* ---------------------------------------------------------------------- *)
 Definition panic_wp_any `{!riscvGS Σ, !sieG Σ} : iProp Σ :=
   (□ ∀ h : CPU, panic_wp (CID := h))%I.

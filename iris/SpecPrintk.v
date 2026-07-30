@@ -57,7 +57,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText KernelDataInv.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.
@@ -98,9 +98,9 @@ Definition pk_vararg (m : regfile) (j : nat) : mword 64 :=
   m !!! Regidx (mword_of_int (11 + Z.of_nat j) : mword 5).
 
 Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
     (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 dqf : dfrac)
-    (f : string) (descs : list pk_arg_desc) :=
+    (f : string) (descs : list pk_arg_desc) (b : bool) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.printk in
@@ -119,7 +119,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
   (length descs <= 7)%nat ->
   eq_vec (sign_extend' 64 pv) zero_reg = false ->
   neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-  sie_cap_gpr γ m0 K -∗
+  sie_cap_gpr m0 K b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   fmt ↦ₛ{ dqf } f -∗
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
@@ -131,8 +131,9 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
      the UART invariant can mint, so [uart_tx_own] alone cannot produce it.
      Persistent, so threading it costs nothing. *)
   dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
-  ( ∀ mf bs,
-    sie_cap_gpr γ mf K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf bs,
+    sie_cap_gpr mf K b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0
       /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
@@ -147,8 +148,8 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
 Module Type PRINTK.
   Parameter wp_printk_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+      (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 dqf : dfrac}
-      (f : string) (descs : list pk_arg_desc),
-      wp_printk_sconf_body γ γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs.
+      (f : string) (descs : list pk_arg_desc) (b : bool),
+      wp_printk_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs b.
 End PRINTK.

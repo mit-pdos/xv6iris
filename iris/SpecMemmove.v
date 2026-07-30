@@ -29,7 +29,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import KernelText.
@@ -47,8 +47,8 @@ Import Defs.
    so it needs 2 of the [n] available stack slots and returns them (avail [n]
    preserved). *)
 Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
-    (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) :=
+    (Φ : mval -> iProp Σ)
+    (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -60,12 +60,13 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (2 <= n)%nat ->
   (Z.of_nat len < 2 ^ 32)%Z ->
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
-  sie_cap_gpr γ m0 n -∗
+  sie_cap_gpr m0 n b -∗
   kernel_text -∗ pc_is pcE -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
-  ( ∀ mfin,
-    sie_cap_gpr γ mfin n -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mfin,
+    sie_cap_gpr mfin n b -∗
     pc_is ret_tgt -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
@@ -77,7 +78,7 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type MEMMOVE.
   Parameter wp_memmove_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8),
-      wp_memmove_sconf_body γ Φ m0 n len src_bytes dst_olds.
+      (Φ : mval -> iProp Σ)
+      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool),
+      wp_memmove_sconf_body Φ m0 n len src_bytes dst_olds b.
 End MEMMOVE.

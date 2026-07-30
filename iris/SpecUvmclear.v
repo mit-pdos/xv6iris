@@ -60,7 +60,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import KallocInv.
@@ -72,8 +72,8 @@ Import Defs.
 Notation UCL := KernelSyms.uvmclear.
 
 Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-    (P : uptd) (w : mword 64) (K : nat) :=
+    (Φ : mval -> iProp Σ) (mm : regfile)
+    (P : uptd) (w : mword 64) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
@@ -87,12 +87,13 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   P.(ud_um) !! vpn = Some w ->
   (* the cleared flag byte is a legal user leaf.  1007 = 1023 - PTE_U *)
   uvm_perm_ok (Z.land (pte_flags10 w) 1007) ->
-  sie_cap_gpr γ mm K -∗
+  sie_cap_gpr mm K b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
-  ( ∀ (mr : regfile),
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_set P vpn (pte_clear_u w)) -∗
@@ -102,7 +103,7 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type UVMCLEAR.
   Parameter wp_uvmclear_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (w : mword 64) (K : nat),
-      wp_uvmclear_sconf_body γ Φ mm P w K.
+      (Φ : mval -> iProp Σ) (mm : regfile)
+      (P : uptd) (w : mword 64) (K : nat) (b : bool),
+      wp_uvmclear_sconf_body Φ mm P w K b.
 End UVMCLEAR.
