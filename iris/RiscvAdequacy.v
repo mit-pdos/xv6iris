@@ -226,6 +226,37 @@ Section reg_alloc.
       intros ->. apply Hc. by eapply elem_of_list_lookup_2.
   Qed.
 
+  (* The per-hart THREE-PIECE allocation the CANONICAL SIE ghost needs: the
+     1/2 live-bit tie, the 1/4 kernel-code token and the 1/4 invariant
+     quarter (the [sie_ghost_alloc] split, IntrDefs.v §2).  Same induction as
+     [ghost_var_alloc_halves_cpus] -- what [sie_name : CPU -> gname] needs,
+     mstatus.SIE being a per-hart register. *)
+  Lemma ghost_var_alloc_sie_cpus {A : Type} `{!ghost_varG Σ A} (a : A)
+      (cs : list CPU) :
+    NoDup cs ->
+    ⊢ |==> ∃ f : CPU -> gname,
+      [∗ list] c ∈ cs,
+        (ghost_var (f c) (1/2)%Qp a ∗ ghost_var (f c) (1/4)%Qp a ∗
+         ghost_var (f c) (1/4)%Qp a).
+  Proof.
+    induction cs as [|c cs' IH]; intros Hnd.
+    - iModIntro. iExists (fun _ => 1%positive). done.
+    - apply NoDup_cons in Hnd as [Hc Hnd'].
+      iMod (IH Hnd') as (fr) "Hrest".
+      iMod (ghost_var_alloc a) as (γ) "Hg".
+      iEval (rewrite -Qp.half_half) in "Hg".
+      iDestruct (ghost_var_split with "Hg") as "[HgA HgB]".
+      iEval (rewrite -Qp.quarter_quarter) in "HgB".
+      iDestruct (ghost_var_split with "HgB") as "[HgB HgC]".
+      iModIntro. iExists (fun c' => if decide (c' = c) then γ else fr c').
+      rewrite big_sepL_cons. iSplitL "HgA HgB HgC".
+      { rewrite decide_True //. iFrame "HgA HgB HgC". }
+      iApply (big_sepL_mono with "Hrest").
+      intros k c' Hk. simpl.
+      rewrite decide_False; [done|].
+      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+  Qed.
+
 End reg_alloc.
 
 (* Bridge a big-sep over the LIST [enum CPU] to one over the SET
@@ -278,6 +309,16 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           ghost_var (strans_name c) (1/2)%Qp strans_bit_bare ∗
           ghost_var (strans_name c) (1/2)%Qp strans_bit_bare) ∗
+       (* EVERY hart's SIE ghost, minted at '0' -- interrupts are off at boot --
+          in the three pieces the choreography (IntrDefs.v §2) splits it into:
+          the 1/2 live-bit tie that rides in [sconf], the 1/4 kernel-code
+          eighth-pair the capability and [intr_count] share, and the 1/4 the
+          interrupt invariant takes.  CANONICAL per hart ([sie_name]), which is
+          why nothing above names a SIE ghost any more. *)
+       ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+          ghost_var (sie_name c) (1/2)%Qp sie_bit_off ∗
+          ghost_var (sie_name c) (1/4)%Qp sie_bit_off ∗
+          ghost_var (sie_name c) (1/4)%Qp sie_bit_off) ∗
        (* the shared kernel page table's one-shot agreement, UNSET: spent
           once, in main's kvm assembly, to allocate [kpt_inv]. *)
        kpt_unset ∗
@@ -319,9 +360,13 @@ Proof.
      both halves of each are handed to the boot client below *)
   iMod (ghost_var_alloc_halves_cpus strans_bit_bare (enum CPU) (NoDup_enum CPU))
     as (γs) "Hs".
+  (* EVERY hart's SIE ghost, minted at '0' (interrupts off at boot), in the
+     three pieces of the choreography *)
+  iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
+    as (γsie) "Hsie".
   (* the shared kernel table's one-shot agreement, unset *)
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk _ γkpt γs).
+  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk _ γkpt γs γsie).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
@@ -377,7 +422,7 @@ Proof.
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hkpt HuF HpF HvF]")
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
@@ -386,6 +431,8 @@ Proof.
     iSplitR; [iExact "Hkbundle" |].
     iSplitL "Hs".
     { iApply big_sepL_enum_to_set. iExact "Hs". }
+    iSplitL "Hsie".
+    { iApply big_sepL_enum_to_set. iExact "Hsie". }
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }
@@ -469,7 +516,7 @@ Proof.
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt
      and the (unfrozen) DLAB half -- are what a boot chain would thread through

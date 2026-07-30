@@ -933,6 +933,11 @@ Qed.
 Definition strans_bit_bare : mword 1 := 'b"0".
 Definition strans_bit_kpt : mword 1 := 'b"1".
 
+(* The SIE ghost's BOOT value, named here for exactly the same reason: the SIE
+   ghost is canonical per hart now ([RiscvPtsto.sie_name]), so RiscvAdequacy
+   mints all three of its pieces per hart, and it cannot spell ['b"0"]. *)
+Definition sie_bit_off : mword 1 := 'b"0".
+
 Class sieG (Σ : gFunctors) := SieG { sie_inG :: ghost_varG Σ (mword 1) }.
 Definition sieΣ : gFunctors := #[ ghost_varΣ (mword 1) ].
 Global Instance subG_sieΣ {Σ} : subG sieΣ Σ -> sieG Σ.
