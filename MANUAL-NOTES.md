@@ -41,6 +41,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - user PT coherence with p->sz: nothing mapped above p->sz (needed to prove growproc's uvmalloc doesn't panic)
 - some device invariant has to hold from power-up, not just after driver initialization, e.g., to conclude no stray DMA
 - sloppy UART ownership: printk can collide with uartwrite and cause FIFO overflow
+- swtch WP for a runnable proc must be for LoopE on any CPUID; not the "current" CPUID from ambient CpuId instance
 
 Big things that still need to be done/explored:
 
