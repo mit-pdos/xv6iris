@@ -48,6 +48,7 @@ Require Import IntrDefs.
 Require Import PtTree.
 Require Import KptGhost KptShare.
 Require Import PtBuild KptExecMap KvmMap.
+Require Import KMap.
 From Kernel Require KernelSyms.
 
 Notation KVMIH := KernelSyms.kvminithart.
@@ -72,6 +73,12 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ root_b -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kpt_unset -∗
+  (* the kernel-mapping AUTH.  It used to ride inside [bare_inv] and be
+     recovered from the arm being dissolved; the Bare arm is now per-hart and
+     holds nothing global (claude-notes/projects/bare-inv-generic.md), so the
+     auth travels as a BOOT TOKEN beside [kpt_unset] -- adequacy mints it,
+     main's kvm assembly hands it here, and it retires into [kpt_inv]. *)
+  kmap_auth kmap_M0 -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr γ mr K -∗
     pc_is ret_tgt -∗

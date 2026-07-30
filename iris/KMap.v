@@ -142,7 +142,7 @@ Section KMap.
     iIntros (Hs) "#Hb H".
     iDestruct (kmap_static_claims_at (svpn_of pa) KP_rw Hs with "Hb") as "#Hk0".
     iDestruct (mem_pointsto_pin pa dq b (kpt_leaf_ppn (svpn_of pa)) with "Hk0 H")
-      as "(%Hc & %Hd & Hp & _)".
+      as "(%Hc & %Hd & _ & Hp & _)".
     rewrite (pa_of_id pa Hc) in Hd.
     iEval (rewrite (pa_of_id pa Hc)) in "Hp".
     rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hd.
@@ -158,7 +158,8 @@ Section KMap.
     iDestruct (kmap_static_claims_at (svpn_of pa) KP_rw Hs with "Hb") as "#Hk0".
     iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
     rewrite /mem_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
-    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro. split; [exact Hc | exact Hram].
+    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro.
+    split; [exact Hc | split; [exact Hram | reflexivity]].
   Qed.
 
   (* text tier: ↦ₓ ⇄ ↦ₚ at KP_rx / addr_is_text *)
@@ -169,7 +170,7 @@ Section KMap.
     iIntros (Hs) "#Hb H".
     iDestruct (kmap_static_claims_at (svpn_of pa) KP_rx Hs with "Hb") as "#Hk0".
     iDestruct (text_pointsto_pin pa dq b (kpt_leaf_ppn (svpn_of pa)) with "Hk0 H")
-      as "(%Hc & %Hd & Hp & _)".
+      as "(%Hc & %Hd & _ & Hp & _)".
     rewrite (pa_of_id pa Hc) in Hd.
     iEval (rewrite (pa_of_id pa Hc)) in "Hp".
     rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact (addr_is_text_ram _ Hd).
@@ -202,7 +203,8 @@ Section KMap.
     iDestruct (kmap_static_claims_at (svpn_of pa) KP_rx Hs with "Hb") as "#Hk0".
     iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
     rewrite /text_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
-    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro. split; [exact Hc | exact Htx].
+    rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro.
+    split; [exact Hc | split; [exact Htx | reflexivity]].
   Qed.
 
 End KMap.

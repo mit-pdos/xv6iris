@@ -224,7 +224,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -282,7 +282,7 @@ Section WpSconfMem.
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+            Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [exact HkptEm |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -789,7 +789,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -850,7 +850,7 @@ Section WpSconfMem.
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+            Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [exact HkptEm |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1176,7 +1176,7 @@ Section WpSconfMem.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
     (* the byte's OWN claim + canonicality + region (refold to keep) *)
-    iDestruct (mem_pointsto_acc with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hram0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hram0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hbyte".
     destruct (Hpma_all (pa_of ppn pa) 1) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
@@ -1237,7 +1237,7 @@ Section WpSconfMem.
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+            Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1410,7 +1410,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hb".
@@ -1458,7 +1458,7 @@ Section WpSconfMem.
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+            Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1590,7 +1590,7 @@ Section WpSconfMem.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1638,7 +1638,7 @@ Section WpSconfMem.
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+            Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.

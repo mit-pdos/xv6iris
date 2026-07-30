@@ -122,6 +122,7 @@ Require Import IntrDefs.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
    the 65 claims are what the deposit wand carries to the secondaries *)
 Require Import KptGhost KptShare KptExecMap KvmMap.
+Require Import KMap.
 Require Import SpecPanic.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
@@ -332,6 +333,11 @@ Section SpecMain.
        GLOBAL, not per-hart, so it travels beside the boot bridge rather
        than through it. *)
     kpt_unset -∗
+    (* the kernel-mapping auth, likewise a GLOBAL boot token minted at
+       adequacy and spent inside kvminithart (it retires into [kpt_inv] with
+       the tree): the Bare translation arm no longer carries it, which is
+       what makes every hart's Bare arm satisfiable at once. *)
+    kmap_auth kmap_M0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     (* ...and what the scheduler at the far end still wants, which main
        cannot build: the proc-lock names are chosen when main allocates the

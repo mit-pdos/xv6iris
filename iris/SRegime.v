@@ -172,12 +172,41 @@ Definition pmp_grant_facts (σ : mstate) : Prop :=
   eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true /\
   (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z.
 
+(* THE BARE ARM'S ADMISSIBILITY (the [s_regime] field [sr_adm] below): a
+   claim is admissible under Bare exactly when it is the IDENTITY -- the pa
+   it takes [va] to IS [va].  A [↦ₘ]/[↦ₓ] datum carries this as a conjunct
+   and a static device claim is built at [kpt_leaf_ppn], so every consumer
+   discharges it locally; the Sv39 arm needs nothing ([True]). *)
+Definition kadm_ident (va : mword 64) (ppn : mword 44) : Prop :=
+  pa_of ppn va = va.
+
 Section SRegimeDef.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
   Record s_regime := SRegime {
     sr_inv : iProp Σ;
+    (* ADMISSIBILITY of a claim under this regime (claude-notes/projects/
+       bare-inv-generic.md).  A pure side condition on the CLAIM the
+       consumer presents -- its va and the ppn it maps to -- taken as a
+       premise by [sr_absorb].  It cannot be uniform: the Sv39 arm honours
+       every claim ([True]), while the BARE arm can only ever honour an
+       IDENTITY claim ([kadm_ident]: a hart with satp=Bare translates va to
+       va itself).  Every consumer discharges it from its OWN resource --
+       [↦ₘ]/[↦ₓ] carry the identity conjunct, a device claim is built at
+       [kpt_leaf_ppn] -- so no leaf statement and no whole-function
+       contract mentions it. *)
+    sr_adm : mword 64 -> mword 44 -> Prop;
+    (* ...and the one thing EVERY regime admits: an IDENTITY claim.  This is
+       what keeps the premise off the REGIME-GENERIC layer (the fetch engine,
+       the walk leaves): they discharge [sr_adm] from their datum's identity
+       conjunct through this field, so no statement grows a premise.  A
+       consumer that presents a NON-identity claim (a kstack/trampoline va,
+       the sp-migration project) must instead know its regime and discharge
+       [sr_adm] for it directly -- which is exactly what the Sv39 arm's
+       [True] instance makes free and the Bare arm's makes impossible. *)
+    sr_adm_id : forall (va : mword 64) (ppn : mword 44),
+      kadm_ident va ppn -> sr_adm va ppn;
     (* THE re-keyed absorption (rwx-kmap): keyed on a kernel-mapping CLAIM
        [kmap_at (svpn_of va) ppn pc] + the access class it must admit,
        with the output pa = ppn ++ pageoff.  The claim is supplied by the
@@ -207,6 +236,7 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      sr_adm va ppn ->
       ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ={E}=∗
@@ -245,16 +275,19 @@ Section SRegimeDef.
   (* ------------------------------------------------------------------- *)
   (* The BARE instance (boot: satp Mode = Bare, translation = identity).   *)
   (* ------------------------------------------------------------------- *)
-  (* The Bare arm carries the auth over EXACTLY the static map (rwx-kmap):
-     any claim honored under Bare is therefore a static identity entry
-     ([kmap_at_M0_static]), and once a dynamic (kstack) fragment has been
-     persisted this arm can never be re-established — Bare→KPT one-way. *)
+  (* PER-HART, and holding NOTHING globally unique (claude-notes/projects/
+     bare-inv-generic.md): this hart's satp cell pinned at Mode=Bare plus
+     its PMP config.  Honoring is not a ghost argument at all -- Bare
+     translates va to va, so the arm admits exactly the IDENTITY claims
+     ([kadm_ident], the regime's [sr_adm]) and the caller's resource
+     supplies that.  Hence EVERY hart can be in its Bare arm at once, and
+     the arm survives the kernel map's growth (a secondary hart spins on
+     [started] in Bare long after the boot hart's satp switch). *)
   Definition bare_inv : iProp Σ :=
     (∃ satp0 : mword 64,
        satp ↦ᵣ satp0 ∗
        ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4) ⌝ ∗
-       pmp_config (mword_of_int 0) ∗
-       kmap_auth kmap_M0)%I.
+       pmp_config (mword_of_int 0))%I.
 
   Lemma bare_absorb :
     forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
@@ -272,6 +305,7 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      kadm_ident va ppn ->
       ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ={E}=∗
@@ -284,14 +318,13 @@ Section SRegimeDef.
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall Hadm HE.
     iIntros "Hat Hri Hgh Hinv".
-    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp & HM)".
-    (* honoring: against the exact static auth, the claim is a static
-       identity entry -- so the caller's pa is va itself *)
-    iDestruct (kmap_at_M0_static with "HM Hat") as %[Hcls ->].
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    (* honoring: the claim is ADMISSIBLE, i.e. the identity -- so the pa the
+       caller derived from it is va itself, which is what Bare translates to *)
     assert (Hpa : pa = va).
-    { rewrite <- Hconcat. exact (static_ident_4k va pc Hcls Hcanon). }
+    { rewrite <- Hconcat. exact Hadm. }
     clear Hconcat. subst pa.
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iDestruct (pmp_config_grant_facts (mword_of_int 0) σ with "Hri Hpmp") as %Hpmp.
@@ -304,7 +337,7 @@ Section SRegimeDef.
     iSplit; [iPureIntro; left; reflexivity |].
     iSplit; [iPureIntro; exact Hpmp |].
     iFrame "Hri Hgh".
-    iExists satp0. iFrame "Hsatp Hpmp HM". iPureIntro. exact Hmode.
+    iExists satp0. iFrame "Hsatp Hpmp". iPureIntro. exact Hmode.
   Qed.
 
   Lemma bare_transform :
@@ -320,7 +353,7 @@ Section SRegimeDef.
   Proof.
     intros acc ea σ Hacc Hcp HSXL Heff Hpml.
     iIntros "Hri Hinv".
-    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp & HM)".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
     iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
     iPureIntro.
     exact (exec_transform_effective_address_mode acc Bare ea σ Hcp Heff Hpml
@@ -328,7 +361,7 @@ Section SRegimeDef.
   Qed.
 
   Definition bare_regime : s_regime :=
-    SRegime bare_inv bare_absorb bare_transform.
+    SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform.
 
 End SRegimeDef.
 
@@ -381,6 +414,7 @@ Section SRegimeShared.
         = Some (Supervisor, σ) ->
       exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
       pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      True ->
       ↑kptN ⊆ E ->
       ⊢ kmap_at (svpn_of va) ppn pc -∗
         reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn ={E}=∗
@@ -393,7 +427,7 @@ Section SRegimeShared.
           ⌜ pmp_grant_facts σ' ⌝ ∗
           reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
   Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall _ HE.
     iIntros "Hat Hri Hgh Hres".
     iMod (tlb_res_pt_translateAddr_at acc root_ppn va pa ppn pc σ E HE
             (fun a d mxr do_sum =>
@@ -407,7 +441,8 @@ Section SRegimeShared.
   Qed.
 
   Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
-    SRegime (tlb_res_pt root_ppn) (res_absorb root_ppn) (res_transform root_ppn).
+    SRegime (tlb_res_pt root_ppn) (fun _ _ => True) (fun _ _ _ => I)
+            (res_absorb root_ppn) (res_transform root_ppn).
 
   Lemma kpt_share_regime_inv (root_ppn : mword 44) :
     sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.

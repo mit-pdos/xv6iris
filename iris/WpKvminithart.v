@@ -306,67 +306,21 @@ Section KvmMint.
     iModIntro. unfold kvm_M. iFrame "Hauth Htr Hks".
   Qed.
 
-  (* The complete result of the kernel page-table construction: ownership of a
-     stack page as kvminit returns it -- 4096 bytes at the page's IDENTITY
-     address [zext (pas i ++ 0^12)] -- becomes ownership of the SAME page at
-     its KSTACK virtual address, re-keyed from the static identity claims onto
-     the kstack claim the kvminithart switch minted.  This is the first
-     non-identity [↦ₘ] ever constructed: from here on, S-mode loads/stores at
-     [KSTACK(i)] verify through the installed table like any other address.
-
-     Per byte the re-key is: the identity byte's [↦ₘ] carries its own KP_rw
-     claim for [svpn_of (pa_add ident j)]; [kvm_pas_ok]'s [node_kdata] makes
-     that byte real RAM, so [ram_svpn_static] hands out the ambient static
-     claim for the same vpn, and agreement pins the byte's physical location
-     to the identity page.  [phys_to_mem_map] then re-forms the byte as a
-     [↦ₘ] at [KSTACK(i)+j] under the (persistent) kstack claim, whose [pa_of]
-     lands on that very physical byte.
-
-     NOTE (forward pointer): this lemma is the interface through which the
-     per-process predicate acquires its kernel stack.  [proc_lock_res] /
-     [procs_inv] (WpWakeup.v) -- the well-formed-[struct proc] invariant --
-     will gain a kstack-ownership conjunct built from this lemma's output:
-     every [struct proc] owns [page_own (kstack_va i)] for its own index [i]
-     (the sp-migration project consumes exactly that). *)
-  Lemma page_own_kstack (pas : nat -> mword 44) (i : nat) :
-    (i < 64)%nat ->
-    kvm_pas_ok pas ->
-    kmap_static_claims -∗
-    kmap_at (kstack_vpn i) (pas i) KP_rw -∗
-    page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) -∗
-    page_own (kstack_va i).
-  Proof.
-    intros Hi Hpas. iIntros "#Hstatic #Hkstack Hpage".
-    pose proof (Hpas i Hi) as Hnk.
-    rewrite /page_own.
-    iApply (big_sepL_impl with "Hpage").
-    iIntros "!>" (k x Hk) "Hby".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    (* per byte [j := 0 + k], j < 4096 *)
-    iEval (rewrite /byte_any) in "Hby". iDestruct "Hby" as (b) "Hin".
-    (* the identity byte is real RAM; hence canonical *)
-    assert (Hram : addr_is_ram
-              (pa_add (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) (0 + k)%nat)).
-    { apply (kstack_ident_ram (pas i) (0 + k)%nat Hnk ltac:(lia)). }
-    assert (Hcan : (uint (pa_add (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12))) (0 + k)%nat)
-                    < 274877906944)%Z).
-    { destruct Hram as [_ Hhi]. unfold ram_base, ram_size in Hhi. lia. }
-    (* the ambient static claim for the identity byte's vpn (some class pc) *)
-    destruct (ram_svpn_static _ Hram) as [pc Hstat].
-    iDestruct (kmap_static_claims_at _ pc Hstat with "Hstatic") as "#Hid".
-    (* the identity byte's OWN KP_rw claim pins its physical location *)
-    iDestruct (mem_pointsto_acc with "Hin") as (ppn') "(#Hk' & %Hcan' & %Hram' & Hp & _)".
-    iDestruct (kmap_at_agree with "Hk' Hid") as %[-> _].
-    iEval (rewrite (pa_of_id _ Hcan)) in "Hp".
-    (* re-form the byte at KSTACK(i)+j under the kstack claim *)
-    rewrite /byte_any. iExists b.
-    assert (Hpram : addr_is_ram (pa_of (pas i) (pa_add (kstack_va i) (0 + k)%nat))).
-    { rewrite (kstack_va_pa_of (pas i) i (0 + k)%nat Hi ltac:(lia)). exact Hram. }
-    iApply (phys_to_mem_map (pa_add (kstack_va i) (0 + k)%nat) (pas i) (DfracOwn 1) b
-              Hpram (kstack_va_canon_add i (0 + k)%nat Hi ltac:(lia)) with "[] [Hp]").
-    { rewrite (kstack_va_svpn_add i (0 + k)%nat Hi ltac:(lia)). iExact "Hkstack". }
-    { rewrite (kstack_va_pa_of (pas i) i (0 + k)%nat Hi ltac:(lia)).
-      rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hram. }
-  Qed.
+  (* THE KSTACK PAGES STAY AT THE PHYSICAL TIER.  kvminit hands out each
+     stack page as [page_own] at its IDENTITY address, and the switch mints
+     the matching [kmap_at (kstack_vpn i) (pas i) KP_rw] claim above -- but
+     the page is NOT re-keyed onto its KSTACK(i) virtual address, because
+     [↦ₘ] carries the identity conjunct [pa_of ppn va = va]
+     (RiscvPtsto.v's header; claude-notes/projects/bare-inv-generic.md).
+     That conjunct is what discharges the Bare regime's [sr_adm]
+     admissibility from the datum itself, and hence what lets EVERY hart be
+     in its Bare arm at once -- a non-identity [↦ₘ] would be read at the
+     wrong page by a hart that is still Bare, and no per-hart resource can
+     rule that out.
+     WHEN THE SP-MIGRATION PROJECT NEEDS S-mode loads/stores at KSTACK(i):
+     the way in is a KPT-REGIME leaf family (whose [sr_adm] is [True], so
+     the caller's non-identity claim is admissible) over a kstack-flavoured
+     points-to built from the claim above + the identity page's [↦ₚ] --
+     NOT a weakening of [↦ₘ]. *)
 
 End KvmMint.

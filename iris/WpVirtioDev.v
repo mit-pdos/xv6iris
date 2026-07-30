@@ -260,7 +260,7 @@ Proof.
           (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_load s_pc)
-          Lpma_pc' _ with "Hclaim Hreg Hmem Htr")
+          Lpma_pc' (pa_of_id a8 Ha8lt) _ with "Hclaim Hreg Hmem Htr")
     as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
   rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
@@ -440,7 +440,7 @@ Proof.
           (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
              ltac:(rewrite Lms_pc; exact HMPRV))
           (exec_is_shadow_stack_store s_pc)
-          Lpma_pc' _ with "Hclaim Hreg Hmem Htr")
+          Lpma_pc' (pa_of_id a8 Ha8lt) _ with "Hclaim Hreg Hmem Htr")
     as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
   rewrite (pa_of_id a8 Ha8lt) in Htr0.
   destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).

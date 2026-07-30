@@ -49,7 +49,7 @@ Section KvminithartBody.
   Proof.
     unfold wp_kvminithart_sconf_body.
     intros Hlvl HK Hrep Hpas.
-    iIntros "Hcg Hbit #Htext Hpc Htlb Hcell Hptree Hunset Hcont".
+    iIntros "Hcg Hbit #Htext Hpc Htlb Hcell Hptree Hunset Hauth Hcont".
     (* register disequalities for creg mapping *)
     assert (Hc6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14 : mword 5))
       by (vm_compute; reflexivity).
@@ -265,7 +265,7 @@ Section KvminithartBody.
     (* open the Bare arm of the translation slot; do the switch *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct (strans_inv_acc_bare with "Hbit Htr") as "(Hbit & Hbit2 & Hbare & Hstv)".
-    iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp & Hauth)".
+    iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
     iMod (reg_update _ satp _ (kvi_satp_word t) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
     iMod (kvm_M_mint pas with "Hauth") as "(Hauth & #Htramp & #Hkstacks)".
     (* THE PUBLICATION: the exclusive tree + the freshly grown auth go into

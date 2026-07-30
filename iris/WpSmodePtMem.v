@@ -1099,7 +1099,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1149,7 +1149,7 @@ Section WpSmodePtMemLeaves.
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1303,7 +1303,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1353,7 +1353,7 @@ Section WpSmodePtMemLeaves.
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1506,7 +1506,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1557,7 +1557,7 @@ Section WpSmodePtMemLeaves.
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1705,7 +1705,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hb".
@@ -1756,7 +1756,7 @@ Section WpSmodePtMemLeaves.
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.

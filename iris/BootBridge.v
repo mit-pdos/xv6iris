@@ -31,18 +31,15 @@
        them inside [mmode_config] without handing them back
        ([mmode_config_persist] below is the one-liner that keeps a copy
        on the caller's side);
-     - [kmap_auth kmap_M0], both halves of the Bare arm bit
+     - both halves of the Bare arm bit
        [strans_bit strans_bit_bare], the [tlb] cell and the three trap
-       CSRs: minted by [RiscvAdequacy.riscv_system_adequacy];
-       [kmap_auth kmap_M0] is LOAD-BEARING here and stays: it is what
-       [bare_inv] pins the static map with, and hence the refutation that
-       makes Bare-arm claim honoring provable ([kmap_at_M0_static]).  It is
-       also globally unique, which is why at most one hart can ever be in
-       its Bare arm -- see SpecMain.v's header for the G5 consequence.
-       Adequacy's OTHER one-shot, [KptGhost.kpt_unset], deliberately does
-       NOT come through this file: it is global rather than per-hart and is
-       spent inside kvminithart, so it travels BESIDE the bridge, straight
-       into main's precondition;
+       CSRs: minted by [RiscvAdequacy.riscv_system_adequacy].  The two
+       GLOBAL boot tokens adequacy also mints -- [KptGhost.kpt_unset] and
+       [KMap.kmap_auth kmap_M0] -- deliberately do NOT come through this
+       file: they are global rather than per-hart and are spent inside
+       kvminithart, so they travel BESIDE the bridge, straight into main's
+       precondition.  Everything this file DOES thread is per-hart, which is
+       what makes the bridge runnable on every hart at once;
      - the cpus[0] struct cells ([a_cpu_noff] / [a_cpu_int] /
        [a_cpu_proc] / the 14 context words behind [cpu_ctx_free]) and the
        [stvec] cell: .bss, from the memory image.
@@ -456,7 +453,6 @@ Section BootBridge.
                  (ti_menv1 (st_menv_adue menvcfg0)) -∗
     stack_own_phys sp0 n -∗
     (* --- the adequacy-minted inputs --- *)
-    kmap_auth kmap_M0 -∗
     strans_bit strans_bit_bare -∗
     strans_bit strans_bit_bare -∗
     tlb ↦ᵣ tlbvec0 -∗
@@ -479,7 +475,7 @@ Section BootBridge.
   Proof.
     iIntros (Hpmp Hsie Hmsf Hmenv Hmiez Hsatpm Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
-             Hstk Hkauth Hbit Hbit2 Htlb Hsepc Hscause Hstval Hstv
+             Hstk Hbit Hbit2 Htlb Hsepc Hscause Hstval Hstv
              Hnoff Hint Hproc Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
     iMod (sie_ghost_alloc ('b"0" : mword 1)) as (γ) "(Hg2 & Hg4a & Hg4b)".
@@ -503,10 +499,9 @@ Section BootBridge.
                     ltac:(rewrite Hu2; lia))
                  with "Hcl Hstk") as "Hstk".
     (* --- the Bare translation slot --- *)
-    iAssert (bare_inv) with "[Hsatp Hpcf Hpad Hkauth]" as "Hbare".
+    iAssert (bare_inv) with "[Hsatp Hpcf Hpad]" as "Hbare".
     { rewrite /bare_inv. iExists (satp_legalized satp0 (mword_of_int 0)).
       iFrame "Hsatp". iSplitR; [iPureIntro; exact Hsatpm |].
-      iFrame "Hkauth".
       destruct (st_pmpcfg1_entry0 pmpcfg0 Hpmp) as [HA _].
       destruct (st_pmpcfg1_xwr pmpcfg0 Hpmp) as (HX & HW & HR).
       destruct (st_pmpaddr1_cov pmpcfg0 pmpaddr00 Hpmp) as [Hord Hcov].

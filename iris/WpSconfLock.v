@@ -544,7 +544,7 @@ Section WpSconfLock.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -603,7 +603,7 @@ Section WpSconfLock.
             (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_amo s_pc)
-            Lpma_pc' _ with "Hk Hreg Hmem Htr")
+            Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.

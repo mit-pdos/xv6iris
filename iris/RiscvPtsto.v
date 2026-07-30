@@ -298,19 +298,36 @@ Definition pa_of (ppn : mword 44) (va : mword 64) : mword 64 :=
 
 (* memory points-to, VA-BASED (uniform-claims): owns the byte at the
    PHYSICAL address the kernel mapping takes [va] to, bundled with the
-   claim itself -- for identity mappings (the static fragments) pa = va;
-   for kstack vas pa is the kalloc-chosen page.  The KP_rw class is what
+   claim itself.  The KP_rw class is what
    makes stores provable ONLY through writable mappings; the R|X kernel
    text lives at the CODE points-to [↦ₓ] below.  The canonicality
    conjunct (positive Sv39 half) pins va ↔ (vpn, offset).  [dq] is a
    [dfrac]: [DfracOwn 1] = full (writable) ownership, [DfracDiscarded] =
    persistent/duplicable read-only ownership (the immutable kernel
-   globals image [kernel_data]). *)
+   globals image [kernel_data]).
+
+   THE IDENTITY CONJUNCT [pa_of ppn va = va] (claude-notes/projects/
+   bare-inv-generic.md).  A kernel datum's va is its physical address: the
+   claim carried here is the STATIC (identity) one.  This is what makes a
+   [↦ₘ] access sound under BOTH translation regimes -- a hart in Bare mode
+   translates va to va itself, so a non-identity [↦ₘ] would be accessed at
+   the WRONG page there, and no ghost resource can rule that out per-hart
+   (a secondary hart is legitimately Bare long after the kernel map has
+   grown).  So the identity is a conjunct of the resource rather than a
+   premise on every leaf: the Bare regime's [sr_adm] admissibility premise
+   (SRegime.v) is discharged from the datum itself, and no leaf statement
+   or whole-function contract mentions it.
+   CONSEQUENCE: a kernel-stack byte at [KSTACK(i)] is NOT expressible as a
+   [↦ₘ] -- those pages stay at the PHYSICAL tier ([↦ₚ], [page_own] at the
+   identity address).  When the sp-migration project needs S-mode
+   loads/stores at a kstack va, the way in is a KPT-only leaf family whose
+   [sr_adm] obligation the caller discharges (not a weakening here). *)
 Definition mem_pointsto `{!riscvGS Σ} (va : Arch.pa) (dq : dfrac) (v : bv 8) : iProp Σ :=
   (∃ ppn : mword 44,
      kmap_at (svpn_of va) ppn KP_rw ∗
      ⌜(uint va < 274877906944)%Z⌝ ∗          (* 2^38: canonical, positive half *)
      ⌜addr_is_ram (pa_of ppn va)⌝ ∗
+     ⌜pa_of ppn va = va⌝ ∗                   (* IDENTITY (see the note above) *)
      pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v)%I.
 Notation "a ↦ₘ{ dq } v" := (mem_pointsto a dq v)
   (at level 20, format "a  ↦ₘ{ dq }  v") : bi_scope.
@@ -345,8 +362,8 @@ Section mem_pointsto_share.
     a ↦ₘ{dq1} b1 -∗ a ↦ₘ{dq2} b2 -∗ ⌜b1 = b2⌝.
   Proof.
     rewrite /mem_pointsto. iIntros "H1 H2".
-    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & Hp1)".
-    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & Hp2)".
+    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & _ & Hp1)".
+    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & _ & Hp2)".
     iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
     by iDestruct (pointsto_agree with "Hp1 Hp2") as %->.
   Qed.
@@ -361,8 +378,8 @@ Section mem_pointsto_share.
     a1 ↦ₘ b1 -∗ a2 ↦ₘ{dq} b2 -∗ ⌜a1 ≠ a2⌝.
   Proof.
     rewrite /mem_pointsto. iIntros "H1 H2".
-    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & Hp1)".
-    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & Hp2)".
+    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & _ & Hp1)".
+    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & _ & Hp2)".
     destruct (decide (a1 = a2)) as [->|Hne]; [| by iPureIntro ].
     iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
     by iDestruct (pointsto_ne with "Hp1 Hp2") as %Hne.
@@ -374,15 +391,15 @@ Section mem_pointsto_share.
     a ↦ₘ{DfracOwn (q1 + q2)} b ⊣⊢ a ↦ₘ{DfracOwn q1} b ∗ a ↦ₘ{DfracOwn q2} b.
   Proof.
     rewrite /mem_pointsto. iSplit.
-    - iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & Hp)".
+    - iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
       rewrite -dfrac_op_own pointsto_fractional.
       iDestruct "Hp" as "[Hp1 Hp2]".
       iSplitL "Hp1"; iExists ppn.
       + by iFrame "Hk Hp1".
       + by iFrame "Hk Hp2".
     - iIntros "[H1 H2]".
-      iDestruct "H1" as (ppn1) "(#Hk1 & %Hc & %Hd & Hp1)".
-      iDestruct "H2" as (ppn2) "(#Hk2 & _ & _ & Hp2)".
+      iDestruct "H1" as (ppn1) "(#Hk1 & %Hc & %Hd & %Hi & Hp1)".
+      iDestruct "H2" as (ppn2) "(#Hk2 & _ & _ & _ & Hp2)".
       iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
       iDestruct (pointsto_combine with "Hp1 Hp2") as "[Hp _]".
       rewrite dfrac_op_own. iExists ppn2. by iFrame "Hk1 Hp".
@@ -446,6 +463,7 @@ Definition text_pointsto `{!riscvGS Σ} (va : Arch.pa) (dq : dfrac) (v : bv 8) :
      kmap_at (svpn_of va) ppn KP_rx ∗
      ⌜(uint va < 274877906944)%Z⌝ ∗          (* 2^38: canonical, positive half *)
      ⌜addr_is_text (pa_of ppn va)⌝ ∗
+     ⌜pa_of ppn va = va⌝ ∗                   (* IDENTITY (see [mem_pointsto]) *)
      pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v)%I.
 Notation "a ↦ₓ{ dq } v" := (text_pointsto a dq v)
   (at level 20, format "a  ↦ₓ{ dq }  v") : bi_scope.
@@ -1011,19 +1029,21 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rw ∗
       ⌜(uint a < 274877906944)%Z⌝ ∗
       ⌜addr_is_ram (pa_of ppn a)⌝ ∗
+      ⌜pa_of ppn a = a⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b -∗ a ↦ₘ{dq} b).
   Proof.
-    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & Hp)".
+    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
     iExists ppn. iFrame "Hk Hp".
     iSplit; [iPureIntro; exact Hc|]. iSplit; [iPureIntro; exact Hd|].
+    iSplit; [iPureIntro; exact Hi|].
     iIntros "Hp". iExists ppn. by iFrame "Hk Hp".
   Qed.
 
   (* the canonicality conjunct (positive Sv39 half): pins [a ↔ (vpn,off)]. *)
   Lemma mem_canonical a dq b : a ↦ₘ{dq} b -∗ ⌜(uint a < 274877906944)%Z⌝.
   Proof.
-    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(_ & %Hc & _ & _)".
+    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(_ & %Hc & _ & _ & _)".
     iPureIntro; exact Hc.
   Qed.
 
@@ -1034,7 +1054,7 @@ Section Bridge.
     a ↦ₘ{dq} b -∗ ∃ ppn : mword 44,
       kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_ram (pa_of ppn a)⌝.
   Proof.
-    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _)".
+    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _ & _)".
     iExists ppn. iFrame "Hk". iPureIntro; exact Hd.
   Qed.
 
@@ -1044,7 +1064,7 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_ram (pa_of ppn a)⌝ ∗
       ⌜mm !! (pa_of ppn a) = Some b⌝.
   Proof.
-    rewrite /mem_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & Hp)".
+    rewrite /mem_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _ & Hp)".
     iDestruct (gen_heap_valid with "Hm Hp") as %Hlk.
     iExists ppn. iFrame "Hk". iPureIntro. split; [exact Hd | exact Hlk].
   Qed.
@@ -1058,9 +1078,9 @@ Section Bridge.
   (* discard the fraction: turn any memory byte into the persistent read-only one. *)
   Lemma mem_pointsto_persist a dq b : a ↦ₘ{dq} b ==∗ a ↦ₘ□ b.
   Proof.
-    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & Hp)".
+    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
     iMod (pointsto_persist with "Hp") as "Hp". iModIntro. iExists ppn.
-    iFrame "Hk Hp". iPureIntro. split; [exact Hc | exact Hd].
+    iFrame "Hk Hp". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
   Qed.
 
   (* KEEP-UNREFERENCED: public bridge API (kept though currently unreferenced).
@@ -1075,28 +1095,31 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rx ∗
       ⌜(uint a < 274877906944)%Z⌝ ∗
       ⌜addr_is_text (pa_of ppn a)⌝ ∗
+      ⌜pa_of ppn a = a⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn a) dq b -∗ a ↦ₓ{dq} b).
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & Hp)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
     iExists ppn. iFrame "Hk Hp".
     iSplit; [iPureIntro; exact Hc|]. iSplit; [iPureIntro; exact Hd|].
+    iSplit; [iPureIntro; exact Hi|].
     iIntros "Hp". iExists ppn. by iFrame "Hk Hp".
   Qed.
 
   Lemma text_canonical a dq b : a ↦ₓ{dq} b -∗ ⌜(uint a < 274877906944)%Z⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(_ & %Hc & _ & _)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(_ & %Hc & _ & _ & _)".
     iPureIntro; exact Hc.
   Qed.
 
   (* PA-SIDE: the byte's PHYSICAL address is kernel TEXT ... *)
   Lemma code_text a dq b :
     a ↦ₓ{dq} b -∗ ∃ ppn : mword 44,
-      kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_text (pa_of ppn a)⌝.
+      kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_text (pa_of ppn a)⌝ ∗
+      ⌜pa_of ppn a = a⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _)".
-    iExists ppn. iFrame "Hk". iPureIntro; exact Hd.
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _)".
+    iExists ppn. iFrame "Hk". iPureIntro; split; [exact Hd | exact Hi].
   Qed.
 
   (* ... and hence real RAM (what the M-mode no-perm-check fetch path and
@@ -1105,7 +1128,7 @@ Section Bridge.
     a ↦ₓ{dq} b -∗ ∃ ppn : mword 44,
       kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_ram (pa_of ppn a)⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & %Hi & _)".
     iExists ppn. iFrame "Hk". iPureIntro; exact (addr_is_text_ram _ Hd).
   Qed.
 
@@ -1114,7 +1137,7 @@ Section Bridge.
       kmap_at (svpn_of a) ppn KP_rx ∗ ⌜addr_is_text (pa_of ppn a)⌝ ∗
       ⌜mm !! (pa_of ppn a) = Some b⌝.
   Proof.
-    rewrite /text_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & Hp)".
+    rewrite /text_pointsto. iIntros "Hm H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _ & Hp)".
     iDestruct (gen_heap_valid with "Hm Hp") as %Hlk.
     iExists ppn. iFrame "Hk". iPureIntro. split; [exact Hd | exact Hlk].
   Qed.
@@ -1127,9 +1150,9 @@ Section Bridge.
      one (adequacy init persists the whole sub-etext image this way). *)
   Lemma text_pointsto_persist a dq b : a ↦ₓ{dq} b ==∗ a ↦ₓ□ b.
   Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & Hp)".
+    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp)".
     iMod (pointsto_persist with "Hp") as "Hp". iModIntro. iExists ppn.
-    iFrame "Hk Hp". iPureIntro. split; [exact Hc | exact Hd].
+    iFrame "Hk Hp". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
   Qed.
 
   (* ---- the PHYSICAL points-to bridge (the OLD pa-era [mem_*] bodies) ---- *)
@@ -1194,31 +1217,31 @@ Section Bridge.
   Lemma mem_pointsto_pin (pa : mword 64) dq b (ppn0 : mword 44) :
     kmap_at (svpn_of pa) ppn0 KP_rw -∗ pa ↦ₘ{dq} b -∗
       ⌜(uint pa < 274877906944)%Z⌝ ∗ ⌜addr_is_ram (pa_of ppn0 pa)⌝ ∗
+      ⌜pa_of ppn0 pa = pa⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b -∗ pa ↦ₘ{dq} b).
   Proof.
     iIntros "#Hk0 H".
-    iDestruct (mem_pointsto_acc with "H") as (ppn) "(#Hk & %Hc & %Hd & Hp & Hcl)".
+    iDestruct (mem_pointsto_acc with "H") as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp & Hcl)".
     iDestruct (kmap_at_agree with "Hk0 Hk") as %[<- _].
-    iFrame "Hp Hcl". iPureIntro. split; [exact Hc | exact Hd].
+    iFrame "Hp Hcl". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
   Qed.
 
-  (* GENERAL (non-identity) VA-tier introduction: a physical byte sitting at
+  (* CLAIM-KEYED VA-tier introduction: a physical byte sitting at
      [pa_of ppn va] -- the pa the claim [kmap_at (svpn_of va) ppn KP_rw] takes
      [va] to -- IS the [↦ₘ] byte at [va].  This is the primary form of the
-     [↦ₚ -> ↦ₘ] direction: [va] and its physical page [ppn] are ARBITRARY (the
-     claim need not be an identity leaf), so it constructs a genuinely
-     non-identity [↦ₘ] -- e.g. a kstack byte owned at its virtual address but
-     physically living at a kalloc-chosen page.  The caller supplies only the
-     RAM/canonicality facts about the physical target; the claim carries the
-     translation. *)
+     [↦ₚ -> ↦ₘ] direction; the claim carries the translation and the caller
+     supplies the RAM/canonicality facts about the physical target plus the
+     IDENTITY [pa_of ppn va = va] that [↦ₘ] carries (see its header: a
+     non-identity [↦ₘ] would be unsound under a Bare hart). *)
   Lemma phys_to_mem_map (va : mword 64) (ppn : mword 44) dq b :
     addr_is_ram (pa_of ppn va) -> (uint va < 274877906944)%Z ->
+    pa_of ppn va = va ->
     kmap_at (svpn_of va) ppn KP_rw -∗ (pa_of ppn va) ↦ₚ{dq} b -∗ va ↦ₘ{dq} b.
   Proof.
-    intros Hram Hcan. iIntros "#Hk [Hp _]".
+    intros Hram Hcan Hid. iIntros "#Hk [Hp _]".
     rewrite /mem_pointsto. iExists ppn. iFrame "Hk Hp".
-    iPureIntro. split; [exact Hcan | exact Hram].
+    iPureIntro. split; [exact Hcan | split; [exact Hram | exact Hid]].
   Qed.
 
   (* Claim-keyed byte conversions ↦ₚ ⇄ ↦ₘ for an IDENTITY-mapped kdata va
@@ -1237,6 +1260,7 @@ Section Bridge.
     iApply (phys_to_mem_map pa ppn dq b with "Hk [Hp]").
     { rewrite Hid. exact Hkd. }
     { exact Hcan. }
+    { exact Hid. }
     { rewrite Hid. iExact "Hp". }
   Qed.
 
@@ -1245,7 +1269,7 @@ Section Bridge.
     kmap_at (svpn_of pa) ppn KP_rw -∗ pa ↦ₘ{dq} b -∗ pa ↦ₚ{dq} b.
   Proof.
     intros Hid. iIntros "#Hk H".
-    iDestruct (mem_pointsto_pin pa dq b ppn with "Hk H") as "(%Hc & %Hd & Hp & _)".
+    iDestruct (mem_pointsto_pin pa dq b ppn with "Hk H") as "(%Hc & %Hd & _ & Hp & _)".
     rewrite Hid in Hd. iEval (rewrite Hid) in "Hp".
     rewrite /phys_pointsto. iFrame "Hp". iPureIntro. exact Hd.
   Qed.
@@ -1253,13 +1277,14 @@ Section Bridge.
   Lemma text_pointsto_pin (pa : mword 64) dq b (ppn0 : mword 44) :
     kmap_at (svpn_of pa) ppn0 KP_rx -∗ pa ↦ₓ{dq} b -∗
       ⌜(uint pa < 274877906944)%Z⌝ ∗ ⌜addr_is_text (pa_of ppn0 pa)⌝ ∗
+      ⌜pa_of ppn0 pa = pa⌝ ∗
       pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b ∗
       (pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn0 pa) dq b -∗ pa ↦ₓ{dq} b).
   Proof.
     iIntros "#Hk0 H".
-    iDestruct (text_pointsto_acc with "H") as (ppn) "(#Hk & %Hc & %Hd & Hp & Hcl)".
+    iDestruct (text_pointsto_acc with "H") as (ppn) "(#Hk & %Hc & %Hd & %Hi & Hp & Hcl)".
     iDestruct (kmap_at_agree with "Hk0 Hk") as %[<- _].
-    iFrame "Hp Hcl". iPureIntro. split; [exact Hc | exact Hd].
+    iFrame "Hp Hcl". iPureIntro. split; [exact Hc | split; [exact Hd | exact Hi]].
   Qed.
 
 End Bridge.

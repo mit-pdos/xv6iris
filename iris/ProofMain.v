@@ -76,6 +76,7 @@ Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
+Require Import KMap.
 Require Import SpecMain.
 Require Import WpMainDecode.
 Require Import KernelRvcDecode.
@@ -667,6 +668,7 @@ Section ProofMain.
     (∃ kpt0 : mword 64,
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) -∗
     strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
+    kmap_auth kmap_M0 -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
     ([∗ list] i ∈ seq 0 NPROC,
@@ -694,7 +696,7 @@ Section ProofMain.
     intros Hn Htp Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hlpid Hlwait Hprocs Hppub Hfds Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -777,7 +779,7 @@ Section ProofMain.
       by (rewrite /V3 upd_ne; [exact Hmkvtp | reg_neq]).
     iApply (Kvminithart.wp_kvminithart_sconf γ Φ V3 0%nat n t pas tlbvec0
               eq_refl ltac:(lia) Hrep Hpasok
-              with "Hcg Hsbit Htext Hpc Htlb Hkpt Htree Hunset").
+              with "Hcg Hsbit Htext Hpc Htlb Hkpt Htree Hunset Hkauth").
     iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec Hkpt #Hkinv #Htramp #Hkstx".
     (* the root cell is immutable from here on: persist it, so the [started]
        deposit can hand it to every secondary alongside [kpt_inv] *)
@@ -1391,7 +1393,7 @@ Section ProofMain.
     intros pcE Hcid HK Htp Hphystop Hs1 Hprun Hlen Hlive.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50).
     iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpanic #Hsinv #Hwand Hlocks Hglobals".
-    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hpages".
+    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     iDestruct "Hglobals" as "(Hdevsw & Hflags & Hkmem24 & Hkpt & Hprocs & Hppub &
@@ -1411,7 +1413,7 @@ Section ProofMain.
     iApply (mn_grp_kvm γ Φ m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Htp2 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hlpid Hlwait Hprocs Hppub Hfds").
+                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds").
     iIntros (γa γs m3 root pas)
       "Hcg Hpc %Htp3 Hcpu Hkenv #Hpinv Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)

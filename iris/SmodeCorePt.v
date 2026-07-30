@@ -256,12 +256,13 @@ Section SmodeCorePt.
       iAssert (kmap_at (svpn_of (pa_add va x)) ppn KP_rw)%I as "#Hkx".
       { rewrite (svpn_of_pa_add va x Hcan Hx). iExact "Hk". }
       iDestruct (mem_pointsto_pin (pa_add va x) (DfracOwn 1) (gold x) ppn with "Hkx Ha")
-        as "(%Hc & %Hd & Hp & _)".
+        as "(%Hc & %Hd & %Hid & Hp & _)".
       simpl foldr.
       rewrite -(pa_of_pa_add ppn va x Hcan Hx).
       iMod (gen_heap_update _ (pa_of ppn (pa_add va x)) (gold x) (gnew x) with "Hm Hp") as "[Hm Hp]".
       iModIntro. iFrame "Hm". simpl. iFrame "Hrest".
-      iExists ppn. iFrame "Hkx Hp". iPureIntro. split; [exact Hc | exact Hd].
+      iExists ppn. iFrame "Hkx Hp". iPureIntro.
+      split; [exact Hc | split; [exact Hd | exact Hid]].
   Qed.
 
   (* 8-byte claim-keyed write: the VA replacement for the (now physical)
@@ -350,7 +351,7 @@ Section SmodeCorePt.
         iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "#Hb0".
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iEval (rewrite pa_add_0) in "Hb0".
-        iDestruct (code_text with "Hb0") as (ppn) "[#Hk %Htext0]".
+        iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off4_bound pc Hal) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
         (* present the claim to the claim-keyed absorb: translate pc = pa_of ppn pc *)
@@ -358,7 +359,7 @@ Section SmodeCorePt.
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma _ with "Hk Hreg Hmem Hinv")
+                Lpma (sr_adm_id R pc ppn Hid) _ with "Hk Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 4 4 (nth_byte w) ppn
@@ -403,12 +404,12 @@ Section SmodeCorePt.
         iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "#Hb0".
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iEval (rewrite pa_add_0) in "Hb0".
-        iDestruct (code_text with "Hb0") as (ppnl) "[#Hkl %Htextl]".
+        iDestruct (code_text with "Hb0") as (ppnl) "(#Hkl & %Htextl & %Hidl)".
         iDestruct (text_canonical with "Hb0") as %Hcanl.
         pose proof (off_bound_div pc 2 ltac:(lia) ltac:(exists 2048; lia) H2al) as Hoffl. rewrite (uint_unsigned_n _) in Hoffl.
         iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbytes") as "#Hb2".
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
-        iDestruct (code_text with "Hb2") as (ppnh) "[#Hkh %Htexth]".
+        iDestruct (code_text with "Hb2") as (ppnh) "(#Hkh & %Htexth & %Hidh)".
         iDestruct (text_canonical with "Hb2") as %Hcanh.
         pose proof (off_bound_div (add_vec_int pc 2) 2 ltac:(lia) ltac:(exists 2048; lia) Hvah2) as Hoffh. rewrite (uint_unsigned_n _) in Hoffh.
         (* absorb the LOW translation: pc -> pa_of ppnl pc, at [σ -> s1] *)
@@ -416,7 +417,7 @@ Section SmodeCorePt.
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcanl) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma _ with "Hkl Hreg Hmem Hinv")
+                Lpma (sr_adm_id R pc ppnl Hidl) _ with "Hkl Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         assert (L1pc : register_lookup PC s1.(sregs) = pc)
@@ -442,7 +443,7 @@ Section SmodeCorePt.
                 (or_introl eq_refl) eq_refl (lo_canonical (add_vec_int pc 2) Hcanh) ltac:(reflexivity)
                 L1misa L1menv L1htif L1priv L1SXL
                 (exec_effectivePrivilege_fetch _ _ s1) (exec_is_shadow_stack_fetch s1)
-                L1pma _ with "Hkh Hreg Hmem Hinv")
+                L1pma (sr_adm_id R (add_vec_int pc 2) ppnh Hidh) _ with "Hkh Hreg Hmem Hinv")
           as (s2) "(%Htr2 & %Hmdev2 & %Hsh2 & %Hgr2 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh2) as Hpres2.
         assert (Hpres12 : forall rr, register_beq rr tlb = false ->
@@ -519,14 +520,14 @@ Section SmodeCorePt.
         iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "#Hb0".
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iEval (rewrite pa_add_0) in "Hb0".
-        iDestruct (code_text with "Hb0") as (ppn) "[#Hk %Htext0]".
+        iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off4_bound pc Hal) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
         unshelve iMod (sr_absorb R (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma _ with "Hk Hreg Hmem Hinv")
+                Lpma (sr_adm_id R pc ppn Hid) _ with "Hk Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 4 4 (nth_byte w) ppn
@@ -568,14 +569,14 @@ Section SmodeCorePt.
         iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hbytes") as "#Hb0".
         { rewrite lookup_seq_lt; [reflexivity | lia]. }
         iEval (rewrite pa_add_0) in "Hb0".
-        iDestruct (code_text with "Hb0") as (ppn) "[#Hk %Htext0]".
+        iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off_bound_div pc 2 ltac:(lia) ltac:(exists 2048; lia) H2al) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
         unshelve iMod (sr_absorb R (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma _ with "Hk Hreg Hmem Hinv")
+                Lpma (sr_adm_id R pc ppn Hid) _ with "Hk Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 2 2 (nth_byte h) ppn
