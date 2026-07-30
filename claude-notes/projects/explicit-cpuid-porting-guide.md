@@ -203,6 +203,32 @@ is the open design question in `explicit-cpuid.md`, to be settled against
 actually changes), so it is easy to build consumers that violate it and only
 find out at Stage 2. Don't.
 
+## Discharge gotchas (all found the hard way)
+
+- **`$!` cannot skip an intervening wand or nested `∀`.** `iApply ("Hcont" $!
+  cpu_id v with …)` mis-targets the wand's antecedent or fails to parse. Do the
+  pure premise first: `iSpecialize ("Hcont" $! cpu_id with "[]");
+  [iPureIntro; done|].` then a plain `iApply` for the rest.
+- **A `wp_next` obligation under a `▷`:** put the later OUTSIDE
+  (`▷ wp_next b (fun CID => …)`), so the existing `iNext` strips it from goal
+  and hypothesis exactly as before. Inside, one `iApply` cannot peel a later
+  and a wand at once and you need an `iSpecialize` first.
+- **`iIntros (CID)` fails with "CID is already used"** against the section's
+  `Context \`{CID : CpuId}` — a term-level `fun (CID : CpuId) =>` binder
+  shadows fine, but `iIntros`/`intro` do NOT. In proofs always introduce a
+  FRESH name (`CID1`, `CID2`, …); the names do not matter, resolution is
+  positional.
+- **A local proof variable named `b`** collides with the new `(b : bool)`
+  lemma binder. Rename the local, never the binder. Same for a statement-level
+  `b : bv 8` byte value (`SpecUart`'s became `bt`).
+- **`rdok_split` poses without `as`**, so its projections get generated names.
+  `congruence` finds the sp one fine, but `tp_refold` takes its hypothesis BY
+  NAME — write `tp_refold (rd_ok_tp _ Hrdok) "Hfile"`, which is name-free and
+  a line shorter anyway.
+- **Not every leaf case-splits on `b`.** Leaves that never inspect the arm
+  (WpPlic's, the WFI leaf) just carry it through opaquely — no `destruct b` at
+  all. Only split when the old proof destructed the disjunction.
+
 ## The SIE arm
 
 `iDestruct "Harm" as "[Hq0 | (Hq1 & …)]"` becomes a plain **`destruct b`**
