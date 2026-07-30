@@ -20,6 +20,7 @@ Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes.
 Require Import PtTree KptTree KvmMap.
+Require Import KptGhost KptShare.
 Require Import TransPt.
 Require Import UserretDefs.
 Require Import WpKvminithart WpKvminithartInstr.
@@ -48,7 +49,7 @@ Section KvminithartBody.
   Proof.
     unfold wp_kvminithart_sconf_body.
     intros Hlvl HK Hrep Hpas.
-    iIntros "Hcg Hbit #Htext Hpc Htlb Hcell Hptree Hcont".
+    iIntros "Hcg Hbit #Htext Hpc Htlb Hcell Hptree Hunset Hcont".
     (* register disequalities for creg mapping *)
     assert (Hc6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14 : mword 5))
       by (vm_compute; reflexivity).
@@ -267,11 +268,19 @@ Section KvminithartBody.
     iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp & Hauth)".
     iMod (reg_update _ satp _ (kvi_satp_word t) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
     iMod (kvm_M_mint pas with "Hauth") as "(Hauth & #Htramp & #Hkstacks)".
-    iDestruct (tlb_inv_pt_intro (pt_base t) (kvi_satp_word t) tlbz1 t (kvm_M pas)
+    (* THE PUBLICATION: the exclusive tree + the freshly grown auth go into
+       the shared invariant [kpt_inv], spending the one-shot; what this hart
+       keeps is the RESIDUE (its own satp/tlb/pmp cells + the persistent
+       snapshot [kpt_lb t] + [kpt_inv] riding along).  Same ghost step as
+       [KptShare.tlb_inv_pt_share], inlined so [kpt_inv] itself lands in
+       hand for the postcondition. *)
+    iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) _
+            (kvm_bridge pas t (pt_base t) Hpas eq_refl Hrep)
+            with "Hptree Hauth Hunset") as "[#Hkinv #Hlbt]".
+    iDestruct (tlb_res_pt_intro (pt_base t) (kvi_satp_word t) tlbz1 t
                  (kvi_satp_mode t) (kvi_satp_asid t) (kvi_satp_ppn t)
                  (tlb_ok_pt_empty (mword_of_int 0) t tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
-                 (kvm_bridge pas t (pt_base t) Hpas eq_refl Hrep)
-                 with "Hsatpc Htlb Hauth Hptree [Hpmp]") as "Htlbinv".
+                 with "Hsatpc Htlb Hlbt [Hpmp] Hkinv") as "Htlbinv".
     { iApply (pmp_config_reindex (mword_of_int 0) (pt_base t) with "Hpmp"). }
     iMod (strans_bit_flip with "Hbit Hbit2") as "[Hbitkpt Hbitkpt2]".
     iDestruct (strans_inv_intro (pt_base t) with "Hbitkpt2 Htlbinv") as "Htr".
@@ -321,12 +330,16 @@ Section KvminithartBody.
     { iDestruct (strans_bit_agree with "Hbitkpt Hbit0") as %Hbad.
       apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate. }
     iDestruct "Hk" as (root_ppn) "Htlbinv".
-    iDestruct (tlb_inv_pt_open with "Htlbinv") as (ksatp3 tlbvec3 kt3 M3)
-      "(Hsatp & %HkMode3 & %Hkasid3 & %Hkppn3 & Htlbc & %Hokk3 & %Hspeck3 & HM & Hkt & Hpmp)".
+    (* the flush touches only THIS hart's tlb cell: the tree stays inside
+       [kpt_inv], and the post-flush coherence is [tlb_ok_pt_empty] at the
+       residue's OWN snapshot, so no invariant is opened in this step. *)
+    iDestruct (tlb_res_pt_open with "Htlbinv") as (ksatp3 tlbvec3)
+      "(Hsatp & %HkMode3 & %Hkasid3 & %Hkppn3 & Htlbc & Hsnap3 & Hpmp & #Hkinv3)".
+    iDestruct "Hsnap3" as (kt3) "(_ & #Hlb3)".
     iMod (reg_update _ tlb _ tlbz3 with "Hreg Htlbc") as "[Hreg Htlbc]".
-    iDestruct (tlb_inv_pt_intro root_ppn ksatp3 tlbz3 kt3 M3 HkMode3 Hkasid3 Hkppn3
+    iDestruct (tlb_res_pt_intro root_ppn ksatp3 tlbz3 kt3 HkMode3 Hkasid3 Hkppn3
                  (tlb_ok_pt_empty (mword_of_int 0) kt3 tlbz3 (fun vpn' => Hnone3 _ (tlb_hash_range vpn')))
-                 Hspeck3 with "Hsatp Htlbc HM Hkt Hpmp") as "Htlbinv".
+                 with "Hsatp Htlbc Hlb3 Hpmp Hkinv3") as "Htlbinv".
     iDestruct (strans_inv_intro root_ppn with "Hbit1 Htlbinv") as "Htr".
     iAssert (sie_cap γ S4 (K - 2)) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
@@ -403,7 +416,7 @@ Section KvminithartBody.
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi2a [-]").
     iIntros "Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
     (* ---- hand the continuation the post-switch resources ---- *)
-    iApply ("Hcont" $! Efin with "Hcg Hpc [%] Hbitkpt [Hstv] Hcell Htramp Hkstacks").
+    iApply ("Hcont" $! Efin with "Hcg Hpc [%] Hbitkpt [Hstv] Hcell Hkinv Htramp Hkstacks").
     { (* callee_saved mm Efin *)
       unfold callee_saved.
       repeat split;

@@ -52,6 +52,7 @@ Require Import WpMmodeLeafBase StackOwn.
 Require Import SmodeCore MstatusBits KernelText WpKvInstr.
 Require Import VcGen VcGenS.
 Require Import KptTree.
+Require Import KptShare.
 Require Import WpSmodePtLeaves WpSmodePtCtl.
 Require Import IntrDefs.
 (* legalize_sie_clear_idem + have_nom_val: kept QUALIFIED (no Import) so the
@@ -389,7 +390,7 @@ Section KernelvecCore.
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 : bv 64)
       {dq : dfrac} :
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is (mword_of_int (KV + 0x2)) -∗
     gpr_file m -∗
     kernel_text -∗
@@ -411,7 +412,7 @@ Section KernelvecCore.
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈ vold16 -∗
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈ vold17 -∗
     ( smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KV + 0x24)) -∗
       gpr_file m -∗
       (m !!! Regidx csp_rs1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -554,7 +555,7 @@ Section KernelvecCore.
       (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64)
       {dq : dfrac} :
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is (mword_of_int (KV + 0x28)) -∗
     gpr_file m -∗
     kernel_text -∗
@@ -576,7 +577,7 @@ Section KernelvecCore.
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈ w16 -∗
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈ w17 -∗
     ( smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KV + 0x4a)) -∗
       gpr_file (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) -∗
       (m !!! Regidx csp_rs1) ↦₈ w1 -∗
@@ -801,7 +802,7 @@ Section KernelvecCore.
        vold13 vold14 vold15 vold16 vold17 : bv 64)
       (Φ : mval -> iProp Σ) :
     smode_config γ (DfracOwn (1/2)) -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
     kernel_text -∗
@@ -823,7 +824,7 @@ Section KernelvecCore.
     (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ vold16 -∗
     (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ vold17 -∗
     ( smode_config γ (DfracOwn (1/2)) -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (mword_of_int (KernelSyms.kerneltrap) : mword 64) -∗
       gpr_file (kv_m2 m) -∗
       ((((kv_sp1 m)))) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -1016,7 +1017,7 @@ Section KernelvecCore.
     mie ↦ᵣ{DfracOwn (1/2)} mie_v -∗
     mideleg ↦ᵣ{DfracOwn (1/2)} mdv0 -∗
     menvcfg ↦ᵣ{DfracOwn (1/2)} menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     sepc ↦ᵣ sepc0 -∗
     pc_is (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64) -∗
     gpr_file mt -∗
@@ -1044,7 +1045,7 @@ Section KernelvecCore.
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
       menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       sepc ↦ᵣ sepc0 -∗
       pc_is (ret_pc sepc0) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> (<[Regidx (mword_of_int 31 : mword 5) := regval_into_reg v17]> (<[Regidx (mword_of_int 30 : mword 5) := regval_into_reg v16]> (<[Regidx (mword_of_int 29 : mword 5) := regval_into_reg v15]> (<[Regidx (mword_of_int 28 : mword 5) := regval_into_reg v14]> (<[Regidx (mword_of_int 17 : mword 5) := regval_into_reg v13]> (<[Regidx (mword_of_int 16 : mword 5) := regval_into_reg v12]> (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v11]> (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg v10]> (<[Regidx (mword_of_int 13 : mword 5) := regval_into_reg v9]> (<[Regidx (mword_of_int 12 : mword 5) := regval_into_reg v8]> (<[Regidx (mword_of_int 11 : mword 5) := regval_into_reg v7]> (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg v6]> (<[Regidx (mword_of_int 7 : mword 5) := regval_into_reg v5]> (<[Regidx (mword_of_int 6 : mword 5) := regval_into_reg v4]> (<[Regidx (mword_of_int 5 : mword 5) := regval_into_reg v3]> (<[Regidx (mword_of_int 3 : mword 5) := regval_into_reg v2]> (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg v1]> (mt))))))))))))))))))) -∗
@@ -1217,7 +1218,7 @@ Section KernelvecCore.
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     sepc ↦ᵣ sepc0 -∗
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
     gpr_file m -∗
@@ -1245,7 +1246,7 @@ Section KernelvecCore.
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
       menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       sepc ↦ᵣ sepc0 -∗
       pc_is (ret_pc sepc0) -∗
       gpr_file m -∗
@@ -1302,8 +1303,14 @@ Section KernelvecCore.
     assert (Hra_l : kv_m2 m !!! Regidx (mword_of_int 1 : mword 5)
                     = regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
     { unfold kv_m2. apply upd_eq. }
-    iDestruct (tlb_inv_pt_open with "Htlbinv") as (satp0 tlbmid t0 M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hokmid & %Hspec0 & HM & Hpte & Hpmp)".
+    (* the kerneltrap axiom wants this hart's satp/tlb CELLS, so the
+       translation residue is peeled here and rebuilt for the epilogue.
+       Under the SHARED table nothing about the tree comes out: the
+       [∃ t0, ⌜tlb_ok_pt 0 t0 tlbmid⌝ ∗ kpt_lb t0] snapshot and the
+       persistent [kpt_inv] frame across the call untouched. *)
+    iDestruct (tlb_res_pt_open with "Htlbinv") as (satp0 tlbmid)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+    iDestruct "Hsnap" as (tsnap) "(%Hokmid & #Hlbsnap)".
     iApply (Kerneltrap.kerneltrap_returns γ (DfracOwn (1/2)) (kv_m2 m) (kv_sp1 m)
               (regval_into_reg (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64))
               satp0 tlbmid
@@ -1321,9 +1328,9 @@ Section KernelvecCore.
     assert (Hsp'' : m' !!! Regidx csp_rs1 = kv_sp1 m).
     { rewrite (Hpres _ Hsp_nc). exact Hsp_l. }
     (* ---- instrs #20..#38: epilogue (restores + sp cancel + sret) ---- *)
-    iDestruct (tlb_inv_pt_intro root_ppn satp0 tlbmid t0 M
-                 Hmode Hasid Hppn Hokmid Hspec0
-                 with "Hsatp Htlb HM Hpte Hpmp") as "Htlbinv".
+    iDestruct (tlb_res_pt_intro root_ppn satp0 tlbmid tsnap
+                 Hmode Hasid Hppn Hokmid
+                 with "Hsatp Htlb Hlbsnap Hpmp Hkinv") as "Htlbinv".
     iApply (wp_kv_epilogue root_ppn γ m' (kv_sp1 m) mstatus0 mie_v mdv0 menvcfg0 sepc0
 
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))

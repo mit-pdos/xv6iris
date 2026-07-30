@@ -41,6 +41,7 @@ Require Import WpGpr WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KptTree.
 Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *)
 Require Import KptGhost.   (* kptN: named in the mask premise *)
+Require Import KptShare.   (* tlb_res_pt: the SHARED table's per-hart residue *)
 Require Import SRegime.
 Require Import MstatusBits WpIntrCore.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
@@ -249,7 +250,7 @@ Section IntrDefs.
      need [cfg_ok], the PT walk needs PBMTE=0 / ADUE), and S-mode never runs
      at any other value, so a parameter would only ever be instantiated at
      [MENVCFG_S] anyway. *)
-  (* [intr_frame] carries [tlb_inv_pt] -- the KPT arm of the translation
+  (* [intr_frame] carries [tlb_res_pt] -- the KPT arm of the translation
      slot -- rather than the slot itself, and that is deliberate: xv6
      enables interrupts only after kvminithart has installed the kernel
      table, so an interrupt can never be taken under Bare.  (Bare with
@@ -259,7 +260,7 @@ Section IntrDefs.
   Definition intr_frame (root_ppn : mword 44)
       (m : regfile) : iProp Σ :=
     (menvcfg ↦ᵣ MENVCFG_S ∗
-     tlb_inv_pt root_ppn ∗
+     tlb_res_pt root_ppn ∗
      stack_own (m !!! Regidx csp_rs1) kv_frame_slots)%I.
 
   (* [intr_frame] depends on [m] only through sp: any register write that
@@ -457,10 +458,10 @@ Section IntrDefs.
 
   Definition strans_inv : iProp Σ :=
     ((strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
-     ∨ (strans_bit ('b"1") ∗ ∃ root_ppn : mword 44, tlb_inv_pt root_ppn))%I.
+     ∨ (strans_bit ('b"1") ∗ ∃ root_ppn : mword 44, tlb_res_pt root_ppn))%I.
 
   Lemma strans_inv_intro (root_ppn : mword 44) :
-    strans_bit ('b"1") -∗ tlb_inv_pt root_ppn -∗ strans_inv.
+    strans_bit ('b"1") -∗ tlb_res_pt root_ppn -∗ strans_inv.
   Proof. iIntros "Hbit H". iRight. iFrame "Hbit". iExists root_ppn. iExact "H". Qed.
 
   Lemma strans_inv_intro_bare (v : mword 64) :
@@ -510,7 +511,7 @@ Section IntrDefs.
   (* ------------------------------------------------------------------- *)
   (* [strans_regime] -- the slot packaged as a DERIVED [s_regime]: each    *)
   (* field destructs the disjunct and delegates to the proven              *)
-  (* [bare_regime] / [kpt_regime root] fields, so every engine and leaf    *)
+  (* [bare_regime] / [kpt_share_regime root] fields, so every engine+leaf  *)
   (* built on the R-generic machinery serves BOTH regimes with the slot    *)
   (* kept folded (no skolem-root open/repack at leaf level).               *)
   (* ------------------------------------------------------------------- *)
@@ -550,7 +551,7 @@ Section IntrDefs.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
       iFrame "Hri Hgh". iLeft. iFrame "Hbit Hb Hstv".
     - iDestruct "Hk" as (root_ppn) "Ht".
-      iMod (kpt_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
+      iMod (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
               with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
       iModIntro. iExists σ'.
       iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
@@ -572,7 +573,7 @@ Section IntrDefs.
     iIntros "Hri [(_ & Hb & _) | (_ & Hk)]".
     - iApply (bare_transform acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Hb").
     - iDestruct "Hk" as (root_ppn) "Ht".
-      iApply (kpt_transform root_ppn acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Ht").
+      iApply (res_transform root_ppn acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Ht").
   Qed.
 
   Definition strans_regime : s_regime :=

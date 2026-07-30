@@ -28,12 +28,17 @@
    SpecEntry.v.
 
    THIS FILE STATES THE BOOT-HART CONTRACT ONLY ([fin_to_nat cpu_id = 0]).  The
-   secondary-hart contract is designed but not statable yet: the per-hart
-   resources its [kvminithart] needs are globally unique in today's model
-   ([ptree_own] at full fraction inside [tlb_inv_pt], [kmap_auth] at fraction
-   1), and [SchedCtx.procs_inv] is indexed by the AMBIENT hart through
-   [p_sched]'s [cid_word], so hart 0's cannot be hart 1's.  See
-   claude-notes/projects/main-boot.md (G5) for what has to move first.
+   secondary-hart contract is not statable yet, but the KERNEL PAGE TABLE is no
+   longer what blocks it: kvminithart now publishes the table as the shared
+   invariant [KptShare.kpt_inv] and every hart's Sv39 translation runs on the
+   per-hart residue [tlb_res_pt], so the table itself is shareable and rides to
+   the secondaries in [P] below.  What still has to move (claude-notes/
+   projects/main-boot.md G5): (i) [SRegime.bare_inv] carries the globally
+   unique [kmap_auth kmap_M0] -- it is the refutation that makes Bare-arm
+   claim honoring provable, so at most ONE hart can ever be in its Bare arm,
+   and every secondary spends its whole pre-switch phase there; (ii)
+   [SchedCtx.procs_inv] is indexed by the AMBIENT hart through [p_sched]'s
+   [cid_word], so hart 0's cannot be hart 1's.
 
    THE DEVICES.  The three device invariants ([WpUart.uart_inv] /
    [plic_inv] / [disk_inv], bundled as [dev_inv]) exist FROM TIME 0: they are
@@ -69,10 +74,21 @@
    ([DiskBoot.disk_res_boot]) -- the disk's PAGES (its configuration identity)
    are chosen by kalloc inside virtio_disk_init, so [pd pav pu] are quantified
    here too, and the persistent [DiskInv.disk_geom] that names them travels
-   alongside the lock.  Everything else a secondary hart wants is either
-   already persistent in main's own precondition (the device bundle) or, per
-   G5, not statable yet.  main's proof therefore never has to know what the
-   secondaries want.
+   alongside the lock.
+
+   ... and, out of kvminithart's post, THE KERNEL PAGE TABLE: the shared
+   invariant [KptShare.kpt_inv root], the root cell main PERSISTS after
+   kvminit wrote it ([kernel_pagetable ↦₈□ root_b]), and the 65 mapping
+   claims the switch minted (trampoline + the 64 kernel stacks).  The root
+   and the kstack pas are kalloc-chosen inside kvminit, so [root] and [pas]
+   are quantified in the wand exactly as the disk's pages are.  All of it is
+   persistent, which is what lets it ride the one-shot escrow to every
+   secondary -- a secondary's own kvminithart needs no exclusive tree, only
+   [kpt_inv] and the root cell.
+
+   Everything else a secondary hart wants is either already persistent in
+   main's own precondition (the device bundle) or, per G5, not statable yet.
+   main's proof therefore never has to know what the secondaries want.
 
    THE INTERRUPT QUARTER.  [IntrDefs]'s SIE choreography splits the live-bit
    ghost 1/2 (tied in [sconf]) + 1/8 (the capability's arm) + 1/8 (the
@@ -101,6 +117,9 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
+(* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
+   the 65 claims are what the deposit wand carries to the secondaries *)
+Require Import KptGhost KptShare KptExecMap KvmMap.
 Require Import SpecPanic.
 Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
@@ -199,6 +218,9 @@ Section SpecMain.
         (mword_of_int KernelSyms.panicking : mword 64) ↦₄ pv ∗
         (mword_of_int KernelSyms.panicked : mword 64) ↦₄ pkv) ∗
      (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) ∗
+     (* the kernel page-table root: RAW here (kvminit writes it), and
+        PERSISTED by main once kvminithart has installed it -- the ↦₈□ form
+        is what the deposit wand hands the secondaries *)
      (∃ kpt0 : mword 64,
         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) ∗
      ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
@@ -271,11 +293,18 @@ Section SpecMain.
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)
     started_inv P -∗
-    □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64),
+    □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
+         (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
          procs_inv γ Φ γs -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
-         disk_geom γv pd pav pu -∗ P) -∗
+         disk_geom γv pd pav pu -∗
+         kpt_inv root -∗
+         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
+           (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
+         kmap_at tramp_vpn tramp_ppn KP_rx -∗
+         ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
+         P) -∗
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -295,6 +324,12 @@ Section SpecMain.
     ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
     disk_done_lb γv 0%nat -∗
     main_hart_raw tlbvec0 -∗
+    (* the shared kernel page table's one-shot, minted at adequacy beside the
+       per-hart strans halves and spent exactly once -- inside kvminithart,
+       which publishes the table it just installed as [kpt_inv].  It is
+       GLOBAL, not per-hart, so it travels beside the boot bridge rather
+       than through it. *)
+    kpt_unset -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     (* ...and what the scheduler at the far end still wants, which main
        cannot build: the proc-lock names are chosen when main allocates the

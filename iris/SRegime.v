@@ -12,12 +12,17 @@
    identity/region assumption at this altitude.  The PMP grant facts at
    the output state are exposed for the subsequent memory access.
    Instances:
-     - [kpt_regime root_ppn]: sr_inv := tlb_inv_pt root_ppn; the fields
-       are the existing absorption wrappers + the ktramp-style PMP
-       peel-and-reseal.
+     - [kpt_share_regime root_ppn] (§3): sr_inv := [KptShare.tlb_res_pt
+       root_ppn], the per-hart residue of the SHARED kernel table -- the
+       whole sconf tier's Sv39 instance.  Its absorb is the one that
+       actually uses the mask (it opens [kptN]).
      - [bare_regime]: satp pinned to Mode=Bare + pmp_config; translation
        short-circuits to the identity before touching the TLB
-       ([exec_translateAddr_bare]), so absorption is trivial.           *)
+       ([exec_translateAddr_bare]), so absorption is trivial.
+   There is deliberately NO instance over the EXCLUSIVE [tlb_inv_pt]: the
+   userret/uservec island that still owns the kernel tree outright
+   (TrampStepPt / UserretEntryPt / UservecExitPt) drives KptTree's
+   absorption theorems directly and never goes through this record.    *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -148,7 +153,7 @@ Section TransformFront.
 End TransformFront.
 
 (* ===================================================================== *)
-(* §2 The regime record + the two instances.                              *)
+(* §2 The regime record + the BARE instance (the Sv39 one is §3).          *)
 (* ===================================================================== *)
 
 (* the access classes the S-mode leaves use *)
@@ -236,91 +241,6 @@ Section SRegimeDef.
     iPureIntro. rewrite /pmp_grant_facts Hpcv Hpav. tauto.
   Qed.
 
-  Lemma tlb_inv_pt_grant_facts (root_ppn : mword 44) (σ : mstate) :
-    reg_interp σ.(sregs) -∗ tlb_inv_pt root_ppn -∗ ⌜pmp_grant_facts σ⌝.
-  Proof.
-    iIntros "Hri Hinv".
-    iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M)
-      "(Hsatp & _ & _ & _ & Htlb & _ & _ & _ & Ht & Hpmp)".
-    iApply (pmp_config_grant_facts with "Hri Hpmp").
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* The Sv39-kernel instance.                                            *)
-  (* ------------------------------------------------------------------- *)
-  (* SINGLE-PATH (rwx-kmap): the claim + [kperm_variant_check] dispatch
-     replaces the old four-way region case bash. *)
-  Lemma kpt_absorb (root_ppn : mword 44) :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
-      kperm_allows pc acc ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec ppn
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ↑kptN ⊆ E ->
-      ⊢ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt root_ppn ={E}=∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn.
-  Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
-    iIntros "Hat Hri Hgh Hinv".
-    iAssert (|==> ∃ σ' : mstate,
-      ⌜ exec (translateAddr (Virtaddr va) acc) σ
-        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-      ⌜ (σ'.(sregs) = σ.(sregs) \/
-         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_inv_pt root_ppn)%I
-      with "[Hat Hri Hgh Hinv]" as ">H".
-    { iApply (tlb_inv_pt_translateAddr_at acc root_ppn va pa ppn pc σ
-                (fun a d mxr do_sum =>
-                   kperm_variant_check ppn pc acc a d mxr do_sum Hacc Hallow)
-                Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall
-                with "Hat Hri Hgh Hinv"). }
-    iDestruct "H" as (σ') "(%Htr & %Hmdev & %Hsh & Hri & Hgh & Hinv)".
-    iDestruct (tlb_inv_pt_grant_facts root_ppn σ' with "Hri Hinv") as %Hpmp.
-    iModIntro. iExists σ'. iFrame "Hri Hgh Hinv". iPureIntro. tauto.
-  Qed.
-
-  Lemma kpt_transform (root_ppn : mword 44) :
-    forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),
-      s_acc_ok acc ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
-      ⊢ reg_interp σ.(sregs) -∗ tlb_inv_pt root_ppn -∗
-        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝.
-  Proof.
-    intros acc ea σ Hacc Hcp HSXL Heff Hpml.
-    iIntros "Hri Hinv".
-    iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & _)".
-    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
-    iPureIntro.
-    exact (exec_transform_effective_address_mode acc Sv39 ea σ Hcp Heff Hpml
-             (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode)).
-  Qed.
-
-  Definition kpt_regime (root_ppn : mword 44) : s_regime :=
-    SRegime (tlb_inv_pt root_ppn) (kpt_absorb root_ppn) (kpt_transform root_ppn).
 
   (* ------------------------------------------------------------------- *)
   (* The BARE instance (boot: satp Mode = Bare, translation = identity).   *)

@@ -14,7 +14,7 @@
        syntactically;
      - the fixed context threaded through every step is the S-mode machine
        configuration (Supervisor privilege, mstatus/mie/mideleg/menvcfg,
-       the PMP TOR-covers-RAM geometry, and the [tlb_inv_pt root_ppn]
+       the PMP TOR-covers-RAM geometry, and the [tlb_res_pt root_ppn]
        identity-translation invariant) instead of [mmode_config];
      - all loads/stores are sp-relative 8-byte accesses (that is all the
        S-mode RVC-shape leaves cover today).
@@ -38,6 +38,7 @@ Require Import SRegime.
 Require Import SmodeCore.
 Require Import VcGen.
 Require Import KptTree.
+Require Import KptShare.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMem WpSmodePtMemWrap.
 From iris.base_logic.lib Require Import invariants.
@@ -751,7 +752,7 @@ Section VcGenSIris.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is (mword_of_int st.(vpc)) -∗
     gpr_file (vregs_den ρ st.(vregs)) -∗
     block_instrs_s st.(vpc) prog -∗
@@ -760,7 +761,7 @@ Section VcGenSIris.
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (mword_of_int st'.(vpc)) -∗
       gpr_file (vregs_den ρ st'.(vregs)) -∗
       vheap_own ρ st'.(vheap) -∗
@@ -768,7 +769,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_vc_block_s_den_r (kpt_regime root_ppn) prog Φ st st' ρ mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
+    exact (wp_vc_block_s_den_r (kpt_share_regime root_ppn) prog Φ st st' ρ mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 
 
@@ -1210,7 +1211,7 @@ Section VcGenSIris.
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is (mword_of_int st.(vpc)) -∗
     gpr_file m -∗
     block_instrs_s st.(vpc) prog -∗
@@ -1221,7 +1222,7 @@ Section VcGenSIris.
       hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (mword_of_int st'.(vpc)) -∗
       gpr_file mf -∗
       vheap_own ρ st'.(vheap) -∗
@@ -1229,7 +1230,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_vc_block_s_aux_r (kpt_regime root_ppn) prog Φ st st' ρ m m0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
+    exact (wp_vc_block_s_aux_r (kpt_share_regime root_ppn) prog Φ st st' ρ m m0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 
   (* Thin wrapper over [wp_vc_block_s_aux]: instantiate the auxiliary
@@ -1288,7 +1289,7 @@ Section VcGenSIris.
     vc_block_s st prog = Some st' ->
     gpr_matches ρ st.(vregs) m ->
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is (mword_of_int st.(vpc)) -∗
     gpr_file m -∗
     block_instrs_s st.(vpc) prog -∗
@@ -1297,7 +1298,7 @@ Section VcGenSIris.
     ( ∀ mf : regfile,
       ⌜ gpr_matches ρ st'.(vregs) mf ∧ agree_off st'.(vregs) mf m ⌝ -∗
       smode_config γ dq -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (mword_of_int st'.(vpc)) -∗
       gpr_file mf -∗
       vheap_own ρ st'.(vheap) -∗
@@ -1305,7 +1306,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_vc_block_s_r (kpt_regime root_ppn) prog Φ st st' ρ m γ (dq:=dq)).
+    exact (wp_vc_block_s_r (kpt_share_regime root_ppn) prog Φ st st' ρ m γ (dq:=dq)).
   Qed.
 
   (* ================================================================== *)
@@ -1372,20 +1373,20 @@ Section VcGenSIris.
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
     ( ⌜neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true⌝ -∗
-      smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
+      smode_config γ dq -∗ tlb_res_pt root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     ( ⌜neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false⌝ -∗
-      smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
+      smode_config γ dq -∗ tlb_res_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_bne_split_s_r (kpt_regime root_ppn) Φ pc imm rs2 rs1 m γ (dq:=dq)).
+    exact (wp_bne_split_s_r (kpt_share_regime root_ppn) Φ pc imm rs2 rs1 m γ (dq:=dq)).
   Qed.
 
   Lemma wp_beq_split_s_r (R : s_regime) (Φ : mval -> iProp Σ)
@@ -1430,20 +1431,20 @@ Section VcGenSIris.
     uint rs1 <> 0 -> uint rs2 <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     smode_config γ dq -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is pc -∗ gpr_file m -∗
     instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
     ( ⌜eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = true⌝ -∗
-      smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
+      smode_config γ dq -∗ tlb_res_pt root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     ( ⌜eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2) = false⌝ -∗
-      smode_config γ dq -∗ tlb_inv_pt root_ppn -∗
+      smode_config γ dq -∗ tlb_res_pt root_ppn -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_beq_split_s_r (kpt_regime root_ppn) Φ pc imm rs2 rs1 m γ (dq:=dq)).
+    exact (wp_beq_split_s_r (kpt_share_regime root_ppn) Φ pc imm rs2 rs1 m γ (dq:=dq)).
   Qed.
 
 End VcGenSIris.

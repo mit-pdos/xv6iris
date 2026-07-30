@@ -34,6 +34,15 @@
      - [kmap_auth kmap_M0], both halves of the Bare arm bit
        [strans_bit strans_bit_bare], the [tlb] cell and the three trap
        CSRs: minted by [RiscvAdequacy.riscv_system_adequacy];
+       [kmap_auth kmap_M0] is LOAD-BEARING here and stays: it is what
+       [bare_inv] pins the static map with, and hence the refutation that
+       makes Bare-arm claim honoring provable ([kmap_at_M0_static]).  It is
+       also globally unique, which is why at most one hart can ever be in
+       its Bare arm -- see SpecMain.v's header for the G5 consequence.
+       Adequacy's OTHER one-shot, [KptGhost.kpt_unset], deliberately does
+       NOT come through this file: it is global rather than per-hart and is
+       spent inside kvminithart, so it travels BESIDE the bridge, straight
+       into main's precondition;
      - the cpus[0] struct cells ([a_cpu_noff] / [a_cpu_int] /
        [a_cpu_proc] / the 14 context words behind [cpu_ctx_free]) and the
        [stvec] cell: .bss, from the memory image.

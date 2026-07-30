@@ -12,6 +12,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpDecode ExecCommon WpGpr WpGprCsrwCommon.
 Require Import SRegime.
+Require Import KptShare.
 Require Import SmodeCore WpMmodeLeafBase.
 Require Import WpSmodeSret MstatusBits.
 Require Import KptTree SmodeCorePt.
@@ -338,18 +339,18 @@ Section WpSmodePtCtl.
     uint rd <> 0 ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     smode_config γ (DfracOwn q) -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc false (JAL (imm, Regidx rd)) -∗
     ( smode_config γ (DfracOwn q) -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_jal_gpr_s_zca_r (kpt_regime root_ppn) γ Φ pc rd imm m q).
+    exact (wp_jal_gpr_s_zca_r (kpt_share_regime root_ppn) γ Φ pc rd imm m q).
   Qed.
 
   (* ---- from WpSmodeJalr.v ---- *)
@@ -680,7 +681,7 @@ Section WpSmodePtCtl.
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     sepc ↦ᵣ sepc0 -∗
     pc_is pc -∗
     gpr_file m -∗
@@ -691,14 +692,14 @@ Section WpSmodePtCtl.
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
       menvcfg ↦ᵣ menvcfg0 -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       sepc ↦ᵣ sepc0 -∗
       pc_is (ret_pc sepc0) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_sret_gpr_r (kpt_regime root_ppn) Φ pc mstatus0 mie_v mdv0 menvcfg0 sepc0 m).
+    exact (wp_sret_gpr_r (kpt_share_regime root_ppn) Φ pc mstatus0 mie_v mdv0 menvcfg0 sepc0 m).
   Qed.
 
 End WpSmodePtCtl.

@@ -1,5 +1,10 @@
 (* SmodeCorePt.v -- the S-mode instruction-step ENGINE over the
-   generalized page-table-tree invariant [tlb_inv_pt] (KptTree.v).
+   generalized page-table-tree invariant (KptTree.v).  The [_pt] family
+   here is the RESTATEMENT layer of the regime-generic engines at the
+   Sv39-kernel instance, and that instance is now the SHARED table's
+   per-hart residue [KptShare.tlb_res_pt] ([kpt_share_regime]) -- the
+   names keep their [_pt] suffix, which reads "over the page-table
+   regime".
 
    The successor of [wp_instr_s_tlbinv]/[wp_instr_s_tlbinv_ad]
    (SmodeCore.v): the fetch's per-chunk translation goes through the
@@ -22,10 +27,10 @@
      - [tlb_inv_pt_fetch]: the unified S-mode fetch as a [==∗]: for any
        geometry (4-aligned Base / 2-aligned 2+2 Base / RVC at either
        alignment), [exec (fetch tt) σ = Some (r, σf)] with the state
-       interpretation and [tlb_inv_pt] re-established at [σf], reusing
+       interpretation and [tlb_res_pt] re-established at [σf], reusing
        SmodeCore's state-generic fetch drivers [exec_fetch_*_S_gen];
      - [wp_instr_s_tlbinv_pt]: the step engine, same interface as
-       [wp_instr_s_tlbinv] with [tlb_inv_pt] threaded in place of
+       [wp_instr_s_tlbinv] with [tlb_res_pt] threaded in place of
        [tlb_inv].                                                        *)
 From Stdlib Require Import ZArith Bool.
 From stdpp Require Import gmap bitvector.definitions.
@@ -40,6 +45,7 @@ Require Import SmodeCore.
 Require Import KptPt UserBits.
 Require Import KptTree.
 Require Import KptGhost.   (* kptN: named in the mask premise *)
+Require Import KptShare.   (* tlb_res_pt: the shared-table residue *)
 Require Import SRegime.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -865,8 +871,9 @@ Section SmodeCorePt.
 
   (* =================================================================== *)
   (* Sv39-kernel instances under the ORIGINAL names/signatures: nothing   *)
-  (* downstream moves.  [sr_inv (kpt_regime root_ppn)] is definitionally  *)
-  (* [tlb_inv_pt root_ppn], so [exact] closes each restatement.           *)
+  (* downstream moves.  [sr_inv (kpt_share_regime root_ppn)] IS            *)
+  (* [tlb_res_pt root_ppn] definitionally, so [exact] closes each          *)
+  (* restatement.                                                         *)
   (* =================================================================== *)
   Lemma tlb_inv_pt_fetch (root_ppn : mword 44) (σ : mstate)
       (pc : mword 64) (r : FetchResult) (E : coPset) :
@@ -879,7 +886,7 @@ Section SmodeCorePt.
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     mstate_interp σ -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     instr_bytes pc r ={E}=∗
     ∃ σf : mstate,
       ⌜ exec (fetch tt) σ = Some (r, σf) ⌝ ∗
@@ -887,8 +894,8 @@ Section SmodeCorePt.
       ⌜ forall rr, register_beq rr tlb = false ->
           register_lookup rr σf.(sregs) = register_lookup rr σ.(sregs) ⌝ ∗
       mstate_interp σf ∗
-      tlb_inv_pt root_ppn.
-  Proof. exact (s_regime_fetch (kpt_regime root_ppn) σ pc r E). Qed.
+      tlb_res_pt root_ppn.
+  Proof. exact (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E). Qed.
 
   Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction)
@@ -907,7 +914,7 @@ Section SmodeCorePt.
     mie ↦ᵣ{ dq } mie_v -∗
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     PC ↦ᵣ pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
@@ -916,7 +923,7 @@ Section SmodeCorePt.
        mie ↦ᵣ{ dq } mie_v -∗
        mideleg ↦ᵣ{ dq } mdv0 -∗
        menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-       tlb_inv_pt root_ppn -∗
+       tlb_res_pt root_ppn -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
        ∃ (s_exec : mstate),
          ⌜ exec (execute i)
@@ -929,7 +936,7 @@ Section SmodeCorePt.
           ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    exact (wp_instr_s_config_regime (kpt_regime root_ppn) Φ pc is_rvc i
+    exact (wp_instr_s_config_regime (kpt_share_regime root_ppn) Φ pc is_rvc i
              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 

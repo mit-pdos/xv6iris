@@ -62,6 +62,9 @@ Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr WpAuipc.
 Require Import WpLock.
 Require Import KallocInv KvmSpec PageGeom.
+(* the shared kernel page table: kvminithart's [kpt_unset] input and the
+   [kpt_inv] / 65-claim / root-cell outputs the deposit wand carries *)
+Require Import PtTree KptGhost KptShare KptExecMap KvmMap.
 Require Import ProcGeom CpuOwn SchedCtx FdSlots FileInv.
 Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
@@ -663,13 +666,14 @@ Section ProofMain.
     ([∗ list] p ∈ ps, page_own p) -∗
     (∃ kpt0 : mword 64,
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) -∗
-    strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗
+    strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
     ([∗ list] i ∈ seq 0 NPROC,
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
     fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
-    ( ∀ (γa : gname) (γs : list gname) (m' : regfile),
+    ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
+        (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr γ m' n -∗
         pc_is (mword_of_int (MN + 0x7e) : mword 64) -∗
         ⌜ m' !!! Regidx (mword_of_int 4 : mword 5) = cid_word ⌝ -∗
@@ -677,13 +681,20 @@ Section ProofMain.
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) cid_word -∗
         procs_inv γ Φ γs -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
+        (* what kvminithart published about the kernel page table: all four
+           PERSISTENT, and exactly what the [started] deposit carries *)
+        kpt_inv root -∗
+        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
+          (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
+        kmap_at tramp_vpn tramp_ppn KP_rx -∗
+        ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hn Htp Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hlpid Hlwait Hprocs Hppub Hfds Hcont".
+    iIntros "Hsbit Htlb Hunset Hlpid Hlwait Hprocs Hppub Hfds Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -766,8 +777,11 @@ Section ProofMain.
       by (rewrite /V3 upd_ne; [exact Hmkvtp | reg_neq]).
     iApply (Kvminithart.wp_kvminithart_sconf γ Φ V3 0%nat n t pas tlbvec0
               eq_refl ltac:(lia) Hrep Hpasok
-              with "Hcg Hsbit Htext Hpc Htlb Hkpt Htree").
-    iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec _ _ _".
+              with "Hcg Hsbit Htext Hpc Htlb Hkpt Htree Hunset").
+    iIntros (mkh) "Hcg Hpc %Hcskh _ Hstvec Hkpt #Hkinv #Htramp #Hkstx".
+    (* the root cell is immutable from here on: persist it, so the [started]
+       deposit can hand it to every secondary alongside [kpt_inv] *)
+    iMod (word_pointsto_persist with "Hkpt") as "#Hkptp".
     assert (Hretkh : ret_pc (V3 !!! Regidx (mword_of_int 1))
                      = (mword_of_int (MN + 0x7a) : mword 64)).
     { rewrite /V3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -809,7 +823,8 @@ Section ProofMain.
                  (seq 0 NPROC) with "Hready Hppub") as "Hin".
     iMod (procs_inv_alloc γ Φ ⊤ with "Hin") as (γs) "#Hpinv".
     iModIntro.
-    iApply ("Hcont" $! γl γs mpr with "Hcg Hpc [] Hcpu Hkenv Hpinv Hstvec").
+    iApply ("Hcont" $! γl γs mpr (pt_base t) pas
+              with "Hcg Hpc [] Hcpu Hkenv Hpinv Hstvec Hkinv Hkptp Htramp Hkstx").
     iPureIntro. exact Hmprtp.
   Qed.
 
@@ -1224,6 +1239,7 @@ Section ProofMain.
       (γpr γk γa : gname) (γs : list gname)
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
+      (root : mword 44) (pas : nat -> mword 44)
       (P : iProp Σ) `{!Persistent P} :
     (20 <= n)%nat ->
     m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
@@ -1233,20 +1249,32 @@ Section ProofMain.
     cpu_own γ 0 false p0 cpu_ctx_free -∗
     trap_csrs -∗ intr_handler_avail γ -∗
     started_inv P -∗
-    □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64),
+    □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
+         (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
          procs_inv γ Φ γs' -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
-         disk_geom γv pd' pav' pu' -∗ P) -∗
+         disk_geom γv pd' pav' pu' -∗
+         kpt_inv root' -∗
+         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
+           (zero_extend' 64 (concat_vec root' (zeros' 12 : mword 12))) -∗
+         kmap_at tramp_vpn tramp_ppn KP_rx -∗
+         ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
+         P) -∗
     printk_env γpr γd γv -∗
     procs_inv γ Φ γs -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
+    kpt_inv root -∗
+    (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
+      (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hn Htp.
     iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hintr #Hsinv #Hwand".
-    iIntros "#Hpenv #Hpinv #Hdlock #Hgeom".
+    iIntros "#Hpenv #Hpinv #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
     iPoseProof (mni_a8 with "Htext") as "Hia8".
@@ -1255,8 +1283,8 @@ Section ProofMain.
     iPoseProof (mni_3e with "Htext") as "Hi3e".
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
-    { iApply ("Hwand" $! γpr γs γk pd pav pu
-                with "Hpenv Hpinv Hdlock Hgeom"). }
+    { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
+                with "Hpenv Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
     (* ---- +0xa2 fence rw,rw : the release barrier ---- *)
     iApply (wp_fence_gen_s_sconf γ Φ (mword_of_int (MN + 0xa2))
               (mword_of_int 0 : mword 4) (mword_of_int 3 : mword 4)
@@ -1363,7 +1391,7 @@ Section ProofMain.
     intros pcE Hcid HK Htp Hphystop Hs1 Hprun Hlen Hlive.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50).
     iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpanic #Hsinv #Hwand Hlocks Hglobals".
-    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hpages".
+    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     iDestruct "Hglobals" as "(Hdevsw & Hflags & Hkmem24 & Hkpt & Hprocs & Hppub &
@@ -1383,8 +1411,9 @@ Section ProofMain.
     iApply (mn_grp_kvm γ Φ m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Htp2 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hlpid Hlwait Hprocs Hppub Hfds").
-    iIntros (γa γs m3) "Hcg Hpc %Htp3 Hcpu Hkenv #Hpinv Hstvec".
+                    Hsbit Htlb Hunset Hlpid Hlwait Hprocs Hppub Hfds").
+    iIntros (γa γs m3 root pas)
+      "Hcg Hpc %Htp3 Hcpu Hkenv #Hpinv Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γ Φ γd γv m3 (K - 2)%nat Hn50 Hcid Htp3
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
@@ -1398,10 +1427,10 @@ Section ProofMain.
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     iIntros (γk pd pav pu m5) "Hcg Hpc %Htp5 Hcpu #Hdlock #Hgeom".
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
-    iApply (mn_grp_started γ Φ γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu P
-              ltac:(lia) Htp5
+    iApply (mn_grp_started γ Φ γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
+              root pas P ltac:(lia) Htp5
               with "Hcg Htext Hpanic Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
-                    Hpinv Hdlock Hgeom").
+                    Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
   Qed.
 
 End ProofMain.

@@ -44,6 +44,7 @@ Require Import SmodePte.
 Require Import SmodeCore WpSmodeGpr.
 Require Import UserBits.
 Require Import KptTree SmodeCorePt SRegime.
+Require Import KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1125,19 +1126,19 @@ Section WpSmodePtGprGamma.
       (m : regfile)
       (q : Qp) :
     smode_config γ (DfracOwn q) -∗
-    tlb_inv_pt root_ppn -∗
+    tlb_res_pt root_ppn -∗
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) -∗
     ( smode_config γ (DfracOwn q) -∗
-      tlb_inv_pt root_ppn -∗
+      tlb_res_pt root_ppn -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
     Proof.
-    exact (wp_caddi16sp_gpr_s_r (kpt_regime root_ppn) γ Φ pc imm6 m q).
+    exact (wp_caddi16sp_gpr_s_r (kpt_share_regime root_ppn) γ Φ pc imm6 m q).
   Qed.
 
 
