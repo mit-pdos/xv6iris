@@ -311,6 +311,45 @@ reading the slot, which should surface as a proof failure, not silently.
 **Do it with NO consumer agents running** — it changes the wand-chain arity of
 53 contracts.
 
+### DEFERRED: the central fix for the conversion blowup
+
+**Measured, diagnosed, and deliberately not done yet** — a local patch is in
+place instead (`Local Strategy opaque [rget].` in `ProofVirtioDiskInit.v` plus
+the `rgne` sweep it forces).
+
+THE BUG. One `wp_cand_s_sconf` application took **400 s of a 421 s prefix**
+(0.06 s before the refactor). Conversion unfolds the transparent register tower
+through `rget → tp_pin → rf_upd` over a 24-link `pose`-chain. Making ANY ONE of
+the three opaque collapses it to **0.08 s**. Depth is necessary: the same lemma
+two links deep is 0.035 s.
+
+RULED OUT by direct measurement — the inline `ltac:`, the statement's `let`,
+the value being map-derived, a closed-literal `wval`, operands passed as
+separate premises, `and_vec`, the symbolic `cid_word_of`, and `gpr_file`'s
+32-way `rf_to_gmap` fold. **A `Strategy` LEVEL does nothing (level 1000 = 390 s);
+only true opacity works.**
+
+WHY IT IS LATENT EVERYWHERE: the trigger is `tp_pin`'s extra transparent layer
+over a deep tower. There are 7 `let wval := … rget …` statements in
+`WpSconfAlu.v` alone and ~25 more across `WpSconfLock` / `WpVirtioDev` /
+`WpPlic` / `WpSmodeHalf` / `SpecUart`. Any of them can hit this at sufficient
+depth.
+
+THE CENTRAL FIX, when someone wants it: either a global
+`Strategy opaque [tp_pin]` in `HartTp.v`, or seal `gpr_file (tp_pin m)` behind
+a named opaque wrapper in `IntrDefs.v`. Either makes the failure mode
+impossible tree-wide. THE COST is a mechanical sweep: every site that today
+closes `rget M k` against `M !!! Regidx k` silently BY CONVERSION needs an
+explicit `rgne`. Note also that opacifying all three of `rget`/`tp_pin`/`rf_upd`
+additionally broke a `reg_neq` ("No primitive equality found") — prefer the
+minimal opacity that works.
+
+NOT worth chasing: `ProofPrintk` is +12 s / +13 %, a FLAT per-step tax from
+`wp_next`'s binder (349 `iIntros` = +3.0 s, 91 `iSpecialize` = +1.4 s, +3.3 s
+of `Qed`); `tp_pin`/`rget` contribute 0.95 s there. `Strategy`/opacity buys
+nothing on that file (measured 102 s vs 100 s). Recovering it would mean
+changing the `wp_next` shape — a spec decision, not a tuning knob.
+
 ### Known spec fixes still owed
 
 - `SpecMemsetParts`'s loop premises need `Regidx ra5 <> Regidx Rtp` (its other
