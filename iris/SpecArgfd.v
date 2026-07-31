@@ -74,6 +74,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
@@ -150,15 +151,14 @@ Section SpecArgfd.
 End SpecArgfd.
 
 Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
+    (Φ : mval -> iProp Σ) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (v : mword 64)
-    (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) :=
+    (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argfd in
   let pfd := m !!! Regidx (mword_of_int 11 : mword 5) in
   let pf := m !!! Regidx (mword_of_int 12 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the syscall argument index, in range: argraw's panic arm *)
   (i < NARG)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (Z.of_nat i) ->
@@ -170,16 +170,17 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   pf <> (zero_reg : mword 64) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (argfd_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   pfd ↦₄ oldfd -∗
   pf ↦₈ oldf -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid V -∗
       argfd_post pfd pf oldfd oldf v (pv_ofile V)
@@ -190,9 +191,9 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
 Module Type ARGFD.
   Parameter wp_argfd_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
+      (Φ : mval -> iProp Σ) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64),
-      wp_argfd_sconf_body γ Φ γf m av n eb p C i v pid V oldfd oldf.
+      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool),
+      wp_argfd_sconf_body Φ γf m av n eb p C i v pid V oldfd oldf b.
 End ARGFD.

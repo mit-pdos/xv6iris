@@ -61,6 +61,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import ByteBuf.
@@ -84,28 +85,27 @@ Definition fetchstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   \/ r = (mword_of_int (-1) : mword 64).
 
 Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) :=
+    (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchstr in
   let buf := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* myproc runs on the ambient CPU *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* push_off's transient noff increment stays in int range (myproc) *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (fetchstr_stack <= av)%nat ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int (Z.of_nat maxn) : mword 64) ->
   (Z.of_nat maxn < 2 ^ 31)%Z ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_olds j) -∗
-  ( ∀ (mf : regfile) (buf_new : nat -> bv 8),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid V -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_new j) -∗
@@ -116,8 +116,8 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 Module Type FETCHSTR.
   Parameter wp_fetchstr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8),
-      wp_fetchstr_sconf_body γ γf Φ m av n eb p C pid V maxn buf_olds.
+      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool),
+      wp_fetchstr_sconf_body γf Φ m av n eb p C pid V maxn buf_olds b.
 End FETCHSTR.

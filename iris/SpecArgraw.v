@@ -46,6 +46,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import WpLock.
@@ -58,13 +59,12 @@ Import Defs.
 Notation AR := KernelSyms.argraw.
 
 Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-    (dqt : dfrac) :=
+    (dqt : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argraw in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the switch index, in range: this is what refutes the panic arm *)
   (i < NARG)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (Z.of_nat i) ->
@@ -72,16 +72,17 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for myproc's *)
   (14 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = v ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
@@ -91,9 +92,9 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 Module Type ARGRAW.
   Parameter wp_argraw_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (dqt : dfrac),
-      wp_argraw_sconf_body γ Φ m av n eb p C i tfp ws v dqt.
+      (dqt : dfrac) (b : bool),
+      wp_argraw_sconf_body Φ m av n eb p C i tfp ws v dqt b.
 End ARGRAW.

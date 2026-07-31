@@ -49,6 +49,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.
@@ -68,10 +69,11 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{CID : CpuId} : iProp Σ :=
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{CID : CpuId}.
-  (* the ambient S-mode world: the SIE ghost name and the whole-machine
-     postcondition.  (The kernel page table rides inside [swconf]'s
-     translation slot; no root parameter.) *)
-  Context (γ : gname) (Φ : mval -> iProp Σ).
+  (* the ambient S-mode world: the whole-machine postcondition.  (The SIE
+     ghost is canonical per hart now -- [IntrDefs.sie_gname] -- so no [γ]
+     binder survives here; the kernel page table rides inside [swconf]'s
+     translation slot, no root parameter.) *)
+  Context (Φ : mval -> iProp Σ).
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
 
@@ -154,7 +156,7 @@ Section SchedCtx.
           is the scheduler's own record, PINNED at (h, g) -- cpus[h].context
           can only ever be resumed from hart h's own tp, and the parked
           scheduler's closure holds hart-h register resources. *)
-       (intr_handler_avail (CID := h) g ∗
+       (intr_handler_avail (CID := h) ∗
         ∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h) /\
@@ -173,7 +175,7 @@ Section SchedCtx.
   Definition sched_vc_at (h : CPU) (g : gname) (c p : mword 64) : iProp Σ :=
     valid_context Φ p_sched (Some (h, g)) c p.
 
-  Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id γ c p.
+  Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id sie_gname c p.
 
   (* ------------------------------------------------------------------ *)
   (* Payload intro/elim.  Discrimination is by the resumed context's own  *)
@@ -205,7 +207,7 @@ Section SchedCtx.
   Lemma p_sched_to_proc (i : CPU) (g : gname) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
     trap_csrs (CID := i) -∗
-    intr_handler_avail (CID := i) g -∗
+    intr_handler_avail (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
     p_sched i g (Some (i, g)) (p_context (proc_addr j))
       (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
@@ -224,7 +226,7 @@ Section SchedCtx.
     p_sched i g A' (p_context (proc_addr j)) cret tpv p -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
     ⌜p = proc_addr j⌝ ∗ ⌜A' = Some (i, g)⌝ ∗
-    trap_csrs (CID := i) ∗ intr_handler_avail (CID := i) g ∗
+    trap_csrs (CID := i) ∗ intr_handler_avail (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch.
   Proof.

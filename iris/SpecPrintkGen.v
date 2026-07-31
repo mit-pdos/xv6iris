@@ -140,21 +140,21 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   nonul f = true ->
   pk_kinds f = map pk_desc_kind descs ->
   (length descs <= 7)%nat ->
-  sie_cap_gpr m0 K b -∗
+  sie_cap_gpr m0 K b pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp -∗
   (* the interrupt level is left exactly as found: acquire/release pair *)
-  cpu_own 0%nat eb pj C -∗
+  cpu_own 0%nat eb pj C b -∗
   (* the general path's whole credential (persistent) *)
   printk_env γpr γd γv -∗
   fmt ↦ₛ{ dqf } f -∗
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mf : regfile,
-    sie_cap_gpr mf K b -∗
+    sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    cpu_own 0%nat eb pj C -∗
+    cpu_own 0%nat eb pj C b -∗
     fmt ↦ₛ{ dqf } f -∗
     ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

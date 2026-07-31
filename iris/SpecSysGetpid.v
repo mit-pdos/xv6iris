@@ -51,6 +51,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
@@ -62,26 +63,25 @@ Import Defs.
 Notation SG := KernelSyms.sys_getpid.
 
 Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
+    (Φ : mval -> iProp Σ) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) :=
+    (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_getpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the hart id is the ambient CpuId (myproc's convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* myproc's push_off transient increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 2 for this frame, 10 for myproc's *)
   (12 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 pid ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid V -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -90,8 +90,8 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG
 Module Type SYSGETPID.
   Parameter wp_sys_getpid_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
+      (Φ : mval -> iProp Σ) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate),
-      wp_sys_getpid_sconf_body γ Φ γf m av n eb p C pid V.
+      (pid : mword 32) (V : pprivate) (b : bool),
+      wp_sys_getpid_sconf_body Φ γf m av n eb p C pid V b.
 End SYSGETPID.

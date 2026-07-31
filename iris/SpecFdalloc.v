@@ -73,6 +73,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
@@ -202,29 +203,28 @@ Section SpecFdalloc.
 End SpecFdalloc.
 
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) :=
+    (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fdalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the hart id is the ambient CpuId (myproc convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* a0 is the file to install *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   (k < NFILE)%nat ->
   (* push_off's transient noff increment stays in int range (myproc) *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (fdalloc_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   file_ref γf k q Cf -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       fdalloc_post γf p pid V k q Cf (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -233,9 +233,9 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
 Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate),
-      wp_fdalloc_sconf_body γ Φ γf k q Cf m av n eb p C pid V.
+      (pid : mword 32) (V : pprivate) (b : bool),
+      wp_fdalloc_sconf_body Φ γf k q Cf m av n eb p C pid V b.
 End FDALLOC.

@@ -70,6 +70,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
@@ -127,27 +128,26 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Pr
      \/ ((uint szv <= uint (add_vec szv n))%Z /\ szv' = szv) )).
 
 Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) :=
+    (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.growproc in
   let n := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the kalloc / mappages chain inside uvmalloc runs on the ambient CPU *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (growproc_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b p -∗
   (* [n = 0]: uvmalloc's kalloc runs with interrupts un-pushed *)
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own 0%nat eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  ( ∀ (mf : regfile) (P' : uptd) (szv' : mword 64),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (P' : uptd) (szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       ⌜growproc_ok (pv_sz V) n (pv_upt V) P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0%nat eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own 0%nat eb p C b -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -156,8 +156,8 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type GROWPROC.
   Parameter wp_growproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate),
-      wp_growproc_sconf_body γ γa γf Φ m av eb p C pid V.
+      (pid : mword 32) (V : pprivate) (b : bool),
+      wp_growproc_sconf_body γa γf Φ m av eb p C pid V b.
 End GROWPROC.

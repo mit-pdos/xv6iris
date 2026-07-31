@@ -63,6 +63,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
@@ -107,29 +108,28 @@ Section SpecFetchaddr.
 End SpecFetchaddr.
 
 Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (oldv : mword 64) :=
+    (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchaddr in
   let addr := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the vmfault chain inside copyin runs on the ambient CPU *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (fetchaddr_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b p -∗
   (* [n = 0]: copyin's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyin.v) *)
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own 0%nat eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
   ip ↦₈ oldv -∗
-  ( ∀ (mf : regfile) (P' : uptd),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0%nat eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own 0%nat eb p C b -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗
       fetchaddr_post ip oldv addr (pv_sz V)
@@ -140,8 +140,8 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
 Module Type FETCHADDR.
   Parameter wp_fetchaddr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (oldv : mword 64),
-      wp_fetchaddr_sconf_body γ γa γf Φ m av eb p C pid V oldv.
+      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool),
+      wp_fetchaddr_sconf_body γa γf Φ m av eb p C pid V oldv b.
 End FETCHADDR.

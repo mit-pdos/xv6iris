@@ -155,7 +155,10 @@ Rules:
   store values are all in this class.)
 - Concrete-register statements (`mm !!! Regidx (mword_of_int 10)`) do **not**
   need `rget` — a0/ra/sp are never tp. Only leaves whose register index is a
-  VARIABLE do.
+  VARIABLE do. **EXCEPT index 4 itself**: a read of the literal tp register off
+  the raw map is unsound however the index is spelled, because the map's tp slot
+  is unobservable. `SpecSwtch`'s `m0 !!! Regidx (mword_of_int 4)` is the worked
+  case. So the rule is "variable index OR index 4", not "variable index".
 - M-mode / interrupts-off contracts take **no** `wp_next` wrapper: same hart in
   and out, stated exactly as today.
 

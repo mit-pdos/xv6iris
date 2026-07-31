@@ -67,6 +67,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
@@ -102,16 +103,14 @@ Section SpecEitherCopyout.
 End SpecEitherCopyout.
 
 Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-    (src_bytes dst_olds : nat -> bv 8) :=
+    (src_bytes dst_olds : nat -> bv 8) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.either_copyout in
   let dst := m !!! Regidx (mword_of_int 11 : mword 5) in
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the myproc / vmfault chains run on the ambient CPU (push_off cid) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (either_copyout_stack <= av)%nat ->
   (* THE FLAG, reflected: [user_dst] is nonzero exactly when [user] *)
   eq_vec (m !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = negb user ->
@@ -121,18 +120,19 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   (* myproc's push_off, and vmfault's kalloc inside copyout, keep their
      transient noff increments in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ lvl eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own lvl eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
   (if user
    then proc_priv γf p pid V
    else [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ lvl eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own lvl eb p C b -∗
       pc_is ret_tgt -∗
       ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
       either_copyout_post user γf p pid V dst len src_bytes
@@ -143,10 +143,10 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
 Module Type EITHER_COPYOUT.
   Parameter wp_either_copyout_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-      (src_bytes dst_olds : nat -> bv 8),
-      wp_either_copyout_sconf_body γ γa γf Φ m av lvl eb p C pid V user len
-        src_bytes dst_olds.
+      (src_bytes dst_olds : nat -> bv 8) (b : bool),
+      wp_either_copyout_sconf_body γa γf Φ m av lvl eb p C pid V user len
+        src_bytes dst_olds b.
 End EITHER_COPYOUT.
