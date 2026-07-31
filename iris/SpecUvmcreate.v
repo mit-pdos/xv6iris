@@ -66,14 +66,14 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   (18 <= K)%nat ->
   (* kalloc's push/pop addresses this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr mm K b -∗
-  cpu_own lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗
   kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4))

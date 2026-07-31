@@ -116,8 +116,8 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* the child's map is free over the run (mappages panics on a remap, and
      it is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
-  sie_cap_gpr mm K b -∗
-  cpu_own 0%nat eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own 0%nat eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt Pold -∗
@@ -125,8 +125,8 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own 0%nat eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own 0%nat eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     (* the parent's table comes back verbatim *)

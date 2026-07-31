@@ -73,7 +73,7 @@ Notation UCL := KernelSyms.uvmclear.
 
 Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile)
-    (P : uptd) (w : mword 64) (K : nat) (b : bool) :=
+    (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
@@ -87,13 +87,13 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   P.(ud_um) !! vpn = Some w ->
   (* the cleared flag byte is a legal user leaf.  1007 = 1023 - PTE_U *)
   uvm_perm_ok (Z.land (pte_flags10 w) 1007) ->
-  sie_cap_gpr mm K b -∗
+  sie_cap_gpr mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_set P vpn (pte_clear_u w)) -∗
@@ -104,6 +104,6 @@ Module Type UVMCLEAR.
   Parameter wp_uvmclear_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (w : mword 64) (K : nat) (b : bool),
-      wp_uvmclear_sconf_body Φ mm P w K b.
+      (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64),
+      wp_uvmclear_sconf_body Φ mm P w K b p.
 End UVMCLEAR.

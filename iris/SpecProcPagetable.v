@@ -71,15 +71,15 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (exists nb, on = Some nb /\ (K_proc_pagetable < nb)%nat) ->
   subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->
   (uint tf + 4096 < 2 ^ 56)%Z ->
-  sie_cap_gpr mm K b -∗
-  cpu_own lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
   kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
-    sie_cap_gpr mr K b -∗
-    cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
     ptree_own 2 (DfracOwn 1) t -∗

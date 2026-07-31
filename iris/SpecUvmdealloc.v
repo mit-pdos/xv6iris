@@ -68,16 +68,16 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
      the run empty -- which is what lets growproc call this at the wrapped
      [sz + n] an [sbrk] with a big negative argument computes. *)
   (uint oldsz <= uvm_maxsz)%Z ->
-  sie_cap_gpr mm K b -∗
-  cpu_own 0%nat eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own 0%nat eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own 0%nat eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own 0%nat eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ ((uint newsz >= uint oldsz)%Z /\

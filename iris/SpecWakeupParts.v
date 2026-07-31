@@ -28,12 +28,12 @@ Notation WK := KernelSyms.wakeup.
    (SpecWakeup.v).  There is no myproc axiom. *)
 
 Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
-  sie_cap_gpr m K b -∗
+  sie_cap_gpr m K b p -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
   wp_next b (fun (CID : CpuId) =>
       ∀ (M : regfile) (vpad : mword 64),
@@ -51,7 +51,7 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ M !!! Regidx (mword_of_int 26) = m !!! Regidx (mword_of_int 26)
       /\ M !!! Regidx (mword_of_int 27) = m !!! Regidx (mword_of_int 27)
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap M)) ⌝ -∗
-      sie_cap_gpr M (K - 8) b -∗
+      sie_cap_gpr M (K - 8) b p -∗
       pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
       wk_fcell spF 7 ↦₈ (m !!! Regidx (mword_of_int 1)) -∗
       wk_fcell spF 6 ↦₈ (m !!! Regidx (mword_of_int 8)) -∗
@@ -65,13 +65,13 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) :=
+    (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64) :=
   let spF := M !!! Regidx csp_rs1 in
   let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) in
   let rettgt := ret_pc vra in
   (8 <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap M)) ->
-  sie_cap_gpr M (K - 8) b -∗
+  sie_cap_gpr M (K - 8) b p -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x58)) -∗
   wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗
   wk_fcell spF 4 ↦₈ vs2 -∗ wk_fcell spF 3 ↦₈ vs3 -∗ wk_fcell spF 2 ↦₈ vs4 -∗
@@ -93,7 +93,7 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       /\ Mf !!! Regidx (mword_of_int 26) = M !!! Regidx (mword_of_int 26)
       /\ Mf !!! Regidx (mword_of_int 27) = M !!! Regidx (mword_of_int 27)
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr Mf K b -∗
+      sie_cap_gpr Mf K b p -∗
       pc_is rettgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -101,10 +101,10 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
 Module Type WAKEUPPARTS.
   Parameter wp_wakeup_prologue_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool),
-      wp_wakeup_prologue_sconf_body Φ m K b.
+      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64),
+      wp_wakeup_prologue_sconf_body Φ m K b p.
   Parameter wp_wakeup_epilogue_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool),
-      wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b.
+      (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64),
+      wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
 End WAKEUPPARTS.

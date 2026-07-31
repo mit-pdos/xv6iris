@@ -89,16 +89,16 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (uint sz + 4096 <= uvm_maxsz)%Z ->
   (* the table maps nothing above PGROUNDUP(sz): see the header *)
   dom um ⊆ vpn_run vpn0 n ->
-  sie_cap_gpr mm K b -∗
-  cpu_own ilvl eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own ilvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own ilvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own ilvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

@@ -99,16 +99,16 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      This is what keeps every vpn it clears different from [tramp_vpn] and
      [tf_vpn], so the tree spec survives. *)
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
-  sie_cap_gpr mm K b -∗
-  cpu_own ilvl eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own ilvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own ilvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own ilvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_del_run P vpn0 npages) -∗
@@ -157,16 +157,16 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
   mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
-  sie_cap_gpr mm K b -∗
-  cpu_own ilvl eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own ilvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own ilvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own ilvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗

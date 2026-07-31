@@ -73,21 +73,21 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   (* holding the lock forces the level to be at least 1, hence interrupts
      disabled on entry -- this is not a choice, it is what [cpu_own (S n)]
      already means *)
-  sie_cap_gpr m av false -∗
+  sie_cap_gpr m av false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
   locked γl cpu_id -∗
   R -∗
   lock_finisher γl lka R Dc Out (⊤ ∖ ↑minstretN) -∗
-  cpu_own (S n) eb p C -∗
+  cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
   wp_next outb (fun (CID : CpuId) =>
     ∀ mr,
     Out -∗
-    sie_cap_gpr mr av outb -∗
+    sie_cap_gpr mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    cpu_own n eb p C -∗
+    cpu_own n eb p C outb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -102,19 +102,19 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
-  sie_cap_gpr m av false -∗
+  sie_cap_gpr m av false p -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
   R -∗
-  cpu_own (S n) eb p C -∗
+  cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
   wp_next outb (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr av outb -∗
+    sie_cap_gpr mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    cpu_own n eb p C -∗
+    cpu_own n eb p C outb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -142,24 +142,24 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CI
   (10 <= av)%nat ->
   (⊢ locked γl cpu_id -∗ D -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ D -∗ False) ->
-  sie_cap_gpr m av false -∗
+  sie_cap_gpr m av false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R D -∗
   locked γl cpu_id -∗
   R -∗
   (* the licence to destroy, cashed inside the store *)
   (lock_frag γl None -∗ R ==∗ D ∗ Out) -∗
-  cpu_own (S n) eb p C -∗
+  cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
   wp_next outb (fun (CID : CpuId) =>
     ∀ mr,
     lka ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lka ↦₈ (zero_reg : mword 64) -∗
     Out -∗
-    sie_cap_gpr mr av outb -∗
+    sie_cap_gpr mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
-    cpu_own n eb p C -∗
+    cpu_own n eb p C outb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

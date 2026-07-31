@@ -71,8 +71,8 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      [lvl] is otherwise generic -- vmfault runs at whatever nesting its
      caller holds (usertrap at 0, pipewrite/piperead's copies at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr mm K b -∗
-  cpu_own lvl eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   p_sz p ↦₈{dqs} szv -∗
@@ -81,8 +81,8 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗

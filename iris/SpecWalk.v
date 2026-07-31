@@ -47,14 +47,14 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
      this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr mm K b -∗ cpu_own lvl eb p C -∗
+  sie_cap_gpr mm K b p -∗ cpu_own lvl eb p C b -∗
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-    sie_cap_gpr mr K b -∗ cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -92,7 +92,7 @@ End WALK.
 
 Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) :=
+    (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.walk in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
@@ -103,13 +103,13 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   mm !!! Regidx (mword_of_int 12) = mword_of_int 0 ->
   (uint va < 2 ^ 38)%Z ->
   pt_rep0 t m ->
-  sie_cap_gpr mm K b -∗
+  sie_cap_gpr mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own 2 dq t -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ptree_own 2 dq t -∗
     ⌜callee_saved mm mr⌝ -∗
@@ -126,6 +126,6 @@ Module Type WALK_NOALLOC.
   Parameter wp_walk_noalloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool),
-      wp_walk_noalloc_sconf_body Φ mm t m K dq b.
+      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
+      wp_walk_noalloc_sconf_body Φ mm t m K dq b p.
 End WALK_NOALLOC.

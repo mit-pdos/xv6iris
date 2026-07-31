@@ -101,16 +101,16 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (* the run is unmapped to begin with (mappages panics on a remap, and it
      is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> P.(ud_um) !! vpn_at vpn0 i = None) ->
-  sie_cap_gpr mm K b -∗
-  cpu_own 0%nat eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own 0%nat eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own 0%nat eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own 0%nat eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ( (* out of memory: rolled back to exactly the table we were given *)

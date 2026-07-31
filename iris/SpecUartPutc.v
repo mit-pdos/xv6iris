@@ -24,7 +24,7 @@ From Kernel Require KernelSyms.
 Notation UPS := KernelSyms.uartputc_sync.
 
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) (b : bool) :=
+    (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.uartputc_sync in
@@ -37,14 +37,14 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !di
   (4 <= K)%nat ->
   eq_vec (sign_extend' 64 pv) zero_reg = false ->
   neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-  sie_cap_gpr m0 K b -∗
+  sie_cap_gpr m0 K b p -∗
   kernel_text -∗ pc_is pcE -∗
   (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
   (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
   dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mf,
-    sie_cap_gpr mf K b -∗
+    sie_cap_gpr mf K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
@@ -56,6 +56,6 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !di
 Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac} (b : bool),
-      wp_uartputc_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 b.
+      (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac} (b : bool) (p : mword 64),
+      wp_uartputc_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 b p.
 End UARTPUTC.
