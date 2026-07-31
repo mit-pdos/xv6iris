@@ -193,8 +193,8 @@ Section ProofPlicinithart.
   (*  THE CAPSTONE: a WP for the entire plicinithart(), entry to return.  *)
   (* =================================================================== *)
   Lemma wp_plicinithart_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool)
-    : wp_plicinithart_sconf_body γd γv Φ m0 n b.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64)
+    : wp_plicinithart_sconf_body γd γv Φ m0 n b p.
   Proof.
     cbv beta delta [wp_plicinithart_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.

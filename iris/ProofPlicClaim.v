@@ -154,8 +154,8 @@ Section ProofPlicClaim.
   (*  THE CAPSTONE: a WP for the entire plic_claim(), entry to return.    *)
   (* =================================================================== *)
   Lemma wp_plic_claim_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool)
-    : wp_plic_claim_sconf_body γd γv Φ m0 n b.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64)
+    : wp_plic_claim_sconf_body γd γv Φ m0 n b p.
   Proof.
     cbv beta delta [wp_plic_claim_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hhart Hn.

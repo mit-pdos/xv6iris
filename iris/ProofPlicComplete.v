@@ -42,7 +42,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import HartTp WpNext.
+Require Import HartTp WpNext IntrDefs.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpDecodeBridge.
 Require Import KernelRvcDecode WpRvcBridge.
@@ -187,8 +187,8 @@ Section ProofPlicComplete.
      (leaf-by-leaf, [rd_ok] -> [ltac:(rdok)], per-leaf [wp_next] peeled with
      [iIntros (CIDk Hsk) "…"], exactly the generic-[b] template). *)
   Lemma wp_plic_complete_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool)
-    : wp_plic_complete_sconf_body γd γv Φ m0 n b.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64)
+    : wp_plic_complete_sconf_body γd γv Φ m0 n b p.
   Proof.
     cbv beta delta [wp_plic_complete_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
