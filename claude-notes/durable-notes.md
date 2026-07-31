@@ -170,7 +170,12 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 
 ## Proof-check speed: what actually costs time in these files
 
-Measured on ProofPrintk.v (4800 lines, ~65 s of coqc).  `coqc -time` plus a
+Measured on ProofPrintk.v.  **The "~65 s" figure below is for the 4800-line
+version of that file and is now badly stale** -- it grew to 7903 lines long
+before the explicit-cpuid branch, and a pre-refactor compile measures **93 s**
+(105 s on that branch).  A stale baseline here cost real time: it produced a
+"+56% regression" that did not exist, and the arithmetic looked convincing.
+Re-measure the baseline before believing any regression claim about this file.  `coqc -time` plus a
 per-lemma roll-up is the tool; two findings generalise:
 
 - **`vm_compute` in the leaf side conditions is FREE** -- the ubiquitous
