@@ -81,8 +81,8 @@ Section ProofInitsleeplock.
   Lemma wp_initsleeplock_sconf (Φ : mval -> iProp Σ)
       (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
-      (av : nat) (b : bool)
-    : wp_initsleeplock_sconf_body Φ m s vlocked vlk vpid vlkname vcpu vname av b.
+      (av : nat) (b : bool) (p : mword 64)
+    : wp_initsleeplock_sconf_body Φ m s vlocked vlk vpid vlkname vcpu vname av b p.
   Proof.
     cbv beta delta [wp_initsleeplock_sconf_body].
     intros pcE slk name ret_tgt Hav.
@@ -309,7 +309,7 @@ Section ProofInitsleeplock.
     (* the cpu-word cell in initlock's [add_vec lk (sext 0x10)] form *)
     iEval (rewrite /sl_lkcpu) in "Hcpu".
     (* ===== jal initlock: initlock(&lk->lk, "sleep lock") ===== *)
-    iApply (Initlock.wp_initlock_sconf Φ A7 vlk vlkname vcpu "sleep lock"%string (av - 4) b
+    iApply (Initlock.wp_initlock_sconf Φ A7 vlk vlkname vcpu "sleep lock"%string (av - 4) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlk] [Hlkname] [Hcpu]").
     { iEval (rewrite HA7a1). iExact "Hstr". }

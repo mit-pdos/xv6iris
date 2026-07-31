@@ -145,8 +145,8 @@ Section ProofCpuid.
   (*  a0 = cpuid_ret tp, ra/sp/s0 restored (callee-saved).                *)
   (* =================================================================== *)
   Lemma wp_cpuid_sconf (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat)
-    : wp_cpuid_sconf_body Φ m0 n.
+      (m0 : regfile) (n : nat) (p : mword 64)
+    : wp_cpuid_sconf_body Φ m0 n p.
   Proof.
     cbv beta delta [wp_cpuid_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt cret Hn.
@@ -354,8 +354,8 @@ Section ProofCpuid.
   (* jal-callable form: writes ra := P+4, runs cpuid, returns to P+4. *)
   Lemma wp_call_cpuid_sconf_cs (Φ : mval -> iProp Σ)
       (P : mword 64) (jimm : mword 21)
-      (m : regfile) (n : nat)
-    : wp_call_cpuid_sconf_cs_body Φ P jimm m n.
+      (m : regfile) (n : nat) (p : mword 64)
+    : wp_call_cpuid_sconf_cs_body Φ P jimm m n p.
   Proof.
     cbv beta delta [wp_call_cpuid_sconf_cs_body].
     intros ra_idx tp_idx a0_idx m0 pcE ra0 ret_tgt cret Htarget Halpce Hn.
@@ -367,7 +367,7 @@ Section ProofCpuid.
     rewrite wp_next_off.
     iIntros "Hcg Hpc".
     iEval (rewrite Htarget) in "Hpc".
-    iApply (wp_cpuid_sconf Φ m0 n Hn
+    iApply (wp_cpuid_sconf Φ m0 n p Hn
               with "Hcg Htext Hpc [-]").
     iIntros (m') "Hcg Hpc %Hcs".
     iApply ("Hcont" $! m' with "Hcg Hpc [%]").

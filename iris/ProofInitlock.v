@@ -63,8 +63,8 @@ Section ProofInitlock.
   Lemma wp_initlock_sconf (Φ : mval -> iProp Σ)
       (m : regfile)
       (vlock : bv 32) (vname vcpu : bv 64) (s : string)
-      (K : nat) (b : bool)
-    : wp_initlock_sconf_body Φ m vlock vname vcpu s K b.
+      (K : nat) (b : bool) (p : mword 64)
+    : wp_initlock_sconf_body Φ m vlock vname vcpu s K b p.
   Proof.
     cbv beta delta [wp_initlock_sconf_body].
     intros pcE lk name ret_tgt c_name c_cpu HK.

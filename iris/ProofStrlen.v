@@ -152,7 +152,7 @@ Section ProofStrlen.
   (*  THE EPILOGUE (+0x20 .. +0x26), entered by both arms.               *)
   (* ================================================================== *)
   Local Lemma sl_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) :
+      (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->
     mm !!! Regidx Rra = ra0 ->
@@ -161,7 +161,7 @@ Section ProofStrlen.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b -∗
+    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
@@ -169,7 +169,7 @@ Section ProofStrlen.
     wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b -∗
+        sie_cap_gpr mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -300,9 +300,9 @@ Section ProofStrlen.
   (*  THE PROBE (+0x12 .. +0x16): both arms of the [bnez] run it.         *)
   (* ================================================================== *)
   Local Lemma sl_probe `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (M : regfile) (Kv : nat) (dq : dfrac) (s : mword 64) (t : nat) (bt : mword 8) (b : bool) :
+      (M : regfile) (Kv : nat) (dq : dfrac) (s : mword 64) (t : nat) (bt : mword 8) (b : bool) (p : mword 64) :
     M !!! Regidx Ra5 = pa_add s (S t) ->
-    sie_cap_gpr (CID := CID0) M Kv b -∗
+    sie_cap_gpr (CID := CID0) M Kv b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x12) : mword 64) -∗
     (pa_add s (S t)) ↦ₘ{dq} bt -∗
@@ -313,7 +313,7 @@ Section ProofStrlen.
         ⌜Mp !!! Regidx Ra4 = zero_extend' 64 bt⌝ -∗
         ⌜forall r : mword 5, r <> Ra3 -> r <> Ra4 -> r <> Ra5 ->
             Mp !!! Regidx r = M !!! Regidx r⌝ -∗
-        sie_cap_gpr Mp Kv b -∗
+        sie_cap_gpr Mp Kv b p -∗
         pc_is (mword_of_int (KernelSyms.strlen + 0x1a) : mword 64) -∗
         (pa_add s (S t)) ↦ₘ{dq} bt -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -402,7 +402,7 @@ Section ProofStrlen.
      outermost entry hart, silently false as soon as [b] can flip [true]. *)
   Local Lemma sl_loop (Φ : mval -> iProp Σ)
       (mm : regfile) (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac)
-      (s sp0 : mword 64) (b : bool) (CIDh : CpuId) :
+      (s sp0 : mword 64) (b : bool) (p : mword 64) (CIDh : CpuId) :
     (k < n)%nat -> bb_cstr f k -> (Z.of_nat k < 2147483648)%Z ->
     forall (rem t : nat) (M : regfile) (CID0 : CpuId),
     (b = false -> (CID0 : CPU) = (CIDh : CPU)) ->
@@ -412,7 +412,7 @@ Section ProofStrlen.
     M !!! Regidx Ra5 = pa_add s (S t) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b -∗
+    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x12) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
@@ -422,7 +422,7 @@ Section ProofStrlen.
         ⌜Mt !!! Regidx Ra0 = (mword_of_int (Z.of_nat k) : mword 64)⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b -∗
+        sie_cap_gpr Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -435,7 +435,7 @@ Section ProofStrlen.
       assert (Htk : (S t = k)%nat) by lia.
       assert (Hlt : (S t < n)%nat) by lia.
       iDestruct (bb_byte_acc s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
-      iApply (sl_probe Φ M (K - 2)%nat dq s t (f (S t)) b Ha5
+      iApply (sl_probe Φ M (K - 2)%nat dq s t (f (S t)) b p Ha5
                 with "Hcg Htext Hpc Hbyte [-]").
       iIntros (CIDp Hspp Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
       iDestruct ("Hback" $! f with "[%] Hbyte") as "Hbuf"; [done |].
@@ -496,7 +496,7 @@ Section ProofStrlen.
     - (* ---- rem = S rem: [S t < k], so the byte is not the terminator ---- *)
       assert (Hlt : (S t < n)%nat) by lia.
       iDestruct (bb_byte_acc s n (S t) f dq Hlt with "Hbuf") as "[Hbyte Hback]".
-      iApply (sl_probe Φ M (K - 2)%nat dq s t (f (S t)) b Ha5
+      iApply (sl_probe Φ M (K - 2)%nat dq s t (f (S t)) b p Ha5
                 with "Hcg Htext Hpc Hbyte [-]").
       iIntros (CIDp Hspp Mp) "%Hpa3 %Hpa5 %Hpa4 %Hpthr Hcg Hpc Hbyte".
       iDestruct ("Hback" $! f with "[%] Hbyte") as "Hbuf"; [done |].
@@ -539,8 +539,8 @@ Section ProofStrlen.
   (* ================================================================== *)
   Lemma wp_strlen_sconf
       (Φ : mval -> iProp Σ) (mm : regfile)
-      (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool)
-    : wp_strlen_sconf_body Φ mm n k f K dq b.
+      (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
+    : wp_strlen_sconf_body Φ mm n k f K dq b p.
   Proof.
     cbv beta delta [wp_strlen_sconf_body].
     intros pcE s ret_tgt HK Hkn Hcstr Hk31.
@@ -708,7 +708,7 @@ Section ProofStrlen.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht20) in "Hpc".
       iApply (sl_tail Φ mm Z1 K (mword_of_int (Z.of_nat k)) sp0
-                (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b
+                (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(rewrite /Z1 upd_ne; [exact HR3sp | reg_neq])
                 ltac:(rewrite /Z1 upd_eq; reflexivity)
@@ -759,7 +759,7 @@ Section ProofStrlen.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
     (* ---- the loop, entered with t = 0 ---- *)
-    iApply (sl_loop Φ mm n k f K dq s sp0 b CID7 Hkn Hcstr Hk31
+    iApply (sl_loop Φ mm n k f K dq s sp0 b p CID7 Hkn Hcstr Hk31
               (k - 1)%nat 0%nat R4 CID7 ltac:(intros _; reflexivity) ltac:(lia)
               ltac:(apply bb_nonul_step; [apply bb_nonul_0 | exact Hnz0])
               ltac:(rewrite /R4 upd_ne; [exact HR3sp | reg_neq])
@@ -772,7 +772,7 @@ Section ProofStrlen.
               with "Hcg Htext Hpc Hbuf [-]").
     iIntros (CID8 Hs8 Mt) "%Htsp %Hta0 %Htthr Hcg Hpc Hbuf".
     iApply (sl_tail Φ mm Mt K (mword_of_int (Z.of_nat k)) sp0
-              (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b
+              (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
               HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
               Htsp Hta0 Htthr
               with "Hcg Htext Hpc Hb1 Hb2 [-]").

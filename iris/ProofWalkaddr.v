@@ -94,8 +94,8 @@ Section ProofWalkaddr.
 
   Lemma wp_walkaddr_sconf
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool)
-    : wp_walkaddr_sconf_body Φ mm t m K dq b.
+      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
+    : wp_walkaddr_sconf_body Φ mm t m K dq b p.
   Proof.
     cbv beta delta [wp_walkaddr_sconf_body].
     intros pcE va vpn ret_tgt HK Hroot Hrep.
@@ -347,7 +347,7 @@ Section ProofWalkaddr.
       by (rewrite HW4a1; exact Hvalt).
     assert (HKw : (8 <= K - 2)%nat) by lia.
     (* ---- the call ---- *)
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ W4 t m (K - 2)%nat dq b
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ W4 t m (K - 2)%nat dq b p
               HKw HW4a0 HW4a2 Hwkva Hrep
               with "Hcg Htext Hpc Hptree [-]").
     iIntros (CID13 Hs13 mw) "Hcg Hpc Hptree %Hkcs %Hpay".
@@ -387,7 +387,7 @@ Section ProofWalkaddr.
     iAssert (∀ (CIDe : CpuId) (M : regfile),
                ⌜b = false -> (CIDe : CPU) = (CID : CPU)⌝ -∗
                ⌜callee_saved mw M⌝ -∗
-               sie_cap_gpr (CID := CIDe) M (K - 2)%nat b -∗
+               sie_cap_gpr (CID := CIDe) M (K - 2)%nat b p -∗
                pc_is (CID := CIDe) (mword_of_int (WA + 0x2a) : mword 64) -∗
                ptree_own 2 dq t -∗
                ⌜ M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0

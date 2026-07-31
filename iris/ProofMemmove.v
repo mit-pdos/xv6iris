@@ -193,7 +193,7 @@ Section ProofMemmove.
   (*  hart [CID0] suffices, resolved fresh by unification at each call.     *)
   (* =================================================================== *)
   Local Lemma mm_epilogue `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (m0 M : regfile) (n : nat) (b : bool) :
+      (m0 M : regfile) (n : nat) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in
     let ra0 := (m0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
     let s00 := (m0 !!! Regidx (mword_of_int 8 : mword 5) : mword 64) in
@@ -202,13 +202,13 @@ Section ProofMemmove.
     (forall c : mword 5, is_cs_idx c = true -> c <> (mword_of_int 8 : mword 5) ->
        c <> csp_rs1 -> M !!! Regidx c = m0 !!! Regidx c) ->
     kernel_text -∗
-    sie_cap_gpr (CID := CID0) M (n - 2) b -∗
+    sie_cap_gpr (CID := CID0) M (n - 2) b pcur -∗
     pc_is (CID := CID0) (mword_of_int (MM + 0x28)) -∗
     (pa_stk sp0 1) ↦₈ ra0 -∗
     (pa_stk sp0 2) ↦₈ s00 -∗
     wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
       ∀ mf,
-      sie_cap_gpr mf n b -∗
+      sie_cap_gpr mf n b pcur -∗
       pc_is (ret_pc ra0) -∗
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
         = M !!! Regidx (mword_of_int 10 : mword 5) ⌝ -∗
@@ -333,7 +333,7 @@ Section ProofMemmove.
   (* =================================================================== *)
   Local Lemma mm_loop (Φ : mval -> iProp Σ)
       (p_src p_dst : mword 64) (len : nat) (src_bytes dst_olds : nat -> bv 8) (n : nat)
-      (b : bool) (CIDh : CpuId) :
+      (b : bool) (pcur : mword 64) (CIDh : CpuId) :
     (Z.of_nat len < 2 ^ 64)%Z ->
     forall (rem off : nat) (m : regfile) (CID0 : CpuId),
     (b = false -> (CID0 : CPU) = (CIDh : CPU)) ->
@@ -342,14 +342,14 @@ Section ProofMemmove.
     m !!! Regidx (mword_of_int 14 : mword 5) = pa_add p_dst off ->
     m !!! Regidx (mword_of_int 15 : mword 5)
       = add_vec (mword_of_int (Z.of_nat len) : mword 64) p_src ->
-    sie_cap_gpr (CID := CID0) m n b -∗
+    sie_cap_gpr (CID := CID0) m n b pcur -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (MM + 0x18)) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
     wp_next (CID0 := CIDh) b (fun (CID : CpuId) =>
       ∀ mf,
-      sie_cap_gpr mf n b -∗
+      sie_cap_gpr mf n b pcur -∗
       pc_is (mword_of_int (MM + 0x28)) -∗
       ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
       ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
@@ -540,7 +540,7 @@ Section ProofMemmove.
   (*  leading (shadowing) hart [CID0] suffices, as for [mm_epilogue].        *)
   (* =================================================================== *)
   Local Lemma mm_fwd `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (m0 M : regfile) (n len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) :
+      (m0 M : regfile) (n len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in
     let ra0 := (m0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
     let s00 := (m0 !!! Regidx (mword_of_int 8 : mword 5) : mword 64) in
@@ -554,7 +554,7 @@ Section ProofMemmove.
     (forall c : mword 5, is_cs_idx c = true -> c <> (mword_of_int 8 : mword 5) ->
        c <> csp_rs1 -> M !!! Regidx c = m0 !!! Regidx c) ->
     kernel_text -∗
-    sie_cap_gpr (CID := CID0) M (n - 2) b -∗
+    sie_cap_gpr (CID := CID0) M (n - 2) b pcur -∗
     pc_is (CID := CID0) (mword_of_int (MM + 0x0e)) -∗
     (pa_stk sp0 1) ↦₈ ra0 -∗
     (pa_stk sp0 2) ↦₈ s00 -∗
@@ -562,7 +562,7 @@ Section ProofMemmove.
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
     wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
       ∀ mfin,
-      sie_cap_gpr mfin n b -∗
+      sie_cap_gpr mfin n b pcur -∗
       pc_is (ret_pc ra0) -∗
       ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
       ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
@@ -677,7 +677,7 @@ Section ProofMemmove.
     { unfold M4. rewrite upd_ne; [| vm_compute; discriminate].
       unfold M3. rewrite upd_eq. unfold regval_into_reg. apply add_vec_comm. }
     (* ---- +0x18..+0x24: the copy loop ---- *)
-    iApply (mm_loop Φ p_src p_dst len src_bytes dst_olds (n - 2) b CID4 Hlen64
+    iApply (mm_loop Φ p_src p_dst len src_bytes dst_olds (n - 2) b pcur CID4 Hlen64
               len 0%nat M4 CID4 ltac:(intros _; reflexivity) ltac:(lia) ltac:(lia)
               HM4a1 HM4a4 HM4a5
               with "Hcg Htext Hpc Hsrc Hdst [-]").
@@ -697,7 +697,7 @@ Section ProofMemmove.
       rewrite (callee_saved_lookup Hcsf c Hc).
       unfold M4, M3, M2, M1. strip_caller Hc.
       exact (HMcs c Hc Hc8 Hcsp). }
-    iApply (mm_epilogue Φ m0 mf n b Hn Hmfsp HmfCs
+    iApply (mm_epilogue Φ m0 mf n b pcur Hn Hmfsp HmfCs
               with "Htext Hcg Hpc Hb1 Hb2 [-]").
     iIntros (CID5 Hs5 mfin) "Hcg Hpc %Ha0fin %Hcsfin".
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
@@ -710,8 +710,8 @@ Section ProofMemmove.
   (*  THE WHOLE FUNCTION.                                                  *)
   (* =================================================================== *)
   Lemma wp_memmove_sconf (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool)
-    : wp_memmove_sconf_body Φ m0 n len src_bytes dst_olds b.
+      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64)
+    : wp_memmove_sconf_body Φ m0 n len src_bytes dst_olds b pcur.
   Proof.
     cbv beta delta [wp_memmove_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p_dst p_src ret_tgt Hn Hlen32 Ha2.
@@ -843,7 +843,7 @@ Section ProofMemmove.
                         (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0"))))
                       = mword_of_int (MM + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpsuf) in "Hpc".
-      iApply (mm_epilogue Φ m0 m2 n b Hn Hm2sp Hm2cs
+      iApply (mm_epilogue Φ m0 m2 n b pcur Hn Hm2sp Hm2cs
                 with "Htext Hcg Hpc Hb1 Hb2 [-]").
       iIntros (CID6 Hs6 mfin) "Hcg Hpc %Ha0fin %Hcsfin".
       iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
@@ -968,7 +968,7 @@ Section ProofMemmove.
                          = mword_of_int (MM + 0x0e))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp0e) in "Hpc".
-          iApply (mm_fwd Φ m0 m5 n (S len') src_bytes dst_olds b Hn Hlen0 Hlen32
+          iApply (mm_fwd Φ m0 m5 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
                     Hm5a0 ltac:(unfold m5, m4, m3;
                                 repeat (rewrite upd_ne; [| vm_compute; discriminate]);
                                 exact Hm2a1)
@@ -1018,7 +1018,7 @@ Section ProofMemmove.
                   with "Hcg Hpc Hi0a [-]").
         iIntros (CID6 Hs6) "Hcg Hpc".
         iEval (rewrite Hp0e) in "Hpc".
-        iApply (mm_fwd Φ m0 m2 n (S len') src_bytes dst_olds b Hn Hlen0 Hlen32
+        iApply (mm_fwd Φ m0 m2 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
                   Hm2a0 Hm2a1 Hm2a2 Hm2sp Hm2cs
                   with "Htext Hcg Hpc Hb1 Hb2 Hsrc Hdst [-]").
         iIntros (CID7 Hs7 mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".

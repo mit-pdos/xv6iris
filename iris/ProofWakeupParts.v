@@ -63,8 +63,8 @@ Section ProofWakeupPartsEpi.
      spF+64); the pop feeds the frame back and lifts the count K-8 -> K. *)
   Lemma wp_wakeup_epilogue_sconf (Φ : mval -> iProp Σ)
       (M : regfile) (K : nat)
-      (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool)
-    : wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b.
+      (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64)
+    : wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
   Proof.
     cbv beta delta [wp_wakeup_epilogue_sconf_body].
     intros spF sp0 rettgt HK8 Hdom.
@@ -251,8 +251,8 @@ Section ProofWakeupPartsPro.
      (s4:=chan(a0), s1:=&proc[0], s3:=2, s5:=3, s2:=&proc[64]) and c.j to the
      loop test at wakeup+0x38. *)
   Lemma wp_wakeup_prologue_sconf (Φ : mval -> iProp Σ)
-      (m : regfile) (K : nat) (b : bool)
-    : wp_wakeup_prologue_sconf_body Φ m K b.
+      (m : regfile) (K : nat) (b : bool) (p : mword 64)
+    : wp_wakeup_prologue_sconf_body Φ m K b p.
   Proof.
     cbv beta delta [wp_wakeup_prologue_sconf_body].
     intros sp0 spF HK8 Hdom.

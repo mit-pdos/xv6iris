@@ -108,8 +108,8 @@ Section ProofUvmclear.
   Proof. iIntros "(_ & Hpv & _)". iExact "Hpv". Qed.
 
   Lemma wp_uvmclear_sconf (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (w : mword 64) (K : nat) (b : bool)
-    : wp_uvmclear_sconf_body Φ mm P w K b.
+      (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64)
+    : wp_uvmclear_sconf_body Φ mm P w K b p.
   Proof.
     cbv beta delta [wp_uvmclear_sconf_body].
     intros pcE va vpn ret_tgt HK Hroot Hvab Hum Hperm.
@@ -233,7 +233,7 @@ Section ProofUvmclear.
     assert (Hret0e : ret_pc (W4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (UCL + 0x0e)).
     { rewrite HW4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     (* ---- the call ---- *)
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ W4 t m_ad (K - 2)%nat (DfracOwn 1) b
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ W4 t m_ad (K - 2)%nat (DfracOwn 1) b p
               ltac:(lia) HW4a0 HW4a2
               ltac:(rewrite HW4a1; exact Hvab)
               Hrep

@@ -81,7 +81,7 @@ Section IsmappedEpi.
 
   Lemma ismapped_epi `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
-      (vpn : mword 27) (K : nat) (HK2 : (2 <= K)%nat) (dq : dfrac) (b : bool) (ret_tgt : mword 64)
+      (vpn : mword 27) (K : nat) (HK2 : (2 <= K)%nat) (dq : dfrac) (b : bool) (p : mword 64) (ret_tgt : mword 64)
       (Hrt_def : ret_tgt = ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)))
       (spr sp0 : mword 64)
       (Hsp0_def : sp0 = mm !!! Regidx csp_rs1)
@@ -95,7 +95,7 @@ Section IsmappedEpi.
       (M : regfile)
     : ⌜callee_saved mw M⌝ -∗
       kernel_text -∗
-      sie_cap_gpr M (K - 2)%nat b -∗
+      sie_cap_gpr M (K - 2)%nat b p -∗
       pc_is (mword_of_int (IM + 0x14) : mword 64) -∗
       ptree_own 2 dq t -∗
       pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -105,7 +105,7 @@ Section IsmappedEpi.
              M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 1) ⌝ -∗
       wp_next b (fun (CID' : CpuId) =>
         ∀ (mr : regfile),
-        sie_cap_gpr mr K b -∗
+        sie_cap_gpr mr K b p -∗
         pc_is ret_tgt -∗
         ptree_own 2 dq t -∗
         ⌜callee_saved mm mr⌝ -∗
@@ -243,8 +243,8 @@ Section ProofIsmapped.
 
   Lemma wp_ismapped_sconf
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
-      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool)
-    : wp_ismapped_sconf_body Φ mm t m K dq b.
+      (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
+    : wp_ismapped_sconf_body Φ mm t m K dq b p.
   Proof.
     cbv beta delta [wp_ismapped_sconf_body].
     intros pcE va vpn ret_tgt HK Hroot Hvab Hrep.
@@ -352,7 +352,7 @@ Section ProofIsmapped.
     assert (Hret0e : ret_pc (W4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (IM + 0x0e)).
     { rewrite HW4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     (* ---- the call ---- *)
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ W4 t m (K - 2)%nat dq b
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ W4 t m (K - 2)%nat dq b p
               ltac:(lia) HW4a0 HW4a2
               ltac:(rewrite HW4a1; exact Hvab)
               Hrep
@@ -397,7 +397,7 @@ Section ProofIsmapped.
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0"))))
               = mword_of_int (IM + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt14) in "Hpc".
-      iApply (ismapped_epi (CID:=CID8) Φ mm t m vpn K ltac:(lia) dq b ret_tgt eq_refl spr sp0 eq_refl eq_refl Hb1 Hb2 mw Hmwsp Hmwagree mw
+      iApply (ismapped_epi (CID:=CID8) Φ mm t m vpn K ltac:(lia) dq b p ret_tgt eq_refl spr sp0 eq_refl eq_refl Hb1 Hb2 mw Hmwsp Hmwagree mw
                 with "[%] Htext Hcg Hpc Hptree Hc1 Hc2 [%] [-]").
       { apply callee_saved_refl. }
       { left. split; [exact Ha0z | exact Hnone]. }
@@ -477,7 +477,7 @@ Section ProofIsmapped.
         destruct (Hmaps vpn w0 Hsome) as (q2 & q1 & Hmp).
         destruct Hmp as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hv0 & _).
         exact Hv0. }
-      iApply (ismapped_epi (CID:=CID12) Φ mm t m vpn K ltac:(lia) dq b ret_tgt eq_refl spr sp0 eq_refl eq_refl Hb1 Hb2 mw Hmwsp Hmwagree B2
+      iApply (ismapped_epi (CID:=CID12) Φ mm t m vpn K ltac:(lia) dq b p ret_tgt eq_refl spr sp0 eq_refl eq_refl Hb1 Hb2 mw Hmwsp Hmwagree B2
                 with "[%] Htext Hcg Hpc Hptree Hc1 Hc2 [%] [-]").
       { exact HcsB2. }
       { right. exists w0. split; [exact Hsome |].
@@ -487,7 +487,7 @@ Section ProofIsmapped.
       iApply ("Hcont" $! mr with "Hcg Hpc Hptree [%] [%]").
       { exact Hcs. } { exact Hpay2. } }
     (* unmapped-with-path: the slot holds the literal zero *)
-    iApply (ismapped_epi (CID:=CID12) Φ mm t m vpn K ltac:(lia) dq b ret_tgt eq_refl spr sp0 eq_refl eq_refl Hb1 Hb2 mw Hmwsp Hmwagree B2
+    iApply (ismapped_epi (CID:=CID12) Φ mm t m vpn K ltac:(lia) dq b p ret_tgt eq_refl spr sp0 eq_refl eq_refl Hb1 Hb2 mw Hmwsp Hmwagree B2
               with "[%] Htext Hcg Hpc Hptree Hc1 Hc2 [%] [-]").
     { exact HcsB2. }
     { left. split; [| exact Hnone].
