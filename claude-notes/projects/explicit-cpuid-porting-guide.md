@@ -305,6 +305,30 @@ through a lock-holding function is not necessarily a bug; check whether the
 derivation closes before concluding the contract is wrong. (This is the same
 algebra that forces `SwtchCtx`'s resumed hart to `false`.)
 
+## Two things about re-anchoring, learned the expensive way
+
+- **`wp_next_shift`'s direct idiom fails when the target is wrapped in a named
+  `Definition`.** `iDestruct (wp_next_shift Hs with "Hexit") as "Hexit"` gives
+  *"iSpecialize: cannot instantiate"* — Coq cannot unify `wp_next`'s `?K`
+  through the wrapper. Go through an explicit entailment first:
+  ```coq
+  assert (Hshift : ⊢ (ua_exit (CID0:=CIDa) … -∗ ua_exit (CID0:=CIDb) …)).
+  { rewrite /ua_exit. exact (wp_next_shift Hs). }
+  iDestruct (Hshift with "Hexit") as "Hexit".
+  ```
+  Unfolding the real definition lets Coq compute `K` instead of inferring it.
+- **`cpu_own_transport` is needed at more places than "before each call".**
+  `Hcnt` only rides through implicitly where a CALLEE refreshes it; at a loop's
+  exit-production points, its back edge, and a function's short-circuit exits
+  it must be re-anchored explicitly. One file estimated 6 and needed 14.
+  Conversely a branch whose callee already refreshed `cpu_own` needs
+  `wp_next_shift` and NO transport — so the anchor a continuation wants depends
+  on what ran before it, and cannot be stated uniformly.
+
+**`Set Printing Implicit` is the standard first move on any opaque
+*"iSpecialize: cannot instantiate"*.** Every hart mismatch prints identically
+without it, including a simple stale-CID bookkeeping slip.
+
 ## THE VACUITY TRAP — check every spec body you touch
 
 In `bi_scope` a `forall` extends **maximally**. So an unparenthesised `∀` inside
