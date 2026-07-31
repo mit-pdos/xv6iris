@@ -1,26 +1,34 @@
 (* CpuOwn.v -- ownership of THIS cpu's [struct cpu] plus the push/pop
    interrupt discipline, as ONE predicate.
 
-   [cpu_own n eb p C] owns, for the ambient CpuId:
-     - cpus[cid].noff  ↦₄ n            -- the CELL IS the count level, so
-                                          push/pop specs need no noff
-                                          argument and no level-mirror
-                                          premise;
-     - cpus[cid].intena               -- pinned to [eb] (the saved base
-                                          enable state) while n ≥ 1;
-                                          arbitrary at level 0;
-     - the counting token [intr_count n eb] (IntrDefs.v) -- the SIE
-       ghost eighth + (at n ≥ 1, eb = true) the restore payload;
-     - cpus[cid].proc  ↦₈ p            -- the current-process field
-                                          (the former [cur_proc p],
-                                          inlined here);
+   [cpu_own n eb p C b] owns, for the ambient CpuId:
+     - the per-cpu cells and the counting token [cpu_hart n eb p]
+       (IntrDefs.v):
+         cpus[cid].noff  ↦₄ n     -- the CELL IS the count level, so
+                                     push/pop specs need no noff argument
+                                     and no level-mirror premise;
+         cpus[cid].intena         -- pinned to [eb] (the saved base enable
+                                     state) while n ≥ 1; arbitrary at 0;
+         cpus[cid].proc  ↦₈ p     -- the current-process field;
+         [intr_count n eb]        -- the SIE ghost eighth + (at n ≥ 1,
+                                     eb = true) the restore payload;
      - [C], the context-slot payload for cpus[cid].context:
        [cpu_ctx_free] at boot and while the scheduler itself runs; the
        scheduler tier instantiates it with the parked scheduler
-       continuation (▷ sched_vc (a_cpu_ctx cid), SchedCtx.v).  Functions
-       indifferent to the slot are ∀C-parametric and carry it opaquely.
+       continuation.  Functions indifferent to the slot are ∀C-parametric
+       and carry it opaquely.
 
-   [cpu_own 0 false p cpu_ctx_free] is constructible from raw boot
+   THE [b] INDEX -- the SIE state of the ambient [sie_cap_gpr] this bundle
+   travels beside.  At [b = true] the cells and the token are NOT here:
+   they ride in [sie_arm]'s enabled arm (IntrDefs.v), because with
+   interrupts enabled a trap can migrate the thread and only what a leaf's
+   [wp_next] re-delivers survives the crossing.  What is left at [b = true]
+   is the pure fact the arm's ghost agreement pins anyway ([n = 0] and
+   [eb = true], [intr_count_get_on]) plus the caller's frame [C], which is
+   an opaque [iProp Σ] and therefore crosses for free.  push_off and
+   pop_off are the two functions that move the payload across this seam.
+
+   [cpu_own 0 false p cpu_ctx_free false] is constructible from raw boot
    resources (cells + the SIE eighth at '0') -- no trap handler, no
    stvec, no trap CSRs -- which is what makes push_off/pop_off (and the
    whole acquire/release cone above them) usable during early boot,
@@ -37,26 +45,62 @@ Require Import IntrDefs.
 Require Import ProcGeom.
 Local Open Scope Z_scope.
 
-Definition noff_val (n : nat) : mword 32 := mword_of_int (Z.of_nat n).
-Definition intena_val (eb : bool) : mword 32 :=
-  if eb then mword_of_int 1 else mword_of_int 0.
-
 Section CpuOwn.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
   Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) : iProp Σ :=
-    (⌜ (Z.of_nat n < 2 ^ 31)%Z ⌝ ∗
-     a_cpu_noff cid_word ↦₄ noff_val n ∗
-     (match n with
-      | O => (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv)%I
-      | S _ => a_cpu_int cid_word ↦₄ intena_val eb
-      end) ∗
-     intr_count n eb ∗
-     a_cpu_proc cid_word ↦₈ p ∗
-     C)%I.
+      (C : iProp Σ) (b : bool) : iProp Σ :=
+    ((if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p) ∗ C)%I.
+
+  (* at the disabled index the bundle IS the cells + the token + the slot *)
+  Lemma cpu_own_off (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+    cpu_own n eb p C false ⊣⊢ cpu_hart n eb p ∗ C.
+  Proof. reflexivity. Qed.
+
+  (* ... and at the enabled index it is the pure fact plus the frame: the
+     payload is inside [sie_arm true p].  This is not a weakening -- a
+     caller could not have HELD the cells there anyway ([cpu_own_arm_excl]
+     below refutes it), because the arm already owns them. *)
+  Lemma cpu_own_on (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+    cpu_own n eb p C true ⊣⊢ ⌜ n = 0%nat /\ eb = true ⌝ ∗ C.
+  Proof. reflexivity. Qed.
+
+  Lemma cpu_own_on_intro (p : mword 64) (C : iProp Σ) :
+    C -∗ cpu_own 0 true p C true.
+  Proof. iIntros "HC". iFrame "HC". iPureIntro. done. Qed.
+
+  (* THE MOVE push_off makes at the enabled arm, and pop_off's inverse. *)
+  Lemma cpu_own_of_arm (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+    cpu_own n eb p C true -∗
+    cpu_hart 0 true p -∗
+    cpu_own 0 true p C false.
+  Proof. iIntros "[_ HC] Hh". iFrame. Qed.
+
+  Lemma cpu_own_to_arm (p : mword 64) (C : iProp Σ) :
+    cpu_own 0 true p C false -∗
+    cpu_hart 0 true p ∗ cpu_own 0 true p C true.
+  Proof. iIntros "[Hh HC]". iFrame "Hh HC". iPureIntro. done. Qed.
+
+  (* the cells are EXCLUSIVE, so nobody holds them beside the enabled arm *)
+  Lemma cpu_hart_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64) :
+    cpu_hart n eb p -∗ cpu_hart n' eb' p' -∗ False.
+  Proof.
+    iIntros "((_ & Hn & _ & _) & _) ((_ & Hn' & _ & _) & _)".
+    iDestruct (word4_pointsto_bytes with "Hn") as "Hb".
+    iDestruct (word4_pointsto_bytes with "Hn'") as "Hb'".
+    cbn [seq]. iDestruct "Hb" as "[H0 _]". iDestruct "Hb'" as "[H0' _]".
+    iDestruct (mem_pointsto_ne with "H0 H0'") as %Hne. done.
+  Qed.
+
+  Lemma cpu_own_arm_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)
+      (C : iProp Σ) :
+    sie_arm true p -∗ cpu_own n' eb' p' C false -∗ False.
+  Proof.
+    iIntros "(_ & _ & _ & _ & _ & Hh) [Hh' _]".
+    iApply (cpu_hart_excl with "Hh Hh'").
+  Qed.
 
   (* boot entry: raw cells + the SIE eighth at '0'.  [iv] arbitrary. *)
   Lemma cpu_own_init_boot (p : mword 64) (nv iv : mword 32)
@@ -67,33 +111,64 @@ Section CpuOwn.
     intr_off_tok -∗
     a_cpu_proc cid_word ↦₈ p -∗
     C -∗
-    cpu_own 0 false p C.
+    cpu_own 0 false p C false.
   Proof.
     intros ->. iIntros "Hnoff Hint Htok Hproc HC".
-    iFrame "Hnoff Hproc HC".
+    iFrame "HC".
+    iSplitR "Htok"; [| iApply (intr_count_init_off with "Htok") ].
     iSplitR. { iPureIntro. vm_compute. reflexivity. }
-    iSplitL "Hint". { iExists iv. iExact "Hint". }
-    iApply (intr_count_init_off with "Htok").
+    iFrame "Hnoff Hproc". iExists iv. iExact "Hint".
   Qed.
 
   (* swap the context-slot payload (e.g. park / unpark the scheduler
-     continuation) without disturbing the rest. *)
+     continuation) without disturbing the rest.  Index-generic: [C] is a
+     frame at either arm. *)
   Lemma cpu_own_ctx_swap (n : nat) (eb : bool) (p : mword 64)
-      (C C' : iProp Σ) :
-    cpu_own n eb p C -∗ (C -∗ C') -∗ cpu_own n eb p C'.
+      (C C' : iProp Σ) (b : bool) :
+    cpu_own n eb p C b -∗ (C -∗ C') -∗ cpu_own n eb p C' b.
   Proof.
-    iIntros "(%Hbound & Hnoff & Hint & Hcnt & Hproc & HC) HW".
-    iSplitR; [done |]. iFrame "Hnoff Hint Hcnt Hproc". iApply ("HW" with "HC").
+    iIntros "[Hrest HC] HW". iFrame "Hrest". iApply ("HW" with "HC").
   Qed.
 
-  (* retarget the proc field (the scheduler's c->proc writes). *)
+  (* retarget the proc field (the scheduler's c->proc writes).  Only at the
+     DISABLED index: c->proc is written under a held lock, hence at level
+     ≥ 1, hence with interrupts off. *)
   Lemma cpu_own_set_proc (n : nat) (eb : bool)
       (p p' : mword 64) (C : iProp Σ) :
-    cpu_own n eb p C -∗
+    cpu_own n eb p C false -∗
     (a_cpu_proc cid_word ↦₈ p ∗
-     (a_cpu_proc cid_word ↦₈ p' -∗ cpu_own n eb p' C)).
+     (a_cpu_proc cid_word ↦₈ p' -∗ cpu_own n eb p' C false)).
   Proof.
-    iIntros "(%Hbound & Hnoff & Hint & Hcnt & Hproc & HC)".
-    iFrame "Hproc". iIntros "Hproc". iSplitR; [done |]. iFrame.
+    iIntros "(((%Hbound & Hnoff & Hint & Hproc) & Hcnt) & HC)".
+    iFrame "Hproc". iIntros "Hproc". iFrame "Hnoff Hint Hcnt HC Hproc".
+    iPureIntro. exact Hbound.
   Qed.
+
 End CpuOwn.
+
+(* ===================================================================== *)
+(* THE HART TRANSPORT -- what makes a [b]-GENERIC consumer able to carry  *)
+(* this bundle across an interrupts-possibly-enabled instruction.         *)
+(*                                                                        *)
+(* A leaf's [wp_next] hands back a FRESH hart and re-delivers only         *)
+(* [sie_cap_gpr] there; a caller-held hart-indexed resource is stranded    *)
+(* at the entry hart.  [cpu_own] escapes because it is hart-indexed only   *)
+(* at [b = false] -- at [b = true] the hart-indexed payload has moved      *)
+(* into [sie_arm], leaving a pure fact and the caller's own frame [C].     *)
+(* So the two arms are discharged by the two halves of what a step         *)
+(* actually gives you: at [b = true] by CONVERSION (there is no hart in    *)
+(* the term), at [b = false] by [wp_next]'s conditional equality.  Chain   *)
+(* the per-step equalities with [wp_next_chain] and apply this once.       *)
+(* ===================================================================== *)
+Lemma cpu_own_transport `{!riscvGS Σ} `{!sieG Σ}
+    (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
+    (C : iProp Σ) (b : bool) :
+  (b = false -> (CID1 : CPU) = (CID0 : CPU)) ->
+  cpu_own (CID := CID0) n eb p C b -∗ cpu_own (CID := CID1) n eb p C b.
+Proof.
+  intros Heq. destruct b.
+  - (* enabled: the payload is in [sie_arm], nothing here mentions the hart *)
+    iIntros "H". iExact "H".
+  - (* disabled: no trap was taken, so the hart did not move *)
+    rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq eq_refl) ].
+Qed.

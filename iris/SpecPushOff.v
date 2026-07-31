@@ -28,7 +28,17 @@ Notation PP := KernelSyms.pop_off.
    ENTRY index, even though the capability it hands back is pinned at
    [false] -- the resource index (what SIE now is) and the [wp_next] index
    (whether a trap could have been taken during the call) are two different
-   things here, and this is the function where they diverge. *)
+   things here, and this is the function where they diverge.
+
+   PUSH_OFF IS ONE OF THE TWO FUNCTIONS THAT MOVE THE PER-CPU BUNDLE ACROSS
+   THE ARM SEAM.  At [b = true] the [cpus[cid]] cells and the counting token
+   live inside [sie_arm true p] (IntrDefs.v) and the caller's [cpu_own] is
+   just the pure fact plus its own frame [C]; the [csrci] flips the arm to
+   [false], and [sie_arm_on_out] hands the payload to the code -- which is
+   exactly the [cpu_own (S n) eb p C false] and the [trap_csrs_pay n eb]
+   ([= trap_csrs] at the only index reachable from [b = true], n = 0 and
+   eb = true) below.  At [b = false] nothing moves and the statement reads
+   exactly as it always did. *)
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
@@ -42,14 +52,14 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (* the noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (6 <= av)%nat ->
-  sie_cap_gpr m av b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.push_off + 0x00) : mword 64) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
-    sie_cap_gpr mfin av false -∗
-    cpu_own (S n) eb p C -∗
+    sie_cap_gpr mfin av false p -∗
+    cpu_own (S n) eb p C false -∗
     trap_csrs_pay n eb -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
@@ -64,7 +74,17 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
    was true), so a trap CAN be taken right there -- the exit index is
    [match n with O => eb | S _ => false end], which is [eb] exactly in the
    interesting (fully-unwound) case and collapses to [false] (no [wp_next]
-   needed, by [wp_next_off]) whenever the count does not reach 0. *)
+   needed, by [wp_next_off]) whenever the count does not reach 0.
+
+   POP_OFF IS THE OTHER HALF OF THE ARM SEAM, and the direction that PAYS:
+   when the count reaches 0 with an enabled base ([bexit = true]) the final
+   [csrsi] re-enables interrupts, and the payload it was holding -- the
+   [cpus[cid]] cells plus the counting token at level 0 ([cpu_hart 0 true p])
+   together with the [trap_csrs_pay] it was given -- goes back INTO
+   [sie_arm true p] via [sie_arm_on_in].  That is why the exit [cpu_own] is
+   indexed by [bexit] rather than [false]: at [bexit = true] the caller keeps
+   only its frame [C] and the pure fact, and reaches the cells through the
+   bundle, at whatever hart it resumes on. *)
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
@@ -75,14 +95,14 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      facts of [cpu_own]: the level is S n > 0, SIE is pinned '0' by the count
      eighth, and the final pop's re-enable branch reads intena = [eb]. *)
   (4 <= av)%nat ->
-  sie_cap_gpr m av false -∗
-  cpu_own (S n) eb p C -∗
+  sie_cap_gpr m av false p -∗
+  cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
   kernel_text -∗ pc_is pcE -∗
   wp_next bexit (fun (CID : CpuId) =>
     ∀ mf,
-    sie_cap_gpr mf av bexit -∗
-    cpu_own n eb p C -∗
+    sie_cap_gpr mf av bexit p -∗
+    cpu_own n eb p C bexit -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mf ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

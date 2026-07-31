@@ -171,6 +171,9 @@ Section WpSconfCtl.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* ------------------------------------------------------------------- *)
   (* fence -- state-preserving at ANY pred/succ pair (the model's whole   *)
@@ -184,11 +187,11 @@ Section WpSconfCtl.
   Lemma wp_fence_gen_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
       (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -233,12 +236,12 @@ Section WpSconfCtl.
      sites do not change. *)
   Lemma wp_fence_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
                            Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -267,11 +270,11 @@ Section WpSconfCtl.
   Lemma wp_fence_gen_later_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
       (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
     wp_next b (fun (CID : CpuId) =>
-      ▷ ( sie_cap_gpr m n b -∗
+      ▷ ( sie_cap_gpr m n b p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -323,10 +326,10 @@ Section WpSconfCtl.
       (m : regfile) (n : nat) (b : bool) :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (JAL (jimm, zreg)) -∗
     wp_next b (fun (CID : CpuId) =>
-      ▷ ( sie_cap_gpr m n b -∗
+      ▷ ( sie_cap_gpr m n b p -∗
         pc_is tgt -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -386,10 +389,10 @@ Section WpSconfCtl.
     uint rd <> 0 ->
     rd_ok rd ->
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (JAL (imm, Regidx rd)) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -476,10 +479,10 @@ Section WpSconfCtl.
       (m : regfile) (n : nat) (b : bool) :
     let tgt := ret_pc (rget m ra) in
     uint ra <> 0 ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.

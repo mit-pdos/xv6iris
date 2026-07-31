@@ -50,18 +50,20 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   pt_rep0 t m ->
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
   match on with
-  | None => panic_wp
+  | None => panic_wp_any   (* hart-GENERIC: the panic arm is reached after
+                              [b]-generic instructions, i.e. possibly on a
+                              different hart from the one that entered *)
   | Some nb => ⌜(pt_missing t vpn0 npages < nb)%nat⌝
   end -∗
-  sie_cap_gpr mm K b -∗
-  cpu_own lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-    sie_cap_gpr mr K b -∗
-    cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗

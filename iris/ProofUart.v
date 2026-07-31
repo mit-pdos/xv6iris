@@ -22,7 +22,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import DevModel RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import WpLoad WpGpr WpMmodeLeafBase.
-Require Import RegFile.
+Require Import RegFile HartTp WpNext.
 Require Import KptPt.
 Require Import SmodeCore WpSmodeGpr.
 Require Import KMap.
@@ -41,11 +41,11 @@ Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{CID : CpuId}.
 
-  Lemma wp_sb_uart_uinv_s_sconf (γ : gname) (γd : uart_names)
+  Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ)
-    : wp_sb_uart_uinv_s_sconf_body γ γd off Φ pc is_rvc rs2 rs1 imm m n R S.
+    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool)
+    : wp_sb_uart_uinv_s_sconf_body γd off Φ pc is_rvc rs2 rs1 imm m n R S b.
   Proof.
     cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
@@ -60,7 +60,7 @@ Context `{CID : CpuId}.
   { assert (Hds : kmap_static (svpn_of a8) KP_rw) by (apply kmap_class_rw; right; exact Hdevvpn).
     pose proof (pa_of_id a8 (static_canon_lo a8 KP_rw Hds Hcanon)) as Hpid.
     unfold pa_of in Hpid. exact Hpid. }
-  iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -89,11 +89,11 @@ Context `{CID : CpuId}.
   destruct (uart_write_total u off storebyte Hoff) as [u' Hwrite_u].
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
-  iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
-  iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
   iDestruct ("Hfb1" with "Hspc") as "Hfmap".
-  iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
-  iDestruct (gpr_pt_value rs2 (m (Regidx rs2)) s_pc with "Hreg Hr2c") as %Lv2.
+  iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
+  iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hr2c") as %Lv2.
   iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
   assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
   assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
@@ -179,42 +179,47 @@ Context `{CID : CpuId}.
     rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
     unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
   iEval (rewrite Lnpc) in "Hpc'".
-  iAssert (sconf γ) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
+  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
   { iFrame "Hhw Hminv Hpriv Hmiex".
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-  iApply ("Hcont" with "Hcg [$Hpc' $Hnpc] HS").
+  (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
+     obligation is discharged by instantiating it here. *)
+  iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc] HS").
+  iPureIntro. done.
 Qed.
 
   (* The bundle-taking RESTATEMENT of the accessor leaf above, statement
      verbatim, proof one projection out of [dev_inv]. *)
-  Lemma wp_sb_uart_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_sb_uart_s_sconf (γd : uart_names) (γv : disk_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ)
-    : wp_sb_uart_s_sconf_body γ γd γv off Φ pc is_rvc rs2 rs1 imm m n R S.
+    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool)
+    : wp_sb_uart_s_sconf_body γd γv off Φ pc is_rvc rs2 rs1 imm m n R S b.
   Proof.
     cbv beta delta [wp_sb_uart_s_sconf_body].
     intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
     iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
     iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
-    iApply (wp_sb_uart_uinv_s_sconf γ γd off Φ pc is_rvc rs2 rs1 imm m n R S
+    iApply (wp_sb_uart_uinv_s_sconf γd off Φ pc is_rvc rs2 rs1 imm m n R S b
               Hoff Hcanon Hvpn_def Hpa
               with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
   Qed.
 
-  Lemma wp_lb_uart_s_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_lb_uart_s_sconf (γd : uart_names) (γv : disk_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ)
-    : wp_lb_uart_s_sconf_body γ γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S.
+    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool)
+    : wp_lb_uart_s_sconf_body γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S b.
   Proof.
     cbv beta delta [wp_lb_uart_s_sconf_body].
-  intros ea a8 ldval lppn Hoff Hrd Hrdsp Hcanon Hvpn_def Hpa.
+  intros ea a8 ldval lppn Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
+  pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+  pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
   assert (Ha8pa : a8 = uart_pa off).
   { rewrite <- Hpa. change (0 * 1) with 0. rewrite avi0. symmetry. apply zero_extend'_id. }
@@ -226,7 +231,7 @@ Qed.
   { assert (Hds : kmap_static (svpn_of a8) KP_rw) by (apply kmap_class_rw; right; exact Hdevvpn).
     pose proof (pa_of_id a8 (static_canon_lo a8 KP_rw Hds Hcanon)) as Hpid.
     unfold pa_of in Hpid. exact Hpid. }
-  iApply (wp_instr_s_sconf γ m n Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -253,11 +258,11 @@ Qed.
   iInv "Huinv" as ">Hdbody" "Hdclose".
   iDestruct "Hdbody" as (u) "(Huf & Hg)".
   iDestruct (uart_agree with "Hua Huf") as %Hduart.
-  destruct (uart_read_total u off Hoff) as (b & u' & Hread_u).
+  destruct (uart_read_total u off Hoff) as (bt & u' & Hread_u).
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
-  iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
-  iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
+  iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+  iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
   iDestruct ("Hfb1" with "Hspc") as "Hfmap".
   assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor) by (unfold s_pc; tmig; exact Lpriv).
   assert (Lms_pc : register_lookup mstatus s_pc.(sregs) = mstatus0) by (unfold s_pc; tmig; exact Lms).
@@ -303,17 +308,17 @@ Qed.
     by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
   assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
     by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-  assert (Hdrd_uart : dev_read s_tr.(mdev) (uart_pa off) 1 = Some (b, set_duart σ.(mdev) u')).
+  assert (Hdrd_uart : dev_read s_tr.(mdev) (uart_pa off) 1 = Some (bt, set_duart σ.(mdev) u')).
   { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
-    apply (dev_read_uart σ.(mdev) off b u' Hoff). rewrite <- Hduart. exact Hread_u. }
+    apply (dev_read_uart σ.(mdev) off bt u' Hoff). rewrite <- Hduart. exact Hread_u. }
   assert (Htr_uart : exec (translateAddr (Virtaddr a8) (Load Data)) s_pc
                      = Some (Ok (Physaddr (uart_pa off), PBMT_PMA, init_ext_ptw), s_tr)).
   { replace (uart_pa off) with a8 by exact Ha8pa. exact Htr0. }
   pose (d' := set_duart σ.(mdev) u').
-  pose (s_x := set_reg (MState s_tr.(sregs) s_tr.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ldval b))).
+  pose (s_x := set_reg (MState s_tr.(sregs) s_tr.(mem) d') (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ldval bt))).
   assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))) s_pc = Some (RETIRE_SUCCESS, s_x)).
   { subst s_x. unfold ldval.
-    apply (exec_execute_LOAD_1_gpr_S_walk_dev rs1 rd imm is_unsigned b d' region_ld s_pc s_tr
+    apply (exec_execute_LOAD_1_gpr_S_walk_dev rs1 rd imm is_unsigned bt d' region_ld s_pc s_tr
              Hrd Htea
              ltac:(unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity)
              ltac:(cbn [bits_of_virtaddr]; rewrite !Lva Hpa; change (0 * 1)%Z with 0%Z; rewrite avi0; exact Htr_uart)
@@ -329,10 +334,10 @@ Qed.
              ltac:(rewrite !Lva Hpa; apply dev_addr_uart; exact Hoff)
              ltac:(rewrite !Lva Hpa; exact Hdrd_uart)). }
   iMod (dev_interp_update_uart σ.(mdev) u u' with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
-  iMod ("Hacc" $! u b u' with "[//] Hg HR") as "[Hg' HS]".
-  iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg (ldval b)) with "Hfmap") as "[Hrdc Hfins]".
+  iMod ("Hacc" $! u bt u' with "[//] Hg HR") as "[Hg' HS]".
+  iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (ldval bt)) with "Hfmap") as "[Hrdc Hfins]".
   rewrite (gpr_pt_nz rd _ Hrd).
-  iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval b)) with "Hreg Hrdc") as "[Hreg Hrdc]".
+  iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval bt)) with "Hreg Hrdc") as "[Hreg Hrdc]".
   iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
   { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
   iMod ("Hdclose" with "[Huf' Hg']") as "_".
@@ -350,19 +355,22 @@ Qed.
   iEval (rewrite Lnpc) in "Hpc'".
   assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
   assert (Hsp : m !!! Regidx csp_rs1
-                = <[Regidx rd := regval_into_reg (ldval b)]> m !!! Regidx csp_rs1)
+                = <[Regidx rd := regval_into_reg (ldval bt)]> m !!! Regidx csp_rs1)
     by (symmetry; apply upd_ne; congruence).
-  iAssert (sconf γ) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
+  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
   { iFrame "Hhw Hminv Hpriv Hmiex".
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap γ m n) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
-  iDestruct (sie_cap_retarget γ m
-               (<[Regidx rd := regval_into_reg (ldval b)]> m) n Hsp with "Hcap") as "Hcap".
+  (* the leaf's own write commutes with the tp pin *)
+  tp_refold Hrdtp "Hfmap".
+  iDestruct (sie_cap_retarget m
+               (<[Regidx rd := regval_into_reg (ldval bt)]> m) n b Hsp with "Hcap") as "Hcap".
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
-  iApply ("Hcont" $! b with "Hcg [$Hpc' $Hnpc] HS").
+  iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+  iApply ("Hcont" $! bt with "Hcg [$Hpc' $Hnpc] HS").
 Qed.
 
 End ProofUart.

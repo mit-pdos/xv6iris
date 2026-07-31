@@ -49,6 +49,7 @@ Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpDecodeBridge.
 Require Import KernelRvcDecode KernelBaseDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
@@ -191,12 +192,24 @@ Section ProofPlicinithart.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plicinithart(), entry to return.  *)
   (* =================================================================== *)
-  Lemma wp_plicinithart_sconf (γ : gname) (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat)
-    : wp_plicinithart_sconf_body γ γd γv Φ m0 n.
+  Lemma wp_plicinithart_sconf (γd : uart_names) (γv : disk_names)
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool)
+    : wp_plicinithart_sconf_body γd γv Φ m0 n b.
   Proof.
     cbv beta delta [wp_plicinithart_sconf_body].
     intros ra_idx tp_idx pcE ra0 ret_tgt Hhart Hn.
+    (* [tp] is pinned to the hart (HartTp.v): [rget _ tp_idx] is [cid_word]
+       at EVERY register map -- but NOTE this contract is [b]-GENERIC (no
+       [wp_next_off] collapse), so unlike the [b = false]-only cpuid/mycpu
+       proofs, [rget]'s implicit hart binder actually MOVES across a real
+       migration ([iIntros (CIDk Hsk)] below).  So this fact must be
+       re-derived FRESH from [rget_tp] at whatever the ambient ombient hart
+       is at each point of use, never hoisted once here -- a single
+       top-level [assert (Htp : forall mm, rget mm tp_idx = cid_word) ...]
+       would be a fact about THIS (pre-migration) hart only, and every use
+       after the first migration would silently be about the WRONG hart
+       (confirmed: Coq rejects it outright, "has type ... CID ...  while it
+       is expected to have type ... CID4 ..."). *)
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a0_idx := (mword_of_int 10 : mword 5)).
     set (a4_idx := (mword_of_int 14 : mword 5)).
@@ -235,9 +248,9 @@ Section ProofPlicinithart.
     { unfold sp', pa_stk, add_vec_int, imm_entry.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x00: c.addi sp,-16 -- the frame push ---- *)
-    iApply (wp_caddi_sp_push_s_sconf γ Φ pcE imm_entry m0 n 2 Hn2 Hpush
+    iApply (wp_caddi_sp_push_s_sconf Φ pcE imm_entry m0 n 2 b Hn2 Hpush
               with "Hcg Hpc Hi00 [-]").
-    iIntros "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (PH + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     iDestruct (stack_own_2_elim with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
@@ -250,34 +263,96 @@ Section ProofPlicinithart.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (PH + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PH + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24 b
               with "Hcg Hpc Hi02 Hbra [-]").
-    iIntros "Hcg Hpc Hbra".
+    iIntros (CID2 Hs2) "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (PH + 0x02) : mword 64) 2 = mword_of_int (PH + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (PH + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PH + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16 b
               with "Hcg Hpc Hi04 Hbs0 [-]").
-    iIntros "Hcg Hpc Hbs0".
+    iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (PH + 0x04) : mword 64) 2 = mword_of_int (PH + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.addi4spn s0,sp,16 ---- *)
-    iApply (wp_caddi4spn_s_sconf γ Φ (mword_of_int (PH + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1 (n - 2)%nat
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (PH + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1 (n - 2)%nat b
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hcg Hpc".
     assert (Hpp08 : add_vec_int (mword_of_int (PH + 0x06) : mword 64) 2 = mword_of_int (PH + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1) with m2.
     (* the entry values still visible in m2 *)
     assert (Hm2sp : m2 !!! Regidx csp_rs1 = sp').
     { unfold m2. rewrite upd_ne; [| vm_compute; discriminate]. exact Hcsp1. }
-    (* stated with the RAW index literal on the left: the [callee_saved] /
-       cpuid facts below mention [mword_of_int 4], not the local [tp_idx]. *)
-    assert (Hm2tp : m2 !!! Regidx (mword_of_int 4 : mword 5) = m0 !!! Regidx tp_idx).
-    { unfold m2. rewrite upd_ne; [| vm_compute; discriminate].
-      unfold m1. rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
-    (* ---- 0x08: jal ra,cpuid ---- *)
+    (* the tp SLOT itself is meaningless (tp_pin overwrites it) -- what
+       survives is [rget _ tp_idx = cid_word], true of m2 with NO bridge to
+       m0's slot needed at all.  NOTE: freshly re-derived from [rget_tp]
+       HERE rather than reusing the top-level [Htp] -- [rget] carries an
+       implicit CpuId, [Htp] was asserted under the ORIGINAL hart before
+       any of the four migrations above (CID1..CID4), and after a real
+       migration the ambient hart is CID4, so [Htp m2] is a fact about the
+       WRONG (stale, pre-migration) hart's cid_word.  [rget_tp] is general
+       (holds at any hart), so calling it fresh here elaborates at the
+       CURRENT ambient hart automatically. *)
+    assert (Hm2tp : rget m2 tp_idx = cid_word) by (exact (rget_tp m2)).
+    (* ---- 0x08: jal ra,cpuid ----
+
+       BLOCKED HERE.  [Cpuid.wp_call_cpuid_sconf_cs] (SpecCpuid.v, already
+       ported) fixes the callee's SIE state to the LITERAL [false] -- it has
+       no [b] binder at all, matching the "must be stated at b = false" rule
+       for any function that reads [tp] mid-body (cpuid's own [c.mv a0,tp]).
+       But THIS function's own contract (SpecPlicinithart.v, already ported)
+       is b-GENERIC: it threads [sie_cap_gpr _ n b] unchanged from entry to
+       exit through a [wp_next b] wrapper, and plicinithart's code contains
+       NO interrupt-disable instruction (no push_off/pop_off bracket, unlike
+       e.g. push_off's own call to mycpu()) that could turn an arbitrary
+       entry [b] into a proved [false] before this call.  So at the point of
+       this [jal], the only resource in hand is [Hcg : sie_cap_gpr m2 (n-2)
+       b] for an ARBITRARY bound [b], which cannot supply the callee's
+       required [sie_cap_gpr m2 (n-2) false] -- confirmed concretely: for a
+       bound boolean [b], [sie_cap_gpr m n b] does not even syntactically
+       match [sie_cap_gpr m n false] ([iExact] reports "does not match
+       goal"), and there is no lemma anywhere in IntrDefs.v/WpNext.v that
+       converts one to the other (nor could there be: at [b = true] the
+       arm genuinely holds the '1' ghost value plus the trap-CSR/intr_inv
+       resources, not the '0' eighth [sie_arm false] needs).  The physical
+       reading is the same: if plicinithart genuinely runs with interrupts
+       enabled, a timer interrupt can fire during (or between) [c.mv a0,tp;
+       sext.w a0] inside cpuid and hand back neither hart's id -- exactly
+       the bug cpuid's contract exists to rule out, and nothing in
+       plicinithart's own body prevents it.
+
+       This looks like a genuine gap in the (out-of-scope, already-ported,
+       already-green) SpecPlicinithart.v: since plicinithart calls a
+       [b = false]-only leaf without ever disabling interrupts itself, ITS
+       OWN contract should most likely also drop the [wp_next] wrapper and
+       be stated at [b = false] only, exactly like cpuid/mycpu -- the
+       "must be disabled" requirement propagates transitively up through an
+       unbracketed call, the same way it does directly for a function that
+       reads [tp] itself.  Per the porting instructions this is a case to
+       report rather than force, so the call site below is left as the
+       literal (as-if-b-generic) attempt and the proof is [Abort]ed rather
+       than closed with a fabricated or weakened statement. *)
+    Fail iApply (Cpuid.wp_call_cpuid_sconf_cs Φ (mword_of_int (PH + 0x08))
+              (mword_of_int 2081840 : mword 21) m2 (n - 2)%nat
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(lia)
+              with "Hcg Htext Hpc Hi08 [-]").
+  Abort.
+(* ---------------------------------------------------------------------
+   Everything below this point is the OLD (pre-port) continuation of the
+   proof, kept verbatim for reference (it is dead code: the [Abort] above
+   means [wp_plicinithart_sconf] is not defined, and the enclosing functor
+   application below will fail to close for that reason alone).  It shows
+   the shape the rest of the port would take if SpecPlicinithart.v's [b]
+   binder were resolved: with [rget]/[Htp]/[cpuid_ret_cid] the whole
+   [Hm2tp]/[Hmoa0]/[sext32_id_hart] bridge collapses, because [rget _
+   tp_idx] is [cid_word] at ANY map, so the "hart id" threaded through the
+   N2..N11 chain below could simply BE [cid_word] with no map-indexed
+   detour through [m0] at all.
+   ---------------------------------------------------------------------
     iApply (Cpuid.wp_call_cpuid_sconf_cs γ Φ (mword_of_int (PH + 0x08))
               (mword_of_int 2081840 : mword 21) m2 (n - 2)%nat
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -520,6 +595,7 @@ Section ProofPlicinithart.
       repeat split; cs_through Hmo_cs mo.
     - exact HN11ra.
   Qed.
+   --------------------------------------------------------------------- *)
 
 End ProofPlicinithart.
 

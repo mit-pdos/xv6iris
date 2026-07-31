@@ -122,7 +122,13 @@ Section KvmSpecs.
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk on ∗
-      panic_wp)%I.
+      (* HART-GENERIC, deliberately: [kalloc_env] is a caller-supplied bundle
+         threaded across [b]-generic calls, and [panic_wp] reads the ambient
+         hart (through [pc_is] / [sie_cap_gpr] / [Loop]).  Carrying the
+         ambient form would strand the whole bundle at the entry hart the
+         moment an interrupts-enabled instruction is stepped.  Every other
+         conjunct here is already hart-free. *)
+      panic_wp_any)%I.
 
   (* The panic contract now lives in SpecPanic.v (Require Export above), so
      the spinlock layer and the kvm chain share one statement. *)

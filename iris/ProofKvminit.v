@@ -19,6 +19,8 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore RegFile WpMmodeLeafBase.
+Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
@@ -46,22 +48,34 @@ Section KvminitBody.
 
   Notation KVI := KernelSyms.kvminit.
 
+  (* [CID] is bound HERE, per-hypothesis, rather than reused from the
+     Section's own [Context `{CID : CpuId}] -- this Hypothesis stands in for
+     [KMK.wp_kvmmake_sconf] (a Module Type Parameter, hence ALREADY fully
+     CID-generic), and the body below must be able to apply it at a hart
+     other than the section's own (after several b-generic leaf steps below
+     migrate to a fresh CID). Without its own binder, [wp_kvmmake] would be
+     fixed at the section's single ambient CID and could never be invoked at
+     a migrated one at all -- a strictly more basic obstruction than the
+     [cpu_own] gap documented at the call site below. Per the porting guide's
+     "KEEP the section's Context... only remove it from a file that must
+     apply its OWN lemmas at a migrated hart, and then make CID an implicit
+     per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
-    forall (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat),
-      wp_kvmmake_sconf_body γ γa Φ mm lvl K eb p C on.
+    forall `{CID : CpuId} (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_kvmmake_sconf_body γa Φ mm lvl K eb p C on b.
 
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_kvminit_sconf_gen (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
-      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) :
-    wp_kvminit_sconf_body γ γa Φ mm lvl K eb p C on kpt0.
+  Lemma wp_kvminit_sconf_gen (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) :
+    wp_kvminit_sconf_body γa Φ mm lvl K eb p C on kpt0 b.
   Proof.
     unfold wp_kvminit_sconf_body.
-    intros Hlvl HK Hex Hcid.
+    intros Hlvl HK Hex.
     destruct Hex as (nb & Hon & Hnbk). subst lvl. subst on.
     pose proof (kii_cap_bounds K HK) as (Hc2 & HKmk).
     iIntros "Hcg Hcnt #Htext Hpc Hcell Henv Hcont".
@@ -84,9 +98,9 @@ Section KvminitBody.
     iPoseProof (kii_18 with "Htext") as "Hi18".
     iPoseProof (kii_1a with "Htext") as "Hi1a".
     (* +0x00 addi sp,sp,-16 : 2-slot frame push *)
-    iApply (wp_caddi_sp_push_s_sconf γ Φ (mword_of_int KVI) (mword_of_int 48 : mword 6) mm K 2 Hc2 Hpush
+    iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int KVI) (mword_of_int 48 : mword 6) mm K 2 b Hc2 Hpush
               with "Hcg Hpc Hi00 [-]").
-    iIntros "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
     iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
@@ -96,43 +110,87 @@ Section KvminitBody.
     assert (Hp02 : add_vec_int (mword_of_int KVI : mword 64) 2 = mword_of_int (KVI + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
     (* +0x02 sd ra,8(sp) -> slot 1 *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (KVI + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
-              W1 (K - 2)%nat v1 with "Hcg Hpc Hi02 [Hc1] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KVI + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+              W1 (K - 2)%nat v1 b with "Hcg Hpc Hi02 [Hc1] [-]").
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
-    iIntros "Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
+    iIntros (CID2 Hs2) "Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
+    (* the leaf's [storeval] is [rget m rs2], let-bound outside its own
+       [wp_next] -- read at the CALLER's ambient hart (CID1, active when this
+       leaf was applied). [rgne] peels it to the CID-free [!!!] form. *)
+    iEval (rgne) in "Hc1".
     assert (HW1r1 : W1 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1)) by (rewrite /W1 upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HW1r1) in "Hc1".
     assert (Hp04 : add_vec_int (mword_of_int (KVI + 0x02) : mword 64) 2 = mword_of_int (KVI + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
     (* +0x04 sd s0,0(sp) -> slot 2 *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (KVI + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
-              W1 (K - 2)%nat v2 with "Hcg Hpc Hi04 [Hc2] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KVI + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+              W1 (K - 2)%nat v2 b with "Hcg Hpc Hi04 [Hc2] [-]").
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
-    iIntros "Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
+    iIntros (CID3 Hs3) "Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
+    (* same bridge as above (this leaf was applied at CID2). *)
+    iEval (rgne) in "Hc2".
     assert (HW1r8 : W1 !!! Regidx (mword_of_int 8 : mword 5) = mm !!! Regidx (mword_of_int 8)) by (rewrite /W1 upd_ne; [reflexivity | reg_neq]).
     iEval (rewrite HW1r8) in "Hc2".
     assert (Hp06 : add_vec_int (mword_of_int (KVI + 0x04) : mword 64) 2 = mword_of_int (KVI + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp06) in "Hpc".
     (* +0x06 addi s0,sp,16 (value unused; s0 reloaded at the epilogue) *)
-    iApply (wp_caddi4spn_s_sconf γ Φ (mword_of_int (KVI + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
-              W1 (K - 2)%nat ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KVI + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
+              W1 (K - 2)%nat b
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hcg Hpc".
     set (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> W1).
     assert (Hp08 : add_vec_int (mword_of_int (KVI + 0x06) : mword 64) 2 = mword_of_int (KVI + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp08) in "Hpc".
     (* +0x08 jal kvmmake *)
-    iApply (wp_jal_s_sconf γ Φ (mword_of_int (KVI + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2096970 : mword 21)
-              W2 (K - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KVI + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2096970 : mword 21)
+              W2 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi08 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hcg Hpc".
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KVI + 0x08) : mword 64) 4)]> W2).
     assert (Htgt : add_vec (mword_of_int (KVI + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2096970 : mword 21)) = mword_of_int KernelSyms.kvmmake) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt) in "Hpc".
-    assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
-    { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HJsp : J !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     { rewrite /J upd_ne; [| reg_neq]. rewrite /W2 upd_ne; [| reg_neq]. rewrite /W1 upd_eq. reflexivity. }
+    (* ---- THE CALL: BLOCKED HERE, for exactly the same reason as
+       ProofKvmmap.v's [Mappages.wp_mappages_sconf] call (see the long
+       comment there, and claude-notes/projects/explicit-cpuid.md:256-265).
+       [wp_kvmmake] (SpecKvmmake.v, already ported) is b-GENERIC and threads
+       [cpu_own lvl eb p C] unchanged through its own [wp_next b] wrapper,
+       exactly like THIS function's contract (SpecKvminit.v, already ported)
+       does. kvminit's own body above contains FIVE plain instructions (the
+       frame push, two sdsp, the addi4spn, and the jal itself) before this
+       call, none of which disables interrupts, so by the b-generic recipe
+       each is threaded via a fresh, universally quantified hart (CID1..CID5
+       above). [Hcg : sie_cap_gpr J (K - 2) b] is correctly rebound at each
+       step (the leaves rebind it), but [Hcnt : cpu_own lvl eb p C] was
+       introduced ONCE at this function's entry hart and is never mentioned,
+       let alone rebound, by any leaf. At this call site the ambient hart is
+       CID5, with no proven relationship to the entry hart unless [b =
+       false], so [Hcnt] does not typecheck as [wp_kvmmake]'s [cpu_own]
+       premise (needed at CID5) for generic [b] -- same [iSpecialize] failure
+       shape as ProofKvmmap.v's, confirmed by disabling the [Fail] below.
+       Reported rather than forced, per the porting instructions; the proof
+       is [Abort]ed. *)
+    Fail iApply (wp_kvmmake γa Φ J 0%nat (K - 2)%nat eb p C (Some nb) b
+              eq_refl HKmk
+              ltac:(exists nb; split; [reflexivity | exact Hnbk])
+              with "Hcg Hcnt Htext Hpc Henv [-]").
+  Abort.
+(* -------------------------------------------------------------------------
+   Everything below this point is the OLD (pre-port) continuation of the
+   proof, kept verbatim for reference (it is dead code: the [Abort] above
+   means [wp_kvminit_sconf_gen] is not defined, and the enclosing functor
+   application at the bottom of this file will fail to close for that reason
+   alone -- the same state ProofKvmmap.v / ProofPlicinithart.v are already in
+   for independently confirmed instances of the same gap). The
+   [HJ4]/[Hcid]/[Henv]-rewrite triple below is the ENTRY-side tp premise the
+   porting guide says to delete outright (SpecKvmmake.v's already-ported body
+   carries no such premise); everything else here is otherwise untouched by
+   the explicit-CPUID sweep.
+   -------------------------------------------------------------------------
+    assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
+    { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     iEval (rewrite -HJ4) in "Henv".
     iApply (wp_kvmmake γ γa Φ J 0%nat (K - 2)%nat eb p C (Some nb)
               eq_refl HKmk
@@ -227,6 +285,7 @@ Section KvminitBody.
                    | vm_compute; reflexivity ]) ]. }
     { exact Hpasok. }
   Qed.
+   ------------------------------------------------------------------------- *)
 
 End KvminitBody.
 
@@ -236,7 +295,7 @@ End KvminitBody.
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64)
-      : wp_kvminit_sconf_body γ γa Φ mm lvl K eb p C on kpt0 :=
-    wp_kvminit_sconf_gen KMK.wp_kvmmake_sconf γ γa Φ mm lvl K eb p C on kpt0.
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool)
+      : wp_kvminit_sconf_body γa Φ mm lvl K eb p C on kpt0 b :=
+    wp_kvminit_sconf_gen KMK.wp_kvmmake_sconf γa Φ mm lvl K eb p C on kpt0 b.
 End KvminitProof.

@@ -40,6 +40,7 @@ Require Import MinstretInv.
 Require Import KptGhost.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
+Require Import HartTp WpNext.
 Require Import IntrDefs.
 Require Import WpLock SleepLock.
 Require Import WpSconfMem.
@@ -67,51 +68,53 @@ Section BreadEscrowLeaves.
   (* [lw rd, imm(rs1)] with the cell produced and returned inside the
      engine's callback -- the tail's [c.lw a5,0(s1)] opens [buf_escrow]
      around exactly this step. *)
-  Lemma wp_lw_au_s_sconf (γ : gname) (Φ : mval -> iProp Σ) (cmp : bool)
+  Lemma wp_lw_au_s_sconf (Φ : mval -> iProp Σ) (cmp : bool)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset)
+      (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
       {dqm : dfrac} :
     uint rd <> 0 ->
-    rd <> csp_rs1 ->
+    rd_ok rd ->
     ↑kptN ⊆ Em ->
-    sie_cap_gpr γ m av -∗
+    sie_cap_gpr m av b -∗
     pc_is pc -∗
     instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ↦₄{dqm} v
+       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
+       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
           ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
     ( ∀ v : mword 32,
-      sie_cap_gpr γ (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av -∗
-      pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-      Ψ v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      wp_next b (fun (CID : CpuId) =>
+        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b -∗
+        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
+        Ψ v -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hrd Hrdsp HkptEm.
+    intros Hrd Hrdok HkptEm.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false γ Φ pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Ψ Em
+    iApply (wp_load_s_sconf_au 4 cmp false Φ pc rd rs1 imm m av
+              (fun w => sign_extend' 64 w) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdsp HkptEm
+              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
               with "Hcg Hpc Hinstr HAU Hcont").
   Qed.
 
   (* [sw rs2, imm(rs1)], same discipline -- the recycle block's three field
      stores each open [buf_escrow] around one of these. *)
-  Lemma wp_sw_au_s_sconf (γ : gname) (Φ : mval -> iProp Σ) (cmp : bool)
+  Lemma wp_sw_au_s_sconf (Φ : mval -> iProp Σ) (cmp : bool)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) :
+      (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     ↑kptN ⊆ Em ->
-    sie_cap_gpr γ m av -∗
+    sie_cap_gpr m av b -∗
     pc_is pc -∗
     instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
-       add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ↦₄ vold ∗
-       (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)
-          ↦₄ (trunc32 (m !!! Regidx rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    ( sie_cap_gpr γ m av -∗
+       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
+       (add_vec (rget m rs1) (sign_extend' 64 imm)
+          ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
+    wp_next b (fun (CID : CpuId) =>
+      sie_cap_gpr m av b -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
       Ψ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -119,11 +122,11 @@ Section BreadEscrowLeaves.
   Proof.
     intro HkptEm.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au 4 cmp γ Φ pc rs2 rs1 imm m av
-              (trunc32 (m !!! Regidx rs2)) Ψ Em
+    iApply (wp_store_s_sconf_au 4 cmp Φ pc rs2 rs1 imm m av
+              (trunc32 (rget m rs2)) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (m !!! Regidx rs2)) HkptEm
+              exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
               with "Hcg Hpc Hinstr HAU Hcont").
   Qed.
 

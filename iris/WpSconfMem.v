@@ -75,6 +75,9 @@ Section WpSconfMem.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* ------------------------------------------------------------------- *)
   (* c.ld rd, imm(rs1) -- width-8 RVC load.                               *)
@@ -193,7 +196,7 @@ Section WpSconfMem.
        mask (claude-notes/completed/kpt-share.md).  Every supplier's [Em] is
        [⊤ ∖ ↑minstretN] minus device/lock namespaces, so [solve_ndisj]. *)
     ↑kptN ⊆ Em ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword (8*width),
@@ -201,7 +204,7 @@ Section WpSconfMem.
        (wordw_pointsto width pa dqm v ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
     ( ∀ v : mword (8*width),
       wp_next b (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (ext v)]> m) n b -∗
+        sie_cap_gpr (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
         Ψ v -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
@@ -381,7 +384,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
@@ -421,12 +424,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
     wordw_pointsto width pa dqm v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -467,12 +470,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, false, width)) -∗
     wordw_pointsto width pa dqm v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -503,12 +506,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc c (LOAD (imm, Regidx rs1, Regidx rd, true, width)) -∗
     wordw_pointsto width pa dqm v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -572,12 +575,12 @@ Section WpSconfMem.
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     pa ↦ₘ{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -648,10 +651,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) -∗ pa ↦₄{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -669,10 +672,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗ pa ↦₈{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -690,10 +693,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗ pa ↦₈{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -711,10 +714,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗ pa ↦₄{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -732,10 +735,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗ pa ↦₄{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -775,14 +778,14 @@ Section WpSconfMem.
     (* see [wp_load_s_sconf_au]: the absorb runs with the accessor open *)
     ↑kptN ⊆ Em ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
     (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword (8*width),
        wordw_pointsto width pa (DfracOwn 1) vold ∗
        (wordw_pointsto width pa (DfracOwn 1) sv ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       Ψ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -958,7 +961,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -983,12 +986,12 @@ Section WpSconfMem.
             (subrange_vec_dec (rget m rs2) (width*8-1) 0) : mword (8*width))
          (8*(0+1)*width-1) (8*0*width)) = sv ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
     wordw_pointsto width pa (DfracOwn 1) vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa (DfracOwn 1) sv -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1039,10 +1042,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := rget m rs2 in
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗ pa ↦₈ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1061,10 +1064,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := rget m rs2 in
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗ pa ↦₈ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1082,10 +1085,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (rget m rs2) in
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗ pa ↦₄ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1103,10 +1106,10 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc32 (rget m rs2) in
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗ pa ↦₄ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1186,12 +1189,12 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 8) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc8 (rget m rs2) in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
     pa ↦ₘ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1339,7 +1342,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -1360,12 +1363,12 @@ Section WpSconfMem.
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc true (LOAD (imm, sp, Regidx rd, false, 8)) -∗
     pa ↦₈{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1384,12 +1387,12 @@ Section WpSconfMem.
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
     let pa := add_vec (m !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) in
     let storeval := rget m rs2 in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, sp, 8)) -∗
     pa ↦₈ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1411,12 +1414,12 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (zero_reg : mword 64) in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
     pa ↦₈ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦₈ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1578,7 +1581,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
@@ -1594,12 +1597,12 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (vold : bv 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := (mword_of_int 0 : mword 32) in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     pa ↦₄ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦₄ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1760,7 +1763,7 @@ Section WpSconfMem.
       iSplitL "Hms Hhalf".
       { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }

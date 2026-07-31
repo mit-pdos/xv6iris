@@ -47,6 +47,7 @@ Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *
 Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import KptShare.   (* tlb_res_pt: the SHARED table's per-hart residue *)
 Require Import SRegime.
+Require Import ProcGeom.   (* a_cpu_noff / a_cpu_int / a_cpu_proc: the enabled arm owns them *)
 Require Import MstatusBits WpIntrCore.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
    namespace doesn't shadow anything here. *)
@@ -441,35 +442,154 @@ Section IntrDefs.
   Definition intr_off_tok : iProp Σ :=
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1).
 
+  (* =================================================================== *)
+  (* §6a THE PUSH/POP COUNTING TOKEN and THE PER-CPU CELLS.               *)
+  (* Hoisted ABOVE [sie_arm] because the interrupts-ENABLED arm OWNS      *)
+  (* them (see [sie_arm]): while SIE = 1 a trap can migrate the thread,   *)
+  (* so the resuming hart's [cpus[cid]] cells have to be re-delivered by  *)
+  (* the crossing, and the only vehicle that crosses is the arm.          *)
+  (* =================================================================== *)
+
+  Definition sie_bit (eb : bool) : mword 1 := if eb then 'b"1" else 'b"0".
+
+  (* the persistent half of the old restore payload: an interrupt handler
+     is installed and its contract is available.  Persistent (intr_inv and
+     the □ handler spec both are), hence duplicable -- a crossing retune
+     (sched's intena restore) can drop or re-duplicate it freely. *)
+  Definition intr_handler_avail : iProp Σ :=
+    (∃ handler : mword 64,
+        intr_inv handler ∗
+        ▷ intr_handler_spec handler)%I.
+
+  Global Instance intr_handler_avail_persistent :
+    Persistent (intr_handler_avail).
+  Proof. rewrite /intr_handler_avail. apply _. Qed.
+
+  (* the LINEAR half: the trap-scratch CSRs.  They live in the SIE arm's
+     '1' branch while interrupts are enabled, and are threaded EXPLICITLY
+     at SIE=0 -- they ride on the UNBALANCED specs only (bare push_off /
+     pop_off, acquire's post / release's pre, the flip leaves), via
+     [trap_csrs_pay]: owed exactly at a level-0 boundary with an enabled
+     base.  Push/pop-balanced functions never mention them. *)
+  Definition trap_csrs : iProp Σ :=
+    ((∃ v : mword 64, sepc ↦ᵣ v) ∗
+     (∃ v : mword 64, scause ↦ᵣ v) ∗
+     (∃ v : mword 64, stval ↦ᵣ v))%I.
+
+  Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
+    (match n with
+     | O => if eb then trap_csrs else emp
+     | S _ => emp
+     end)%I.
+
+  Definition intr_restore : iProp Σ :=
+    (intr_handler_avail ∗ trap_csrs)%I.
+
+  Definition intr_count (n : nat) (eb : bool) : iProp Σ :=
+    match n with
+    | O => ghost_var sie_gname (1/4/2)%Qp (sie_bit eb)
+    | S _ => (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗
+              (if eb then intr_handler_avail else emp))%I
+    end.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE PER-CPU CELLS of [cpus[cid]] a running kernel thread owns: the   *)
+  (* push/pop level cell [noff], the saved base-enable [intena], and the  *)
+  (* current-process field [proc].  Split out of [CpuOwn.cpu_own] and     *)
+  (* moved down here for the same reason as §6a.                          *)
+  (* ------------------------------------------------------------------- *)
+  Definition noff_val (n : nat) : mword 32 := mword_of_int (Z.of_nat n).
+  Definition intena_val (eb : bool) : mword 32 :=
+    if eb then mword_of_int 1 else mword_of_int 0.
+
+  Definition cpu_cells (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (⌜ (Z.of_nat n < 2 ^ 31)%Z ⌝ ∗
+     a_cpu_noff cid_word ↦₄ noff_val n ∗
+     (match n with
+      | O => (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv)%I
+      | S _ => a_cpu_int cid_word ↦₄ intena_val eb
+      end) ∗
+     a_cpu_proc cid_word ↦₈ p)%I.
+
+  (* the cells PLUS the counting token -- the whole per-cpu bundle minus
+     the caller's context-slot payload [C] (which is an ordinary caller
+     FRAME: an opaque [iProp Σ] crosses a migration for free, and every
+     live instantiation that can reach the enabled arm is [emp]).  This is
+     exactly what push_off / pop_off move between the arm and the code. *)
+  Definition cpu_hart (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (cpu_cells n eb p ∗ intr_count n eb)%I.
+
   (* THE SIE ARM IS AN INDEX, NOT AN INTERNAL DISJUNCTION.  It used to be
      [A ∨ B], which made every leaf SIE-agnostic at the price of hiding the
      one fact a leaf statement now has to expose: whether an interrupt can be
      taken at this instruction, and therefore whether execution can resume on
      a DIFFERENT hart.  The old form is recoverable as [∃ b, sie_arm b], and
      a leaf's case split on the disjunction becomes a case split on [b], so
-     nothing inside the leaves changed shape.  See [wp_next]. *)
-  Definition sie_arm (b : bool) : iProp Σ :=
+     nothing inside the leaves changed shape.  See [wp_next].
+
+     THE ENABLED ARM ALSO OWNS THIS HART'S [cpus[cid]] BOOKKEEPING
+     ([cpu_hart 0 true p], §6a).  Rationale: with SIE = 1 a trap can be
+     taken at any instruction and the thread can resume on a DIFFERENT
+     hart, so every hart-indexed resource a caller holds across such an
+     instruction must ride the crossing -- and the only thing that crosses
+     is what a leaf's [wp_next] re-delivers, i.e. [sie_cap_gpr].  The
+     level and the base-enable come for FREE: the arm's own eighth is at
+     '1' and [intr_count]'s complementary eighth is at [sie_bit eb] (n=0)
+     or '0' (n>0), so ghost agreement pins [n = 0] and [eb = true]
+     ([intr_count_get_on]) -- the arm needs neither as a parameter.  What
+     it does need is [p], the value of [cpus[cid].proc]: that value is a
+     THREAD invariant (the dispatcher sets the resuming hart's field to
+     the same proc), so it is threaded like the register map [m] and no
+     transport or agreement ghost is required.  The context-slot payload
+     [C] does NOT ride here: it is an opaque [iProp Σ], hence an ordinary
+     caller frame that crosses for free.  This matches the C: a thread
+     touches c->noff / c->intena / c->proc only with interrupts disabled,
+     which is precisely what push_off exists for. *)
+  Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
     (if b
      then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
            (∃ handler : mword 64, intr_inv handler) ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
-           (∃ v : mword 64, stval ↦ᵣ v))
+           (∃ v : mword 64, stval ↦ᵣ v) ∗
+           cpu_hart 0 true p)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
-  Lemma sie_arm_of_ex :
-    (∃ b : bool, sie_arm b) ⊣⊢
+  Lemma sie_arm_of_ex (p : mword 64) :
+    (∃ b : bool, sie_arm b p) ⊣⊢
     (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
      (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
       (∃ handler : mword 64, intr_inv handler) ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
-      (∃ v : mword 64, stval ↦ᵣ v))).
+      (∃ v : mword 64, stval ↦ᵣ v) ∗
+      cpu_hart 0 true p)).
   Proof.
     iSplit.
     - iIntros "H". iDestruct "H" as ([]) "H"; [ iRight | iLeft ]; iExact "H".
     - iIntros "[H|H]"; [ iExists false | iExists true ]; iExact "H".
   Qed.
+
+  (* THE TWO MOVES push_off / pop_off make.  The enabled arm's per-cpu
+     bookkeeping comes OUT (push_off, right after its [csrci] has already
+     flipped the live bit -- the eighth it hands back is the one the flip
+     produced) and goes back IN (pop_off's final [csrsi]).  Everything
+     else in the arm is untouched, so these are pure re-associations. *)
+  Lemma sie_arm_on_out (p : mword 64) :
+    sie_arm true p -∗
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
+    (∃ handler : mword 64, intr_inv handler) ∗
+    trap_csrs ∗
+    cpu_hart 0 true p.
+  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hcpu)". iFrame. Qed.
+
+  Lemma sie_arm_on_in (p : mword 64) :
+    ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
+    (∃ handler : mword 64, intr_inv handler) -∗
+    trap_csrs -∗
+    cpu_hart 0 true p -∗
+    sie_arm true p.
+  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv) Hcpu". iFrame. Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread
@@ -635,10 +755,11 @@ Section IntrDefs.
   Lemma strans_regime_inv : sr_inv strans_regime ⊣⊢ strans_inv.
   Proof. reflexivity. Qed.
 
-  Definition sie_cap (m : regfile) (avail : nat) (b : bool) : iProp Σ :=
+  Definition sie_cap (m : regfile) (avail : nat) (b : bool)
+      (p : mword 64) : iProp Σ :=
     (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
      strans_inv ∗
-     sie_arm b)%I.
+     sie_arm b p)%I.
 
   (* THE WRITE-SIDE PREMISE of every gpr-writing leaf.  Replaces the old
      [rd <> csp_rs1] IN PLACE (same premise slot, so no call site changes
@@ -694,13 +815,13 @@ Section IntrDefs.
      what makes the whole sconf-tier (memset, the lock/kalloc cone via
      [cpu_own γ 0 false p C], ...) callable during early boot. *)
   Lemma sie_cap_intro_bare (m : regfile) (avail : nat)
-      (v : mword 64) :
+      (v : mword 64) {p : mword 64} :
     stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) -∗
     strans_bit ('b"0") -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
-    sie_cap m avail false.
+    sie_cap m avail false p.
   Proof.
     iIntros "Hstk Hbit Hb Hstv Htok".
     iFrame "Hstk".
@@ -714,37 +835,37 @@ Section IntrDefs.
      That is what lets a migration hand back the SAME map [m] at the new hart
      instead of an [rf_upd m Rtp …] layer per instruction. *)
   Definition sie_cap_gpr
-      (m : regfile) (avail : nat) (b : bool) : iProp Σ :=
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
     (hart_state ↦ᵣ HART_ACTIVE tt ∗
      sconf ∗
-     sie_cap m avail b ∗
+     sie_cap m avail b p ∗
      gpr_file (tp_pin m))%I.
 
-  Global Instance sie_cap_gpr_into_sep m avail b :
-    IntoSep (sie_cap_gpr m avail b)
+  Global Instance sie_cap_gpr_into_sep m avail b p :
+    IntoSep (sie_cap_gpr m avail b p)
             (hart_state ↦ᵣ HART_ACTIVE tt)
-            (sconf ∗ sie_cap m avail b ∗ gpr_file (tp_pin m)).
+            (sconf ∗ sie_cap m avail b p ∗ gpr_file (tp_pin m)).
   Proof. rewrite /IntoSep /sie_cap_gpr. by iIntros "($ & $ & $ & $)". Qed.
 
-  Global Instance sie_cap_gpr_from_sep m avail b :
-    FromSep (sie_cap_gpr m avail b)
+  Global Instance sie_cap_gpr_from_sep m avail b p :
+    FromSep (sie_cap_gpr m avail b p)
             (hart_state ↦ᵣ HART_ACTIVE tt)
-            (sconf ∗ sie_cap m avail b ∗ gpr_file (tp_pin m)).
+            (sconf ∗ sie_cap m avail b p ∗ gpr_file (tp_pin m)).
   Proof. rewrite /FromSep /sie_cap_gpr. by iIntros "[$ [$ [$ $]]]". Qed.
 
   (* Foolproof split/join for the ports (no instance-resolution surprises). *)
-  Lemma sie_cap_gpr_split m avail b :
-    sie_cap_gpr m avail b -∗
-    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ sie_cap m avail b ∗
+  Lemma sie_cap_gpr_split m avail b p :
+    sie_cap_gpr m avail b p -∗
+    hart_state ↦ᵣ HART_ACTIVE tt ∗ sconf ∗ sie_cap m avail b p ∗
     gpr_file (tp_pin m).
   Proof. by iIntros "$". Qed.
 
-  Lemma sie_cap_gpr_join m avail b :
+  Lemma sie_cap_gpr_join m avail b p :
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     sconf -∗
-    sie_cap m avail b -∗
+    sie_cap m avail b p -∗
     gpr_file (tp_pin m) -∗
-    sie_cap_gpr m avail b.
+    sie_cap_gpr m avail b p.
   Proof. iIntros "Hhs Hsc Hcap Hfile". rewrite /sie_cap_gpr. iFrame. Qed.
 
   (* [hw_config] is persistent and rides at the head of [sconf]; a
@@ -752,8 +873,8 @@ Section IntrDefs.
      bundle intact) whenever it needs the ambient static-claims bundle for a
      ghost conversion between instructions (e.g. the walk's kalloc-page ->
      PT-node ↦ₘ→↦ₚ disassembly, which needs [kmap_static_claims]). *)
-  Lemma sie_cap_gpr_dup_hw_config m avail b :
-    sie_cap_gpr m avail b -∗ hw_config ∗ sie_cap_gpr m avail b.
+  Lemma sie_cap_gpr_dup_hw_config m avail b p :
+    sie_cap_gpr m avail b p -∗ hw_config ∗ sie_cap_gpr m avail b p.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
@@ -785,8 +906,8 @@ Section IntrDefs.
     rewrite /sconf. iSplitR; [iExact "Hhw" | iExact "Hrest"].
   Qed.
 
-  Lemma sie_cap_gpr_kmap_claims m avail b :
-    sie_cap_gpr m avail b -∗ kmap_static_claims ∗ sie_cap_gpr m avail b.
+  Lemma sie_cap_gpr_kmap_claims m avail b p :
+    sie_cap_gpr m avail b p -∗ kmap_static_claims ∗ sie_cap_gpr m avail b p.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
@@ -796,10 +917,10 @@ Section IntrDefs.
 
   (* the [gpr_file_x0] fact at the bundled altitude: a whole-function proof
      threading [sie_cap_gpr] can read the map's x0 slot and keep the bundle. *)
-  Lemma sie_cap_gpr_x0 m avail b (i : mword 5) :
+  Lemma sie_cap_gpr_x0 m avail b p (i : mword 5) :
     uint i = 0 ->
-    sie_cap_gpr m avail b -∗
-    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr m avail b.
+    sie_cap_gpr m avail b p -∗
+    ⌜ m !!! Regidx i = zero_reg ⌝ ∗ sie_cap_gpr m avail b p.
   Proof.
     intro Hi. iIntros "Hcg".
     (* x0 is not tp, so the pinned file's x0 slot IS the map's. *)
@@ -817,12 +938,12 @@ Section IntrDefs.
   (* the funnel's accessor: split off the exact reserved carve (the
      [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
   Lemma sie_cap_acc
-      (m : regfile) (avail : nat) (b : bool) :
-    sie_cap m avail b ⊣⊢
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
+    sie_cap m avail b p ⊣⊢
     stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
     strans_inv ∗
-    sie_arm b.
+    sie_arm b p.
   Proof.
     rewrite /sie_cap stack_own_app. iSplit.
     - iIntros "[[Hkv Hdeep] [Htr Harm]]". iFrame.
@@ -831,9 +952,9 @@ Section IntrDefs.
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
   Lemma sie_cap_retarget
-      (m m' : regfile) (avail : nat) (b : bool) :
+      (m m' : regfile) (avail : nat) (b : bool) {p : mword 64} :
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
-    sie_cap m avail b -∗ sie_cap m' avail b.
+    sie_cap m avail b p -∗ sie_cap m' avail b p.
   Proof.
     iIntros (Hsp) "(Hstk & Htr & Harm)". iFrame "Htr Harm". rewrite Hsp. iExact "Hstk".
   Qed.
@@ -844,11 +965,11 @@ Section IntrDefs.
      the top k slots, ABOVE the new sp and therefore trap-stable --
      comes OUT for the client. *)
   Lemma sie_cap_push
-      (m m' : regfile) (avail k : nat) (b : bool) :
+      (m m' : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     (k <= avail)%nat ->
     m' !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) k ->
-    sie_cap m avail b -∗
-    sie_cap m' (avail - k) b ∗ stack_own (m !!! Regidx csp_rs1) k.
+    sie_cap m avail b p -∗
+    sie_cap m' (avail - k) b p ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
     iIntros (Hk Hsp') "(Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + avail)%nat
@@ -861,11 +982,11 @@ Section IntrDefs.
      release): the function's frame [sp, sp') = the top k slots at sp'
      is fed back IN and k returns to [avail]. *)
   Lemma sie_cap_pop
-      (m m' : regfile) (avail k : nat) (b : bool) :
+      (m m' : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     m !!! Regidx csp_rs1 = pa_stk (m' !!! Regidx csp_rs1) k ->
     stack_own (m' !!! Regidx csp_rs1) k -∗
-    sie_cap m avail b -∗
-    sie_cap m' (avail + k) b.
+    sie_cap m avail b p -∗
+    sie_cap m' (avail + k) b p.
   Proof.
     iIntros (Hsp) "Hframe (Hstk & Htr & Harm)". iFrame "Htr Harm".
     replace (kv_frame_slots + (avail + k))%nat
@@ -876,10 +997,10 @@ Section IntrDefs.
   (* custody transfer at the DEEP end (no sp move): absorb k adjacent
      slots below the owned region into [avail]... *)
   Lemma sie_cap_grow
-      (m : regfile) (avail k : nat) (b : bool) :
+      (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
-    sie_cap m avail b -∗
-    sie_cap m (avail + k) b.
+    sie_cap m avail b p -∗
+    sie_cap m (avail + k) b p.
   Proof.
     iIntros "Hdeep (Hstk & Htr & Harm)". iFrame "Htr Harm".
     rewrite Nat.add_assoc. iApply stack_own_app. iFrame "Hstk Hdeep".
@@ -887,10 +1008,10 @@ Section IntrDefs.
 
   (* ... and release the k deepest slots back out. *)
   Lemma sie_cap_shrink
-      (m : regfile) (avail k : nat) (b : bool) :
+      (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
     (k <= avail)%nat ->
-    sie_cap m avail b -∗
-    sie_cap m (avail - k) b ∗
+    sie_cap m avail b p -∗
+    sie_cap m (avail - k) b p ∗
     stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
   Proof.
     iIntros (Hk) "(Hstk & Htr & Harm)". iFrame "Htr Harm".
@@ -917,48 +1038,6 @@ Section IntrDefs.
   (* no-ops on SIE and need no handler, no stvec, no trap CSRs -- the    *)
   (* early-boot discipline ([intr_count 0 false] = [intr_off_tok]).  *)
   (* =================================================================== *)
-  Definition sie_bit (eb : bool) : mword 1 := if eb then 'b"1" else 'b"0".
-
-  (* the persistent half of the old restore payload: an interrupt handler
-     is installed and its contract is available.  Persistent (intr_inv and
-     the □ handler spec both are), hence duplicable -- a crossing retune
-     (sched's intena restore) can drop or re-duplicate it freely. *)
-  Definition intr_handler_avail : iProp Σ :=
-    (∃ handler : mword 64,
-        intr_inv handler ∗
-        ▷ intr_handler_spec handler)%I.
-
-  Global Instance intr_handler_avail_persistent :
-    Persistent (intr_handler_avail).
-  Proof. rewrite /intr_handler_avail. apply _. Qed.
-
-  (* the LINEAR half: the trap-scratch CSRs.  They live in the SIE arm's
-     '1' branch while interrupts are enabled, and are threaded EXPLICITLY
-     at SIE=0 -- they ride on the UNBALANCED specs only (bare push_off /
-     pop_off, acquire's post / release's pre, the flip leaves), via
-     [trap_csrs_pay]: owed exactly at a level-0 boundary with an enabled
-     base.  Push/pop-balanced functions never mention them. *)
-  Definition trap_csrs : iProp Σ :=
-    ((∃ v : mword 64, sepc ↦ᵣ v) ∗
-     (∃ v : mword 64, scause ↦ᵣ v) ∗
-     (∃ v : mword 64, stval ↦ᵣ v))%I.
-
-  Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
-    (match n with
-     | O => if eb then trap_csrs else emp
-     | S _ => emp
-     end)%I.
-
-  Definition intr_restore : iProp Σ :=
-    (intr_handler_avail ∗ trap_csrs)%I.
-
-  Definition intr_count (n : nat) (eb : bool) : iProp Σ :=
-    match n with
-    | O => ghost_var sie_gname (1/4/2)%Qp (sie_bit eb)
-    | S _ => (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∗
-              (if eb then intr_handler_avail else emp))%I
-    end.
-
   (* crossing retunes (the sched intena restore): the payload is
      persistent-or-empty, so both directions are loss-free. *)
   Lemma intr_count_retune_off (n : nat) (eb : bool) :

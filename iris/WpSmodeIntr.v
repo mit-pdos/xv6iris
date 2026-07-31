@@ -74,6 +74,9 @@ Section WpSmodeIntr.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* =================================================================== *)
   (* §1 THE STEP ENGINE at SIE=1: the [wp_instr_s_tlbinv_pt] callback     *)
@@ -214,12 +217,12 @@ Section WpSmodeIntr.
   Lemma wp_instr_s_sconf
       (m : regfile) (n : nat) (b : bool) Φ
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
        sconf -∗
-       sie_cap m n b -∗
+       sie_cap m n b p -∗
        gpr_file (tp_pin m) -∗
        nextPC ↦ᵣ pc -∗
        mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -247,7 +250,7 @@ Section WpSmodeIntr.
     - (* ---- b = true: the interrupt-absorbing engine.  [sie_arm true]
            needs no unfolding: the [if] reduces by conversion, so
            [iDestruct] / [iFrame] / [iExact] see through it. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx)".
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hcpu)".
       iDestruct "Hhx" as (handler) "#Hintr".
       (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
          inside its invariant, and the Bare slot owns the same cell. *)
@@ -285,12 +288,12 @@ Section WpSmodeIntr.
       iDestruct (v2_of_intr_config with "Hic Hmenv")
         as "(Hsc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
+              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
         iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
-        iFrame "Hq1 Hsepcx Hscausex Hstvalx".
+        iFrame "Hq1 Hsepcx Hscausex Hstvalx Hcpu".
         iExists handler. iExact "Hintr". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
@@ -353,11 +356,11 @@ Section WpSmodeIntr.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc true base -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -427,11 +430,11 @@ Section WpSmodeIntr.
        exec (execute base) s_pc
        = Some (RETIRE_SUCCESS,
                set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval))) ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false base -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -499,11 +502,11 @@ Section WpSmodeIntr.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) = wval ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc true (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
