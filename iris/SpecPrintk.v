@@ -100,7 +100,7 @@ Definition pk_vararg (m : regfile) (j : nat) : mword 64 :=
 Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
     (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 dqf : dfrac)
-    (f : string) (descs : list pk_arg_desc) (b : bool) :=
+    (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.printk in
@@ -119,7 +119,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
   (length descs <= 7)%nat ->
   eq_vec (sign_extend' 64 pv) zero_reg = false ->
   neq_vec (sign_extend' 64 pkv) zero_reg = false ->
-  sie_cap_gpr m0 K b -∗
+  sie_cap_gpr m0 K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   fmt ↦ₛ{ dqf } f -∗
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
@@ -133,7 +133,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
   dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mf bs,
-    sie_cap_gpr mf K b -∗
+    sie_cap_gpr mf K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0
       /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
@@ -150,6 +150,6 @@ Module Type PRINTK.
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 dqf : dfrac}
-      (f : string) (descs : list pk_arg_desc) (b : bool),
-      wp_printk_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs b.
+      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64),
+      wp_printk_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 dqf f descs b p.
 End PRINTK.

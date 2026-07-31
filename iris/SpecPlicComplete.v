@@ -49,7 +49,7 @@ Notation PLIC_COMPLETE := KernelSyms.plic_complete.
 
 Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names)
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let pcE := mword_of_int KernelSyms.plic_complete in
@@ -59,12 +59,12 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
   (* plic_complete's own max depth: its 32-byte frame (4 slots) plus the two
      slots cpuid's frame needs below it. *)
   (6 <= n)%nat ->
-  sie_cap_gpr m0 n b -∗
+  sie_cap_gpr m0 n b p -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ m' : regfile,
-    sie_cap_gpr m' n b -∗
+    sie_cap_gpr m' n b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -74,6 +74,6 @@ Module Type PLIC_COMPLETE.
   Parameter wp_plic_complete_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool),
-      wp_plic_complete_sconf_body γd γv Φ m0 n b.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64),
+      wp_plic_complete_sconf_body γd γv Φ m0 n b p.
 End PLIC_COMPLETE.

@@ -35,17 +35,17 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr m K b -∗
-  cpu_own n eb pcur C -∗
+  sie_cap_gpr m K b pcur -∗
+  cpu_own n eb pcur C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   kfree_pre p -∗
   kalloc_avail γk on -∗
-  panic_wp -∗
+  panic_wp_any -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
-    cpu_own n eb pcur C -∗
+    sie_cap_gpr mr K b pcur -∗
+    cpu_own n eb pcur C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (avail_inc on) -∗

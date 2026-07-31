@@ -148,15 +148,15 @@ Definition wp_pipealloc_sconf_body
   (24 <= K)%nat ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr m K b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two object pools pipealloc draws on *)
   is_ftable γfl γf -∗
   is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
-  panic_wp -∗
+  panic_wp_any -∗
   (* pipealloc creates TWO references, so it needs two fd slots -- one per
      end of the pipe.  Both come back from the fileclose calls on the error
      paths. *)
@@ -168,8 +168,8 @@ Definition wp_pipealloc_sconf_body
   pf1 ↦₈ v1 -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
-    cpu_own n eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗

@@ -56,20 +56,20 @@ Notation PLICINIT := KernelSyms.plicinit.
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
 Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
   (2 <= n)%nat ->
-  sie_cap_gpr m0 n b -∗
+  sie_cap_gpr m0 n b p -∗
   kernel_text -∗ pc_is pcE -∗
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      both writes preserve [plic_ok], so nothing is owed back to the caller *)
   plic_inv -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ m' : regfile,
-    sie_cap_gpr m' n b -∗
+    sie_cap_gpr m' n b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -78,6 +78,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool),
-      wp_plicinit_sconf_body Φ m0 n b.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64),
+      wp_plicinit_sconf_body Φ m0 n b p.
 End PLICINIT.

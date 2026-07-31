@@ -61,13 +61,13 @@ Notation KVMIH := KernelSyms.kvminithart.
 Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
     (root : mword 44)
-    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) :=
+    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
   (2 <= K)%nat ->
-  sie_cap_gpr mm K b -∗
+  sie_cap_gpr mm K b p -∗
   strans_bit strans_bit_bare -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -80,7 +80,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   kpt_inv root -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     strans_bit strans_bit_kpt -∗
@@ -93,6 +93,6 @@ Module Type KVMINITHART.
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
-      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool),
-      wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b.
+      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) (p : mword 64),
+      wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b p.
 End KVMINITHART.

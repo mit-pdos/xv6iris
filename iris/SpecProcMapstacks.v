@@ -51,15 +51,15 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   pt_rep0 t m ->
   (forall i : nat, (i < 64)%nat -> m !! kstack_vpn i = None) ->
   (exists nb, on = Some nb /\ (64 + kstacks_missing t < nb)%nat) ->
-  sie_cap_gpr mm K b -∗
-  cpu_own lvl eb p C -∗ kernel_text -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
-    sie_cap_gpr mr K b -∗
-    cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
