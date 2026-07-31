@@ -83,8 +83,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* vmfault's kalloc keeps its transient noff increment in int range;
      [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr mm K b -∗
-  cpu_own lvl eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   p_sz p ↦₈{dqs} szv -∗
@@ -94,8 +94,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
-    sie_cap_gpr mr K b -∗
-    cpu_own lvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
     p_sz p ↦₈{dqs} szv -∗
     p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗

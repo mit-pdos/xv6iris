@@ -78,18 +78,18 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
      below that. *)
   (14 <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr m K b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_ftable γl γf -∗
-  panic_wp -∗
+  panic_wp_any -∗
   (* the new reference needs somewhere to live: one fd slot goes into the
      table and comes back out of fileclose. *)
   fd_slot -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
-    cpu_own n eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     filealloc_post γf (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗

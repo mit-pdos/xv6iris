@@ -84,19 +84,19 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* a0 is the file being duplicated *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
-  sie_cap_gpr m K b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_ftable γl γf -∗
-  panic_wp -∗
+  panic_wp_any -∗
   (* THE precondition that makes [f->ref++] safe: the duplicate needs a
      descriptor to live in, and there are only FDSLOTS of those. *)
   fd_slot -∗
   file_ref γf k q Cf -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
-    cpu_own n eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = fnode k ⌝ -∗

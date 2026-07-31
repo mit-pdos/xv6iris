@@ -52,7 +52,7 @@ Definition buffer_name_str : Z := 0x80007398.
 
 Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-    (vlock : mword 32) (vname vcpu : mword 64) (b : bool) :=
+    (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.binit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   let lk : mword 64 := bcache_addr in
@@ -61,7 +61,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   (* binit's own frame is 6 slots and its deepest callee (initsleeplock) wants
      6 more below that. *)
   (12 <= K)%nat ->
-  sie_cap_gpr m K b -∗
+  sie_cap_gpr m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
@@ -71,7 +71,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   blink_raw bhead -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -86,6 +86,6 @@ Module Type BINIT.
   Parameter wp_binit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-      (vlock : mword 32) (vname vcpu : mword 64) (b : bool),
-      wp_binit_sconf_body Φ m K vlock vname vcpu b.
+      (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
+      wp_binit_sconf_body Φ m K vlock vname vcpu b p.
 End BINIT.

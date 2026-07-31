@@ -72,7 +72,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
     (vtlock : bv 32) (vtname vtcpu : bv 64)
-    (dread0 dwrite0 : mword 64) (b : bool) :=
+    (dread0 dwrite0 : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* &cons.lock = &cons: the spinlock is the first field of the [cons] struct *)
@@ -85,7 +85,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
      which needs 4. *)
   (6 <= K)%nat ->
-  sie_cap_gpr m K b -∗
+  sie_cap_gpr m K b p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
      uartinit's own spec, the "uart" one. *)
@@ -107,7 +107,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   devsw_console_write ↦₈ dwrite0 -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
@@ -134,6 +134,6 @@ Module Type CONSOLEINIT.
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
-      (dread0 dwrite0 : mword 64) (b : bool),
-      wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 b.
+      (dread0 dwrite0 : mword 64) (b : bool) (p : mword 64),
+      wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 b p.
 End CONSOLEINIT.

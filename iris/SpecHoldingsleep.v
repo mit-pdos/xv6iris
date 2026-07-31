@@ -49,22 +49,22 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (16 <= av)%nat ->
-  sie_cap_gpr m av b -∗
-  cpu_own 0 eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own 0 eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle (returned untouched) *)
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pidv -∗
-  panic_wp -∗
+  panic_wp_any -∗
   (* the caller's own pid, agreeing with the lock's pid field *)
   p_pid p ↦₄{dq} pidv -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
-      sie_cap_gpr mf av b -∗
-      cpu_own 0 eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own 0 eb p C b -∗
       pc_is ret_tgt -∗
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗

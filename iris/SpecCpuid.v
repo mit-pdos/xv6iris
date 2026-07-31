@@ -55,7 +55,7 @@ Qed.
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
 Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -67,10 +67,10 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      id regardless of which hart the continuation resumes on. *)
   let cret := cpuid_ret (rget m0 tp_idx) in
   (2 <= n)%nat ->
-  sie_cap_gpr m0 n false -∗
+  sie_cap_gpr m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   ( ∀ m' : regfile,
-    sie_cap_gpr m' n false -∗
+    sie_cap_gpr m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = cret ⌝ -∗
@@ -90,7 +90,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
 Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) :=
+    (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -102,11 +102,11 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   add_vec P (sign_extend' 64 jimm) = pcE ->
   eq_vec (access_vec_dec (pcE : mword 64) 0) ('b"0") = true ->
   (2 <= n)%nat ->
-  sie_cap_gpr m n false -∗
+  sie_cap_gpr m n false p -∗
   kernel_text -∗ pc_is P -∗
   instr P false (JAL (jimm, Regidx (mword_of_int 1 : mword 5))) -∗
   ( ∀ mo,
-    sie_cap_gpr mo n false -∗
+    sie_cap_gpr mo n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mo /\
       mo !!! Regidx a0_idx = cret ⌝ -∗
@@ -116,10 +116,10 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat),
-      wp_cpuid_sconf_body Φ m0 n.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_cpuid_sconf_body Φ m0 n p.
   Parameter wp_call_cpuid_sconf_cs :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat),
-      wp_call_cpuid_sconf_cs_body Φ P jimm m n.
+      (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
+      wp_call_cpuid_sconf_cs_body Φ P jimm m n p.
 End CPUID.

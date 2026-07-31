@@ -70,7 +70,7 @@ Definition ilw_code `{!riscvGS Σ} `{CID : CpuId} (F : Z)
 Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
-    (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) :=
+    (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
@@ -82,7 +82,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
   add_vec (add_vec (mword_of_int (F + 0x08) : mword 64) (auipc_off uname)) (sign_extend' 64 iname) = name ->
   add_vec (add_vec (mword_of_int (F + 0x10) : mword 64) (auipc_off ulk)) (sign_extend' 64 ilk) = lk ->
   add_vec (mword_of_int (F + 0x18) : mword 64) (sign_extend' 64 j) = mword_of_int KernelSyms.initlock ->
-  sie_cap_gpr m K b -∗
+  sie_cap_gpr m K b p -∗
   kernel_text -∗ ilw_code F uname ulk iname ilk j -∗ pc_is (mword_of_int F : mword 64) -∗
   (* the name string literal: DUPLICABLE, so the member keeps its copy *)
   name ↦ₛ□ s -∗
@@ -91,7 +91,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
   c_cpu ↦₈ vcpu -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -107,6 +107,6 @@ Module Type INITLOCK_WRAPPER.
     forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
-      (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool),
-      wp_initlock_wrapper_sconf_body Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu b.
+      (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
+      wp_initlock_wrapper_sconf_body Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.
 End INITLOCK_WRAPPER.

@@ -36,21 +36,21 @@ Definition ftable_name_str : Z := 0x80007558%Z.
    step, not fileinit's -- it need only add the invariant ([is_lock_intro]).
    The "ftable" literal itself is read out of [kernel_data]. *)
 Definition wp_fileinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.ftable in
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (4 <= K)%nat ->
-  sie_cap_gpr m K b -∗
+  sie_cap_gpr m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -62,6 +62,6 @@ Definition wp_fileinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
 Module Type FILEINIT.
   Parameter wp_fileinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool),
-      wp_fileinit_sconf_body Φ m K vlock vname vcpu b.
+      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
+      wp_fileinit_sconf_body Φ m K vlock vname vcpu b p.
 End FILEINIT.

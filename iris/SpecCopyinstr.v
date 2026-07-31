@@ -79,7 +79,7 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
 
 Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile)
-    (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool) :=
+    (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
   let dst := mm !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -89,14 +89,14 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   mm !!! Regidx (mword_of_int 10 : mword 5) = page_base P.(ud_root) ->
   mm !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat maxn) : mword 64) ->
   (Z.of_nat maxn < 2 ^ 64)%Z ->
-  sie_cap_gpr mm K b -∗
+  sie_cap_gpr mm K b p -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_olds j) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile) (dst_new : nat -> bv 8),
-    sie_cap_gpr mr K b -∗
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     proc_pt P -∗
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_new j) -∗
@@ -109,6 +109,6 @@ Module Type COPYINSTR.
   Parameter wp_copyinstr_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile)
-      (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool),
-      wp_copyinstr_sconf_body Φ mm P maxn dst_olds K b.
+      (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool) (p : mword 64),
+      wp_copyinstr_sconf_body Φ mm P maxn dst_olds K b p.
 End COPYINSTR.

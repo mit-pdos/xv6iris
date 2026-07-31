@@ -87,16 +87,16 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   mm !!! Regidx (mword_of_int 10) = page_base (pt_base t) ->
   (* the table maps nothing: the panic arm is dead *)
   pt_free_ok lvl t ->
-  sie_cap_gpr mm K b -∗
-  cpu_own ilvl eb p C -∗
+  sie_cap_gpr mm K b p -∗
+  cpu_own ilvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own lvl (DfracOwn 1) t -∗
   kalloc_env γa None -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own ilvl eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own ilvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

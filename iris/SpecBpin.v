@@ -54,17 +54,17 @@ Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CI
   (* a0 is the buffer being pinned *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
-  sie_cap_gpr m K b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn -∗
-  panic_wp -∗
+  panic_wp_any -∗
   (* THE premise that makes the unchecked [refcnt++] safe *)
   bslot bn -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
-    cpu_own n eb p C -∗
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (∃ (q : Qp) (dev bno : mword 32), bref bn k q dev bno) -∗

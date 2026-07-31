@@ -38,14 +38,14 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
     (Φ : mval -> iProp Σ)
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
-    (av : nat) (b : bool) :=
+    (av : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initsleeplock in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (6 <= av)%nat ->
-  sie_cap_gpr m av b -∗
+  sie_cap_gpr m av b p -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
@@ -60,7 +60,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
   sl_pid slk ↦₄ vpid -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr av b -∗
+    sie_cap_gpr mr av b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -80,6 +80,6 @@ Module Type INITSLEEPLOCK.
       (Φ : mval -> iProp Σ)
       (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
-      (av : nat) (b : bool),
-      wp_initsleeplock_sconf_body Φ m s vlocked vlk vpid vlkname vcpu vname av b.
+      (av : nat) (b : bool) (p : mword 64),
+      wp_initsleeplock_sconf_body Φ m s vlocked vlk vpid vlkname vcpu vname av b p.
 End INITSLEEPLOCK.

@@ -52,12 +52,12 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   (10 <= av)%nat ->
   (⊢ Tc -∗ Dc -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
-  sie_cap_gpr m av b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lk0 R Dc -∗
   Tc -∗
-  panic_wp -∗
+  panic_wp_any -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
@@ -69,11 +69,11 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
        the resource-index / wp_next-index divergence documented in the porting
        guide.  Threading [b] out made release -- whose entry is [false] --
        uncallable. *)
-    sie_cap_gpr mfin av false -∗
+    sie_cap_gpr mfin av false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C -∗
+    cpu_own (S n) eb p C false -∗
     trap_csrs_pay n eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -85,11 +85,11 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
-  sie_cap_gpr m av b -∗
-  cpu_own n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
-  panic_wp -∗
+  panic_wp_any -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
@@ -100,11 +100,11 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
        the resource-index / wp_next-index divergence documented in the porting
        guide.  Threading [b] out made release -- whose entry is [false] --
        uncallable. *)
-    sie_cap_gpr mfin av false -∗
+    sie_cap_gpr mfin av false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C -∗
+    cpu_own (S n) eb p C false -∗
     trap_csrs_pay n eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

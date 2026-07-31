@@ -54,17 +54,17 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
-  sie_cap_gpr m K b -∗
-  cpu_own ncnt eb pcur C -∗
+  sie_cap_gpr m K b pcur -∗
+  cpu_own ncnt eb pcur C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
-  panic_wp -∗
+  panic_wp_any -∗
   kalloc_avail γk (Some 0%nat) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b -∗
-    cpu_own ncnt eb pcur C -∗
+    sie_cap_gpr mr K b pcur -∗
+    cpu_own ncnt eb pcur C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (Some (length ps)) -∗
