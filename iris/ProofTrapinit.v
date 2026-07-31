@@ -35,9 +35,9 @@ Section ProofTrapinit.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
 
-  Lemma wp_trapinit_sconf (γ : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64)
-    : wp_trapinit_sconf_body γ Φ m K vlock vname vcpu.
+  Lemma wp_trapinit_sconf (Φ : mval -> iProp Σ)
+      (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
+    : wp_trapinit_sconf_body Φ m K vlock vname vcpu b p.
   Proof.
     cbv beta delta [wp_trapinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK.
@@ -46,17 +46,17 @@ Section ProofTrapinit.
     pose (name := (mword_of_int time_name_str : mword 64)).
     iIntros "Hcg #Htext #Hkdata Hpc Hlock Hname Hcpu Hcont".
     (* the "time" string literal (4 chars + NUL), read out of the data image *)
-    assert (Htime : forall j b, cstring_bytes "time"%string !! j = Some b ->
-                      KernelData.kernel_data !! (time_name_str + Z.of_nat j)%Z = Some b).
-    { intros j b Hj.
+    assert (Htime : forall j bt, cstring_bytes "time"%string !! j = Some bt ->
+                      KernelData.kernel_data !! (time_name_str + Z.of_nat j)%Z = Some bt).
+    { intros j bt Hj.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl ltac:(unfold text_end, time_name_str; lia) Htime
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf γ Φ m K TI
+    iApply (ILW.wp_initlock_wrapper_sconf Φ m K TI
               (mword_of_int 5) (mword_of_int 22) (mword_of_int 3646) (mword_of_int 3430)
-              (mword_of_int 2090862) lk name "time"%string vlock vname vcpu HK
+              (mword_of_int 2090862) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

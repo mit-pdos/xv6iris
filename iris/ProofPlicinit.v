@@ -164,8 +164,8 @@ Section ProofPlicinit.
   (*  THE CAPSTONE: a WP for the entire plicinit(), entry through return.  *)
   (* =================================================================== *)
   Lemma wp_plicinit_sconf (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (b : bool)
-    : wp_plicinit_sconf_body Φ m0 n b.
+      (m0 : regfile) (n : nat) (b : bool) (p : mword 64)
+    : wp_plicinit_sconf_body Φ m0 n b p.
   Proof.
     cbv beta delta [wp_plicinit_sconf_body].
     intros ra_idx pcE ra0 ret_tgt Hn.
