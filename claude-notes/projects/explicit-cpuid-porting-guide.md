@@ -351,6 +351,36 @@ iIntros "Hcg Hpc".                                               (* byte-identic
 
 - `rewrite wp_next_off` is the only structural addition at `b = false`, and the
   `iIntros` pattern is unchanged at every site.
+- **AT A GENERIC `b` THE `wp_next_off` SHORTCUT DOES NOT APPLY**, and most
+  functions are generic — check the contract in its `Spec*.v` before assuming.
+  The generic template (worked example: `ProofPlicinit.v`) is: per leaf,
+  `iIntros (CIDk Hsk) "…"` with FRESH names, everything after resolving at
+  `CIDk` automatically; then at the end
+  ```coq
+  iSpecialize ("Hcont" $! CIDn with "[%]"); [wp_next_chain|].
+  iApply ("Hcont" $! <finalmap> …).
+  ```
+  Never `destruct b`. Further traps at a generic `b`, all found the hard way:
+  - a helper lemma sharing the enclosing `Section`'s `Context CID` silently
+    pins to the ENTRY hart once the ambient hart has moved — give it its own
+    fresh binder. Durable-notes has this rule; it bites far more often here.
+  - build any `rget`-mentioning bridging fact BEFORE the leaf's
+    `iApply`/`iIntros`. Constructed after `iIntros (CIDk …)`, its implicit hart
+    silently binds to the RESUMED hart while printing identically.
+  - a sealed composition functor must eta-expand a module argument
+    (`fun (CID' : CpuId) … => M.f (CID := CID') …`); passed bare, implicit-
+    argument insertion silently defeats the genericity.
+  - a recursive/loop lemma forwarding `Hcont` unchanged across the induction
+    needs TWO hart binders — a lemma-level anchor and a per-iteration hart —
+    linked by a chained equality re-proved each step. `wp_next_shift`
+    re-anchors the obligation; `wp_next_chain` alone is for straight-line code.
+  - passing a deep `set`-chain register map into a cross-function call can make
+    the elaborator re-walk it (multi-minute false hang): `remember mapchain as
+    m eqn:Heq` first.
+- **`Set Printing Implicit` / `Set Printing All` is the essential diagnostic**
+  for all of the above. Default printing HIDES the differing implicit `CpuId`,
+  so two propositions that differ only in their hart print identically and the
+  error reads as nonsense.
 - **The second-biggest edit class is map-chain respelling**, and the premise
   list gives NO hint it is needed: a leaf whose written value reads a register
   at a VARIABLE index now spells it `rget m k`, so the consumer's
