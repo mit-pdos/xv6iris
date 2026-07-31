@@ -21,7 +21,7 @@ Import Defs.
 
 Definition wp_lb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64) :=
-let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let ldval := fun (bt : bv 8) =>
       (extend_value is_unsigned (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) bt) : mword 64) in
@@ -50,9 +50,9 @@ WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Definition wp_sb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
-let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
 let lppn := kpt_leaf_ppn uart_vpn in
 (0 <= off < uart_size)%Z ->
 (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf
@@ -82,9 +82,9 @@ WP (Loop : expr riscv_lang) {{ Φ }}.
    its bundle-taking restatement, kept verbatim for the existing consumers. *)
 Definition wp_sb_uart_uinv_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
     (γd : uart_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
-let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
 let lppn := kpt_leaf_ppn uart_vpn in
 (0 <= off < uart_size)%Z ->
 (* geometry: [a8] is canonical, its Sv39 vpn is [uart_vpn], and the leaf

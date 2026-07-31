@@ -58,7 +58,7 @@ Section WpSconfUartAccess.
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa 5 ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 5 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
@@ -72,7 +72,7 @@ Section WpSconfUartAccess.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf γd γv 5 Φ pc false true rd rs1 imm
+    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv 5 Φ pc false true rd rs1 imm
               m n (uart_tx_own γd l)
               (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
@@ -100,7 +100,7 @@ Section WpSconfUartAccess.
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
-    m !!! Regidx rs1 = uart_pa 5 ->
+    rget m rs1 = uart_pa 5 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
@@ -161,7 +161,7 @@ Section WpSconfUartAccess.
     (0 <= off < uart_size)%Z ->
     uint rd <> 0 ->
     rd_ok rd ->
-    add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa off ->
+    add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa off ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗
@@ -174,7 +174,7 @@ Section WpSconfUartAccess.
   Proof.
     iIntros (Hoff Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
-    iApply (Uart.wp_lb_uart_s_sconf γd γv off Φ pc false true rd rs1 imm
+    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv off Φ pc false true rd rs1 imm
               m n emp%I (fun _ => emp%I) b p
               Hoff Hrd Hrdok
               ltac:(rewrite Haddr; exact Hg1)
@@ -199,21 +199,25 @@ Section WpSconfUartAccess.
   Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
-    m !!! Regidx rs1 = uart_pa 0 ->
+    (* the stored byte reads [rs2] at the hart we ENTER on, so it must be
+       bound OUTSIDE the [wp_next] lambda (which rebinds [CID], and would
+       silently re-read [rs2] -- i.e. [tp] -- at the RESUMING hart). *)
+    let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
+    rget m rs1 = uart_pa 0 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
     wp_next b (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
-      uart_sent γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
+      uart_tx_own γd (l ++ [sb]) -∗
+      uart_sent γd (l ++ [sb]) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
+    intros sb.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
-    set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
-    iApply (Uart.wp_sb_uart_s_sconf γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf (CID:=CID) γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b p
               ltac:(unfold uart_size; lia)

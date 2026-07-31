@@ -431,6 +431,14 @@ iIntros "Hcg Hpc".                                               (* byte-identic
   - build any `rget`-mentioning bridging fact BEFORE the leaf's
     `iApply`/`iIntros`. Constructed after `iIntros (CIDk …)`, its implicit hart
     silently binds to the RESUMED hart while printing identically.
+  - a leaf whose premises mention `rget` and that is applied with `ltac:(…)`
+    argument terms must have its hart PINNED at the application site
+    (`iApply (M.f (CID:=CID) …)`). The `ltac:` goals are elaborated BEFORE
+    `iApply` unifies the conclusion, so the premise still reads
+    `rget (CID:=?CID) m rs1` and `rewrite Haddr` fails with "does not match
+    any subterm of the goal" — the goal prints identically to `Haddr`'s LHS.
+    (`WpSconfUartAccess.v`'s three UART leaf applications; `Set Printing
+    Implicit` shows the bare `?CID` immediately.)
   - a sealed composition functor must eta-expand a module argument
     (`fun (CID' : CpuId) … => M.f (CID := CID') …`); passed bare, implicit-
     argument insertion silently defeats the genericity.

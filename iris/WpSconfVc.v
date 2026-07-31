@@ -165,41 +165,22 @@ Definition vc_store8_sp (st : vsstate) (pc' : Z) (a : sval) (v2 : sval)
       end
   end.
 
-(* [rd_tp_bad rd]: the executor's OWN gate against a generic write's two
-   forbidden destinations, sp AND tp -- exactly [IntrDefs.rd_ok]'s two
-   conjuncts negated, decided as a bool since every use here sits inside a
-   plain (non-Iris) match.  [VcGenS.vc_step_s] only ever excluded
-   [uint rd = 0]; tp becomes a second forbidden destination now that the
-   register file PINS it (HartTp.v), so a leaf write to it would falsify
-   the pin -- the guard has to reject that case here, at the executor,
-   since [rd] is a symbolic block-local register with no other place to
-   rule it out. *)
-Definition rd_tp_bad (rd : mword 5) : bool :=
-  orb (eq_vec rd csp_rs1) (eq_vec rd (mword_of_int 4 : mword 5)).
+(* [rd_sp_bad rd]: this executor's OWN gate against a generic write landing
+   on sp.  The sie capability is keyed on the sp slot, so an sp write outside
+   the two sp-movers below has to be rejected; that is a property of THIS
+   tier, not of the base executor.  The OTHER forbidden destination, tp, is
+   ruled out one level down -- [VcGenS.vc_step_s] now rejects every opcode
+   whose variable register operand is tp ([VcGenS.is_tp]), which is what
+   [rd_ok_of_guards] below composes with this one to rebuild [IntrDefs.rd_ok].
+   (Both are bools: every use sits inside a plain, non-Iris match.) *)
+Definition rd_sp_bad (rd : mword 5) : bool := eq_vec rd csp_rs1.
 
-Local Lemma rd_tp_bad_false (rd : mword 5) : rd_tp_bad rd = false -> rd_ok rd.
+(* the two guards together are exactly [IntrDefs.rd_ok]'s two conjuncts. *)
+Local Lemma rd_ok_of_guards (rd : mword 5) :
+  rd_sp_bad rd = false -> is_tp rd = false -> rd_ok rd.
 Proof.
-  unfold rd_tp_bad, rd_ok. intro H. apply orb_false_iff in H. destruct H as [H1 H2].
-  pose proof (neq_of_eq_vec_false _ _ H1) as Hsp.
-  pose proof (neq_of_eq_vec_false _ _ H2) as Htp.
-  split; [exact Hsp | intro Heq; injection Heq as Heq2; exact (Htp Heq2)].
-Qed.
-
-(* [is_tp r]: the executor's gate against a generic READ source being tp.
-   [gpr_matches] relates the block's symbolic register map to the PLAIN
-   register file [m], not to [rget m _] -- so at [r = tp] the two can
-   disagree (the plain slot is whatever the caller's [m] happens to carry,
-   while the hardware always reads the pin). VcGenS.vc_step_s never guarded
-   against this because tp did not exist as a distinguished slot before the
-   pin; the guard has to reject it here for every opcode that reads a
-   variable (non-sp) register, since [rd]/[rs1]/[rs2] are symbolic
-   block-local registers with no other place to rule this out. *)
-Definition is_tp (r : mword 5) : bool := eq_vec r (mword_of_int 4 : mword 5).
-
-Local Lemma is_tp_false (r : mword 5) : is_tp r = false -> Regidx r <> Regidx Rtp.
-Proof.
-  unfold is_tp. intro H. pose proof (neq_of_eq_vec_false _ _ H) as Hne.
-  intro Heq. injection Heq as Heq2. exact (Hne Heq2).
+  unfold rd_sp_bad, rd_ok. intros H1 H2.
+  split; [exact (neq_of_eq_vec_false _ _ H1) | exact (is_tp_false _ H2)].
 Qed.
 
 Definition vc_step_sp_s (st : vsstate) (op : vop_s) : option vsstate :=
@@ -208,19 +189,18 @@ Definition vc_step_sp_s (st : vsstate) (op : vop_s) : option vsstate :=
   | VScaddi imm rd =>
       if eq_vec rd csp_rs1
       then vc_step_sp_move st pc' (zimm12 (sign_extend' 12 imm))
-      else if rd_tp_bad rd then None
       else lift_base st (vc_step_s (vsb st) op)
   | VScaddi16sp imm6 =>
       vc_step_sp_move st pc' (zimm12 (caddi16sp_imm imm6))
   | VScaddi4spn _ _ rd | VScldsp _ rd | VScaddiw _ rd =>
-      if rd_tp_bad rd then None else lift_base st (vc_step_s (vsb st) op)
+      if rd_sp_bad rd then None else lift_base st (vc_step_s (vsb st) op)
   | VSclw _ rs1 rd =>
-      if orb (rd_tp_bad rd) (is_tp rs1) then None
-      else lift_base st (vc_step_s (vsb st) op)
+      if rd_sp_bad rd then None else lift_base st (vc_step_s (vsb st) op)
   | VSld _ _ rs1 rd =>
-      if orb (rd_tp_bad rd) (is_tp rs1) then None
-      else lift_base st (vc_step_s (vsb st) op)
+      if rd_sp_bad rd then None else lift_base st (vc_step_s (vsb st) op)
   | VScsdsp uimm rs2 =>
+      (* implemented HERE (the frame ledger), so the tp read guard cannot be
+         inherited from [vc_step_s] and is applied directly. *)
       if is_tp rs2 then None else
       match (vsb st).(vregs) !! Regidx csp_rs1, (vsb st).(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
@@ -229,6 +209,7 @@ Definition vc_step_sp_s (st : vsstate) (op : vop_s) : option vsstate :=
       | _, _ => None
       end
   | VSsd _ imm rs2 rs1 =>
+      (* likewise implemented here *)
       if orb (is_tp rs1) (is_tp rs2) then None else
       match (vsb st).(vregs) !! Regidx rs1, (vsb st).(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
@@ -237,8 +218,7 @@ Definition vc_step_sp_s (st : vsstate) (op : vop_s) : option vsstate :=
       | _, _ => None
       end
   | VScsw imm rs2 rs1 =>
-      if orb (is_tp rs1) (is_tp rs2) then None
-      else lift_base st (vc_step_s (vsb st) op)
+      lift_base st (vc_step_s (vsb st) op)
   end.
 
 Fixpoint vc_block_sp_s (st : vsstate) (prog : list vop_s) : option vsstate :=
@@ -352,23 +332,23 @@ Proof.
     cbn [vc_step_sp_s] in H, Hlift.
   - destruct (eq_vec rd csp_rs1).
     + exact (vc_step_sp_move_ux _ _ _ _ H Hux).
-    + destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
-  - destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
+    + exact (Hlift H).
+  - destruct (rd_sp_bad rd); [discriminate|]. exact (Hlift H).
   - destruct (is_tp rs2); [discriminate|].
     destruct (vregs (vsb st) !! Regidx csp_rs1) as [v1|]; [|discriminate].
     destruct (vregs (vsb st) !! Regidx rs2) as [v2|]; [|discriminate].
     destruct (negb (sval_is64 v1)); [discriminate|].
     destruct (vc_store8_sp_ux _ _ _ _ _ H) as [-> ->]. split; [exact Hux | lia].
-  - destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
-  - destruct (orb (rd_tp_bad rd) (is_tp rs1)); [discriminate|]. exact (Hlift H).
-  - destruct (orb (is_tp rs1) (is_tp rs2)); [discriminate|]. exact (Hlift H).
-  - destruct (rd_tp_bad rd); [discriminate|]. exact (Hlift H).
+  - destruct (rd_sp_bad rd); [discriminate|]. exact (Hlift H).
+  - destruct (rd_sp_bad rd); [discriminate|]. exact (Hlift H).
+  - exact (Hlift H).
+  - destruct (rd_sp_bad rd); [discriminate|]. exact (Hlift H).
   - destruct (orb (is_tp rs1) (is_tp rs2)); [discriminate|].
     destruct (vregs (vsb st) !! Regidx rs1) as [v1|]; [|discriminate].
     destruct (vregs (vsb st) !! Regidx rs2) as [v2|]; [|discriminate].
     destruct (negb (sval_is64 v1)); [discriminate|].
     destruct (vc_store8_sp_ux _ _ _ _ _ H) as [-> ->]. split; [exact Hux | lia].
-  - destruct (orb (rd_tp_bad rd) (is_tp rs1)); [discriminate|]. exact (Hlift H).
+  - destruct (rd_sp_bad rd); [discriminate|]. exact (Hlift H).
   - exact (vc_step_sp_move_ux _ _ _ _ H Hux).
 Qed.
 
@@ -748,9 +728,10 @@ Section WpSconfVc.
                       (agree_off_step Hao)
                       with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont"). }
         * (* ---- ordinary c.addi rd, imm ---- *)
-          destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
-          pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
-          unfold lift_base in Hstep; simpl in Hstep.
+          unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
+          destruct (is_tp rd) eqn:Hbadtp; [discriminate|].
+          pose proof (rd_ok_of_guards _ Hrdsp0 Hbadtp) as Hrdok.
+          simpl in Hstep.
           destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
           apply Z.eqb_neq in Hrd0.
           destruct (vregs vb !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
@@ -776,9 +757,11 @@ Section WpSconfVc.
           cbn [vsu vsx vsb vsf vpc vregs vheap vheap4] in IH1.
           iApply (IH1 with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScaddi4spn *)
-        destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
-        pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
-        unfold lift_base in Hstep; simpl in Hstep.
+        destruct (rd_sp_bad rd) eqn:Hbad; [discriminate|].
+        unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
+        destruct (is_tp rd) eqn:Hbadtp; [discriminate|].
+        pose proof (rd_ok_of_guards _ Hbad Hbadtp) as Hrdok.
+        simpl in Hstep.
         destruct (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) eqn:Hrdc0;
           [|discriminate].
         pose proof (regidx_eqb_eq _ _ Hrdc0) as Hrdc. cbn [negb] in Hstep.
@@ -859,9 +842,11 @@ Section WpSconfVc.
           iApply (IH _ _ CID6 Hblk Hux1 Hxn Hmatch Hao
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScldsp *)
-        destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
-        pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
-        unfold lift_base in Hstep; simpl in Hstep.
+        destruct (rd_sp_bad rd) eqn:Hbad; [discriminate|].
+        unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
+        destruct (is_tp rd) eqn:Hbadtp; [discriminate|].
+        pose proof (rd_ok_of_guards _ Hbad Hbadtp) as Hrdok.
+        simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs vb !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -894,11 +879,13 @@ Section WpSconfVc.
                   (agree_off_step Hao)
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VSclw *)
-        destruct (orb (rd_tp_bad rd) (is_tp rs1)) eqn:Hbad; [discriminate|].
-        apply orb_false_iff in Hbad as [Hbadrd Hbadrs1].
-        pose proof (rd_tp_bad_false _ Hbadrd) as Hrdok.
+        destruct (rd_sp_bad rd) eqn:Hbad; [discriminate|].
+        unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
+        destruct (orb (is_tp rd) (is_tp rs1)) eqn:Hbadtp; [discriminate|].
+        apply orb_false_iff in Hbadtp as [Hbadrd Hbadrs1].
+        pose proof (rd_ok_of_guards _ Hbad Hbadrd) as Hrdok.
         pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
-        unfold lift_base in Hstep; simpl in Hstep.
+        simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -931,11 +918,12 @@ Section WpSconfVc.
                   (agree_off_step Hao)
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScsw *)
+        unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
         destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Hbad; [discriminate|].
         apply orb_false_iff in Hbad as [Hbadrs1 Hbadrs2].
         pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
         pose proof (is_tp_false _ Hbadrs2) as Hrs2ok.
-        unfold lift_base in Hstep; simpl in Hstep.
+        simpl in Hstep.
         destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs vb !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -968,9 +956,11 @@ Section WpSconfVc.
         iApply (IH _ _ CID9 Hblk Hux1 Hxn Hmatch Hao
                   with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VScaddiw *)
-        destruct (rd_tp_bad rd) eqn:Hbad; [discriminate|].
-        pose proof (rd_tp_bad_false _ Hbad) as Hrdok.
-        unfold lift_base in Hstep; simpl in Hstep.
+        destruct (rd_sp_bad rd) eqn:Hbad; [discriminate|].
+        unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
+        destruct (is_tp rd) eqn:Hbadtp; [discriminate|].
+        pose proof (rd_ok_of_guards _ Hbad Hbadtp) as Hrdok.
+        simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs vb !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
@@ -1082,11 +1072,13 @@ Section WpSconfVc.
              iApply (IH _ _ CID14 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
       + (* VSld *)
-        destruct (orb (rd_tp_bad rd) (is_tp rs1)) eqn:Hbad; [discriminate|].
-        apply orb_false_iff in Hbad as [Hbadrd Hbadrs1].
-        pose proof (rd_tp_bad_false _ Hbadrd) as Hrdok.
+        destruct (rd_sp_bad rd) eqn:Hbad; [discriminate|].
+        unfold lift_base in Hstep; cbn [vc_step_s] in Hstep.
+        destruct (orb (is_tp rd) (is_tp rs1)) eqn:Hbadtp; [discriminate|].
+        apply orb_false_iff in Hbadtp as [Hbadrd Hbadrs1].
+        pose proof (rd_ok_of_guards _ Hbad Hbadrd) as Hrdok.
         pose proof (is_tp_false _ Hbadrs1) as Hrs1ok.
-        unfold lift_base in Hstep; simpl in Hstep.
+        simpl in Hstep.
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs vb !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].

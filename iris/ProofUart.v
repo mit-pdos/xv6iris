@@ -44,8 +44,8 @@ Context `{CID : CpuId}.
   Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool)
-    : wp_sb_uart_uinv_s_sconf_body γd off Φ pc is_rvc rs2 rs1 imm m n R S b.
+    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
+    : wp_sb_uart_uinv_s_sconf_body γd off Φ pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
@@ -184,7 +184,7 @@ Context `{CID : CpuId}.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
@@ -198,14 +198,14 @@ Qed.
   Lemma wp_sb_uart_s_sconf (γd : uart_names) (γv : disk_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool)
-    : wp_sb_uart_s_sconf_body γd γv off Φ pc is_rvc rs2 rs1 imm m n R S b.
+    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
+    : wp_sb_uart_s_sconf_body γd γv off Φ pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_sb_uart_s_sconf_body].
     intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
     iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
     iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
-    iApply (wp_sb_uart_uinv_s_sconf γd off Φ pc is_rvc rs2 rs1 imm m n R S b
+    iApply (wp_sb_uart_uinv_s_sconf γd off Φ pc is_rvc rs2 rs1 imm m n R S b p
               Hoff Hcanon Hvpn_def Hpa
               with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
   Qed.
@@ -213,8 +213,8 @@ Qed.
   Lemma wp_lb_uart_s_sconf (γd : uart_names) (γv : disk_names)
     (off : Z) (Φ : mval -> iProp Σ)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
-    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool)
-    : wp_lb_uart_s_sconf_body γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S b.
+    (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64)
+    : wp_lb_uart_s_sconf_body γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_lb_uart_s_sconf_body].
   intros ea a8 ldval lppn Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
@@ -362,7 +362,7 @@ Qed.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".

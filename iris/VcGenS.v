@@ -107,10 +107,44 @@ Definition zoff6 (uimm : mword 6) : Z :=
 (*    All four shapes are RVC, so every step advances the pc by 2.         *)
 (* ====================================================================== *)
 
+(* [is_tp r]: the executor's gate against a variable register operand being
+   [tp] (x4, [HartTp.Rtp]).
+
+   [tp] is PINNED to the hart (HartTp.v): a register-file resource held at
+   hart [CID] owns [tp] at [cid_word_of cpu_id], so the value the hardware
+   reads at x4 is [rget m 4], NOT [m !!! Regidx 4], and a write to x4 would
+   falsify the pin outright.  [gpr_matches] below -- the executor's ONLY
+   interface to a surrounding proof's register file -- relates the block's
+   symbolic map to the PLAIN file [m], so at [r = tp] the symbolic value and
+   the value the machine actually reads can disagree.  The executor
+   therefore REJECTS every opcode whose variable register operand (source
+   OR destination) is x4; [uint rd <> 0] was the only operand gate before
+   the pin existed.
+
+   This can only make the executor MORE conservative: a block that touches
+   tp fails to run, it is never mis-run.  Downstream, [is_tp_false] is what
+   feeds a tp-excluding leaf premise ([IntrDefs.rd_ok], or an [rget]-spelled
+   value premise via [HartTp.rget_ne]).
+
+   Spelled with [Z.eqb (uint _)] to match the neighbouring [uint rd <> 0]
+   gate: that form is what survives the [simpl in Hstep] of every branch of
+   the proofs below without unfolding. *)
+Definition is_tp (r : mword 5) : bool := Z.eqb (uint r) 4.
+
+(* [Regidx (mword_of_int 4 : mword 5)] IS [Regidx Rtp] (HartTp's [Rtp] is a
+   notation for that literal), so this conclusion needs no bridge. *)
+Lemma is_tp_false (r : mword 5) :
+  is_tp r = false -> Regidx r <> Regidx (mword_of_int 4 : mword 5).
+Proof.
+  unfold is_tp. intros H Heq. apply Z.eqb_neq in H.
+  injection Heq as Hr. subst r. apply H. vm_compute. reflexivity.
+Qed.
+
 Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
   let pc' := st.(vpc) + vop_s_w op in
   match op with
   | VScaddi imm rd =>
+      if is_tp rd then None else
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx rd with
       | Some v =>
@@ -123,6 +157,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | None => None
       end
   | VScaddi4spn rdc nzimm rd =>
+      if is_tp rd then None else
       if negb (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) then None else
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx csp_rs1 with
@@ -136,6 +171,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | None => None
       end
   | VScsdsp uimm rs2 =>
+      if is_tp rs2 then None else
       match st.(vregs) !! Regidx csp_rs1, st.(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
           if negb (sval_is64 v1) then None else
@@ -148,6 +184,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | _, _ => None
       end
   | VScldsp uimm rd =>
+      if is_tp rd then None else
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx csp_rs1 with
       | Some v1 =>
@@ -161,6 +198,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | None => None
       end
   | VSclw imm rs1 rd =>
+      if orb (is_tp rd) (is_tp rs1) then None else
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx rs1 with
       | Some v1 =>
@@ -174,6 +212,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | None => None
       end
   | VScsw imm rs2 rs1 =>
+      if orb (is_tp rs1) (is_tp rs2) then None else
       match st.(vregs) !! Regidx rs1, st.(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
           if negb (sval_is64 v1) then None else
@@ -187,6 +226,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | _, _ => None
       end
   | VScaddiw imm rd =>
+      if is_tp rd then None else
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx rd with
       | Some v =>
@@ -197,6 +237,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | None => None
       end
   | VSsd _ imm rs2 rs1 =>
+      if orb (is_tp rs1) (is_tp rs2) then None else
       match st.(vregs) !! Regidx rs1, st.(vregs) !! Regidx rs2 with
       | Some v1, Some v2 =>
           if negb (sval_is64 v1) then None else
@@ -209,6 +250,7 @@ Definition vc_step_s (st : vstate) (op : vop_s) : option vstate :=
       | _, _ => None
       end
   | VSld _ imm rs1 rd =>
+      if orb (is_tp rd) (is_tp rs1) then None else
       if Z.eqb (uint rd) 0 then None else
       match st.(vregs) !! Regidx rs1 with
       | Some v1 =>
@@ -381,6 +423,7 @@ Section VcGenSIris.
                      |imm rs1 rd|imm rs2 rs1|imm rd
                      |rvc imm rs2 rs1|rvc imm rs1 rd|imm6]; simpl in Hstep.
       + (* VScaddi *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
@@ -408,6 +451,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScaddi4spn *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) eqn:Hrdc0;
           [|discriminate].
         pose proof (regidx_eqb_eq _ _ Hrdc0) as Hrdc. cbn [negb] in Hstep.
@@ -438,6 +482,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScsdsp *)
+        destruct (is_tp rs2) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -469,6 +514,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScldsp *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -506,6 +552,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSclw *)
+        destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -545,6 +592,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScsw *)
+        destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -580,6 +628,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScaddiw *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
@@ -611,6 +660,7 @@ Section VcGenSIris.
         iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                 Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSsd : general-base 8-byte store (c.sd / base sd) *)
+        destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -658,6 +708,7 @@ Section VcGenSIris.
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                   Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSld : general-base 8-byte load (c.ld / base ld) *)
+        destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -860,6 +911,7 @@ Section VcGenSIris.
                      |imm rs1 rd|imm rs2 rs1|imm rd
                      |rvc imm rs2 rs1|rvc imm rs1 rd|imm6]; simpl in Hstep.
       + (* VScaddi *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
@@ -883,6 +935,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScaddi4spn *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (regidx_eqb (creg2reg_idx rdc) (Regidx rd)) eqn:Hrdc0;
           [|discriminate].
         pose proof (regidx_eqb_eq _ _ Hrdc0) as Hrdc. cbn [negb] in Hstep.
@@ -910,6 +963,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScsdsp *)
+        destruct (is_tp rs2) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -943,6 +997,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScldsp *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -978,6 +1033,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSclw *)
+        destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
@@ -1012,6 +1068,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScsw *)
+        destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -1047,6 +1104,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VScaddiw *)
+        destruct (is_tp rd) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
@@ -1075,6 +1133,7 @@ Section VcGenSIris.
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                         Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSsd : general-base 8-byte store (agreement interface) *)
+        destruct (orb (is_tp rs1) (is_tp rs2)) eqn:Htp; [discriminate|].
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (vregs st !! Regidx rs2) as [v2|] eqn:Hrs2; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; cbn [negb] in Hstep; [|discriminate].
@@ -1122,6 +1181,7 @@ Section VcGenSIris.
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
       + (* VSld : general-base 8-byte load (agreement interface) *)
+        destruct (orb (is_tp rd) (is_tp rs1)) eqn:Htp; [discriminate|].
         destruct (Z.eqb (uint rd) 0) eqn:Hrd0; [discriminate|].
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rs1) as [v1|] eqn:Hrs1; [|discriminate].

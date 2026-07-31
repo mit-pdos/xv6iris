@@ -316,9 +316,35 @@ reading the slot, which should surface as a proof failure, not silently.
 - `SpecMemsetParts`'s loop premises need `Regidx ra5 <> Regidx Rtp` (its other
   operands are excluded from sp/ra1/ra4 but not tp, so `rd_ok` cannot be
   derived). Real bug, blocks `ProofMemset.wp_memset_loop_sconf`.
-- `VcGenS`'s symbolic executor still lacks the tp guards that `WpSconfVc` got
-  locally (`rd_tp_bad` / `is_tp`). A VC-block operand that could be tp makes
-  `gpr_matches`'s plain-map relation unsound — invisible before tp was pinned.
+- ~~`VcGenS`'s symbolic executor still lacks the tp guards that `WpSconfVc` got
+  locally.~~ **DONE.** `VcGenS.is_tp` / `is_tp_false` now live in `VcGenS.v`,
+  and `vc_step_s` rejects EVERY opcode whose variable register operand
+  (source or destination) is tp — `VScaddi`/`VScaddi4spn`/`VScldsp`/`VScaddiw`
+  on `rd`, `VScsdsp` on `rs2`, `VSclw`/`VSld` on `rd`+`rs1`,
+  `VScsw`/`VSsd` on `rs1`+`rs2`; `VScaddi16sp` is sp-only and needs none.
+  `WpSconfVc` was simplified onto it: its local `rd_tp_bad`/`is_tp` are gone,
+  replaced by `rd_sp_bad` (the sp half, which is genuinely this tier's — the
+  sie capability is keyed on sp) plus `rd_ok_of_guards`, which composes the
+  two halves back into `IntrDefs.rd_ok`. The two store shapes `VScsdsp`/`VSsd`
+  keep an explicit `is_tp` because `vc_step_sp_s` implements them itself (the
+  frame ledger) instead of delegating. Tightening only REJECTS more programs:
+  every consumer (`ProofKernelvec`, `WpPopOff`, `WpUartPutcSyncFull`, and the
+  13 `Proof*` users of `wp_vc_block_s_sconf`) still runs its block.
+- Same class, still owed — a leaf contract that reads a register at a VARIABLE
+  index through the raw map instead of `rget`, at the PINNED (`sie_cap_gpr`)
+  altitude. `SpecUart` was one (fixed: its three `_body` definitions now spell
+  the base as `rget m rs1` and the store byte as `rget m rs2`, which is what
+  unblocked `ProofUart.v`). A tree-wide sweep finds 11 more declarations / 18
+  sites, all in files that are not yet ported (no `.vo`), so all latent:
+  `ProofBrelse.wp_csdsp_au_s_sconf` (rs2), `ProofVirtioDiskInit`
+  (`wp_vdi_sw`/`_sw_reset`/`_flip`/`_lw`, 7 sites), `ProofVirtioDiskIntr`
+  (`wp_vt_lw_dev`/`wp_vt_sw_dev`/`wp_vt_lhu_used_idx`/`wp_vt_lw_used_elem`,
+  5 sites), `SpecMemsetParts.wp_memset_loop_sconf_body` (the bullet above),
+  and `WpUartgetc.wp_uartgetc_inline` (rs_lsr/rs_rhr). Everything else that
+  greps is either the raw-`gpr_file` M-mode / pre-sconf `WpSmodePt*` tier
+  (where the raw read is correct by construction), a map-to-map agreement
+  fact, `HartTp.rget` itself, or `IntrDefs.sie_cap_gpr_x0` (guarded by
+  `uint i = 0`).
 - `kvminithart` / `trapinithart` / `plicinithart` / `plic_claim` are boot- or
   trap-context only and should be stated at `b = false` rather than
   `b`-generic; that is what blocks four of their proofs.

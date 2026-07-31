@@ -238,15 +238,15 @@ Section ProofUartinit.
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c sb zero,1(a5) : IER <- 0.  Offset 1 is IER (or DLM under DLAB);
        either way nothing tracked moves, so the tokens pass straight through. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 1 Φ (mword_of_int (UI + 0x0c)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 1 Φ (mword_of_int (UI + 0x0c)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
               R3 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) b0)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) b0)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR3a5; vm_compute; reflexivity)
-              ltac:(rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR3a5; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR3a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi0c Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       destruct (uart_write_1_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
@@ -285,15 +285,15 @@ Section ProofUartinit.
        [true] together, acc/out are untouched. *)
     assert (Hblcr1 : (autocast (T := mword) (subrange_vec_dec (R5 !!! Regidx (mword_of_int 13 : mword 5)) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = Z_to_bv 8 128).
     { rewrite /R5 upd_eq. rgne. rewrite HR4x0. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 3 Φ (mword_of_int (UI + 0x18)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 3 Φ (mword_of_int (UI + 0x18)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
               R5 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) b0)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR5a4; vm_compute; reflexivity)
-              ltac:(rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR5a4; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR5a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi18 Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       destruct (uart_write_3_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
@@ -345,15 +345,15 @@ Section ProofUartinit.
     iEval (rewrite Hpp22) in "Hpc".
     (* +0x22 sb a3,0(a2) : DLL <- 3.  Offset 0 is the divisor latch, not THR --
        and it is the caller's DLAB half that says so. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 0 Φ (mword_of_int (UI + 0x22)) false (mword_of_int 13 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 0 Φ (mword_of_int (UI + 0x22)) false (mword_of_int 13 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 0 : mword 12)
               R7 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR7a2; vm_compute; reflexivity)
-              ltac:(rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a2; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a2; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi22 Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       iDestruct (ui_dlab_of_ghosts γd uu (DfracOwn (1/2)) true with "Hg Hd") as %Hdu.
@@ -365,15 +365,15 @@ Section ProofUartinit.
     assert (Hpp26 : add_vec_int (mword_of_int (UI + 0x22) : mword 64) 4 = mword_of_int (UI + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
     (* +0x26 sb zero,1(a5) : DLM <- 0.  Offset 1 again -- stable at either DLAB. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 1 Φ (mword_of_int (UI + 0x26)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 1 Φ (mword_of_int (UI + 0x26)) false (mword_of_int 0 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
               R7 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR7a5; vm_compute; reflexivity)
-              ltac:(rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a5; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi26 Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       destruct (uart_write_1_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
@@ -387,15 +387,15 @@ Section ProofUartinit.
        [false]; from here the half is freezable. *)
     assert (Hblcr2 : (autocast (T := mword) (subrange_vec_dec (R7 !!! Regidx (mword_of_int 13 : mword 5)) (Z.sub (Z.mul 1 8) 1) 0) : mword 8) = Z_to_bv 8 3).
     { rewrite HR7a3. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 3 Φ (mword_of_int (UI + 0x2a)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 3 Φ (mword_of_int (UI + 0x2a)) false (mword_of_int 13 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3 : mword 12)
               R7 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) true)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR7a4; vm_compute; reflexivity)
-              ltac:(rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a4; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR7a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi2a Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       destruct (uart_write_3_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
@@ -442,15 +442,15 @@ Section ProofUartinit.
        clear is the write the invariant would forbid; the token plus the
        carried [uart_out_lb] prove the FIFO already empty, so it shrinks
        nothing. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 2 Φ (mword_of_int (UI + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 2 Φ (mword_of_int (UI + 0x32)) false (mword_of_int 12 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 2 : mword 12)
               R9 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR9a4; vm_compute; reflexivity)
-              ltac:(rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR9a4; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR9a4; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi32 Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       iDestruct (ui_tx_empty γd uu l with "Hg Ht Hlb") as %Htxe.
@@ -463,15 +463,15 @@ Section ProofUartinit.
     iEval (rewrite Hpp36) in "Hpc".
     (* +0x36 sb a3,1(a5) : IER <- 3 -- enable tx/rx interrupts.  Offset 1
        again, stable. *)
-    iApply (Uart.wp_sb_uart_uinv_s_sconf γd 1 Φ (mword_of_int (UI + 0x36)) false (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
+    iApply (Uart.wp_sb_uart_uinv_s_sconf (CID:=CID) γd 1 Φ (mword_of_int (UI + 0x36)) false (mword_of_int 13 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 12)
               R9 (K - 2)%nat
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               (uart_tx_own γd l ∗ uart_dlab_is γd (DfracOwn (1/2)) false)%I
               false p
               ltac:(unfold uart_size; lia)
-              ltac:(rewrite HR9a5; vm_compute; reflexivity)
-              ltac:(rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR9a5; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
+              ltac:(rgne; rewrite HR9a5; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi36 Huinv [$Htx $Hdlab] [] [-]").
     { iIntros (uu uu') "%Hw Hg [Ht Hd]".
       destruct (uart_write_1_stable uu _ uu' Hw) as (Ha & Ho & Hdb).
