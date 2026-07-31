@@ -259,6 +259,48 @@ this project just spent a commit removing. (3) is the cleanest shape and the
 most work. DECIDE BEFORE IMPLEMENTING — this lands in the tier's central
 definition and every contract above it.
 
+## WHERE THE SWEEP STANDS (2026-07-31)
+
+Committed and each verified by my own `coqc`, never by an agent's report:
+
+| layer | done | notes |
+|---|---|---|
+| foundation | complete | `HartTp`, `WpNext`, `IntrDefs`, `RiscvPtsto`, `CalleeSaved`, `InstrBytes`/`KernelText` hart-free, engines, `RiscvAdequacy` |
+| `Spec*` | 71 / 122 | |
+| `Wp*` | 17 / 169 | most of the 169 are M-mode leaves needing NO change (interrupts off ⇒ same hart already correct) |
+| `Proof*` | 14 / 109 | the consumer wave |
+| `Link*` | 0 / 116 | functor instantiations; expected to need little |
+
+IN FLIGHT: the `p`/`C` prototype on `IntrDefs`/`CpuOwn`/`push_off`/`pop_off` +
+`ProofKvmmap`. **No consumer agent may run until it lands** — see the guide's
+orchestration rule.
+
+### Resumption order, once `p` has propagated
+
+1. Propagate `p` into the `Spec*.v` files that the arity change breaks —
+   `SpecPrintint`, `SpecConsputc`, `SpecPlicinit`, `SpecCpuid` were the
+   confirmed casualties, expect more. This is the gate on everything else.
+2. Resume the two waves that were killed mid-flight. Both are mechanical:
+   printk/printint never inspect `p`, so it threads implicitly exactly as `CID`
+   does, and only a helper lemma whose own statement mentions `sie_cap_gpr`
+   needs it written out. `ProofPrintint.wp_printint_epi` already carries a
+   validated partial port; several blocked `Proof*` files carry an in-file
+   diagnostic comment at their exact failure point.
+3. Then the remaining `Proof*`, largest last: `ProofPrintk` alone is 337 leaf
+   applications, a third of the wave.
+
+### Known spec fixes still owed
+
+- `SpecMemsetParts`'s loop premises need `Regidx ra5 <> Regidx Rtp` (its other
+  operands are excluded from sp/ra1/ra4 but not tp, so `rd_ok` cannot be
+  derived). Real bug, blocks `ProofMemset.wp_memset_loop_sconf`.
+- `VcGenS`'s symbolic executor still lacks the tp guards that `WpSconfVc` got
+  locally (`rd_tp_bad` / `is_tp`). A VC-block operand that could be tp makes
+  `gpr_matches`'s plain-map relation unsound — invisible before tp was pinned.
+- `kvminithart` / `trapinithart` / `plicinithart` / `plic_claim` are boot- or
+  trap-context only and should be stated at `b = false` rather than
+  `b`-generic; that is what blocks four of their proofs.
+
 ## Staging (the key economy)
 
 **The new leaf statements are strictly WEAKER than the current ones** — a
