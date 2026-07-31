@@ -309,28 +309,17 @@ Section ProofKinit.
                  with "Hcnt") as "Hcnt".
     (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads the count.
 
-       BLOCKED HERE, not by this port: [SpecFreerange.wp_freerange_sconf_body]
-       wants [panic_wp_any] (added by commit 7865e4e, "explicit cpuid:
-       propagate p into 23 contracts, and panic_wp_any with it"), but
-       [SpecKinit.wp_kinit_sconf_body] -- last touched by ff8b106/f6064ba,
-       never revisited by 7865e4e -- still only hands this proof the
-       single-hart [panic_wp] (unchanged since the pre-explicit-cpuid base,
-       where both files agreed on [panic_wp]).  [panic_wp_any_at] converts
-       [panic_wp_any -∗ panic_wp (CID:=h)], never the other direction, and
-       [KinitProof]'s module signature (Freerange, Initlock only) has no
-       independent route to [panic_wp_any] -- so no tactic here can produce
-       what Freerange's premise demands from what SpecKinit supplies.  Fix
-       is a one-line SpecKinit.v change (thread [panic_wp_any] instead of
-       [panic_wp], matching the other 23 contracts 7865e4e already moved),
-       which is out of this port's permitted scope (no Spec*.v edits).
-       Everything below this call is ported and was verified, offline, to
-       typecheck against a stubbed [panic_wp_any] in place of "Hpanic". *)
+       [SpecFreerange.wp_freerange_sconf_body] wants [panic_wp_any] (added by
+       commit 7865e4e, "explicit cpuid: propagate p into 23 contracts, and
+       panic_wp_any with it"); [SpecKinit.wp_kinit_sconf_body] now threads the
+       same [panic_wp_any] (that sweep missed this one contract -- fixed
+       above), so "Hpanic" hands it straight through with no conversion. *)
     iApply (Freerange.wp_freerange_sconf Φ γl γk lk fl R12 ps (K - 2) ncnt eb pcur C b
               ltac:(lia) Hncnt
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun)
               with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hpanic] [Havail] [-]").
-    { iExact "Hpanic". (* <-- fails: needs [panic_wp_any], have [panic_wp] *) }
+    { iExact "Hpanic". }
     { iExact "Havail". }
     iIntros (CIDfr Hsfr mfr) "Hcg Hcnt Hpc %Hfrcs Havail".
     assert (Hpcfr : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KI + 0x2c)).

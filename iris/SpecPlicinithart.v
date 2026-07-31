@@ -65,9 +65,25 @@ Notation PLICINITHART := KernelSyms.plicinithart.
    = (1 << 10) | (1 << 1) = 1026 -- exactly the kernel's permitted set. *)
 Definition plic_senable_word : bv 32 := Z_to_bv 32 plic_dev_irq_mask.
 
+(* INTERRUPTS MUST BE DISABLED.  plicinithart's very first instruction is an
+   unbracketed [jal cpuid] -- there is no push_off/pop_off anywhere in its
+   body -- and [cpuid]'s own contract (SpecCpuid.v) is [b = false]-ONLY (it
+   reads [tp] mid-body; see the porting guide, "A function that READS tp
+   mid-body must be stated at b = false"). A caller-supplied [b] cannot meet
+   that precondition, so plicinithart itself can only be called with
+   interrupts already off. This holds at every real call site: plicinithart
+   runs from main(), on every hart, strictly before scheduler()'s
+   [intr_on()] -- interrupts (SSTATUS.SIE) are never turned on during boot
+   (start()/main() only touch the [sie] CSR's per-source mask bits, not the
+   global enable) -- see
+   claude-notes/projects/explicit-cpuid-porting-guide.md, and
+   SpecTrapinithart.v / SpecCpuid.v for the identical boot-only shape. So the
+   contract is stated at the literal index [false] rather than a generic
+   [b], with no [wp_next] wrapper (it would collapse via [wp_next_off]
+   anyway, since the hart cannot move). *)
 Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names)
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64) :=
+    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let pcE := mword_of_int KernelSyms.plicinithart in
@@ -77,12 +93,11 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ,
   (* plicinithart's own max depth: its 16-byte frame (2 slots) plus the two
      slots cpuid's frame needs below it. *)
   (4 <= n)%nat ->
-  sie_cap_gpr m0 n b p -∗
+  sie_cap_gpr m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
-  wp_next b (fun (CID : CpuId) =>
-    ∀ m' : regfile,
-    sie_cap_gpr m' n b p -∗
+  ( ∀ m' : regfile,
+    sie_cap_gpr m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -92,6 +107,6 @@ Module Type PLICINITHART.
   Parameter wp_plicinithart_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64),
-      wp_plicinithart_sconf_body γd γv Φ m0 n b p.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plicinithart_sconf_body γd γv Φ m0 n p.
 End PLICINITHART.

@@ -46,7 +46,7 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* freerange -> kfree -> acquire sits above panic() *)
-  panic_wp -∗
+  panic_wp_any -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗

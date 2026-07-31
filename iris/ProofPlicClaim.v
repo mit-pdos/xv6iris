@@ -88,6 +88,15 @@ Proof.
     [ left | right; left | right; right ]; apply bv_eq; vm_compute; reflexivity.
 Qed.
 
+(* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
+   one-line bridge from a leaf's [rget] to the register-map facts a
+   whole-function proof already has.  Written name-free (durable-notes: an
+   Ltac body cannot mention a hypothesis by literal name). *)
+Local Ltac rgne :=
+  rewrite rget_ne;
+  [ | let H1 := fresh in let H2 := fresh in
+      intro H1; injection H1 as H2; vm_compute in H2; congruence ].
+
 Module PlicClaimProof (Cpuid : CPUID) : PLIC_CLAIM.
 
 Section ProofPlicClaim.
@@ -152,13 +161,24 @@ Section ProofPlicClaim.
 
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire plic_claim(), entry to return.    *)
+  (*  Interrupts-off (see SpecPlicClaim.v's header): no [b] binder, no     *)
+  (*  [wp_next] wrapper, so the ambient hart never moves and the proof     *)
+  (*  reads exactly like a straight-line function -- one continuous       *)
+  (*  [rewrite wp_next_off] per leaf, save for the [jal cpuid] call, whose *)
+  (*  own contract likewise has no wrapper to collapse. *)
   (* =================================================================== *)
   Lemma wp_plic_claim_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64)
-    : wp_plic_claim_sconf_body γd γv Φ m0 n b p.
+      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64)
+    : wp_plic_claim_sconf_body γd γv Φ m0 n p.
   Proof.
     cbv beta delta [wp_plic_claim_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hhart Hn.
+    (* [tp] is pinned to the hart: [rget _ tp_idx] is [cid_word] at EVERY
+       register map, and the ambient hart never moves in this proof (no
+       [wp_next]), so this and the bound it carries are hoisted ONCE. *)
+    assert (Htp : forall mm : regfile, rget mm tp_idx = cid_word)
+      by (intros mm; exact (rget_tp mm)).
+    rewrite (Htp m0) in Hhart.
     set (s0_idx := (mword_of_int 8 : mword 5)).
     set (a5_idx := (mword_of_int 15 : mword 5)).
     set (imm_entry := (mword_of_int 48 : mword 6)).
@@ -189,9 +209,10 @@ Section ProofPlicClaim.
     { unfold sp', pa_stk, add_vec_int, imm_entry.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x00: c.addi sp,-16 -- the frame push ---- *)
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE imm_entry m0 n 2 b Hn2 Hpush
+    iApply (wp_caddi_sp_push_s_sconf Φ pcE imm_entry m0 n 2 false Hn2 Hpush
               with "Hcg Hpc Hi00 [-]").
-    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    rewrite wp_next_off.
+    iIntros "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (PQ + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     iDestruct (stack_own_2_elim with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
@@ -204,90 +225,36 @@ Section ProofPlicClaim.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PQ + 0x02)) (mword_of_int 1 : mword 6) ra_idx R1 (n - 2)%nat vr24 b
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PQ + 0x02)) (mword_of_int 1 : mword 6) ra_idx R1 (n - 2)%nat vr24 false
               with "Hcg Hpc Hi02 Hbra [-]").
-    iIntros (CID2 Hs2) "Hcg Hpc Hbra".
+    rewrite wp_next_off.
+    iIntros "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (PQ + 0x02) : mword 64) 2 = mword_of_int (PQ + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PQ + 0x04)) (mword_of_int 0 : mword 6) s0_idx R1 (n - 2)%nat vs16 b
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PQ + 0x04)) (mword_of_int 0 : mword 6) s0_idx R1 (n - 2)%nat vs16 false
               with "Hcg Hpc Hi04 Hbs0 [-]").
-    iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
+    rewrite wp_next_off.
+    iIntros "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (PQ + 0x04) : mword 64) 2 = mword_of_int (PQ + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.addi4spn s0,sp,16 ---- *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (PQ + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx R1 (n - 2)%nat b
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (PQ + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx R1 (n - 2)%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    rewrite wp_next_off.
+    iIntros "Hcg Hpc".
     assert (Hpp08 : add_vec_int (mword_of_int (PQ + 0x06) : mword 64) 2 = mword_of_int (PQ + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx s0_idx := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> R1) with R2.
     assert (HR2sp : R2 !!! Regidx csp_rs1 = sp').
     { unfold R2. rewrite upd_ne; [| vm_compute; discriminate]. exact Hcsp1. }
-    (* ---- 0x08: jal ra,cpuid ----
-
-       BLOCKED HERE.  [Cpuid.wp_call_cpuid_sconf_cs] (SpecCpuid.v, already
-       ported) fixes the callee's SIE state to the LITERAL [false] -- it has
-       no [b] binder at all, matching the "must be stated at b = false" rule
-       for any function that reads [tp] mid-body (cpuid's own [c.mv a0,tp]).
-       But THIS function's own contract (SpecPlicClaim.v, already ported) is
-       b-GENERIC: it threads [sie_cap_gpr _ n b] unchanged from entry to exit
-       through a [wp_next b] wrapper, and plic_claim's code contains NO
-       interrupt-disable instruction (no push_off/pop_off bracket) that could
-       turn an arbitrary entry [b] into a proved [false] before this call. At
-       the point of this [jal] the only resource in hand is [Hcg :
-       sie_cap_gpr R2 (n - 2) b] for an ARBITRARY bound [b], which cannot
-       supply the callee's required [sie_cap_gpr R2 (n - 2) false] --
-       confirmed concretely (this is the exact same gap already reported at
-       ProofPlicinithart.v:299-336 for plicinithart's identical unbracketed
-       call to cpuid): for a bound boolean [b], [sie_cap_gpr m n b] does not
-       even syntactically match [sie_cap_gpr m n false], and there is no
-       lemma anywhere in IntrDefs.v/WpNext.v that converts one to the other
-       (nor could there be: [sie_arm] ties each arm to a DIFFERENT, mutually
-       exclusive value of the SIE ghost variable, so producing [false] from a
-       held [b] is a real ghost-state update, not a reformulation, and
-       nothing in plic_claim's instruction stream performs one). The physical
-       reading is the same: if plic_claim genuinely runs with interrupts
-       enabled, a timer interrupt can fire during (or between) [c.mv a0,tp;
-       sext.w a0] inside cpuid and hand back neither hart's id -- exactly the
-       bug cpuid's contract exists to rule out, and nothing in plic_claim's
-       own body prevents it.
-
-       This looks like a genuine gap in the (out-of-scope, already-ported,
-       already-green) SpecPlicClaim.v: since plic_claim calls a [b =
-       false]-only leaf without ever disabling interrupts itself, its own
-       contract should most likely also drop the [wp_next] wrapper and be
-       stated at [b = false] only, exactly like cpuid/mycpu/plicinithart --
-       the "must be disabled" requirement propagates transitively up through
-       an unbracketed call, the same way it does directly for a function that
-       reads [tp] itself. Per the porting instructions this is a case to
-       report rather than force, so the call site below is left as the
-       literal (as-if-b-generic) attempt and the proof is [Abort]ed rather
-       than closed with a fabricated or weakened statement. *)
-    Fail iApply (Cpuid.wp_call_cpuid_sconf_cs Φ (mword_of_int (PQ + 0x08))
-              (mword_of_int 2081788 : mword 21) R2 (n - 2)%nat
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(lia)
-              with "Hcg Htext Hpc Hi08 [-]").
-  Abort.
-(* -----------------------------------------------------------------------
-   Everything below this point is the OLD (pre-port) continuation of the
-   proof, kept verbatim for reference (it is dead code: the [Abort] above
-   means [wp_plic_claim_sconf] is not defined, and the enclosing functor
-   application below will fail to close for that reason alone -- exactly the
-   state ProofPlicinithart.v is already in for the identical reason). It
-   shows the shape the rest of the port would take if SpecPlicClaim.v's [b]
-   binder were resolved (most likely by stating it at [b = false] only, per
-   the note above): with [rget]/[rget_tp] the [HR2tp] bridge below collapses,
-   because [rget _ tp_idx] is [cid_word] at ANY map.
-   -----------------------------------------------------------------------
-    assert (HR2tp : R2 !!! Regidx (mword_of_int 4 : mword 5) = m0 !!! Regidx tp_idx).
-    { unfold R2, R1. repeat (rewrite upd_ne; [| vm_compute; discriminate]). reflexivity. }
-    (* ---- 0x08: jal ra,cpuid ---- *)
-    iApply (Cpuid.wp_call_cpuid_sconf_cs γ Φ (mword_of_int (PQ + 0x08))
-              (mword_of_int 2081788 : mword 21) R2 (n - 2)%nat
+    (* ---- 0x08: jal ra,cpuid.  [Cpuid.wp_call_cpuid_sconf_cs] is itself
+       [b = false]-only (SpecCpuid.v) with no [wp_next] wrapper, matching
+       plic_claim's own now-[b = false] contract exactly -- so the call
+       produces its continuation directly, with nothing to collapse. ---- *)
+    iApply (Cpuid.wp_call_cpuid_sconf_cs Φ (mword_of_int (PQ + 0x08))
+              (mword_of_int 2081788 : mword 21) R2 (n - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
@@ -301,65 +268,71 @@ Section ProofPlicClaim.
     iEval (rewrite Hpc0c) in "Hpc".
     assert (Hmosp : mo !!! Regidx csp_rs1 = sp')
       by (rewrite (proj1 Hmo_cs); exact HR2sp).
-    assert (Hmoa0 : mo !!! Regidx a0_idx = m0 !!! Regidx tp_idx).
-    { unfold a0_idx. rewrite Hmo_a0 HR2tp. exact (sext32_id_hart _ Hhart). }
+    (* the hart id IS [cid_word] -- no detour through [m0]'s tp slot. *)
+    assert (Hmoa0 : mo !!! Regidx a0_idx = cid_word).
+    { rewrite Hmo_a0 (Htp R2). exact cpuid_ret_cid. }
     (* ---- the post-call register-map chain ---- *)
-    set (N2 := <[Regidx a0_idx := regval_into_reg (ph_shl (m0 !!! Regidx tp_idx) 13)]> mo).
+    set (N2 := <[Regidx a0_idx := regval_into_reg (ph_shl cid_word 13)]> mo).
     set (N3 := <[Regidx a5_idx := regval_into_reg (mword_of_int 0x0c201000 : mword 64)]> N2).
-    set (N4 := <[Regidx a5_idx := regval_into_reg (add_vec (N3 !!! Regidx a5_idx) (N3 !!! Regidx a0_idx))]> N3).
+    set (N4 := <[Regidx a5_idx := regval_into_reg (add_vec (rget N3 a5_idx) (rget N3 a0_idx))]> N3).
     (* ---- 0x0c: slliw a0,a0,13 ---- *)
-    iApply (wp_slliw_s_sconf γ Φ (mword_of_int (PQ + 0x0c)) a0_idx a0_idx
-              (mword_of_int 13 : mword 5) (ph_shl (m0 !!! Regidx tp_idx) 13) mo (n - 2)%nat
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hmoa0; reflexivity)
+    iApply (wp_slliw_s_sconf Φ (mword_of_int (PQ + 0x0c)) a0_idx a0_idx
+              (mword_of_int 13 : mword 5) (ph_shl cid_word 13) mo (n - 2)%nat false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              ltac:(rgne; rewrite Hmoa0; reflexivity)
               with "Hcg Hpc Hi0c [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc".
     assert (Hpp10 : add_vec_int (mword_of_int (PQ + 0x0c) : mword 64) 4 = mword_of_int (PQ + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    change (<[Regidx a0_idx := regval_into_reg (ph_shl (m0 !!! Regidx tp_idx) 13)]> mo) with N2.
+    change (<[Regidx a0_idx := regval_into_reg (ph_shl cid_word 13)]> mo) with N2.
     (* ---- 0x10: lui a5,0xc201 ---- *)
-    iApply (wp_lui_s_sconf γ Φ (mword_of_int (PQ + 0x10)) a5_idx
-              (mword_of_int 0xc201 : mword 20) (mword_of_int 0x0c201000 : mword 64) N2 (n - 2)%nat
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_lui_s_sconf Φ (mword_of_int (PQ + 0x10)) a5_idx
+              (mword_of_int 0xc201 : mword 20) (mword_of_int 0x0c201000 : mword 64) N2 (n - 2)%nat false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc".
     assert (Hpp14 : add_vec_int (mword_of_int (PQ + 0x10) : mword 64) 4 = mword_of_int (PQ + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     change (<[Regidx a5_idx := regval_into_reg (mword_of_int 0x0c201000 : mword 64)]> N2) with N3.
     (* ---- 0x14: c.add a5,a5,a0 ---- *)
-    iApply (wp_cadd_s_sconf γ Φ (mword_of_int (PQ + 0x14)) a5_idx a0_idx N3 (n - 2)%nat
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cadd_s_sconf Φ (mword_of_int (PQ + 0x14)) a5_idx a0_idx N3 (n - 2)%nat false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc".
     assert (Hpp16 : add_vec_int (mword_of_int (PQ + 0x14) : mword 64) 2 = mword_of_int (PQ + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
-    change (<[Regidx a5_idx := regval_into_reg (add_vec (N3 !!! Regidx a5_idx) (N3 !!! Regidx a0_idx))]> N3) with N4.
-    assert (HN3a5 : N3 !!! Regidx a5_idx = (mword_of_int 0x0c201000 : mword 64))
-      by (unfold N3; apply upd_eq).
-    assert (HN3a0 : N3 !!! Regidx a0_idx = ph_shl (m0 !!! Regidx tp_idx) 13).
-    { unfold N3. rewrite upd_ne; [| vm_compute; discriminate]. unfold N2. apply upd_eq. }
-    assert (HN4a5 : N4 !!! Regidx a5_idx = ph_sthb (m0 !!! Regidx tp_idx)).
-    { unfold N4. rewrite upd_eq. unfold regval_into_reg, ph_sthb.
+    change (<[Regidx a5_idx := regval_into_reg (add_vec (rget N3 a5_idx) (rget N3 a0_idx))]> N3) with N4.
+    assert (HN3a5 : rget N3 a5_idx = (mword_of_int 0x0c201000 : mword 64))
+      by (rgne; unfold N3; apply upd_eq).
+    assert (HN3a0 : rget N3 a0_idx = ph_shl cid_word 13).
+    { rgne. unfold N3. rewrite upd_ne; [| vm_compute; discriminate]. unfold N2. apply upd_eq. }
+    assert (HN4a5 : rget N4 a5_idx = ph_sthb cid_word).
+    { rgne. unfold N4. rewrite upd_eq. unfold regval_into_reg, ph_sthb.
       rewrite HN3a5 HN3a0. reflexivity. }
     (* ---- 0x16: c.lw a0,4(a5) -- THE CLAIM ---- *)
-    iApply (wp_lw_plic_dev_s_sconf γ γd γv Φ (mword_of_int (PQ + 0x16)) true false
-              a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
+    iApply (wp_lw_plic_dev_s_sconf (CID := CID) γd γv Φ (mword_of_int (PQ + 0x16)) true false
+              a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok false
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_vpn   _ (ph_sclaim_geom _ Hhart)))
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite HN4a5; intros pq Hpq;
-                    destruct (plic_claim pq (Z.to_nat (bv_unsigned (m0 !!! Regidx tp_idx)))) as [cv cp] eqn:Hc;
+                    destruct (plic_claim pq (Z.to_nat (bv_unsigned cid_word))) as [cv cp] eqn:Hc;
                     exists cv, cp; split; [ | split ];
                     [ rewrite (ph_sclaim_read _ pq Hhart); rewrite Hc; reflexivity
-                    | pose proof (plic_ok_claim pq (Z.to_nat (bv_unsigned (m0 !!! Regidx tp_idx))) Hpq) as Hk;
+                    | pose proof (plic_ok_claim pq (Z.to_nat (bv_unsigned cid_word)) Hpq) as Hk;
                       rewrite Hc in Hk; exact Hk
-                    | pose proof (plic_claim_ret pq (Z.to_nat (bv_unsigned (m0 !!! Regidx tp_idx))) Hpq) as Hk;
+                    | pose proof (plic_claim_ret pq (Z.to_nat (bv_unsigned cid_word)) Hpq) as Hk;
                       rewrite Hc in Hk; exact Hk ])
               with "Hcg Hpc Hi16 Hdinv [-]").
-    iIntros (cv) "%Hcv Hcg Hpc".
+    iIntros (cv) "%Hcv".
+    rewrite wp_next_off.
+    iIntros "Hcg Hpc".
     assert (Hpp18 : add_vec_int (mword_of_int (PQ + 0x16) : mword 64) 2 = mword_of_int (PQ + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     set (cval := (extend_value false
@@ -376,16 +349,17 @@ Section ProofPlicClaim.
     { rewrite HN5sp. rewrite -Hcsp1. exact Hpa1. }
     assert (Hpa2' : add_vec (N5 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
     { rewrite HN5sp. rewrite -Hcsp1. exact Hpa2. }
-    assert (Hra0v : R1 !!! Regidx ra_idx = ra0)
-      by (unfold R1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
-    assert (Hs00v : R1 !!! Regidx s0_idx = s00)
-      by (unfold R1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
+    assert (Hra0v : rget R1 ra_idx = ra0)
+      by (rgne; unfold R1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
+    assert (Hs00v : rget R1 s0_idx = s00)
+      by (rgne; unfold R1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite Hpa1 -Hpa1' Hra0v) in "Hbra".
     iEval (rewrite Hpa2 -Hpa2' Hs00v) in "Hbs0".
     (* ---- 0x18: c.ldsp ra,8(sp) ---- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (PQ + 0x18)) (mword_of_int 1 : mword 6) ra_idx N5 (n - 2)%nat ra0
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (PQ + 0x18)) (mword_of_int 1 : mword 6) ra_idx N5 (n - 2)%nat ra0 false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hbra [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc Hbra".
     assert (Hpp1a : add_vec_int (mword_of_int (PQ + 0x18) : mword 64) 2 = mword_of_int (PQ + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
@@ -394,9 +368,10 @@ Section ProofPlicClaim.
       by (unfold N6; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite -HN6sp) in "Hbs0".
     (* ---- 0x1a: c.ldsp s0,0(sp) ---- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (PQ + 0x1a)) (mword_of_int 0 : mword 6) s0_idx N6 (n - 2)%nat s00
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (PQ + 0x1a)) (mword_of_int 0 : mword 6) s0_idx N6 (n - 2)%nat s00 false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a Hbs0 [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc Hbs0".
     assert (Hpp1c : add_vec_int (mword_of_int (PQ + 0x1a) : mword 64) 2 = mword_of_int (PQ + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
@@ -413,9 +388,10 @@ Section ProofPlicClaim.
     iEval (rewrite HN6sp Hpa2') in "Hbs0".
     iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf γ Φ (mword_of_int (PQ + 0x1c)) imm_dealloc N7
-              (n - 2)%nat 2 Hpop
+    iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (PQ + 0x1c)) imm_dealloc N7
+              (n - 2)%nat 2 false Hpop
               with "Hcg Hpc Hi1c Hframe [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
     iEval (rewrite Hnk) in "Hcg".
@@ -429,12 +405,13 @@ Section ProofPlicClaim.
     assert (HN8a0 : N8 !!! Regidx a0_idx = cval).
     { unfold N8, N7, N6. repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold N5. rewrite upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf γ Φ (mword_of_int (PQ + 0x1e)) ra_idx N8 n
+    iApply (wp_cret_s_sconf Φ (mword_of_int (PQ + 0x1e)) ra_idx N8 n false
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi1e [-]").
+    rewrite wp_next_off.
     iIntros "Hcg Hpc".
-    assert (Hra_final : ret_pc (N8 !!! Regidx ra_idx) = ret_tgt)
-      by (rewrite HN8ra; reflexivity).
+    assert (Hra_final : ret_pc (rget N8 ra_idx) = ret_tgt)
+      by (rgne; rewrite HN8ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     iApply ("Hcont" $! N8 with "Hcg Hpc [%]").
     split; [ | split ].
@@ -443,7 +420,6 @@ Section ProofPlicClaim.
       unfold callee_saved.
       split.
       { unfold N8. rewrite upd_eq. unfold regval_into_reg. exact Hwv. }
-      split; [ cs_through Hmo_cs mo | ].
       split.
       { unfold N8, N7, s0_idx, s00.
         rewrite upd_ne; [| vm_compute; discriminate].
@@ -452,7 +428,6 @@ Section ProofPlicClaim.
     - exact HN8ra.
     - rewrite HN8a0. unfold cval. apply pq_a0_of_claim. exact Hcv.
   Qed.
-   ----------------------------------------------------------------------- *)
 
 End ProofPlicClaim.
 
