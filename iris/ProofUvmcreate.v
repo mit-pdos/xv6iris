@@ -114,8 +114,9 @@ Section ProofUvmcreate.
     (forall r : mword 5, is_cs_idx r = true ->
        r <> csp_rs1 -> r <> mword_of_int 8 -> r <> mword_of_int 9 ->
        Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 4)%nat b -∗
-    cpu_own lvl eb p C -∗
+    mm !!! Regidx csp_rs1 = sp0 ->
+    sie_cap_gpr Mt (K - 4)%nat b p -∗
+    cpu_own lvl eb p C b -∗
     kernel_text -∗
     pc_is (mword_of_int (UVC + 0x1a)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -125,15 +126,15 @@ Section ProofUvmcreate.
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) rv -∗
     wp_next b (fun (CID : CpuId) =>
       ∀ mr : regfile,
-      sie_cap_gpr mr K b -∗
-      cpu_own lvl eb p C -∗
+      sie_cap_gpr mr K b p -∗
+      cpu_own lvl eb p C b -∗
       pc_is (ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ⌜ callee_saved mm mr ⌝ -∗
       uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) (mr !!! Regidx (mword_of_int 10)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hc4 Htsp Hts1 Htrest.
+    intros Hc4 Htsp Hts1 Htrest Hmmsp.
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     (* the three saved-slot addresses, purely arithmetic in [sp0] -- the
        SAME facts the outer proof computed once from its own [sp0]/[spr],
@@ -256,61 +257,29 @@ Section ProofUvmcreate.
       rewrite /E0 upd_ne; [| congruence].
       exact (Htrest r Hr Ncsp N8 N9). }
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
-    (* BLOCKED HERE: NOT a mechanical-porting slip, but the SAME open,
-       deliberately-deferred design gap independently confirmed while
-       porting ProofKvmmap.v (see that file's identical comment, and
-       claude-notes/projects/explicit-cpuid.md:256-265).
-
-       [uvc_htail]'s own contract -- copied verbatim from the already-ported
-       [wp_uvmcreate_sconf_body], since it IS that function's shared tail --
-       threads [cpu_own lvl eb p C] UNCHANGED from entry to exit through a
-       [wp_next b] wrapper, exactly like [sie_cap_gpr].  That is sound for
-       [sie_cap_gpr]: every leaf REBINDS it fresh at whatever hart the
-       [wp_next] lambda names, so [Hcg] is always current.  But NONE of
-       uvc_htail's six leaves (mv/ldsp x3/pop/ret) mention [cpu_own] at
-       all, so [Hcnt] is never rebound: it stays exactly the [cpu_own]
-       obtained at this lemma's OWN entry hart [CID0], while the
-       continuation below needs [cpu_own] at [CID11] (the hart six
-       [wp_next]-introduced migrations later) -- an ARBITRARY hart with no
-       proven relationship to [CID0] unless [b = false] ([Hs6]..[Hs11] give
-       that only conditionally).  Confirmed concretely: [iExact "Hcnt"]
-       against the goal [cpu_own lvl eb p C] reports "does not match goal"
-       even though the two print IDENTICALLY -- they differ only in the
-       elided [CpuId] argument ([@cpu_own _ _ _ CID0 lvl eb p C] vs
-       [@cpu_own _ _ _ CID11 lvl eb p C]).
-
-       Per claude-notes/projects/explicit-cpuid.md: "what else has to cross
-       the migration... cpu_own... a caller holds it across
-       interrupts-enabled instructions.  Today intr_handler_spec returns
-       only the register file and config, so nothing hands cpu_own back at
-       the new hart... That choice should be made against kerneltrap's real
-       contract, not guessed."  No such hand-back lemma exists yet anywhere
-       in IntrDefs.v/WpNext.v/CpuOwn.v, so no consumer proof -- this one
-       included -- can bridge it without inventing Stage-2 infrastructure
-       that has been explicitly deferred.  Per the porting instructions this
-       is reported rather than forced: the call is left below as the
-       literal (as-if-provable) attempt and the proof is [Abort]ed rather
-       than closed with a fabricated or weakened statement. *)
-    Fail iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] [Hpost]").
-  Abort.
-(* ---------------------------------------------------------------------
-   Everything below this point is the intended (untestable, since the
-   [Abort] above means [uvc_htail] is not defined) continuation, kept for
-   reference.  It shows the shape the discharge would take if the
-   [cpu_own]-across-migration gap were resolved: identical to every other
-   callee_saved/uvmcreate_post bookkeeping bullet already proved above.
-   ---------------------------------------------------------------------
+    (* [cpu_own] was obtained at this lemma's OWN entry hart [CID0] and is
+       never rebound by any of the six plain leaves above (none of them
+       mention [cpu_own]); the continuation needs it at [CID11].
+       [cpu_own_transport] bridges exactly this: at [b = true] the payload
+       isn't hart-indexed at all (pure conversion), at [b = false] the
+       chained [Hs6]..[Hs11] equalities (composed by [wp_next_chain]) show
+       the hart never moved. *)
+    iDestruct (cpu_own_transport CID0 CID11 lvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
     iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] [Hpost]").
     - unfold callee_saved.
-      split. { rewrite /E4 upd_eq. exact Hwv. }
-      split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
+      (* A1 (sp), A2 (s0) and A3 (s1) are NOT covered by [Hthr] (it
+         explicitly excludes csp_rs1/8/9 -- those three are exactly the
+         registers this shared tail itself reloads/restores), so they are
+         discharged from the E-chain directly; the remaining nine
+         (s2..s11) are untouched by any leaf here and go via [Hthr]. *)
+      split. { rewrite /E4 upd_eq. rewrite Hwv. symmetry. exact Hmmsp. }
       split. { rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3. rewrite upd_ne; [| reg_neq]. rewrite /E2 upd_eq. reflexivity. }
       split. { rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3 upd_eq. reflexivity. }
       repeat (split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|]).
       apply Hthr; vm_compute; first [reflexivity | discriminate].
     - iEval (rewrite HE4a0). iExact "Hpost".
   Qed.
-   --------------------------------------------------------------------- *)
 
   Lemma wp_uvmcreate_sconf (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
@@ -323,6 +292,17 @@ Section ProofUvmcreate.
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc Henv Hcont".
+    (* [ret_tgt] is a LET-bound local (from [intros] on the spec body's own
+       [let ret_tgt := ... in]), not a plain hypothesis -- [rewrite /ret_tgt]
+       is a no-op on it (durable-notes.md).  [uvc_htail]'s own continuation
+       is stated at the unfolded [ret_pc (mm !!! Regidx 1)] directly (it has
+       no [ret_tgt] local of its own), so [Hcont] must be re-spelled that way
+       ONCE here for [iApply (uvc_htail ...  with "... Hcont")] to unify
+       syntactically at either call site below -- [iSpecialize]/[iApply]'s
+       hypothesis matching does not zeta-reduce a local [let] the way [exact]
+       does. *)
+    assert (Hrettgt : ret_tgt = ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5))) by reflexivity.
+    iEval (rewrite Hrettgt) in "Hcont".
     (* frame-cell address facts *)
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { unfold spr, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -432,68 +412,19 @@ Section ProofUvmcreate.
        is simply dropped at the call below -- [HJ4] is now unused (kept
        for documentation) rather than deleted, since nothing else in the
        proof reads it either. *)
-    (* ---- THE CALL: BLOCKED HERE.
-       [AK.wp_kalloc_sconf] (SpecKalloc.v, already ported) is b-GENERIC
-       exactly like this function: it threads [sie_cap_gpr J (K-4) b] AND
-       [cpu_own lvl eb p C] unchanged from entry to exit through its own
-       [wp_next b] wrapper -- and so does uvmcreate's OWN contract
-       (SpecUvmcreate.v). uvmcreate's body above runs SIX plain instructions
-       (the frame push, three sdsp, addi4spn, the jal itself) before this
-       point, none of which disables interrupts -- so by the b-generic
-       recipe each is threaded via a FRESH, universally quantified hart
-       ([iIntros (CIDk Hsk) ...], CID1..CID6 above), exactly as the porting
-       guide's "b generic or true" bullet prescribes.  That is sound for
-       [Hcg : sie_cap_gpr W2/J (K-4) b] (each leaf rebinds it fresh at the
-       new hart), but [Hcnt : cpu_own lvl eb p C] was introduced ONCE at
-       CID0 (this function's entry hart, from the very first [iIntros]) and
-       is never rebound by any leaf -- none of the six mention [cpu_own] at
-       all.  At this call site the ambient hart is CID6, an ARBITRARY hart
-       with no proven relationship to CID0 unless [b = false] (Hs1..Hs6
-       only give that conditionally).  [AK.wp_kalloc_sconf]'s own
-       [cpu_own lvl eb p C] premise is required AT CID6 (matching [Hcg]'s
-       hart), so [Hcnt] does not typecheck there for generic [b].
-
-       This is NOT a mechanical-porting slip: it is the SAME open,
-       deliberately-deferred design gap independently confirmed while
-       porting ProofKvmmap.v (see that file's identical comment) and
-       recorded at claude-notes/projects/explicit-cpuid.md:256-265 ("what
-       else has to cross the migration... cpu_own... a caller holds it
-       across interrupts-enabled instructions.  Today intr_handler_spec
-       returns only the register file and config, so nothing hands cpu_own
-       back at the new hart... That choice should be made against
-       kerneltrap's real contract, not guessed.").  No such hand-back lemma
-       exists yet anywhere in IntrDefs.v/WpNext.v/CpuOwn.v, so no consumer
-       proof -- this one included -- can bridge it without inventing
-       Stage-2 infrastructure that has been explicitly deferred.  (The
-       [uvc_htail] lemma above hits the identical gap independently, at
-       ITS OWN final [cpu_own] discharge six instructions later -- see its
-       own [Abort] comment -- confirming this is one root cause surfacing
-       twice in the same function, not two separate bugs.)  Per the porting
-       instructions this is reported rather than forced: the call is left
-       below as the literal (as-if-provable) attempt and the proof is
-       [Abort]ed rather than closed with a fabricated or weakened
-       statement. *)
-    Fail iApply (AK.wp_kalloc_sconf Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
+    (* ---- THE CALL.  [Hcnt : cpu_own lvl eb p C b] was introduced at this
+       function's ENTRY hart [CID]; the six plain instructions above each
+       ran through a FRESH, universally quantified hart (CID1..CID6), so
+       kalloc wants it at CID6.  [cpu_own_transport] moves it there, one
+       line, no case split on [b] -- exactly the ProofKvmmap.v pattern. ---- *)
+    iDestruct (cpu_own_transport CID CID6 lvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
+    iApply (AK.wp_kalloc_sconf Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
               J on lvl eb p C (K - 4)%nat b
               Hc14
               ltac:(reflexivity)
               Hlvl
               with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic [-]").
-  Abort.
-(* ---------------------------------------------------------------------
-   Everything below this point is the intended (untestable, since the
-   [Abort] above means [wp_uvmcreate_sconf] is not defined) continuation of
-   the proof, kept for reference.  It shows the shape the rest of the port
-   would take if the [cpu_own]-across-migration gap were resolved: the
-   register-map algebra (kalloc's return chain, the null/success split,
-   memset, the physical-page claims, and the shared-epilogue call via
-   [uvc_htail]) is otherwise untouched by the explicit-CPUID sweep, since
-   none of it mentions the SIE bundle, [rd_ok], or a variable-indexed
-   [rget] read beyond what is already fixed above.  (The nested
-   [Fail ... Abort.] a little further down, from when this was written as
-   a live attempt before the kalloc-call gap above was found to block
-   everything earlier, is now just inert text inside this comment.)
-   ---------------------------------------------------------------------
     iIntros (CID7 Hs7 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (UVC + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -553,28 +484,28 @@ Section ProofUvmcreate.
                        = mword_of_int (UVC + 0x1a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt1a) in "Hpc".
-      (* BLOCKED, TRANSITIVELY: [uvc_htail] above could not be completed
-         (the cpu_own-across-migration gap, documented there in full) --
-         there is no working lemma to call here.  Left as the literal
-         attempt, [Fail]ed, and the proof [Abort]ed rather than forced. *)
-      Fail iApply (uvc_htail Φ γa mm lvl K eb p C on b M1 root0 sp0 v4
-                Hc4 HM1sp HM1s1 HM1rest
-                with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Havail2]").
-  Abort.
-(* ---------------------------------------------------------------------
-   Everything below is the intended continuation (untestable, since the
-   [Abort] above means neither [uvc_htail] nor [wp_uvmcreate_sconf] is
-   defined), kept for reference.  It shows the shape the rest of the port
-   would take if the [cpu_own] gap were resolved: the remaining
-   register-map algebra (M2/M3/M4, the memset bridge, the physical-page
-   claims) is otherwise untouched by the explicit-CPUID sweep, since none
-   of it mentions the SIE bundle, [rd_ok], or a variable-indexed [rget]
-   read beyond what is already fixed above.
-   ---------------------------------------------------------------------
-      rewrite /uvmcreate_post. iLeft.
-      iSplit; [iPureIntro; rewrite Hnull; symmetry; exact Hnz|].
-      iSplit; [iPureIntro; exact Hz|].
-      iExists γk. iFrame "Hlock Havail2 Hpanic". }
+      (* [Hcnt] was last rebound at CID7 (kalloc's own continuation); the
+         mv and the taken cbeqz above moved the hart on to CID9 without
+         either mentioning [cpu_own] -- transport it across both hops. *)
+      iDestruct (cpu_own_transport CID7 CID9 lvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iApply (uvc_htail Φ γa mm lvl K eb p C on b M1 root0 sp0 v4
+                Hc4 HM1sp HM1s1 HM1rest ltac:(reflexivity)
+                with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Havail2] [-]").
+      { rewrite /uvmcreate_post. iLeft.
+        iSplit; [iPureIntro; rewrite Hnull; symmetry; exact Hnz|].
+        iSplit; [iPureIntro; exact Hz|].
+        iExists γk. iFrame "Hlock Havail2 Hpanic". }
+      (* [uvc_htail]'s OWN [wp_next b K] obligation (the [-]-framed slot
+         above) is at ITS ambient hart (CID9 here), which is NOT [Hcont]'s
+         hart -- [Hcont]'s [wp_next] is fixed at the OUTER entry hart
+         [CID].  Re-derive it at the fresh hart the same way [uvc_htail]
+         discharges its OWN continuation: [iIntros] the fresh hart plus the
+         crossing equality, chase [Hcont] there with [iSpecialize], done. *)
+      iIntros (CIDx Hsx).
+      iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain|].
+      iExact "Hcont".
+    }
     iAssert (kalloc_env γa (avail_sub on 1))
       with "[Havail2]" as "Henv".
     { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2 Hpanic". }
@@ -622,7 +553,7 @@ Section ProofUvmcreate.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
-    iApply (MS.wp_memset_sconf Φ M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b
+    iApply (MS.wp_memset_sconf Φ M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf] [-]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
@@ -685,16 +616,26 @@ Section ProofUvmcreate.
       rewrite /J upd_ne; [| congruence].
       rewrite /W2 upd_ne; [| congruence].
       rewrite /W1 upd_ne; [| congruence]. reflexivity. }
+    (* [Hcnt] was last rebound at CID7 (kalloc's own continuation); memset's
+       OWN contract does not thread [cpu_own] at all (SpecMemset.v), so it
+       rode UNCHANGED, still at CID7, across the fall-through, lui, li, jal,
+       and the memset call itself -- transport it in one hop to CID13, the
+       hart memset's own [wp_next] resumed on. *)
+    iDestruct (cpu_own_transport CID7 CID13 lvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
     iApply (uvc_htail Φ γa mm lvl K eb p C on b mfin (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) sp0 v4
-              Hc4 Hfsp Hfs1 Hfrest
-              with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Hptree Henv]").
-    rewrite /uvmcreate_post. iRight. iExists bppn.
-    iSplit; [done|].
-    iSplit; [iPureIntro; rewrite Hpbase; exact Hpv|].
-    iFrame "Hptree Henv".
+              Hc4 Hfsp Hfs1 Hfrest ltac:(reflexivity)
+              with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Hptree Henv] [-]").
+    { rewrite /uvmcreate_post. iRight. iExists bppn.
+      iSplit; [done|].
+      iSplit; [iPureIntro; rewrite Hpbase; exact Hpv|].
+      iFrame "Hptree Henv". }
+    (* same re-derivation as the taken branch: [uvc_htail]'s [wp_next]
+       obligation here is at CID13, not [Hcont]'s (outer-entry-hart) one. *)
+    iIntros (CIDy Hsy).
+    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain|].
+    iExact "Hcont".
   Qed.
-   --------------------------------------------------------------------- *)
-   ======================================================================= *)
 
 End ProofUvmcreate.
 

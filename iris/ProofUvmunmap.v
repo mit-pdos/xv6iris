@@ -65,6 +65,8 @@ Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
+Require Import HartTp WpNext.
+Require Import WpSconfVc.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import ByteCursor.
@@ -193,14 +195,14 @@ Section ProofUvmunmap.
   (*  branch directly and by the loop exit through the [ld s1] at +0x76,  *)
   (*  so slot 3 arrives at existential contents.                          *)
   (* ================================================================== *)
-  Local Lemma uu_epilogue (γ : gname) (Φ : mval -> iProp Σ)
-      (mm mj : regfile) (K : nat) (sp0 : mword 64) :
+  Local Lemma uu_epilogue `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+      (mm mj : regfile) (K : nat) (sp0 : mword 64) (b : bool) (p : mword 64) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     (8 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->
     mj !!! Regidx csp_rs1 = spr ->
     uu_thr1 mm mj ->
-    sie_cap_gpr γ mj (K - 8) -∗
+    sie_cap_gpr mj (K - 8) b p -∗
     kernel_text -∗
     pc_is (mword_of_int (UU + 0x78) : mword 64) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
@@ -211,8 +213,9 @@ Section ProofUvmunmap.
     pa_stk sp0 6 ↦₈ (mm !!! Regidx Rs4) -∗
     pa_stk sp0 7 ↦₈ (mm !!! Regidx Rs5) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
-    ( ∀ mf : regfile,
-      sie_cap_gpr γ mf K -∗
+    wp_next b (fun (CID : CpuId) =>
+      ∀ mf : regfile,
+      sie_cap_gpr mf K b p -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -248,84 +251,84 @@ Section ProofUvmunmap.
     { unfold spr, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     (* --- +0x78 c.ldsp s2,32(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x78)) (mword_of_int 4 : mword 6) Rs2
-              mj (K - 8) (mm !!! Regidx Rs2) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x78)) (mword_of_int 4 : mword 6) Rs2
+              mj (K - 8) (mm !!! Regidx Rs2) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi78 [Hk4] [-]").
     { iEval (rewrite Hjsp Hb4). iExact "Hk4". }
-    iIntros "Hcg Hpc Hk4". iEval (rewrite Hjsp Hb4) in "Hk4".
+    iIntros (CID1 Hs1) "Hcg Hpc Hk4". iEval (rewrite Hjsp Hb4) in "Hk4".
     set (E1 := <[Regidx Rs2 := regval_into_reg (mm !!! Regidx Rs2)]> mj).
     assert (HE1sp : E1 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp7a : add_vec_int (mword_of_int (UU + 0x78) : mword 64) 2
                    = mword_of_int (UU + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp7a) in "Hpc".
     (* --- +0x7a c.ldsp s3,24(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x7a)) (mword_of_int 3 : mword 6) Rs3
-              E1 (K - 8) (mm !!! Regidx Rs3) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x7a)) (mword_of_int 3 : mword 6) Rs3
+              E1 (K - 8) (mm !!! Regidx Rs3) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a [Hk5] [-]").
     { iEval (rewrite HE1sp Hb5). iExact "Hk5". }
-    iIntros "Hcg Hpc Hk5". iEval (rewrite HE1sp Hb5) in "Hk5".
+    iIntros (CID2 Hs2) "Hcg Hpc Hk5". iEval (rewrite HE1sp Hb5) in "Hk5".
     set (E2 := <[Regidx Rs3 := regval_into_reg (mm !!! Regidx Rs3)]> E1).
     assert (HE2sp : E2 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp7c : add_vec_int (mword_of_int (UU + 0x7a) : mword 64) 2
                    = mword_of_int (UU + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp7c) in "Hpc".
     (* --- +0x7c c.ldsp s4,16(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x7c)) (mword_of_int 2 : mword 6) Rs4
-              E2 (K - 8) (mm !!! Regidx Rs4) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x7c)) (mword_of_int 2 : mword 6) Rs4
+              E2 (K - 8) (mm !!! Regidx Rs4) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7c [Hk6] [-]").
     { iEval (rewrite HE2sp Hb6). iExact "Hk6". }
-    iIntros "Hcg Hpc Hk6". iEval (rewrite HE2sp Hb6) in "Hk6".
+    iIntros (CID3 Hs3) "Hcg Hpc Hk6". iEval (rewrite HE2sp Hb6) in "Hk6".
     set (E3 := <[Regidx Rs4 := regval_into_reg (mm !!! Regidx Rs4)]> E2).
     assert (HE3sp : E3 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp7e : add_vec_int (mword_of_int (UU + 0x7c) : mword 64) 2
                    = mword_of_int (UU + 0x7e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp7e) in "Hpc".
     (* --- +0x7e c.ldsp s5,8(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x7e)) (mword_of_int 1 : mword 6) Rs5
-              E3 (K - 8) (mm !!! Regidx Rs5) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x7e)) (mword_of_int 1 : mword 6) Rs5
+              E3 (K - 8) (mm !!! Regidx Rs5) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7e [Hk7] [-]").
     { iEval (rewrite HE3sp Hb7). iExact "Hk7". }
-    iIntros "Hcg Hpc Hk7". iEval (rewrite HE3sp Hb7) in "Hk7".
+    iIntros (CID4 Hs4) "Hcg Hpc Hk7". iEval (rewrite HE3sp Hb7) in "Hk7".
     set (E4 := <[Regidx Rs5 := regval_into_reg (mm !!! Regidx Rs5)]> E3).
     assert (HE4sp : E4 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp80 : add_vec_int (mword_of_int (UU + 0x7e) : mword 64) 2
                    = mword_of_int (UU + 0x80)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp80) in "Hpc".
     (* --- +0x80 c.ldsp s6,0(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x80)) (mword_of_int 0 : mword 6) Rs6
-              E4 (K - 8) (mm !!! Regidx Rs6) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x80)) (mword_of_int 0 : mword 6) Rs6
+              E4 (K - 8) (mm !!! Regidx Rs6) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi80 [Hk8] [-]").
     { iEval (rewrite HE4sp Hb8). iExact "Hk8". }
-    iIntros "Hcg Hpc Hk8". iEval (rewrite HE4sp Hb8) in "Hk8".
+    iIntros (CID5 Hs5) "Hcg Hpc Hk8". iEval (rewrite HE4sp Hb8) in "Hk8".
     set (E5 := <[Regidx Rs6 := regval_into_reg (mm !!! Regidx Rs6)]> E4).
     assert (HE5sp : E5 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp82 : add_vec_int (mword_of_int (UU + 0x80) : mword 64) 2
                    = mword_of_int (UU + 0x82)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp82) in "Hpc".
     (* --- +0x82 c.ldsp ra,56(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x82)) (mword_of_int 7 : mword 6) Rra
-              E5 (K - 8) (mm !!! Regidx Rra) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x82)) (mword_of_int 7 : mword 6) Rra
+              E5 (K - 8) (mm !!! Regidx Rra) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi82 [Hk1] [-]").
     { iEval (rewrite HE5sp Hb1). iExact "Hk1". }
-    iIntros "Hcg Hpc Hk1". iEval (rewrite HE5sp Hb1) in "Hk1".
+    iIntros (CID6 Hs6) "Hcg Hpc Hk1". iEval (rewrite HE5sp Hb1) in "Hk1".
     set (E6 := <[Regidx Rra := regval_into_reg (mm !!! Regidx Rra)]> E5).
     assert (HE6sp : E6 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp84 : add_vec_int (mword_of_int (UU + 0x82) : mword 64) 2
                    = mword_of_int (UU + 0x84)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp84) in "Hpc".
     (* --- +0x84 c.ldsp s0,48(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x84)) (mword_of_int 6 : mword 6) Rs0
-              E6 (K - 8) (mm !!! Regidx Rs0) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x84)) (mword_of_int 6 : mword 6) Rs0
+              E6 (K - 8) (mm !!! Regidx Rs0) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi84 [Hk2] [-]").
     { iEval (rewrite HE6sp Hb2). iExact "Hk2". }
-    iIntros "Hcg Hpc Hk2". iEval (rewrite HE6sp Hb2) in "Hk2".
+    iIntros (CID7 Hs7) "Hcg Hpc Hk2". iEval (rewrite HE6sp Hb2) in "Hk2".
     set (E7 := <[Regidx Rs0 := regval_into_reg (mm !!! Regidx Rs0)]> E6).
     assert (HE7sp : E7 !!! Regidx csp_rs1 = spr) by lkp.
     assert (Hp86 : add_vec_int (mword_of_int (UU + 0x84) : mword 64) 2
@@ -354,10 +357,10 @@ Section ProofUvmunmap.
       iSplitL "Hk8"; [iExists _; iExact "Hk8" |].
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi16sp_pop_s_sconf γ Φ (mword_of_int (UU + 0x86))
-              (mword_of_int 4 : mword 6) E7 (K - 8) 8 Hpop
+    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (UU + 0x86))
+              (mword_of_int 4 : mword 6) E7 (K - 8) 8 b Hpop
               with "Hcg Hpc Hi86 Hframe [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID8 Hs8) "Hcg Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
       (add_vec (E7 !!! Regidx csp_rs1)
          (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))))]> E7) with E8.
@@ -373,46 +376,47 @@ Section ProofUvmunmap.
               c <> Rs2 -> c <> Rs3 -> c <> Rs4 -> c <> Rs5 -> c <> Rs6 ->
               E8 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H18 H19 H20 H21 H22. thr_peel. apply Hjthr; assumption. }
-    iApply (wp_cret_s_sconf γ Φ (mword_of_int (UU + 0x88)) Rra E8 K
+    iApply (wp_cret_s_sconf Φ (mword_of_int (UU + 0x88)) Rra E8 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi88 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID9 Hs9) "Hcg Hpc".
+    iEval (rgne) in "Hpc".
     iEval (rewrite HE8ra) in "Hpc".
+    iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E8 with "Hcg Hpc [%]").
     unfold callee_saved. split_and!.
-    - rewrite /E8 upd_eq. rewrite Hwv. symmetry. exact Hmmsp.
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
-    - rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7 upd_eq. reflexivity.
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
-    - rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
+    - (* sp *) rewrite /E8 upd_eq. rewrite Hwv. symmetry. exact Hmmsp.
+    - (* s0 *) rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7 upd_eq. reflexivity.
+    - (* s1 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
+    - (* s2 *) rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
       rewrite /E6. rewrite upd_ne; [| reg_neq]. rewrite /E5. rewrite upd_ne; [| reg_neq].
       rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3. rewrite upd_ne; [| reg_neq].
       rewrite /E2. rewrite upd_ne; [| reg_neq]. rewrite /E1 upd_eq. reflexivity.
-    - rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
+    - (* s3 *) rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
       rewrite /E6. rewrite upd_ne; [| reg_neq]. rewrite /E5. rewrite upd_ne; [| reg_neq].
       rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3. rewrite upd_ne; [| reg_neq].
       rewrite /E2 upd_eq. reflexivity.
-    - rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
+    - (* s4 *) rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
       rewrite /E6. rewrite upd_ne; [| reg_neq]. rewrite /E5. rewrite upd_ne; [| reg_neq].
       rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3 upd_eq. reflexivity.
-    - rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
+    - (* s5 *) rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
       rewrite /E6. rewrite upd_ne; [| reg_neq]. rewrite /E5. rewrite upd_ne; [| reg_neq].
       rewrite /E4 upd_eq. reflexivity.
-    - rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
+    - (* s6 *) rewrite /E8. rewrite upd_ne; [| reg_neq]. rewrite /E7. rewrite upd_ne; [| reg_neq].
       rewrite /E6. rewrite upd_ne; [| reg_neq]. rewrite /E5 upd_eq. reflexivity.
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
-    - apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
+    - (* s7 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
+    - (* s8 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
+    - (* s9 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
+    - (* s10 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
+    - (* s11 *) apply HE8thr; [vm_compute; reflexivity | vm_compute; discriminate ..].
   Qed.
 
   (* ================================================================== *)
   (*  THE LOOP (+0x50 head, +0x4a tail), by induction on the remaining    *)
   (*  page count.                                                         *)
   (* ================================================================== *)
-  Local Lemma uu_loop (γ γa : gname) (Φ : mval -> iProp Σ)
+  Local Lemma uu_loop `{CID0 : CpuId} (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (otf : option (mword 44)) (uroot : mword 44)
-      (um : gmap (mword 27) (mword 64)) (npages K : nat) (eb : bool)
+      (um : gmap (mword 27) (mword 64)) (npages K : nat) (eb b : bool)
       (p : mword 64) (C : iProp Σ) (va spr : mword 64) (ilvl : nat) :
     (22 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
@@ -425,25 +429,25 @@ Section ProofUvmunmap.
     uptg_view otf (um_del_run um (svpn_of va) done) m_ad ->
     pt_base t = uroot ->
     m !!! Regidx csp_rs1 = spr ->
-    m !!! Regidx Rtp = cid_word ->
     m !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done)) ->
     m !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages)) ->
     m !!! Regidx Rs4 = page_base uroot ->
     m !!! Regidx Rs5 <> (mword_of_int 0 : mword 64) ->
     m !!! Regidx Rs6 = (mword_of_int 4096 : mword 64) ->
     uu_thr mm m ->
-    sie_cap_gpr γ m (K - 8) -∗
-    cpu_own γ ilvl eb p C -∗
+    sie_cap_gpr m (K - 8) b p -∗
+    cpu_own ilvl eb p C b -∗
     kernel_text -∗
     pc_is (mword_of_int (UU + 0x50) : mword 64) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     upt_pages_own (um_del_run um (svpn_of va) done) -∗
     kalloc_env γa None -∗
-    ( ∀ mj : regfile,
+    wp_next b (fun (CID : CpuId) =>
+      ∀ mj : regfile,
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜uu_thr mm mj⌝ -∗
-      sie_cap_gpr γ mj (K - 8) -∗
-      cpu_own γ ilvl eb p C -∗
+      sie_cap_gpr mj (K - 8) b p -∗
+      cpu_own ilvl eb p C b -∗
       pc_is (mword_of_int (UU + 0x76) : mword 64) -∗
       uptg otf uroot (um_del_run um (svpn_of va) npages) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -451,9 +455,10 @@ Section ProofUvmunmap.
   Proof.
     intros HK Hilvl Hrange Hwf.
     intro rem.
+    revert CID0.
     induction rem as [| rem' IH];
-      intros done m t m_ad Hrem Hsum Hrep Hview Hbase
-             Hsp Htp Hs2 Hs3 Hs4 Hs5 Hs6 Hthr;
+      intros CID0 done m t m_ad Hrem Hsum Hrep Hview Hbase
+             Hsp Hs2 Hs3 Hs4 Hs5 Hs6 Hthr;
       [ destruct (Nat.nle_succ_0 0 Hrem) |].
     iIntros "Hcg Hcnt #Htext Hpc Hptree Hown Henv Hcont".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -507,9 +512,9 @@ Section ProofUvmunmap.
     (* ================================================================ *)
     (*  THE +0x4a JOIN: the loop tail, over the post-body descriptor.     *)
     (* ================================================================ *)
-    iAssert (∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
+    iAssert (wp_next b (fun (CIDt : CpuId) =>
+        ∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
         ⌜ mt !!! Regidx csp_rs1 = spr
-          /\ mt !!! Regidx Rtp = cid_word
           /\ mt !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
           /\ mt !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
           /\ mt !!! Regidx Rs4 = page_base uroot
@@ -519,22 +524,23 @@ Section ProofUvmunmap.
           /\ pt_rep0 t' m'
           /\ uptg_view otf (um_del_run um (svpn_of va) (S done)) m'
           /\ pt_base t' = uroot ⌝ -∗
-        sie_cap_gpr γ mt (K - 8) -∗
-        cpu_own γ ilvl eb p C -∗
+        sie_cap_gpr mt (K - 8) b p -∗
+        cpu_own ilvl eb p C b -∗
         pc_is (mword_of_int (UU + 0x4a) : mword 64) -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         upt_pages_own (um_del_run um (svpn_of va) (S done)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I with "[Hcont]" as "TAIL".
-    { iIntros (mt t' m').
-      iIntros "(%Htsp & %Http & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
+        WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[Hcont]" as "TAIL".
+    { iIntros (CIDt Hst mt t' m').
+      iIntros "(%Htsp & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
                 & %Htrep & %Htview & %Htbase) Hcg Hcnt Hpc Hptree Hown".
       iPoseProof (uui_4a with "Htext") as "Hi4a".
       iPoseProof (uui_4c with "Htext") as "Hi4c".
       (* --- +0x4a c.add s2,s2,s6 : a += PGSIZE --- *)
-      iApply (wp_cadd_s_sconf γ Φ (mword_of_int (UU + 0x4a)) Rs2 Rs6 mt (K - 8)
-                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+      iApply (wp_cadd_s_sconf Φ (mword_of_int (UU + 0x4a)) Rs2 Rs6 mt (K - 8) b
+                ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4a [-]").
-      iIntros "Hcg Hpc".
+      iIntros (CIDu Hsu) "Hcg Hpc".
+      iEval (repeat rgne) in "Hcg".
       set (T1 := <[Regidx Rs2 := regval_into_reg
                     (add_vec (mt !!! Regidx Rs2) (mt !!! Regidx Rs6))]> mt).
       assert (HT1s2 : T1 !!! Regidx Rs2
@@ -544,7 +550,6 @@ Section ProofUvmunmap.
       assert (HT1s3 : T1 !!! Regidx Rs3
                       = add_vec va (mword_of_int (4096 * Z.of_nat npages))) by lkp.
       assert (HT1sp : T1 !!! Regidx csp_rs1 = spr) by lkp.
-      assert (HT1tp : T1 !!! Regidx Rtp = cid_word) by lkp.
       assert (HT1s4 : T1 !!! Regidx Rs4 = page_base uroot) by lkp.
       assert (HT1s5 : T1 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
       { rewrite /T1. rewrite upd_ne; [exact Hts5 | reg_neq]. }
@@ -557,12 +562,12 @@ Section ProofUvmunmap.
         assert (Hdn : S done = npages) by lia.
         assert (Hcmp : zopz0zKzJ_u (T1 !!! Regidx Rs2) (T1 !!! Regidx Rs3) = true).
         { rewrite HT1s2 HT1s3. rewrite Hdn. apply bc_geu. apply Z.le_refl. }
-        iApply (wp_bgeu_taken_s_sconf γ Φ (mword_of_int (UU + 0x4c))
-                  (mword_of_int 42 : mword 13) Rs3 Rs2 T1 (K - 8)
+        iApply (wp_bgeu_taken_s_sconf Φ (mword_of_int (UU + 0x4c))
+                  (mword_of_int 42 : mword 13) Rs3 Rs2 T1 (K - 8) b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi4c [-]").
-        iNext. iIntros "Hcg Hpc".
+        iNext. iIntros (CIDv Hsv) "Hcg Hpc".
         assert (Htgt76 : add_vec (mword_of_int (UU + 0x4c) : mword 64)
                   (sign_extend' 64 (mword_of_int 42 : mword 13))
                 = mword_of_int (UU + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
@@ -572,6 +577,9 @@ Section ProofUvmunmap.
         iDestruct (uptg_rebuild otf uroot (um_del_run um (svpn_of va) npages)
                      t' m' (uptg_wf_del_run um (svpn_of va) npages Hwf)
                      Htview Htrep Htbase with "Hptree Hown") as "Hpt".
+        iDestruct (cpu_own_transport CIDt CIDv ilvl eb p C b ltac:(wp_next_chain)
+                     with "Hcnt") as "Hcnt".
+        iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! T1 with "[%] [%] Hcg Hcnt Hpc Hpt").
         - exact HT1sp.
         - exact HT1thr. }
@@ -587,58 +595,64 @@ Section ProofUvmunmap.
                    ltac:(exact (z_run_end64 (bv_unsigned va) (Z.of_nat npages)
                            Hva0 (Nat2Z.is_nonneg npages) Hrange))).
         apply z_run_strict. lia. }
-      iApply (wp_bgeu_fall_s_sconf γ Φ (mword_of_int (UU + 0x4c))
-                (mword_of_int 42 : mword 13) Rs3 Rs2 T1 (K - 8)
+      iApply (wp_bgeu_fall_s_sconf Φ (mword_of_int (UU + 0x4c))
+                (mword_of_int 42 : mword 13) Rs3 Rs2 T1 (K - 8) b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp with "Hcg Hpc Hi4c [-]").
-      iIntros "Hcg Hpc".
+      iIntros (CIDw Hsw) "Hcg Hpc".
       assert (Hp50 : add_vec_int (mword_of_int (UU + 0x4c) : mword 64) 4
                      = mword_of_int (UU + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp50) in "Hpc".
       iAssert (kalloc_env γa None) as "Henv2".
       { iExists γk. iFrame "Hlock Havail Hpanic". }
-      iApply (IH (S done) T1 t' m' ltac:(lia) ltac:(lia) Htrep Htview Htbase
-                HT1sp HT1tp HT1s2 HT1s3 HT1s4 HT1s5 HT1s6 HT1thr
+      iDestruct (cpu_own_transport CIDt CIDw ilvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDw) ltac:(wp_next_chain)
+                   with "Hcont") as "Hcont".
+      iApply (IH CIDw (S done) T1 t' m' ltac:(lia) ltac:(lia) Htrep Htview Htbase
+                HT1sp HT1s2 HT1s3 HT1s4 HT1s5 HT1s6 HT1thr
                 with "Hcg Hcnt Htext Hpc Hptree Hown Henv2 Hcont"). }
     (* ================================================================ *)
     (*  THE BODY: walk(pagetable, a, 0) and the two-way verdict.         *)
     (* ================================================================ *)
     (* --- +0x50 c.li a2,0 --- *)
-    iApply (wp_cli_s_sconf γ Φ (mword_of_int (UU + 0x50)) Ra2
-              (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) m (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cli_s_sconf Φ (mword_of_int (UU + 0x50)) Ra2
+              (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) m (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi50 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDp1 Hsp1) "Hcg Hpc".
     set (L1 := <[Regidx Ra2 := regval_into_reg (mword_of_int 0 : mword 64)]> m).
     assert (Hp52 : add_vec_int (mword_of_int (UU + 0x50) : mword 64) 2
                    = mword_of_int (UU + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp52) in "Hpc".
     (* --- +0x52 c.mv a1,s2 --- *)
-    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (UU + 0x52)) Ra1 Rs2 L1 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (UU + 0x52)) Ra1 Rs2 L1 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi52 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDp2 Hsp2) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (L2 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (L1 !!! Regidx Rs2))]> L1).
     assert (Hp54 : add_vec_int (mword_of_int (UU + 0x52) : mword 64) 2
                    = mword_of_int (UU + 0x54)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp54) in "Hpc".
     (* --- +0x54 c.mv a0,s4 --- *)
-    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (UU + 0x54)) Ra0 Rs4 L2 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (UU + 0x54)) Ra0 Rs4 L2 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi54 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDp3 Hsp3) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (L3 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L2 !!! Regidx Rs4))]> L2).
     assert (Hp56 : add_vec_int (mword_of_int (UU + 0x54) : mword 64) 2
                    = mword_of_int (UU + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp56) in "Hpc".
     (* --- +0x56 jal ra,walk --- *)
-    iApply (wp_jal_s_sconf γ Φ (mword_of_int (UU + 0x56)) Rra
-              (mword_of_int 2096392 : mword 21) L3 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (UU + 0x56)) Rra
+              (mword_of_int 2096392 : mword 21) L3 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi56 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDp4 Hsp4) "Hcg Hpc".
     set (L4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (UU + 0x56) : mword 64) 4)]> L3).
     assert (Htgtwk : add_vec (mword_of_int (UU + 0x56) : mword 64)
@@ -652,7 +666,6 @@ Section ProofUvmunmap.
                     = add_vec va (mword_of_int (4096 * Z.of_nat done))) by lkp.
     assert (HL4a2 : L4 !!! Regidx Ra2 = (mword_of_int 0 : mword 64)) by lkp.
     assert (HL4sp : L4 !!! Regidx csp_rs1 = spr) by lkp.
-    assert (HL4tp : L4 !!! Regidx Rtp = cid_word) by lkp.
     assert (HL4s2 : L4 !!! Regidx Rs2
                     = add_vec va (mword_of_int (4096 * Z.of_nat done))) by lkp.
     assert (HL4s3 : L4 !!! Regidx Rs3
@@ -670,10 +683,10 @@ Section ProofUvmunmap.
       change (2 ^ 38)%Z with 274877906944%Z. exact Hc38. }
     assert (Hret5a : ret_pc (L4 !!! Regidx Rra) = mword_of_int (UU + 0x5a)).
     { rewrite /L4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf γ Φ L4 t m_ad (K - 8)%nat (DfracOwn 1)
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf Φ L4 t m_ad (K - 8)%nat (DfracOwn 1) b p
               ltac:(lia) HL4a0 HL4a2 Hwkva Hrep
               with "Hcg Htext Hpc Hptree [-]").
-    iIntros (mw) "Hcg Hpc Hptree %Hwcs %Hpay".
+    iIntros (CIDx Hsx mw) "Hcg Hpc Hptree %Hwcs %Hpay".
     iEval (rewrite Hret5a) in "Hpc".
     assert (Hvv : svpn_of (L4 !!! Regidx Ra1) = vpn_at (svpn_of va) done)
       by (rewrite HL4a1; exact Hvpne).
@@ -682,9 +695,6 @@ Section ProofUvmunmap.
     assert (Hmwsp : mw !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hwcs csp_rs1 ltac:(vm_compute; reflexivity)).
       exact HL4sp. }
-    assert (Hmwtp : mw !!! Regidx Rtp = cid_word).
-    { rewrite (callee_saved_lookup Hwcs Rtp ltac:(vm_compute; reflexivity)).
-      exact HL4tp. }
     assert (Hmws2 : mw !!! Regidx Rs2
                     = add_vec va (mword_of_int (4096 * Z.of_nat done))).
     { rewrite (callee_saved_lookup Hwcs Rs2 ltac:(vm_compute; reflexivity)).
@@ -706,13 +716,13 @@ Section ProofUvmunmap.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22.
       rewrite (callee_saved_lookup Hwcs c Hc). apply HL4thr; assumption. }
     (* --- +0x5a c.mv s1,a0 --- *)
-    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (UU + 0x5a)) Rs1 Ra0 mw (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (UU + 0x5a)) Rs1 Ra0 mw (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5a [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDy Hsy) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (B1 := <[Regidx Rs1 := regval_into_reg (add_vec zero_reg (mw !!! Regidx Ra0))]> mw).
     assert (HB1sp : B1 !!! Regidx csp_rs1 = spr) by lkp.
-    assert (HB1tp : B1 !!! Regidx Rtp = cid_word) by lkp.
     assert (HB1s2 : B1 !!! Regidx Rs2
                     = add_vec va (mword_of_int (4096 * Z.of_nat done))) by lkp.
     assert (HB1s3 : B1 !!! Regidx Rs3
@@ -735,14 +745,14 @@ Section ProofUvmunmap.
             = mword_of_int (UU + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     destruct Hpay as [(Ha0z & Hnone) | (p2 & p1 & w0 & Hl0 & Ha0v & Hverd)].
     { (* ============ walk found no leaf table: continue ============ *)
-      assert (Hbz : eq_vec (B1 !!! Regidx Ra0) zero_reg = true).
-      { rewrite HB1a0 Ha0z. vm_compute; reflexivity. }
-      iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (UU + 0x5c))
-                (mword_of_int 247 : mword 8) (Cregidx (mword_of_int 2)) Ra0 B1 (K - 8)
+      assert (Hbz : eq_vec (rget B1 Ra0) zero_reg = true).
+      { rgne. rewrite HB1a0 Ha0z. vm_compute; reflexivity. }
+      iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (UU + 0x5c))
+                (mword_of_int 247 : mword 8) (Cregidx (mword_of_int 2)) Ra0 B1 (K - 8) b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi5c [-]").
-      iNext. iIntros "Hcg Hpc".
+      iNext. iIntros (CIDz Hsz) "Hcg Hpc".
       iEval (rewrite Htgt4a) in "Hpc".
       assert (Hunone : um_del_run um (svpn_of va) done
                        !! vpn_at (svpn_of va) done = None).
@@ -751,6 +761,9 @@ Section ProofUvmunmap.
       assert (Hstep : um_del_run um (svpn_of va) (S done)
                       = um_del_run um (svpn_of va) done).
       { cbn [um_del_run]. apply delete_notin. exact Hunone. }
+      iDestruct (cpu_own_transport CID0 CIDz ilvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iSpecialize ("TAIL" $! CIDz with "[%]"); [wp_next_chain|].
       iApply ("TAIL" $! B1 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
         rewrite Hstep. exact Hview. }
@@ -765,14 +778,14 @@ Section ProofUvmunmap.
     { rewrite Ha0v. intro Heq. rewrite Heq in Hslotram.
       unfold addr_is_ram in Hslotram. destruct Hslotram as [Hlo _].
       apply (proj2 (Z.leb_le _ _)) in Hlo. vm_compute in Hlo. discriminate. }
-    assert (Hbnz : eq_vec (B1 !!! Regidx Ra0) zero_reg = false).
-    { rewrite HB1a0. apply eq_vec_false_iff. intro He. apply Ha0nz.
+    assert (Hbnz : eq_vec (rget B1 Ra0) zero_reg = false).
+    { rgne. rewrite HB1a0. apply eq_vec_false_iff. intro He. apply Ha0nz.
       rewrite He. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_cbeqz_fall_s_sconf γ Φ (mword_of_int (UU + 0x5c))
-              (mword_of_int 247 : mword 8) (Cregidx (mword_of_int 2)) Ra0 B1 (K - 8)
+    iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (UU + 0x5c))
+              (mword_of_int 247 : mword 8) (Cregidx (mword_of_int 2)) Ra0 B1 (K - 8) b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               Hbnz with "Hcg Hpc Hi5c [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz1 Hsz1) "Hcg Hpc".
     assert (Hp5e : add_vec_int (mword_of_int (UU + 0x5c) : mword 64) 2
                    = mword_of_int (UU + 0x5e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp5e) in "Hpc".
@@ -785,14 +798,14 @@ Section ProofUvmunmap.
         (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_cld_s_sconf γ Φ (mword_of_int (UU + 0x5e)) Ra5 Ra0
+    iApply (wp_cld_s_sconf Φ (mword_of_int (UU + 0x5e)) Ra5 Ra0
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
-              B1 (K - 8) w0 (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              B1 (K - 8) w0 b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5e [Hcell] [-]").
-    { iEval (rewrite Hea0 HB1a0 Ha0v). iExact "Hcell". }
-    iIntros "Hcg Hpc Hcell".
-    iEval (rewrite Hea0 HB1a0 Ha0v) in "Hcell".
+    { iEval (rewrite Hea0; rgne; rewrite HB1a0 Ha0v). iExact "Hcell". }
+    iIntros (CIDz2 Hsz2) "Hcg Hpc Hcell".
+    iEval (rewrite Hea0; rgne; rewrite HB1a0 Ha0v) in "Hcell".
     set (B2 := <[Regidx Ra5 := regval_into_reg w0]> B1).
     assert (HB2a5 : B2 !!! Regidx Ra5 = w0) by (rewrite /B2 upd_eq; reflexivity).
     (* give the tree back: the read left the slot alone *)
@@ -803,21 +816,20 @@ Section ProofUvmunmap.
                    = mword_of_int (UU + 0x60)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp60) in "Hpc".
     (* --- +0x60 andi a4,a5,1 : PTE_V --- *)
-    iApply (wp_andi_s_sconf γ Φ (mword_of_int (UU + 0x60)) Ra4 Ra5
+    iApply (wp_andi_s_sconf Φ (mword_of_int (UU + 0x60)) Ra4 Ra5
               (mword_of_int 1 : mword 12)
               (and_vec w0 (sign_extend' 64 (mword_of_int 1 : mword 12)))
-              B2 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              ltac:(rewrite HB2a5; reflexivity)
+              B2 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              ltac:(rgne; rewrite HB2a5; reflexivity)
               with "Hcg Hpc Hi60 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz3 Hsz3) "Hcg Hpc".
     set (B3 := <[Regidx Ra4 := regval_into_reg
                   (and_vec w0 (sign_extend' 64 (mword_of_int 1 : mword 12)))]> B2).
     assert (HB3a4 : B3 !!! Regidx Ra4
                     = and_vec w0 (sign_extend' 64 (mword_of_int 1 : mword 12)))
       by (rewrite /B3 upd_eq; reflexivity).
     assert (HB3sp : B3 !!! Regidx csp_rs1 = spr) by lkp.
-    assert (HB3tp : B3 !!! Regidx Rtp = cid_word) by lkp.
     assert (HB3s1 : B3 !!! Regidx Rs1 = mw !!! Regidx Ra0) by lkp.
     assert (HB3s2 : B3 !!! Regidx Rs2
                     = add_vec va (mword_of_int (4096 * Z.of_nat done))) by lkp.
@@ -839,14 +851,14 @@ Section ProofUvmunmap.
             = mword_of_int (UU + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     destruct Hverd as [Hsome | (Hw0z & Hnone)].
     2:{ (* ---- the slot holds the literal zero: continue ---- *)
-      assert (Hbz : eq_vec (B3 !!! Regidx Ra4) zero_reg = true).
-      { rewrite HB3a4 Hw0z. vm_compute; reflexivity. }
-      iApply (wp_cbeqz_taken_s_sconf γ Φ (mword_of_int (UU + 0x64))
-                (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 6)) Ra4 B3 (K - 8)
+      assert (Hbz : eq_vec (rget B3 Ra4) zero_reg = true).
+      { rgne. rewrite HB3a4 Hw0z. vm_compute; reflexivity. }
+      iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (UU + 0x64))
+                (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 6)) Ra4 B3 (K - 8) b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi64 [-]").
-      iNext. iIntros "Hcg Hpc".
+      iNext. iIntros (CIDz4 Hsz4) "Hcg Hpc".
       iEval (rewrite Htgt4a') in "Hpc".
       assert (Hunone : um_del_run um (svpn_of va) done
                        !! vpn_at (svpn_of va) done = None).
@@ -855,6 +867,9 @@ Section ProofUvmunmap.
       assert (Hstep : um_del_run um (svpn_of va) (S done)
                       = um_del_run um (svpn_of va) done).
       { cbn [um_del_run]. apply delete_notin. exact Hunone. }
+      iDestruct (cpu_own_transport CID0 CIDz4 ilvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iSpecialize ("TAIL" $! CIDz4 with "[%]"); [wp_next_chain|].
       iApply ("TAIL" $! B3 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
         rewrite Hstep. exact Hview. }
@@ -871,36 +886,37 @@ Section ProofUvmunmap.
       destruct Hmp as (c1 & c0 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
                         & Hvv0 & _ & Hnn & Hpb).
       exact (pte_hi_zero w0 Hvv0 Hnn Hpb). }
-    assert (Hbnz4 : eq_vec (B3 !!! Regidx Ra4) zero_reg = false).
-    { rewrite HB3a4. rewrite (pte_valid_bit0 w0 Hv0). vm_compute; reflexivity. }
-    iApply (wp_cbeqz_fall_s_sconf γ Φ (mword_of_int (UU + 0x64))
-              (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 6)) Ra4 B3 (K - 8)
+    assert (Hbnz4 : eq_vec (rget B3 Ra4) zero_reg = false).
+    { rgne. rewrite HB3a4. rewrite (pte_valid_bit0 w0 Hv0). vm_compute; reflexivity. }
+    iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (UU + 0x64))
+              (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 6)) Ra4 B3 (K - 8) b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               Hbnz4 with "Hcg Hpc Hi64 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz5 Hsz5) "Hcg Hpc".
     assert (Hp66 : add_vec_int (mword_of_int (UU + 0x64) : mword 64) 2
                    = mword_of_int (UU + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp66) in "Hpc".
     (* --- +0x66 beq s5,zero : do_free != 0, so NOT taken --- *)
-    assert (Hs5nz : eq_vec (B3 !!! Regidx Rs5) zero_reg = false).
-    { apply eq_vec_false_iff. intro He. apply HB3s5.
+    assert (Hs5nz : eq_vec (rget B3 Rs5) zero_reg = false).
+    { rgne. apply eq_vec_false_iff. intro He. apply HB3s5.
       rewrite He. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_beqz_x0_fall_s_sconf γ Φ (mword_of_int (UU + 0x66))
-              (mword_of_int 8160 : mword 13) Rs5 B3 (K - 8)
+    iApply (wp_beqz_x0_fall_s_sconf Φ (mword_of_int (UU + 0x66))
+              (mword_of_int 8160 : mword 13) Rs5 B3 (K - 8) b
               ltac:(vm_compute; discriminate) Hs5nz
               with "Hcg Hpc Hi66 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz6 Hsz6) "Hcg Hpc".
     assert (Hp6a : add_vec_int (mword_of_int (UU + 0x66) : mword 64) 4
                    = mword_of_int (UU + 0x6a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp6a) in "Hpc".
     (* --- +0x6a c.srli a5,a5,0xa  /  +0x6c slli a0,a5,0xc : PTE2PA --- *)
     assert (HB3a5 : B3 !!! Regidx Ra5 = w0) by lkp.
-    iApply (wp_csrli_s_sconf γ Φ (mword_of_int (UU + 0x6a)) (Cregidx (mword_of_int 7))
-              Ra5 (mword_of_int 10 : mword 6) B3 (K - 8)
+    iApply (wp_csrli_s_sconf Φ (mword_of_int (UU + 0x6a)) (Cregidx (mword_of_int 7))
+              Ra5 (mword_of_int 10 : mword 6) B3 (K - 8) b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
+              ltac:(rdok)
               with "Hcg Hpc Hi6a [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz7 Hsz7) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (B4 := <[Regidx Ra5 := regval_into_reg
         (shift_bits_right (B3 !!! Regidx Ra5)
            (subrange_vec_dec (mword_of_int 10 : mword 6) (Z.sub log2_xlen 1) 0))]> B3).
@@ -917,15 +933,15 @@ Section ProofUvmunmap.
     assert (Hs12 : int_of_mword false
               (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0) = 12)
       by (vm_compute; reflexivity).
-    assert (Hpte2pa : shift_bits_left (B4 !!! Regidx Ra5)
+    assert (Hpte2pa : shift_bits_left (rget B4 Ra5)
               (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0)
             = page_base (pte_ppn w0)).
-    { rewrite HB4a5. apply pte2pa; [ exact Hs10 | exact Hs12 | exact Hlt54 ]. }
-    iApply (wp_slli_s_sconf γ Φ (mword_of_int (UU + 0x6c)) Ra0 Ra5
-              (mword_of_int 12 : mword 6) (page_base (pte_ppn w0)) B4 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hpte2pa
+    { rgne. rewrite HB4a5. apply pte2pa; [ exact Hs10 | exact Hs12 | exact Hlt54 ]. }
+    iApply (wp_slli_s_sconf Φ (mword_of_int (UU + 0x6c)) Ra0 Ra5
+              (mword_of_int 12 : mword 6) (page_base (pte_ppn w0)) B4 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok) Hpte2pa
               with "Hcg Hpc Hi6c [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz8 Hsz8) "Hcg Hpc".
     set (B5 := <[Regidx Ra0 := regval_into_reg (page_base (pte_ppn w0))]> B4).
     assert (Hp70 : add_vec_int (mword_of_int (UU + 0x6c) : mword 64) 4
                    = mword_of_int (UU + 0x70)) by (apply bv_eq; vm_compute; reflexivity).
@@ -945,12 +961,12 @@ Section ProofUvmunmap.
                  (vpn_at (svpn_of va) done) wu Hwfd Humsome with "Hkmapb Hown")
       as "[Hpage Hown]".
     (* --- +0x70 jal ra,kfree --- *)
-    iApply (wp_jal_s_sconf γ Φ (mword_of_int (UU + 0x70)) Rra
-              (mword_of_int 2095064 : mword 21) B5 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (UU + 0x70)) Rra
+              (mword_of_int 2095064 : mword 21) B5 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi70 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDz9 Hsz9) "Hcg Hpc".
     set (B6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (UU + 0x70) : mword 64) 4)]> B5).
     assert (Htgtkf : add_vec (mword_of_int (UU + 0x70) : mword 64)
@@ -960,7 +976,6 @@ Section ProofUvmunmap.
     assert (HB6a0 : B6 !!! Regidx Ra0 = page_base (pte_ppn wu)).
     { rewrite /B6. rewrite upd_ne; [| reg_neq]. rewrite /B5 upd_eq.
       rewrite Hppn. reflexivity. }
-    assert (HB6tp : B6 !!! Regidx Rtp = cid_word) by lkp.
     assert (HB6sp : B6 !!! Regidx csp_rs1 = spr) by lkp.
     assert (HB6s1 : B6 !!! Regidx Rs1 = mw !!! Regidx Ra0) by lkp.
     assert (HB6s2 : B6 !!! Regidx Rs2
@@ -976,20 +991,19 @@ Section ProofUvmunmap.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. thr_peel. apply Hmwthr; assumption. }
     assert (Hret74 : ret_pc (B6 !!! Regidx Rra) = mword_of_int (UU + 0x74)).
     { rewrite /B6 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Kfree.wp_kfree_sconf γ Φ γa γk (mword_of_int KernelSyms.kmem)
-              (mword_of_int (KernelSyms.kmem + 24)) B6 None ilvl eb p C (K - 8)%nat
-              ltac:(lia) HB6tp ltac:(reflexivity) ltac:(reflexivity) Hilvl
+    iDestruct (cpu_own_transport CID0 CIDz9 ilvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
+    iApply (Kfree.wp_kfree_sconf Φ γa γk (mword_of_int KernelSyms.kmem)
+              (mword_of_int (KernelSyms.kmem + 24)) B6 None ilvl eb p C (K - 8)%nat b
+              ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic [-]").
     { rewrite /kfree_pre HB6a0.
       iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
-    iIntros (mk) "Hcg Hcnt Hpc %Hkcs _".
+    iIntros (CIDk1 Hsk1 mk) "Hcg Hcnt Hpc %Hkcs _".
     iEval (rewrite Hret74) in "Hpc".
     assert (Hmksp : mk !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hkcs csp_rs1 ltac:(vm_compute; reflexivity)).
       exact HB6sp. }
-    assert (Hmktp : mk !!! Regidx Rtp = cid_word).
-    { rewrite (callee_saved_lookup Hkcs Rtp ltac:(vm_compute; reflexivity)).
-      exact HB6tp. }
     assert (Hmks1 : mk !!! Regidx Rs1 = mw !!! Regidx Ra0).
     { rewrite (callee_saved_lookup Hkcs Rs1 ltac:(vm_compute; reflexivity)).
       exact HB6s1. }
@@ -1014,11 +1028,11 @@ Section ProofUvmunmap.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22.
       rewrite (callee_saved_lookup Hkcs c Hc). apply HB6thr; assumption. }
     (* --- +0x74 c.j -0x2e : back to the store --- *)
-    iApply (wp_cj_s_sconf γ Φ (mword_of_int (UU + 0x74))
+    iApply (wp_cj_s_sconf Φ (mword_of_int (UU + 0x74))
               (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")))
-              mk (K - 8) ltac:(vm_compute; reflexivity)
+              mk (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi74 [-]").
-    iNext. iIntros "Hcg Hpc".
+    iIntros (CIDk2 Hsk2). iNext. iIntros "Hcg Hpc".
     assert (Htgt46 : add_vec (mword_of_int (UU + 0x74) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
@@ -1035,12 +1049,12 @@ Section ProofUvmunmap.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_sd_zero_s_sconf γ Φ (mword_of_int (UU + 0x46)) Rs1
-              (mword_of_int 0 : mword 12) mk (K - 8) w0
+    iApply (wp_sd_zero_s_sconf Φ (mword_of_int (UU + 0x46)) Rs1
+              (mword_of_int 0 : mword 12) mk (K - 8) w0 b
               with "Hcg Hpc Hi46 [Hcell] [-]").
-    { iEval (rewrite Hzoff Hmks1 Ha0v). iExact "Hcell". }
-    iIntros "Hcg Hpc Hcell".
-    iEval (rewrite Hzoff Hmks1 Ha0v) in "Hcell".
+    { iEval (rewrite Hzoff; rgne; rewrite Hmks1 Ha0v). iExact "Hcell". }
+    iIntros (CIDk3 Hsk3) "Hcg Hpc Hcell".
+    iEval (rewrite Hzoff; rgne; rewrite Hmks1 Ha0v) in "Hcell".
     assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hzr) in "Hcell".
@@ -1063,6 +1077,9 @@ Section ProofUvmunmap.
     { cbn [um_del_run].
       exact (uptg_view_delete otf (um_del_run um (svpn_of va) done)
                m_ad (vpn_at (svpn_of va) done) Hvlt Hview). }
+    iDestruct (cpu_own_transport CIDk1 CIDk3 ilvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
+    iSpecialize ("TAIL" $! CIDk3 with "[%]"); [wp_next_chain|].
     iApply ("TAIL" $! mk (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
                         (delete (vpn_at (svpn_of va) done) m_ad)
               with "[%] Hcg Hcnt Hpc Hptree [Hown]").
@@ -1075,11 +1092,11 @@ Section ProofUvmunmap.
   (*  below are this lemma at [Some tfp] and at [None].                  *)
   (* ================================================================== *)
   Lemma wp_uvmunmap_gen
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (otf : option (mword 44)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) :
+      (C : iProp Σ) (ilvl : nat) (b : bool) :
     let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
@@ -1092,15 +1109,16 @@ Section ProofUvmunmap.
     mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
     mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
     (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
-    sie_cap_gpr γ mm K -∗
-    cpu_own γ ilvl eb p C -∗
+    sie_cap_gpr mm K b p -∗
+    cpu_own ilvl eb p C b -∗
     kernel_text -∗
     pc_is pcE -∗
     uptg otf uroot um -∗
     kalloc_env γa None -∗
-    ( ∀ (mr : regfile),
-      sie_cap_gpr γ mr K -∗
-      cpu_own γ ilvl eb p C -∗
+    wp_next b (fun (CID : CpuId) =>
+      ∀ (mr : regfile),
+      sie_cap_gpr mr K b p -∗
+      cpu_own ilvl eb p C b -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       uptg otf uroot (um_del_run um vpn0 npages) -∗
@@ -1141,9 +1159,9 @@ Section ProofUvmunmap.
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))
                     = pa_stk (mm !!! Regidx csp_rs1) 8).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_caddi16sp_push_s_sconf γ Φ pcE (mword_of_int 60 : mword 6) mm K 8
+    iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 60 : mword 6) mm K 8 b
               ltac:(lia) Hpush with "Hcg Hpc Hi00 [-]").
-    iIntros "Hcg Hframe Hpc".
+    iIntros (CIDq1 Hsq1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (mm !!! Regidx csp_rs1)
@@ -1178,32 +1196,34 @@ Section ProofUvmunmap.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq02) in "Hpc".
     (* --- +0x02 c.sdsp ra,56(sp) --- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x02)) (mword_of_int 7 : mword 6) Rra
-              R1 (K - 8) u1 with "Hcg Hpc Hi02 [Hk1] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x02)) (mword_of_int 7 : mword 6) Rra
+              R1 (K - 8) u1 b with "Hcg Hpc Hi02 [Hk1] [-]").
     { iEval (rewrite HspR1 Hb1). iExact "Hk1". }
-    iIntros "Hcg Hpc Hk1". iEval (rewrite HspR1 Hb1) in "Hk1".
+    iIntros (CIDq2 Hsq2) "Hcg Hpc Hk1". iEval (rewrite HspR1 Hb1) in "Hk1".
+    iEval (rgne) in "Hk1".
     assert (HR1ra : R1 !!! Regidx Rra = mm !!! Regidx Rra) by lkp.
     iEval (rewrite HR1ra) in "Hk1".
     assert (Hq04 : add_vec_int (mword_of_int (UU + 0x02) : mword 64) 2
                    = mword_of_int (UU + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq04) in "Hpc".
     (* --- +0x04 c.sdsp s0,48(sp) --- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x04)) (mword_of_int 6 : mword 6) Rs0
-              R1 (K - 8) u2 with "Hcg Hpc Hi04 [Hk2] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x04)) (mword_of_int 6 : mword 6) Rs0
+              R1 (K - 8) u2 b with "Hcg Hpc Hi04 [Hk2] [-]").
     { iEval (rewrite HspR1 Hb2). iExact "Hk2". }
-    iIntros "Hcg Hpc Hk2". iEval (rewrite HspR1 Hb2) in "Hk2".
+    iIntros (CIDq3 Hsq3) "Hcg Hpc Hk2". iEval (rewrite HspR1 Hb2) in "Hk2".
+    iEval (rgne) in "Hk2".
     assert (HR1s0 : R1 !!! Regidx Rs0 = mm !!! Regidx Rs0) by lkp.
     iEval (rewrite HR1s0) in "Hk2".
     assert (Hq06 : add_vec_int (mword_of_int (UU + 0x04) : mword 64) 2
                    = mword_of_int (UU + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq06) in "Hpc".
     (* --- +0x06 c.addi4spn s0,sp,64 --- *)
-    iApply (wp_caddi4spn_s_sconf γ Φ (mword_of_int (UU + 0x06)) (Cregidx (mword_of_int 0))
-              (mword_of_int 16 : mword 8) Rs0 R1 (K - 8)
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (UU + 0x06)) (Cregidx (mword_of_int 0))
+              (mword_of_int 16 : mword 8) Rs0 R1 (K - 8) b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
+              ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq4 Hsq4) "Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))))]> R1).
@@ -1215,15 +1235,15 @@ Section ProofUvmunmap.
               (subrange_vec_dec (mword_of_int 52 : mword 6) (Z.sub log2_xlen 1) 0) = 52)
       by (vm_compute; reflexivity).
     assert (HR2a1 : R2 !!! Regidx Ra1 = va) by lkp.
-    assert (Hshl : shift_bits_left (R2 !!! Regidx Ra1)
+    assert (Hshl : shift_bits_left (rget R2 Ra1)
               (subrange_vec_dec (mword_of_int 52 : mword 6) (Z.sub log2_xlen 1) 0)
             = (mword_of_int 0 : mword 64)).
-    { rewrite HR2a1. exact (shl52_aligned va _ _ Hs52 Hva12). }
-    iApply (wp_slli_s_sconf γ Φ (mword_of_int (UU + 0x08)) Ra5 Ra1
-              (mword_of_int 52 : mword 6) (mword_of_int 0 : mword 64) R2 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hshl
+    { rgne. rewrite HR2a1. exact (shl52_aligned va _ _ Hs52 Hva12). }
+    iApply (wp_slli_s_sconf Φ (mword_of_int (UU + 0x08)) Ra5 Ra1
+              (mword_of_int 52 : mword 6) (mword_of_int 0 : mword 64) R2 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok) Hshl
               with "Hcg Hpc Hi08 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq5 Hsq5) "Hcg Hpc".
     set (R3 := <[Regidx Ra5 := regval_into_reg (mword_of_int 0 : mword 64)]> R2).
     assert (Hq0c : add_vec_int (mword_of_int (UU + 0x08) : mword 64) 4
                    = mword_of_int (UU + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1231,93 +1251,102 @@ Section ProofUvmunmap.
     (* --- +0x0c c.bnez a5 : NOT taken (the panic block is dead) --- *)
     assert (Hbnz : neq_vec (R3 !!! Regidx Ra5) zero_reg = false).
     { rewrite /R3 upd_eq. vm_compute; reflexivity. }
-    iApply (wp_cbnez_fall_s_sconf γ Φ (mword_of_int (UU + 0x0c))
-              (mword_of_int 17 : mword 8) (Cregidx (mword_of_int 7)) Ra5 R3 (K - 8)
+    iApply (wp_cbnez_fall_s_sconf Φ (mword_of_int (UU + 0x0c))
+              (mword_of_int 17 : mword 8) (Cregidx (mword_of_int 7)) Ra5 R3 (K - 8) b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hbnz
               with "Hcg Hpc Hi0c [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq6 Hsq6) "Hcg Hpc".
     assert (Hq0e : add_vec_int (mword_of_int (UU + 0x0c) : mword 64) 2
                    = mword_of_int (UU + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq0e) in "Hpc".
     assert (HspR3 : R3 !!! Regidx csp_rs1 = spr) by lkp.
     (* --- +0x0e .. +0x16 : push s2..s6 --- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x0e)) (mword_of_int 4 : mword 6) Rs2
-              R3 (K - 8) u4 with "Hcg Hpc Hi0e [Hk4] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x0e)) (mword_of_int 4 : mword 6) Rs2
+              R3 (K - 8) u4 b with "Hcg Hpc Hi0e [Hk4] [-]").
     { iEval (rewrite HspR3 Hb4). iExact "Hk4". }
-    iIntros "Hcg Hpc Hk4". iEval (rewrite HspR3 Hb4) in "Hk4".
+    iIntros (CIDq7 Hsq7) "Hcg Hpc Hk4". iEval (rewrite HspR3 Hb4) in "Hk4".
+    iEval (rgne) in "Hk4".
     assert (HR3s2 : R3 !!! Regidx Rs2 = mm !!! Regidx Rs2) by lkp.
     iEval (rewrite HR3s2) in "Hk4".
     assert (Hq10 : add_vec_int (mword_of_int (UU + 0x0e) : mword 64) 2
                    = mword_of_int (UU + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq10) in "Hpc".
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x10)) (mword_of_int 3 : mword 6) Rs3
-              R3 (K - 8) u5 with "Hcg Hpc Hi10 [Hk5] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x10)) (mword_of_int 3 : mword 6) Rs3
+              R3 (K - 8) u5 b with "Hcg Hpc Hi10 [Hk5] [-]").
     { iEval (rewrite HspR3 Hb5). iExact "Hk5". }
-    iIntros "Hcg Hpc Hk5". iEval (rewrite HspR3 Hb5) in "Hk5".
+    iIntros (CIDq8 Hsq8) "Hcg Hpc Hk5". iEval (rewrite HspR3 Hb5) in "Hk5".
+    iEval (rgne) in "Hk5".
     assert (HR3s3 : R3 !!! Regidx Rs3 = mm !!! Regidx Rs3) by lkp.
     iEval (rewrite HR3s3) in "Hk5".
     assert (Hq12 : add_vec_int (mword_of_int (UU + 0x10) : mword 64) 2
                    = mword_of_int (UU + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq12) in "Hpc".
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x12)) (mword_of_int 2 : mword 6) Rs4
-              R3 (K - 8) u6 with "Hcg Hpc Hi12 [Hk6] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x12)) (mword_of_int 2 : mword 6) Rs4
+              R3 (K - 8) u6 b with "Hcg Hpc Hi12 [Hk6] [-]").
     { iEval (rewrite HspR3 Hb6). iExact "Hk6". }
-    iIntros "Hcg Hpc Hk6". iEval (rewrite HspR3 Hb6) in "Hk6".
+    iIntros (CIDq9 Hsq9) "Hcg Hpc Hk6". iEval (rewrite HspR3 Hb6) in "Hk6".
+    iEval (rgne) in "Hk6".
     assert (HR3s4 : R3 !!! Regidx Rs4 = mm !!! Regidx Rs4) by lkp.
     iEval (rewrite HR3s4) in "Hk6".
     assert (Hq14 : add_vec_int (mword_of_int (UU + 0x12) : mword 64) 2
                    = mword_of_int (UU + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq14) in "Hpc".
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x14)) (mword_of_int 1 : mword 6) Rs5
-              R3 (K - 8) u7 with "Hcg Hpc Hi14 [Hk7] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x14)) (mword_of_int 1 : mword 6) Rs5
+              R3 (K - 8) u7 b with "Hcg Hpc Hi14 [Hk7] [-]").
     { iEval (rewrite HspR3 Hb7). iExact "Hk7". }
-    iIntros "Hcg Hpc Hk7". iEval (rewrite HspR3 Hb7) in "Hk7".
+    iIntros (CIDq10 Hsq10) "Hcg Hpc Hk7". iEval (rewrite HspR3 Hb7) in "Hk7".
+    iEval (rgne) in "Hk7".
     assert (HR3s5 : R3 !!! Regidx Rs5 = mm !!! Regidx Rs5) by lkp.
     iEval (rewrite HR3s5) in "Hk7".
     assert (Hq16 : add_vec_int (mword_of_int (UU + 0x14) : mword 64) 2
                    = mword_of_int (UU + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq16) in "Hpc".
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x16)) (mword_of_int 0 : mword 6) Rs6
-              R3 (K - 8) u8 with "Hcg Hpc Hi16 [Hk8] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x16)) (mword_of_int 0 : mword 6) Rs6
+              R3 (K - 8) u8 b with "Hcg Hpc Hi16 [Hk8] [-]").
     { iEval (rewrite HspR3 Hb8). iExact "Hk8". }
-    iIntros "Hcg Hpc Hk8". iEval (rewrite HspR3 Hb8) in "Hk8".
+    iIntros (CIDq11 Hsq11) "Hcg Hpc Hk8". iEval (rewrite HspR3 Hb8) in "Hk8".
+    iEval (rgne) in "Hk8".
     assert (HR3s6 : R3 !!! Regidx Rs6 = mm !!! Regidx Rs6) by lkp.
     iEval (rewrite HR3s6) in "Hk8".
     assert (Hq18 : add_vec_int (mword_of_int (UU + 0x16) : mword 64) 2
                    = mword_of_int (UU + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq18) in "Hpc".
     (* --- +0x18 c.mv s4,a0  /  +0x1a c.mv s2,a1  /  +0x1c c.mv s5,a3 --- *)
-    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (UU + 0x18)) Rs4 Ra0 R3 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (UU + 0x18)) Rs4 Ra0 R3 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq12 Hsq12) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (R4 := <[Regidx Rs4 := regval_into_reg (add_vec zero_reg (R3 !!! Regidx Ra0))]> R3).
     assert (Hq1a : add_vec_int (mword_of_int (UU + 0x18) : mword 64) 2
                    = mword_of_int (UU + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq1a) in "Hpc".
-    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (UU + 0x1a)) Rs2 Ra1 R4 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (UU + 0x1a)) Rs2 Ra1 R4 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq13 Hsq13) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Rs2 := regval_into_reg (add_vec zero_reg (R4 !!! Regidx Ra1))]> R4).
     assert (Hq1c : add_vec_int (mword_of_int (UU + 0x1a) : mword 64) 2
                    = mword_of_int (UU + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq1c) in "Hpc".
-    iApply (wp_cmv_s_sconf γ Φ (mword_of_int (UU + 0x1c)) Rs5 Ra3 R5 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (UU + 0x1c)) Rs5 Ra3 R5 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq14 Hsq14) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (R6 := <[Regidx Rs5 := regval_into_reg (add_vec zero_reg (R5 !!! Regidx Ra3))]> R5).
     assert (Hq1e : add_vec_int (mword_of_int (UU + 0x1c) : mword 64) 2
                    = mword_of_int (UU + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq1e) in "Hpc".
     (* --- +0x1e c.slli a2,a2,0xc --- *)
-    iApply (wp_cslli_s_sconf γ Φ (mword_of_int (UU + 0x1e)) (Regidx Ra2) Ra2
-              (mword_of_int 12 : mword 6) R6 (K - 8)
+    iApply (wp_cslli_s_sconf Φ (mword_of_int (UU + 0x1e)) (Regidx Ra2) Ra2
+              (mword_of_int 12 : mword 6) R6 (K - 8) b
               ltac:(reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
+              ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq15 Hsq15) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
     set (R7 := <[Regidx Ra2 := regval_into_reg
         (shift_bits_left (R6 !!! Regidx Ra2)
            (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))]> R6).
@@ -1335,32 +1364,31 @@ Section ProofUvmunmap.
                                       = (mword_of_int (Z.of_nat npages) : mword 64));
         [reflexivity | lkp0; exact Hnpr]. }
     assert (HR7a1 : R7 !!! Regidx Ra1 = va) by lkp.
-    assert (Hbnd : add_vec (R7 !!! Regidx Ra2) (R7 !!! Regidx Ra1)
+    assert (Hbnd : add_vec (rget R7 Ra2) (rget R7 Ra1)
                    = add_vec va (mword_of_int (4096 * Z.of_nat npages))).
-    { rewrite HR7a2 HR7a1. apply shl12_pages_add. exact Hs12'. }
-    iApply (wp_add_s_sconf γ Φ (mword_of_int (UU + 0x20)) Rs3 Ra2 Ra1
-              (add_vec va (mword_of_int (4096 * Z.of_nat npages))) R7 (K - 8)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hbnd
+    { repeat rgne. rewrite HR7a2 HR7a1. apply shl12_pages_add. exact Hs12'. }
+    iApply (wp_add_s_sconf Φ (mword_of_int (UU + 0x20)) Rs3 Ra2 Ra1
+              (add_vec va (mword_of_int (4096 * Z.of_nat npages))) R7 (K - 8) b
+              ltac:(vm_compute; discriminate) ltac:(rdok) Hbnd
               with "Hcg Hpc Hi20 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq16 Hsq16) "Hcg Hpc".
     set (R8 := <[Regidx Rs3 := regval_into_reg
                   (add_vec va (mword_of_int (4096 * Z.of_nat npages)))]> R7).
     assert (Hq24 : add_vec_int (mword_of_int (UU + 0x20) : mword 64) 4
                    = mword_of_int (UU + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq24) in "Hpc".
     (* --- +0x24 c.lui s6,0x1 : PGSIZE --- *)
-    iApply (wp_clui_s_sconf γ Φ (mword_of_int (UU + 0x24)) Rs6
+    iApply (wp_clui_s_sconf Φ (mword_of_int (UU + 0x24)) Rs6
               (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
-              R8 (K - 8) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              R8 (K - 8) b ltac:(vm_compute; discriminate) ltac:(rdok)
               lui_4096 with "Hcg Hpc Hi24 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDq17 Hsq17) "Hcg Hpc".
     set (R9 := <[Regidx Rs6 := regval_into_reg (mword_of_int 4096 : mword 64)]> R8).
     assert (Hq26 : add_vec_int (mword_of_int (UU + 0x24) : mword 64) 2
                    = mword_of_int (UU + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq26) in "Hpc".
     (* ---- the register facts at the loop entry ---- *)
     assert (HR9sp : R9 !!! Regidx csp_rs1 = spr) by lkp.
-    assert (HR9tp : R9 !!! Regidx Rtp = cid_word) by lkp.
     assert (HR9a1 : R9 !!! Regidx Ra1 = va) by lkp.
     assert (HR9s2 : R9 !!! Regidx Rs2 = va).
     { rewrite /R9. rewrite upd_ne; [| reg_neq]. rewrite /R8. rewrite upd_ne; [| reg_neq].
@@ -1391,20 +1419,23 @@ Section ProofUvmunmap.
     { (* ============ npages == 0: nothing to do ============ *)
       assert (Hcmp : zopz0zKzJ_u (R9 !!! Regidx Ra1) (R9 !!! Regidx Rs3) = true).
       { rewrite HR9a1 HR9s3. apply bc_geu. rewrite Hends. rewrite Hnp0. cbn [Z.of_nat]. lia. }
-      iApply (wp_bgeu_taken_s_sconf γ Φ (mword_of_int (UU + 0x26))
-                (mword_of_int 82 : mword 13) Rs3 Ra1 R9 (K - 8)
+      iApply (wp_bgeu_taken_s_sconf Φ (mword_of_int (UU + 0x26))
+                (mword_of_int 82 : mword 13) Rs3 Ra1 R9 (K - 8) b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [-]").
-      iNext. iIntros "Hcg Hpc".
+      iNext. iIntros (CIDr1 Hsr1) "Hcg Hpc".
       assert (Htgt78 : add_vec (mword_of_int (UU + 0x26) : mword 64)
                 (sign_extend' 64 (mword_of_int 82 : mword 13))
               = mword_of_int (UU + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt78) in "Hpc".
-      iApply (uu_epilogue γ Φ mm R9 K sp0 ltac:(lia) Hspm HR9sp HR9thr1
+      iApply (uu_epilogue Φ mm R9 K sp0 b p ltac:(lia) Hspm HR9sp HR9thr1
                 with "Hcg Htext Hpc Hk1 Hk2 [Hk3] Hk4 Hk5 Hk6 Hk7 Hk8 [-]").
       { iExists u3. iExact "Hk3". }
-      iIntros (mf) "Hcg Hpc %Hcs".
+      iIntros (CIDr2 Hsr2 mf) "Hcg Hpc %Hcs".
+      iDestruct (cpu_own_transport CID CIDr2 ilvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iSpecialize ("Hcont" $! CIDr2 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] [Hpt]").
       { exact Hcs. }
       { rewrite Hnp0 um_del_run_0. iExact "Hpt". } }
@@ -1412,11 +1443,11 @@ Section ProofUvmunmap.
     assert (Hcmp : zopz0zKzJ_u (R9 !!! Regidx Ra1) (R9 !!! Regidx Rs3) = false).
     { rewrite HR9a1 HR9s3. apply bc_ltu. rewrite Hends.
       assert (Hnp1 : (1 <= Z.of_nat npages)%Z) by lia. lia. }
-    iApply (wp_bgeu_fall_s_sconf γ Φ (mword_of_int (UU + 0x26))
-              (mword_of_int 82 : mword 13) Rs3 Ra1 R9 (K - 8)
+    iApply (wp_bgeu_fall_s_sconf Φ (mword_of_int (UU + 0x26))
+              (mword_of_int 82 : mword 13) Rs3 Ra1 R9 (K - 8) b
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Hcmp with "Hcg Hpc Hi26 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CIDr3 Hsr3) "Hcg Hpc".
     assert (Hq2a : add_vec_int (mword_of_int (UU + 0x26) : mword 64) 4
                    = mword_of_int (UU + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq2a) in "Hpc".
@@ -1424,21 +1455,22 @@ Section ProofUvmunmap.
     iPoseProof (uui_2c with "Htext") as "Hi2c".
     iPoseProof (uui_76 with "Htext") as "Hi76".
     (* --- +0x2a c.sdsp s1,40(sp) : the shrink-wrapped save --- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (UU + 0x2a)) (mword_of_int 5 : mword 6) Rs1
-              R9 (K - 8) u3 with "Hcg Hpc Hi2a [Hk3] [-]").
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (UU + 0x2a)) (mword_of_int 5 : mword 6) Rs1
+              R9 (K - 8) u3 b with "Hcg Hpc Hi2a [Hk3] [-]").
     { iEval (rewrite HR9sp Hb3). iExact "Hk3". }
-    iIntros "Hcg Hpc Hk3". iEval (rewrite HR9sp Hb3) in "Hk3".
+    iIntros (CIDr4 Hsr4) "Hcg Hpc Hk3". iEval (rewrite HR9sp Hb3) in "Hk3".
+    iEval (rgne) in "Hk3".
     assert (HR9s1 : R9 !!! Regidx Rs1 = mm !!! Regidx Rs1) by lkp.
     iEval (rewrite HR9s1) in "Hk3".
     assert (Hq2c : add_vec_int (mword_of_int (UU + 0x2a) : mword 64) 2
                    = mword_of_int (UU + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq2c) in "Hpc".
     (* --- +0x2c c.j +0x24 : enter the loop --- *)
-    iApply (wp_cj_s_sconf γ Φ (mword_of_int (UU + 0x2c))
+    iApply (wp_cj_s_sconf Φ (mword_of_int (UU + 0x2c))
               (sign_extend' 21 (concat_vec (mword_of_int 18 : mword 11) ('b"0")))
-              R9 (K - 8) ltac:(vm_compute; reflexivity)
+              R9 (K - 8) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2c [-]").
-    iNext. iIntros "Hcg Hpc".
+    iIntros (CIDr5 Hsr5). iNext. iIntros "Hcg Hpc".
     assert (Htgt50 : add_vec (mword_of_int (UU + 0x2c) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 18 : mword 11) ('b"0"))))
@@ -1453,20 +1485,22 @@ Section ProofUvmunmap.
       symmetry. apply kv_addv_zero. }
     assert (HR9thr : uu_thr mm R9).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. apply HR9thr1; assumption. }
-    iApply (uu_loop γ γa Φ mm otf uroot um npages K eb p C va spr ilvl HK Hilvl Hrz Hwf
+    iDestruct (cpu_own_transport CID CIDr5 ilvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
+    iApply (uu_loop γa Φ mm otf uroot um npages K eb b p C va spr ilvl HK Hilvl Hrz Hwf
               npages 0%nat R9 t m_ad ltac:(lia) ltac:(lia) Hrep
               ltac:(rewrite um_del_run_0; exact Hview) Hbase
-              HR9sp HR9tp HR9s2' HR9s3 HR9s4 HR9s5 HR9s6 HR9thr
+              HR9sp HR9s2' HR9s3 HR9s4 HR9s5 HR9s6 HR9thr
               with "Hcg Hcnt Htext Hpc Hptree [Hown] Henv [-]").
     { cbn [um_del_run]. iExact "Hown". }
-    iIntros (mj) "%Hjsp %Hjthr Hcg Hcnt Hpc Hpt".
+    iIntros (CIDr6 Hsr6 mj) "%Hjsp %Hjthr Hcg Hcnt Hpc Hpt".
     (* --- +0x76 c.ldsp s1,40(sp) --- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (UU + 0x76)) (mword_of_int 5 : mword 6) Rs1
-              mj (K - 8) (mm !!! Regidx Rs1) (dqm:=DfracOwn 1)
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x76)) (mword_of_int 5 : mword 6) Rs1
+              mj (K - 8) (mm !!! Regidx Rs1) b (dqm:=DfracOwn 1)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi76 [Hk3] [-]").
     { iEval (rewrite Hjsp Hb3). iExact "Hk3". }
-    iIntros "Hcg Hpc Hk3". iEval (rewrite Hjsp Hb3) in "Hk3".
+    iIntros (CIDr7 Hsr7) "Hcg Hpc Hk3". iEval (rewrite Hjsp Hb3) in "Hk3".
     set (F1 := <[Regidx Rs1 := regval_into_reg (mm !!! Regidx Rs1)]> mj).
     assert (HF1sp : F1 !!! Regidx csp_rs1 = spr) by lkp.
     assert (HF1thr1 : uu_thr1 mm F1).
@@ -1479,10 +1513,13 @@ Section ProofUvmunmap.
     assert (Hq78 : add_vec_int (mword_of_int (UU + 0x76) : mword 64) 2
                    = mword_of_int (UU + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hq78) in "Hpc".
-    iApply (uu_epilogue γ Φ mm F1 K sp0 ltac:(lia) Hspm HF1sp HF1thr1
+    iApply (uu_epilogue Φ mm F1 K sp0 b p ltac:(lia) Hspm HF1sp HF1thr1
               with "Hcg Htext Hpc Hk1 Hk2 [Hk3] Hk4 Hk5 Hk6 Hk7 Hk8 [-]").
     { iExists (mm !!! Regidx Rs1). iExact "Hk3". }
-    iIntros (mf) "Hcg Hpc %Hcs".
+    iIntros (CIDr8 Hsr8 mf) "Hcg Hpc %Hcs".
+    iDestruct (cpu_own_transport CIDr6 CIDr8 ilvl eb p C b ltac:(wp_next_chain)
+                 with "Hcnt") as "Hcnt".
+    iSpecialize ("Hcont" $! CIDr8 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] Hpt").
     exact Hcs.
   Qed.
@@ -1508,10 +1545,10 @@ Section SealUvmunmap.
      by [upt_acc_wf_del_run]) and the trapframe page's [page_valid], which
      the loop never touches. *)
   Lemma wp_uvmunmap_sconf
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat)
-    : wp_uvmunmap_sconf_body γ γa Φ mm P npages K eb p C ilvl.
+      (C : iProp Σ) (ilvl : nat) (b : bool)
+    : wp_uvmunmap_sconf_body γa Φ mm P npages K eb p C ilvl b.
   Proof.
     cbv beta delta [wp_uvmunmap_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange.
@@ -1519,10 +1556,11 @@ Section SealUvmunmap.
     iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
     destruct Hwf as (_ & Hacc & _ & _ & Htfv).
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
-    iApply (Core.wp_uvmunmap_gen γ γa Φ mm (Some P.(ud_tfp)) P.(ud_root)
-              P.(ud_um) npages K eb p C ilvl HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange
+    iApply (Core.wp_uvmunmap_gen γa Φ mm (Some P.(ud_tfp)) P.(ud_root)
+              P.(ud_um) npages K eb p C ilvl b HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
-    iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpt".
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
+    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
     iApply (uptg_proc_pt (uptd_del_run P vpn0 npages)
@@ -1546,20 +1584,21 @@ Section SealUvmunmapBare.
   (* [bare_pt] IS the [None] instance, definitionally -- there is nothing
      to owe. *)
   Lemma wp_uvmunmap_bare_sconf
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat)
-    : wp_uvmunmap_bare_sconf_body γ γa Φ mm uroot um npages K eb p C ilvl.
+      (C : iProp Σ) (ilvl : nat) (b : bool)
+    : wp_uvmunmap_bare_sconf_body γa Φ mm uroot um npages K eb p C ilvl b.
   Proof.
     cbv beta delta [wp_uvmunmap_bare_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
     iEval (rewrite /bare_pt) in "Hpt".
-    iApply (Core.wp_uvmunmap_gen γ γa Φ mm None uroot um npages K eb p C ilvl
+    iApply (Core.wp_uvmunmap_gen γa Φ mm None uroot um npages K eb p C ilvl b
               HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
-    iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpt".
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
+    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
     rewrite /bare_pt. iExact "Hpt".
