@@ -223,30 +223,6 @@ Section ProofUvmfree.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  (* THE TP BRIDGE.  A register map's OWN [Rtp] slot is dead data: [sie_cap_gpr]
-     owns [gpr_file (tp_pin m)], and [tp_pin] OVERWRITES [Rtp] with the CURRENT
-     hart's [cid_word] regardless of what [m] itself says there (HartTp.v).  So
-     [m]'s [Rtp] field may be freely patched to whatever value a callee's entry
-     premise wants -- in particular to [cid_word] AT WHICHEVER HART "Hcg" is
-     actually held, which is what Freewalk's/Uvmunmap's still-syntactically-
-     present "[m !!! Rtp = cid_word]" entry premise needs when the call is made
-     from a hart reached via a [b]-generic (potentially migrating) stretch of
-     plain leaves: that premise's OWN [cid_word] resolves (like [sie_cap_gpr]'s
-     own implicit hart) to whichever [CpuId] is in scope at the call, which is
-     NOT in general the entry hart the ORIGINAL [mm]-inherited [Rtp] value
-     traces back to.  Patching sidesteps proving an equality between two
-     hart ids that need not agree under a generic [b]. *)
-  Lemma sie_cap_gpr_settp `{CID0 : CpuId} (m : regfile) (n : nat) (b : bool)
-      (p0 v : mword 64) :
-    sie_cap_gpr m n b p0 -∗ sie_cap_gpr (<[Regidx Rtp := v]> m) n b p0.
-  Proof.
-    assert (Hsp : <[Regidx Rtp := v]> m !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
-      by (apply upd_ne; reg_neq).
-    assert (Htpn : tp_pin (<[Regidx Rtp := v]> m) = tp_pin m)
-      by (unfold tp_pin; apply upd_upd).
-    unfold sie_cap_gpr, sie_cap. rewrite Hsp Htpn. by iIntros "$".
-  Qed.
-
   Lemma wp_uvmfree_sconf
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
@@ -402,12 +378,6 @@ Section ProofUvmfree.
     assert (HA2a1 : A2 !!! Regidx Ra1 = sz).
     { rewrite /A2 upd_ne; [| reg_neq]. rewrite /A1 upd_ne; [| reg_neq].
       rewrite /A0 upd_ne; [| reg_neq]. reflexivity. }
-    (* NOTE: no [A2 !!! Regidx Rtp = cid_word] fact is derived here -- [Rtp]'s
-       value is dead data (HartTp.v) and, under a generic [b], "the entry
-       hart's cid_word" need not equal cid_word at whichever hart either arm
-       below actually reaches; see [sie_cap_gpr_settp]'s comment. Each arm
-       patches [Rtp] locally, at its own landing hart, right before it is
-       needed. *)
     assert (HA2thr : forall c : mword 5, is_cs_idx c = true ->
               c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
               A2 !!! Regidx c = mm !!! Regidx c).
@@ -443,7 +413,6 @@ Section ProofUvmfree.
         ∀ (mj : regfile),
         ⌜ mj !!! Regidx csp_rs1 = spd
           /\ mj !!! Regidx Rs1 = page_base uroot
-          /\ mj !!! Regidx Rtp = cid_word
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
@@ -453,7 +422,7 @@ Section ProofUvmfree.
         bare_pt uroot ∅ -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[Hcont Hr24 Hr16 Hr8 Hgap]" as "Hjoin".
-    { iIntros (CIDj Hcrossj mj) "(%Hjsp & %Hjs1 & %Hjtp & %Hjthr) Hcg Hcpu Hpc Hpt".
+    { iIntros (CIDj Hcrossj mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hpc Hpt".
       (* +0x0e c.mv a0,s1 *)
       iApply (wp_cmv_s_sconf Φ (mword_of_int (UF + 0x0e)) Ra0 Rs1 mj (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -674,25 +643,9 @@ Section ProofUvmfree.
       iEval (rewrite Hpc0e) in "Hpc".
       iDestruct (cpu_own_transport CID CID7 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      (* patch [Rtp] to THIS (CID7) hart's id -- see [sie_cap_gpr_settp]. *)
-      iDestruct (sie_cap_gpr_settp A2 (K - 4)%nat b p cid_word with "Hcg") as "Hcg".
-      set (A2' := <[Regidx Rtp := cid_word]> A2).
-      change (<[Regidx Rtp := cid_word]> A2) with A2'.
-      assert (HA2'sp : A2' !!! Regidx csp_rs1 = spd)
-        by (rewrite /A2' upd_ne; [exact HA2sp | reg_neq]).
-      assert (HA2's1 : A2' !!! Regidx Rs1 = page_base uroot)
-        by (rewrite /A2' upd_ne; [exact HA2s1 | reg_neq]).
-      assert (HA2'tp : A2' !!! Regidx Rtp = cid_word) by (rewrite /A2' upd_eq; reflexivity).
-      assert (HA2'thr : forall c : mword 5, is_cs_idx c = true ->
-                c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
-                A2' !!! Regidx c = mm !!! Regidx c).
-      { intros c Hc H2 H8 H9.
-        rewrite /A2' upd_ne;
-          [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
-        apply HA2thr; assumption. }
       iSpecialize ("Hjoin" $! CID7 with "[%]"); [wp_next_chain|].
-      iApply ("Hjoin" $! A2' with "[%] Hcg Hcpu Hpc Hpt").
-      split_and!; [exact HA2'sp | exact HA2's1 | exact HA2'tp | exact HA2'thr]. }
+      iApply ("Hjoin" $! A2 with "[%] Hcg Hcpu Hpc Hpt").
+      split_and!; [exact HA2sp | exact HA2s1 | exact HA2thr]. }
 
     (* ---- TAKEN: sz > 0, so uvmunmap first ---- *)
     assert (Hbr' : neq_vec (A2 !!! Regidx Ra1) (zero_reg : mword 64) = true)
@@ -856,9 +809,6 @@ Section ProofUvmfree.
       rewrite /B5 upd_ne; [| reg_neq]. rewrite /B4 upd_ne; [| reg_neq].
       rewrite /B3 upd_ne; [| reg_neq]. rewrite /B2 upd_ne; [| reg_neq].
       rewrite /B1 upd_ne; [| reg_neq]. exact HA2a0. }
-    (* NOTE: no [B7 !!! Regidx Rtp = cid_word] fact here -- see the comment at
-       [sie_cap_gpr_settp]; [HB7'tp] (below, at uvmunmap's call site) patches
-       it fresh instead. *)
     assert (HB7sp : B7 !!! Regidx csp_rs1 = spd).
     { rewrite /B7 upd_ne; [| reg_neq]. rewrite /B6 upd_ne; [| reg_neq].
       rewrite /B5 upd_ne; [| reg_neq]. rewrite /B4 upd_ne; [| reg_neq].
@@ -891,69 +841,42 @@ Section ProofUvmfree.
     (* ---- uvmunmap(), at the BARE altitude ---- *)
     iDestruct (cpu_own_transport CID CID14 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    (* patch [Rtp] to THIS (CID14) hart's id -- see [sie_cap_gpr_settp]. *)
-    iDestruct (sie_cap_gpr_settp B7 (K - 4)%nat b p cid_word with "Hcg") as "Hcg".
-    set (B7' := <[Regidx Rtp := cid_word]> B7).
-    change (<[Regidx Rtp := cid_word]> B7) with B7'.
-    assert (HB7'tp : B7' !!! Regidx Rtp = cid_word) by (rewrite /B7' upd_eq; reflexivity).
-    assert (HB7'a0 : B7' !!! Regidx Ra0 = page_base uroot)
-      by (rewrite /B7' upd_ne; [exact HB7a0 | reg_neq]).
-    assert (HB7'a1 : B7' !!! Regidx Ra1 = (mword_of_int 0 : mword 64))
-      by (rewrite /B7' upd_ne; [exact HB7a1 | reg_neq]).
-    assert (HB7'a2 : B7' !!! Regidx Ra2 = (mword_of_int (Z.of_nat n) : mword 64))
-      by (rewrite /B7' upd_ne; [exact HB7a2 | reg_neq]).
-    assert (HB7'a3 : B7' !!! Regidx Ra3 = (mword_of_int 1 : mword 64))
-      by (rewrite /B7' upd_ne; [exact HB7a3 | reg_neq]).
-    assert (HB7'sp : B7' !!! Regidx csp_rs1 = spd)
-      by (rewrite /B7' upd_ne; [exact HB7sp | reg_neq]).
-    assert (HB7's1 : B7' !!! Regidx Rs1 = page_base uroot)
-      by (rewrite /B7' upd_ne; [exact HB7s1 | reg_neq]).
-    assert (HB7'ra : B7' !!! Regidx Rra = add_vec_int (mword_of_int (UF + 0x2c) : mword 64) 4)
-      by (rewrite /B7' upd_ne; [exact HB7ra | reg_neq]).
-    assert (HB7'thr : forall c : mword 5, is_cs_idx c = true ->
-              c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
-              B7' !!! Regidx c = mm !!! Regidx c).
-    { intros c Hc H2 H8 H9.
-      rewrite /B7' upd_ne;
-        [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
-      apply HB7thr; assumption. }
-    (* the three pure premises uvmunmap asks about the run, now re-derived
-       relative to the [Rtp]-patched map [B7'] *)
-    assert (Halign : subrange_vec_dec (B7' !!! Regidx Ra1) 11 0 = (zeros' 12 : mword 12)).
-    { rewrite HB7'a1. apply bv_eq; vm_compute; reflexivity. }
-    assert (Hdofree : B7' !!! Regidx Ra3 <> (mword_of_int 0 : mword 64)).
-    { rewrite HB7'a3. intro He.
+    (* the three pure premises uvmunmap asks about the run *)
+    assert (Halign : subrange_vec_dec (B7 !!! Regidx Ra1) 11 0 = (zeros' 12 : mword 12)).
+    { rewrite HB7a1. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hdofree : B7 !!! Regidx Ra3 <> (mword_of_int 0 : mword 64)).
+    { rewrite HB7a3. intro He.
       assert (Hc : bv_unsigned (mword_of_int 1 : mword 64)
                    = bv_unsigned (mword_of_int 0 : mword 64)) by (rewrite He; reflexivity).
       vm_compute in Hc. discriminate. }
-    assert (Hrange : uint (B7' !!! Regidx Ra1) + Z.of_nat n * 4096 <= uvm_maxsz).
-    { rewrite HB7'a1.
+    assert (Hrange : uint (B7 !!! Regidx Ra1) + Z.of_nat n * 4096 <= uvm_maxsz).
+    { rewrite HB7a1.
       assert (Hz : uint (mword_of_int 0 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz. rewrite Z.add_0_l. exact Hnrange. }
-    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa Φ B7' uroot um n (K - 4)%nat eb p C ilvl b
-              HKuu Hilvl HB7'tp HB7'a0 Halign HB7'a2 Hdofree Hrange
+    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa Φ B7 uroot um n (K - 4)%nat eb p C ilvl b
+              HKuu Hilvl HB7a0 Halign HB7a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv [-]").
     iIntros (CID15 Hs15 mr) "Hcg Hcpu Hpc %Hcs Hpt".
-    iEval (rewrite HB7'a1) in "Hpt".
+    iEval (rewrite HB7a1) in "Hpt".
     (* everything the table still mapped was inside the run it just cleared *)
     assert (Hempty : um_del_run um (svpn_of (mword_of_int 0 : mword 64)) n = ∅)
       by exact (uf_del_run_empty um vpn0 n Hdom).
     iEval (rewrite Hempty) in "Hpt".
-    assert (Hret30 : ret_pc (B7' !!! Regidx Rra) = mword_of_int (UF + 0x30)).
-    { rewrite HB7'ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hret30 : ret_pc (B7 !!! Regidx Rra) = mword_of_int (UF + 0x30)).
+    { rewrite HB7ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret30) in "Hpc".
     (* +0x30 c.j -0x22 : join the tail *)
     assert (Hmrsp : mr !!! Regidx csp_rs1 = spd).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)).
-      exact HB7'sp. }
+      exact HB7sp. }
     assert (Hmrs1 : mr !!! Regidx Rs1 = page_base uroot).
     { rewrite (callee_saved_lookup Hcs Rs1 ltac:(vm_compute; reflexivity)).
-      exact HB7's1. }
+      exact HB7s1. }
     assert (Hmrthr : forall c : mword 5, is_cs_idx c = true ->
               c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
               mr !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9.
-      rewrite (callee_saved_lookup Hcs c Hc). apply HB7'thr; assumption. }
+      rewrite (callee_saved_lookup Hcs c Hc). apply HB7thr; assumption. }
     iApply (wp_cj_s_sconf Φ (mword_of_int (UF + 0x30))
               (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")))
               mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
@@ -967,27 +890,9 @@ Section ProofUvmfree.
     iEval (rewrite Htgt0e) in "Hpc".
     iDestruct (cpu_own_transport CID15 CID16 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    (* patch [Rtp] to THIS (CID16) hart's id -- see [sie_cap_gpr_settp]:
-       [mr]'s own [Rtp] slot is UNCONSTRAINED by [callee_saved] (Rtp is not
-       an [is_cs_idx] register), so it must be patched fresh here too. *)
-    iDestruct (sie_cap_gpr_settp mr (K - 4)%nat b p cid_word with "Hcg") as "Hcg".
-    set (mr' := <[Regidx Rtp := cid_word]> mr).
-    change (<[Regidx Rtp := cid_word]> mr) with mr'.
-    assert (Hmr'sp : mr' !!! Regidx csp_rs1 = spd)
-      by (rewrite /mr' upd_ne; [exact Hmrsp | reg_neq]).
-    assert (Hmr's1 : mr' !!! Regidx Rs1 = page_base uroot)
-      by (rewrite /mr' upd_ne; [exact Hmrs1 | reg_neq]).
-    assert (Hmr'tp : mr' !!! Regidx Rtp = cid_word) by (rewrite /mr' upd_eq; reflexivity).
-    assert (Hmr'thr : forall c : mword 5, is_cs_idx c = true ->
-              c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
-              mr' !!! Regidx c = mm !!! Regidx c).
-    { intros c Hc H2 H8 H9.
-      rewrite /mr' upd_ne;
-        [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
-      apply Hmrthr; assumption. }
     iSpecialize ("Hjoin" $! CID16 with "[%]"); [wp_next_chain|].
-    iApply ("Hjoin" $! mr' with "[%] Hcg Hcpu Hpc Hpt").
-    split_and!; [exact Hmr'sp | exact Hmr's1 | exact Hmr'tp | exact Hmr'thr].
+    iApply ("Hjoin" $! mr with "[%] Hcg Hcpu Hpc Hpt").
+    split_and!; [exact Hmrsp | exact Hmrs1 | exact Hmrthr].
   Qed.
 
 End ProofUvmfree.

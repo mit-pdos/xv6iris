@@ -81,34 +81,43 @@ Section ProofMemset.
     change (2 ^ 8)%Z with 256%Z. apply Z.le_refl.
   Qed.
 
-  (* BLOCKED: see the file-level report.  [wp_memset_loop_sconf_body]
-     (SpecMemsetParts.v, already ported) quantifies [ra1 ra4 ra5 : mword 5]
-     GENERICALLY, constrained only by [uint _ <> 0], [Regidx ra4 <> Regidx
-     ra5], [Regidx ra1 <> Regidx ra5] and [ra5 <> csp_rs1] -- none of which
-     exclude [ra5 = Rtp] (tp, index 4).  The new [rd_ok] (HartTp/IntrDefs)
-     that every gpr-writing leaf now demands is [rd <> csp_rs1 /\ Regidx rd
-     <> Regidx Rtp], and the loop WRITES ra5 (c.addi a5,a5,1) and READS it
-     through [rget] (the sb leaf's address is [add_vec (rget m ra5) ...]),
-     so both need [Regidx ra5 <> Regidx Rtp] -- which is simply not
-     derivable from the four hypotheses above.  Confirmed empirically below:
-     the very first leaf (sb) cannot even state its own precondition
-     address without this fact.  This is a gap in the ALREADY-PORTED
-     SpecMemsetParts.v contract (missing exactly one conjunct, e.g. [Regidx
-     ra5 <> Regidx Rtp]), not a mechanical-porting issue -- reported rather
-     than forced through.  Per the task's instructions the STATEMENT is
-     still updated to match the (unprovable) new contract; the PROOF below
-     is developed as far as it correctly goes (through the
-     [generalizing CID] restructuring the recursion needs for [b]-genericity
-     -- see the header comment on that pattern) and stops at the confirmed
-     blocker rather than admitting anything. *)
+  (* STILL BLOCKED, one layer deeper than before.  The landed premise
+     [Regidx ra5 <> Regidx Rtp] fixes ra5's leg (it is WRITTEN each
+     iteration -- [c.addi a5,a5,1] -- and its [rd_ok] premise carries the
+     tp exclusion, and its READ through [rget] in the [sb]/[bne] leaves now
+     bridges to the plain-map facts [Hcur]/[Hm'a5] via [rget_ne Hra5tp], as
+     the development below shows).  But [ra1] and [ra4] are READ-ONLY every
+     iteration -- [ra1] as the [sb] leaf's STORE VALUE ([storeval := trunc8
+     (rget m ra1)], used in this lemma's OWN postcondition to show the
+     written byte is [cbyte]), [ra4] as the [bne] comparison's other
+     operand ([neq_vec (rget m' ra1(*rs1=ra5*)) (rget m' ra4)]) -- and nothing in
+     [wp_memset_loop_sconf_body] excludes [ra1 = Rtp] or [ra4 = Rtp].  Both
+     premises given for them, [Hm4 : m !!! Regidx ra4 = e] and
+     [Hm1 : m !!! Regidx ra1 = cval], are PLAIN map facts; bridging either to
+     the leaf's [rget]-spelled premise needs [rget_ne], whose side condition
+     is exactly [Regidx ra4 <> Regidx Rtp] / [Regidx ra1 <> Regidx Rtp] --
+     NOT derivable from [Hra1]/[Hra4]/[Hra4ne]/[Hra1ne]/[Hra5sp]/[Hra5tp]
+     (none of those relate ra1 or ra4 to Rtp at all).  Confirmed empirically:
+     the very first leaf (sb) already needs [Hm1] bridged this way to
+     discharge its OWN postcondition ([Hb0]'s written byte = [cbyte]), and
+     the development below reaches exactly that point and stops.  This is a
+     second gap in the ALREADY-PORTED SpecMemsetParts.v contract (missing
+     two more conjuncts, [Regidx ra1 <> Regidx Rtp] and [Regidx ra4 <>
+     Regidx Rtp]), not a mechanical-porting issue -- reported rather than
+     forced through.  The STATEMENT is updated to match the new (still
+     unprovable) contract; the PROOF is developed as far as it correctly
+     goes -- through the [b]-generic recursion restructuring ([revert CID]
+     before [induction], matching the header comment's pattern) and the
+     [sb] leaf's precondition (ra5-only, now provable) -- and stops at the
+     confirmed blocker rather than admitting anything. *)
   Lemma wp_memset_loop_sconf (Φ : mval -> iProp Σ)
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13)
-      (olds : nat -> bv 8) (n : nat) (b : bool)
-    : wp_memset_loop_sconf_body Φ N p e cval ra1 ra4 ra5 imm_bne olds n b.
+      (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
+    : wp_memset_loop_sconf_body Φ N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
-      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hext0 Hext4 Hext6.
+      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hra5tp Hext0 Hext4 Hext6.
     (* [b]-generic recursion: IH must be applicable at ANY landing hart
        (the taken-bne step can migrate), so CID has to be part of what the
        induction generalizes -- a plain [induction rem] here would fix IH at
@@ -127,21 +136,26 @@ Section ProofMemset.
     rewrite (seq_cons off rem').
     rewrite big_sepL_cons.
     iDestruct "Hbuf" as "[Hb0 Hbuf]".
+    assert (Hcur' : rget m ra5 = ms_addr p off) by (rewrite (rget_ne m ra5 Hra5tp); exact Hcur).
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
     iApply (wp_sb_s_sconf Φ pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
               with "Hcg Hpc Hi0 [Hb0]").
-    (* the leaf's address is [add_vec (rget m ra5) (sign_extend' 64 0)];
-       bridging it to [Hcur : m !!! Regidx ra5 = ms_addr p off] needs
-       [rget_ne], whose side condition [Regidx ra5 <> Regidx Rtp] is
-       exactly the missing fact.  UNPROVABLE from Hra1/Hra4/Hra5/Hra4ne/
-       Hra1ne/Hra5sp alone: none of them exclude ra5 = Rtp.  STOP here, see
-       the comment above -- left open rather than admitted. *)
-    rewrite rget_ne.
+    { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
+    iIntros (CID1 Hs1) "Hcg Hpc Hb0".
+    (* the postcondition needs [rget m ra1 = cval] (the byte the store
+       actually wrote is [trunc8 (rget m ra1)]); bridging [Hm1 : m !!!
+       Regidx ra1 = cval] to it needs [rget_ne], whose side condition
+       [Regidx ra1 <> Regidx Rtp] is exactly the missing fact -- see the
+       comment above.  STOP here, left open rather than admitted. *)
+    assert (Hm1' : rget m ra1 = cval).
+    rewrite rget_ne; [exact Hm1|].
+    (* remaining goal: [Regidx ra1 <> Regidx Rtp] -- NOT derivable from
+       Hra1/Hra4/Hra5/Hra4ne/Hra1ne/Hra5sp/Hra5tp. *)
   Abort.
 
   Lemma wp_memset_suffix_sconf (Φ : mval -> iProp Σ)
-      (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool)
-    : wp_memset_suffix_sconf_body Φ M n ra0e s00e b.
+      (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64)
+    : wp_memset_suffix_sconf_body Φ M n ra0e s00e b pcur.
   Proof.
     cbv beta delta [wp_memset_suffix_sconf_body].
     intros spd sp0up ret_tgt.
@@ -233,8 +247,8 @@ Section ProofMemset.
   (*  (ra0/s0) out to whichever arm of it runs.                            *)
   (* =================================================================== *)
   Lemma wp_memset_head_sconf (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8) (b : bool)
-    : wp_memset_head_sconf_body Φ m0 n imm_entry nzimm_s0 b.
+      (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8) (b : bool) (pcur : mword 64)
+    : wp_memset_head_sconf_body Φ m0 n imm_entry nzimm_s0 b pcur.
   Proof.
     cbv beta delta [wp_memset_head_sconf_body].
     intros ra_idx s0_idx pcE sp0 sp' pa_ra pa_s0 ra0 s00 m1 m2 Hn2 Hsp'.
@@ -292,8 +306,8 @@ Section ProofMemset.
   (*  straight to the epilogue -- nothing written, no register moved.      *)
   (* =================================================================== *)
   Lemma wp_memset_skip_sconf (Φ : mval -> iProp Σ)
-      (M : regfile) (n : nat) (imm8_beqz : mword 8) (b : bool)
-    : wp_memset_skip_sconf_body Φ M n imm8_beqz b.
+      (M : regfile) (n : nat) (imm8_beqz : mword 8) (b : bool) (pcur : mword 64)
+    : wp_memset_skip_sconf_body Φ M n imm8_beqz b pcur.
   Proof.
     cbv beta delta [wp_memset_skip_sconf_body].
     intros a2_idx pcE Hz Htgt.
@@ -320,8 +334,8 @@ Section ProofMemset.
   (* =================================================================== *)
   Lemma wp_memset_setup_sconf (Φ : mval -> iProp Σ)
       (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8)
-      (wval_add : mword 64) (b : bool)
-    : wp_memset_setup_sconf_body Φ M n shamt_l shamt_r imm8_beqz wval_add b.
+      (wval_add : mword 64) (b : bool) (pcur : mword 64)
+    : wp_memset_setup_sconf_body Φ M n shamt_l shamt_r imm8_beqz wval_add b pcur.
   Proof.
     cbv beta delta [wp_memset_setup_sconf_body].
     intros a0_idx a2_idx a4_idx a5_idx pcE m3 m4 m5 m6 Hn0 Hvalue_add.

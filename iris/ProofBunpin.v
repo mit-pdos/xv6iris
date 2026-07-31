@@ -36,11 +36,10 @@
    and [cpu_own] moved across each stretch with ONE [cpu_own_transport] call.
    The critical section (acquire's return through release's call) runs at the
    LITERAL [false] SIE state acquire hands back, so [rewrite wp_next_off]
-   collapses each of its steps with no hart threading.  Release's own
-   contract still asks for the raw register file's tp slot literally at
-   [cid_word] on entry; [tp_pin] retags the map handed to release so that
-   premise is trivial, and release's derived exit index is absorbed by
-   [sie_b_agree]'s [Houtb], read once at function entry. *)
+   collapses each of its steps with no hart threading.  [SpecRelease.v]'s
+   entry-side tp premise is gone (HartTp.v -- the map's tp slot is ignored),
+   so the map is handed to release as-is; release's derived exit index is
+   absorbed by [sie_b_agree]'s [Houtb], read once at function entry. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -132,38 +131,6 @@ Section ProofBunpin.
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-  Qed.
-
-  (* release's own precondition (SpecRelease.v) still asks for the RAW map's
-     tp slot literally at [cid_word]; [tp_pin m] is a representative of the
-     SAME [sie_cap_gpr m av b p] resource whose raw tp slot IS [cid_word] by
-     construction.  Fresh [CID0] binder: see ProofFiledup.v's comment. *)
-  Local Lemma sie_cap_gpr_tp_retag `{CID0 : CpuId} (m : regfile) (av : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr (CID := CID0) m av b p -∗
-    sie_cap_gpr (CID := CID0) (tp_pin (CID := CID0) m) av b p.
-  Proof.
-    rewrite /sie_cap_gpr /sie_cap (tp_pin_sp (CID := CID0))
-      (tp_pin_id (CID := CID0) (tp_pin (CID := CID0) m) (rget_tp (CID := CID0) m)).
-    iIntros "$".
-  Qed.
-
-  (* [rget_ne] restated with a PLAIN [!!!] LHS so [rewrite] matches directly
-     against release's own [let lk0 := m !!! Regidx …] once [m] is
-     instantiated at [tp_pin D5]. *)
-  Local Lemma tp_pin_ne `{CID0 : CpuId} (m : regfile) (k : mword 5) :
-    Regidx k <> Regidx Rtp -> tp_pin (CID := CID0) m !!! Regidx k = m !!! Regidx k.
-  Proof. exact (rget_ne (CID := CID0) m k). Qed.
-
-  (* [callee_saved] never mentions tp (index 4). *)
-  Local Lemma callee_saved_untp_l `{CID0 : CpuId} (m mr : regfile) :
-    callee_saved (tp_pin (CID := CID0) m) mr -> callee_saved m mr.
-  Proof.
-    unfold callee_saved. intros (H2&H8&H9&H18&H19&H20&H21&H22&H23&H24&H25&H26&H27).
-    repeat split;
-      match goal with
-      | H : mr !!! Regidx ?c = tp_pin (CID := CID0) m !!! Regidx ?c |- mr !!! Regidx ?c = m !!! Regidx ?c =>
-          rewrite H; exact (rget_ne (CID := CID0) m c ltac:(vm_compute; discriminate))
-      end.
   Qed.
 
   (* the value [c.addiw a5,a5,-1] leaves for the store, as a function of the
@@ -577,25 +544,20 @@ Section ProofBunpin.
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmsp).
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (BU + 0x26) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
-    (* ===== +0x26 lands us in release; retag the map so its raw tp premise
-       is trivial, and let bunpin's own derived index [Houtb] absorb
-       release's [outb]. ===== *)
-    iDestruct (sie_cap_gpr_tp_retag (CID0 := CIDacq) D5 (K - 4)%nat false p with "Hcg") as "Hcg".
-    iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) (tp_pin (CID := CIDacq) D5)
+    (* ===== +0x26 lands us in release; bunpin's own derived index [Houtb]
+       absorbs release's [outb]. ===== *)
+    iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) D5
               n eb p C (K - 4)%nat
-              ltac:(rewrite (tp_pin_ne (CID0 := CIDacq) D5 Ra0 ltac:(vm_compute; discriminate)) HD5a0;
-                    apply bv_eq; vm_compute; reflexivity)
-              (rget_tp (CID := CIDacq) D5)
+              ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     rewrite <- Houtb in Hsr.
-    pose proof (callee_saved_untp_l (CID0 := CIDacq) D5 mr Hrelpins) as Hrelpins_cs.
-    assert (Hpc2a : ret_pc (tp_pin (CID := CIDacq) D5 !!! Regidx Rra) = mword_of_int (BU + 0x2a)).
-    { rewrite (tp_pin_ne (CID0 := CIDacq) D5 Rra ltac:(vm_compute; discriminate)) HD5ra.
-      apply bv_eq; vm_compute; reflexivity. }
+    pose proof Hrelpins as Hrelpins_cs.
+    assert (Hpc2a : ret_pc (D5 !!! Regidx Rra) = mword_of_int (BU + 0x2a)).
+    { rewrite HD5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc2a) in "Hpc".
     (* ===== EPILOGUE (generic [b], via [Houtb]) ===== *)
     iPoseProof (bui_2a with "Htext") as "Hi2a".

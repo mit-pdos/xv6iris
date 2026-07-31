@@ -24,16 +24,7 @@
    eb | S _ => false end]; [cpu_own_b_eq] derives [outb = b] UP FRONT from the
    entry resources (ghost agreement between [sie_arm]'s and [intr_count]'s
    eighths -- see the porting guide's "Derive the SIE index rather than
-   stating it"), so the fact is in hand by the time release returns.
-
-   THE tp SEAM: [callee_saved] (CalleeSaved.v) deliberately excludes tp (a
-   parked thread inherits the resuming hart's), so acquire's opaque return map
-   carries NO fact about its own tp slot -- yet [RELEASE]'s contract still
-   takes a raw-map tp premise.  [sie_cap_gpr_tp_pin] re-pins that map's tp
-   slot for free (the resource depends on the map only through [csp_rs1] and
-   [tp_pin], both invariant under this substitution), producing a map whose
-   tp slot IS [cid_word] by construction ([upd_eq]), with no [callee_saved]
-   involvement. *)
+   stating it"), so the fact is in hand by the time release returns. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -156,30 +147,6 @@ Section ProofSysUptime.
           exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
         * iPureIntro. reflexivity.
       + iPureIntro. reflexivity.
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* THE tp RE-PIN.  [callee_saved] excludes tp (CalleeSaved.v), so a
-     callee's returned map carries no fact about its own tp slot -- yet
-     RELEASE's raw-map tp premise still needs one.  Re-pinning the map costs
-     nothing: [sie_cap] only reads the map through [csp_rs1] ([tp_pin_sp]),
-     and [gpr_file] only through [tp_pin], which is idempotent
-     ([tp_pin_idem], itself [tp_pin_id] fed its own [rget_tp]). *)
-  (* Freshly hart-generic (own `{CID : CpuId}` binder, shadowing the
-     section's): applied downstream of acquire's own [wp_next], at whatever
-     hart THAT delivered, not the section's entry hart. *)
-  Local Lemma tp_pin_idem `{CID0 : CpuId} (m : regfile) : tp_pin (tp_pin m) = tp_pin m.
-  Proof. apply tp_pin_id. exact (rget_tp m). Qed.
-
-  Local Lemma sie_cap_gpr_tp_pin `{CID0 : CpuId} (m : regfile) (n : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr m n b p -∗ sie_cap_gpr (tp_pin m) n b p.
-  Proof.
-    iIntros "Hcg". iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iApply (sie_cap_gpr_join with "Hhs Hsc [Hcap] [Hfile]").
-    - assert (Heq : sie_cap (tp_pin m) n b p = sie_cap m n b p)
-        by (rewrite /sie_cap tp_pin_sp; reflexivity).
-      rewrite Heq. iExact "Hcap".
-    - rewrite tp_pin_idem. iExact "Hfile".
   Qed.
 
   Lemma wp_sys_uptime_sconf (Φ : mval -> iProp Σ) (γl : gname)
@@ -332,29 +299,21 @@ Section ProofSysUptime.
     iEval (rewrite Hpc16) in "Hpc".
     (* the protected resource: the counter cell at an arbitrary value *)
     iDestruct "HR" as (t) "Hticks".
-    (* re-pin the opaque map's tp slot: [callee_saved] says nothing about it,
-       but RELEASE still wants a raw-map tp fact -- get it for free instead. *)
-    iDestruct (sie_cap_gpr_tp_pin _ _ _ _ with "Hcg") as "Hcg".
-    set (MA0 := tp_pin MA).
-    assert (HMA0tp : MA0 !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
-      by (exact (rget_tp MA)).
-    assert (HMA0csp : MA0 !!! Regidx csp_rs1 = spd).
-    { rewrite /MA0 tp_pin_sp.
-      rewrite (callee_saved_lookup HcsA csp_rs1 ltac:(vm_compute; reflexivity)).
-      exact HA4csp. }
+    assert (HMAcsp : MA !!! Regidx csp_rs1 = spd).
+    { rewrite (callee_saved_lookup HcsA csp_rs1 ltac:(vm_compute; reflexivity)). exact HA4csp. }
     (* ===================== a5 := ticks ===================== *)
     (* +0x16: auipc a5,0x7 *)
     iPoseProof (sui_16 with "Htext") as "Hi16".
     iApply (wp_auipc_s_sconf Φ (mword_of_int (SU + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 0x7 : mword 20)
-              MA0 (av - 4)%nat false
+              MA (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     rewrite wp_next_off.
     iIntros "Hcg Hpc".
     set (B0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
-        (add_vec (mword_of_int (SU + 0x16) : mword 64) (auipc_off (mword_of_int 0x7 : mword 20)))]> MA0).
+        (add_vec (mword_of_int (SU + 0x16) : mword 64) (auipc_off (mword_of_int 0x7 : mword 20)))]> MA).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
-        (add_vec (mword_of_int (SU + 0x16) : mword 64) (auipc_off (mword_of_int 0x7 : mword 20)))]> MA0) with B0.
+        (add_vec (mword_of_int (SU + 0x16) : mword 64) (auipc_off (mword_of_int 0x7 : mword 20)))]> MA) with B0.
     assert (Hpc1a : add_vec_int (mword_of_int (SU + 0x16) : mword 64) 4 = mword_of_int (SU + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* +0x1a: lw a5,1982(a5) -- the read, under the lock *)
@@ -435,14 +394,6 @@ Section ProofSysUptime.
     { rewrite /B5 upd_ne; [| vm_compute; discriminate].
       rewrite /B4 upd_eq. rewrite /B3 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
-    assert (HB5tp : B5 !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
-    { rewrite /B5 upd_ne; [| vm_compute; discriminate].
-      rewrite /B4 upd_ne; [| vm_compute; discriminate].
-      rewrite /B3 upd_ne; [| vm_compute; discriminate].
-      rewrite /B2 upd_ne; [| vm_compute; discriminate].
-      rewrite /B1 upd_ne; [| vm_compute; discriminate].
-      rewrite /B0 upd_ne; [| vm_compute; discriminate].
-      exact HMA0tp. }
     assert (HB5csp : B5 !!! Regidx csp_rs1 = spd).
     { rewrite /B5 upd_ne; [| vm_compute; discriminate].
       rewrite /B4 upd_ne; [| vm_compute; discriminate].
@@ -450,13 +401,12 @@ Section ProofSysUptime.
       rewrite /B2 upd_ne; [| vm_compute; discriminate].
       rewrite /B1 upd_ne; [| vm_compute; discriminate].
       rewrite /B0 upd_ne; [| vm_compute; discriminate].
-      exact HMA0csp. }
+      exact HMAcsp. }
     (* ===================== release(&tickslock) ===================== *)
     iDestruct (ticks_res_intro t with "Hticks") as "HR".
     iApply (Release.wp_release_sconf Φ γl a_tickslock "time"%string ticks_res B5
               n eb p C (av - 4)%nat
               ltac:(rewrite HB5a0; apply su_add_vec_0)
-              HB5tp
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay [-]").
     { iExact "Hlk". }
@@ -630,8 +580,7 @@ Section ProofSysUptime.
     { rewrite /E4 upd_ne; [| vm_compute; discriminate].
       rewrite /E3. apply upd_eq. }
     (* every other callee-saved register (tp, s2..s11) threads untouched: the
-       peel goes through E4..E1/C1/C0, release, B5..B0, MA0 (the tp re-pin,
-       which does not move a non-tp index), acquire, A4..A0. *)
+       peel goes through E4..E1/C1/C0, release, B5..B0, acquire, A4..A0. *)
     assert (Hthr : forall r : mword 5, is_cs_idx r = true ->
                      r <> csp_rs1 -> r <> mword_of_int 8 -> r <> mword_of_int 9 ->
                      E4 !!! Regidx r = m !!! Regidx r).
@@ -653,7 +602,6 @@ Section ProofSysUptime.
       rewrite /B2 upd_ne; [| congruence].
       rewrite /B1 upd_ne; [| congruence].
       rewrite /B0 upd_ne; [| congruence].
-      rewrite /MA0 upd_ne; [| congruence].
       rewrite (callee_saved_lookup HcsA r Hr).
       rewrite /A4 upd_ne; [| congruence].
       rewrite /A3 upd_ne; [| congruence].

@@ -65,8 +65,6 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
      ghost eighth at '0' unconditionally for every [S _] level. *)
   let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
   (⊢ locked γl cpu_id -∗ Dc -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
@@ -99,8 +97,6 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   (* see [wp_release_gen_sconf_body] for why this is the exit arm *)
   let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  (* the tp register holds THIS cpu's id (pop_off's cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
   sie_cap_gpr m av false p -∗
   kernel_text -∗ pc_is pcE -∗
@@ -138,7 +134,6 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CI
   (* see [wp_release_gen_sconf_body] for why this is the exit arm *)
   let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (10 <= av)%nat ->
   (⊢ locked γl cpu_id -∗ D -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ D -∗ False) ->

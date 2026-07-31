@@ -1103,7 +1103,6 @@ Section ProofUvmunmap.
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
     (22 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-    mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
     mm !!! Regidx (mword_of_int 10) = page_base uroot ->
     subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
     mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
@@ -1125,7 +1124,7 @@ Section ProofUvmunmap.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE va vpn0 ret_tgt HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange.
+    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
@@ -1551,13 +1550,13 @@ Section SealUvmunmap.
     : wp_uvmunmap_sconf_body γa Φ mm P npages K eb p C ilvl b.
   Proof.
     cbv beta delta [wp_uvmunmap_sconf_body].
-    intros pcE va vpn0 ret_tgt HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange.
+    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
     iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
     destruct Hwf as (_ & Hacc & _ & _ & Htfv).
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
     iApply (Core.wp_uvmunmap_gen γa Φ mm (Some P.(ud_tfp)) P.(ud_root)
-              P.(ud_um) npages K eb p C ilvl b HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange
+              P.(ud_um) npages K eb p C ilvl b HK Hilvl Hroot Hval Hnpr Hdf Hrange
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
     iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
@@ -1591,11 +1590,11 @@ Section SealUvmunmapBare.
     : wp_uvmunmap_bare_sconf_body γa Φ mm uroot um npages K eb p C ilvl b.
   Proof.
     cbv beta delta [wp_uvmunmap_bare_sconf_body].
-    intros pcE va vpn0 ret_tgt HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange.
+    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
     iEval (rewrite /bare_pt) in "Hpt".
     iApply (Core.wp_uvmunmap_gen γa Φ mm None uroot um npages K eb p C ilvl b
-              HK Hilvl Htp Hroot Hval Hnpr Hdf Hrange
+              HK Hilvl Hroot Hval Hnpr Hdf Hrange
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
     iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].

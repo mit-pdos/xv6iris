@@ -86,8 +86,6 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      transient noff increment in int range.  It used to be pinned at 0 --
      an artifact of the boot-time callers. *)
   (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-  (* the kfree chain runs on the ambient CPU (push_off cid convention) *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the pagetable argument is the table [proc_pt P] describes *)
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
   (* va is page-aligned: the panic arm is dead *)
@@ -151,7 +149,6 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
      transient noff increment in int range.  It used to be pinned at 0 --
      an artifact of the boot-time callers. *)
   (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   mm !!! Regidx (mword_of_int 10) = page_base uroot ->
   subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
   mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->

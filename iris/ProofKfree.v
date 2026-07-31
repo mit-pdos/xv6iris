@@ -73,47 +73,6 @@ Proof.
     + iPureIntro. reflexivity.
 Qed.
 
-(* THE tp-forget BRIDGE for release's call (see ProofHoldingsleep.v for the
-   full rationale): [wp_release_sconf_body] still states an entry premise on
-   the RAW tp slot of its own map even though [HartTp.tp_pin] makes it
-   meaningless -- the ACTUAL register file always pins tp regardless of what
-   the map says there.  Respelling the map with its tp slot FORCED to
-   [cid_word] costs nothing ([sie_cap_gpr_tp_forget]) and makes the premise
-   trivial; since tp is not callee-saved, the postcondition transfers back
-   ([callee_saved_tp_forget]). *)
-Lemma sie_cap_gpr_tp_forget `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (avail : nat) (b : bool) (p v : mword 64) :
-  sie_cap_gpr (<[Regidx (mword_of_int 4 : mword 5) := v]> m) avail b p
-  = sie_cap_gpr m avail b p.
-Proof.
-  unfold sie_cap_gpr, sie_cap, tp_pin.
-  rewrite upd_upd.
-  rewrite (upd_ne m (Regidx (mword_of_int 4 : mword 5)) (Regidx csp_rs1) v
-             ltac:(vm_compute; discriminate)).
-  reflexivity.
-Qed.
-
-Lemma callee_saved_tp_forget (m mr : regfile) (v : mword 64) :
-  callee_saved (<[Regidx (mword_of_int 4 : mword 5) := v]> m) mr -> callee_saved m mr.
-Proof.
-  unfold callee_saved.
-  intros (Hsp&Hs0&Hs1&Hs2&Hs3&Hs4&Hs5&Hs6&Hs7&Hs8&Hs9&Hs10&Hs11).
-  repeat split.
-  - rewrite Hsp. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs0. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs1. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs2. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs3. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs4. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs5. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs6. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs7. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs8. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs9. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs10. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs11. apply upd_ne. vm_compute; discriminate.
-Qed.
-
 Module KfreeProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELEASE) : KFREE.
 
 Section ProofKfree.
@@ -666,19 +625,9 @@ Section ProofKfree.
       rewrite /Rae upd_eq. rewrite HRlds2. apply add_vec_zero_l. }
     assert (HRrelra : Rrel !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KF + 0x50) : mword 64) 4)
       by (rewrite /Rrel; apply upd_eq).
-    (* [wp_release_sconf_body] still states an entry premise on the RAW tp
-       slot of its own map (see ProofHoldingsleep.v for the full rationale);
-       respell [Rrel] with its tp slot FORCED to [cid_word] so the premise
-       becomes trivial. *)
-    set (Rrelt := <[Regidx (mword_of_int 4 : mword 5) := cid_word]> Rrel).
-    iEval (rewrite -(sie_cap_gpr_tp_forget Rrel (K - 4)%nat false pcur cid_word)) in "Hcg".
-    change (<[Regidx (mword_of_int 4 : mword 5) := cid_word]> Rrel) with Rrelt.
-    assert (HRrelta0 : Rrelt !!! Regidx (mword_of_int 10 : mword 5) = Rrel !!! Regidx (mword_of_int 10 : mword 5))
-      by (apply upd_ne; vm_compute; discriminate).
-    iApply (Release.wp_release_sconf Φ γl lk "kmem"%string (kmem_res γk fl) Rrelt
+    iApply (Release.wp_release_sconf Φ γl lk "kmem"%string (kmem_res γk fl) Rrel
               n eb pcur C (K - 4)%nat
-              ltac:(rewrite HRrelta0 HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
-              ltac:(rewrite /Rrelt upd_eq; reflexivity)
+              ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hkmem] Htok HRres Hcnt Hpay [-]").
     { iExact "Hkmem". }
@@ -686,8 +635,7 @@ Section ProofKfree.
        -- literally the term [Hbmatch] equates with [b] -- so the fresh hart
        it hands back is at [wp_next b], matching kfree's own top-level index. *)
     rewrite -Hbmatch.
-    iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hrelpins0 Hcnt".
-    assert (Hrelpins : callee_saved Rrel mrel) by (eapply callee_saved_tp_forget; exact Hrelpins0).
+    iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hpc54 : ret_pc (Rrel !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KF + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".

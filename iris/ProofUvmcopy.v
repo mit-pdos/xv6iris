@@ -441,34 +441,10 @@ Section ProofUvmcopy.
   (* ------------------------------------------------------------------ *)
   (* THE err BLOCK (+0x6c .. +0x7c), reached from BOTH failure arms.      *)
   (* ------------------------------------------------------------------ *)
-  (* THE TP BRIDGE (ProofUvmfree.v/ProofMappages.v's [sie_cap_gpr_settp],
-     restated here).  A register map's OWN [Rtp] slot is dead data:
-     [sie_cap_gpr] owns [gpr_file (tp_pin m)], and [tp_pin] OVERWRITES [Rtp]
-     with the CURRENT hart's [cid_word] regardless of what [m] itself says
-     there.  So [m]'s [Rtp] field may be freely patched to whatever value a
-     callee's entry premise wants -- in particular Uvmunmap's
-     still-syntactically-present [m !!! Rtp = cid_word] premise, needed at
-     whichever hart "Hcg" is actually held at (not in general the entry hart
-     an inherited [Rtp] value traces back to, under a generic migrating [b]).
-     Patching sidesteps proving an equality between two hart ids that need
-     not agree. *)
-  Local Lemma sie_cap_gpr_settp `{CID0 : CpuId} (m : regfile) (n : nat) (b : bool)
-      (p0 v : mword 64) :
-    sie_cap_gpr m n b p0 -∗ sie_cap_gpr (<[Regidx Rtp := v]> m) n b p0.
-  Proof.
-    assert (Hsp : <[Regidx Rtp := v]> m !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
-      by (apply upd_ne; reg_neq).
-    assert (Htpn : tp_pin (<[Regidx Rtp := v]> m) = tp_pin m)
-      by (unfold tp_pin; apply upd_upd).
-    unfold sie_cap_gpr, sie_cap. rewrite Hsp Htpn. by iIntros "$".
-  Qed.
-
   (* DECOMPOSED: takes its OWN [CID0] (the hart uc_loop's callers reach it
-     at), not the section's ambient one.  No [Rtp = cid_word] premise -- see
-     [sie_cap_gpr_settp] above: it is derived FRESH right before Uvmunmap's
-     call, the only place still asking for it, instead of threaded from
-     entry (nothing else needs it: Kalloc/Mappages/Kfree/WalkNoalloc/Memmove
-     dropped this premise in the new interface). *)
+     at), not the section's ambient one.  [SpecUvmunmap.v]'s entry-side tp
+     premise is gone (HartTp.v -- the map's tp slot is IGNORED), so no
+     re-tagging is needed before the Uvmunmap call below. *)
   Local Lemma uc_err `{CID0 : CpuId} (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (Pold Pnew Pj : uptd) (vpn0 : mword 27) (n j : nat) (K : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (spr iv : mword 64)
@@ -593,48 +569,28 @@ Section ProofUvmcopy.
       uc_thr_peel. apply Hthr; assumption. }
     iDestruct (cpu_own_transport CID0 CIDe5 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    (* patch [Rtp] to THIS (CIDe5) hart's id -- see [sie_cap_gpr_settp]. *)
-    iDestruct (sie_cap_gpr_settp N5 (K - 10)%nat b p cid_word with "Hcg") as "Hcg".
-    set (N5' := <[Regidx Rtp := cid_word]> N5).
-    change (<[Regidx Rtp := cid_word]> N5) with N5'.
-    assert (HN5'tp : N5' !!! Regidx Rtp = cid_word) by (rewrite /N5' upd_eq; reflexivity).
-    assert (HN5'a0 : N5' !!! Regidx Ra0 = page_base Pj.(ud_root))
-      by (rewrite /N5' upd_ne; [exact HN5a0 | reg_neq]).
-    assert (HN5'a1 : N5' !!! Regidx Ra1 = (mword_of_int 0 : mword 64))
-      by (rewrite /N5' upd_ne; [exact HN5a1 | reg_neq]).
-    assert (HN5'a2 : N5' !!! Regidx Ra2 = (mword_of_int (Z.of_nat j) : mword 64))
-      by (rewrite /N5' upd_ne; [exact HN5a2 | reg_neq]).
-    assert (HN5'a3 : N5' !!! Regidx Ra3 = (mword_of_int 1 : mword 64))
-      by (rewrite /N5' upd_ne; [exact HN5a3 | reg_neq]).
-    assert (HN5'sp : N5' !!! Regidx csp_rs1 = spr)
-      by (rewrite /N5' upd_ne; [exact HN5sp | reg_neq]).
-    assert (HN5'ra : N5' !!! Regidx Rra = add_vec_int (mword_of_int (UC + 0x76) : mword 64) 4)
-      by (rewrite /N5' upd_ne; [exact HN5ra | reg_neq]).
-    assert (HN5'thr : uc_thr mm N5').
-    { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
-      rewrite /N5' upd_ne; [| uc_thr_ne]. apply HN5thr; assumption. }
-    assert (Hual : subrange_vec_dec (N5' !!! Regidx Ra1) 11 0 = (zeros' 12 : mword 12)).
-    { rewrite HN5'a1. apply bv_eq. vm_compute. reflexivity. }
-    assert (Hua3 : N5' !!! Regidx Ra3 <> (mword_of_int 0 : mword 64)).
-    { rewrite HN5'a3. intro He. apply (f_equal bv_unsigned) in He.
+    assert (Hual : subrange_vec_dec (N5 !!! Regidx Ra1) 11 0 = (zeros' 12 : mword 12)).
+    { rewrite HN5a1. apply bv_eq. vm_compute. reflexivity. }
+    assert (Hua3 : N5 !!! Regidx Ra3 <> (mword_of_int 0 : mword 64)).
+    { rewrite HN5a3. intro He. apply (f_equal bv_unsigned) in He.
       vm_compute in He. discriminate. }
-    assert (Hurng : (uint (N5' !!! Regidx Ra1) + Z.of_nat j * 4096 <= uvm_maxsz)%Z).
-    { rewrite HN5'a1 uvm_maxsz_val.
+    assert (Hurng : (uint (N5 !!! Regidx Ra1) + Z.of_nat j * 4096 <= uvm_maxsz)%Z).
+    { rewrite HN5a1 uvm_maxsz_val.
       assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z) by (vm_compute; reflexivity).
       rewrite Hu0. clear -Hjb. lia. }
-    iApply (Uvmunmap.wp_uvmunmap_sconf γa Φ N5' Pj j (K - 10)%nat eb p C 0%nat b
-              HKuu ltac:(vm_compute; reflexivity) HN5'tp HN5'a0 Hual HN5'a2 Hua3 Hurng
+    iApply (Uvmunmap.wp_uvmunmap_sconf γa Φ N5 Pj j (K - 10)%nat eb p C 0%nat b
+              HKuu ltac:(vm_compute; reflexivity) HN5a0 Hual HN5a2 Hua3 Hurng
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
     iIntros (CIDe6 Hse6 mu) "Hcg Hcnt Hpc %Hucs Hpt".
-    iEval (rewrite HN5'a1 Hvpn0) in "Hpt".
-    assert (Hret7a : ret_pc (N5' !!! Regidx Rra) = mword_of_int (UC + 0x7a)).
-    { rewrite HN5'ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
+    iEval (rewrite HN5a1 Hvpn0) in "Hpt".
+    assert (Hret7a : ret_pc (N5 !!! Regidx Rra) = mword_of_int (UC + 0x7a)).
+    { rewrite HN5ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret7a) in "Hpc".
     assert (Husp : mu !!! Regidx csp_rs1 = spr).
-    { rewrite (callee_saved_lookup Hucs csp_rs1 ltac:(vm_compute; reflexivity)). exact HN5'sp. }
+    { rewrite (callee_saved_lookup Hucs csp_rs1 ltac:(vm_compute; reflexivity)). exact HN5sp. }
     assert (Huthr : uc_thr mm mu).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
-      rewrite (callee_saved_lookup Hucs c Hc). apply HN5'thr; assumption. }
+      rewrite (callee_saved_lookup Hucs c Hc). apply HN5thr; assumption. }
     iDestruct (uc_restore Pnew Pj vpn0 j Hext Hout Hfr with "Hpt") as "Hpt".
     (* --- +0x7a c.li a0,-1 --- *)
     iApply (wp_cli_s_sconf Φ (mword_of_int (UC + 0x7a)) Ra0

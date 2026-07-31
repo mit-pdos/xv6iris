@@ -35,13 +35,11 @@
    threading at all -- [rewrite wp_next_off] collapses each of its steps
    back onto the same hart, exactly as an interrupts-off proof always did.
 
-   Release's own contract (SpecRelease.v) still asks the caller for the RAW
-   register file's tp slot literally at [cid_word] on entry (unlike
-   acquire's, which the port dropped) -- see the porting guide.  [tp_pin]
-   gives a representative of the SAME [sie_cap_gpr] resource whose raw tp
-   slot IS [cid_word] by construction (idempotent pin), so retagging the map
-   handed to release discharges that premise without needing to know
-   anything about the map filedup actually carries.
+   Release's own contract (SpecRelease.v) no longer states an entry premise
+   on the register file's raw tp slot (HartTp.v -- the map's tp slot is
+   IGNORED; the true tp is [cid_word_of <the hart we are on>] by
+   construction), so the map filedup carries is handed to release as-is,
+   with no retagging.
 
    Release's own exit SIE index is DERIVED, not asserted equal to filedup's
    [b]: [sie_b_agree] below reads the ghost agreement between [sie_cap_gpr]'s
@@ -117,48 +115,6 @@ Section ProofFiledup.
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-  Qed.
-
-  (* release's own precondition (SpecRelease.v) still asks for the RAW map's
-     tp slot literally at [cid_word]; [tp_pin m] is a representative of the
-     SAME [sie_cap_gpr m av b p] resource (idempotent pin, [sp] untouched)
-     whose raw tp slot IS [cid_word] by construction.
-
-     A FRESH [CID0] binder, not the section's ambient [CID]: this lemma gets
-     applied at whatever hart the prologue's [wp_next] chain has already
-     moved to (e.g. [CIDacq]), and a helper pinned to the section's own
-     [CID] would silently target the ENTRY hart instead -- see the porting
-     guide's "a helper lemma sharing the enclosing Section's Context CID". *)
-  Local Lemma sie_cap_gpr_tp_retag `{CID0 : CpuId} (m : regfile) (av : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr (CID := CID0) m av b p -∗
-    sie_cap_gpr (CID := CID0) (tp_pin (CID := CID0) m) av b p.
-  Proof.
-    rewrite /sie_cap_gpr /sie_cap (tp_pin_sp (CID := CID0))
-      (tp_pin_id (CID := CID0) (tp_pin (CID := CID0) m) (rget_tp (CID := CID0) m)).
-    iIntros "$".
-  Qed.
-
-  (* [rget_ne] restated with a PLAIN [!!!] LHS (rather than [rget]'s folded
-     form) so [rewrite] matches directly against a goal that already shows
-     [tp_pin m !!! Regidx k] syntactically -- e.g. release's own [let lk0 :=
-     m !!! Regidx …] / [let ret_tgt := ret_pc (m !!! Regidx …)] once [m] is
-     instantiated at [tp_pin D5]. *)
-  Local Lemma tp_pin_ne `{CID0 : CpuId} (m : regfile) (k : mword 5) :
-    Regidx k <> Regidx Rtp -> tp_pin (CID := CID0) m !!! Regidx k = m !!! Regidx k.
-  Proof. exact (rget_ne (CID := CID0) m k). Qed.
-
-  (* [callee_saved] never mentions tp (index 4), so a [callee_saved (tp_pin
-     m) mr] fact is exactly [callee_saved m mr] -- each of the 13 conjuncts
-     sits at an index other than tp.  Same fresh-binder caveat as above. *)
-  Local Lemma callee_saved_untp_l `{CID0 : CpuId} (m mr : regfile) :
-    callee_saved (tp_pin (CID := CID0) m) mr -> callee_saved m mr.
-  Proof.
-    unfold callee_saved. intros (H2&H8&H9&H18&H19&H20&H21&H22&H23&H24&H25&H26&H27).
-    repeat split;
-      match goal with
-      | H : mr !!! Regidx ?c = tp_pin (CID := CID0) m !!! Regidx ?c |- mr !!! Regidx ?c = m !!! Regidx ?c =>
-          rewrite H; exact (rget_ne (CID := CID0) m c ltac:(vm_compute; discriminate))
-      end.
   Qed.
 
   Lemma wp_filedup_sconf (Φ : mval -> iProp Σ)
@@ -492,25 +448,20 @@ Section ProofFiledup.
       rewrite /D3 upd_ne; [| vm_compute; discriminate]. exact HD2s1. }
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (FD + 0x2a) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
-    (* ===== +0x2a lands us in release; retag the map so its raw tp premise
-       is trivial, and let filedup's own derived index [Houtb] absorb
-       release's [outb]. ===== *)
-    iDestruct (sie_cap_gpr_tp_retag (CID0 := CIDacq) D5 (K - 4)%nat false p with "Hcg") as "Hcg".
-    iApply (Release.wp_release_sconf Φ γl ftable_addr "ftable"%string (ftable_res γf) (tp_pin (CID := CIDacq) D5)
+    (* ===== +0x2a lands us in release; let filedup's own derived index
+       [Houtb] absorb release's [outb]. ===== *)
+    iApply (Release.wp_release_sconf Φ γl ftable_addr "ftable"%string (ftable_res γf) D5
               n eb p C (K - 4)%nat
-              ltac:(rewrite (tp_pin_ne (CID0 := CIDacq) D5 Ra0 ltac:(vm_compute; discriminate)) HD5a0;
-                    apply bv_eq; vm_compute; reflexivity)
-              (rget_tp (CID := CIDacq) D5)
+              ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     rewrite <- Houtb in Hsr.
-    pose proof (callee_saved_untp_l (CID0 := CIDacq) D5 mr Hrelpins) as Hrelpins_cs.
-    assert (Hpc2e : ret_pc (tp_pin (CID := CIDacq) D5 !!! Regidx Rra) = mword_of_int (FD + 0x2e)).
-    { rewrite (tp_pin_ne (CID0 := CIDacq) D5 Rra ltac:(vm_compute; discriminate)) HD5ra.
-      apply bv_eq; vm_compute; reflexivity. }
+    pose proof Hrelpins as Hrelpins_cs.
+    assert (Hpc2e : ret_pc (D5 !!! Regidx Rra) = mword_of_int (FD + 0x2e)).
+    { rewrite HD5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc2e) in "Hpc".
     (* ===== EPILOGUE (generic [b], via [Houtb]) ===== *)
     iPoseProof (fdi_2e with "Htext") as "Hi2e".

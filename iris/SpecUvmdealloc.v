@@ -60,7 +60,6 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 4-slot frame + uvmunmap's 22 *)
   (26 <= K)%nat ->
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
   (* the OLD size names a page inside the user region.  Nothing is asked of
      [newsz]: on the arm where it matters it is below [oldsz] and so inherits

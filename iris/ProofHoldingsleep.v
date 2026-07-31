@@ -92,49 +92,6 @@ Proof.
     exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
 Qed.
 
-(* THE tp-forget BRIDGE for release's call.  [wp_release_sconf_body] still
-   states an entry premise on the RAW map's tp slot ([m !!! Regidx 4 =
-   cid_word], pop_off's cid convention) even though [HartTp.tp_pin] makes the
-   ACTUAL register file's tp meaningless -- the register file the engine
-   really holds is [gpr_file (tp_pin m)], which overwrites index 4
-   regardless of what [m] says there.  So a caller can always satisfy the
-   premise by respelling its own map with the tp slot FORCED to [cid_word]:
-   [tp_pin] erases the difference, so the [sie_cap_gpr] resource is
-   UNCHANGED, and since tp is not a callee-saved index the postcondition's
-   [callee_saved] fact transfers back to the original map for free. *)
-Lemma sie_cap_gpr_tp_forget `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (avail : nat) (b : bool) (p v : mword 64) :
-  sie_cap_gpr (<[Regidx (mword_of_int 4 : mword 5) := v]> m) avail b p
-  = sie_cap_gpr m avail b p.
-Proof.
-  unfold sie_cap_gpr, sie_cap, tp_pin.
-  rewrite upd_upd.
-  rewrite (upd_ne m (Regidx (mword_of_int 4 : mword 5)) (Regidx csp_rs1) v
-             ltac:(vm_compute; discriminate)).
-  reflexivity.
-Qed.
-
-Lemma callee_saved_tp_forget (m mr : regfile) (v : mword 64) :
-  callee_saved (<[Regidx (mword_of_int 4 : mword 5) := v]> m) mr -> callee_saved m mr.
-Proof.
-  unfold callee_saved.
-  intros (Hsp&Hs0&Hs1&Hs2&Hs3&Hs4&Hs5&Hs6&Hs7&Hs8&Hs9&Hs10&Hs11).
-  repeat split.
-  - rewrite Hsp. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs0. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs1. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs2. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs3. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs4. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs5. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs6. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs7. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs8. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs9. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs10. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs11. apply upd_ne. vm_compute; discriminate.
-Qed.
-
 Module HoldingsleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC) : HOLDINGSLEEP.
 
 Section ProofHoldingsleep.
@@ -562,32 +519,16 @@ Section ProofHoldingsleep.
       rewrite /C46 upd_ne; [| vm_compute; discriminate]. exact HC42csp. }
     (* close sl_res again (held), for release's R argument. *)
     iDestruct (sl_res_close_held γsl slk R v Hvnz with "Hslk") as "HR2".
-    (* [wp_release_sconf_body] still states an entry premise on the RAW tp
-       slot of its own map ("the tp register holds THIS cpu's id", pop_off's
-       convention) even though the ACTUAL register file always pins tp via
-       [HartTp.tp_pin] regardless of what the map says there.  Respell [D20]
-       with its tp slot FORCED to [cid_word]: [sie_cap_gpr_tp_forget] shows
-       this is the SAME [sie_cap_gpr] resource (tp is overwritten either way),
-       so the premise becomes a trivial [upd_eq], and since tp is not a
-       callee-saved index ([callee_saved_tp_forget]) the postcondition
-       transfers back to [D20] for free. *)
-    set (D20t := <[Regidx (mword_of_int 4 : mword 5) := cid_word]> D20).
-    iEval (rewrite -(sie_cap_gpr_tp_forget D20 (av - 6)%nat false p cid_word)) in "Hcg".
-    change (<[Regidx (mword_of_int 4 : mword 5) := cid_word]> D20) with D20t.
-    assert (HD20ta0 : D20t !!! Regidx (mword_of_int 10 : mword 5) = D20 !!! Regidx (mword_of_int 10 : mword 5))
-      by (apply upd_ne; vm_compute; discriminate).
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20t
+    iApply (Release.wp_release_sconf Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20
               0%nat b p C (av - 6)%nat
-              ltac:(rewrite HD20ta0 HD20a0; apply wk_add_vec_0)
-              ltac:(rewrite /D20t upd_eq; reflexivity)
+              ltac:(rewrite HD20a0; apply wk_add_vec_0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR2] Hcnt Hpay [-]").
     { iExact "Hlk". }
     { iExact "Htok". }
     { iExact "HR2". }
-    iIntros (CIDrel Hsrel MR) "Hcg Hpc %HcsMR0 Hcnt".
-    assert (HcsMR : callee_saved D20 MR) by (eapply callee_saved_tp_forget; exact HcsMR0).
+    iIntros (CIDrel Hsrel MR) "Hcg Hpc %HcsMR Hcnt".
     assert (Hpc24 : ret_pc (D20 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (HSL + 0x24))
       by (rewrite HD20ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".

@@ -136,23 +136,6 @@ Section ProofBpin.
       + iPureIntro. reflexivity.
   Qed.
 
-  (* THE tp RE-PIN (see ProofSysUptime.v): [callee_saved] excludes tp, so
-     acquire's opaque return map carries no fact about its own tp slot, yet
-     RELEASE's raw-map tp premise still needs one -- re-pin it for free. *)
-  Local Lemma tp_pin_idem `{CID0 : CpuId} (m : regfile) : tp_pin (tp_pin m) = tp_pin m.
-  Proof. apply tp_pin_id. exact (rget_tp m). Qed.
-
-  Local Lemma sie_cap_gpr_tp_pin `{CID0 : CpuId} (m : regfile) (n : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr m n b p -∗ sie_cap_gpr (tp_pin m) n b p.
-  Proof.
-    iIntros "Hcg". iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iApply (sie_cap_gpr_join with "Hhs Hsc [Hcap] [Hfile]").
-    - assert (Heq : sie_cap (tp_pin m) n b p = sie_cap m n b p)
-        by (rewrite /sie_cap tp_pin_sp; reflexivity).
-      rewrite Heq. iExact "Hcap".
-    - rewrite tp_pin_idem. iExact "Hfile".
-  Qed.
-
   (* the value the [c.addiw a5,a5,1] leaves for the store, as a function of
      the loaded word -- what joins the two arms of the critical section. *)
   Local Definition incr32 (cw : mword 32) : mword 32 :=
@@ -335,16 +318,6 @@ Section ProofBpin.
       by (rewrite (callee_saved_lookup Hacqpins_cs csp_rs1 ltac:(vm_compute; reflexivity)); exact HmAsp).
     assert (Hms1 : macq !!! Regidx Rs1 = bnode k)
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 9) ltac:(vm_compute; reflexivity)); exact HmAs1).
-    (* re-pin the opaque map's tp slot: [callee_saved] says nothing about it
-       (CalleeSaved.v), but RELEASE still wants a raw-map tp fact -- get it
-       for free instead (ProofSysUptime.v has the full comment). *)
-    iDestruct (sie_cap_gpr_tp_pin _ _ _ _ with "Hcg") as "Hcg".
-    set (macq0 := tp_pin macq).
-    assert (Hmacq0tp : macq0 !!! Regidx Rtp = cid_word) by (exact (rget_tp macq)).
-    assert (Hmacq0sp : macq0 !!! Regidx csp_rs1 = spr)
-      by (rewrite /macq0 tp_pin_sp; exact Hmsp).
-    assert (Hmacq0s1 : macq0 !!! Regidx Rs1 = bnode k)
-      by (rewrite /macq0 upd_ne; [exact Hms1 | vm_compute; discriminate]).
     (* ===== the critical section ===== *)
     (* the refcnt cell, at the address the [c.lw]/[c.sw] compute *)
     assert (Hs64 : sign_extend' 64 (mword_of_int 64 : mword 12) = (mword_of_int 64 : mword 64))
@@ -457,22 +430,22 @@ Section ProofBpin.
     iPoseProof (bpi_22 with "Htext") as "Hi22".
     iPoseProof (bpi_26 with "Htext") as "Hi26".
     (* +0x18 c.lw a5,64(s1) *)
-    assert (Hpa : add_vec (rget macq0 Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
+    assert (Hpa : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                   = brefcnt k).
-    { rgne. rewrite Hmacq0s1 Hs64. rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
+    { rgne. rewrite Hms1 Hs64. rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
     iApply (wp_clw_s_sconf Φ (mword_of_int (BP + 0x18)) Ra5 Rs1 (mword_of_int 64 : mword 12)
-              macq0 (K - 4)%nat (cw : mword 32) false
+              macq (K - 4)%nat (cw : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell [-]").
     rewrite wp_next_off.
     iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa) in "Hcell".
-    set (D1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 (cw : mword 32))]> macq0).
+    set (D1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 (cw : mword 32))]> macq).
     assert (HD1a5 : D1 !!! Regidx Ra5 = sign_extend' 64 (cw : mword 32))
       by (rewrite /D1; apply upd_eq).
     assert (HD1s1 : D1 !!! Regidx Rs1 = bnode k)
-      by (rewrite /D1 upd_ne; [exact Hmacq0s1 | vm_compute; discriminate]).
+      by (rewrite /D1 upd_ne; [exact Hms1 | vm_compute; discriminate]).
     assert (Hpp1a : add_vec_int (mword_of_int (BP + 0x18) : mword 64) 2 = mword_of_int (BP + 0x1a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
@@ -556,23 +529,14 @@ Section ProofBpin.
       rewrite /D4 upd_ne; [| regne].
       rewrite /D3 upd_ne; [| regne].
       rewrite /D2 upd_ne; [| regne].
-      rewrite /D1 upd_ne; [| regne].
-      rewrite /macq0 upd_ne; [reflexivity | regne]. }
+      rewrite /D1 upd_ne; [reflexivity | regne]. }
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spr)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmsp).
-    assert (HD5tp : D5 !!! Regidx Rtp = cid_word).
-    { rewrite /D5 upd_ne; [| vm_compute; discriminate].
-      rewrite /D4 upd_ne; [| vm_compute; discriminate].
-      rewrite /D3 upd_ne; [| vm_compute; discriminate].
-      rewrite /D2 upd_ne; [| vm_compute; discriminate].
-      rewrite /D1 upd_ne; [| vm_compute; discriminate].
-      exact Hmacq0tp. }
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (BP + 0x26) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
     iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
-              HD5tp
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
     { iExact "Hlock". }

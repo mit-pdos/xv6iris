@@ -1,5 +1,33 @@
 (* ProofVmfault.v -- vmfault() over the SIE-agnostic sconf world.
 
+   *** BLOCKED (explicit-cpuid port, not yet attempted) ***
+   Unlike ProofUvmcreate.v / ProofWalkNoalloc.v (already ported in this
+   sweep), this file is still on the ORIGINAL pre-sweep interface throughout:
+   every [sie_cap_gpr]/[cpu_own] occurrence here is still spelled with a
+   leading ghost name and no trailing SIE-index (`sie_cap_gpr γ mj (K-6)`,
+   `cpu_own γ lvl eb p C`), there is no [wp_next] anywhere, and none of its
+   five callee integrations (Myproc, Ismapped, Kalloc, MemsetPage/Mappages,
+   Kfree) have been touched. Porting it needs the FULL three-stage interface
+   migration (pre-sweep -> CID/[wp_next] -> [p]/[cpu_own_transport]) applied
+   in one pass, not just the final wave the porting task described.
+   Additionally the shared epilogue/five-way-join ([EPI], built via
+   [set]/[iAssert] as a bare, CID-less [iProp Σ] around line 436) hits
+   durable-notes.md's "a nested iAssert cannot rebind a fresh hart" trap
+   head-on: it must first be pulled out into its own top-level
+   [Local Lemma] with a fresh `{CID0 : CpuId}` binder (the same restructuring
+   ProofUvmcreate.v's [uvc_htail] and ProofWalkNoalloc.v's [wp_wkn_epilogue]
+   already needed) before any [wp_next]/[cpu_own_transport] threading through
+   it can typecheck.
+   This is a single 1587-line monolithic lemma (no helper decomposition
+   beyond EPI) integrating five Module-Type callees, at proc/kalloc altitude
+   -- exactly the size class durable-notes.md warns produces 30-40 MINUTE
+   silent hangs (not errors) on a single wrong tactic before any feedback.
+   Given the scale mismatch against the porting task's assumption (that
+   consumer files only need the LAST wave applied), this file was left
+   UNTOUCHED rather than half-ported: see the explicit-cpuid-porting-guide.md
+   recipe (already validated on the other two files) for the mechanical
+   steps once someone budgets for the full sweep here.
+
      uint64 vmfault(pagetable_t pagetable, uint64 va, int read) {
        struct proc *p = myproc();
        if (va >= p->sz) return 0;

@@ -75,13 +75,13 @@ Section ConsoleinitBody.
      such fix). *)
   Hypothesis wp_initlock :
     forall `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32)
-      (vname vcpu : bv 64) (s : string) (K : nat) (b : bool),
-      wp_initlock_sconf_body Φ m vlock vname vcpu s K b.
+      (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
+      wp_initlock_sconf_body Φ m vlock vname vcpu s K b p.
 
   Hypothesis wp_uartinit :
     forall `{CID : CpuId} (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
-      (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (b : bool),
-      wp_uartinit_sconf_body γd Φ m K l b0 vlock vname vcpu b.
+      (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64),
+      wp_uartinit_sconf_body γd Φ m K l b0 vlock vname vcpu p.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -92,8 +92,8 @@ Section ConsoleinitBody.
       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
-      (dread0 dwrite0 : mword 64) (b : bool) :
-    wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 b.
+      (dread0 dwrite0 : mword 64) (b : bool) (p : mword 64) :
+    wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 b p.
   Proof.
     cbv beta delta [wp_consoleinit_sconf_body].
     intros pcE ret_tgt clk c_cname c_ccpu tlk c_tname c_tcpu HK.
@@ -244,9 +244,9 @@ Section ConsoleinitBody.
        everything needed about it is already captured in
        [HW7a0]/[HW7a1]/[HW7sp]/[Hretil] above, which [remember] restates
        at [m7] automatically since [W7] is part of the current goal. *)
-    iAssert (sie_cap_gpr W7 (K - 2)%nat b) with "Hcg" as "Hcg".
+    iAssert (sie_cap_gpr W7 (K - 2)%nat b p) with "Hcg" as "Hcg".
     remember W7 as m7 eqn:Heqm7.
-    iApply (wp_initlock Φ m7 vclock vcname vccpu "cons"%string (K - 2)%nat b
+    iApply (wp_initlock Φ m7 vclock vcname vccpu "cons"%string (K - 2)%nat b p
               ltac:(lia) with "Hcg Htext Hpc [] [Hclock] [Hcname] [Hccpu]").
     { iEval (rewrite HW7a1). iExact "Hstr". }
     { iEval (rewrite HW7a0). iExact "Hclock". }
@@ -270,10 +270,10 @@ Section ConsoleinitBody.
     iEval (rewrite Htgtua) in "Hpc".
     assert (HU0sp : U0 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /U0 upd_ne; [exact Hmilsp | reg_neq]).
-    iApply (wp_uartinit γd Φ U0 (K - 2)%nat l b0 vtlock vtname vtcpu b
+    iApply (wp_uartinit γd Φ U0 (K - 2)%nat l b0 vtlock vtname vtcpu p
               ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab [Htlock] [Htname] [Htcpu]").
     { iExact "Htlock". } { iExact "Htname". } { iExact "Htcpu". }
-    iIntros (CID12 Hs12 mu) "Hcg Hpc %Huacs Htx #Hsent' #Hdoff Htlock #Htnm Htcpu".
+    iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' #Hdoff Htlock #Htnm Htcpu".
     assert (Hretua : ret_pc (U0 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (CI + 0x20)).
     { rewrite /U0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretua) in "Hpc".

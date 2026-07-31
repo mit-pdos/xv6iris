@@ -119,38 +119,6 @@ Section ProofFilealloc.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
-  (* release's own precondition (SpecRelease.v) still asks for the RAW map's
-     tp slot literally at [cid_word]; [tp_pin m] is a representative of the
-     SAME [sie_cap_gpr m av b p] resource whose raw tp slot IS [cid_word] by
-     construction.  Fresh [CID0] binder: see ProofFiledup.v's comment. *)
-  Local Lemma sie_cap_gpr_tp_retag `{CID0 : CpuId} (m : regfile) (av : nat) (b : bool) (p : mword 64) :
-    sie_cap_gpr (CID := CID0) m av b p -∗
-    sie_cap_gpr (CID := CID0) (tp_pin (CID := CID0) m) av b p.
-  Proof.
-    rewrite /sie_cap_gpr /sie_cap (tp_pin_sp (CID := CID0))
-      (tp_pin_id (CID := CID0) (tp_pin (CID := CID0) m) (rget_tp (CID := CID0) m)).
-    iIntros "$".
-  Qed.
-
-  (* [rget_ne] restated with a PLAIN [!!!] LHS so [rewrite] matches directly
-     against release's own [let lk0 := m !!! Regidx …] once [m] is
-     instantiated at [tp_pin D5]-style maps. *)
-  Local Lemma tp_pin_ne `{CID0 : CpuId} (m : regfile) (k : mword 5) :
-    Regidx k <> Regidx Rtp -> tp_pin (CID := CID0) m !!! Regidx k = m !!! Regidx k.
-  Proof. exact (rget_ne (CID := CID0) m k). Qed.
-
-  (* [callee_saved] never mentions tp (index 4). *)
-  Local Lemma callee_saved_untp_l `{CID0 : CpuId} (m mr : regfile) :
-    callee_saved (tp_pin (CID := CID0) m) mr -> callee_saved m mr.
-  Proof.
-    unfold callee_saved. intros (H2&H8&H9&H18&H19&H20&H21&H22&H23&H24&H25&H26&H27).
-    repeat split;
-      match goal with
-      | H : mr !!! Regidx ?c = tp_pin (CID := CID0) m !!! Regidx ?c |- mr !!! Regidx ?c = m !!! Regidx ?c =>
-          rewrite H; exact (rget_ne (CID := CID0) m c ltac:(vm_compute; discriminate))
-      end.
-  Qed.
-
   Lemma wp_filealloc_sconf (Φ : mval -> iProp Σ)
       (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
@@ -866,24 +834,20 @@ Section ProofFilealloc.
         rewrite /F2 upd_ne; [| vm_compute; discriminate]. exact HF1s1. }
       assert (HF4ra : F4 !!! Regidx Rra = add_vec_int (mword_of_int (FA + 0x4e) : mword 64) 4)
         by (rewrite /F4; apply upd_eq).
-      (* ===== +0x4e lands us in release; retag the map and absorb its
-         derived exit index via [Houtb]. ===== *)
-      iDestruct (sie_cap_gpr_tp_retag (CID0 := CIDacq) F4 (K - 4)%nat false p with "Hcg") as "Hcg".
-      iApply (Release.wp_release_sconf Φ γl ftable_addr "ftable"%string (ftable_res γf) (tp_pin (CID := CIDacq) F4)
+      (* ===== +0x4e lands us in release; absorb its derived exit index via
+         [Houtb]. ===== *)
+      iApply (Release.wp_release_sconf Φ γl ftable_addr "ftable"%string (ftable_res γf) F4
                 n eb p C (K - 4)%nat
-                ltac:(rewrite (tp_pin_ne (CID0 := CIDacq) F4 Ra0 ltac:(vm_compute; discriminate)) HF4a0;
-                      apply bv_eq; vm_compute; reflexivity)
-                (rget_tp (CID := CIDacq) F4)
+                ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
       rewrite <- Houtb in Hsr.
-      pose proof (callee_saved_untp_l (CID0 := CIDacq) F4 mr Hrelpins) as Hrelpins_cs.
-      assert (Hpc52 : ret_pc (tp_pin (CID := CIDacq) F4 !!! Regidx Rra) = mword_of_int (FA + 0x52)).
-      { rewrite (tp_pin_ne (CID0 := CIDacq) F4 Rra ltac:(vm_compute; discriminate)) HF4ra.
-        apply bv_eq; vm_compute; reflexivity. }
+      pose proof Hrelpins as Hrelpins_cs.
+      assert (Hpc52 : ret_pc (F4 !!! Regidx Rra) = mword_of_int (FA + 0x52)).
+      { rewrite HF4ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc52) in "Hpc".
       iApply ("Hepi" $! CIDr mr (fnode i) with "[%] Hcg Hpc Hcnt [Href] [-]").
       { split.
@@ -966,22 +930,18 @@ Section ProofFilealloc.
         rewrite /G1 upd_ne; [apply Mfthr; assumption | regne]. }
       assert (HG3ra : G3 !!! Regidx Rra = add_vec_int (mword_of_int (FA + 0x3a) : mword 64) 4)
         by (rewrite /G3; apply upd_eq).
-      iDestruct (sie_cap_gpr_tp_retag (CID0 := CIDacq) G3 (K - 4)%nat false p with "Hcg") as "Hcg".
-      iApply (Release.wp_release_sconf Φ γl ftable_addr "ftable"%string (ftable_res γf) (tp_pin (CID := CIDacq) G3)
+      iApply (Release.wp_release_sconf Φ γl ftable_addr "ftable"%string (ftable_res γf) G3
                 n eb p C (K - 4)%nat
-                ltac:(rewrite (tp_pin_ne (CID0 := CIDacq) G3 Ra0 ltac:(vm_compute; discriminate)) HG3a0;
-                      apply bv_eq; vm_compute; reflexivity)
-                (rget_tp (CID := CIDacq) G3)
+                ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
       rewrite <- Houtb in Hsr.
-      pose proof (callee_saved_untp_l (CID0 := CIDacq) G3 mr Hrelpins) as Hrelpins_cs.
-      assert (Hpc3e : ret_pc (tp_pin (CID := CIDacq) G3 !!! Regidx Rra) = mword_of_int (FA + 0x3e)).
-      { rewrite (tp_pin_ne (CID0 := CIDacq) G3 Rra ltac:(vm_compute; discriminate)) HG3ra.
-        apply bv_eq; vm_compute; reflexivity. }
+      pose proof Hrelpins as Hrelpins_cs.
+      assert (Hpc3e : ret_pc (G3 !!! Regidx Rra) = mword_of_int (FA + 0x3e)).
+      { rewrite HG3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc3e) in "Hpc".
       (* +0x3e c.li s1,0 -- past release, GENERIC [b] again (via [Houtb]) *)
       iApply (wp_cli_s_sconf Φ (mword_of_int (FA + 0x3e)) Rs1 (mword_of_int 0 : mword 6)

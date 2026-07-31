@@ -44,8 +44,8 @@ Section KvminithartBody.
   Lemma wp_kvminithart_sconf_proof
       (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
-      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) :
-    wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b.
+      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) (pcur : mword 64) :
+    wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b pcur.
   Proof.
     unfold wp_kvminithart_sconf_body.
     intros Hlvl HK.
@@ -126,31 +126,45 @@ Section KvminithartBody.
     assert (Hp08 : add_vec_int (mword_of_int (KVI + 0x06) : mword 64) 2 = mword_of_int (KVI + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp08) in "Hpc".
     (* ============ +0x08 sfence.vma zero,zero (under Bare) ============= *)
-    (* BLOCKED (explicit-cpuid port): SpecKvminithart.v wraps this function's
-       continuation in [wp_next b (fun CID => ...)] with a fully GENERIC [b],
-       but [Htlb : tlb ↦ᵣ tlbvec0] (and, further down, [Hbit : strans_bit
-       strans_bit_bare] / [Hbitkpt]) are HART-INDEXED resources ([↦ᵣ] and
-       [strans_bit] both carry an implicit ambient [CpuId]) that this whole
-       function must carry from ENTRY all the way to this sfence.vma (and
-       later to the csrw / second sfence.vma).  Getting here already crosses
-       FOUR wp_next-wrapped leaf steps (caddi_sp_push, the two csdsp's,
-       caddi4spn); at generic [b] each such crossing hands back a genuinely
-       fresh, UNCONSTRAINED [CpuId] (the guide's conditional equality
-       [b = false -> CID = CID0] is vacuous unless [b] is known false), so by
-       the time we reach here [Hreg]/[Hcap] are typed at that fresh hart while
-       [Htlb] is still typed at the function's ENTRY hart -- there is no proof
-       that the two coincide, and no transport lemma for [tlb ↦ᵣ]/[strans_bit]
-       across a generic wp_next crossing exists yet.  This is exactly the
-       "Caller-supplied propositions must be hart-INDEPENDENT" / Stage 2 open
-       design question the porting guide flags, not a mechanical porting
-       mistake: [iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb")] below fails
-       with "iSpecialize: cannot instantiate (tlb ↦ᵣ ?v ==∗ ...) with (tlb
-       ↦ᵣ tlbvec0)".  kvminithart is boot-only code (called from main(),
-       always with interrupts disabled), so the natural fix is for
+    (* STILL BLOCKED (explicit-cpuid port, re-checked after threading the
+       proc-pointer [pcur] through this lemma's signature and the two
+       [sie_cap _ _ b pcur] reassemblies below the switch): as of this check,
+       SpecKvminithart.v's [wp_kvminithart_sconf_body] still wraps the
+       function's continuation in [wp_next b (fun CID => ...)] with a fully
+       GENERIC [b] (confirmed by direct inspection -- it was NOT narrowed to
+       [b = false] despite the design log flagging kvminithart as boot/trap-
+       only), and [sie_cap_gpr]/[sie_cap] gaining the trailing [pcur] argument
+       has NO bearing on this gap: [pcur] threads through identically at
+       entry and exit (never touched by any [wp_next] crossing), while the
+       actual blocker is that [Htlb : tlb ↦ᵣ tlbvec0] (and, further down,
+       [Hbit : strans_bit strans_bit_bare] / [Hbitkpt]) are HART-INDEXED
+       resources ([↦ᵣ] and [strans_bit] both carry an implicit ambient
+       [CpuId], orthogonal to [pcur]) that this whole function must carry
+       from ENTRY all the way to this sfence.vma (and later to the csrw /
+       second sfence.vma).  Getting here already crosses FOUR wp_next-wrapped
+       leaf steps (caddi_sp_push, the two csdsp's, caddi4spn); at generic [b]
+       each such crossing hands back a genuinely fresh, UNCONSTRAINED [CpuId]
+       (the guide's conditional equality [b = false -> CID = CID0] is vacuous
+       unless [b] is known false), so by the time we reach here [Hreg]/[Hcap]
+       are typed at that fresh hart while [Htlb] is still typed at the
+       function's ENTRY hart -- there is no proof that the two coincide, and
+       no transport lemma for [tlb ↦ᵣ]/[strans_bit] across a generic wp_next
+       crossing exists yet.  This is exactly the "Caller-supplied
+       propositions must be hart-INDEPENDENT" / Stage 2 open design question
+       the porting guide flags, not a mechanical porting mistake:
+       [iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb")] below fails with
+       "iSpecialize: cannot instantiate (tlb ↦ᵣ ?v ==∗ ...) with (tlb ↦ᵣ
+       tlbvec0)" -- reproduced verbatim by [coqc] on this file in its current
+       (pcur-threaded) form.  kvminithart is boot-only code (called from
+       main(), always with interrupts disabled), so the natural fix is for
        SpecKvminithart.v to drop the [wp_next] wrapper and state this
        contract at [b = false], the same shape as SpecCpuid.v/SpecMycpu.v --
-       but Spec*.v files are out of scope for this port.  Left un-Qed'd
-       below at the point this genuinely stops. *)
+       but Spec*.v files are out of scope for this port ([pcur]-threading
+       does not change that scope boundary either).  Left un-Qed'd below at
+       the point this genuinely stops; the code below (unreachable under the
+       current interface) has still been kept pcur-consistent where it
+       directly mentions [sie_cap], so no further mechanical work remains
+       here once SpecKvminithart.v is fixed. *)
     iApply (wp_instr_s_sconf W2 (K - 2)%nat b Φ (mword_of_int (KVI + 0x08)) false
               (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
               with "Hcg Hpc Hi08").
@@ -309,7 +323,7 @@ Section KvminithartBody.
     { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
     iMod (strans_bit_flip with "Hbit Hbit2") as "[Hbitkpt Hbitkpt2]".
     iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
-    iAssert (sie_cap S4 (K - 2) b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap S4 (K - 2) b pcur) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
     iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word root)).
     iSplitR.
@@ -366,7 +380,7 @@ Section KvminithartBody.
                  (tlb_ok_pt_empty (mword_of_int 0) kt3 tlbz3 (fun vpn' => Hnone3 _ (tlb_hash_range vpn')))
                  with "Hsatp Htlbc Hlb3 Hpmp Hkinv3") as "Htlbinv".
     iDestruct (strans_inv_intro root_ppn with "Hbit1 Htlbinv") as "Htr".
-    iAssert (sie_cap S4 (K - 2) b) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap S4 (K - 2) b pcur) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
     iModIntro. iExists (set_reg s_pc3 tlb tlbz3).
     iSplitR.
@@ -459,7 +473,7 @@ Module KvminithartProof : KVMINITHART.
       `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
-      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool)
-      : wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b :=
-    wp_kvminithart_sconf_proof Φ mm lvl K root tlbvec0 b.
+      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) (pcur : mword 64)
+      : wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b pcur :=
+    wp_kvminithart_sconf_proof Φ mm lvl K root tlbvec0 b pcur.
 End KvminithartProof.

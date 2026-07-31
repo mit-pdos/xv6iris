@@ -40,11 +40,11 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
-(* See ProofKfree.v (kf_b_derive / sie_cap_gpr_tp_forget / callee_saved_tp_forget)
-   for the full rationale -- kalloc needs the identical three bridges: the
-   entry [b]/[(n,eb)] agreement (so kalloc's own top-level [wp_next b] can
-   absorb release's [wp_next outb]), and the tp-forget pair for release's
-   entry premise on the raw tp slot. *)
+(* See ProofKfree.v (kf_b_derive) for the full rationale -- kalloc needs the
+   identical bridge: the entry [b]/[(n,eb)] agreement, so kalloc's own
+   top-level [wp_next b] can absorb release's [wp_next outb]. [SpecRelease.v]'s
+   entry-side tp premise is gone (HartTp.v -- the map's tp slot is ignored),
+   so no tp-forget bridge is needed any more. *)
 Lemma ka_b_derive `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
     (m : regfile) (K : nat) (p : mword 64) (n : nat) (eb b : bool) (C : iProp Σ) :
   sie_cap_gpr m K b p -∗ cpu_own n eb p C b -∗
@@ -65,39 +65,6 @@ Proof.
       iPureIntro. destruct eb; [ | reflexivity ].
       exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
     + iPureIntro. reflexivity.
-Qed.
-
-Lemma sie_cap_gpr_tp_forget `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (avail : nat) (b : bool) (p v : mword 64) :
-  sie_cap_gpr (<[Regidx (mword_of_int 4 : mword 5) := v]> m) avail b p
-  = sie_cap_gpr m avail b p.
-Proof.
-  unfold sie_cap_gpr, sie_cap, tp_pin.
-  rewrite upd_upd.
-  rewrite (upd_ne m (Regidx (mword_of_int 4 : mword 5)) (Regidx csp_rs1) v
-             ltac:(vm_compute; discriminate)).
-  reflexivity.
-Qed.
-
-Lemma callee_saved_tp_forget (m mr : regfile) (v : mword 64) :
-  callee_saved (<[Regidx (mword_of_int 4 : mword 5) := v]> m) mr -> callee_saved m mr.
-Proof.
-  unfold callee_saved.
-  intros (Hsp&Hs0&Hs1&Hs2&Hs3&Hs4&Hs5&Hs6&Hs7&Hs8&Hs9&Hs10&Hs11).
-  repeat split.
-  - rewrite Hsp. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs0. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs1. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs2. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs3. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs4. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs5. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs6. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs7. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs8. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs9. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs10. apply upd_ne. vm_compute; discriminate.
-  - rewrite Hs11. apply upd_ne. vm_compute; discriminate.
 Qed.
 
 Module KallocProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELEASE) : KALLOC.
@@ -342,22 +309,14 @@ Section ProofKalloc.
       { rewrite /E3 upd_ne; [| vm_compute; discriminate]. exact Ha0kmem2. }
       assert (HE3ra : E3 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (AK + 0x54) : mword 64) 4)
         by (rewrite /E3; apply upd_eq).
-      (* tp-forget: see ProofKfree.v for the full rationale. *)
-      set (E3t := <[Regidx (mword_of_int 4 : mword 5) := cid_word]> E3).
-      iEval (rewrite -(sie_cap_gpr_tp_forget E3 (K - 4)%nat false p cid_word)) in "Hcg".
-      change (<[Regidx (mword_of_int 4 : mword 5) := cid_word]> E3) with E3t.
-      assert (HE3ta0 : E3t !!! Regidx (mword_of_int 10 : mword 5) = E3 !!! Regidx (mword_of_int 10 : mword 5))
-        by (apply upd_ne; vm_compute; discriminate).
-      iApply (Release.wp_release_sconf Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3t
+      iApply (Release.wp_release_sconf Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
                 n eb p C (K - 4)%nat
-                ltac:(rewrite HE3ta0 HE3a0; apply bv_eq; vm_compute; reflexivity)
-                ltac:(rewrite /E3t upd_eq; reflexivity)
+                ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
       { iExact "Hlock". }
       rewrite -Hbmatch.
-      iIntros (CIDrel Hsrel mr0) "Hcg Hpc %Hrelpins0 Hcnt".
-      assert (Hrelpins : callee_saved E3 mr0) by (eapply callee_saved_tp_forget; exact Hrelpins0).
+      iIntros (CIDrel Hsrel mr0) "Hcg Hpc %Hrelpins Hcnt".
       rename mr0 into mr.
       assert (Hpc58 : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (AK + 0x58)).
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -622,22 +581,14 @@ Section ProofKalloc.
       assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = pg).
       { rewrite /R12 /R11 /R10 /R9 /R8;
         repeat (rewrite upd_ne; [| vm_compute; discriminate]); exact Hs1R7. }
-      (* tp-forget: see ProofKfree.v for the full rationale. *)
-      set (R12t := <[Regidx (mword_of_int 4 : mword 5) := cid_word]> R12).
-      iEval (rewrite -(sie_cap_gpr_tp_forget R12 (K - 4)%nat false p cid_word)) in "Hcg".
-      change (<[Regidx (mword_of_int 4 : mword 5) := cid_word]> R12) with R12t.
-      assert (HR12ta0 : R12t !!! Regidx (mword_of_int 10 : mword 5) = R12 !!! Regidx (mword_of_int 10 : mword 5))
-        by (apply upd_ne; vm_compute; discriminate).
-      iApply (Release.wp_release_sconf Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12t
+      iApply (Release.wp_release_sconf Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
                 n eb p C (K - 4)%nat
-                ltac:(rewrite HR12ta0 HR12a0; apply bv_eq; vm_compute; reflexivity)
-                ltac:(rewrite /R12t upd_eq; reflexivity)
+                ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay [-]").
       { iExact "Hlock". }
       rewrite -Hbmatch.
-      iIntros (CIDrel Hsrel mr0) "Hcg Hpc %Hrelpins0 Hcnt".
-      assert (Hrelpins : callee_saved R12 mr0) by (eapply callee_saved_tp_forget; exact Hrelpins0).
+      iIntros (CIDrel Hsrel mr0) "Hcg Hpc %Hrelpins Hcnt".
       rename mr0 into mr.
       assert (Hpc36 : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (AK + 0x36)).
       { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }

@@ -26,20 +26,7 @@
    [wp_next_off] shortcut with no hart binder at all -- see the porting
    guide's "Two different indices" section.  [cpu_own] crosses the prologue
    and the epilogue via [cpu_own_transport]; nothing carries it across the
-   critical section itself (no hart change there).
-
-   THE RELEASE TP PREMISE: [wp_release_sconf_body] still asks for the RAW
-   entry map's tp slot ([m !!! Regidx 4 = cid_word]), unlike acquire (which
-   dropped it).  Acquire's own postcondition says nothing about its output
-   map's tp slot (tp is not in [callee_saved] anymore), so that slot is
-   otherwise unknowable to the caller.  The fix costs nothing physically:
-   [tp_pin] overwrites a map's tp slot unconditionally, so substituting
-   [macq := tp_pin macq0] for acquire's raw output, right when it is
-   received, makes the tp premise true BY CONSTRUCTION ([upd_eq]) while
-   leaving every other register lookup unchanged ([tp_pin] only touches
-   slot 4) -- see [allocpid_b_outb] below for the sibling derivation this
-   file needs for the SAME reason (a raw fact the new interface no longer
-   states for the caller, but which the caller's own resources force). *)
+   critical section itself (no hart change there). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -328,45 +315,25 @@ Section ProofAllocpid.
     { iEval (rewrite HA4a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq0) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".
     (* ===================== CRITICAL SECTION (fixed b = false) ===================== *)
-    (* [macq0] is acquire's raw output map; [callee_saved] no longer says
-       anything about its tp slot (release still needs one).  [tp_pin]
-       overwrites a map's tp slot unconditionally and leaves every other
-       lookup alone, so substituting [macq := tp_pin macq0] settles release's
-       premise for free ([upd_eq]) while [sie_cap_gpr]/[callee_saved] survive
-       the swap via [tp_pin_sp] (sp is untouched) and [rget_ne] (any other
-       concrete register is untouched). *)
-    set (macq := tp_pin macq0).
-    assert (Hpinidem : tp_pin macq = tp_pin macq0).
-    { rewrite /macq. apply (tp_pin_id (tp_pin macq0) (rget_tp macq0)). }
-    assert (Hspeq : macq !!! Regidx csp_rs1 = macq0 !!! Regidx csp_rs1).
-    { rewrite /macq. exact (tp_pin_sp macq0). }
-    assert (Hgpreq : sie_cap_gpr macq0 (av - 4)%nat false p = sie_cap_gpr macq (av - 4)%nat false p).
-    { unfold sie_cap_gpr, sie_cap. rewrite Hspeq Hpinidem. reflexivity. }
-    iEval (rewrite Hgpreq) in "Hcg".
-    assert (Hacq_csp : macq !!! Regidx csp_rs1 = spd).
-    { rewrite Hspeq (callee_saved_lookup Hcsacq csp_rs1 ltac:(vm_compute; reflexivity)). exact HA4csp. }
-    assert (Hacq_tp : macq !!! Regidx (mword_of_int 4 : mword 5) = cid_word)
-      by (rewrite /macq upd_eq; reflexivity).
+    assert (Hacq_csp : macq0 !!! Regidx csp_rs1 = spd).
+    { rewrite (callee_saved_lookup Hcsacq csp_rs1 ltac:(vm_compute; reflexivity)). exact HA4csp. }
     assert (Hacq_rest : forall r : mword 5, is_cs_idx r = true ->
                           r <> csp_rs1 -> r <> ai_s0 -> r <> ai_s1 ->
-                          macq !!! Regidx r = m !!! Regidx r).
+                          macq0 !!! Regidx r = m !!! Regidx r).
     { intros r Hr Ncsp N8 N9.
-      assert (Hne : Regidx r <> Regidx Rtp).
-      { intro Heq. apply (is_cs_idx_true_neq Rtp r ltac:(vm_compute; reflexivity) Hr). congruence. }
-      assert (Hmacqr : macq !!! Regidx r = macq0 !!! Regidx r) by (rewrite /macq; apply (rget_ne macq0 r Hne)).
-      rewrite Hmacqr (callee_saved_lookup Hcsacq r Hr). exact (HA4rest r Hr Ncsp N8 N9). }
+      rewrite (callee_saved_lookup Hcsacq r Hr). exact (HA4rest r Hr Ncsp N8 N9). }
     iDestruct "HR" as (nv) "Hnp".
     (* +0x16 auipc a5,0x9 ; +0x1a addi a5,a5,-2034 : a5 := &nextpid *)
     iPoseProof (apdi_16 with "Htext") as "Hi16".
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (API + 0x16)) ai_a5 (mword_of_int 9 : mword 20) macq (av - 4)%nat false
+    iApply (wp_auipc_s_sconf Φ (mword_of_int (API + 0x16)) ai_a5 (mword_of_int 9 : mword 20) macq0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     rewrite wp_next_off.
     iIntros "Hcg Hpc".
     set (B1 := <[Regidx ai_a5 := regval_into_reg
-        (add_vec (mword_of_int (API + 0x16) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> macq).
+        (add_vec (mword_of_int (API + 0x16) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> macq0).
     change (<[Regidx ai_a5 := regval_into_reg
-        (add_vec (mword_of_int (API + 0x16) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> macq) with B1.
+        (add_vec (mword_of_int (API + 0x16) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> macq0) with B1.
     assert (Hp1a : add_vec_int (mword_of_int (API + 0x16) : mword 64) 4 = mword_of_int (API + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1a) in "Hpc".
     iPoseProof (apdi_1a with "Htext") as "Hi1a".
@@ -493,14 +460,6 @@ Section ProofAllocpid.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite /B2 upd_ne; [| vm_compute; discriminate].
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact Hacq_csp. }
-    assert (HB7tp : B7 !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
-    { rewrite /B7 upd_ne; [| vm_compute; discriminate].
-      rewrite /B6 upd_ne; [| vm_compute; discriminate].
-      rewrite /B5 upd_ne; [| vm_compute; discriminate].
-      rewrite /B4 upd_ne; [| vm_compute; discriminate].
-      rewrite /B3 upd_ne; [| vm_compute; discriminate].
-      rewrite /B2 upd_ne; [| vm_compute; discriminate].
-      rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact Hacq_tp. }
     assert (HB7rest : forall r : mword 5, is_cs_idx r = true ->
                         r <> csp_rs1 -> r <> ai_s0 -> r <> ai_s1 ->
                         B7 !!! Regidx r = m !!! Regidx r).
@@ -518,7 +477,7 @@ Section ProofAllocpid.
       rewrite /B1 upd_ne; [| congruence].
       exact (Hacq_rest r Hr Ncsp N8 N9). }
     iApply (Release.wp_release_sconf Φ γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p C (av - 4)%nat
-              Hlka HB7tp (apid_K10 av Hav)
+              Hlka (apid_K10 av Hav)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay [-]").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcsrel Hcpu".
     (* ===================== EPILOGUE (generic b again) ===================== *)

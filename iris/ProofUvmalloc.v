@@ -640,49 +640,29 @@ Section ProofUvmalloc.
                 N4 !!! Regidx c = mm !!! Regidx c).
       { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
         ua_thr_peel. apply Hmkthr; assumption. }
-      (* EXPLICIT-CPUID: [callee_saved] (kalloc's own postcondition) drops tp
-         (CalleeSaved.v -- a parked call may resume on another hart), so
-         nothing tracks [N4]'s raw tp slot any more.  Retarget to [tp_pin N4]
-         instead, right at the point [Uvmdealloc] needs it: [sie_cap_gpr] is
-         invariant under [tp_pin] ([sie_cap] reads only [csp_rs1], which
-         [tp_pin] never touches, and [gpr_file] already owns the pinned map),
-         [tp_pin N4 !!! Regidx Rtp = cid_word] holds by construction
-         ([upd_eq]), and every other register fact survives via [upd_ne]. *)
-      assert (HN4tp : tp_pin N4 !!! Regidx Rtp = cid_word)
-        by (unfold tp_pin; apply upd_eq).
-      assert (HN4a0' : tp_pin N4 !!! Regidx Ra0 = page_base Pi.(ud_root))
-        by (unfold tp_pin; rewrite upd_ne; [exact HN4a0 | reg_neq]).
-      assert (HN4a1' : tp_pin N4 !!! Regidx Ra1 = av)
-        by (unfold tp_pin; rewrite upd_ne; [exact HN4a1 | reg_neq]).
-      assert (HN4a2' : tp_pin N4 !!! Regidx Ra2 = pgroundup oldsz)
-        by (unfold tp_pin; rewrite upd_ne; [exact HN4a2 | reg_neq]).
-      assert (Hudo : (uint (tp_pin N4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
-        by (rewrite HN4a1'; exact Hudold).
-      assert (Heqcg1 : sie_cap_gpr (tp_pin N4) (K - 10)%nat b p
-                       = sie_cap_gpr N4 (K - 10)%nat b p).
-      { unfold sie_cap_gpr, sie_cap. rewrite tp_pin_sp.
-        assert (Htpp : tp_pin (tp_pin N4) = tp_pin N4)
-          by (apply tp_pin_id; unfold tp_pin; apply upd_eq).
-        rewrite Htpp. reflexivity. }
-      iEval (rewrite -Heqcg1) in "Hcg".
-      iApply (Uvmdealloc.wp_uvmdealloc_sconf γa Φ (tp_pin N4) Pi (K - 10)%nat eb p C b
-                HKud HN4tp HN4a0' Hudo
+      (* EXPLICIT-CPUID: [SpecUvmdealloc.v]'s entry-side tp premise is gone
+         (HartTp.v -- the map's tp slot is IGNORED, the true tp is
+         [cid_word_of <the hart we are on>] by construction), so [N4] is
+         handed to [Uvmdealloc] as-is; no [tp_pin] re-tagging needed. *)
+      assert (Hudo : (uint (N4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
+        by (rewrite HN4a1; exact Hudold).
+      iApply (Uvmdealloc.wp_uvmdealloc_sconf γa Φ N4 Pi (K - 10)%nat eb p C b
+                HKud HN4a0 Hudo
                 with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
       iIntros (CIDu9 Hsu9 md) "Hcg Hcnt Hpc %Hdcs _ Hpt".
-      iEval (rewrite HN4a1' HN4a2' Hpgpu Hnpd) in "Hpt".
+      iEval (rewrite HN4a1 HN4a2 Hpgpu Hnpd) in "Hpt".
       assert (Hret70 : ret_pc (N4 !!! Regidx Rra) = mword_of_int (UA + 0x70)).
       { rewrite HN4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret70) in "Hpc".
       assert (Hmdsp : md !!! Regidx csp_rs1 = spr).
       { rewrite (callee_saved_lookup Hdcs csp_rs1 ltac:(vm_compute; reflexivity)).
-        rewrite tp_pin_sp. exact HN4sp. }
+        exact HN4sp. }
       assert (Hmdthr : forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
                 c <> Rs4 -> c <> Rs5 -> c <> Rs6 -> c <> Rs7 ->
                 md !!! Regidx c = mm !!! Regidx c).
       { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
         rewrite (callee_saved_lookup Hdcs c Hc).
-        unfold tp_pin. rewrite upd_ne; [| ua_thr_ne].
         apply HN4thr; assumption. }
       (* +0x70 c.li a0,0 *)
       iApply (wp_cli_s_sconf Φ (mword_of_int (UA + 0x70)) Ra0 (mword_of_int 0 : mword 6)
@@ -1449,43 +1429,28 @@ Section ProofUvmalloc.
               G4 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       ua_thr_peel. apply Hfthr; assumption. }
-    (* EXPLICIT-CPUID: same [tp_pin] retarget as the first [Uvmdealloc] call
-       above (kalloc/memset/mappages/kfree's [callee_saved] all drop tp). *)
-    assert (HG4tp : tp_pin G4 !!! Regidx Rtp = cid_word)
-      by (unfold tp_pin; apply upd_eq).
-    assert (HG4a0' : tp_pin G4 !!! Regidx Ra0 = page_base Pi.(ud_root))
-      by (unfold tp_pin; rewrite upd_ne; [exact HG4a0 | reg_neq]).
-    assert (HG4a1' : tp_pin G4 !!! Regidx Ra1 = av)
-      by (unfold tp_pin; rewrite upd_ne; [exact HG4a1 | reg_neq]).
-    assert (HG4a2' : tp_pin G4 !!! Regidx Ra2 = pgroundup oldsz)
-      by (unfold tp_pin; rewrite upd_ne; [exact HG4a2 | reg_neq]).
-    assert (Hudo2 : (uint (tp_pin G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
-      by (rewrite HG4a1'; exact Hudold).
-    assert (Heqcg2 : sie_cap_gpr (tp_pin G4) (K - 10)%nat b p
-                     = sie_cap_gpr G4 (K - 10)%nat b p).
-    { unfold sie_cap_gpr, sie_cap. rewrite tp_pin_sp.
-      assert (Htpp2 : tp_pin (tp_pin G4) = tp_pin G4)
-        by (apply tp_pin_id; unfold tp_pin; apply upd_eq).
-      rewrite Htpp2. reflexivity. }
-    iEval (rewrite -Heqcg2) in "Hcg".
-    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa Φ (tp_pin G4) Pi (K - 10)%nat eb p C b
-              HKud HG4tp HG4a0' Hudo2
+    (* EXPLICIT-CPUID: [SpecUvmdealloc.v]'s entry-side tp premise is gone
+       (same reasoning as the first [Uvmdealloc] call above); no [tp_pin]
+       re-tagging needed. *)
+    assert (Hudo2 : (uint (G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
+      by (rewrite HG4a1; exact Hudold).
+    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa Φ G4 Pi (K - 10)%nat eb p C b
+              HKud HG4a0 Hudo2
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
     iIntros (CIDu43 Hsu43 md2) "Hcg Hcnt Hpc %Hd2cs _ Hpt".
-    iEval (rewrite HG4a1' HG4a2' Hpgpu Hnpd) in "Hpt".
+    iEval (rewrite HG4a1 HG4a2 Hpgpu Hnpd) in "Hpt".
     assert (Hret98 : ret_pc (G4 !!! Regidx Rra) = mword_of_int (UA + 0x98)).
     { rewrite HG4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret98) in "Hpc".
     assert (Hd2sp : md2 !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hd2cs csp_rs1 ltac:(vm_compute; reflexivity)).
-      rewrite tp_pin_sp. exact HG4sp. }
+      exact HG4sp. }
     assert (Hd2thr : forall c : mword 5, is_cs_idx c = true ->
               c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
               c <> Rs4 -> c <> Rs5 -> c <> Rs6 -> c <> Rs7 ->
               md2 !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       rewrite (callee_saved_lookup Hd2cs c Hc).
-      unfold tp_pin. rewrite upd_ne; [| ua_thr_ne].
       apply HG4thr; assumption. }
     (* +0x98 c.li a0,0 *)
     iApply (wp_cli_s_sconf Φ (mword_of_int (UA + 0x98)) Ra0 (mword_of_int 0 : mword 6)
