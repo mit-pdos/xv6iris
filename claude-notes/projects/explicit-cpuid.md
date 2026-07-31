@@ -214,6 +214,51 @@ ambient-`CpuId` shape this was not statable, let alone checkable.
 This is the refactor paying for itself: the falsehood was invisible before, and
 would have stayed invisible until `kerneltrap` was proved.
 
+## APPROVED: cpu_own rides in the SIE arm when interrupts are enabled
+
+The blocker found at ~100 files in: a leaf's `wp_next` does not carry
+`cpu_own`, so a caller holding it across an interrupts-ENABLED instruction is
+stuck — the continuation hands back a fresh hart and nothing rebinds
+`cpus[c]`'s cells there. Confirmed independently in five proofs
+(`kvmmap`, `kvminit`, `kvminithart`, `uvmcreate`, `trapinithart`) and it
+affects the 39 `b`-generic contracts that thread `cpu_own` (82 mention it).
+
+Note the gap is NARROWER than it first looked: function CONTRACTS already
+cross correctly, because their `cpu_own` input sits outside the `wp_next`
+lambda (entry hart) and their output inside it (exit hart) — `SpecAcquire` is
+the worked example. Only the LEAF level lacks the vehicle.
+
+**The fix (approved): the `b = true` arm of `sie_arm` holds the per-cpu
+bundle.** It already holds exactly the resources that exist only while
+interrupts are enabled (the trap-scratch CSRs), and it already crosses inside
+`sie_cap` — so a leaf's continuation returning `sie_cap_gpr m' av b` at the new
+hart re-delivers that hart's cpu cells for free, with NO growth in any leaf's
+footprint. It also matches what the C actually does: a thread only touches
+`c->noff` / `c->proc` with interrupts disabled, which is why `push_off` exists.
+
+### The sub-decision this forces, and it must be made deliberately
+
+`cpu_own n eb p C` is parameterized by the current proc `p` and the context
+slot `C`, but `sie_arm b` has no such parameters. Three ways out:
+
+1. **Index the arm** — `sie_arm b p C`, hence `sie_cap m av b p C` and
+   `sie_cap_gpr m av b p C`. Preserves `p`'s identity across the crossing
+   (correct: `c->proc` is thread-dependent, the scheduler sets the new hart's
+   to the same proc), at the cost of two more parameters on the tier's central
+   bundle — and they are VESTIGIAL in the `b = false` arm, which is exactly the
+   shape that made `kalloc_env`'s `tp` parameter noise.
+2. **Existentially quantify `p` inside the arm.** No new parameters, but a
+   caller loses the identity of its own proc across every enabled instruction,
+   which breaks `myproc`'s postcondition and every contract naming `p`.
+3. **Keep the arm payload-free and add an agreement ghost** tying `c->proc` to
+   a thread-owned fragment, so the arm can hold `∃ p` while the thread retains
+   `p`'s identity. No signature growth on `sie_cap_gpr`, one new ghost.
+
+(2) is wrong. (1) is simplest but re-introduces the vestigial-parameter smell
+this project just spent a commit removing. (3) is the cleanest shape and the
+most work. DECIDE BEFORE IMPLEMENTING — this lands in the tier's central
+definition and every contract above it.
+
 ## Staging (the key economy)
 
 **The new leaf statements are strictly WEAKER than the current ones** — a
