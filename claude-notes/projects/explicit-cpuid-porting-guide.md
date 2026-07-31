@@ -265,6 +265,46 @@ So:
 `wp_next false` on pop_off would claim the hart cannot move when it can. Note
 this cannot be caught by compiling: at `eb = false` both spellings typecheck.
 
+## ORCHESTRATION: serialize changes to the central interface
+
+`sie_cap_gpr`'s arity is load-bearing for EVERY consumer, not just the ones
+that reason about the resource being added. When `p` was threaded into it, two
+consumer waves dispatched in parallel were both dead on arrival: their `Spec*.v`
+files stopped typechecking at the source level (an under-application, not a
+stale `.vo`), and neither agent was permitted to fix it.
+
+**Rule: while a change to `IntrDefs`'s central definitions is in flight, run NO
+consumer agents.** Splitting the remaining files by "does it mention the
+resource being changed" does not work — an arity change is unconditional. The
+cost of getting this wrong is two agents' full token budget for zero files.
+
+## Two things a DECOMPOSED proof needs (beyond the straight-line recipe)
+
+Most real whole-function proofs are not one straight line; they split into
+private helper lemmas and fuel/index inductions. Both need more than the
+per-call-site edit:
+
+- **Every decomposed helper lemma needs its OWN `` `{CID0 : CpuId} `` binder**
+  (shadowing the section's `Context`) and must wrap its own continuation in
+  `wp_next b (fun CID => …)`, closing with
+  `iSpecialize ("Hcont" $! CIDn with "[%]"); [wp_next_chain|]`.
+  Worked example: `ProofConsputc.wp_consputc_epi`.
+- **A fuel/index induction that forwards `Hcont` across recursive calls** needs
+  `WpSconfVc`'s `wp_next_shift`: make `CID` part of the SAME `forall` clause as
+  the other per-iteration state so `induction` on the fuel auto-generalizes it,
+  and after each leaf step re-anchor with
+  `iDestruct (wp_next_shift Hsk with "Hcont") as "Hcont"` before recursing.
+  `wp_next_chain` alone is for straight-line code only.
+
+## Derive the SIE index rather than stating it
+
+`b = match n with O => eb | S _ => false end` is DERIVABLE from resources a
+caller already holds — ghost agreement between `sie_arm`'s eighth and
+`intr_count`'s complementary eighth. So a contract that threads a plain `b`
+through a lock-holding function is not necessarily a bug; check whether the
+derivation closes before concluding the contract is wrong. (This is the same
+algebra that forces `SwtchCtx`'s resumed hart to `false`.)
+
 ## THE VACUITY TRAP — check every spec body you touch
 
 In `bi_scope` a `forall` extends **maximally**. So an unparenthesised `∀` inside
