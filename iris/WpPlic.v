@@ -62,6 +62,9 @@ Section WpPlic.
 Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{CID : CpuId}.
+(* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+   bundle like the register map.  Implicit, so no call site changes. *)
+Context {p : mword 64}.
 Existing Instance riscv_memGS.
 
 (* The SAME width-4 PLIC store, but for code that runs CONCURRENTLY on every
@@ -91,11 +94,11 @@ Lemma wp_sw_plic_pinv_s_sconf
   kpt_dev_vpn (svpn_of a8) ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   plic_inv -∗
   wp_next b (fun (CID : CpuId) =>
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -126,9 +129,9 @@ Proof.
   iDestruct "Hdev" as "(Hua & Hpldev & Hvdev)".
   (* only the PLIC half of the fabric is touched *)
   iInv "Hpinv" as ">Hdbody" "Hdclose".
-  iDestruct "Hdbody" as (p) "(Hplf & %Hpok)".
+  iDestruct "Hdbody" as (pl) "(Hplf & %Hpok)".
   iDestruct (plic_agree with "Hpldev Hplf") as %Hpeq.
-  destruct (Hwrite p Hpok) as (p' & Hpw & Hpok').
+  destruct (Hwrite pl Hpok) as (pl' & Hpw & Hpok').
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
   iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
@@ -181,11 +184,11 @@ Proof.
     by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
   assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
     by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-  assert (Hwr_plic : dev_write s_tr.(mdev) a8 4 storeword = Some (set_dplic σ.(mdev) p')).
+  assert (Hwr_plic : dev_write s_tr.(mdev) a8 4 storeword = Some (set_dplic σ.(mdev) pl')).
   { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
-    apply (dev_write_plic σ.(mdev) a8 storeword p' Hrange).
+    apply (dev_write_plic σ.(mdev) a8 storeword pl' Hrange).
     rewrite <- Hpeq. exact Hpw. }
-  pose (d' := set_dplic σ.(mdev) p').
+  pose (d' := set_dplic σ.(mdev) pl').
   pose (s_x := MState s_tr.(sregs) s_tr.(mem) d').
   assert (Hstore : exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 4))) s_pc = Some (RETIRE_SUCCESS, s_x)).
   { rewrite (exec_execute_STORE_4_gpr_S_walk_dev rs2 rs1 imm region_st s_pc s_tr d'
@@ -207,9 +210,9 @@ Proof.
                      change (8 * (0 + 1) * 4 - 1)%Z with 31%Z; change (8 * 0 * 4)%Z with 0%Z;
                      rewrite wv32_collapse; exact Hwr_plic)).
     subst s_x d'. reflexivity. }
-  iMod (dev_interp_update_plic σ.(mdev) p p' with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
+  iMod (dev_interp_update_plic σ.(mdev) pl pl' with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
   iMod ("Hdclose" with "[Hp']") as "_".
-  { iNext. iExists p'. iFrame "Hp'". iPureIntro. exact Hpok'. }
+  { iNext. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hstore. }
@@ -226,7 +229,7 @@ Proof.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
@@ -250,11 +253,11 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
   kpt_dev_vpn (svpn_of a8) ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γd γv -∗
   wp_next b (fun (CID : CpuId) =>
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -290,13 +293,13 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
   rd_ok rd ->
   (forall p, plic_ok p ->
      exists v p', plic_read p (uint a8 - plic_base)%Z = Some (v, p') /\ plic_ok p' /\ P v) ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γd γv -∗
   ( ∀ v : bv 32,
     ⌜ P v ⌝ -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n b p -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }})) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -330,9 +333,9 @@ Proof.
   (* only the PLIC half of the fabric is touched, and [↑plicN ⊆ ↑devN] *)
   iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
   iInv "Hpinv" as ">Hdbody" "Hdclose".
-  iDestruct "Hdbody" as (p) "(Hplf & %Hpok)".
+  iDestruct "Hdbody" as (pl) "(Hplf & %Hpok)".
   iDestruct (plic_agree with "Hpldev Hplf") as %Hpeq.
-  destruct (Hread p Hpok) as (v & p' & Hrd_p & Hpok' & HPv).
+  destruct (Hread pl Hpok) as (v & pl' & Hrd_p & Hpok' & HPv).
   iMod (reg_update _ nextPC _ (add_vec_int pc (if is_rvc then 2 else 4)) with "Hreg Hnpc") as "[Hreg Hnpc]".
   set (s_pc := set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))).
   iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
@@ -382,11 +385,11 @@ Proof.
     by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
   assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
     by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-  assert (Hdrd_plic : dev_read s_tr.(mdev) a8 4 = Some (v, set_dplic σ.(mdev) p')).
+  assert (Hdrd_plic : dev_read s_tr.(mdev) a8 4 = Some (v, set_dplic σ.(mdev) pl')).
   { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
-    apply (dev_read_plic σ.(mdev) a8 v p' Hrange).
+    apply (dev_read_plic σ.(mdev) a8 v pl' Hrange).
     rewrite <- Hpeq. exact Hrd_p. }
-  pose (d' := set_dplic σ.(mdev) p').
+  pose (d' := set_dplic σ.(mdev) pl').
   pose (s_x := set_reg (MState s_tr.(sregs) s_tr.(mem) d')
                  (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (ldval v))).
   assert (Hload : exec (execute (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))) s_pc
@@ -408,14 +411,14 @@ Proof.
              ltac:(apply within_htif_false; exact Lhtif_tr)
              ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply dev_addr_plic; exact Hrange)
              ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Hdrd_plic)). }
-  iMod (dev_interp_update_plic σ.(mdev) p p' with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
+  iMod (dev_interp_update_plic σ.(mdev) pl pl' with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
   iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (ldval v)) with "Hfmap") as "[Hrdc Hfins]".
   rewrite (gpr_pt_nz rd _ Hrd).
   iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (ldval v)) with "Hreg Hrdc") as "[Hreg Hrdc]".
   iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
   { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
   iMod ("Hdclose" with "[Hp']") as "_".
-  { iNext. iExists p'. iFrame "Hp'". iPureIntro. exact Hpok'. }
+  { iNext. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
   iModIntro. iExists s_x.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hload. }
@@ -435,7 +438,7 @@ Proof.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".

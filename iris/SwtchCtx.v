@@ -201,8 +201,8 @@ Section SwtchCtx.
       (∀ (h : CPU) (g : gname) (m : regfile) (eb' : bool),
          ⌜adm A h g⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr (CID := h) m av false -∗
-         cpu_own (CID := h) 1 eb' p emp -∗
+         sie_cap_gpr (CID := h) m av false p -∗
+         cpu_own (CID := h) 1 eb' p emp false -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
          (∃ (A' : ctx_adm) (cret : mword 64),

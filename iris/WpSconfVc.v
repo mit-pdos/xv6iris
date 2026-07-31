@@ -461,6 +461,9 @@ Section WpSconfVc.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* ==================================================================== *)
   (* 3. The frame ledger's denotation + the resource algebra of the new    *)
@@ -613,7 +616,7 @@ Section WpSconfVc.
     (vsx st' <= n)%nat ->
     gpr_matches ρ (vsb st).(vregs) m ->
     agree_off (vsb st).(vregs) m m0 ->
-    sie_cap_gpr m (n - vsu st) b -∗
+    sie_cap_gpr m (n - vsu st) b p -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
     vheap_own ρ (vsb st).(vheap) -∗
@@ -622,7 +625,7 @@ Section WpSconfVc.
     wp_next b (fun (CID : CpuId) =>
       (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m0 ⌝ -∗
-      sie_cap_gpr mf (n - vsu st') b -∗
+      sie_cap_gpr mf (n - vsu st') b p -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
@@ -1218,7 +1221,7 @@ Section WpSconfVc.
     (vsu st <= vsx st)%nat ->
     (vsx st' <= n)%nat ->
     gpr_matches ρ (vsb st).(vregs) m ->
-    sie_cap_gpr m (n - vsu st) b -∗
+    sie_cap_gpr m (n - vsu st) b p -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
     vheap_own ρ (vsb st).(vheap) -∗
@@ -1227,7 +1230,7 @@ Section WpSconfVc.
     wp_next b (fun (CID : CpuId) =>
       (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m ⌝ -∗
-      sie_cap_gpr mf (n - vsu st') b -∗
+      sie_cap_gpr mf (n - vsu st') b p -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗

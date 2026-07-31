@@ -50,8 +50,8 @@ Section WpInitlockWrapper.
   Lemma wp_initlock_wrapper_sconf (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
-      (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool)
-    : wp_initlock_wrapper_sconf_body Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu b.
+      (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
+    : wp_initlock_wrapper_sconf_body Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.
   Proof.
     cbv beta delta [wp_initlock_wrapper_sconf_body].
     intros ret_tgt c_name c_cpu HK Halign Hnamerel Hlkrel Hjrel.
@@ -171,7 +171,7 @@ Section WpInitlockWrapper.
     assert (HR7ra : R7 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (F + 0x1c)).
     { rewrite /R7 upd_eq. exact (pc_step F 0x18 4 0x1c eq_refl). }
     (* initlock(&lock, "name") : owns lk's 3 struct fields, returns them init'd *)
-    iApply (Initlock.wp_initlock_sconf Φ R7 vlock vname vcpu s (K - 2) b
+    iApply (Initlock.wp_initlock_sconf Φ R7 vlock vname vcpu s (K - 2) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HR7a1). iExact "Hstr". }

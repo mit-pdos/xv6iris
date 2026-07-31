@@ -214,6 +214,9 @@ Section WpSconfTimer.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* ---- rdtime rd: rd := (an arbitrary) mtime reading ---- *)
   Lemma wp_csrr_time_s_sconf (Φ : mval -> iProp Σ)
@@ -222,12 +225,12 @@ Section WpSconfTimer.
     uint rd <> 0 ->
     rd_ok rd ->
     timer_cap -∗
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
     ( ∀ tv : mword 64,
       wp_next b (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b -∗
+        sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -293,11 +296,11 @@ Section WpSconfTimer.
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
     timer_cap -∗
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.

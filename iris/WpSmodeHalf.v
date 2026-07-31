@@ -59,6 +59,9 @@ Section WpSmodeHalf.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* ------------------------------------------------------------------- *)
   (* §1  The pure width-2 value facts.                                    *)
@@ -137,10 +140,10 @@ Section WpSmodeHalf.
       (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗ pa ↦₂{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -160,10 +163,10 @@ Section WpSmodeHalf.
       (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 2)) -∗ pa ↦₂{ dqm } v -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -185,10 +188,10 @@ Section WpSmodeHalf.
       (m : regfile) (n : nat) (vold : mword 16) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let storeval := trunc16 (rget m rs2) in
-    sie_cap_gpr m n b -∗ pc_is pc -∗
+    sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗ pa ↦₂ vold -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.

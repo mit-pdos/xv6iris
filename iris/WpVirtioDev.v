@@ -147,6 +147,9 @@ Section WpVirtioDev.
 Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{CID : CpuId}.
+(* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+   bundle like the register map.  Implicit, so no call site changes. *)
+Context {p : mword 64}.
 Existing Instance riscv_memGS.
 
 (* ===================================================================== *)
@@ -182,7 +185,7 @@ Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names)
   kpt_dev_vpn (svpn_of a8) ->
   uint rd <> 0 ->
   rd_ok rd ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   disk_inv γd -∗
   R -∗
@@ -192,7 +195,7 @@ Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names)
                  virtio_proto γd v ∗ S w ) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ w : bv 32,
-    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b -∗
+    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S w -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -329,7 +332,7 @@ Proof.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_retarget m
                (<[Regidx rd := regval_into_reg (ldval w)]> m) n b Hsp with "Hcap") as "Hcap".
@@ -366,7 +369,7 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   disk_inv γd -∗
   R -∗
@@ -376,7 +379,7 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
       ⌜ virtio_write v (uint a8 - virtio_base)%Z storeword = Some v' ⌝ ∗
       ⌜ virtio_isr_ok v' ⌝ ∗ virtio_proto γd v' ∗ S ) -∗
   wp_next b (fun (CID : CpuId) =>
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -507,7 +510,7 @@ Proof.
     iSplitL "Hms Hhalf".
     { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
@@ -548,13 +551,13 @@ Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
   rd_ok rd ->
   (forall v : virtio_state, virtio_isr_ok v ->
      exists w : bv 32, virtio_read v (uint a8 - virtio_base)%Z = Some w /\ P w) ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γu γd -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ w : bv 32,
     ⌜ P w ⌝ -∗
-    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b -∗
+    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -603,11 +606,11 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
        /\ virtio_isr_ok v'
        /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
        /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
-  sie_cap_gpr m n b -∗
+  sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
   wp_next b (fun (CID : CpuId) =>
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

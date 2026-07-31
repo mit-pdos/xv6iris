@@ -410,6 +410,9 @@ Section WpSmodeWfi.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* ------------------------------------------------------------------- *)
   (* THE WAIT PHASE.  At this tier the caller owns the [hart_state] cell   *)
@@ -511,11 +514,11 @@ Section WpSmodeWfi.
   (* ------------------------------------------------------------------- *)
   Lemma wp_wfi_s_sconf (Φ : mval -> iProp Σ) (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     intr_count 0 false -∗
     pc_is pc -∗
     instr pc false (WFI tt) -∗
-    ( ▷ ( sie_cap_gpr m n b -∗
+    ( ▷ ( sie_cap_gpr m n b p -∗
           intr_count 0 false -∗
           pc_is (add_vec_int pc 4) -∗
           WP (Loop : expr riscv_lang) {{ Φ }})) -∗
@@ -628,7 +631,7 @@ Section WpSmodeWfi.
     (* ---- and now the WAIT phase, with everything the client is owed
        riding through as [R] ---- *)
     iApply (wp_wfi_wait Φ pc (zero_extend' 32 w)
-              (sconf ∗ sie_cap m n b ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
+              (sconf ∗ sie_cap m n b p ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
               with "Hminv Hhs Hpcr Hnpc
                     [Hpriv Hms Hhalf Hmie Hmdl Hmenv Hstk Htr Harm Hfile Hcnt]
                     [Hcont]").

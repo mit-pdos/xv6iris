@@ -41,6 +41,9 @@ Section WpSconfUartAccess.
   Context `{!sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{CID : CpuId}.
+  (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
+     bundle like the register map.  Implicit, so no call site changes. *)
+  Context {p : mword 64}.
 
   (* The LSR poll load (offset 5).  Takes [dev_inv] + the transmitter token;
      hands back the token and -- IF the read byte says THRE was set -- the
@@ -56,12 +59,12 @@ Section WpSconfUartAccess.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa 5 ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
     wp_next b (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
@@ -71,7 +74,7 @@ Section WpSconfUartAccess.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
     iApply (Uart.wp_lb_uart_s_sconf γd γv 5 Φ pc false true rd rs1 imm
               m n (uart_tx_own γd l)
-              (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b
+              (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)
@@ -98,12 +101,12 @@ Section WpSconfUartAccess.
     uint rd <> 0 ->
     rd_ok rd ->
     m !!! Regidx rs1 = uart_pa 5 ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
     wp_next b (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
@@ -159,12 +162,12 @@ Section WpSconfUartAccess.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) = uart_pa off ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗
     wp_next b (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b -∗
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -172,7 +175,7 @@ Section WpSconfUartAccess.
     iIntros (Hoff Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
     iApply (Uart.wp_lb_uart_s_sconf γd γv off Φ pc false true rd rs1 imm
-              m n emp%I (fun _ => emp%I) b
+              m n emp%I (fun _ => emp%I) b p
               Hoff Hrd Hrdok
               ltac:(rewrite Haddr; exact Hg1)
               ltac:(rewrite Haddr; exact Hg2)
@@ -197,11 +200,11 @@ Section WpSconfUartAccess.
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     m !!! Regidx rs1 = uart_pa 0 ->
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
     wp_next b (fun (CID : CpuId) =>
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
       uart_sent γd (l ++ [autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8]) -∗
@@ -212,7 +215,7 @@ Section WpSconfUartAccess.
     set (sb := autocast (T := mword) (subrange_vec_dec (m !!! Regidx rs2) (Z.sub (Z.mul 1 8) 1) 0) : mword 8).
     iApply (Uart.wp_sb_uart_s_sconf γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
-              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b
+              (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b p
               ltac:(unfold uart_size; lia)
               ltac:(rewrite Haddr; vm_compute; reflexivity)
               ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)

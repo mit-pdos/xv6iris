@@ -40,8 +40,8 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   (22 <= K)%nat ->
   ncnt = 0%nat ->
   prun phystop s1entry ps ->
-  sie_cap_gpr m K b -∗
-  cpu_own ncnt eb pcur C -∗
+  sie_cap_gpr m K b pcur -∗
+  cpu_own ncnt eb pcur C b -∗
   (* [kernel_data] supplies the "kmem" string literal kinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -54,8 +54,8 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   ([∗ list] p ∈ ps, page_own p) -∗
   wp_next b (fun (CID : CpuId) =>
     ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
-    sie_cap_gpr mr K b -∗
-    cpu_own ncnt eb pcur C -∗
+    sie_cap_gpr mr K b pcur -∗
+    cpu_own ncnt eb pcur C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     is_kmem γl γk lk fl -∗
