@@ -289,6 +289,28 @@ orchestration rule.
 3. Then the remaining `Proof*`, largest last: `ProofPrintk` alone is 337 leaf
    applications, a third of the wave.
 
+### THE TP-PREMISE SWEEP (53 files) — owed, and blocking
+
+**53 `Spec*.v` files still carry a raw `⌜m !!! Regidx (mword_of_int 4) = cid_word⌝`
+premise.** Under `tp_pin` that slot is unobservable, so the premise constrains
+nothing — and `callee_saved` no longer carries tp to discharge it after an
+opaque call, so it is not merely noise: it BLOCKS consumers. Confirmed blocking
+`ProofUvmdealloc` (via `SpecUvmunmap`/`SpecUvmdealloc`) and forcing a `tp_pin`
+re-tagging workaround in `SpecRelease`'s callers, which four agent groups
+invented independently.
+
+Why it was missed: the deletion rule was applied only by wave 2's first batch.
+Every later brief said "mechanical arity propagation, do not restructure" — so
+the batches correctly left them alone. Prompt design, not agent error.
+
+The sweep: delete the premise, then delete the now-dead `tp_pin` re-tagging in
+whatever consumers grew it. Deleting a PREMISE strengthens the contract, so it
+is safe in the direction that matters; the risk is only that a consumer was
+reading the slot, which should surface as a proof failure, not silently.
+
+**Do it with NO consumer agents running** — it changes the wand-chain arity of
+53 contracts.
+
 ### Known spec fixes still owed
 
 - `SpecMemsetParts`'s loop premises need `Regidx ra5 <> Regidx Rtp` (its other
