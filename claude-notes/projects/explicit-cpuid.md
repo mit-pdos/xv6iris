@@ -496,6 +496,93 @@ LOGIC, about Rocq/Iris MECHANICS, or about ORCHESTRATION.
     applied to a wrong premise* — the most dangerous kind of error, because it
     reads as rigour.
 
+## RETROSPECTIVE — how this should have been sequenced
+
+The single structural mistake: **this was run as a big-bang interface change on
+a long-lived branch, so the tree was red for the whole project.** Everything
+painful downstream follows from that — the dependency waves, the serialization
+on central edits, the frontier hiding 21 files, agents blocking each other, and
+a branch that is still not mergeable 50+ commits in.
+
+### The thing we knew early and under-used
+
+**The new statements are WEAKER than the old ones.** A `∀ CID` continuation is a
+STRONGER obligation on the caller, so every new leaf statement is derivable from
+the old proof by instantiating at the current hart. This was noticed in the
+first hour and used only to argue that Stage-1 leaf proofs would be cheap. It is
+actually the licence for **expand / contract (parallel change)**:
+
+1. **EXPAND** — add the new form ALONGSIDE the old, *derived from it*
+   (`wp_add_s_sconf_v2` proved from `wp_add_s_sconf` in three lines). Tree green.
+2. **MIGRATE** — move consumers to the new form one file at a time, in any
+   order. **Tree green after every single file.**
+3. **CONTRACT** — when the last consumer has moved, delete the old form. Tree
+   green.
+
+Cost: some duplicated statements and a scaffolding commit per interface change.
+Benefits, all of which we paid for by not having them:
+
+- the frontier is always the TRUE remaining work, so nothing hides;
+- no dependency waves — any file is workable at any time;
+- no serialization on central edits, so agents never block each other and a
+  wrong `rm` cannot cascade;
+- **every commit is mergeable**, so the work can stop or be reviewed at any
+  point rather than being all-or-nothing.
+
+The six interface changes here (`wp_next`, the `b` index, tp-pinning, canonical
+SIE ghost, `cpu_own`-in-the-arm, the `p` parameter) were independent and should
+have been six expand/contract cycles, not one bundle.
+
+### Prototype on the HARDEST consumer, not the easiest
+
+The recipe was hardened on `ProofCpuid` / `ProofMycpu` — `b = false`,
+straight-line, no locks. Every real design gap lived somewhere else: the
+flipping functions (`push_off`/`release`), the parking/sleeper cone, and the
+lock-credential proofs. Those came LAST, so `wp_next`'s two-index subtlety, the
+arm-eighth gap, and the ∀-hart refutation gap each surfaced after ~100 files
+had been ported on a recipe that did not know about them.
+
+**Pick the prototype for maximum design coverage, not minimum effort.** One
+flipping function plus one lock consumer would have exposed almost everything.
+
+### Write the checkers BEFORE the sweep
+
+`tools/spec_vacuity.py`, the lemma-name diff, and the raw-map-read grep were
+each written *after* the bug they detect. All three are cheap, and all three
+catch the characteristic failure of this refactor: **something that typechecks
+and is wrong** (a vacuous contract, a dropped lemma, a wrong-hart read). If a
+refactor has a known silent failure mode, the detector is part of the setup.
+
+### Enumerate what you are absorbing, before absorbing it
+
+`cpu_own`-in-the-arm was approved, and only then did `p` and `C` surface as
+parameters the arm had no room for. One question — "what are this thing's
+arguments, and what happens to each?" — asked at design time rather than at
+implementation time, would have produced the `p`-is-a-thread-invariant answer
+immediately.
+
+### Measure remaining work against the TOTAL, not the failing set
+
+See surprise 20. A one-line instrumentation change would have made the 21-file
+cohort visible in wave one.
+
+### What went right and should be repeated
+
+- Prototype-first, with the shapes checked by `reflexivity` against the
+  fully-annotated form rather than by eye.
+- The orchestrator verifying **every** file itself (compile + name-list diff)
+  rather than trusting agent reports — three agents reported nothing at all
+  while their work was complete and correct, and one reported a file green that
+  was not.
+- The porting guide as a living artifact: every trap found once was written down
+  once, and later agents stopped hitting it.
+- Escalating design forks to the user instead of picking. Each time (`p`/`C`,
+  `cpu_own`'s home, local-vs-central perf fix) the answer was better than the
+  recommendation that preceded it.
+- Agents instructed that "a blocked file with a precise diagnosis beats a forced
+  proof". Nearly every genuine design gap in this project arrived as a careful
+  refusal, not as a compile error.
+
 ## Staging (the key economy)
 
 **The new leaf statements are strictly WEAKER than the current ones** — a
