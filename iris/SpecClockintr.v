@@ -52,6 +52,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import WpLock.
@@ -73,45 +74,48 @@ Section SpecClockintr.
   (* "this hart keeps time": the branch clockintr tests, [cpuid() == 0]. *)
   Definition tick_hart : bool := eq_vec (cid_word : mword 64) (zero_reg : mword 64).
 
-  (* the tick machinery, owned by the tick keeper (see the header). *)
-  Definition tick_keeper (γ : gname) (Φ : mval -> iProp Σ)
+  (* the tick machinery, owned by the tick keeper (see the header).
+     [panic_wp_any]: a migration can happen anywhere in a [b]-generic
+     stretch, and this bundle is threaded across the whole call, so the
+     acquire/wakeup panic arms it discharges may be reached at a hart other
+     than the one that entered. *)
+  Definition tick_keeper (Φ : mval -> iProp Σ)
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
     ∨ ( is_tickslock γl ∗
         procs_inv Φ γs ∗
-        panic_wp ) )%I.
+        panic_wp_any ) )%I.
 
 End SpecClockintr.
 
 Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the hart id is the ambient CpuId (acquire/wakeup's cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* acquire's transient noff increments (one for the tickslock, one inside
      wakeup's per-proc acquire) stay in int range *)
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (20 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   timer_cap -∗
-  tick_keeper γ Φ γl γs -∗
-  ( ∀ mf : regfile,
+  tick_keeper Φ γl γs -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      tick_keeper γ Φ γl γs -∗
+      tick_keeper Φ γl γs -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_clockintr_sconf_body γ Φ γl γs m n eb p C av.
+      (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool),
+      wp_clockintr_sconf_body Φ γl γs m n eb p C av b.
 End CLOCKINTR.

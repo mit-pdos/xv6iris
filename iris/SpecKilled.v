@@ -42,6 +42,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
@@ -54,28 +55,28 @@ Import Defs.
 Notation KL := KernelSyms.killed.
 
 Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
+    (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.killed in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the argument is proc j *)
   m !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for acquire's / release's *)
   (14 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
-  panic_wp -∗
-  ( ∀ (mf : regfile) (kl : mword 32),
+  panic_wp_any -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (kl : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 kl ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -83,7 +84,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 Module Type KILLED.
   Parameter wp_killed_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_killed_sconf_body γ Φ γs j γl m av n eb p C.
+      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
+      wp_killed_sconf_body Φ γs j γl m av n eb p C b.
 End KILLED.

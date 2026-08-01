@@ -123,6 +123,7 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
    the 65 claims are what the deposit wand carries to the secondaries *)
 Require Import KptGhost KptShare KptExecMap KvmMap.
@@ -264,7 +265,7 @@ Section SpecMain.
   (* main(), entered on the BOOT hart.                                    *)
   (* ------------------------------------------------------------------- *)
   Definition wp_main_boot_sconf_body
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
@@ -277,8 +278,6 @@ Section SpecMain.
        the boot path exactly when cpuid() returns 0. *)
     cid_word = (zero_reg : mword 64) ->
     (K_main <= K)%nat ->
-    (* the tp/cid convention every callee in the kalloc cone requires *)
-    m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
     (* kinit's free-page run: [end .. PHYSTOP), page-aligned *)
     phystop = (mword_of_int 0x88000000 : mword 64) ->
     s1entry = add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
@@ -289,12 +288,12 @@ Section SpecMain.
     (* the disk's protocol is in its not-live arm at boot: virtio_disk_init
        makes it live, and its config half [c0] is how main knows so *)
     virtio_live c0 = false ->
-    sie_cap_gpr γ m K -∗
-    cpu_own γ 0 false p0 cpu_ctx_free -∗
+    sie_cap_gpr m K false p0 -∗
+    cpu_own 0 false p0 cpu_ctx_free false -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
        code that ever allocates [IntrDefs.intr_inv] (out of trapinithart's
        [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)
-    ghost_var γ (1/4) ('b"0" : mword 1) -∗
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     panic_wp -∗
     (* the handover channel, and the RECIPE for the deposit it will carry:
@@ -359,7 +358,7 @@ Module Type MAIN.
   Parameter wp_main_boot_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
@@ -367,6 +366,6 @@ Module Type MAIN.
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P},
-      wp_main_boot_sconf_body γ Φ m K p0 ps s1entry phystop
+      wp_main_boot_sconf_body Φ m K p0 ps s1entry phystop
         γd γv l0 b0 c0 tlbvec0 P.
 End MAIN.

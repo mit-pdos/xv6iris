@@ -101,6 +101,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
@@ -152,9 +153,9 @@ End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+    (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (v : mword 64) (pid : mword 32) (V : pprivate) :=
+    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   (* [pipeG] does not appear below: sys_pipe's CONTRACT says nothing about
      pipes, since the two references it creates end up inside [proc_priv]'s
      existentials.  It is here because the PROOF needs it -- [pipealloc]'s
@@ -162,18 +163,16 @@ Definition wp_sys_pipe_sconf_body
      instantiate PIPEALLOC has it anyway. *)
   let pcE : mword 64 := mword_of_int KernelSyms.sys_pipe in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the hart id is the ambient CpuId (myproc / acquire convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* sys_pipe reads syscall argument 0 -- the user address of the two-int
      array -- out of the trapframe page [proc_priv] carries.  Nothing is
      assumed about it: argaddr does not check, and copyout is the check. *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
   (sys_pipe_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
-  cpu_own γ 0%nat eb p C -∗
+  cpu_own 0%nat eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
   (* the kmem lock, the sealed page count and panic's contract: pipealloc
@@ -184,11 +183,12 @@ Definition wp_sys_pipe_sconf_body
   (* the syscall's own allowance -- two references may be live in locals
      before they reach descriptors.  Both come back. *)
   fd_slot -∗ fd_slot -∗
-  ( ∀ (mf : regfile) (P' : uptd),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ 0%nat eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own 0%nat eb p C b -∗
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -198,8 +198,8 @@ Definition wp_sys_pipe_sconf_body
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+      (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate),
-      wp_sys_pipe_sconf_body γ γa Φ γfl γf m av eb p C v pid V.
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
+      wp_sys_pipe_sconf_body γa Φ γfl γf m av eb p C v pid V b.
 End SYSPIPE.

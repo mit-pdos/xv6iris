@@ -18,8 +18,8 @@
    IT DOES NOT RETURN ON THE HART IT PARKED FROM (SpecSched.v): proc
    contexts are migratable, so the continuation is quantified over the
    DISPATCHING hart [h] and its per-hart SIE ghost [g], every resource comes
-   back at [(h, g)], the register fact weakens to [callee_saved_notp m mf]
-   plus [mf !!! x4 = cid_word_of h] (CalleeSaved.v), and the conclusion is
+   back at [(h, g)], the register fact weakens to [callee_saved m mf] (tp-free)
+   plus <the tp conjunct, now deleted: tp_pin makes it true by construction> (CalleeSaved.v), and the conclusion is
    hart [h]'s own [WP (LoopE h)].  Consequences for the interface:
      - the cpu context slot [C] stays ONE hart-independent proposition: it is
        carried out of the entry bundle and back into the exit bundle
@@ -48,6 +48,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -62,10 +63,10 @@ Import Defs.
 Notation SL := KernelSyms.sleep.
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   (* a0 = the channel, a1 = the caller's condition lock *)
@@ -73,14 +74,13 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eb = true ->
   (22 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ 1 eb pj C -∗
+  sie_cap_gpr m av b pj -∗
+  cpu_own 1 eb pj C b -∗
   (* sleep is NOT push/pop-order-balanced: it pops p->lock to level 0
      BEFORE re-acquiring the condition lock, so at eb = true the interior
      pop deposits the trap CSRs into the re-enabled arm and the
@@ -95,31 +95,31 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   (* the running-thread bundle *)
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 1 eb pj C -∗
-      trap_csrs_pay (CID := h) 0 eb -∗
-      pc_is (CID := h) ret_tgt -∗
-      (* lk reacquired ON HART [h], with its resource *)
-      locked γk h -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 1 eb pj C b -∗
+      trap_csrs_pay 0 eb -∗
+      pc_is ret_tgt -∗
+      (* lk reacquired on the resuming hart, with its resource *)
+      locked γk cpu_id -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_sconf_body γ Φ γs j γl γk lka sk Rk m av eb C.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
+      wp_sleep_sconf_body Φ γs j γl γk lka sk Rk m av eb C b.
 End SLEEP.
 
 (* ===================================================================== *)
@@ -142,10 +142,10 @@ End SLEEP.
    [wp_sleep_sconf_body] is the [Tk := emp], [Dk := False] instance
    (via WpLock.is_lock_openable); ProofSleep.SleepOfGen restates it. *)
 Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   (* a0 = the channel, a1 = the caller's condition lock *)
@@ -153,7 +153,6 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
@@ -165,8 +164,8 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (⊢ Tk -∗ Dk -∗ False) ->
   (forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False) ->
   (forall i : CPU, ⊢ locked_pre γk i -∗ Dk -∗ False) ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ 1 eb pj C -∗
+  sie_cap_gpr m av b pj -∗
+  cpu_own 1 eb pj C b -∗
   (* same pay note as [wp_sleep_sconf_body]: the interior pop reaches 0 *)
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
@@ -179,30 +178,31 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* the running-thread bundle *)
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 1 eb pj C -∗
-      trap_csrs_pay (CID := h) 0 eb -∗
-      pc_is (CID := h) ret_tgt -∗
-      (* lk reacquired ON HART [h], with its resource and the credential *)
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 1 eb pj C b -∗
+      trap_csrs_pay 0 eb -∗
+      pc_is ret_tgt -∗
+      (* lk reacquired on the resuming hart, with its resource and the
+         credential *)
       Tk -∗
-      locked γk h -∗
+      locked γk cpu_id -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SLEEP_GEN.
   Parameter wp_sleep_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_gen_sconf_body γ Φ γs j γl γk lka Rk Tk Dk m av eb C.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
+      wp_sleep_gen_sconf_body Φ γs j γl γk lka Rk Tk Dk m av eb C b.
 End SLEEP_GEN.

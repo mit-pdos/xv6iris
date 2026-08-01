@@ -13,7 +13,7 @@
    IT RETURNS ON THE HART THAT DISPATCHED IT, not necessarily the one it
    parked from (SpecSched.v): the continuation is quantified over that hart
    [h] and its SIE ghost [g], every resource comes back at [(h, g)], and the
-   register fact is [callee_saved_notp m mf] plus [mf !!! x4 = cid_word_of h]
+   register fact is [callee_saved m mf] (tp-free) plus <the tp conjunct, now deleted: tp_pin makes it true by construction>
    (CalleeSaved.v).  The trap CSRs never appear: yield's own acquire takes
    them and its own release gives them back, and the crossing in between
    carries them inside the chain payload.
@@ -39,6 +39,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -53,41 +54,40 @@ Import Defs.
 Notation YD := KernelSyms.yield.
 
 Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.yield in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   eb = true ->
   (20 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ 0 eb pj C -∗
+  sie_cap_gpr m av b pj -∗
+  cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
-  panic_wp -∗
+  panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 0 eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type YIELD.
   Parameter wp_yield_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_yield_sconf_body γ Φ γs j γl m av eb C.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
+      wp_yield_sconf_body Φ γs j γl m av eb C b.
 End YIELD.

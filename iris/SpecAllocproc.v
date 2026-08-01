@@ -76,6 +76,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
@@ -110,12 +111,12 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
    knows the returned value and nothing else about which arm produced it. *)
 Definition allocproc_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ γa γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
-    (pme : mword 64) (C : iProp Σ) (on : option nat) (tp : mword 64)
+    (γa γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
+    (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
     (rv : mword 64) : iProp Σ :=
   ( (* --- no free slot: a0 = 0, every lock released, budget untouched --- *)
     (⌜ rv = (zero_reg : mword 64) ⌝ ∗
-     cpu_own γ lvl eb pme C ∗
+     cpu_own lvl eb pme C b ∗
      kalloc_env γa on)
   ∨ (* --- found: a0 = &proc[j], j's lock HELD, the private block built --- *)
     (∃ (j : nat) (γl : gname) (ch : mword 64) (pid : mword 32)
@@ -133,15 +134,15 @@ Definition allocproc_post
        is_kstack (proc_addr j) ks ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
-       cpu_own γ (S lvl) eb pme C ∗
+       cpu_own (S lvl) eb pme C false ∗
        trap_csrs_pay lvl eb ∗
        kalloc_env γa (avail_sub on nc)))%I.
 
 Definition wp_allocproc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-    (pme : mword 64) (C : iProp Σ) (on : option nat) :=
+    (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* 4 slots for this frame, 36 for proc_pagetable's (the deepest callee) *)
@@ -150,19 +151,19 @@ Definition wp_allocproc_sconf_body
      push_off sees [S lvl] and needs one more slot of headroom than usual *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (exists nb, on = Some nb /\ (K_allocproc < nb)%nat) ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ lvl eb pme C -∗
+  sie_cap_gpr m K b pme -∗
+  cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗
+  panic_wp_any -∗
   procs_inv Φ γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
-  ( ∀ (mr : regfile),
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
-      sie_cap_gpr γ mr K -∗
+      sie_cap_gpr mr K b pme -∗
       pc_is ret_tgt -∗
-      allocproc_post γ γa γf γs lvl eb pme C on (m !!! Regidx (mword_of_int 4))
+      allocproc_post γa γf γs lvl eb pme C on b
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -170,8 +171,8 @@ Definition wp_allocproc_sconf_body
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (on : option nat),
-      wp_allocproc_sconf_body γ γa γp γf Φ γs m lvl K eb pme C on.
+      (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_allocproc_sconf_body γa γp γf Φ γs m lvl K eb pme C on b.
 End ALLOCPROC.

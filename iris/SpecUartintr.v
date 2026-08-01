@@ -55,6 +55,7 @@ Require Import WpLock.
 Require Import SpecPanic.
 Require Import CalleeSaved.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
@@ -69,31 +70,30 @@ Definition uartintr_stack : nat := 36%nat.
 
 Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γu : uart_names) (γv : disk_names) (γl : gname)
+    (γu : uart_names) (γv : disk_names) (γl : gname)
     (Φ : mval -> iProp Σ) (γs : list gname)
-    (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) :=
+    (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the tp register holds THIS cpu's id (acquire / wakeup's convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   length γs = NPROC ->
   (* the transient noff increments (tx_lock, and wakeup's per-proc lock) stay
      in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (uartintr_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ lvl eb pme C -∗
+  sie_cap_gpr m av b pme -∗
+  cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the device, and the transmitter's lock -- the whole credential *)
   dev_inv γu γv -∗
   is_txlock γl γu -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
   procs_inv Φ γs -∗
-  panic_wp -∗
-  ( ∀ mf : regfile,
+  panic_wp_any -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ lvl eb pme C -∗
+      sie_cap_gpr mf av b pme -∗
+      cpu_own lvl eb pme C b -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -102,8 +102,8 @@ Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γu : uart_names) (γv : disk_names) (γl : gname)
+      (γu : uart_names) (γv : disk_names) (γl : gname)
       (Φ : mval -> iProp Σ) (γs : list gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ),
-      wp_uartintr_sconf_body γ γu γv γl Φ γs m av lvl eb pme C.
+      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),
+      wp_uartintr_sconf_body γu γv γl Φ γs m av lvl eb pme C b.
 End UARTINTR.

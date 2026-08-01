@@ -29,6 +29,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -46,28 +47,28 @@ Definition K_virtio_disk_intr : nat := 22%nat.
 Definition wp_virtio_disk_intr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+    (Φ : mval -> iProp Σ) (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
-    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) :=
+    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_intr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_virtio_disk_intr <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ lvl eb pme C -∗
+  sie_cap_gpr m K b pme -∗
+  cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv Φ γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr γ mf K -∗
-      cpu_own γ lvl eb pme C -∗
+      sie_cap_gpr mf K b pme -∗
+      cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -76,9 +77,9 @@ Module Type VIRTIODISKINTR.
   Parameter wp_virtio_disk_intr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (Φ : mval -> iProp Σ) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ),
-      wp_virtio_disk_intr_sconf_body γ Φ γs γu γd γk pd pav pu m K lvl eb pme C.
+      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),
+      wp_virtio_disk_intr_sconf_body Φ γs γu γd γk pd pav pu m K lvl eb pme C b.
 End VIRTIODISKINTR.

@@ -55,6 +55,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
@@ -88,29 +89,28 @@ Section SpecSysClose.
 End SpecSysClose.
 
 Definition wp_sys_close_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname)
+    (Φ : mval -> iProp Σ) (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (v : mword 64) (pid : mword 32) (V : pprivate) :=
+    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the hart id is the ambient CpuId (myproc / acquire convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* sys_close reads syscall argument 0, out of the trapframe page
      [proc_priv] carries *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
   (* push_off's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (sys_close_stack <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb p C -∗
+  sie_cap_gpr m av b p -∗
+  cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γl γf -∗
-  panic_wp -∗
+  panic_wp_any -∗
   proc_priv γf p pid V -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf av -∗
-      cpu_own γ n eb p C -∗
+      sie_cap_gpr mf av b p -∗
+      cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       sys_close_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -119,8 +119,8 @@ Definition wp_sys_close_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γl γf : gname)
+      (Φ : mval -> iProp Σ) (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate),
-      wp_sys_close_sconf_body γ Φ γl γf m av n eb p C v pid V.
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
+      wp_sys_close_sconf_body Φ γl γf m av n eb p C v pid V b.
 End SYSCLOSE.

@@ -27,7 +27,7 @@
    [b = true] arm demands noff == 0) -- a second, DISTINCT index from
    [wp_next]'s own [b] (see explicit-cpuid-porting-guide.md, "two different
    indices").  The register postcondition weakens to [callee_saved m mf]
-   (CalleeSaved.v's tp-free relation); the old [mf !!! x4 = cid_word_of h]
+   (CalleeSaved.v's tp-free relation); the old <the tp conjunct, now deleted: tp_pin makes it true by construction>
    conjunct is gone -- [tp_pin] makes it true by construction.
 
    What the continuation gets back: same j, state now RUNNING, lock held on

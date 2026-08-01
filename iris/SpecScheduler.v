@@ -37,6 +37,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -50,24 +51,23 @@ Import Defs.
 Notation SC := KernelSyms.scheduler.
 
 Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (20 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ 0 false p0 cpu_ctx_free -∗
+  sie_cap_gpr m av false p0 -∗
+  cpu_own 0 false p0 cpu_ctx_free false -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
   panic_wp -∗
   trap_csrs -∗
-  intr_handler_avail γ -∗
+  intr_handler_avail -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
-      wp_scheduler_sconf_body γ Φ γs m av p0.
+      wp_scheduler_sconf_body Φ γs m av p0.
 End SCHEDULER.

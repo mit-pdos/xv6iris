@@ -29,6 +29,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -45,17 +46,15 @@ Import Defs.
 Notation ASL := KernelSyms.acquiresleep.
 
 Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) :=
+    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  (* the hart id is the ambient CpuId *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   (26 <= av)%nat ->
   (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
@@ -63,8 +62,8 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ 0 eb pj C -∗
+  sie_cap_gpr m av b pj -∗
+  cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   panic_wp_any -∗
@@ -73,29 +72,29 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   (* the running-thread bundle threaded through to sleep() *)
   procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜ callee_saved_notp m mf ⌝ -∗
-      ⌜ mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h ⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 0 eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜ callee_saved m mf ⌝ -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
       (* the lock is now HELD: token + pid field + protected resource *)
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac},
-      wp_acquiresleep_sconf_body γ Φ γs j γl γsl s R m pidv av eb C dq.
+      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool),
+      wp_acquiresleep_sconf_body Φ γs j γl γsl s R m pidv av eb C dq b.
 End ACQUIRESLEEP.

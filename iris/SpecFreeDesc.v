@@ -25,6 +25,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -40,10 +41,10 @@ Definition K_free_desc : nat := 20%nat.
 
 Definition wp_free_desc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+    (Φ : mval -> iProp Σ) (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (va : mword 64) (vl : mword 32) (vf vn : mword 16) :=
+    (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.free_desc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_free_desc <= K)%nat ->
@@ -51,12 +52,11 @@ Definition wp_free_desc_sconf_body
   uint (m !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = Z.of_nat i ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ lvl eb pme C -∗
+  sie_cap_gpr m K b pme -∗
+  cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv Φ γs -∗
   (* the descriptor-page pointer cell: free_desc RE-READS [disk.desc] (twice)
      to reach entry [i], so it needs the persistent half of [disk_geom] that
      names the page [pd] the four descriptor words below live on. *)
@@ -68,10 +68,11 @@ Definition wp_free_desc_sconf_body
   pa_add pd (16 * i + 8)  ↦₄ vl -∗
   pa_add pd (16 * i + 12) ↦₂ vf -∗
   pa_add pd (16 * i + 14) ↦₂ vn -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
-      sie_cap_gpr γ mf K -∗
-      cpu_own γ lvl eb pme C -∗
+      sie_cap_gpr mf K b pme -∗
+      cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is ret_tgt -∗
       d_free_cell i ↦ₘ Z_to_bv 8 1 -∗
       d_desc pd i ↦₈ (zero_reg : mword 64) -∗
@@ -84,9 +85,9 @@ Definition wp_free_desc_sconf_body
 Module Type FREEDESC.
   Parameter wp_free_desc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (Φ : mval -> iProp Σ) (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (va : mword 64) (vl : mword 32) (vf vn : mword 16),
-      wp_free_desc_sconf_body γ Φ γs pd i m K lvl eb pme C va vl vf vn.
+      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool),
+      wp_free_desc_sconf_body Φ γs pd i m K lvl eb pme C va vl vf vn b.
 End FREEDESC.
