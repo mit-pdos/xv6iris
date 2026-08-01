@@ -41,22 +41,31 @@ Import Defs.
 
 Notation HD := KernelSyms.holding.
 
+(* INTERRUPTS MUST BE DISABLED at holding() -- it [jal mycpu]s at +0x16, and
+   [mycpu]'s own contract (SpecMycpu.v) is stated at the LITERAL [b = false]
+   (its [tp] read happens mid-body, so a [b]-generic caller could not even
+   supply a matching [sie_cap_gpr _ _ b] to it).  Stating this contract at
+   [false] directly -- with no [wp_next] wrapper at all, since it collapses
+   by [wp_next_off] anyway -- is sound: holding() is only ever called from
+   acquire()/release(), both of which have already called push_off().  It
+   also makes the holder token's hart identity track a SINGLE ambient [CID]
+   throughout the body (no migrated-hart mismatch can arise at the +0x12
+   [lk->cpu] read below). *)
 Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (b : bool) (p : mword 64) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   (6 <= n)%nat ->
   (⊢ Tc -∗ Dc -∗ False) ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
   Tc -∗
-  wp_next b (fun (CID : CpuId) =>
-    ∀ mh,
+  ( ∀ mh,
     Tc -∗
-    sie_cap_gpr mh n b p -∗
+    sie_cap_gpr mh n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
       (mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64) \/
@@ -64,27 +73,32 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
+(* INTERRUPTS MUST BE DISABLED -- see the note above [wp_holding_lockinv_s_sconf_body];
+   the same [jal mycpu] at +0x16 forces this contract to [b = false] too, with
+   no [wp_next] wrapper (it collapses by [wp_next_off]).  Stated at literal
+   [false] the whole body runs on the ONE ambient hart, so [held_cpu] names
+   the SAME identity throughout -- including at the +0x12 [lk->cpu] read,
+   where a [b]-generic statement would otherwise hand that leaf a token about
+   the entry hart while it demands one about its own (post-migration)
+   ambient hart. *)
 Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (b : bool) (p : mword 64) :=
+    (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the holder token is about a FIXED cpu identity -- the one recorded at
-     acquire time -- so it is bound here, at the entry hart, and threaded
-     through [wp_next] BY NAME rather than re-read as [cpu_id] inside the
-     continuation (which would resolve to whatever hart the thread resumes
-     on). *)
+     acquire time -- which, at [b = false], is the SAME as the ambient
+     [cpu_id] throughout this body (no hart ever moves). *)
   let held_cpu := cpu_id in
   add_vec lk (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   (6 <= n)%nat ->
   (⊢ locked γl held_cpu -∗ Dc -∗ False) ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
   locked γl held_cpu -∗
-  wp_next b (fun (CID : CpuId) =>
-    ∀ mh,
-    sie_cap_gpr mh n b p -∗
+  ( ∀ mh,
+    sie_cap_gpr mh n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mh /\
       mh !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64) ⌝ -∗
@@ -95,10 +109,10 @@ Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lock
 Module Type HOLDING.
   Parameter wp_holding_lockinv_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (b : bool) (p : mword 64),
-      wp_holding_lockinv_s_sconf_body Φ γl lka R Tc Dc m n b p.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64),
+      wp_holding_lockinv_s_sconf_body Φ γl lka R Tc Dc m n p.
   Parameter wp_holding_lockinv_locked_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (b : bool) (p : mword 64),
-      wp_holding_lockinv_locked_s_sconf_body Φ γl lka R Dc m n b p.
+      (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64),
+      wp_holding_lockinv_locked_s_sconf_body Φ γl lka R Dc m n p.
 End HOLDING.

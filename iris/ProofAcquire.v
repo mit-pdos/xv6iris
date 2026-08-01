@@ -352,10 +352,9 @@ Section ProofAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (Holding.wp_holding_lockinv_s_sconf Φ γl lk0 R Tc Dc B2 (av - 4)%nat false p
+    iApply (Holding.wp_holding_lockinv_s_sconf Φ γl lk0 R Tc Dc B2 (av - 4)%nat p
               Hlkb ltac:(lia) Href
               with "Hcg Htext Hpc Hlock HTc [-]").
-    rewrite wp_next_off.
     iIntros (mh) "HTc Hcg Hpc %Hmh".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
@@ -476,96 +475,40 @@ Section ProofAcquire.
               ltac:(lia)
               with "Hcg Htext Hpc Hi24 [-]").
     iIntros (mo) "Hcg Hpc %Hmo".
-    set (Cm := mo).
+    set (Cm := mo) in *.
     destruct Hmo as [Hcso Hmo_a0].
     destruct Hcso as (Hcspo & Hs0o & Hs1o & Hs2o & Hs3o & Hs4o & Hs5o & Hs6o & Hs7o & Hs8o & Hs9o & Hs10o & Hs11o).
     assert (Ha0C : Cm !!! Regidx (mword_of_int 10 : mword 5) = mycpu_ret cid_word)
-      by (rewrite /Cm Hmo_a0; exact (f_equal mycpu_ret (rget_tp B8))).
+      by (rewrite Hmo_a0; exact (f_equal mycpu_ret (rget_tp B8))).
     iEval (rewrite upd_eq) in "Hpc".
     assert (Hpc28 : ret_pc (add_vec_int (mword_of_int (AQ + 0x24) : mword 64) 4)
                     = (mword_of_int (AQ + 0x28) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
     (* ---- 0x28: c.sd a0,16(s1) : lk->cpu := mycpu ---- *)
     assert (Hs1C : Cm !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk0).
-    { rewrite /Cm Hs1o /B8 upd_ne; [| vm_compute; discriminate].
+    { rewrite Hs1o /B8 upd_ne; [| vm_compute; discriminate].
       exact HB3s1. }
     assert (Hpacpu : add_vec (Cm !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lk0).
     { rewrite Hs1C aq_addv_zero_l. reflexivity. }
     iPoseProof (aqi_28 with "Htext") as "Hi28".
-    (* BLOCKED HERE -- the same structural gap already diagnosed in full at
-       ProofHolding.v's [wp_holding_lockinv_locked_s_sconf] (its "0x12"
-       comment), one level up the call chain from there: [Hrefpre :
-       locked_pre γl cpu_id -∗ Dc -∗ False] was bound by [SpecAcquire.v] at
-       THIS FUNCTION's ENTRY hart [CID] ([wp_acquire_gen_sconf_body]'s
-       [cpu_id] sits before any [wp_next], exactly like [Href]/[Hrefpre] in
-       SpecHolding.v).  But [wp_csd_lkcpu_lockopen_s_sconf] (WpSconfLock.v)
-       demands the refutation at ITS OWN ambient hart -- [h0 := cpu_id],
-       resolved where the leaf is APPLIED, which is [CIDpo] here (the hart
-       push_off's own [wp_next b] handed back, seven [wp_next]-bound leaf
-       hops plus push_off's own migration deep from entry).  [cpu_id
-       (CID:=CID)] and [cpu_id (CID:=CIDpo)] are different terms (confirmed
-       concretely: [iApply] leaves the goal "The term Hrefpre has type
-       locked_pre ... (cpu_id (CID:=CID)) ... while it is expected to have
-       type locked_pre ... (cpu_id (CID:=CIDpo)) ..."), and [Hrefpre]'s
-       accumulated [Hs1..Hs7]/[Hspo] chain only proves them equal under
-       [b = false] -- for the ARBITRARY entry [b] this function's own
-       contract admits, there is no bridge, and unlike [cpu_own] there is no
-       [locked_pre]-transport lemma anywhere in WpLock.v to manufacture one
-       (confirmed: [locked_pre_state]/[locked_pre] have no such lemma,
-       matching the note at ProofHolding.v that no [locked]-family resource
-       has one).  The physical reading is the same as at every other
-       instance of this gap: if acquire's prologue (the seven instructions
-       before push_off) genuinely ran with interrupts enabled, a migration
-       could really land it on a hart different from where push_off/holding/
-       the amoswap loop/mycpu/this store all subsequently run -- exactly
-       what a [b]-generic contract would need to rule out, and nothing in
-       [wp_acquire_gen_sconf_body]'s premises does.
-
-       CONFIRMED to be the ONLY remaining gap: stubbing [Hrefpre] at
-       [cpu_id (CID:=CIDpo)] with a bare [admit] lets the ENTIRE REST of this
-       proof -- through this [Qed], and independently the [AcquireOfGen]
-       wrapper below (already ported, unaffected: it treats [G] as an
-       opaque, already-sealed [ACQUIRE_GEN] instance and never sees this
-       gap) -- go through clean, no other errors.  This is a FIFTH confirmed
-       instance of the same (out-of-scope, already-ported, already-green)
-       Spec gap: [SpecAcquire.v]'s [Hrefpre] (and, one level down,
-       [SpecHolding.v]'s [Href]/[Hrefpre]) most likely need to thread a
-       hart-GENERIC refutation (something in the shape of [panic_wp_any]'s
-       [∀ h, ...] wrapper, or be discharged only where [b] is already known
-       [false]) rather than a single [cpu_id]-at-entry credential, when the
-       resource being refuted is itself hart-indexed.  Per the porting
-       instructions this is a case to report rather than force, so the call
-       site below is left as the literal (as-if-entry-hart-suffices) attempt
-       and the proof is [Abort]ed rather than closed with a fabricated or
-       weakened statement. *)
-    Fail iApply (wp_csd_lkcpu_lockopen_s_sconf Φ γl lk0 R Dc (mword_of_int (AQ + 0x28))
-              (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) Cm (av - 4)%nat false
-              Hpacpu Ha0C Hrefpre
-              with "Hcg Hpc Hi28 Hlock Htokp [-]").
-  Abort.
-(* -----------------------------------------------------------------------
-   Everything below this point is the PORTED (not dead pre-port) shape the
-   rest of the proof takes once the gap above is resolved -- kept as a
-   comment because [Abort] above means [wp_acquire_gen_sconf] is not
-   defined, so this can never be checked by [coqc] as live code (and the
-   enclosing functor application would fail to close for that reason alone).
-   It was verified, offline, to compile TO THIS FILE'S OWN [Qed] with
-   [Hrefpre] replaced by an [admit]-stubbed fact at [cpu_id (CID:=CIDpo)] --
-   i.e. this is not a guess, it is the actual continuation, confirmed
-   correct up to the one blocked line.
-   -----------------------------------------------------------------------
+    (* [wp_csd_lkcpu_lockopen_s_sconf] (WpSconfLock.v) demands the dead-state
+       refutation at ITS OWN ambient hart -- [h0 := cpu_id], resolved where
+       the leaf is APPLIED, i.e. [CIDpo] here (the hart push_off's own
+       migration handed back).  With [Hrefpre] now ∀-hart (SpecAcquire.v's
+       Fix 1), instantiating it at the ambient [cpu_id] gives exactly the
+       credential this leaf wants, at no cost to [AcquireOfGen] below
+       ([lock_refute_False] is hart-generic already). *)
     iApply (wp_csd_lkcpu_lockopen_s_sconf Φ γl lk0 R Dc (mword_of_int (AQ + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 16 : mword 12) Cm (av - 4)%nat false
-              Hpacpu Ha0C Hrefpre
+              Hpacpu Ha0C (Hrefpre cpu_id)
               with "Hcg Hpc Hi28 Hlock Htokp [-]").
     rewrite wp_next_off.
     iIntros "Hcg Hpc Htok".
     assert (Hpc2a : add_vec_int (mword_of_int (AQ + 0x28) : mword 64) 2 = mword_of_int (AQ + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- 0x2a/0x2c/0x2e: c.ldsp ra/s0/s1 ---- *)
-    assert (HcspC : Cm !!! Regidx csp_rs1 = spd) by (rewrite /Cm Hcspo; exact HcspB8).
+    assert (HcspC : Cm !!! Regidx csp_rs1 = spd) by (rewrite Hcspo; exact HcspB8).
     assert (HraA0 : A0 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
       by (rewrite /A0 upd_ne; [reflexivity | vm_compute; discriminate]).
     assert (Hs0A0 : A0 !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5))
@@ -675,10 +618,19 @@ Section ProofAcquire.
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hown Hpay").
     { exact Hmsf. }
+    (* [s0]/[s1] never surface as separate goals below: each is restored by
+       an epilogue [ldsp] as the LITERAL value [m !!! reg] (the leaf's own
+       [wval] argument), so [E4 !!! 8 = m !!! 8] / [E4 !!! 9 = m !!! 9] are
+       convertible outright and [repeat split] -- which is [constructor 1],
+       i.e. tries [eq_refl] on each leaf -- discharges them silently before
+       ever producing a bullet (the gotcha recorded in durable-notes.md's
+       "repeat split CLOSES a convertible equality" entry).  Only [sp]
+       (a real computation, not a bare reload) and [s2..s11] (threaded
+       through the push_off/holding/mycpu sub-calls) reach the tactic. *)
     unfold callee_saved. repeat split.
     + rewrite HE4sp. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs2o.
+      rewrite Hs2o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs2h.
@@ -690,7 +642,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs3o.
+      rewrite Hs3o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs3h.
@@ -702,7 +654,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs4o.
+      rewrite Hs4o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs4h.
@@ -714,7 +666,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs5o.
+      rewrite Hs5o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs5h.
@@ -726,7 +678,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs6o.
+      rewrite Hs6o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs6h.
@@ -738,7 +690,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs7o.
+      rewrite Hs7o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs7h.
@@ -750,7 +702,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs8o.
+      rewrite Hs8o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs8h.
@@ -762,7 +714,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs9o.
+      rewrite Hs9o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs9h.
@@ -774,7 +726,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs10o.
+      rewrite Hs10o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs10h.
@@ -786,7 +738,7 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
     + do 4 (rewrite upd_ne; [| vm_compute; discriminate]).
-      rewrite /Cm Hs11o.
+      rewrite Hs11o.
       rewrite /B8 upd_ne; [| vm_compute; discriminate].
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hs11h.
@@ -798,7 +750,6 @@ Section ProofAcquire.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity.
   Qed.
-   ----------------------------------------------------------------------- *)
 
 End ProofAcquire.
 
@@ -822,7 +773,7 @@ Section OfGen.
     intros pcE lk0 ret_tgt Hpos Hav.
     iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
     iApply (G.wp_acquire_gen_sconf Φ γl R emp%I False%I m n eb p C av b
-              Hpos Hav (lock_refute_False _) (lock_refute_False _)
+              Hpos Hav (lock_refute_False _) (fun i => lock_refute_False _)
               with "Hcg Hown Htext Hpc [] [] Hpanic [-]").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }

@@ -193,10 +193,9 @@ Section ProofRelease.
     assert (HlkaR3 : add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5))
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
       by (rewrite Ha0R3; exact Hlka).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf Φ γl lka R Dc R3 (av - 4)%nat false p
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf Φ γl lka R Dc R3 (av - 4)%nat p
               HlkaR3 ltac:(lia) Href
               with "Hcg Htext Hpc Hlock Htoken [-]").
-    rewrite wp_next_off.
     iIntros (mh) "Hcg Hpc %Hmh Htoken".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).

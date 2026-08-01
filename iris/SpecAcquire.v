@@ -51,7 +51,15 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
   (⊢ Tc -∗ Dc -∗ False) ->
-  (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
+  (* [∀ i : CPU], not pinned at the entry [cpu_id]: acquire's entry can be at
+     [b = true] (the enabled arm forces [n = 0]), so "enter at CID with
+     interrupts on, migrate during the 7-instruction prologue, win the lock
+     as CIDpo" is a REAL execution -- the caller's entry-hart credential is
+     the wrong credential, since the leaf [wp_csd_lkcpu_lockopen_s_sconf]
+     fixes the hart at its OWN (the post-migration) ambient identity.
+     Strengthening this premise to every hart costs [AcquireOfGen] nothing:
+     [lock_refute_False] is already hart-generic. *)
+  (forall i : CPU, ⊢ locked_pre γl i -∗ Dc -∗ False) ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
