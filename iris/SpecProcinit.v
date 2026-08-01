@@ -45,6 +45,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes SmodeCore CalleeSaved KernelText KernelDataInv IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ArrCursor.
 Require Import ProcGeom.
@@ -312,13 +313,13 @@ Section ProcinitProcsInv.
 End ProcinitProcsInv.
 
 Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
      wants 2 below that. *)
   (10 <= K)%nat ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the two standalone locks ... *)
   lk_raw pid_lock_addr -∗
@@ -328,8 +329,9 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
   (* THE supply being routed: NOFILE + FDSPARE units per process, i.e. the
      WHOLE of [FDSLOTS] -- nothing is left over. *)
   fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr K -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk_fresh pid_lock_addr "nextpid"%string -∗
@@ -341,6 +343,6 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (K : nat),
-      wp_procinit_sconf_body γ Φ m K.
+      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64),
+      wp_procinit_sconf_body Φ m K b p.
 End PROCINIT.

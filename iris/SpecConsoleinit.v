@@ -66,13 +66,21 @@ Definition cons_name_str : Z := 0x80007000%Z.
 Definition devsw_console_read : mword 64 := mword_of_int (KernelSyms.devsw + 16).
 Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24).
 
+(* BOOT-ONLY: consoleinit's callee uartinit is itself stated at the literal
+   index [false] (interrupts never on before intr_on(), see
+   SpecUartinit.v), so a [b]-generic consoleinit could never call it -- the
+   [sie_cap_gpr] its call to uartinit hands over would need to unify a
+   generic [b] with the callee's literal [false].  consoleinit is called
+   only from main() before intr_on(), so it is stated at [false] with no
+   [wp_next] wrapper, the same shape as SpecCpuid.v / SpecTrapinithart.v /
+   SpecPlicClaim.v. *)
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{CID : CpuId}
     (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
     (vtlock : bv 32) (vtname vtcpu : bv 64)
-    (dread0 dwrite0 : mword 64) (b : bool) (p : mword 64) :=
+    (dread0 dwrite0 : mword 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* &cons.lock = &cons: the spinlock is the first field of the [cons] struct *)
@@ -85,7 +93,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   (* consoleinit's own frame is 2 slots and its deepest callee is uartinit,
      which needs 4. *)
   (6 <= K)%nat ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr m K false p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
      uartinit's own spec, the "uart" one. *)
@@ -105,9 +113,8 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   c_tcpu ↦₈ vtcpu -∗
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
-  wp_next b (fun (CID : CpuId) =>
-    ∀ mr,
-    sie_cap_gpr mr K b p -∗
+  ( ∀ mr,
+    sie_cap_gpr mr K false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* uartinit writes no THR, so the accepted trace is unchanged; its final
@@ -134,6 +141,6 @@ Module Type CONSOLEINIT.
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
-      (dread0 dwrite0 : mword 64) (b : bool) (p : mword 64),
-      wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 b p.
+      (dread0 dwrite0 : mword 64) (p : mword 64),
+      wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
 End CONSOLEINIT.

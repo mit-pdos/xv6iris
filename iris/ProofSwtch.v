@@ -45,7 +45,7 @@ Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import VcGen VcGenS.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import WpSmodePtCtl.
 Require Import StackOwn.
 Require Import CpuOwn.
@@ -70,13 +70,13 @@ Section ProofSwtch.
     rewrite /word_pointsto /mem_pointsto. apply _.
   Qed.
 
-  Lemma wp_swtch_sconf (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_swtch_sconf (Φ : mval -> iProp Σ)
       (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body γ Φ P An Ao oldc newc m0 old_vs av eb p.
+    wp_swtch_sconf_body Φ P An Ao oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -96,18 +96,20 @@ Section ProofSwtch.
     iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvx" as (menvcfg0)
       "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    (* ---- refute sie_arm '1' against cpu_own's level-1 count eighth; keep the
-       off-eighth [Hq0] for the SIE=0 pin, refold cpu_own ---- *)
-    iEval (rewrite /cpu_own) in "Hcpuown".
-    iDestruct "Hcpuown" as "(%Hcpb & Hcnoff & Hcint & Hccnt & Hcproc & _)".
-    iDestruct (intr_count_pos_off γ 0 with "Hccnt") as "[Hq0cnt Hres]".
-    iAssert (intr_off_tok γ ∗ intr_count γ 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
-    { iDestruct "Hsiearm" as "[Hq0arm | (Hq1arm & _)]".
-      - iFrame "Hq0arm". rewrite /intr_count. iFrame "Hq0cnt Hres".
-      - iDestruct (ghost_var_agree with "Hq0cnt Hq1arm") as %Hbad.
-        exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate. }
-    iAssert (cpu_own γ 1 eb p emp) with "[Hcnoff Hcint Hccnt Hcproc]" as "Hcpuown".
-    { rewrite /cpu_own. iFrame "Hcnoff Hcint Hccnt Hcproc". iPureIntro; exact Hcpb. }
+    (* ---- [Hcg]'s [sie_cap_gpr] is pinned at the literal [b = false] (both
+       swtch's own entry and exit index, per SpecSwtch.v's header), so
+       [Hsiearm : sie_arm false p] IS [intr_off_tok] by conversion -- no
+       disjunction to destruct any more (that was the pre-index [sie_arm]
+       shape), so the old ghost_var_agree contradiction arm is simply GONE:
+       there is no other case to refute. ---- *)
+    iEval (rewrite /cpu_own /cpu_hart /cpu_cells) in "Hcpuown".
+    iDestruct "Hcpuown" as "(((%Hcpb & Hcnoff & Hcint & Hcproc) & Hccnt) & _)".
+    iDestruct (intr_count_pos_off 0 eb with "Hccnt") as "[Hq0cnt Hres]".
+    iAssert (intr_off_tok ∗ intr_count 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
+    { iFrame "Hsiearm". rewrite /intr_count. iFrame "Hq0cnt Hres". }
+    iAssert (cpu_own 1 eb p emp false) with "[Hcnoff Hcint Hccnt Hcproc]" as "Hcpuown".
+    { rewrite /cpu_own /cpu_hart /cpu_cells.
+      iFrame "Hcnoff Hcint Hcproc Hccnt". iPureIntro; exact Hcpb. }
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).
@@ -121,20 +123,31 @@ Section ProofSwtch.
     iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
     iModIntro.
-    (* ---- the symbolic environment: 0..31 = m0; 32..45 = new's saved; 46..59 = old's ---- *)
+    (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
+       [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
+       construction, not whatever [m0]'s raw slot 4 happens to hold);
+       32..45 = new's saved; 46..59 = old's.  Every OTHER index agrees with
+       raw [m0] via [rget_ne] (tp_pin only ever touches index 4). ---- *)
+    (* fold [tp_pin m0] into an opaque local name FIRST: [rho] and every
+       [vm_compute]-driven side condition below is far cheaper against one
+       flat map than against a live [<[Regidx Rtp := ...]> m0] insert
+       re-exposed at every one of [rho]'s 32 low branches. *)
+    set (M0 := tp_pin m0).
     iDestruct (VcGenS.gpr_file_dom with "Hfile") as "[%Hdom Hfile]".
-    iDestruct (gpr_file_x0 m0 (mword_of_int 0) ltac:(vm_compute; reflexivity)
+    iDestruct (gpr_file_x0 M0 (mword_of_int 0) ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0 Hfile]".
     set (rho := fun k : nat =>
            if (k <? 32)%nat
-           then m0 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
+           then M0 !!! Regidx (mword_of_int (Z.of_nat k) : mword 5)
            else if (k <? 46)%nat then nth (k - 32) new_vs (mword_of_int 0)
            else nth (k - 46) old_vs (mword_of_int 0)).
-    assert (Hden : vregs_den rho vregs_init = m0).
+    assert (Hden : vregs_den rho vregs_init = M0).
     { apply (vregs_den_init_agree _ _ Hx0). intros k Hk.
       unfold rho. rewrite (proj2 (Nat.ltb_lt k 32) Hk). reflexivity. }
-    assert (Hrho10 : rho 10%nat = oldc) by (unfold rho; exact Holdc).
-    assert (Hrho11 : rho 11%nat = newc) by (unfold rho; exact Hnewc).
+    assert (Hrho10 : rho 10%nat = oldc).
+    { unfold rho; cbn. unfold M0, tp_pin. rewrite upd_ne; [exact Holdc | vm_compute; discriminate]. }
+    assert (Hrho11 : rho 11%nat = newc).
+    { unfold rho; cbn. unfold M0, tp_pin. rewrite upd_ne; [exact Hnewc | vm_compute; discriminate]. }
     assert (Hmapold : map (fun w => rho w)
               [46;47;48;49;50;51;52;53;54;55;56;57;58;59]%nat = old_vs).
     { unfold rho; cbn.
@@ -197,17 +210,27 @@ Section ProofSwtch.
     { rewrite (vregs_den_lookup rho swtch_regs1 (Regidx (mword_of_int 1 : mword 5))
                  (SX 32 0) ltac:(vm_compute; reflexivity)).
       rewrite sval_den_SX0. unfold rho. cbn. reflexivity. }
-    assert (Hm4 : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 4 : mword 5)
-                = m0 !!! Regidx (mword_of_int 4 : mword 5)).
+    (* x4 (tp) is not among [swtch_regs1]'s keys (it threads through the
+       block unchanged), so it denotes its GENERATION-0 (initial) value --
+       which, since [rho]'s environment IS [tp_pin m0], is [cid_word_of
+       cpu_id] by [tp_pin]'s own definition, with no dependence on raw
+       [m0] at all. *)
+    assert (Hm4_raw : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 4 : mword 5)
+                = cid_word_of cpu_id).
     { rewrite (vregs_den_lookup rho swtch_regs1 (Regidx (mword_of_int 4 : mword 5))
                  (SX 4 0) ltac:(vm_compute; reflexivity)).
-      rewrite sval_den_SX0. unfold rho. cbn. reflexivity. }
+      rewrite sval_den_SX0. unfold rho. cbn. unfold M0, tp_pin. rewrite upd_eq. reflexivity. }
+    (* tp is never carried by the raw map any more -- both sides are this
+       SAME hart's [rget ... Rtp] (swtch's own proof never migrates; only
+       the payload it hands off is later resumed elsewhere), so the two
+       [rget]s agree unconditionally via [rget_tp_agree] with no map lookup
+       at all. *)
+    pose proof (rget_tp_agree (vregs_den rho swtch_regs1) m0) as Hm4.
     assert (Hcallee_new :
               callee_img (vregs_den rho swtch_regs1) = new_vs).
     { rewrite <- Hmapnew. unfold callee_img, ctx_regs; cbn [map nth].
       repeat f_equal;
-        (erewrite vregs_den_lookup by (vm_compute; reflexivity);
-         apply sval_den_SX0). }
+        (erewrite vregs_den_lookup; [apply sval_den_SX0 | vm_compute; reflexivity]). }
     (* the resumed file's sp (= new's saved sp = nth 1 new_vs) keys its stack. *)
     assert (Hcsp_t : vregs_den rho swtch_regs1 !!! Regidx csp_rs1
                      = nth 1 new_vs (mword_of_int 0)).
@@ -226,25 +249,33 @@ Section ProofSwtch.
     iNext.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
     (* ---- rebuild sconf ---- *)
-    iAssert (sconf γ) with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv]" as "Hsc".
+    iAssert sconf with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv]" as "Hsc".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
       iSplitL "Hms Hhalf".
       { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
       iSplitL "Hmie Hmdl".
       { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    (* ---- the target record's resume wand is [∀ m eb'] and demands cpu_own at
-       the record's INDEX p (= our own p); supply our bundle at our own [eb]
-       (eb' := eb) -- no retune, no equation. ---- *)
-    iAssert (sie_cap γ (vregs_den rho swtch_regs1) av_t) with "[Hstk_t Htr Hq0]" as "Hcap_t".
-    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iLeft. iExact "Hq0". }
-    iDestruct (sie_cap_gpr_join γ (vregs_den rho swtch_regs1) av_t
+    (* ---- the target record's resume wand is [∀ h g m eb'] and demands
+       cpu_own at the record's INDEX p (= our own p); supply our bundle at
+       our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
+       is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
+       building [sie_cap] at [false] needs no [iLeft]. ---- *)
+    iAssert (sie_cap (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
+    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iExact "Hq0". }
+    (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
+       rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it
+       under [tp_pin] -- a no-op, since that map's own tp slot is ALREADY
+       [cid_word_of cpu_id] ([Hm4_raw]) -- to match [sie_cap_gpr]'s shape. *)
+    iEval (rewrite -(tp_pin_id (vregs_den rho swtch_regs1) Hm4_raw)) in "Hfile".
+    iDestruct (sie_cap_gpr_join (vregs_den rho swtch_regs1) av_t false p
                  with "Hhs Hsc Hcap_t Hfile") as "Hcg_t".
     (* the record's wand is [∀ h g m eb']; swtch resumes it HERE, so it is
-       applied at this hart and this hart's ghost, and the spec's [adm An
-       cpu_id γ] premise is exactly its admissibility obligation.  The
-       hand-off names the OLD record's own index [Ao]. *)
-    iApply ("Hnewwand" $! cpu_id γ (vregs_den rho swtch_regs1) eb
+       applied at this hart and this hart's (now canonical) SIE ghost
+       [sie_gname], and the spec's [adm An cpu_id sie_gname] premise is
+       exactly its admissibility obligation.  The hand-off names the OLD
+       record's own index [Ao]. *)
+    iApply ("Hnewwand" $! cpu_id sie_gname (vregs_den rho swtch_regs1) eb
               with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }

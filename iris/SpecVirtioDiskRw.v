@@ -34,7 +34,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -57,16 +57,19 @@ Definition K_virtio_disk_rw : nat := 34%nat.
 Definition wp_virtio_disk_rw_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* fabric + lock ghosts *)
     (pd pav pu : mword 64)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) :=
+    (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_rw in
   let pj := proc_addr j in
-  (* a0 = b, a1 = write *)
-  let b : Arch.pa := m !!! Regidx (mword_of_int 10 : mword 5) in
+  (* a0 = the [struct buf *b] argument, a1 = write.  Renamed to [bp] (was
+     [b]): [b] is now the SIE-index binder every contract in this port
+     carries, so the pre-existing local collides with it (porting-guide
+     rule: rename the pre-existing binder, never the new index). *)
+  let bp : Arch.pa := m !!! Regidx (mword_of_int 10 : mword 5) in
   let wr : bool :=
     negb (eq_vec (m !!! Regidx (mword_of_int 11 : mword 5) : mword 64)
                  (zero_reg : mword 64)) in
@@ -90,8 +93,7 @@ Definition wp_virtio_disk_rw_sconf_body
      (Same shape as the [uint bno < 2^31] premise above: the honest
      statement of what the code needs.)  [KptPt.kdata_svpn_class] turns it
      into the [kmap_static … KP_rw] the tier bridges consume. *)
-  (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data bp) k)) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* PARKING PREMISE (hart-generic scheduler protocol): the saved base enable
@@ -99,9 +101,9 @@ Definition wp_virtio_disk_rw_sconf_body
      trap CSRs across the crossing -- which only the interior acquire can mint,
      and only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
   eb = true ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b pj -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
-  cpu_own γ 0 eb pj C -∗
+  cpu_own 0 eb pj C b -∗
   (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
      before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
      [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
@@ -115,7 +117,7 @@ Definition wp_virtio_disk_rw_sconf_body
   panic_wp_any -∗
   procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -123,34 +125,34 @@ Definition wp_virtio_disk_rw_sconf_body
   (* the caller's buffer and the disk block it names.
      BSIZE = 1024 and sector = blockno * 2, so the block's byte range on
      the disk starts at 1024 * blockno. *)
-  buf_own b bno dsk0 bs_buf -∗
+  buf_own bp bno dsk0 bs_buf -∗
   disk_block γd (uint bno) bs_disk -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf K -∗
-      cpu_own (CID := h) g 0 eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
       (* the exchange: a read fills the buffer from the block, a write
          moves the buffer's bytes onto the disk; b->disk ends at 0 *)
-      buf_own b bno (mword_of_int 0 : mword 32)
+      buf_own bp bno (mword_of_int 0 : mword 32)
               (if wr then bs_buf else bs_disk) -∗
       disk_block γd (uint bno) (if wr then bs_buf else bs_disk) -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type VIRTIODISKRW.
   Parameter wp_virtio_disk_rw_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)),
-      wp_virtio_disk_rw_sconf_body γ Φ γs j γl γu γd γk pd pav pu
-                                   m K eb C bno dsk0 bs_buf bs_disk.
+      (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool),
+      wp_virtio_disk_rw_sconf_body Φ γs j γl γu γd γk pd pav pu
+                                   m K eb C bno dsk0 bs_buf bs_disk b.
 End VIRTIODISKRW.

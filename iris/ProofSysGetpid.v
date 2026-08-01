@@ -28,8 +28,9 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import KernelRvcDecode WpRvcBridge WpDecodeBridge.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
-Require Import ProcGeom.
+Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecMyproc.
 Require Import SpecSysGetpid.
@@ -131,13 +132,13 @@ Section ProofSysGetpid.
   (* =================================================================== *)
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
-  Lemma wp_sys_getpid_sconf (γ : gname) (Φ : mval -> iProp Σ) (γf : gname)
+  Lemma wp_sys_getpid_sconf (Φ : mval -> iProp Σ) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate)
-    : wp_sys_getpid_sconf_body γ Φ γf m av n eb p C pid V.
+      (pid : mword 32) (V : pprivate) (b : bool)
+    : wp_sys_getpid_sconf_body Φ γf m av n eb p C pid V b.
   Proof.
     cbv beta delta [wp_sys_getpid_sconf_body].
-    intros pcE ret_tgt Htp Hn Hav.
+    intros pcE ret_tgt Hn Hav.
     set (imm_entry := (mword_of_int 48 : mword 6)).
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
     set (nzimm_s0 := (mword_of_int 4 : mword 8)).
@@ -163,9 +164,9 @@ Section ProofSysGetpid.
     { unfold sp', pa_stk, add_vec_int, imm_entry.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0x00: c.addi sp,-16 (frame push) ---- *)
-    iApply (wp_caddi_sp_push_s_sconf γ Φ pcE imm_entry m av 2 ltac:(lia) Hpush
+    iApply (wp_caddi_sp_push_s_sconf Φ pcE imm_entry m av 2 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
-    iIntros "Hcg Hframe Hpc".
+    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (SG + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     iDestruct (stack_own_2_elim with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
@@ -178,52 +179,55 @@ Section ProofSysGetpid.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- +0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (SG + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) M1 (av - 2)%nat vr24
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (SG + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) M1 (av - 2)%nat vr24 b
               with "Hcg Hpc Hi02 Hbra [-]").
-    iIntros "Hcg Hpc Hbra".
+    iIntros (CID2 Hs2) "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (SG + 0x02) : mword 64) 2 = mword_of_int (SG + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- +0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf γ Φ (mword_of_int (SG + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) M1 (av - 2)%nat vs16
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (SG + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) M1 (av - 2)%nat vs16 b
               with "Hcg Hpc Hi04 Hbs0 [-]").
-    iIntros "Hcg Hpc Hbs0".
+    iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (SG + 0x04) : mword 64) 2 = mword_of_int (SG + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
-    (* the two saved values, named for the epilogue's reloads *)
-    assert (Hra0v : M1 !!! Regidx (mword_of_int 1 : mword 5) = ra0)
-      by (unfold M1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
-    assert (Hs00v : M1 !!! Regidx (mword_of_int 8 : mword 5) = s00)
-      by (unfold M1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
+    (* the two saved values, named for the epilogue's reloads.  The stores'
+       own postcondition now spells the written value via [rget] (the
+       leaf is generic over its source register), so the bridge from the
+       raw fact goes through [rgne] even though ra/s0 are never tp. *)
+    assert (Hra0v : forall (CID' : CpuId), rget (CID := CID') M1 (mword_of_int 1 : mword 5) = ra0).
+    { intros CID'; rgne. unfold M1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (Hs00v : forall (CID' : CpuId), rget (CID := CID') M1 (mword_of_int 8 : mword 5) = s00).
+    { intros CID'; rgne. unfold M1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
     iEval (rewrite Hra0v) in "Hbra".
     iEval (rewrite Hs00v) in "Hbs0".
     (* ---- +0x06: c.addi4spn s0,sp,16 ---- *)
-    iApply (wp_caddi4spn_s_sconf γ Φ (mword_of_int (SG + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 (mword_of_int 8 : mword 5) M1 (av - 2)%nat
-              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (SG + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 (mword_of_int 8 : mword 5) M1 (av - 2)%nat b
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID4 Hs4) "Hcg Hpc".
     assert (Hpp08 : add_vec_int (mword_of_int (SG + 0x06) : mword 64) 2 = mword_of_int (SG + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1) with M2.
     (* ---- +0x08: jal ra,myproc ---- *)
-    iApply (wp_jal_s_sconf γ Φ (mword_of_int (SG + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2093072 : mword 21)
-              M2 (av - 2)%nat ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (SG + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2093072 : mword 21)
+              M2 (av - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi08 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID5 Hs5) "Hcg Hpc".
     set (Bj := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (SG + 0x08) : mword 64) 4)]> M2).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (SG + 0x08) : mword 64) 4)]> M2) with Bj.
     assert (Hjmp : add_vec (mword_of_int (SG + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2093072 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HBjra : Bj !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SG + 0x08) : mword 64) 4) by (rewrite /Bj upd_eq; reflexivity).
-    assert (HBjtp : Bj !!! Regidx (mword_of_int 4 : mword 5) = cid_word).
-    { rewrite /Bj upd_ne; [| vm_compute; discriminate].
-      rewrite /M2 upd_ne; [| vm_compute; discriminate].
-      rewrite /M1 upd_ne; [| vm_compute; discriminate]. exact Htp. }
+    (* [Hcpu] rode through the four leaf steps untouched (only [Hcg]/[Hpc] are
+       part of an ordinary leaf's own footprint), so it is still anchored at
+       the ENTRY hart -- re-anchor it at [CID5] before crossing into myproc. *)
+    iDestruct (cpu_own_transport CID CID5 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- myproc(): a0 = p, callee-saved preserved ---- *)
-    iApply (Myproc.wp_myproc_sconf γ Φ Bj (av - 2)%nat n eb p C
-              HBjtp Hn ltac:(lia)
+    iApply (Myproc.wp_myproc_sconf Φ Bj (av - 2)%nat n eb p C b
+              Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
-    iIntros (ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
+    iIntros (CID6 Hs6 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (SG + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
@@ -236,13 +240,13 @@ Section ProofSysGetpid.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       reflexivity. }
-    iApply (wp_clw_s_sconf γ Φ (mword_of_int (SG + 0x0c)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
-              (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) MF (av - 2)%nat pid
+    iApply (wp_clw_s_sconf Φ (mword_of_int (SG + 0x0c)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
+              (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) MF (av - 2)%nat pid b
               (dqm := DfracOwn (1/4))
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [Hpid] [-]").
     { iEval (rewrite Haddr0c). iExact "Hpid". }
-    iIntros "Hcg Hpc Hpid".
+    iIntros (CID7 Hs7) "Hcg Hpc Hpid".
     iEval (rewrite Haddr0c) in "Hpid".
     iDestruct ("Hpidback" with "Hpid") as "Hpriv".
     set (E0c := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (sign_extend' 64 pid)]> MF).
@@ -263,10 +267,10 @@ Section ProofSysGetpid.
     iEval (rewrite Hpa1 -Hpa1') in "Hbra".
     iEval (rewrite Hpa2 -Hpa2') in "Hbs0".
     (* ---- +0x0e: c.ldsp ra,8(sp) ---- *)
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (SG + 0x0e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) E0c (av - 2)%nat ra0
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (SG + 0x0e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) E0c (av - 2)%nat ra0 b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e Hbra [-]").
-    iIntros "Hcg Hpc Hbra".
+    iIntros (CID8 Hs8) "Hcg Hpc Hbra".
     assert (Hpp10 : add_vec_int (mword_of_int (SG + 0x0e) : mword 64) 2 = mword_of_int (SG + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     set (E0e := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0]> E0c).
@@ -275,10 +279,10 @@ Section ProofSysGetpid.
     assert (HE0esp : E0e !!! Regidx csp_rs1 = E0c !!! Regidx csp_rs1)
       by (rewrite /E0e upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite -HE0esp) in "Hbs0".
-    iApply (wp_cldsp_s_sconf γ Φ (mword_of_int (SG + 0x10)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) E0e (av - 2)%nat s00
-              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (SG + 0x10)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) E0e (av - 2)%nat s00 b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 Hbs0 [-]").
-    iIntros "Hcg Hpc Hbs0".
+    iIntros (CID9 Hs9) "Hcg Hpc Hbs0".
     assert (Hpp12 : add_vec_int (mword_of_int (SG + 0x10) : mword 64) 2 = mword_of_int (SG + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     set (E10 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00]> E0e).
@@ -296,10 +300,10 @@ Section ProofSysGetpid.
     iEval (rewrite HE0esp Hpa2') in "Hbs0".
     iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf γ Φ (mword_of_int (SG + 0x12)) imm_dealloc E10
-              (av - 2)%nat 2 Hpop
+    iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (SG + 0x12)) imm_dealloc E10
+              (av - 2)%nat 2 b Hpop
               with "Hcg Hpc Hi12 Hframe [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID10 Hs10) "Hcg Hpc".
     assert (Hnk : ((av - 2) + 2)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
     assert (Hpp14 : add_vec_int (mword_of_int (SG + 0x12) : mword 64) 2 = mword_of_int (SG + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -311,10 +315,10 @@ Section ProofSysGetpid.
     { rewrite /E12 upd_ne; [| vm_compute; discriminate].
       rewrite /E10 upd_ne; [| vm_compute; discriminate].
       rewrite /E0e upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf γ Φ (mword_of_int (SG + 0x14)) (mword_of_int 1 : mword 5) E12 av
+    iApply (wp_cret_s_sconf Φ (mword_of_int (SG + 0x14)) (mword_of_int 1 : mword 5) E12 av b
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi14 [-]").
-    iIntros "Hcg Hpc".
+    iIntros (CID11 Hs11) "Hcg Hpc".
     assert (Hra_final : ret_pc (E12 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE12ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
@@ -346,23 +350,27 @@ Section ProofSysGetpid.
       rewrite /E10 upd_ne; [| vm_compute; discriminate].
       rewrite /E0e upd_ne; [| vm_compute; discriminate].
       rewrite /E0c upd_eq. reflexivity. }
+    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    (* [Hcpu] has sat at [CID6] (myproc's own resumed hart) since the crossing;
+       the five leaf steps since then never touched it. *)
+    iDestruct (cpu_own_transport CID6 CID11 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply ("Hcont" $! E12 with "[%] Hcg Hcpu Hpc Hpriv").
     split; [| exact HE12a0].
     unfold callee_saved.
-    split; [exact HE12csp|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [exact HE12s0|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
-    apply Hthr; vm_compute; first [reflexivity | discriminate].
+    split_and!.
+    - exact HE12csp.
+    - exact HE12s0.
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - apply Hthr; vm_compute; first [reflexivity | discriminate].
   Qed.
 
 End ProofSysGetpid.

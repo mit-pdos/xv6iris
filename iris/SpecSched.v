@@ -14,18 +14,28 @@
    IT DOES NOT RETURN ON THE HART IT PARKED FROM.  Proc contexts are
    MIGRATABLE ([ctx_adm = None], SwtchCtx.v): any hart's scheduler may
    dispatch this process, swtch does not save tp, and the resumed thread
-   inherits the resuming hart's.  So the continuation is quantified over the
-   resuming hart [h] AND its per-hart SIE ghost [g], every resource it
-   receives is spelled at [(h, g)], and its conclusion is hart [h]'s own
-   [WP (LoopE h)].  The register postcondition weakens to
-   [callee_saved_notp m mf] (everything but tp) plus the far more
-   informative [mf !!! x4 = cid_word_of h] -- see CalleeSaved.v.
+   inherits the resuming hart's.  So the continuation is wrapped in
+   [wp_next b], whose rebound [CID] IS the resuming hart -- every resource
+   it receives resolves at that hart automatically (no [(CID := h)]
+   annotation, no separate ghost-name binder: the SIE ghost is canonical per
+   hart now), and its conclusion is the plain [WP (Loop)] at the rebound
+   [CID].  sched always swtches (there is no non-parking path), so the proof
+   establishes the fully hart-generic postcondition regardless of [b] and
+   discharges the wrapper via [wp_next_intro] for whichever index a caller
+   supplies; sched's OWN [sie_cap_gpr]/[cpu_own] resource index stays the
+   literal [false] throughout (entered at noff == 1, and [cpu_own]'s
+   [b = true] arm demands noff == 0) -- a second, DISTINCT index from
+   [wp_next]'s own [b] (see explicit-cpuid-porting-guide.md, "two different
+   indices").  The register postcondition weakens to [callee_saved m mf]
+   (CalleeSaved.v's tp-free relation); the old [mf !!! x4 = cid_word_of h]
+   conjunct is gone -- [tp_pin] makes it true by construction.
 
    What the continuation gets back: same j, state now RUNNING, lock held on
-   hart [h], the trap CSRs and hart [h]'s [intr_handler_avail g] (the
-   dispatch payload's, which is what a caller's own release/retune needs
-   under the fresh ghost), c->proc back at proc j, and a FRESH parked
-   scheduler context under ▷ -- hart [h]'s, hence [sched_vc_at h g]. *)
+   the resumed hart, the trap CSRs and that hart's fresh
+   [intr_handler_avail] (the dispatch payload's, which is what a caller's
+   own release/retune needs under the fresh ghost), c->proc back at proc j,
+   and a FRESH parked scheduler context under ▷ ([sched_vc], which resolves
+   at the rebound hart the same way). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -38,7 +48,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
+Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -51,14 +61,13 @@ Import Defs.
 Notation SD := KernelSyms.sched.
 
 Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-    (m : regfile) (av : nat) (eb : bool) :=
+    (m : regfile) (av : nat) (eb : bool) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   needs_ctx st = true ->
@@ -71,7 +80,13 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      nothing. *)
   eb = true ->
   (16 <= av)%nat ->
-  sie_cap_gpr γ m av -∗
+  (* sched is entered holding p->lock at noff == 1, so its OWN resource
+     index is pinned [false] (cpu_own's [b = true] arm demands [n = 0]) --
+     that is DISTINCT from [b] below, which is [wp_next]'s index: whether
+     the swtch this function always performs may hand off to a hart other
+     than the one it entered on (it always may, hence the wrapper), not
+     what the SIE state IS at any point in sched's own body. *)
+  sie_cap_gpr m av false pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
   proc_held cpu_id j γl st ch -∗
@@ -81,30 +96,30 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      the parked-scheduler slot content is the ▷ sched_vc premise below.
      sched PRESERVES [eb] across the park -- its intena save/restore is
      exactly the eb retune back to the caller's own state, now realized
-     against the DISPATCHING hart's ghost [g] from the payload's own
-     [intr_handler_avail g] (the entry stash is about the wrong name). *)
-  cpu_own γ 1 eb pj emp -∗
+     against the DISPATCHING hart's fresh [intr_handler_avail] (the entry
+     stash is about the wrong hart's ghost). *)
+  cpu_own 1 eb pj emp false -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile) (ch' : mword 64),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      pc_is (CID := h) ret_tgt -∗
-      proc_held h j γl RUNNING ch' -∗
-      trap_csrs (CID := h) -∗
-      intr_handler_avail (CID := h) g -∗
-      cpu_own (CID := h) g 1 eb pj emp -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (ch' : mword 64),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf av false pj -∗
+      pc_is ret_tgt -∗
+      proc_held cpu_id j γl RUNNING ch' -∗
+      trap_csrs -∗
+      intr_handler_avail -∗
+      cpu_own 1 eb pj emp false -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SCHED.
   Parameter wp_sched_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-      (m : regfile) (av : nat) (eb : bool),
-      wp_sched_sconf_body γ Φ γs j γl st ch m av eb.
+      (m : regfile) (av : nat) (eb : bool) (b : bool),
+      wp_sched_sconf_body Φ γs j γl st ch m av eb b.
 End SCHED.
