@@ -30,8 +30,8 @@ Module PrintkGen : PRINTK_GEN.
   Axiom wp_printk_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ γpr : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+      (γpr : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
-      {dqf : dfrac} (f : string) (descs : list pk_arg_desc),
-      wp_printk_gen_sconf_body γ γpr γd γv Φ m0 K eb pj C dqf f descs.
+      {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool),
+      wp_printk_gen_sconf_body γpr γd γv Φ m0 K eb pj C dqf f descs b.
 End PrintkGen.
