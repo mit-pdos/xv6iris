@@ -81,35 +81,24 @@ Section ProofMemset.
     change (2 ^ 8)%Z with 256%Z. apply Z.le_refl.
   Qed.
 
-  (* STILL BLOCKED, one layer deeper than before.  The landed premise
-     [Regidx ra5 <> Regidx Rtp] fixes ra5's leg (it is WRITTEN each
-     iteration -- [c.addi a5,a5,1] -- and its [rd_ok] premise carries the
-     tp exclusion, and its READ through [rget] in the [sb]/[bne] leaves now
-     bridges to the plain-map facts [Hcur]/[Hm'a5] via [rget_ne Hra5tp], as
-     the development below shows).  But [ra1] and [ra4] are READ-ONLY every
-     iteration -- [ra1] as the [sb] leaf's STORE VALUE ([storeval := trunc8
-     (rget m ra1)], used in this lemma's OWN postcondition to show the
-     written byte is [cbyte]), [ra4] as the [bne] comparison's other
-     operand ([neq_vec (rget m' ra1(*rs1=ra5*)) (rget m' ra4)]) -- and nothing in
-     [wp_memset_loop_sconf_body] excludes [ra1 = Rtp] or [ra4 = Rtp].  Both
-     premises given for them, [Hm4 : m !!! Regidx ra4 = e] and
-     [Hm1 : m !!! Regidx ra1 = cval], are PLAIN map facts; bridging either to
-     the leaf's [rget]-spelled premise needs [rget_ne], whose side condition
-     is exactly [Regidx ra4 <> Regidx Rtp] / [Regidx ra1 <> Regidx Rtp] --
-     NOT derivable from [Hra1]/[Hra4]/[Hra4ne]/[Hra1ne]/[Hra5sp]/[Hra5tp]
-     (none of those relate ra1 or ra4 to Rtp at all).  Confirmed empirically:
-     the very first leaf (sb) already needs [Hm1] bridged this way to
-     discharge its OWN postcondition ([Hb0]'s written byte = [cbyte]), and
-     the development below reaches exactly that point and stops.  This is a
-     second gap in the ALREADY-PORTED SpecMemsetParts.v contract (missing
-     two more conjuncts, [Regidx ra1 <> Regidx Rtp] and [Regidx ra4 <>
-     Regidx Rtp]), not a mechanical-porting issue -- reported rather than
-     forced through.  The STATEMENT is updated to match the new (still
-     unprovable) contract; the PROOF is developed as far as it correctly
-     goes -- through the [b]-generic recursion restructuring ([revert CID]
-     before [induction], matching the header comment's pattern) and the
-     [sb] leaf's precondition (ra5-only, now provable) -- and stops at the
-     confirmed blocker rather than admitting anything. *)
+  (* The fuel induction over the remaining byte count.  Two things it needs
+     beyond the pre-port shape:
+
+     - [b]-GENERIC RECURSION.  The taken bne can migrate, so [IH] must be
+       applicable at the hart the back edge lands on: [CID] is [revert]ed
+       before [induction] so it is part of what the induction generalizes.
+       The recursive call then re-anchors the caller's own [wp_next]
+       obligation at that hart -- not with [wp_next_shift] (the two
+       continuations differ: [IH]'s is about [m'], the caller's about [m]),
+       but by INTRODUCING [IH]'s [wp_next] and specialising ["Hcont"] at the
+       hart that introduction hands back, chaining the per-step equalities
+       with [wp_next_chain].
+
+     - THE [rget] BRIDGES.  Every register the leaves read is read through
+       [rget] (which at tp answers the hart's id, not the map's slot), while
+       the loop's premises are plain map facts.  [rget_ne] bridges them, one
+       per operand, and its side conditions are exactly the three
+       [Regidx ra{1,4,5} <> Regidx Rtp] premises. *)
   Lemma wp_memset_loop_sconf (Φ : mval -> iProp Σ)
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13)
       (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
@@ -117,7 +106,7 @@ Section ProofMemset.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0
-      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hra5tp Hext0 Hext4 Hext6.
+      Hincr Hcmp Hra4ne Hra1ne Hra5sp Hra5tp Hra1tp Hra4tp Hext0 Hext4 Hext6.
     (* [b]-generic recursion: IH must be applicable at ANY landing hart
        (the taken-bne step can migrate), so CID has to be part of what the
        induction generalizes -- a plain [induction rem] here would fix IH at
@@ -136,22 +125,100 @@ Section ProofMemset.
     rewrite (seq_cons off rem').
     rewrite big_sepL_cons.
     iDestruct "Hbuf" as "[Hb0 Hbuf]".
-    assert (Hcur' : rget m ra5 = ms_addr p off) by (rewrite (rget_ne m ra5 Hra5tp); exact Hcur).
+    (* THE [rget] BRIDGES, stated at EVERY hart.  Each leaf reads its
+       operands as [rget] at the hart IT is applied at, and those harts are
+       the fresh ones the preceding steps' [wp_next]s handed back -- so a
+       bridge pinned to one hart would not rewrite at the next leaf.  Away
+       from tp the value does not depend on the hart at all ([rget_ne]), so
+       the ∀-hart form is exactly as easy to prove and rewrites everywhere. *)
+    assert (Hcur' : forall H : CpuId, rget (CID := H) m ra5 = ms_addr p off).
+    { intro H. rewrite (rget_ne (CID := H) m ra5 Hra5tp). exact Hcur. }
+    assert (Hm1' : forall H : CpuId, rget (CID := H) m ra1 = cval).
+    { intro H. rewrite (rget_ne (CID := H) m ra1 Hra1tp). exact Hm1. }
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
     iApply (wp_sb_s_sconf Φ pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
               with "Hcg Hpc Hi0 [Hb0]").
     { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
     iIntros (CID1 Hs1) "Hcg Hpc Hb0".
-    (* the postcondition needs [rget m ra1 = cval] (the byte the store
-       actually wrote is [trunc8 (rget m ra1)]); bridging [Hm1 : m !!!
-       Regidx ra1 = cval] to it needs [rget_ne], whose side condition
-       [Regidx ra1 <> Regidx Rtp] is exactly the missing fact -- see the
-       comment above.  STOP here, left open rather than admitted. *)
-    assert (Hm1' : rget m ra1 = cval).
-    rewrite rget_ne; [exact Hm1|].
-    (* remaining goal: [Regidx ra1 <> Regidx Rtp] -- NOT derivable from
-       Hra1/Hra4/Hra5/Hra4ne/Hra1ne/Hra5sp/Hra5tp. *)
-  Abort.
+    (* --- 0xce4: c.addi a5, a5, 1 : a5 := a5 + 1 --- *)
+    iApply (wp_caddi_s_sconf Φ pc4 ra5 (mword_of_int 1) m n b
+              Hra5 (conj Hra5sp Hra5tp)
+              with "Hcg [Hpc] Hi4 [-]").
+    { unfold pc4. iExact "Hpc". }
+    iIntros (CID2 Hs2) "Hcg Hpc".
+    (* normalise the written value to [ms_addr p (S off)] IN the bundle, so
+       the map the rest of the proof carries is hart-free. *)
+    iEval (rewrite Hcur') in "Hcg".
+    iEval (change (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))
+             with ms_incr1) in "Hcg".
+    iEval (rewrite Hincr) in "Hcg".
+    set (m' := <[Regidx ra5 := regval_into_reg (ms_addr p (S off))]> m).
+    assert (Hm'a5 : m' !!! Regidx ra5 = ms_addr p (S off))
+      by (unfold m'; apply upd_eq).
+    assert (Hm'a4 : m' !!! Regidx ra4 = e).
+    { unfold m'. rewrite upd_ne; [ exact Hm4 | exact Hra4ne ]. }
+    assert (Hm'a1 : m' !!! Regidx ra1 = cval).
+    { unfold m'. rewrite upd_ne; [ exact Hm1 | exact Hra1ne ]. }
+    (* ... and the two the bne leaf actually reads *)
+    assert (Hm'a5' : forall H : CpuId, rget (CID := H) m' ra5 = ms_addr p (S off)).
+    { intro H. rewrite (rget_ne (CID := H) m' ra5 Hra5tp). exact Hm'a5. }
+    assert (Hm'a4' : forall H : CpuId, rget (CID := H) m' ra4 = e).
+    { intro H. rewrite (rget_ne (CID := H) m' ra4 Hra4tp). exact Hm'a4. }
+    (* --- 0xce6: bne a5, a4, ce0 --- *)
+    destruct rem' as [|rem''].
+    - (* last iteration: S off = N, bne falls through to 0xcea *)
+      assert (HSN : (S off = N)%nat) by lia.
+      assert (Hbcmp : forall H : CpuId,
+                 neq_vec (rget (CID := H) m' ra5) (rget (CID := H) m' ra4) = false).
+      { intro H. rewrite Hm'a5' Hm'a4'. rewrite (Hcmp off HoffN).
+        rewrite HSN Nat.eqb_refl. reflexivity. }
+      iApply (wp_bne_fall_s_sconf Φ pc6 imm_bne ra4 ra5 m' n b
+                Hra5 Hra4 (Hbcmp _)
+                with "Hcg [Hpc] Hi6 [-]").
+      { unfold pc6. iExact "Hpc". }
+      iIntros (CID3 Hs3) "Hcg Hpc".
+      (* the cursor's final value IS [ms_addr p N] on the last iteration *)
+      assert (Hm'N : m' = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
+        by (unfold m'; rewrite HSN; reflexivity).
+      iEval (rewrite Hm'N) in "Hcg".
+      iSpecialize ("Hcont" $! CID3 with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" with "Hcg Hpc [Hb0 Hbuf]").
+      (* buffer: seq off 1 = [off], the single filled byte *)
+      cbn [seq]. rewrite big_sepL_cons.
+      iSplitL "Hb0"; [ iEval (rewrite -ms_pa_sb_pa trunc8_nth0 Hcur' Hm1') in "Hb0"; iExact "Hb0" | done ].
+    - (* more iterations: S off < N, bne taken back to the loop head pc0 *)
+      assert (HSN : (S off < N)%nat) by lia.
+      assert (Hbcmp : forall H : CpuId,
+                 neq_vec (rget (CID := H) m' ra5) (rget (CID := H) m' ra4) = true).
+      { intro H. rewrite Hm'a5' Hm'a4'. rewrite (Hcmp off HoffN).
+        replace (Nat.eqb (S off) N) with false by (symmetry; apply Nat.eqb_neq; lia).
+        reflexivity. }
+      iApply (wp_bne_taken_s_sconf Φ pc6 imm_bne ra4 ra5 m' n b
+                Hra5 Hra4 (Hbcmp _)
+                ltac:(rewrite Hback; exact Hal0)
+                with "Hcg [Hpc] Hi6 [-]").
+      { unfold pc6. iExact "Hpc". }
+      iNext.
+      iIntros (CID3 Hs3) "Hcg Hpc".
+      rewrite Hback.
+      iApply (IH CID3 (S off) m' ltac:(lia) ltac:(lia) Hm'a5 Hm'a4 Hm'a1
+                with "Hcg Htext Hpc [Hbuf] [Hb0 Hcont]").
+      + iExact "Hbuf".
+      + (* recombine: the just-filled byte [off] + IH's continuation gives
+           seq off (S(S rem'')) filled.  Introducing IH's own [wp_next] is
+           what re-anchors the caller's ["Hcont"]: the hart it hands back is
+           related to THIS invocation's by the whole [Hs1..Hs4] chain. *)
+        iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hcg Hpc Hbuf'".
+        assert (Hmeq : <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m'
+                     = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
+          by (unfold m'; apply upd_upd).
+        iEval (rewrite Hmeq) in "Hcg".
+        iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
+        iApply ("Hcont" with "Hcg Hpc [Hb0 Hbuf']").
+        change (seq off (S (S rem''))) with (off :: seq (S off) (S rem'')).
+        rewrite big_sepL_cons.
+        iSplitL "Hb0"; [ iEval (rewrite -ms_pa_sb_pa trunc8_nth0 Hcur' Hm1') in "Hb0"; iExact "Hb0" | iExact "Hbuf'" ].
+  Qed.
 
   Lemma wp_memset_suffix_sconf (Φ : mval -> iProp Σ)
       (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64)

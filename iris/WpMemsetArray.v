@@ -238,6 +238,7 @@ Section WpMemsetArray.
               ltac:(intros j Hj; exact (pa_add_cmp_bound p len j Hlen64 Hj))
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               minstr_cce minstr_cd2 minstr_cd4
               len 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hcg Htext Hpc Hbuf [-]").

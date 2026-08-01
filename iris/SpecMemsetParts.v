@@ -124,6 +124,16 @@ Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (* register indices of a1/a4 are distinct from a5 (so c.addi a5 leaves them) *)
   Regidx ra4 <> Regidx ra5 -> Regidx ra1 <> Regidx ra5 ->
   ra5 <> csp_rs1 -> Regidx ra5 <> Regidx Rtp ->
+  (* ... and ra1 / ra4 are distinct from tp.  [ra5]'s exclusion rides in the
+     [rd_ok] of the [c.addi a5,a5,1] that WRITES it, but ra1 and ra4 are only
+     ever READ -- ra1 as the [sb] leaf's store value ([trunc8 (rget m ra1)]),
+     ra4 as the [bne]'s other operand ([rget m' ra4]) -- and every such read
+     goes through [rget], which at tp answers the HART's id rather than the
+     map's slot.  So the plain map premises [m !!! Regidx ra1 = cval] /
+     [m !!! Regidx ra4 = e] below can only be bridged to what the leaves
+     actually read via [rget_ne], whose side condition is exactly this.
+     Costless for the real caller: memset's operands are a1 / a4. *)
+  Regidx ra1 <> Regidx Rtp -> Regidx ra4 <> Regidx Rtp ->
   (* the three loop instructions, fetched fresh each iteration from kernel_text *)
   (⊢ kernel_text -∗ instr pc0 false (STORE (mword_of_int 0, Regidx ra1, Regidx ra5, 1))) ->
   (⊢ kernel_text -∗ instr pc4 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx ra5, Regidx ra5, ADDI))) ->
