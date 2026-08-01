@@ -332,6 +332,27 @@ algebra that forces `SwtchCtx`'s resumed hart to `false`.)
 *"iSpecialize: cannot instantiate"*.** Every hart mismatch prints identically
 without it, including a simple stale-CID bookkeeping slip.
 
+## A SECTION-DEFINED CONSTANT SILENTLY BEATS THE `wp_next` LAMBDA
+
+If you name a leaf's payload with a `Definition` **inside** the same `Section`
+that has `Context \`{CID : CpuId}`, that section variable is applied
+automatically at every use in the section — and it **beats** the
+`fun (CID : CpuId) => …` binder of a `wp_next` continuation. The leaf then
+hands its payload back **at the hart it started on**, silently.
+
+Symptom, visible only under `Set Printing Implicit`:
+```
+"Hpay" : cpu_cells_pay Σ riscvGS0 CID5 b p     (* the ENTRY hart *)
+"Hcg"  : sie_cap_gpr … CID6                    (* the resumed hart *)
+```
+Fix: define such a constant **above the section**, taking `` `{CID : CpuId} ``
+as an ordinary instance argument. `IntrDefs.cpu_cells_pay` and
+`intr_count_pre` sit there for exactly this reason.
+
+Note this is the OPPOSITE of the rule for lambdas: a `fun (CID : CpuId) =>`
+binder inside such a section shadows correctly (verified by `reflexivity`).
+Lambdas shadow; section-applied constants do not.
+
 ## THE VACUITY TRAP — check every spec body you touch
 
 In `bi_scope` a `forall` extends **maximally**. So an unparenthesised `∀` inside

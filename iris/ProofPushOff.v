@@ -128,7 +128,7 @@ Section ProofPushOff.
               M av ra0e b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 Hp8 [-]").
-    iIntros (CID1 Hs1) "Hcg Hpc Hp8".
+    iIntros (CID1 Hh1) "Hcg Hpc Hp8".
     assert (Hpc2a : add_vec_int (mword_of_int (PP + 0x28) : mword 64) 2 = mword_of_int (PP + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
@@ -141,7 +141,7 @@ Section ProofPushOff.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hp0] [-]").
     { iEval (rewrite Hsp4). iExact "Hp0". }
-    iIntros (CID2 Hs2) "Hcg Hpc Hp0".
+    iIntros (CID2 Hh2) "Hcg Hpc Hp0".
     assert (Hpc2c : add_vec_int (mword_of_int (PP + 0x2a) : mword 64) 2 = mword_of_int (PP + 0x2c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
@@ -173,7 +173,7 @@ Section ProofPushOff.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (PP + 0x2c)) (mword_of_int 16 : mword 6) M5 av 2 b Hpop
               with "Hcg Hpc Hi2c Hframe [-]").
-    iIntros (CID3 Hs3) "Hcg Hpc".
+    iIntros (CID3 Hh3) "Hcg Hpc".
     assert (Hpc2e : add_vec_int (mword_of_int (PP + 0x2c) : mword 64) 2 = mword_of_int (PP + 0x2e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
@@ -187,7 +187,7 @@ Section ProofPushOff.
     iApply (wp_cret_s_sconf Φ (mword_of_int (PP + 0x2e)) (mword_of_int 1 : mword 5) M6 (av + 2)%nat b
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2e [-]").
-    iIntros (CID4 Hs4) "Hcg Hpc".
+    iIntros (CID4 Hh4) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hra_final : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HM6ra; reflexivity).
@@ -195,6 +195,52 @@ Section ProofPushOff.
     iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! M6 with "Hcg Hpc [%]").
     rewrite /M6 /M5 /M4 Hsp5. reflexivity.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE b-GENERIC ENTRY SEAM.  push_off is entered at whatever SIE state  *)
+  (* its caller had, so its prologue (PO+0x00..0x08) runs at a generic     *)
+  (* [b] and the [csrrci] at PO+0x0a is where the arm is dismantled.       *)
+  (* [WpSconfCsr]'s flip leaf takes [intr_count_pre b n eb] and hands back *)
+  (* [cpu_cells_pay b p]: at [b = true] the counting token and the per-cpu *)
+  (* cells are BOTH inside [sie_arm true p] and [cpu_own] is only the pure *)
+  (* fact plus the frame [C], so what goes in is that fact and what comes  *)
+  (* out is the freed cells; at [b = false] the token goes in off          *)
+  (* [cpu_own] and the cells never move.  These three lemmas are the       *)
+  (* consumer side of exactly that, with no case split in the proof body.  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma po_own_split `{CIDx : CpuId} (k : nat) (ebx : bool)
+      (px : mword 64) (Cx : iProp Σ) (bx : bool) :
+    cpu_own k ebx px Cx bx -∗
+    ⌜ bx = true -> k = 0%nat /\ ebx = true ⌝ ∗
+    intr_count_pre bx k ebx ∗
+    (if bx then emp else cpu_cells k ebx px) ∗
+    Cx.
+  Proof.
+    destruct bx.
+    - iIntros "[%Hk HC]".
+      iSplitR; [ iPureIntro; intros _; exact Hk |].
+      iSplitR; [ iPureIntro; exact Hk |].
+      iSplitR; [ done | iExact "HC" ].
+    - iIntros "[[Hcells Hcnt] HC]".
+      iSplitR; [ iPureIntro; discriminate |].
+      iSplitL "Hcnt"; [ iExact "Hcnt" |].
+      iSplitL "Hcells"; [ iExact "Hcells" | iExact "HC" ].
+  Qed.
+
+  (* the cells the flip leaf did NOT free (b = false: the caller's own) have
+     to cross the flip instruction itself; at [b = true] there are none, and
+     at [b = false] the hart is pinned.  Same two-arm argument as
+     [CpuOwn.cpu_own_transport]. *)
+  Lemma po_cells_transport (CID0 CID1 : CpuId) (k : nat) (ebx : bool)
+      (px : mword 64) (bx : bool) :
+    (bx = false -> (CID1 : CPU) = (CID0 : CPU)) ->
+    (if bx then emp else cpu_cells (CID := CID0) k ebx px) -∗
+    (if bx then emp else cpu_cells (CID := CID1) k ebx px).
+  Proof.
+    intros Heq. destruct bx.
+    - iIntros "H". iExact "H".
+    - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq eq_refl) ].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -529,39 +575,19 @@ Section ProofPushOff.
   Qed.
 
   (* ------------------------------------------------------------------- *)
-  (* push_off itself.  BLOCKED (explicit-cpuid port) -- a confirmed,       *)
-  (* central-layer resource-accounting gap, not a consumer-side proof     *)
-  (* gap.  Summary (full diagnosis in the porting report):                *)
-  (*                                                                       *)
-  (* At entry index b = true, the disable instruction (PO+0x0a, csrrci)   *)
-  (* must go through WpSconfCsr.wp_csrci_sstatus_s_sconf's b = true       *)
-  (* branch, whose precondition demands an intr_count k eb resource       *)
-  (* SEPARATE from (not extracted out of, then reassembled back into) the *)
-  (* sie_cap_gpr m av true p it also needs to pass whole.  But sie_arm    *)
-  (* true p already contains BOTH eighths of the kernel-code token: its   *)
-  (* own direct ghost conjunct, and, nested inside cpu_hart 0 true p, the *)
-  (* other eighth (intr_count 0 true's own copy) -- and cpu_own n eb p C  *)
-  (* true supplies NEITHER (cpu_own_on: only the pure fact plus the frame *)
-  (* C).  Verified empirically (a scratch lemma, reproduced in the        *)
-  (* report) that sie_arm true p alone cannot yield BOTH a reconstructed  *)
-  (* sie_arm true p AND a separate intr_count 0 true: extracting the      *)
-  (* arm's nested eighth for the leaf's separate Hcnt, and reassembling a *)
-  (* valid arm to still pass as Hcg, both want the identical, single      *)
-  (* spare eighth.  No third source exists among SpecPushOff.v's two      *)
-  (* premises.  The b = false entry is NOT affected (cpu_own already      *)
-  (* supplies intr_count directly there, no flip needed) -- the           *)
-  (* obstruction is specific to the generic-b prologue reaching the       *)
-  (* disable at b = true.                                                 *)
-  (*                                                                       *)
-  (* The SAME root cause blocks wp_pop_off_sconf's restore branch below   *)
-  (* (WpSconfCsr.wp_csrsi_sstatus_x0_s_sconf's b = false branch wants a    *)
-  (* caller-supplied cpu_hart 0 true p PRECONDITION -- i.e. an intr_count  *)
-  (* 0 true, ghost-valued '1' -- while the caller's sie_cap_gpr is         *)
-  (* STILL at b = false, i.e. its tied half is ghost-valued '0'; holding   *)
-  (* both simultaneously is a proven contradiction via two chained         *)
-  (* ghost_var_agree steps, so no real caller can ever construct that      *)
-  (* precondition honestly).  Left unproven per the STOP-leave-it-clean    *)
-  (* instruction rather than forcing something. *)
+  (* push_off itself.  THE ONE FUNCTION WHOSE PROLOGUE IS GENERIC IN [b]: *)
+  (* it is entered at whatever SIE state the caller had, so PO+0x00..0x08 *)
+  (* each thread a FRESH hart (CID1..CID5) and the [csrrci] at PO+0x0a is *)
+  (* where the arm is dismantled.  Everything the prologue holds across   *)
+  (* those five steps is either plain memory (the frame slots) or         *)
+  (* [cpu_own], kept FOLDED and moved with [cpu_own_transport]: at        *)
+  (* [b = true] it names no hart at all (the cells are in [sie_arm]), at  *)
+  (* [b = false] the hart cannot move.  At the flip, [po_own_split] hands *)
+  (* the leaf what it needs on each arm ([intr_count_pre]) and            *)
+  (* an inline [iAssert] puts the cells back together from the caller's   *)
+  (* half and the freed [cpu_cells_pay].  From PO+0x0e on, [b] is LITERALLY    *)
+  (* false and every [wp_next] collapses by [wp_next_off].                *)
+  (* ------------------------------------------------------------------- *)
   Lemma wp_push_off_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
@@ -569,7 +595,580 @@ Section ProofPushOff.
   Proof.
     cbv beta delta [wp_push_off_sconf_body].
     intros caller_ret Hnbound Hav.
-  Abort.
+    assert (Hbound : (Z.of_nat n < 2 ^ 31)%Z) by (clear - Hnbound; lia).
+    pose (noff := noff_val n : mword 32).
+    pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
+    set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
+    set (N0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
+    set (N1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
+        (add_vec (N0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> N0).
+    iIntros "Hcg Hown #Htext Hpc Hcont".
+    assert (Hb1 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { rewrite /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb2 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { rewrite /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hb3 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
+    { rewrite /spd. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hspd4 : pa_stk sp0 4 = spd).
+    { rewrite /spd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    assert (Hcsp0 : N0 !!! Regidx csp_rs1 = spd) by (rewrite /N0; apply upd_eq).
+    assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
+    { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    (* ---- 0x00: c.addi sp,-32 -- the frame push ---- *)
+    iPoseProof (poi_00 with "Htext") as "Hi00".
+    iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int (PO + 0x00)) (mword_of_int 32 : mword 6) m av 4 b
+              ltac:(lia) Hpush
+              with "Hcg Hpc Hi00 [-]").
+    iIntros (CID1 Hh1) "Hcg Hframe Hpc".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
+    iDestruct "S1" as (vr24) "Hr24".
+    iDestruct "S2" as (vr16) "Hr16".
+    iDestruct "S3" as (vr8) "Hr8".
+    iDestruct "S4" as (vgap) "Hgap".
+    iEval (rewrite -Hb1) in "Hr24". iEval (rewrite -Hb2) in "Hr16".
+    iEval (rewrite -Hb3) in "Hr8".
+    assert (Hpp02 : add_vec_int (mword_of_int (PO + 0x00) : mword 64) 2 = mword_of_int (PO + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp02) in "Hpc".
+    (* ---- 0x02: c.sdsp ra,24(sp) ---- *)
+    iPoseProof (poi_02 with "Htext") as "Hi02".
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PO + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+              N0 (av - 4)%nat vr24 b
+              with "Hcg Hpc Hi02 [Hr24] [-]").
+    { iEval (rewrite Hcsp0). iExact "Hr24". }
+    iIntros (CID2 Hh2) "Hcg Hpc Hr24".
+    assert (Hpp04 : add_vec_int (mword_of_int (PO + 0x02) : mword 64) 2 = mword_of_int (PO + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp04) in "Hpc".
+    (* ---- 0x04: c.sdsp s0,16(sp) ---- *)
+    iPoseProof (poi_04 with "Htext") as "Hi04".
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PO + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+              N0 (av - 4)%nat vr16 b
+              with "Hcg Hpc Hi04 [Hr16] [-]").
+    { iEval (rewrite Hcsp0). iExact "Hr16". }
+    iIntros (CID3 Hh3) "Hcg Hpc Hr16".
+    assert (Hpp06 : add_vec_int (mword_of_int (PO + 0x04) : mword 64) 2 = mword_of_int (PO + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp06) in "Hpc".
+    (* ---- 0x06: c.sdsp s1,8(sp) ---- *)
+    iPoseProof (poi_06 with "Htext") as "Hi06".
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PO + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+              N0 (av - 4)%nat vr8 b
+              with "Hcg Hpc Hi06 [Hr8] [-]").
+    { iEval (rewrite Hcsp0). iExact "Hr8". }
+    iIntros (CID4 Hh4) "Hcg Hpc Hr8".
+    assert (Hpp08 : add_vec_int (mword_of_int (PO + 0x06) : mword 64) 2 = mword_of_int (PO + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp08) in "Hpc".
+    (* ---- 0x08: c.addi4spn s0,sp,32 ---- *)
+    iPoseProof (poi_08 with "Htext") as "Hi08".
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (PO + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
+              N0 (av - 4)%nat b
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi08 [-]").
+    iIntros (CID5 Hh5) "Hcg Hpc".
+    assert (Hpp0a : add_vec_int (mword_of_int (PO + 0x08) : mword 64) 2 = mword_of_int (PO + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp0a) in "Hpc".
+    (* ---- 0x0a: csrrci a5,sstatus,2 -- THE FLIP, and the arm seam ---- *)
+    iDestruct (cpu_own_transport CID CID5 n eb p C b ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (po_own_split n eb p C b with "Hown") as "(%Hbon & Hcnt & Hcells0 & HC)".
+    iPoseProof (poi_0a with "Htext") as "Hi0a".
+    iApply (wp_csrci_sstatus_s_sconf Φ (mword_of_int (PO + 0x0a)) (mword_of_int 15 : mword 5) n eb
+              N1 (av - 4)%nat b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hcnt Hpc Hi0a [-]").
+    iIntros (CID6 Hh6 mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hpay Hpc".
+    iDestruct (po_cells_transport CID5 CID6 n eb p b ltac:(wp_next_chain) with "Hcells0") as "Hcells0".
+    iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
+    (* THE HART IS PINNED AT CID6 FROM HERE ON (push_off never re-enables),
+       so drop the entry hart, the five prologue harts and their conditional
+       equalities: with exactly one [CpuId] left in context the ambient
+       instance -- and hence [cid_word], [cpu_cells], [rget_tp] -- is
+       unambiguous, and the rest of the proof reads hart-free. *)
+    iAssert (cpu_cells (CID := CID6) n eb p) with "[Hcells0 Hpay]" as "Hcells".
+    { destruct b.
+      - destruct (Hbon eq_refl) as [Hn0 Heb0]. rewrite Hn0 Heb0.
+        iEval (rewrite cpu_cells_pay_on) in "Hpay". iExact "Hpay".
+      - iExact "Hcells0". }
+    iDestruct "Hcells" as "(_ & Hnoff & Hint & Hproc)".
+    (* from here on b is LITERALLY false *)
+    pose (a0f := mycpu_ret cid_word : mword 64).
+    set (N2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read mstatus0)]> N1).
+    assert (Hpp0e : add_vec_int (mword_of_int (PO + 0x0a) : mword 64) 4 = mword_of_int (PO + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp0e) in "Hpc".
+    (* ---- 0x0e: c.mv s1,a5 ---- *)
+    iPoseProof (poi_0e with "Htext") as "Hi0e".
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (PO + 0x0e)) (mword_of_int 9 : mword 5) (mword_of_int 15 : mword 5)
+              N2 (av - 4)%nat false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi0e [-]").
+    rewrite wp_next_off.
+    iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (N3 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
+        (add_vec zero_reg (N2 !!! Regidx (mword_of_int 15 : mword 5)))]> N2).
+    change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
+        (add_vec zero_reg (N2 !!! Regidx (mword_of_int 15 : mword 5)))]> N2) with N3.
+    assert (Hpp10 : add_vec_int (mword_of_int (PO + 0x0e) : mword 64) 2 = mword_of_int (PO + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp10) in "Hpc".
+    (* ---- 0x10: jal ra,mycpu (jimm=0xd06) ---- *)
+    assert (Hcsp3n : N3 !!! Regidx csp_rs1 = spd).
+    { rewrite /N3. rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite /N2. rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite /N1. rewrite upd_ne; [| vm_compute; discriminate]. exact Hcsp0. }
+    iPoseProof (poi_10 with "Htext") as "Hi10".
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (PO + 0x10)) (mword_of_int 0xd06 : mword 21) N3 (av - 4)%nat p
+              ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia)
+              with "Hcg Htext Hpc Hi10 [-]").
+    iIntros (mo1) "Hcg Hpc %Hmo4".
+    set (N4 := mo1).
+    destruct Hmo4 as [Hmo4cs Hmo4a0].
+    destruct Hmo4cs as (Hcsp4 & Hs0_4 & Hs1_4 & Hs2_4 & Hs3_4 & Hs4_4 & Hs5_4 & Hs6_4 & Hs7_4 & Hs8_4 & Hs9_4 & Hs10_4 & Hs11_4).
+    set (N5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 noff)]> N4).
+    assert (Ha0_10 : N4 !!! Regidx (mword_of_int 10 : mword 5) = a0f).
+    { rewrite /N4 /a0f Hmo4a0 (rget_tp N3). reflexivity. }
+    iEval (rewrite upd_eq) in "Hpc".
+    assert (Hpc14 : ret_pc (add_vec_int (mword_of_int (PO + 0x10) : mword 64) 4)
+                    = (mword_of_int (PO + 0x14) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpc14) in "Hpc".
+    (* ---- 0x14: c.lw a5,120(a0) : a5 := noff ---- *)
+    iPoseProof (poi_14 with "Htext") as "Hi14".
+    iApply (wp_clw_s_sconf Φ (mword_of_int (PO + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+              (mword_of_int 120 : mword 12) N4 (av - 4)%nat noff false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi14 [Hnoff] [-]").
+    { iEval (rgne). iEval (rewrite Ha0_10). iExact "Hnoff". }
+    rewrite wp_next_off.
+    iIntros "Hcg Hpc Hnoff".
+    iEval (rgne) in "Hnoff". iEval (rewrite Ha0_10) in "Hnoff".
+    assert (Hpp16 : add_vec_int (mword_of_int (PO + 0x14) : mword 64) 2 = mword_of_int (PO + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp16) in "Hpc".
+    (* ---- 0x16: c.beqz a5, 0x2c ---- *)
+    assert (Ha5 : N5 !!! Regidx (mword_of_int 15 : mword 5) = sign_extend' 64 noff) by (rewrite /N5; apply upd_eq).
+    assert (Hv1 : N0 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
+      by (rewrite /N0; rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
+    assert (Hv8 : N0 !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5))
+      by (rewrite /N0; rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
+    assert (Hv9 : N0 !!! Regidx (mword_of_int 9 : mword 5) = m !!! Regidx (mword_of_int 9 : mword 5))
+      by (rewrite /N0; rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
+    assert (HcspN5 : N5 !!! Regidx csp_rs1 = spd).
+    { rewrite /N5. rewrite upd_ne; [| vm_compute; discriminate].
+      rewrite Hcsp4. exact Hcsp3n. }
+    (* convert held memory to clean addresses/values (shared by both arms) *)
+    iEval (rgne) in "Hr24". iEval (rewrite Hcsp0 Hv1) in "Hr24".
+    iEval (rgne) in "Hr16". iEval (rewrite Hcsp0 Hv8) in "Hr16".
+    iEval (rgne) in "Hr8". iEval (rewrite Hcsp0 Hv9) in "Hr8".
+    iPoseProof (poi_16 with "Htext") as "Hi16".
+    destruct (eq_vec (sign_extend' 64 noff) zero_reg) eqn:Hcond.
+    - (* ===== TAKEN arm: noff == 0 ===== *)
+      assert (Hcondf : eq_vec (sign_extend' 64 (noff_val n)) zero_reg = true).
+      { change (noff_val n) with noff. exact Hcond. }
+      assert (Hn0 : n = 0%nat).
+      { pose proof (noff_val_zero n Hbound) as HH. rewrite Hcondf in HH.
+        symmetry in HH. apply Nat.eqb_eq in HH. exact HH. }
+      subst n.
+      iDestruct "Hint" as (iv0) "Hintena".
+      iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
+                (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5 (av - 4)%nat false
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                ltac:(rgne; rewrite Ha5; exact Hcond)
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi16 [-]").
+      rewrite wp_next_off.
+      iNext.
+      iIntros "Hcg Hpc".
+      assert (Htgt2c : add_vec (mword_of_int (PO + 0x16) : mword 64)
+                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0")))) = mword_of_int (PO + 0x2c))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt2c) in "Hpc".
+      (* ---- 0x2c: jal ra,mycpu (jimm=0xcea) ---- *)
+      iPoseProof (poi_2c with "Htext") as "Hi2c".
+      iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (PO + 0x2c)) (mword_of_int 0xcea : mword 21) N5 (av - 4)%nat p
+                ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                ltac:(lia)
+                with "Hcg Htext Hpc Hi2c [-]").
+      iIntros (mo2) "Hcg Hpc %Hmo6".
+      set (N6 := mo2).
+      destruct Hmo6 as [Hmo6cs Hmo6a0].
+      destruct Hmo6cs as (Hcsp6 & Hs0_6 & Hs1_6 & Hs2_6 & Hs3_6 & Hs4_6 & Hs5_6 & Hs6_6 & Hs7_6 & Hs8_6 & Hs9_6 & Hs10_6 & Hs11_6).
+      assert (Ha0_2c : N6 !!! Regidx (mword_of_int 10 : mword 5) = a0f).
+      { rewrite /N6 /a0f Hmo6a0 (rget_tp N5). reflexivity. }
+      iEval (rewrite upd_eq) in "Hpc".
+      assert (Hpc30 : ret_pc (add_vec_int (mword_of_int (PO + 0x2c) : mword 64) 4)
+                      = (mword_of_int (PO + 0x30) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpc30) in "Hpc".
+      (* ---- 0x30: srli a5,s1,1 ---- *)
+      iPoseProof (poi_30 with "Htext") as "Hi30".
+      iApply (wp_srli4_s_sconf Φ (mword_of_int (PO + 0x30)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+                (mword_of_int 1 : mword 6) N6 (av - 4)%nat false
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi30 [-]").
+      rewrite wp_next_off.
+      iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
+      set (N7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+          (shift_bits_right (N6 !!! Regidx (mword_of_int 9 : mword 5))
+             (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))]> N6).
+      change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+          (shift_bits_right (N6 !!! Regidx (mword_of_int 9 : mword 5))
+             (subrange_vec_dec (mword_of_int 1 : mword 6) (Z.sub log2_xlen 1) 0))]> N6) with N7.
+      assert (Hpc34 : add_vec_int (mword_of_int (PO + 0x30) : mword 64) 4 = mword_of_int (PO + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpc34) in "Hpc".
+      (* ---- 0x34: andi a5,a5,1 ---- *)
+      iPoseProof (poi_34 with "Htext") as "Hi34".
+      iApply (wp_candi_s_sconf Φ (mword_of_int (PO + 0x34)) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 6)
+                N7 (av - 4)%nat false
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi34 [-]").
+      rewrite wp_next_off.
+      iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
+      set (N8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+          (and_vec (N7 !!! Regidx (mword_of_int 15 : mword 5))
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> N7).
+      change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+          (and_vec (N7 !!! Regidx (mword_of_int 15 : mword 5))
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> N7) with N8.
+      assert (Hpc36 : add_vec_int (mword_of_int (PO + 0x34) : mword 64) 2 = mword_of_int (PO + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpc36) in "Hpc".
+      assert (Hsv32 : trunc32 (rget N8 (mword_of_int 15 : mword 5)) = po_intena_val mstatus0).
+      { rgne. rewrite /N8 upd_eq /N7 upd_eq.
+        rewrite Hs1_6 /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs1_4 /N3 upd_eq /N2 upd_eq.
+        rewrite addv_zero_l. reflexivity. }
+      (* ---- 0x36: c.sw a5,124(a0) : store intena ---- *)
+      assert (Hintaddr : N8 !!! Regidx (mword_of_int 10 : mword 5) = a0f).
+      { rewrite /N8. rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite /N7. rewrite upd_ne; [| vm_compute; discriminate]. exact Ha0_2c. }
+      iPoseProof (poi_36 with "Htext") as "Hi36".
+      iApply (wp_csw_s_sconf Φ (mword_of_int (PO + 0x36)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+                (mword_of_int 124 : mword 12) N8 (av - 4)%nat iv0 false
+                with "Hcg Hpc Hi36 [Hintena] [-]").
+      { iEval (rgne). iEval (rewrite Hintaddr). iExact "Hintena". }
+      rewrite wp_next_off.
+      iIntros "Hcg Hpc Hintena".
+      iEval (rgne) in "Hintena". iEval (rewrite Hintaddr) in "Hintena".
+      iEval (rewrite Hsv32) in "Hintena".
+      assert (Hpc38 : add_vec_int (mword_of_int (PO + 0x36) : mword 64) 2 = mword_of_int (PO + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpc38) in "Hpc".
+      (* ---- 0x38: c.j 0xbd8 ---- *)
+      iPoseProof (poi_38 with "Htext") as "Hi38".
+      iApply (wp_cj_s_sconf Φ (mword_of_int (PO + 0x38)) (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")))
+                N8 (av - 4)%nat false
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi38 [-]").
+      rewrite wp_next_off.
+      iNext.
+      iIntros "Hcg Hpc".
+      assert (Htgt18t : add_vec (mword_of_int (PO + 0x38) : mword 64)
+                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")))) = mword_of_int (PO + 0x18))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt18t) in "Hpc".
+      assert (HcspN8 : N8 !!! Regidx csp_rs1 = spd).
+      { rewrite /N8. rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite /N7. rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite Hcsp6. exact HcspN5. }
+      (* ---- apply the suffix with ms = N8 ---- *)
+      iApply (wp_push_off_suffix_sconf Φ N8 (av - 4)%nat noff
+                (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5)) (m !!! Regidx (mword_of_int 9 : mword 5)) vgap p
+                ltac:(lia)
+                with "Hcg Htext Hpc [Hnoff] [Hr24] [Hr16] [Hr8] [Hgap] [-]").
+      { iExact "Hnoff". }
+      { iEval (rewrite HcspN8). iExact "Hr24". }
+      { iEval (rewrite HcspN8). iExact "Hr16". }
+      { iEval (rewrite HcspN8). iExact "Hr8". }
+      { iEval (rewrite HcspN8 -Hspd4). iExact "Hgap". }
+      iIntros "Hpc Hmfin Hnoff".
+      iDestruct "Hmfin" as (mfin) "(Hcg & %Hp)".
+      destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
+      assert (Hav4 : (av - 4 + 4)%nat = av) by lia.
+      iEval (rewrite Hav4) in "Hcg".
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] Htcp Hpc [%]").
+      { exact Hmsf. }
+      { (* cpu_own (S 0) eb p C false *)
+        rewrite /cpu_own /cpu_hart /cpu_cells.
+        iSplitL "Hnoff Hintena Hcnt Hproc".
+        { iSplitL "Hnoff Hintena Hproc".
+          { iSplitR. { iPureIntro. change (Z.of_nat (S 0)) with 1%Z. lia. }
+            iSplitL "Hnoff".
+            { assert (Hstore1 : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S 0)).
+              { change noff with (noff_val 0). apply push_storeval_succ. change (Z.of_nat 0) with 0%Z. lia. }
+              iEval (rewrite Hstore1) in "Hnoff". iExact "Hnoff". }
+            iSplitL "Hintena".
+            { assert (Hival : intena_val eb = po_intena_val mstatus0).
+              { symmetry. apply po_intena_val_bridge. apply Hsie. reflexivity. }
+              iEval (rewrite Hival). iExact "Hintena". }
+            iExact "Hproc". }
+          iExact "Hcnt". }
+        iExact "HC". }
+      { unfold callee_saved. repeat split.
+      - (* sp *)
+        rewrite Hsp HcspN8 /spd /sp0 po_addv_assoc.
+        assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
+                              (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
+          by (apply bv_eq; vm_compute; reflexivity).
+        rewrite HAB. apply avi0.
+      - (* s0 *) exact Hs0.
+      - (* s1 *) exact Hs1.
+      - (* s2 *)
+        rewrite Hs2.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs2_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs2_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s3 *)
+        rewrite Hs3.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs3_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs3_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s4 *)
+        rewrite Hs4.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs4_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs4_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s5 *)
+        rewrite Hs5.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs5_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs5_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s6 *)
+        rewrite Hs6.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs6_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs6_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s7 *)
+        rewrite Hs7.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs7_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs7_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s8 *)
+        rewrite Hs8.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs8_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs8_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s9 *)
+        rewrite Hs9.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs9_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs9_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s10 *)
+        rewrite Hs10.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs10_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs10_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s11 *)
+        rewrite Hs11.
+        rewrite /N8 upd_ne; [| vm_compute; discriminate].
+        rewrite /N7 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs11_6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs11_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity. }
+    - (* ===== FALL arm: noff <> 0 ===== *)
+      destruct n as [|n'].
+      { exfalso. pose proof (noff_val_zero 0 Hbound) as HH.
+        change (noff_val 0) with noff in HH. rewrite Hcond in HH. discriminate HH. }
+      iRename "Hint" into "Hintena".
+      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (PO + 0x16)) (mword_of_int 11 : mword 8)
+                (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) N5 (av - 4)%nat false
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                ltac:(rgne; rewrite Ha5; exact Hcond)
+                with "Hcg Hpc Hi16 [-]").
+      rewrite wp_next_off.
+      iIntros "Hcg Hpc".
+      assert (Hpc18 : add_vec_int (mword_of_int (PO + 0x16) : mword 64) 2 = mword_of_int (PO + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpc18) in "Hpc".
+      (* ---- apply the suffix with ms = N5 ---- *)
+      iApply (wp_push_off_suffix_sconf Φ N5 (av - 4)%nat noff
+                (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5)) (m !!! Regidx (mword_of_int 9 : mword 5)) vgap p
+                ltac:(lia)
+                with "Hcg Htext Hpc [Hnoff] [Hr24] [Hr16] [Hr8] [Hgap] [-]").
+      { iExact "Hnoff". }
+      { iEval (rewrite HcspN5). iExact "Hr24". }
+      { iEval (rewrite HcspN5). iExact "Hr16". }
+      { iEval (rewrite HcspN5). iExact "Hr8". }
+      { iEval (rewrite HcspN5 -Hspd4). iExact "Hgap". }
+      iIntros "Hpc Hmfin Hnoff".
+      iDestruct "Hmfin" as (mfin) "(Hcg & %Hp)".
+      destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
+      assert (Hav4 : (av - 4 + 4)%nat = av) by lia.
+      iEval (rewrite Hav4) in "Hcg".
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] Htcp Hpc [%]").
+      { exact Hmsf. }
+      { (* cpu_own (S (S n')) eb p C false *)
+        rewrite /cpu_own /cpu_hart /cpu_cells.
+        iSplitL "Hnoff Hintena Hcnt Hproc".
+        { iSplitL "Hnoff Hintena Hproc".
+          { iSplitR. { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
+            iSplitL "Hnoff".
+            { assert (Hstoref : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S (S n'))).
+              { change noff with (noff_val (S n')). apply push_storeval_succ. exact Hnbound. }
+              iEval (rewrite Hstoref) in "Hnoff". iExact "Hnoff". }
+            iSplitL "Hintena". { iExact "Hintena". }
+            iExact "Hproc". }
+          iExact "Hcnt". }
+        iExact "HC". }
+      { unfold callee_saved. repeat split.
+      - (* sp *)
+        rewrite Hsp HcspN5 /spd /sp0 po_addv_assoc.
+        assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
+                              (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
+          by (apply bv_eq; vm_compute; reflexivity).
+        rewrite HAB. apply avi0.
+      - (* s0 *) exact Hs0.
+      - (* s1 *) exact Hs1.
+      - (* s2 *)
+        rewrite Hs2.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs2_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s3 *)
+        rewrite Hs3.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs3_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s4 *)
+        rewrite Hs4.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs4_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s5 *)
+        rewrite Hs5.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs5_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s6 *)
+        rewrite Hs6.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs6_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s7 *)
+        rewrite Hs7.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs7_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s8 *)
+        rewrite Hs8.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs8_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s9 *)
+        rewrite Hs9.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs9_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s10 *)
+        rewrite Hs10.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs10_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity.
+      - (* s11 *)
+        rewrite Hs11.
+        rewrite /N5 upd_ne; [| vm_compute; discriminate].
+        rewrite Hs11_4.
+        rewrite /N3 upd_ne; [| vm_compute; discriminate].
+        rewrite /N2 upd_ne; [| vm_compute; discriminate].
+        rewrite /N1 upd_ne; [| vm_compute; discriminate].
+        rewrite /N0 upd_ne; [| vm_compute; discriminate].
+        reflexivity. }
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* pop_off over the v2 bundle.  ENTRY IS LITERAL [false] (SpecPushOff's *)
@@ -1174,22 +1773,149 @@ Section ProofPushOff.
         subst eb.
         assert (Htcseq : trap_csrs_pay 0 true = trap_csrs) by reflexivity.
         iEval (rewrite Htcseq) in "Htcp".
-        (* ---- 0x24: csrsi sstatus,2 (rd = x0) -- the restore.  BLOCKED: this
-           is the SAME central-layer gap documented above wp_push_off_sconf.
-           WpSconfCsr.wp_csrsi_sstatus_x0_s_sconf's [b = false] branch (the
-           real-restore arm) additionally demands a caller-supplied
-           [cpu_hart 0 true p] PRECONDITION -- i.e. an [intr_count 0 true],
-           ghost-valued '1' -- to park into the freshly-armed [sie_arm true
-           p], handed through UNCHANGED (never consumed by the flip itself,
-           which only touches [Hhalf]/[Harm]/[Htok]/[Hqi]).  But at the call
-           site the caller's own [sie_cap_gpr ... false p] still carries the
-           tied half at '0' (the real CSR has not flipped yet), and
-           ghost_var agreement across [Hhalf]/[Harm] forces every ghost
-           fraction of this name held here to read '0' too -- so a
-           [cpu_hart 0 true p] fraction (valued '1') cannot be held
-           simultaneously without a provable contradiction.  No real caller
-           can construct this precondition honestly; left unproven. *)
-  Abort.
+        (* ---- 0x24: csrsi sstatus,2 (rd = x0) -- THE RESTORE, and the
+           other half of the arm seam.  The pieces go IN: the counting
+           token (level 0 + the persistent handler-avail = [intr_count 1
+           true]), the trap CSRs the level-0/enabled-base boundary owes,
+           and the per-cpu CELLS -- and the leaf rebuilds [sie_arm true p]
+           whole around them, minting the count eighth at '1' itself.  What
+           the caller keeps is its frame [C] and the pure fact, i.e.
+           [cpu_own 0 true p C true]. ---- *)
+        iPoseProof (ppi_24 with "Htext") as "Hi24".
+        assert (Hdec : noff_val 0 = storeval).
+        { symmetry. rewrite /storeval /nv1. change noffv with (noff_val 1).
+          apply pop_storeval_pred. exact Hbound. }
+        iApply (wp_csrsi_sstatus_x0_s_sconf Φ (mword_of_int (PP + 0x24)) P7 (av - 2)%nat false
+                  with "Hcg [Htok] Htcp [Hnoff Hint Hproc] Hpc Hi24 [-]").
+        { iApply (intr_count_pack_S_on 0 with "Htok Havail"). }
+        { rewrite /cpu_cells.
+          iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
+          iSplitL "Hnoff". { iEval (rewrite Hdec). iExact "Hnoff". }
+          iSplitL "Hint". { iExists intenav. iExact "Hint". }
+          iExact "Hproc". }
+        rewrite wp_next_off.
+        iIntros (msi) "%Hmsfi Hcg Hpc".
+        assert (Hpc28 : add_vec_int (mword_of_int (PP + 0x24) : mword 64) 4 = mword_of_int (PP + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
+        iEval (rewrite Hpc28) in "Hpc".
+        (* the exit index is [bexit] = [eb] = true: the epilogue below runs
+           with interrupts ENABLED, so it is invoked at literal [true] and
+           its own [wp_next true] obligation IS pop_off's. *)
+        assert (Hbext : bexit = true) by (rewrite /bexit; reflexivity).
+        iEval (rewrite Hbext) in "Hcont".
+        iApply (wp_pop_off_epi_sconf Φ P7 (av - 2)%nat
+                  (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5)) true p
+                  with "Hcg Htext Hpc [Hr8] [Hr0] [-]").
+        { iEval (rewrite HcspP7). iExact "Hr8". }
+        { iEval (rewrite HcspP7). iExact "Hr0". }
+        iIntros (CIDe Hse mf) "Hcg Hpc %Hmf".
+        assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
+        iEval (rewrite Hav2) in "Hcg".
+        subst mf.
+        iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain|].
+        iApply ("Hcont" with "Hcg [HC] Hpc [%]").
+        { iApply (cpu_own_on_intro with "HC"). }
+        unfold callee_saved. repeat split.
+        * rewrite upd_eq HcspP7 Hsp0up. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs1C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs2C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs3C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs4C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs5C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs6C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs7C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs8C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs9C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs10C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+        * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
+          rewrite /P7 upd_ne; [| vm_compute; discriminate].
+          rewrite /P6 upd_ne; [| vm_compute; discriminate].
+          rewrite /P5 upd_ne; [| vm_compute; discriminate].
+          rewrite /P4 upd_ne; [| vm_compute; discriminate].
+          rewrite /P3 upd_ne; [| vm_compute; discriminate].
+          rewrite /Cr Hs11C.
+          rewrite /P1 upd_ne; [| vm_compute; discriminate].
+          rewrite /P0 upd_ne; [| vm_compute; discriminate]. reflexivity.
+  Qed.
 
 End ProofPushOff.
 

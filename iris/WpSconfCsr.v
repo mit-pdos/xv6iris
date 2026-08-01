@@ -104,6 +104,62 @@ Proof.
   - apply exec_csr_id_write_callback_stvec.
 Qed.
 
+(* THE TWO COMPANIONS OF [trap_csrs_pay] THE SIE-FLIP LEAVES NEED, one on
+   each side of the flip.  Both exist because [sie_arm true p] owns the
+   enabled arm's per-cpu bookkeeping ([cpu_hart 0 true p], IntrDefs.v) --
+   i.e. BOTH eighths of the kernel-code SIE token: its own, and the one
+   nested inside [intr_count 0 true].  So a caller at [b = true] can hold
+   NEITHER; the flip leaves must consume the arm whole and hand back the
+   pieces (and, in the other direction, take the pieces and build it).
+
+   THEY LIVE OUTSIDE [Section WpSconfCsr] ON PURPOSE.  A constant defined
+   INSIDE a section has that section's variables -- here [CID] -- applied
+   automatically at every use in the same section, which silently BEATS the
+   [fun (CID : CpuId) => ...] binder of a [wp_next] continuation: the leaf
+   would then hand its payload back at the hart it started on rather than
+   the one execution resumed on.  Defined out here they take [CID] as an
+   ordinary instance argument, resolved -- like every [IntrDefs] resource
+   in the same continuation -- to the bound hart. *)
+
+(* ON THE WAY OUT (a csrci): the freed cells.  Indexed by [b], not by the
+   level -- the cells come out exactly when there WAS an arm to dismantle.
+   The count eighth is NOT here: it is accounted for by the leaf's
+   [intr_count (S k) eb] postcondition, and handing out both would be
+   handing out the same eighth at two different values. *)
+Definition cpu_cells_pay `{!riscvGS Σ} `{CID : CpuId}
+    (b : bool) (p : mword 64) : iProp Σ :=
+  (if b then cpu_cells 0 true p else emp)%I.
+
+Lemma cpu_cells_pay_on `{!riscvGS Σ} `{CID : CpuId} (px : mword 64) :
+  cpu_cells_pay true px ⊣⊢ cpu_cells 0 true px.
+Proof. reflexivity. Qed.
+
+Lemma cpu_cells_pay_off `{!riscvGS Σ} `{CID : CpuId} (px : mword 64) :
+  cpu_cells_pay false px ⊣⊢ (emp : iProp Σ).
+Proof. reflexivity. Qed.
+
+(* ON THE WAY IN (a csrci again -- the counting token the leaf increments).
+   At [b = false] the caller holds it beside its bundle and hands it over,
+   exactly as before.  At [b = true] it is inside the arm, so what the
+   caller supplies instead is the PURE fact its own [cpu_own _ _ _ _ true]
+   carries ([CpuOwn.cpu_own_on]) -- which is what pins the leaf's [k]/[eb]
+   there, the arm having baked them in as 0 / true. *)
+Definition intr_count_pre `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    (b : bool) (n : nat) (eb : bool) : iProp Σ :=
+  (if b then ⌜ n = 0%nat /\ eb = true ⌝ else intr_count n eb)%I.
+
+(* the two index-instances, so a proof never has to reduce the [if] by
+   hand inside the proofmode. *)
+Lemma intr_count_pre_on `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    (n : nat) (eb : bool) :
+  intr_count_pre true n eb -∗ ⌜ n = 0%nat /\ eb = true ⌝.
+Proof. iIntros "H". iExact "H". Qed.
+
+Lemma intr_count_pre_off `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    (n : nat) (eb : bool) :
+  intr_count_pre false n eb -∗ intr_count n eb.
+Proof. iIntros "H". iExact "H". Qed.
+
 Section WpSconfCsr.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -111,18 +167,6 @@ Section WpSconfCsr.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
-
-  (* the "pay" companion of [trap_csrs_pay]: the enabled arm's per-cpu
-     bookkeeping [cpu_hart 0 true p] (IntrDefs.v), owed at exactly the same
-     index -- level 0 with an enabled base -- that [trap_csrs_pay] pays at.
-     A push_off-shaped leaf that is generic in the entry level [k] hands
-     this back (real flip, k = 0 /\ eb = true) or [emp] (idempotent write,
-     any other index) through the very same [wp_next] continuation. *)
-  Local Definition cpu_hart_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (match n with
-     | O => if eb then cpu_hart 0 true p else emp
-     | S _ => emp
-     end)%I.
 
   Lemma wp_csrr_sstatus_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
@@ -313,7 +357,7 @@ Section WpSconfCsr.
     uint rd <> 0 ->
     rd_ok rd ->
     sie_cap_gpr m n b p -∗
-    intr_count k eb -∗
+    intr_count_pre b k eb -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
     wp_next b (fun (CID : CpuId) =>
@@ -323,7 +367,7 @@ Section WpSconfCsr.
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n false p -∗
       intr_count (S k) eb -∗
       trap_csrs_pay k eb -∗
-      cpu_hart_pay k eb p -∗
+      cpu_cells_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -361,11 +405,14 @@ Section WpSconfCsr.
       by (apply upd_ne; congruence).
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     destruct b.
-    - (* ---- b = true: the real flip ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hcpu)".
-      iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
-      iDestruct (intr_count_get_on k eb with "Hq1 Hcnt") as "(%Hke & Hq1 & Hc1)".
+    - (* ---- b = true: the real flip.  The caller holds NEITHER eighth here
+           (both are in the arm); what it hands over is the pure fact, and
+           the arm itself is dismantled for the rest. ---- *)
+      iDestruct (intr_count_pre_on with "Hcnt") as %Hke.
       destruct Hke as [-> ->].
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & (Hcells & Hc1))".
+      iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
+      iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hc1)".
       destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
       (* the trap-vector invariant: open it for the quarter, flip, reseal *)
@@ -426,7 +473,7 @@ Section WpSconfCsr.
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
       iApply ("Hcont" $! ms0 with "[%] [%] Hcg
-                            [Htok] [Hsepcx Hscausex Hstvalx] [Hcpu] [$Hpc' $Hnpc]").
+                            [Htok] [Hsepcx Hscausex Hstvalx] [Hcells] [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { intros _. cbn [sie_bit]. exact Hb1. }
       { iApply (intr_count_pack_S_on with "Htok").
@@ -434,8 +481,9 @@ Section WpSconfCsr.
         iSplit; [iPureIntro; exact Htvd |].
         iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
       { iFrame "Hsepcx Hscausex Hstvalx". }
-      { iExact "Hcpu". }
+      { rewrite /cpu_cells_pay. iExact "Hcells". }
     - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
+      iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
       iDestruct "Harm" as "Hq0".
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
       assert (Hcollapse : legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2)) = ms0)
@@ -480,7 +528,7 @@ Section WpSconfCsr.
       { exact Hmsf. }
       { intros Hk. rewrite (Heb0 Hk). cbn [sie_bit]. exact Hb0. }
       { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
-      { rewrite /cpu_hart_pay. destruct k; [rewrite (Heb0 eq_refl) |]; done. }
+      { rewrite /cpu_cells_pay. done. }
   Qed.
 
 
@@ -552,7 +600,14 @@ Section WpSconfCsr.
   Qed.
 
   (* pop_off's restore: consumes the saved payload to re-arm the
-     capability.  The already-enabled branch of [sie_cap] is refuted by
+     capability.  The MIRROR of the csrci leaf above: the pieces go IN and
+     the arm is rebuilt whole, so the caller supplies the CELLS
+     ([cpu_cells 0 true p]) and the counting token at level 1, and gets NO
+     [intr_count] back -- the eighth the flip produces goes straight into
+     [sie_arm true p]'s nested [cpu_hart 0 true p], which is where the
+     enabled arm keeps it.  (Asking the caller for a whole [cpu_hart 0 true
+     p] would ask it for that eighth at '1' while its own bundle still pins
+     it at '0'.)  The already-enabled branch of [sie_cap] is refuted by
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
   Lemma wp_csrsi_sstatus_x0_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64)
@@ -560,19 +615,18 @@ Section WpSconfCsr.
     sie_cap_gpr m n b p -∗
     intr_count 1 true -∗
     trap_csrs -∗
-    cpu_hart 0 true p -∗
+    cpu_cells 0 true p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
     wp_next b (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
-      intr_count 0 true -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "Hcg Hcnt Hcsrs Hcpu Hpc Hinstr Hcont".
+    iIntros "Hcg Hcnt Hcsrs Hcells Hpc Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok Hhx]".
     iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx)".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -602,7 +656,7 @@ Section WpSconfCsr.
     destruct b.
     - (* ---- b = true: already enabled -- impossible.  The payload's sepc
            cell and the '1' arm's sepc cell cannot coexist. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx' & Hcpu')".
+      iDestruct "Harm" as "(Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx' & Hcells')".
       iDestruct "Hsepcx" as (v1) "Hsepc1".
       iDestruct "Hsepcx'" as (v2) "Hsepc2".
       iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[].
@@ -639,21 +693,23 @@ Section WpSconfCsr.
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
       iAssert (sie_cap m n true p)
-        with "[Hqcap Hsepcx Hscausex Hstvalx Hstk Htr Hcpu]" as "Hcap".
+        with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hstk Htr Hcells]" as "Hcap".
       { iSplitL "Hstk". { iExact "Hstk". }
         iFrame "Htr".
         iFrame "Hqcap Hsepcx Hscausex Hstvalx".
-        iSplitR "Hcpu"; [| iExact "Hcpu"].
-        iExists handler. iSplit; [iPureIntro; exact Htvd |].
-        iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+        iSplitR "Hcells Hqcnt".
+        { iExists handler. iSplit; [iPureIntro; exact Htvd |].
+          iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+        (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the
+           count eighth the flip just produced at '1'. *)
+        iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
       iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
-      iApply ("Hcont" $! ms0 with "[%] Hcg [Hqcnt] [$Hpc' $Hnpc]").
+      iApply ("Hcont" $! ms0 with "[%] Hcg [$Hpc' $Hnpc]").
       { exact Hmsf. }
-      { iExact "Hqcnt". }
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -728,19 +784,21 @@ Section WpSconfCsr.
      bundle half + capability eighth + count eighth + invariant quarter,
      with [trap_csrs] moving INTO the arm's '1' branch alongside an
      [intr_inv] copy taken from the persistent parameter).
-       eb = true: SIE is ALREADY '1' (ghost agreement between the count
+       eb = true: SIE is ALREADY '1' (ghost agreement between the arm's own
      eighth and the mstatus-tied half), so the write is idempotent on the
      bit and NO ghost moves; the legalized write still changes mstatus's
      term, but [csrsi_sie_flip] says the new word again has SIE = '1' and
      again satisfies [sconf_ms_facts], which is all the bundle needs.  The
-     capability's '1' arm (trap CSRs + invariant copy) rides through
-     untouched, and the caller's [if eb then emp else trap_csrs] is [emp]. *)
+     capability's '1' arm (trap CSRs + per-cpu cells + invariant copy) rides
+     through untouched, and every one of the caller's [if eb then emp else _]
+     premises is [emp] -- at [eb = true] all of that is ALREADY in the arm,
+     which is exactly why the counting token is one of them. *)
   Lemma wp_csrsi_sstatus_x0_enable_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
     sie_cap_gpr m n eb p -∗
-    intr_count 0 eb -∗
+    (if eb then emp else intr_count 0 false) -∗
     (if eb then emp else trap_csrs) -∗
-    (if eb then emp else cpu_hart 0 true p) -∗
+    (if eb then emp else cpu_cells 0 true p) -∗
     intr_handler_avail -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
@@ -748,21 +806,18 @@ Section WpSconfCsr.
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
-      intr_count 0 true -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     destruct eb.
     2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
-        iIntros "Hcg Hcnt Hcsrs Hcpu #Havail Hpc Hinstr Hcont".
+        iIntros "Hcg Hcnt Hcsrs Hcells #Havail Hpc Hinstr Hcont".
         iApply (wp_csrsi_sstatus_x0_s_sconf Φ pc m n false
-                  with "Hcg [Hcnt] Hcsrs Hcpu Hpc Hinstr Hcont").
+                  with "Hcg [Hcnt] Hcsrs Hcells Hpc Hinstr Hcont").
         iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
     (* ---- base state ENABLED: idempotent on SIE, ghosts stand still ---- *)
-    replace (intr_count 0 true) with (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1))
-      by reflexivity.
-    iIntros "Hcg Hcnt _ _ #Havail Hpc Hinstr Hcont".
+    iIntros "Hcg _ _ _ #Havail Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n true Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
@@ -786,9 +841,13 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    (* [Hcap : sie_cap m n true] already -- the arm is untouched, no need
-       to destructure it. *)
-    iDestruct (ghost_var_agree with "Hhalf Hcnt") as %Hb1.
+    (* [Hcap : sie_cap m n true] already -- the arm rides through untouched;
+       the only thing wanted from it is its own eighth, for the agreement
+       that pins the live bit at '1'. *)
+    iDestruct "Hcap" as "(Hstk & Htr & Hq1 & Harest)".
+    iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
+    iAssert (sie_cap m n true p) with "[Hstk Htr Hq1 Harest]" as "Hcap".
+    { iFrame "Hstk Htr Hq1 Harest". }
     destruct (csrsi_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
@@ -816,7 +875,7 @@ Section WpSconfCsr.
       iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
     iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
-    iApply ("Hcont" $! ms0 with "[%] Hcg Hcnt [$Hpc' $Hnpc]").
+    iApply ("Hcont" $! ms0 with "[%] Hcg [$Hpc' $Hnpc]").
     { exact Hmsf. }
   Qed.
 
