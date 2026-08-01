@@ -15,7 +15,7 @@ Require Import SRegime.
 Require Import KptShare.
 Require Import SmodeCore WpMmodeLeafBase.
 Require Import WpSmodeSret MstatusBits.
-Require Import KptTree SmodeCorePt.
+Require Import SmodeCorePt.
 Require Import RegFile.
 Import Defs.
 

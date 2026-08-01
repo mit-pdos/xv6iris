@@ -19,8 +19,8 @@ Require Import SmodeCore RegFile WpGpr WpMmodeLeafBase.
 Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes.
-Require Import PtTree KptTree KvmMap.
-Require Import KptGhost KptShare.
+Require Import PtTree.
+Require Import KptShare.
 Require Import TransPt.
 Require Import UserretDefs.
 Require Import WpKvminithart WpKvminithartInstr.

@@ -34,11 +34,11 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import WpLock SleepLock.
+Require Import WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.
-Require Import BufOwn BcacheInv BioInv.
+Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

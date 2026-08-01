@@ -38,7 +38,7 @@ Require Import KptPt.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpMmodeLeafBase StackOwn.
-Require Import SmodeCore KptTree.
+Require Import SmodeCore.
 Require Import KMap.   (* kmap_static_claims, extracted from the config bundle *)
 Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import KptShare.   (* tlb_res_pt: the SHARED table's per-hart residue *)

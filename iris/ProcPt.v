@@ -29,7 +29,8 @@ From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
-Require Import PtAdBits Pt4kWalk PtTree PtBuild.
+Require Import PtAdBits Pt4kWalk PtBuild.
+Require Import PtreeType.
 Require Import KptExecMap KptTree TrampPt UptTree.
 Local Open Scope Z_scope.
 

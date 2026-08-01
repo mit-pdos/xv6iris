@@ -76,13 +76,13 @@ Require Import RegFile InstrBytes WpGpr.
 Require Import KMap KptPt SmodePte.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
-Require Import WpGprCsrwA WpGprCsrwB WpGprCsrwC WpGprCsrwCommon.
+Require Import WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMretWp.
-Require Import WpEntryNew WpTimerinit WpStartNew.
+Require Import WpTimerinit WpStartNew.
 Require Import SRegime SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
-Require Import SpecEntry SpecMain.
+Require Import SpecMain.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

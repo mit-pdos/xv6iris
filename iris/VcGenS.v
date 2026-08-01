@@ -37,7 +37,6 @@ Require Import WpMmodeLeafBase.
 Require Import SRegime.
 Require Import SmodeCore.
 Require Import VcGen.
-Require Import KptTree.
 Require Import KptShare.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMem WpSmodePtMemWrap.

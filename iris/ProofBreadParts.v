@@ -28,23 +28,21 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RiscvFetchExec.
 Require Import MemAccessGen.
 Require Import RegFile.
-Require Import InstrBytes KernelText.
+Require Import InstrBytes.
 Require Import VcGen.
 Require Import MinstretInv.
 Require Import KptGhost.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import IntrDefs.
-Require Import WpLock SleepLock.
+Require Import WpLock.
 Require Import WpSconfMem.
-Require Import ByteCursor ArrCursor.
-Require Import DiskPtsto DiskInv.
+Require Import BufOwn.
 Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

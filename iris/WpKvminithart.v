@@ -22,13 +22,11 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvModelBytes RiscvPtsto RiscvExtras.
+Require Import RiscvPtsto RiscvExtras.
 Require Import Pt4kWalk.
-Require Import PtTree.
 Require Import KptPt KptExecMap.
 Require Import KMap.
 Require Import KvmMap.
-Require Import KallocInv.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

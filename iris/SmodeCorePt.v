@@ -43,7 +43,6 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec Ris
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore.
 Require Import KptPt UserBits.
-Require Import KptTree.
 Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import KptShare.   (* tlb_res_pt: the shared-table residue *)
 Require Import SRegime.

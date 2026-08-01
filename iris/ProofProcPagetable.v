@@ -24,7 +24,8 @@ Require Import WpLock.
 Require Import CalleeSaved StackOwn.
 Require Import ProcGeom.
 Require Import KallocInv.
-Require Import PtTree PtBuild KptExecMap TrampPt.
+Require Import PtBuild KptExecMap TrampPt.
+Require Import PtreeType.
 Require Import ProcPt.
 Require Import WpProcPagetableInstr.
 Require Import SpecUvmcreate SpecMappages SpecProcPagetable.

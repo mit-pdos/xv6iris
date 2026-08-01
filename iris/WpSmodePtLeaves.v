@@ -43,7 +43,7 @@ Require Import WpGpr RegFile MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SmodePte.
 Require Import SmodeCore WpSmodeGpr.
 Require Import UserBits.
-Require Import KptTree SmodeCorePt SRegime.
+Require Import SmodeCorePt SRegime.
 Require Import KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

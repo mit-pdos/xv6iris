@@ -57,7 +57,7 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import WpLock SleepLock.
+Require Import WpLock.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import FdSlots.
@@ -66,8 +66,8 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import SwtchCtx.
 Require Import WpUart.
-Require Import ByteCursor ArrCursor.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
+Require Import BufOwn.
 Require Import BufOwn BcacheInv BioInv.
 Require Import SpecPanic.
 Require Import SpecHoldingsleep SpecVirtioDiskRw.

@@ -57,23 +57,22 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import KptGhost KptShare KptExecMap KvmMap.
-Require Import KMap.
+Require Import KptShare KptExecMap KvmMap.
 Require Import SpecPanic.
 Require Import StartedInv.
 Require Import SpecPrintkGen.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
-Require Import KallocInv KvmSpec BcacheInv SleepLock.
+Require Import KallocInv.
+Require Import SpecPanic.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
-Require Import VirtioModel DiskPtsto WpUart.
-Require Import VirtioQueue VirtioProto DiskInv.
+Require Import DiskPtsto WpUart.
+Require Import DiskInv.
 Require Import WpLock FileInv.
 (* the boot-arm interface, for the per-hart bundle [main_hart_raw] (and the
    □-wand whose arguments [main_deposit] packages) *)

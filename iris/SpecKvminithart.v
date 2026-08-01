@@ -49,10 +49,7 @@ Require Import InstrBytes KernelText.
 Require Import RegFile.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import PtTree.
-Require Import KptGhost KptShare.
-Require Import PtBuild KptExecMap KvmMap.
-Require Import KMap.
+Require Import KptShare.
 From Kernel Require KernelSyms.
 
 Notation KVMIH := KernelSyms.kvminithart.
