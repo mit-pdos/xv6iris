@@ -36,6 +36,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock SleepLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -53,24 +54,22 @@ Definition K_brelse : nat := 26%nat.
 
 Definition wp_brelse_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname)
     (bn : bio_names) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (bs : list (bv 8)) :=
+    (bs : list (bv 8)) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.brelse in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_brelse <= K)%nat ->
-  (* the hart id is the ambient CpuId (holdingsleep/releasesleep convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* a0 is the buffer *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ 0 eb p C -∗
+  sie_cap_gpr m K b p -∗
+  cpu_own 0 eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp -∗
+  panic_wp_any -∗
   bio_ctx bn -∗
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗
@@ -78,10 +77,11 @@ Definition wp_brelse_sconf_body
   procs_inv Φ γs -∗
   (* the locked buffer being released *)
   bio_locked bn k pidv dev bno bs -∗
-  ( ∀ mf : regfile,
+  wp_next b (fun (CID : CpuId) =>
+  ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr γ mf K -∗
-      cpu_own γ 0 eb p C -∗
+      sie_cap_gpr mf K b p -∗
+      cpu_own 0 eb p C b -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
       (* the reference's slot unit comes back *)
@@ -92,11 +92,11 @@ Definition wp_brelse_sconf_body
 Module Type BRELSE.
   Parameter wp_brelse_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname)
       (bn : bio_names) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs : list (bv 8)),
-      wp_brelse_sconf_body γ Φ γs bn k pidv dev bno dq m K eb p C bs.
+      (bs : list (bv 8)) (b : bool),
+      wp_brelse_sconf_body Φ γs bn k pidv dev bno dq m K eb p C bs b.
 End BRELSE.

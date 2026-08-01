@@ -57,6 +57,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
@@ -78,17 +79,15 @@ Definition uartwrite_stack : nat := 32%nat.
 
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-    (γ : gname) (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+    (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (n : nat) (f : nat -> bv 8) (dq : dfrac) :=
+    (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartwrite in
   let pj := proc_addr j in
   (* a0 = the buffer, a1 = the count *)
   let buf := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the tp register holds THIS cpu's id (the whole callee row's convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the process running here is proc j (sleep's linkage) *)
   (j < NPROC)%nat ->
   γs !! j = Some γlp ->
@@ -100,9 +99,9 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
-  cpu_own γ 0%nat eb pj C -∗
+  cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the device, and the transmitter's lock -- the whole credential *)
   dev_inv γu γv -∗
@@ -113,27 +112,27 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv Φ γs -∗
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 0%nat eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 0%nat eb pj C b -∗
+      pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
       uart_sent_sub γu (f <$> seq 0 n) -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+      (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) (f : nat -> bv 8) (dq : dfrac),
-      wp_uartwrite_sconf_body γ γu γv Φ γs j γlp γl m av eb C n f dq.
+      (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool),
+      wp_uartwrite_sconf_body γu γv Φ γs j γlp γl m av eb C n f dq b.
 End UARTWRITE.

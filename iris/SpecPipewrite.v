@@ -55,6 +55,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
@@ -79,17 +80,15 @@ Notation PW := KernelSyms.pipewrite.
 Definition pipewrite_stack : nat := 64%nat.
 
 Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (n : Z) :=
+    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipewrite in
   let pj := proc_addr j in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the tp register holds THIS cpu's id (the whole callee row's convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* the process running here is proc j (sleep/killed's linkage) *)
   (j < NPROC)%nat ->
   γs !! j = Some γlp ->
@@ -103,9 +102,9 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
-  cpu_own γ 0%nat eb pj C -∗
+  cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the pipe, and a share of one end -- the whole credential *)
   is_pipe γl γp pi -∗
@@ -117,29 +116,29 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv Φ γs -∗
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile) (P' : uptd),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (P' : uptd),
+      ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 0%nat eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 0%nat eb pj C b -∗
+      pc_is ret_tgt -∗
       pipe_ref γp w q -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type PIPEWRITE.
   Parameter wp_pipewrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z),
-      wp_pipewrite_sconf_body γ γa γf Φ γs j γlp γl γp w q m av eb C pid V n.
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
+      wp_pipewrite_sconf_body γa γf Φ γs j γlp γl γp w q m av eb C pid V n b.
 End PIPEWRITE.

@@ -51,6 +51,7 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
@@ -75,10 +76,10 @@ Definition userinit_pages : nat := 8%nat.
 Definition wp_userinit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
     `{CID : CpuId}
-    (γ γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+    (γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
     (m0 : regfile) (K : nat)
     (eb : bool) (pj : mword 64) (C : iProp Σ)
-    (on : option nat) (v0 : mword 64) :=
+    (on : option nat) (v0 : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.userinit in
   let ra_idx : mword 5 := mword_of_int 1 in
   let ra0 := m0 !!! Regidx ra_idx in
@@ -87,25 +88,23 @@ Definition wp_userinit_sconf_body
   (* enough pages for allocproc's trapframe + page table and uvmfirst's first
      user page; stated exactly as virtio_disk_init states its three *)
   (exists nb, on = Some nb /\ (userinit_pages <= nb)%nat) ->
-  (* the kvm/kalloc convention: tp holds this hart's id, so kalloc's
-     push_off/pop_off address this cpu's cells *)
-  m0 !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  sie_cap_gpr γ m0 K -∗
+  sie_cap_gpr m0 K b pj -∗
   (* [kernel_data] supplies the "initcode" / "/" string literals *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp -∗
-  cpu_own γ 0%nat eb pj C -∗
+  panic_wp_any -∗
+  cpu_own 0%nat eb pj C b -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv Φ γs -∗
   kalloc_env γa on -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
-  ( ∀ mf : regfile,
-    sie_cap_gpr γ mf K -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+    sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    cpu_own γ 0%nat eb pj C -∗
+    cpu_own 0%nat eb pj C b -∗
     kalloc_env γa (avail_sub on userinit_pages) -∗
     (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -115,9 +114,9 @@ Module Type USERINIT.
   Parameter wp_userinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
       `{CID : CpuId}
-      (γ γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (on : option nat) (v0 : mword 64),
-      wp_userinit_sconf_body γ γa Φ γs m0 K eb pj C on v0.
+      (on : option nat) (v0 : mword 64) (b : bool),
+      wp_userinit_sconf_body γa Φ γs m0 K eb pj C on v0 b.
 End USERINIT.

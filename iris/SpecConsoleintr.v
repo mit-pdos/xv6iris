@@ -45,6 +45,7 @@ Require Import WpLock.
 Require Import SpecPanic.
 Require Import CalleeSaved.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
@@ -53,24 +54,24 @@ From Kernel Require KernelSyms.
 Definition consoleintr_stack : nat := 32%nat.
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname)
-    (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) :=
+    (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname)
+    (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (consoleintr_stack <= K)%nat ->
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  eq_vec (zero_reg : mword 64) (mycpu_ret (m !!! Regidx (mword_of_int 4 : mword 5))) = false ->
+  eq_vec (zero_reg : mword 64) (mycpu_ret (rget m (mword_of_int 4 : mword 5))) = false ->
   (* cons.lock's and wakeup's transient noff increments stay in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-  sie_cap_gpr γ m K -∗
-  cpu_own γ lvl eb pme C -∗
+  sie_cap_gpr m K b pme -∗
+  cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
-  panic_wp -∗ procs_inv Φ γs -∗
-  ( ∀ Mf : regfile,
+  panic_wp_any -∗ procs_inv Φ γs -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
-      sie_cap_gpr γ Mf K -∗
-      cpu_own γ lvl eb pme C -∗
+      sie_cap_gpr Mf K b pme -∗
+      cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is rettgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -78,7 +79,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sie
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname)
-      (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ),
-      wp_consoleintr_sconf_body γ Φ m γs pme lvl K eb C.
+      (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname)
+      (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
+      wp_consoleintr_sconf_body Φ m γs pme lvl K eb C b.
 End CONSOLEINTR.

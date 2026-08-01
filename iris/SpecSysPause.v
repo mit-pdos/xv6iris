@@ -73,6 +73,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
@@ -87,14 +88,13 @@ Import Defs.
 Notation SP := KernelSyms.sys_pause.
 
 Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+    (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
     (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-    (dqt : dfrac) :=
+    (dqt : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_pause in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* argint reads argument 0 *)
@@ -107,9 +107,9 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
-  sie_cap_gpr γ m av -∗
+  sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own γ 0 eb pj C -∗
+  cpu_own 0 eb pj C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
   p_trapframe pj ↦₈{dqt} page_base tfp -∗
@@ -121,28 +121,28 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv Φ γs -∗
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile) (r : mword 64),
-      ⌜ callee_saved_notp m mf /\
-        mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h /\
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ (mf : regfile) (r : mword 64),
+      ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = r /\
         (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
-      sie_cap_gpr (CID := h) g mf av -∗
-      cpu_own (CID := h) g 0 eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+      sie_cap_gpr mf av b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SYSPAUSE.
   Parameter wp_sys_pause_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
       (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (dqt : dfrac),
-      wp_sys_pause_sconf_body γ Φ γs j γl γt m av eb C i tfp ws v dqt.
+      (dqt : dfrac) (b : bool),
+      wp_sys_pause_sconf_body Φ γs j γl γt m av eb C i tfp ws v dqt b.
 End SYSPAUSE.

@@ -31,6 +31,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import WpLock SleepLock.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -52,21 +53,20 @@ Definition K_bwrite : nat := 38%nat.
 Definition wp_bwrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ)
+    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (bs bs_disk : list (bv 8)) :=
+    (bs bs_disk : list (bv 8)) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_bwrite <= K)%nat ->
   (* rw's honest arithmetic premise: sector = blockno * 2 in 32 bits *)
   (uint bno < 2147483648)%Z ->
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 is the buffer *)
@@ -77,9 +77,9 @@ Definition wp_bwrite_sconf_body
      trap CSRs across the crossing -- which only the interior acquire can mint,
      and only with an enabled base.  See SpecSched.v / SpecSleep.v. *)
   eb = true ->
-  sie_cap_gpr γ m K -∗
+  sie_cap_gpr m K b pj -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
-  cpu_own γ 0 eb pj C -∗
+  cpu_own 0 eb pj C b -∗
   (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
      before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
      [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
@@ -97,7 +97,7 @@ Definition wp_bwrite_sconf_body
   (* the running-thread bundle rw's sleeps thread through *)
   procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj -∗
+  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -105,33 +105,33 @@ Definition wp_bwrite_sconf_body
   (* the locked buffer and the disk block it names *)
   bio_locked bn k pidv dev bno bs -∗
   disk_block γd (uint bno) bs_disk -∗
-  ( ∀ (h : CPU) (g : gname) (mf : regfile),
-      ⌜callee_saved_notp m mf⌝ -∗
-      ⌜mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word_of h⌝ -∗
-      sie_cap_gpr (CID := h) g mf K -∗
-      cpu_own (CID := h) g 0 eb pj C -∗
-      pc_is (CID := h) ret_tgt -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc_at Φ γs h g (a_cpu_ctx (cid_word_of h)) pj -∗
+      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
       p_pid pj ↦₄{dq} pidv -∗
       bio_locked bn k pidv dev bno bs -∗
       (* the write-through: the disk now holds the buffer's bytes *)
       disk_block γd (uint bno) bs -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type BWRITE.
   Parameter wp_bwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs bs_disk : list (bv 8)),
-      wp_bwrite_sconf_body γ Φ γs j γl γu γd γk pd pav pu bn k
-                           pidv dev bno dq m K eb C bs bs_disk.
+      (bs bs_disk : list (bv 8)) (b : bool),
+      wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn k
+                           pidv dev bno dq m K eb C bs bs_disk b.
 End BWRITE.

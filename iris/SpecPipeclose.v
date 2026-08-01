@@ -34,6 +34,7 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
+Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
 Require Import SchedCtx.
@@ -48,10 +49,11 @@ Import Defs.
 Notation PC := KernelSyms.pipeclose.
 
 Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
-    (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+    (Φ : mval -> iProp Σ) (γs : list gname)
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
-    (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat) :=
+    (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
+    (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipeclose in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -59,8 +61,6 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      the one coupling between an argument and a branch, and it is the natural
      one -- [w] is the argument's truth value, not a side condition on it. *)
   eq_vec (m !!! Regidx (mword_of_int 11 : mword 5)) (zero_reg : mword 64) = negb w ->
-  (* the tp register holds THIS cpu's id (acquire/release/wakeup convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   (* 4 slots for pipeclose's own frame, over wakeup's 18 *)
   (22 <= av)%nat ->
   (* acquire's push_off increments the nesting count, and wakeup's myproc
@@ -68,8 +68,8 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   klk = mword_of_int KernelSyms.kmem ->
   kfl = mword_of_int (KernelSyms.kmem + 24) ->
-  sie_cap_gpr γ m av -∗
-  cpu_own γ n eb pme C -∗
+  sie_cap_gpr m av b pme -∗
+  cpu_own n eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_pipe γl γp pi -∗
   pipe_ref γp w 1 -∗
@@ -78,10 +78,11 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   kalloc_avail γk on -∗
   (* wakeup's *)
   procs_inv Φ γs -∗
-  panic_wp -∗
-  ( ∀ mr,
-    sie_cap_gpr γ mr av -∗
-    cpu_own γ n eb pme C -∗
+  panic_wp_any -∗
+  wp_next b (fun (CID : CpuId) =>
+  ∀ mr,
+    sie_cap_gpr mr av b pme -∗
+    cpu_own n eb pme C b -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* the page came back iff this was the LAST reference; the caller cannot
@@ -93,9 +94,10 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type PIPECLOSE.
   Parameter wp_pipeclose_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (Φ : mval -> iProp Σ) (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
-      (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat),
-      wp_pipeclose_sconf_body γ Φ γs γl γp w γkl γk klk kfl on m n eb pme C av.
+      (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
+      (b : bool),
+      wp_pipeclose_sconf_body Φ γs γl γp w γkl γk klk kfl on m n eb pme C av b.
 End PIPECLOSE.
