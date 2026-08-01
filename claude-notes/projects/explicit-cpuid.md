@@ -388,6 +388,114 @@ changing the `wp_next` shape — a spec decision, not a tuning knob.
   trap-context only and should be stated at `b = false` rather than
   `b`-generic; that is what blocks four of their proofs.
 
+## SURPRISES — the checkpoint
+
+Everything here cost real time to learn. Grouped by whether it is about the
+LOGIC, about Rocq/Iris MECHANICS, or about ORCHESTRATION.
+
+### About the logic
+
+1. **`∃ C, R ∗ C ⊣⊢ R`.** "Existentially quantify the context payload inside the
+   arm" is a NO-OP — take `C := emp`. An existential `C` *is* "the arm owns no
+   `C`", not a way to carry one. So the honest answer was to leave `C` where it
+   was, as a caller frame. I asked for something vacuous and an agent caught it.
+2. **A thread INVARIANT can just be a parameter.** `p` never changes from a
+   kernel thread's point of view — not across migration, interrupt state, or
+   push_off depth — so it needed no ghost and no transport, just a binder. I had
+   been designing an agreement ghost for it.
+3. **`n` and `eb` came for free.** Ghost agreement pins `n = 0 ∧ eb = true` in
+   the enabled arm, and `intr_count 0 true` IS the eighth the arm already held —
+   so absorbing `cpu_own` changed the arm's *ghost* content not at all.
+4. **`cpu_own`-in-the-arm CREATED a new gap.** The arm now holds both eighths,
+   so a flip leaf asking for a separate `intr_count` alongside the bundle cannot
+   be satisfied by anyone. Proven, not guessed:
+   `sie_arm true p ⊢ sie_arm true p ∗ intr_count 0 true` is unprovable. A design
+   fix can manufacture its own downstream gap.
+5. **Not every gap wants a transport lemma.** `locked_transport` (by analogy
+   with `cpu_own_transport`) does not exist soundly: the hart sits inside an
+   exclusive `excl_auth` fragment, and at both stop points the missing thing is
+   a Coq-level `⊢` PREMISE, not a resource — a resource-consuming transport
+   cannot discharge one. Pattern-matching on the shape of a previous fix is not
+   the same as diagnosing what is missing.
+6. **The refactor caught a real over-specification.** `cpuid`/`mycpu` claimed the
+   returned id is the ENTRY hart's; the `tp` read happens mid-body, so that is
+   false with interrupts on. xv6 already knew — `proc.c` says "Interrupts must
+   be disabled." above `mycpu`. The refactor turned a comment into a premise.
+7. **…but the obvious generalization of that was WRONG.** `myproc` reads a
+   per-hart source mid-body (`c->proc`) and is still `b`-GENERIC, because it
+   brackets its own push_off/pop_off. The test is what a function RETURNS —
+   hart-dependent vs thread-dependent — not what it reads.
+8. **`push_off` is not `b = false`.** It is the thing that MAKES `b = false`.
+   Entry is generic.
+9. **A flipping function has TWO indices** and they differ: the resource index
+   (what SIE *is*) and `wp_next`'s (whether interrupts were enabled at ANY point
+   DURING the call). `pop_off` is `false` in / `eb` out with `wp_next` index
+   `eb`, because it re-enables at its LAST instruction. **Compiling cannot catch
+   a wrong choice — at `eb = false` both spellings typecheck.**
+10. **A meaningless premise cost 511 lines.** Deleting one vacuous tp premise
+    removed 15 `tp_pin` re-tagging workarounds. Four agent groups had
+    independently invented that same bridge. **When every consumer reinvents the
+    same bridge, the contract is wrong, not the proofs.**
+
+### About Rocq / Iris mechanics
+
+11. **Instance shadowing is positional and total.** A rebound `CID` captures
+    every resource in scope with ZERO annotation — verified by `reflexivity`
+    against the fully-annotated form. This is what made the whole refactor cheap
+    instead of a 1200-site annotation sweep.
+12. **…but Rocq refuses to rebind a SECTION variable's name** ("CID is already
+    used"), which forced `wp_next` into its own file.
+13. **Yet a `fun (CID : CpuId) =>` LAMBDA inside such a section is fine.** The
+    restriction is on definition binders, not lambdas — which is why ~200
+    `Wp*`/`Spec*` files kept their `Context` and were spared the churn.
+14. **THE VACUITY TRAP.** In `bi_scope` a `forall` extends MAXIMALLY, so an
+    unparenthesised `∀` in a wand chain swallows the trailing `WP` and the
+    contract becomes trivially provable. It compiles. The `Module Type` seal
+    accepts it. Only symptom is a remote `iIntros` failure in another file.
+    `tools/spec_vacuity.py` exists because of this.
+15. **An `Ltac` defined inside a Section does not survive it**, and an Ltac body
+    resolves literal hypothesis names at DEFINITION time.
+16. **The transparent-tower conversion blowup.** One `iApply` took 400 s of a
+    421 s file (0.06 s pre-refactor) because conversion unfolded
+    `rget → tp_pin → rf_upd` over a 24-link chain. Making any ONE opaque
+    collapses it to 0.08 s. **A `Strategy` LEVEL does nothing (390 s at level
+    1000) — only true opacity works.** Eight alternative explanations were
+    falsified by measurement.
+17. **`rget` inside a `wp_next` lambda is a non-terminating `iApply`**, not an
+    error — >10 minutes of silence. And it is silently the wrong hart even when
+    it does work.
+18. **`instr` / `kernel_text` were hart-free in substance already** — only a
+    `∀ σ, mstate_interp σ` clause tied them. Quantifying the hart inside made
+    them fully hart-free, and NO consumer use changed textually.
+19. **Name collisions typecheck.** Fourteen instances of a pre-existing `b`/`p`
+    (byte value, page address, PLIC state, buffer base) aliasing the new index —
+    all `mword 64` or `bool`, all silent. This is the single most common way
+    this refactor goes wrong.
+
+### About orchestration
+
+20. **The frontier tells you what to do NEXT, never how much is LEFT.** Driving
+    from a `-k` build's failing set hid 21 files for five waves — a file deep in
+    the graph never ENTERS the frontier until its dependencies are green. The
+    `Link*` layer exposed them because it sits at the top and fails against
+    everything. **Count against the full file list, or ask the top of the graph.**
+21. **A shared `.vo` tree plus concurrent agents is fragile.** One `rm -f *.vo`
+    during "cleanup" wiped 641 files under five running agents. Banning `make`
+    was not enough; the deletion had to be banned by name.
+22. **`make` without `-k` on a deliberately-broken tree stops at the first
+    casualty** and silently leaves two-thirds of the buildable tree unbuilt.
+23. **Agents hang in wait loops.** Three of seven lost their entire report that
+    way despite completing the work. "Edit, compile once, report, never wait"
+    had to become an explicit protocol line.
+24. **Coordination dominates cost**, not porting: 150k–800k tokens per agent for
+    files whose edits were minutes of work.
+25. **A stale baseline manufactures a phantom regression.** `durable-notes`'
+    "~65 s" for ProofPrintk was measured at 4800 lines; the file had since grown
+    to 7903. That produced a confident "+56% regression" that did not exist, and
+    the reasoning ("+2.5% of source cannot explain +56% of time") was *sound
+    applied to a wrong premise* — the most dangerous kind of error, because it
+    reads as rigour.
+
 ## Staging (the key economy)
 
 **The new leaf statements are strictly WEAKER than the current ones** — a
