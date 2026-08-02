@@ -83,6 +83,30 @@ change that produced it.
 - **`timeout N coqc` does NOT kill the worker, and `pgrep -x coqc` does NOT find it.** `coqc` runs as `rocqworker --kind=compile`, so an exact-name wait loop returns while the compile is still going (giving truncated logs and phantom "stalls"), and `timeout`'s SIGTERM reaps only its direct child. The orphan then spins at 100% and **holds a worker slot, stalling the next build at a random point** — which is what makes the stall location look non-deterministic. Wait on `pgrep -f "rocqworker --kind=compile"`, or better, have the compile print its own sentinel (`bash -c 'coqc …; echo EXIT=$?'`) and wait for that; and `pkill -f rocqworker` before re-measuring.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+## Write the checker for a refactor's SILENT failure mode, before the sweep
+
+If a change has a way of going wrong that still compiles, that way WILL be
+taken, and no build will tell you. Two checkers exist because of exactly that,
+and both are cheap enough to run on every touched file:
+
+- **`tools/spec_vacuity.py`** — an unparenthesised `∀` inside a wand chain
+  extends maximally in `bi_scope`, swallows the trailing `WP`, and leaves a
+  contract that is trivially provable. It compiles, and a `Module Type` seal
+  accepts it.
+- **`tools/lemma_diff.py [--ref REF]`** — reports top-level declarations that
+  VANISHED relative to a git ref, plus `Admitted`/`admit`/`Abort` and any new
+  `Axiom`/`Parameter`/`Hypothesis`. A sweep's characteristic failure is not a
+  red build; it is a file that compiles because something was quietly dropped —
+  a lemma deleted instead of restated, a `Module Type` that lost a `Parameter`.
+  Every line it prints is a thing to justify, not necessarily a bug (a
+  deliberate rename shows up as one `GONE`), which is the point.
+
+The definitive soundness check for a whole cone is still
+`Print Assumptions <the linked top-level theorem>` — it is the only one that
+sees through every functor and seal. Do it once at the end of any interface
+change and diff the axiom list against what the coverage report says should be
+assumed; anything else is a regression.
+
 ## Proof coverage report
 
 `tools/proof_coverage.py` answers "what of the kernel is proved?" — a hierarchy
