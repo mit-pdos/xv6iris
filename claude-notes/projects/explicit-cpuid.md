@@ -536,11 +536,51 @@ agrees it against whatever the arm hands back at the resumed hart, and gets
 makes the registration cross for free — the same property the notes already
 rely on for `□ ∀ c, ∃ h, intr_inv (CID := c) h`.
 
-Allocation is the one fiddly part and it has a natural answer: adequacy mints
-the family at `Ψ0 := fun _ => emp` (full fraction), which is exactly right for
-boot — no scheduler is parked yet, so the arm owes nothing — and `main`
-updates it to the real predicate and discards to `DfracDiscarded` once `γs`
-exists. `saved_pred_update` is the lemma.
+**ALLOCATION IS THE UNRESOLVED PART, and it is not a detail — it is the same
+obstruction one level down.** The natural story is: adequacy mints the family
+at `Ψ0 := fun _ => emp` (full fraction), which is exactly right for boot since
+no scheduler is parked yet, and `main` updates it with `saved_pred_update` and
+discards once `γs` exists. But the arm's clause as written above demands
+`saved_pred_own … DfracDiscarded Ψ`, i.e. a predicate already FIXED — and it
+has to be satisfiable from the moment the first hart enables interrupts, which
+is before `main` can have fixed it. Making the clause hold at full fraction
+instead means the arm owns what `main` needs in order to update. So the clause
+needs a third state ("not yet published"), which is another one-shot ghost,
+and at that point the mechanism is no longer obviously simpler than the thing
+it replaced. **Do not implement this from the sketch above; it needs a
+scratchpad round-trip first.**
+
+### The alternative that may well be better: make the record GLOBAL
+
+Worth weighing before building the payload at all. Every difficulty above
+comes from the parked-scheduler record being *threaded through contracts* as a
+thread-owned resource, so that a migration has to carry it. It does not have
+to be. `procs_inv Φ γs` is already the tree's model for "persistent,
+hart-free, carries per-index resources", and a sibling
+`scheds_inv Φ γs` — holding, per hart, either "hart h's scheduler is running"
+or "it is parked with record R_h" — would be **hart-free from the thread's
+point of view**, which is precisely the property that makes something cross a
+migration for free.
+
+Then `▷ sched_vc` leaves all nine contracts with no replacement at all: a
+thread that wants to `swtch` opens the invariant at whatever hart it is on and
+takes out THAT hart's record. The exclusive record moves in and out under a
+mask instead of riding a frame, and the `p = zero_reg` / running-vs-parked
+distinction the payload sketch encodes in `sie_pay`'s branch becomes the
+invariant's own two-state body — which is where it belongs, since it is a fact
+about the scheduler protocol and not about the SIE arm.
+
+Cost: a real redesign of `SwtchCtx`/`SchedCtx`'s ownership story, against
+`kerneltrap`'s eventual contract. Benefit: nothing new in `IntrDefs`, nothing
+new in `riscvGS`, nine contracts get shorter, and the allocation problem above
+disappears (an invariant can be allocated by `main`, when `γs` exists, because
+nothing below needs to name it).
+
+**Recommendation: prototype `scheds_inv` first.** The payload is the local
+patch; this is the shape. The project's own guiding principle — clean specs
+and good abstractions over avoiding rework — points here, and its own
+retrospective says the design forks that got escalated all came back better
+than the recommendation that preceded them.
 
 Two cheaper things that do NOT work, recorded so nobody re-invents them:
 - **Folding `sched_vc` into `cpu_own`'s `C` slot.** `C` is an opaque `iProp`,
