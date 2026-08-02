@@ -2,8 +2,12 @@
 
 GOAL: remove the ambient `CpuId` from WP statements, so a step's continuation
 is about the hart execution RESUMES on rather than (silently) the hart it
-started on. Started 2026-07-30; design approved, prototype in progress on
-branch `explicit-cpuid`.
+started on. Started 2026-07-30, on branch `explicit-cpuid`. **See STATUS
+below for where it stands; the code blocks in the next three sections are the
+DESIGN as it was reasoned out, and two of them predate their final spelling —
+`γ` is gone (the SIE ghost is canonical per hart) and `wp_next` gained `p`.
+Read `iris/WpNext.v` and `iris/IntrDefs.v` for the shapes as they actually
+are.**
 
 ## The bug in the current shape
 
@@ -81,15 +85,26 @@ The load-bearing case is `push_off(); c = mycpu(); c->noff++` — code that
 disables interrupts, reads `tp`, and expects the answer to stay valid. Handled
 by ONE combinator, the only place that names the hart we came from:
 
-```coq
-Definition wp_next `{CID0 : CpuId} (γ0 : gname) (b : bool)
-    (K : forall (CID : CpuId), gname -> iProp Σ) : iProp Σ :=
-  (∀ (CID : CpuId) (γ : gname),
-     ⌜ b = false -> (cpu_id : CPU) = (CID0 : CPU) /\ γ = γ0 ⌝ -∗ K CID γ)%I.
+As it finally stands (the `γ` this section's reasoning quantifies alongside
+`CID` went away when the SIE ghost became canonical per hart, and a SECOND
+escape hatch was added for `scheduler()` — see "scheduler() is different"):
 
-Lemma wp_next_intro : (∀ CID γ, K CID γ) -∗ wp_next γ0 b K.   (* any b *)
-Lemma wp_next_off   : wp_next γ0 false K ⊣⊢ K CID0 γ0.
+```coq
+Definition wp_next `{CID0 : CpuId} (b : bool) (p : mword 64)
+    (K : forall (CID : CpuId), iProp Σ) : iProp Σ :=
+  (∀ CID : CpuId,
+     ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
+
+Lemma wp_next_intro : (∀ CID, K CID) -∗ wp_next b p K.        (* any b, any p *)
+Lemma wp_next_off   : wp_next false p K ⊣⊢ K CID0.
+Lemma wp_next_idle  : p = zero_reg -> wp_next b p K ⊣⊢ K CID0.
 ```
+
+The two hatches are the two reasons a hart CANNOT change: interrupts were off,
+so no trap was taken; or there is no current proc, so `kerneltrap` would not
+have yielded. The second puts an explicit obligation on `kerneltrap` — *no
+current proc implies the trap returns on the same hart* — where a reader will
+meet it.
 
 `wp_next_off` is why **an interrupts-off or M-mode contract is stated exactly
 as it is today, with no binder at all** — which is the original ask for the
@@ -127,80 +142,6 @@ Why a pure conditional equality and not something prettier:
 - `leaf_means` (same, through `wp_next`) closes by `reflexivity`; the
   `wp_next γ0 false` consumer collapses the hart back to `CID0`.
 
-## Prototype status (branch `explicit-cpuid`)
-
-Landed and compiling: **`HartTp.v`** (Rtp / `cid_word_of` / `tp_pin` / `rget` +
-`rget_ne`, `rget_tp`, `tp_pin_id`, `tp_pin_upd`), **`WpNext.v`** (`wp_next`,
-`wp_next_intro`, `wp_next_off`, `wp_next_trans`, `Ltac wp_next_chain`),
-**`IntrDefs.v`** (`sie_arm γ b`, `sie_cap … b`, `sie_cap_gpr … b` over
-`gpr_file (tp_pin m)`, `rd_ok`; every `sie_cap*` lemma re-indexed, none
-weakened, none found false), and **`ProtoCpuid.v`** — the consumer-side demo.
-No admits, no new axioms (`Print Assumptions` on the demo lemmas shows only the
-three pre-existing Sail model axioms).
-
-`ProtoCpuid.v` takes the leaf as a section `Hypothesis` stated exactly as
-`WpSconfAlu.v:422` will state it, and proves:
-
-- `demo_intr_off` — `add a5, zero, tp ; add a5, a5, a5` at `b = false`. The tp
-  read is just the leaf's value premise closed by `rget_tp`; **no special
-  tp-reading leaf family is needed**. `rewrite wp_next_off` collapses the hart
-  at each step, so the continuation is stated at `CID0` with no binder and the
-  `instr` fact derived before step 1 is still usable at step 2. This is the
-  `push_off(); c = mycpu()` case.
-- `demo_b_generic` — the same stretch with `b` a parameter. **No `destruct b`
-  anywhere**: each step yields a conditional equality, `wp_next_chain` composes
-  them, and that discharges the function's own `wp_next` obligation.
-
-Two things the prototype corrected:
-
-- **State `wp_next`'s pure fact at the BARE binder** (`(CID : CPU) = (CID0 :
-  CPU)`), not via `cpu_id`. Written through the projection the accumulated
-  facts read `@cpu_id CID2 = CID1`, mixing projected and bare spellings, and
-  `congruence`/`eassumption` then fail to chain them.
-- `wp_next` cannot live in a section that fixes `CpuId` — Rocq refuses to
-  rebind a section variable's name ("CID is already used"), which is exactly
-  the shadowing everything relies on. Hence `WpNext.v`.
-
-Everything above `IntrDefs.v` is currently broken, by design: that is the
-Stage-1 sweep (1111 `sie_cap_gpr` sites, 4156 leaf applications, 321 files with
-a `Context \`{CID : CpuId}` to retire).
-
-## The SIE ghost is CANONICAL per hart (approved, in progress)
-
-`riscvGS` gained `sie_name : CPU -> gname`, the exact twin of `strans_name` and
-for the same reason (mstatus.SIE is a per-hart register). With
-`sie_gname := sie_name cpu_id`, the WHOLE sconf tier drops its `γ` argument:
-`sconf`, `sie_cap`, `sie_cap_gpr`, `sie_arm`, `intr_count`, `intr_off_tok`,
-`intr_inv`, `intr_handler_avail`, `intr_restore`, `intr_config`. `wp_next` then
-quantifies only the HART, and every parking contract's `∀ h g` collapses to
-`∀ h`.
-
-**The one ghost that stays an explicit parameter** is the per-trap one
-`ProofKernelvec.v:1572` mints: during a trap the live SIE bit is 0 while the
-interrupted thread's half still reads 1, so the two cannot share a name.
-`wp_kernelvec` takes a raw `ghost_var γ (1/2) _` (never `sconf γ`), so it is
-unaffected by the tier going γ-free.
-
-Allocation is a three-piece (1/2 tie + 1/4 kernel token + 1/4 invariant)
-per-hart mint at adequacy — the `ghost_var_alloc_halves_cpus` induction with
-`sie_ghost_alloc`'s split substituted. **Proven standalone** (scratchpad
-`SieAlloc.v`); it belongs in `RiscvAdequacy.v`'s `reg_alloc` section next to
-`ghost_var_alloc_halves_cpus`, and `RiscvGS`'s one constructor site
-(`RiscvAdequacy.v:324`) takes the resulting `f` as the new field.
-
-```coq
-Lemma ghost_var_alloc_sie_cpus {A} `{!ghost_varG Σ A} (a : A) (cs : list CPU) :
-  NoDup cs ->
-  ⊢ |==> ∃ f : CPU -> gname,
-    [∗ list] c ∈ cs, (ghost_var (f c) (1/2)%Qp a ∗ ghost_var (f c) (1/4)%Qp a ∗
-                      ghost_var (f c) (1/4)%Qp a).
-```
-
-Why it matters beyond the argument count: it is what makes the Stage-2
-hart-generic handler fact statable *without* a recursive definition —
-`□ ∀ c : CPU, ∃ h, intr_inv (CID := c) h` is persistent and hart-independent,
-so it survives a trap for free and `intr_handler_spec` never has to return it.
-
 ## What the refactor has caught so far
 
 **`cpuid()` / `mycpu()` were silently over-specified.** Their contracts said the
@@ -214,102 +155,38 @@ ambient-`CpuId` shape this was not statable, let alone checkable.
 This is the refactor paying for itself: the falsehood was invisible before, and
 would have stayed invisible until `kerneltrap` was proved.
 
-## APPROVED: cpu_own rides in the SIE arm when interrupts are enabled
+## STATUS (2026-08-02): 631 of 641 files green
 
-The blocker found at ~100 files in: a leaf's `wp_next` does not carry
-`cpu_own`, so a caller holding it across an interrupts-ENABLED instruction is
-stuck — the continuation hands back a fresh hart and nothing rebinds
-`cpus[c]`'s cells there. Confirmed independently in five proofs
-(`kvmmap`, `kvminit`, `kvminithart`, `uvmcreate`, `trapinithart`) and it
-affects the 39 `b`-generic contracts that thread `cpu_own` (82 mention it).
+Every cone is ported and linked except one. What is DONE, and no longer worth
+re-reading the play-by-play for: the foundation (`HartTp`, `WpNext`,
+`IntrDefs`, `CalleeSaved`, hart-free `instr`/`kernel_text`, the engines,
+`RiscvAdequacy`'s per-hart SIE mint), all 122 `Spec*`, all 169 `Wp*`, all but
+five `Proof*`, and all but five `Link*` — including `LinkMain`, so the whole
+boot chain links end to end against its callees' proofs.
 
-Note the gap is NARROWER than it first looked: function CONTRACTS already
-cross correctly, because their `cpu_own` input sits outside the `wp_next`
-lambda (entry hart) and their output inside it (exit hart) — `SpecAcquire` is
-the worked example. Only the LEAF level lacks the vehicle.
+WHAT REMAINS is ten files with ONE cause between them: `ProofSleep`,
+`ProofYield`, `ProofBread`, `ProofBwrite`, `ProofAcquiresleep` and their
+`Link*` closure, all blocked on the crossing payload for `sched_vc` — see
+"THE LEVEL-0/ENABLED-BASE CONE" below, which is the section to read first and
+ends in a concrete recommendation.
 
-**The fix (approved): the `b = true` arm of `sie_arm` holds the per-cpu
-bundle.** It already holds exactly the resources that exist only while
-interrupts are enabled (the trap-scratch CSRs), and it already crosses inside
-`sie_cap` — so a leaf's continuation returning `sie_cap_gpr m' av b` at the new
-hart re-delivers that hart's cpu cells for free, with NO growth in any leaf's
-footprint. It also matches what the C actually does: a thread only touches
-`c->noff` / `c->proc` with interrupts disabled, which is why `push_off` exists.
+The refactor's whole purpose was to make a class of silent falsehood visible,
+and the score is that it found **six** contracts that were stated falsely and
+compiled anyway:
 
-### The sub-decision this forces, and it must be made deliberately
-
-`cpu_own n eb p C` is parameterized by the current proc `p` and the context
-slot `C`, but `sie_arm b` has no such parameters. Three ways out:
-
-1. **Index the arm** — `sie_arm b p C`, hence `sie_cap m av b p C` and
-   `sie_cap_gpr m av b p C`. Preserves `p`'s identity across the crossing
-   (correct: `c->proc` is thread-dependent, the scheduler sets the new hart's
-   to the same proc), at the cost of two more parameters on the tier's central
-   bundle — and they are VESTIGIAL in the `b = false` arm, which is exactly the
-   shape that made `kalloc_env`'s `tp` parameter noise.
-2. **Existentially quantify `p` inside the arm.** No new parameters, but a
-   caller loses the identity of its own proc across every enabled instruction,
-   which breaks `myproc`'s postcondition and every contract naming `p`.
-3. **Keep the arm payload-free and add an agreement ghost** tying `c->proc` to
-   a thread-owned fragment, so the arm can hold `∃ p` while the thread retains
-   `p`'s identity. No signature growth on `sie_cap_gpr`, one new ghost.
-
-(2) is wrong. (1) is simplest but re-introduces the vestigial-parameter smell
-this project just spent a commit removing. (3) is the cleanest shape and the
-most work. DECIDE BEFORE IMPLEMENTING — this lands in the tier's central
-definition and every contract above it.
-
-## WHERE THE SWEEP STANDS (2026-07-31)
-
-Committed and each verified by my own `coqc`, never by an agent's report:
-
-| layer | done | notes |
+| contract | what it claimed | why false |
 |---|---|---|
-| foundation | complete | `HartTp`, `WpNext`, `IntrDefs`, `RiscvPtsto`, `CalleeSaved`, `InstrBytes`/`KernelText` hart-free, engines, `RiscvAdequacy` |
-| `Spec*` | 71 / 122 | |
-| `Wp*` | 17 / 169 | most of the 169 are M-mode leaves needing NO change (interrupts off ⇒ same hart already correct) |
-| `Proof*` | 14 / 109 | the consumer wave |
-| `Link*` | 0 / 116 | functor instantiations; expected to need little |
+| `cpuid` / `mycpu` | the returned id is the ENTRY hart's | the tp read is mid-body |
+| `kvminithart` | works at any SIE state | carries `tlb ↦ᵣ` / `strans_bit` / satp cells, all hart-indexed |
+| `clockintr` | interrupt-generic | calls `cpuid()` unbracketed; `tick_keeper` is hart-indexed |
+| `allocproc` | one exit SIE index | returns holding p->lock on one arm and not the other — the shared form is REFUTABLE |
+| `sleep` / `sched` | one index for resource and crossing | a `swtch` moves the hart with interrupts OFF |
+| `wp_csrci_sstatus_x0_s_sconf` | usable at all | asks for a ghost eighth the SIE arm already owns |
 
-IN FLIGHT: the `p`/`C` prototype on `IntrDefs`/`CpuOwn`/`push_off`/`pop_off` +
-`ProofKvmmap`. **No consumer agent may run until it lands** — see the guide's
-orchestration rule.
+Not one of them failed to compile. Every one was found by a consumer agent
+that refused to force a proof and diagnosed instead — which is the single
+most valuable behaviour to keep asking for.
 
-### Resumption order, once `p` has propagated
-
-1. Propagate `p` into the `Spec*.v` files that the arity change breaks —
-   `SpecPrintint`, `SpecConsputc`, `SpecPlicinit`, `SpecCpuid` were the
-   confirmed casualties, expect more. This is the gate on everything else.
-2. Resume the two waves that were killed mid-flight. Both are mechanical:
-   printk/printint never inspect `p`, so it threads implicitly exactly as `CID`
-   does, and only a helper lemma whose own statement mentions `sie_cap_gpr`
-   needs it written out. `ProofPrintint.wp_printint_epi` already carries a
-   validated partial port; several blocked `Proof*` files carry an in-file
-   diagnostic comment at their exact failure point.
-3. Then the remaining `Proof*`, largest last: `ProofPrintk` alone is 337 leaf
-   applications, a third of the wave.
-
-### THE TP-PREMISE SWEEP (53 files) — owed, and blocking
-
-**53 `Spec*.v` files still carry a raw `⌜m !!! Regidx (mword_of_int 4) = cid_word⌝`
-premise.** Under `tp_pin` that slot is unobservable, so the premise constrains
-nothing — and `callee_saved` no longer carries tp to discharge it after an
-opaque call, so it is not merely noise: it BLOCKS consumers. Confirmed blocking
-`ProofUvmdealloc` (via `SpecUvmunmap`/`SpecUvmdealloc`) and forcing a `tp_pin`
-re-tagging workaround in `SpecRelease`'s callers, which four agent groups
-invented independently.
-
-Why it was missed: the deletion rule was applied only by wave 2's first batch.
-Every later brief said "mechanical arity propagation, do not restructure" — so
-the batches correctly left them alone. Prompt design, not agent error.
-
-The sweep: delete the premise, then delete the now-dead `tp_pin` re-tagging in
-whatever consumers grew it. Deleting a PREMISE strengthens the contract, so it
-is safe in the direction that matters; the risk is only that a consumer was
-reading the slot, which should surface as a proof failure, not silently.
-
-**Do it with NO consumer agents running** — it changes the wand-chain arity of
-53 contracts.
 
 ### DEFERRED: the central fix for the conversion blowup
 
