@@ -118,7 +118,7 @@ Section SpecMainSecondary.
   (* main(), entered on a SECONDARY hart.                                 *)
   (* ------------------------------------------------------------------- *)
   Definition wp_main_secondary_sconf_body
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (γd : uart_names) (γv : disk_names)
@@ -130,13 +130,16 @@ Section SpecMainSecondary.
     (* plicinithart indexes the PLIC's per-hart banks with cpuid() *)
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
     (K_main_secondary <= K)%nat ->
-    (* the tp/cid convention every callee in the lock cone requires *)
-    m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-    sie_cap_gpr γ m K -∗
-    cpu_own γ 0 false p0 cpu_ctx_free -∗
+    (* [b = false]: main's secondary arm runs entirely with interrupts off --
+       it is scheduler() at the far end that first enables them.  So the hart
+       provably cannot move under this contract, and (as on the boot arm) it
+       needs no [wp_next] wrapper: it diverges, there is no continuation. *)
+    sie_cap_gpr m K false p0 -∗
+    cpu_own 0 false p0 cpu_ctx_free false -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
-       own [intr_inv] out of its own trapinithart's [stvec ↦ᵣ kernelvec] *)
-    ghost_var γ (1/4) ('b"0" : mword 1) -∗
+       own [intr_inv] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
+       The ghost is this hart's canonical [sie_gname] now, not a parameter. *)
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     panic_wp -∗
     (* the handover channel, at the CONCRETE deposit *)
@@ -151,10 +154,10 @@ Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (Φ : mval -> iProp Σ)
+      (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_main_secondary_sconf_body γ Φ m K p0 γd γv tlbvec0.
+      wp_main_secondary_sconf_body Φ m K p0 γd γv tlbvec0.
 End MAIN_SECONDARY.

@@ -42,10 +42,10 @@ Require Import SpecPiperead.
 Module Piperead : PIPEREAD.
   Axiom wp_piperead_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
-      (γ : gname) (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z),
-      wp_piperead_sconf_body γ γa γf Φ γs j γlp γl γp w q m av eb C pid V n.
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
+      wp_piperead_sconf_body γa γf Φ γs j γlp γl γp w q m av eb C pid V n b.
 End Piperead.

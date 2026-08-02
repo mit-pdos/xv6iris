@@ -94,6 +94,16 @@ by construction, which is strictly more than the old premise said. If deleting
 one makes something else unprovable, STOP and report — that means a consumer
 was reading the slot, which is the one case this rule would be wrong about.
 
+**`callee_saved` LOST A CONJUNCT, and the failure is remote and cryptic.**
+tp used to sit second in the relation, between sp and s0; the tp-free version
+has 13 conjuncts, not 14. So any proof that discharges `callee_saved`
+COMPONENTWISE — a run of `split; [apply …|]` bullets rather than a
+`callee_saved_trans` chain — now has exactly one bullet too many, **the one in
+second position**. The error is `No applicable tactic` at whichever later
+bullet lands on the wrong goal, several lines from the real cause, with
+nothing in it naming tp. Seen in all three files of one batch; expect it in
+every hand-discharging file.
+
 Know this one: **`is_cs_idx (mword_of_int 4)` is now `false`**, so
 `callee_saved_insert_r` accepts a write to tp without complaint. That is sound
 (`callee_saved` says nothing about tp) — the guard against writing tp lives in
@@ -488,6 +498,13 @@ iIntros "Hcg Hpc".                                               (* byte-identic
 - Use `rgne` (IntrDefs.v) to meet a leaf's `rget`-spelled premise from an
   existing `m !!! Regidx k` fact. In an endgame peel loop **`rewrite Htp` must
   come BEFORE `rgne`** or the `repeat` stops early — see the comment at `rgne`.
+- **For a STORE leaf the `rget` respelling lands on the stored-VALUE side of a
+  memory hypothesis, not on the map chain** (`c.sdsp` / `c.sd` / `c.sw` write
+  `rget m rs2`). The premise list gives no hint, and the symptom is an existing
+  `iEval (rewrite …) in "Hs"` failing with *"does not match any subterm"*. Splice
+  `rgne` in as its own step — three one-liners (`iEval (rewrite Hpa) in "Hs"`,
+  `iEval (rgne) in "Hs"`, `iEval (rewrite HM1ra) in "Hs"`) are far more robust
+  than one combined `iEval`.
 - The tp read needs **no special tactic at the call site**; it is an ordinary
   ALU leaf. Its tp-ness surfaces only in the map chain, and
   `HartTp.rget_tp_all` / `rget_tp_agree` are the one-line bridge (the contract
@@ -515,6 +532,27 @@ After each leaf application:
 `instr` and `kernel_text` are hart-INDEPENDENT, so a decode fact derived before
 a step is still usable after it. If you find yourself wanting to re-derive one
 at a new hart, something is wrong — say so rather than working around it.
+
+## The `Link*` layer costs almost nothing — two shapes
+
+Measured over the first dozen: a `Link*.v` either needs a one-line mechanical
+edit or no edit at all.
+
+- **Functor instantiation** (`Module Argint := ArgintProof Argraw.`) — needs
+  **NO edit**. The arity change is entirely inside the functor's `Module Type`,
+  and application is pure substitution.
+- **`Axiom`-style link** (the handful that ASSUME a contract rather than
+  instantiate a proof: `LinkConsoleintr`, `LinkKerneltrap`, `LinkPiperead`,
+  `LinkPipewrite`, `LinkSysPause`, `LinkUartwrite`, `LinkUserinit`,
+  `LinkVirtioDiskRw`) — the `Axiom`'s binder list is a hand-written *copy* of
+  the `Module Type`'s `Parameter`, so it drifts the moment the contract's
+  arity changes. **Regenerate it from the `Module Type` verbatim** (copy the
+  `Parameter` block, change the keyword to `Axiom`) rather than hand-patching
+  binders; the two must agree exactly or the seal is rejected far from the
+  cause.
+
+So do NOT plan the `Link*` files as a wave of work. Compile them behind their
+`Proof*.v`, fix the axiom-style ones by regeneration, and move on.
 
 ## Do not
 

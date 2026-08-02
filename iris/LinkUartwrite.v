@@ -40,9 +40,9 @@ Module Uartwrite : UARTWRITE.
   Axiom wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
-      (γ : gname) (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+      (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) (f : nat -> bv 8) (dq : dfrac),
-      wp_uartwrite_sconf_body γ γu γv Φ γs j γlp γl m av eb C n f dq.
+      (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool),
+      wp_uartwrite_sconf_body γu γv Φ γs j γlp γl m av eb C n f dq b.
 End Uartwrite.

@@ -34,7 +34,23 @@
    and [KptShare.kpt_inv_snapshot] supplies the snapshot ghost.
 
    Boot-free, straight-line, no callees -> unconditional success, no
-   panic_wp.  Follows SpecKvminit.v's file conventions. *)
+   panic_wp.  Follows SpecKvminit.v's file conventions.
+
+   INTERRUPTS OFF, AND THAT IS LOAD-BEARING (not a convenience).  Every
+   resource this contract carries from entry to exit -- [tlb ↦ᵣ], the
+   [strans_bit] receipt, the satp/pmp cells inside the translation slot --
+   is HART-INDEXED, and there is no transport for any of them across a
+   migration: a [wp_next]-crossing hands back an unconstrained hart, and
+   [tlb ↦ᵣ tlbvec0] derived at the entry hart says nothing there.  That is
+   not a gap to be filled, it is the truth about the code: kvminithart
+   configures THIS hart's MMU, so the function is meaningless if the hart
+   can change underneath it.  xv6 only ever calls it from main(), before
+   scheduler()'s [intr_on()], on every hart.  So the contract is stated at
+   the literal index [false] with no [wp_next] wrapper at all -- exactly as
+   SpecTrapinithart.v and SpecPlicinithart.v are, and for the same reason
+   ([wp_next_off] would collapse the wrapper anyway).  Stating it at a
+   generic [b] was a real over-specification: it claimed kvminithart works
+   when the hart may move mid-body, which is false. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -61,13 +77,13 @@ Notation KVMIH := KernelSyms.kvminithart.
 Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
     (root : mword 44)
-    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) (p : mword 64) :=
+    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
   (2 <= K)%nat ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr mm K false p -∗
   strans_bit strans_bit_bare -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -78,9 +94,8 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□ root_b -∗
   (* the shared table, likewise persistent *)
   kpt_inv root -∗
-  wp_next b (fun (CID : CpuId) =>
-    ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+  ( ∀ (mr : regfile),
+    sie_cap_gpr mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     strans_bit strans_bit_kpt -∗
@@ -93,6 +108,6 @@ Module Type KVMINITHART.
     forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
-      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (b : bool) (p : mword 64),
-      wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 b p.
+      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64),
+      wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 p.
 End KVMINITHART.

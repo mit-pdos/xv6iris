@@ -388,6 +388,196 @@ changing the `wp_next` shape — a spec decision, not a tuning knob.
   trap-context only and should be stated at `b = false` rather than
   `b`-generic; that is what blocks four of their proofs.
 
+## THE LEVEL-0/ENABLED-BASE CONE: what actually has to cross (2026-08-02)
+
+The deferred question at the bottom of this file — *"what else has to cross the
+migration"* — **came due during the consumer sweep, not at Stage 2**, and three
+independent agents diagnosed it identically with compiled probes. It is the
+last real design decision in the project.
+
+### The forced index, and why it is not a mis-statement
+
+For a contract with `cpu_own 0 eb p C b` and `eb = true`, **`b = true` is
+FORCED**, not chosen. `sie_arm false` holds the SIE eighth at `'b"0"` while
+`intr_count 0 true` holds the complementary eighth at `'b"1"`, so
+`ghost_var_agree` refutes `b = false`. The probe, which compiles:
+
+```coq
+Lemma b_true `{CID : CpuId} (m : regfile) (K : nat) (p : mword 64)
+    (C : iProp Σ) (b : bool) :
+  sie_cap_gpr m K b p -∗ cpu_own 0 true p C b -∗ ⌜ b = true ⌝.
+Proof.
+  destruct b; [ by iIntros "_ _" |].
+  iIntros "(_ & _ & (_ & _ & Harm) & _) [[_ Hcnt] _]".
+  iDestruct (ghost_var_agree with "Harm Hcnt") as %Hbad.
+  exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad.
+  discriminate.
+Qed.
+```
+
+The dual is immediate: `cpu_own (S n) eb p C true` contains `⌜n = 0⌝`, so
+`n ≥ 1` forces `b = false`. **Both belong in `CpuOwn.v` as named lemmas** —
+"derive the SIE index rather than stating it" currently reads as optional
+advice, and for this cone it is mandatory.
+
+So the cut is exactly **level 0 with an enabled base**. `SpecSleep`
+(`cpu_own 1 …`) and `SpecSched` (`sie_cap_gpr … false …`) are single-hart and
+fine. Nine contracts are on the wrong side: **SpecBread, SpecBwrite,
+SpecAcquiresleep, SpecVirtioDiskRw, SpecYield, SpecUartwrite, SpecPiperead,
+SpecPipewrite, SpecSysPause**.
+
+### The one stranded resource
+
+Every one of those nine carries `▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj`, and
+it is the ONLY thing that cannot cross. The enumeration was done resource by
+resource and is worth keeping:
+
+| crosses how | resources |
+|---|---|
+| hart-free | `own_ctx`, `procs_inv`, `p_pid`, `bio_locked`, `disk_block`, `bslot`/`bref`, the stack frames, `sched_vc_at` (note: the `_at` form, not `sched_vc`) |
+| persistent + hart-free | `is_lock`, `bio_ctx`, `panic_wp_any`, `kernel_text`, `instr` |
+| a transport lemma | `cpu_own` (`cpu_own_transport`) |
+| held only at `b = false`, so never crosses | `locked … cpu_id`, `trap_csrs_pay` |
+| **NOTHING** | **`sched_vc`** |
+
+`sched_vc` is pinned twice: it owns `ctx_cells (a_cpu_ctx (cid_word_of h))` —
+fourteen EXCLUSIVE words of hart h's context slot — and its resume wand is
+guarded by `⌜adm (Some (h, sie_name h)) h' g'⌝`. `NCPU = 8`, so harts are
+genuinely distinct and no transport is derivable. It bites at a function's
+FIRST instruction, so there is no partial port to land.
+
+### The fix, and why the cheap ones are wrong
+
+**`sched_vc` must ride the crossing frame, exactly as `cpu_hart` already
+does.** The physical story is already right: a migration IS a park plus a
+dispatch, and the dispatching hart's scheduler hands over its own parked
+record (that is literally `valid_context_pre`'s resume wand). So the resource
+does cross in reality; `wp_next` just has no vehicle for it.
+
+`sie_arm true p` is that vehicle. The obstruction is layering — `IntrDefs.v`
+sits far below `SchedCtx.v` and cannot name `sched_vc_at`. **The zero-arity-
+change way to break it: add the payload as a FIELD OF `sieG`**, exactly as
+`riscvGS` gained `sie_name : CPU -> gname` and for the same reason.
+
+```coq
+(* SmodeCore.v -- today *)
+Class sieG (Σ : gFunctors) := SieG { sie_inG :: ghost_varG Σ (mword 1) }.
+(* proposed *)
+Class sieG (Σ : gFunctors) := SieG {
+  sie_inG :: ghost_varG Σ (mword 1);
+  sie_pay : CPU -> mword 64 -> iProp Σ;      (* the crossing payload *)
+}.
+```
+`sie_arm true p` then also owns `sie_pay cpu_id p`, and the sleeper cone's
+client instantiates
+
+```coq
+sie_pay := fun h p => if bool_decide (p = zero_reg) then emp
+                      else ▷ sched_vc_at Φ γs h (a_cpu_ctx (cid_word_of h)) p
+```
+
+Note what the `p = zero_reg` branch is doing: the SCHEDULER thread runs at
+`b = true` with `c->proc = 0` and its own record is not parked, so it owes
+nothing — which is the same fact the scheduler's own fix rests on (below).
+Every `sie_cap_gpr m av b p` in the tree keeps its spelling, because `sieG` is
+already a `Context` in every file that mentions the tier. The churn is confined
+to `sie_arm`'s definition, the flip leaves that produce/consume the enabled arm
+(push_off / pop_off / intr_on / intr_off / acquire / release), and the nine
+contracts — which get SHORTER, since `▷ sched_vc` leaves their premise and
+postcondition lists entirely.
+
+Two cheaper things that do NOT work, recorded so nobody re-invents them:
+- **Folding `sched_vc` into `cpu_own`'s `C` slot.** `C` is an opaque `iProp`,
+  so it is the SAME proposition on both sides — it would carry hart A's
+  scheduler record onto hart B. Typechecks at Stage 1; a lie at Stage 2.
+- **Stating the nine at `b = false`.** Unsatisfiable together with `eb = true`
+  at level 0, so the contracts would verify VACUOUSLY. This is the failure
+  mode the vacuity checker exists for, arrived at from a new direction.
+- An `∃ h, sched_vc_at h …` (hart-free, so it crosses for free) is true but
+  useless: `sched()` swtches to the address computed from the live `tp`, and
+  nothing ties the existential back to `cpu_id`. Re-tying it is the agreement
+  ghost, i.e. strictly more work than the payload field.
+
+### Two smaller blockers found alongside, both real bugs
+
+1. **`WpSconfCsr.wp_csrci_sstatus_x0_s_sconf` (WpSconfCsr.v:892) is VACUOUS.**
+   Its two siblings were updated when `cpu_own` moved into the arm; this one
+   was not. It demands a separate `intr_count 0 true` BESIDE
+   `sie_cap_gpr m n b p`, and nobody can hold that eighth: at `b = true` the
+   arm already owns both (surprise 4 below), and at `b = false` the leaf's own
+   last branch refutes the premise. Its postcondition has the mirror bug —
+   it returns `intr_count 0 false` AND `cpu_hart 0 true p`, i.e. the same
+   eighth at two values, which `cpu_cells_pay`'s own comment forbids. Fix with
+   machinery already in that file: premise `intr_count_pre b 0 true`, post
+   `intr_count 0 false ∗ trap_csrs ∗ cpu_cells_pay b p`; the existing
+   `b = true` branch works verbatim, taking the flip's second eighth out of
+   `Hcpu` instead of `Hcnt`.
+
+2. **The `gname` in `SwtchCtx.ctx_adm` is now VESTIGIAL, and the vestige is
+   what blocks `ProofSched`.** `SpecSwtch`'s continuation quantifies
+   `∀ (h : CPU) (g : gname)` with `adm None h g = True`, so `g` is free;
+   `p_sched_at_proc` then yields `⌜A' = Some (h, g)⌝` while `sched_vc` needs
+   `Some (h, sie_gname (CID:=h))`, and the two indices are incomparable
+   (`adm_pin_inv`). The old contract threaded `g` out to the caller; the
+   `wp_next b (fun CID => …)` lambda has no `g` binder, so it must be PINNED
+   instead. Since the SIE ghost went canonical there is nothing left for the
+   slot to say: **drop it** — `ctx_adm := option CPU`, `adm A h`, and the
+   `∀ h g` continuations become `∀ h`. Touches `SwtchCtx.v`, `SpecSwtch.v`,
+   `SchedCtx.v`, `ProofSwtch.v`, `ProofScheduler.v` and the six parking
+   contracts. (A one-line alternative — pin `A' = Some (h, sie_gname (CID:=h))`
+   inside `p_sched`'s dispatch disjunct — is sound, because the scheduler is
+   the only producer of that disjunct and its own record IS at `sie_gname`;
+   but it leaves the slot vestigial, so prefer the deletion.)
+
+   Generalises, and belongs in the guide: **any datum the old `∀ h g …`
+   continuations exported must now be either pinned at the crossing or derived
+   from what the crossing delivers. The lambda cannot forward it.**
+
+### `scheduler()` is different: it REFUTES migration rather than crossing it
+
+`ProofScheduler` is blocked by the same `wp_next true`, but no payload can fix
+it: what it holds across the enabled window is *register* state (`s4`/`s6`
+hold `cpus[h].proc` / `cpus[h].context` for the entry hart) plus
+`own_ctx (a_cpu_ctx cid_word)`. On a different hart the `sd s1,48(s4)` at
++0x68 would write the OLD hart's `cpu->proc` — the code would simply be wrong,
+so this is not a proof gap to be papered over.
+
+It is also not a real possibility. `kerneltrap` yields only when
+`myproc() != 0`, and the scheduler thread has `c->proc == 0`; so the scheduler
+provably cannot migrate. **That datum is already threaded** — it is
+`sie_cap_gpr`/`sie_arm`'s `p`, and it is `zero_reg` at every point in that
+proof where `b` can be true (the one window with `p = proc_addr jj`, +0x68
+through +0x76, runs at `noff ≥ 1` hence `b = false`). So give `wp_next` a
+second escape hatch:
+
+```coq
+Definition wp_next `{CID0 : CpuId} (b : bool) (p : mword 64)
+    (K : forall (CID : CpuId), iProp Σ) : iProp Σ :=
+  (∀ CID : CpuId,
+     ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
+Lemma wp_next_idle : p = zero_reg -> wp_next b p K ⊣⊢ K CID0.
+```
+
+`p` is an implicit section `Context` in every `Wp*` leaf, so **no consumer call
+site changes arity**; only `wp_next`'s own statement, the leaves' `wp_next b` →
+`wp_next b p`, and `wp_next_chain`'s `intros Hb` (which becomes a two-case
+intro). `wp_next_idle` then collapses every step of `ProofScheduler.v` the way
+`wp_next_off` does, and that port becomes mechanical.
+
+The soundness obligation this creates lands squarely on Stage 2's
+`intr_handler_spec`: **no current proc ⇒ the trap returns on the same hart.**
+That is a true statement about `kerneltrap`, and writing it down here is the
+point — it is now a premise someone must discharge rather than an accident.
+
+### Sequencing
+
+All four changes (`sie_pay`, the csrci leaf, `ctx_adm`, `wp_next`'s second
+hatch) are CENTRAL. By this project's own orchestration rule they must land as
+one serialized change with NO consumer agents running, followed by one
+consumer wave over the parking/bio cone. Do not split them across waves: the
+csrci leaf and the arm payload touch the same definition, and `ctx_adm` and
+`wp_next` both change the parking contracts' continuation shape.
+
 ## SURPRISES — the checkpoint
 
 Everything here cost real time to learn. Grouped by whether it is about the

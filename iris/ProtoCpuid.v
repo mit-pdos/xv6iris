@@ -42,6 +42,11 @@ Section Proto.
   (* NOTE: no [Context `{CID : CpuId}].  The hart is a per-statement binder --
      which is what lets a lemma in THIS file be applied at a migrated hart. *)
 
+  (* The current proc.  A THREAD invariant, not a hart one: it is the same on
+     either side of a migration, so it needs no binder and no transport --
+     just a parameter, exactly as the enclosing tier states it. *)
+  Context {p : mword 64}.
+
   (* ================================================================== *)
   (* (D1) THE LEAF SHAPE, exactly as WpSconfAlu.v:422 will state it.     *)
   (*                                                                     *)
@@ -57,11 +62,11 @@ Section Proto.
       uint rd <> 0 ->
       rd_ok rd ->
       add_vec (rget m rs1) (rget m rs2) = wval ->
-      sie_cap_gpr m n b -∗
+      sie_cap_gpr m n b p -∗
       pc_is pc -∗
       instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
       wp_next b (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b -∗
+        sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -82,12 +87,12 @@ Section Proto.
     uint Ra5 <> 0 -> rd_ok Ra5 ->
     let m1 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget m Rzero) (cid_word_of cpu_id))]> m in
-    sie_cap_gpr m n false -∗
+    sie_cap_gpr m n false p -∗
     pc_is pc -∗
     instr pc false (RTYPE (Regidx Rtp, Regidx Rzero, Regidx Ra5, ADD)) -∗
     instr (add_vec_int pc 4) false (RTYPE (Regidx Ra5, Regidx Ra5, Regidx Ra5, ADD)) -∗
     ( sie_cap_gpr (<[Regidx Ra5 := regval_into_reg
-                         (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n false -∗
+                         (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n false p -∗
       pc_is (add_vec_int (add_vec_int pc 4) 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -127,20 +132,18 @@ Section Proto.
     uint Ra5 <> 0 -> rd_ok Ra5 ->
     let m1 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget m Rzero) (rget m Rzero))]> m in
-    sie_cap_gpr m n b -∗
+    sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (RTYPE (Regidx Rzero, Regidx Rzero, Regidx Ra5, ADD)) -∗
-    (* NOTE: quantified over the hart because [instr] is CID-indexed TODAY, so
-       a decode fact derived before a step is useless after a migration.  The
-       real fix (in the sweep) makes [instr] hart-INDEPENDENT -- it is derived
-       from [kernel_text], which is already persistent global [↦ₓ□] memory, and
-       its only CID dependence is the [∀ σ, mstate_interp σ -∗ ⌜…⌝] decode
-       clause.  Then this binder disappears and decode facts survive a step. *)
-    (∀ CID : CpuId,
-        instr (add_vec_int pc 4) false (RTYPE (Regidx Ra5, Regidx Ra5, Regidx Ra5, ADD))) -∗
+    (* NOTE: NO hart binder here.  [instr] is hart-INDEPENDENT -- it is derived
+       from [kernel_text], already persistent global [↦ₓ□] memory, and its one
+       CID dependence (the [∀ σ, mstate_interp σ -∗ ⌜…⌝] decode clause) now
+       quantifies the hart internally.  So a decode fact derived before a step
+       survives the step, at whatever hart execution resumes on. *)
+    instr (add_vec_int pc 4) false (RTYPE (Regidx Ra5, Regidx Ra5, Regidx Ra5, ADD)) -∗
     wp_next b (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx Ra5 := regval_into_reg
-                         (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n b -∗
+                         (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n b p -∗
       pc_is (add_vec_int (add_vec_int pc 4) 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -153,7 +156,6 @@ Section Proto.
        the ghost is the hart's canonical [sie_gname]), plus the conditional
        equality.  NO destruct on [b]. *)
     rewrite /wp_next. iIntros (CID1 Hs1) "Hcg Hpc".
-    iSpecialize ("Hi4" $! CID1).
     iApply (wp_add_s_sconf Φ (add_vec_int pc 4) Ra5 Ra5 Ra5
               (add_vec (rget m1 Ra5) (rget m1 Ra5)) m1 n b Hnz Hok
               eq_refl with "Hcg Hpc Hi4").
