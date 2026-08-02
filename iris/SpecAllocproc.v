@@ -108,14 +108,36 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 (* The postcondition, as a function of the RETURNED POINTER.  Factoring it
    out of the continuation is what lets the proof's shared epilogue (both
    exits join at +0x78) be one lemma: the epilogue moves [s1] into a0, so it
-   knows the returned value and nothing else about which arm produced it. *)
+   knows the returned value and nothing else about which arm produced it.
+
+   THE EXIT SIE INDEX IS PER-ARM, WHICH IS WHY [sie_cap_gpr] LIVES IN HERE
+   RATHER THAN IN THE CONTINUATION.  allocproc RETURNS HOLDING p->lock on the
+   found arm and never releases it, so [acquire]'s unbalanced exit index
+   ([false] whatever the entry [b]) propagates all the way out to the caller
+   -- while the null arm, which releases everything, exits at [b].  A single
+   [sie_cap_gpr mr K b pme] in the shared continuation is not merely
+   unreachable at [b = true], it is REFUTABLE: [sie_arm true pme] owns
+   [cpu_hart 0 true pme] and the found arm owns [cpu_hart (S lvl) eb pme],
+   which [CpuOwn.cpu_own_arm_excl] contradicts.  So the "found a free slot"
+   execution -- an ordinary one -- would have had no derivation at [b = true].
+   Nothing in the premises forces [b = false], and nothing about this fails to
+   compile: the contract typechecks and only the proof discovers it.
+
+   Stating the whole contract at [b = false] would also have closed the hole,
+   but dishonestly: [userinit] is the only caller today and does run at boot
+   with interrupts off, yet [fork] -- which is what allocproc exists for --
+   calls it from a syscall with interrupts on.  The per-arm index says what is
+   actually true, and it is what fork will need, since fork must [release] the
+   proc it gets back and [release] demands [sie_cap_gpr … false …]. *)
 Definition allocproc_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
     (γa γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
+    (mr : regfile) (K : nat)
     (rv : mword 64) : iProp Σ :=
   ( (* --- no free slot: a0 = 0, every lock released, budget untouched --- *)
     (⌜ rv = (zero_reg : mword 64) ⌝ ∗
+     sie_cap_gpr mr K b pme ∗
      cpu_own lvl eb pme C b ∗
      kalloc_env γa on)
   ∨ (* --- found: a0 = &proc[j], j's lock HELD, the private block built --- *)
@@ -134,6 +156,7 @@ Definition allocproc_post
        is_kstack (proc_addr j) ks ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
+       sie_cap_gpr mr K false pme ∗
        cpu_own (S lvl) eb pme C false ∗
        trap_csrs_pay lvl eb ∗
        kalloc_env γa (avail_sub on nc)))%I.
@@ -161,9 +184,8 @@ Definition wp_allocproc_sconf_body
   wp_next b (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
-      sie_cap_gpr mr K b pme -∗
       pc_is ret_tgt -∗
-      allocproc_post γa γf γs lvl eb pme C on b
+      allocproc_post γa γf γs lvl eb pme C on b mr K
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
