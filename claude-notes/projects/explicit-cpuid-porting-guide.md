@@ -278,6 +278,27 @@ So:
 `wp_next false` on pop_off would claim the hart cannot move when it can. Note
 this cannot be caught by compiling: at `eb = false` both spellings typecheck.
 
+### A function that RETURNS HOLDING A LOCK has a PER-ARM exit index
+
+`acquire`'s exit index is `false` whatever its entry `b`, and if the function
+never releases, that propagates all the way out to its caller. So a function
+with a lock-keeping arm and a lock-releasing arm exits at **two different SIE
+indices**, and a single `sie_cap_gpr mr K b p` in the shared continuation
+cannot express it. Put the bundle **inside the per-arm postcondition**, exactly
+where `cpu_own`'s index already lives. `SpecAllocproc.v` is the worked case
+(`allocproc_post` takes `mr K`; its null arm carries `sie_cap_gpr mr K b pme`,
+its found arm `sie_cap_gpr mr K false pme`).
+
+This one is worse than unreachable and it is invisible to the compiler: at
+`b = true` the shared form is **refutable** — `sie_arm true p` owns
+`cpu_hart 0 true p`, the lock-keeping arm owns `cpu_hart (S lvl) eb p`, and
+`CpuOwn.cpu_own_arm_excl` contradicts them. The contract typechecks and an
+ordinary execution simply has no derivation.
+
+Do not "fix" it by stating the whole contract at `b = false` unless every
+caller really is interrupts-off *and always will be* — that hides a fact the
+next caller needs.
+
 ### A PARKING function's `wp_next` index is `true` UNCONDITIONALLY
 
 The table above reads the index as "were interrupts enabled at any point during
@@ -583,6 +604,21 @@ iIntros "Hcg Hpc".                                               (* byte-identic
 - Use `rgne` (IntrDefs.v) to meet a leaf's `rget`-spelled premise from an
   existing `m !!! Regidx k` fact. In an endgame peel loop **`rewrite Htp` must
   come BEFORE `rgne`** or the `repeat` stops early — see the comment at `rgne`.
+- **`(rgne; exact H)` is the general one-liner for turning an existing `!!!`
+  fact into its `rget` twin**, and deriving the twin UP FRONT beats splicing
+  `rgne` into an `iEval` chain:
+  ```coq
+  assert (HA0rag : rget A0 ra_idx = ra0) by (rgne; exact HA0ra).
+  iEval (rewrite Hpa1 HA0rag) in "Hbra".
+  ```
+  It covers the three shapes that otherwise each need their own fix: a store's
+  spilled value, `wp_cret`'s `ret_pc (rget m ra)`, and a branch condition
+  (`eq_vec (rget m rd1) zero_reg`, `zopz0zI_u (rget m rs1) …`).
+- **Pass a callee's derived-value argument as the `rget` term itself plus
+  `eq_refl`**, not as its already-reduced value: `mycpu_ret (rget D5 Rtp)` with
+  `eq_refl` rather than `mycpu_ret cid_word`. The `eq_refl` discharges the
+  premise AND pins the leaf's implicit `CID` before the trailing `ltac:` goals
+  are elaborated, which is the cheapest escape from the `ltac:`-ordering trap.
 - **For a STORE leaf the `rget` respelling lands on the stored-VALUE side of a
   memory hypothesis, not on the map chain** (`c.sdsp` / `c.sd` / `c.sw` write
   `rget m rs2`). The premise list gives no hint, and the symptom is an existing

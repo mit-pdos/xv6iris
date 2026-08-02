@@ -498,6 +498,42 @@ to `sie_arm`'s definition, the flip leaves that produce/consume the enabled arm
 contracts — which get SHORTER, since `▷ sched_vc` leaves their premise and
 postcondition lists entirely.
 
+**THE FIELD CANNOT LITERALLY BE `sie_pay : CPU -> mword 64 -> iProp Σ`, and
+the reason is worth reading before implementing.** `sched_vc_at Φ γs h c p`
+mentions `γs`, the list of proc-lock ghost names — and `γs` is allocated by
+`main`, not at adequacy. A `sieG` field is fixed when the instance is supplied,
+which is strictly earlier, so it cannot name `γs` (nor `Φ`, on the secondary
+arm, where `main_deposit` keeps both existential precisely because a secondary
+hart does not know them). Quantifying them inside the field
+(`∃ Φ γs, …`) is the `∃ C, R ∗ C ⊣⊢ R` mistake in another costume: the thread
+loses the identity of its own `γs` and can never tie the record back.
+
+The resolution is the standard Iris one for "a lower layer must carry a
+proposition only a higher layer can name": a **saved predicate**, keyed by a
+canonical per-hart name, exactly mirroring `sie_name`.
+
+```coq
+(* riscvGS gains a second canonical family, next to sie_name *)
+xpay_name : CPU -> gname                    (* savedPredG Σ (mword 64) *)
+
+(* IntrDefs: the enabled arm carries whatever THIS hart has registered *)
+sie_arm true p := … ∗ (∃ Ψ, saved_pred_own (xpay_name cpu_id) DfracDiscarded Ψ
+                            ∗ ▷ Ψ p)
+```
+A thread holds the **persistent, hart-generic** registration
+`□ ∀ h : CPU, saved_pred_own (xpay_name h) DfracDiscarded
+   (fun p => sched_vc_at Φ γs h (a_cpu_ctx (cid_word_of h)) p)`,
+agrees it against whatever the arm hands back at the resumed hart, and gets
+`▷ sched_vc_at Φ γs CID (a_cpu_ctx (cid_word_of CID)) p`. Persistence is what
+makes the registration cross for free — the same property the notes already
+rely on for `□ ∀ c, ∃ h, intr_inv (CID := c) h`.
+
+Allocation is the one fiddly part and it has a natural answer: adequacy mints
+the family at `Ψ0 := fun _ => emp` (full fraction), which is exactly right for
+boot — no scheduler is parked yet, so the arm owes nothing — and `main`
+updates it to the real predicate and discards to `DfracDiscarded` once `γs`
+exists. `saved_pred_update` is the lemma.
+
 Two cheaper things that do NOT work, recorded so nobody re-invents them:
 - **Folding `sched_vc` into `cpu_own`'s `C` slot.** `C` is an opaque `iProp`,
   so it is the SAME proposition on both sides — it would carry hart A's
