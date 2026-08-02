@@ -295,7 +295,13 @@ Section SpecMain.
        [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-    panic_wp -∗
+    (* HART-GENERIC, and it has to be: main's boot arm calls kinit (-> freerange
+       -> kfree -> acquire) and userinit, and builds [kalloc_env], all three of
+       which now take [panic_wp_any].  [panic_wp_any] is strictly stronger and
+       is NOT derivable from the ambient [panic_wp], so main has nowhere else
+       to get it.  The ambient form is recovered where needed with
+       [panic_wp_any_at cpu_id]. *)
+    panic_wp_any -∗
     (* the handover channel, and the RECIPE for the deposit it will carry:
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)

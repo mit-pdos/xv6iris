@@ -9,13 +9,16 @@
    There is no ghost name, no [sconf], no capability.
 
    [SpecMain.MAIN.wp_main_boot_sconf] wants the sconf-TIER bundle:
-   [sie_cap_gpr γ m K] + [cpu_own γ 0 false p0 cpu_ctx_free] +
+   [sie_cap_gpr m K false p0] + [cpu_own 0 false p0 cpu_ctx_free false] +
    the SIE ghost's spare quarter + [main_hart_raw tlbvec0].
 
    [boot_bridge] below is exactly that conversion, and nothing else: it
-   allocates the SIE ghost (1/2 tied in [sconf], 1/4 for main's
-   [intr_inv_alloc_off], 1/4 split into the capability's and the
-   push/pop counter's eighths), assembles [sconf] from entry's concrete
+   PLACES the three pieces of this hart's SIE ghost (1/2 tied in [sconf],
+   1/4 handed straight through for main's [intr_inv_alloc_off], 1/4 split
+   into the capability's and the push/pop counter's eighths -- the ghost
+   NAME is now canonical per hart, [IntrDefs.sie_gname], and the three
+   pieces are minted at adequacy rather than here),
+   assembles [sconf] from entry's concrete
    post-state CSR values, folds the Bare translation slot
    ([sie_cap_intro_bare]), converts entry's PHYSICAL stack region to the
    VA tier the capability owns, and builds [cpu_own] out of the cpus[0]
@@ -32,7 +35,8 @@
        ([mmode_config_persist] below is the one-liner that keeps a copy
        on the caller's side);
      - both halves of the Bare arm bit
-       [strans_bit strans_bit_bare], the [tlb] cell and the three trap
+       [strans_bit strans_bit_bare], the three pieces of this hart's SIE
+       ghost at [sie_gname], the [tlb] cell and the three trap
        CSRs: minted by [RiscvAdequacy.riscv_system_adequacy].  The two
        GLOBAL boot tokens adequacy also mints -- [KptGhost.kpt_unset] and
        [KMap.kmap_auth kmap_M0] -- deliberately do NOT come through this
@@ -72,7 +76,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec MinstretInv.
-Require Import RegFile InstrBytes WpGpr.
+Require Import RegFile HartTp WpNext InstrBytes WpGpr.
 Require Import KMap KptPt SmodePte.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
@@ -387,16 +391,16 @@ Section BootBridge.
   (* [sconf] from raw cells + the tied ghost half (the [smode_config_rebuild]
      of the SIE-agnostic tier; additive, and stated here rather than in
      IntrDefs so this file stays the only thing the boot wiring touches). *)
-  Lemma sconf_intro (γ : gname) (ms mie_v mdv0 menvcfg0 : mword 64) :
+  Lemma sconf_intro (ms mie_v mdv0 menvcfg0 : mword 64) :
     sconf_ms_facts ms ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
     menvcfg0 = MENVCFG_S ->
     hw_config -∗ minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms -∗
-    ghost_var γ (1/2) (_get_Mstatus_SIE ms) -∗
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
-    sconf γ.
+    sconf.
   Proof.
     iIntros (Hms Hmie ->) "#Hhw #Hmin Hpriv Hmst Hg Hmie Hmdl Hmenv".
     rewrite /sconf. iFrame "Hhw Hmin Hpriv".
@@ -455,6 +459,13 @@ Section BootBridge.
     (* --- the adequacy-minted inputs --- *)
     strans_bit strans_bit_bare -∗
     strans_bit strans_bit_bare -∗
+    (* this hart's SIE ghost, in the three pieces the choreography splits it
+       into (IntrDefs.v §2), all at '0' -- interrupts are off at boot.  The
+       NAME is canonical ([sie_gname]), so there is nothing to allocate and
+       nothing to existentially quantify. *)
+    ghost_var sie_gname (1/2) ('b"0" : mword 1) -∗
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
+    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     tlb ↦ᵣ tlbvec0 -∗
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
@@ -466,19 +477,17 @@ Section BootBridge.
     a_cpu_proc cid_word ↦₈ p0 -∗
     cpu_ctx_free
     ==∗
-    ∃ (γ : gname) (mf : regfile),
-      ⌜ mf !!! Regidx (mword_of_int 4 : mword 5) = cid_word ⌝ ∗
-      sie_cap_gpr γ mf K ∗
-      cpu_own γ 0 false p0 cpu_ctx_free ∗
-      ghost_var γ (1/4) ('b"0" : mword 1) ∗
+    ∃ mf : regfile,
+      sie_cap_gpr mf K false p0 ∗
+      cpu_own 0 false p0 cpu_ctx_free false ∗
+      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
     iIntros (Hpmp Hsie Hmsf Hmenv Hmiez Hsatpm Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
-             Hstk Hbit Hbit2 Htlb Hsepc Hscause Hstval Hstv
+             Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval Hstv
              Hnoff Hint Hproc Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
-    iMod (sie_ghost_alloc ('b"0" : mword 1)) as (γ) "(Hg2 & Hg4a & Hg4b)".
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
     { iPureIntro. apply (bool_decide_unpack _). by compute. }
     iEval (rewrite Hq) in "Hg4b".
@@ -514,22 +523,28 @@ Section BootBridge.
                   !!! Regidx csp_rs1)
                (kv_frame_slots + K)) with "[Hstk]" as "Hstk".
     { rewrite st_mout_sp ti_sp1_pa_stk. iExact "Hstk". }
-    iDestruct (sie_cap_intro_bare γ
+    iDestruct (sie_cap_intro_bare
                  (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)
-                 K stv0 with "Hstk Hbit Hbare Hstv He1") as "Hcap".
+                 K stv0 (p := p0) with "Hstk Hbit Hbare Hstv He1") as "Hcap".
     (* --- the configuration bundle --- *)
     iEval (rewrite Hmenv) in "Hmenv".
-    iAssert (ghost_var γ (1/2) (_get_Mstatus_SIE (cms5 (st_ms1 ms0)))) with "[Hg2]" as "Hg2".
+    iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE (cms5 (st_ms1 ms0))))
+      with "[Hg2]" as "Hg2".
     { rewrite Hsie. iExact "Hg2". }
-    iDestruct (sconf_intro γ (cms5 (st_ms1 ms0)) (st_mie1 mie0 mideleg0)
+    iDestruct (sconf_intro (cms5 (st_ms1 ms0)) (st_mie1 mie0 mideleg0)
                  (st_mdl1 mideleg0) MENVCFG_S Hmsf Hmiez eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
-    iDestruct (cpu_own_init_boot γ p0 nv iv cpu_ctx_free Hnv
+    iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
                  with "Hnoff Hint He2 Hproc Hctx") as "Hcpu".
+    (* --- the register file: boot writes tp itself, so the raw map ALREADY
+       carries this hart's id there and IS its own pin ([tp_pin_id]). --- *)
+    assert (Htpm : st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv
+                     mhartid_in !!! Regidx Rtp = cid_word_of cpu_id).
+    { rewrite st_mout_tp. exact Htp. }
+    iEval (rewrite -(tp_pin_id _ Htpm)) in "Hfile".
     iModIntro.
-    iExists γ, (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in).
-    iSplitR. { iPureIntro. rewrite st_mout_tp. exact Htp. }
+    iExists (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in).
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
     iFrame "Hcpu Hg4a".
