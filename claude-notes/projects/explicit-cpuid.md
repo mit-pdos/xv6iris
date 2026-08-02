@@ -569,14 +569,51 @@ The soundness obligation this creates lands squarely on Stage 2's
 That is a true statement about `kerneltrap`, and writing it down here is the
 point — it is now a premise someone must discharge rather than an accident.
 
+### A fifth, independent bug in the same cone: SpecSleep / SpecSched thread ONE
+### index where the two are opposite constants
+
+`sleep` runs at `noff = 1`, so `cpu_own 1 eb pj C b` forces the RESOURCE index
+to `false` — at `b = true` the enabled arm's `⌜n = 0⌝` makes the whole premise
+`False`, so that instance of the contract is VACUOUS and carries no content.
+The only live instance is `b = false`, and there `wp_next false K ⊣⊢ K CID0`,
+i.e. the contract asserts **sleep returns on the hart that called it**. It
+provably does not, twice over: `sched`'s continuation is over an arbitrary hart
+(`SpecSwtch`'s `∀ h g m eb', … -∗ WP (LoopE h)`), and even ignoring the park,
+the post-resume `release` runs at `n = 0, eb = true` so `SpecRelease`'s
+`outb = true` — interrupts are genuinely re-enabled between that release and
+the following `acquire`.
+
+The root cause is a reading of `wp_next`'s index that the guide had wrong:
+**a `swtch` moves the hart with interrupts OFF**, so a parking function's
+crossing index is `true` unconditionally, independent of its resource index.
+`SpecSched` has the identical hole (its `wp_next b` is a HYPOTHESIS, so at
+`b = false` `ProofSched` would have to produce `h = CID0` out of a swtch that
+resumes at `∀ h`). `SpecYield` escapes only by accident: its `eb = true` at
+level 0 makes `b` derivably `true`, so `wp_next b` coincides with the right
+answer.
+
+Fix both: resource index at the literal `false`, `wp_next true`, and drop the
+`(b : bool)` binder. The rule is now written up in the porting guide under
+"A PARKING function's `wp_next` index is `true` UNCONDITIONALLY".
+
+### While the tree is quiet, hoist the four hand-copied index derivations
+
+`kf_b_derive` / `ka_b_derive` / `mp_b_derive` / `rsl_b_derive` are four
+independent copies of the same three-line proof, written by four agents who
+could not `Require` each other's whole-function files. Four reinventions of the
+same bridge is this project's own signal that the contract is missing something
+(surprise 10). **Put them in `CpuOwn.v`** alongside the two forced-index lemmas
+above; they all belong to the same small algebra.
+
 ### Sequencing
 
-All four changes (`sie_pay`, the csrci leaf, `ctx_adm`, `wp_next`'s second
-hatch) are CENTRAL. By this project's own orchestration rule they must land as
-one serialized change with NO consumer agents running, followed by one
-consumer wave over the parking/bio cone. Do not split them across waves: the
-csrci leaf and the arm payload touch the same definition, and `ctx_adm` and
-`wp_next` both change the parking contracts' continuation shape.
+All five changes (`sie_pay`, the csrci leaf, `ctx_adm`, `wp_next`'s second
+hatch, and the sleep/sched index) are CENTRAL. By this project's own
+orchestration rule they must land as one serialized change with NO consumer
+agents running, followed by one consumer wave over the parking/bio cone. Do not
+split them across waves: the csrci leaf and the arm payload touch the same
+definition, and `ctx_adm`, `wp_next` and the index fix all change the parking
+contracts' continuation shape.
 
 ## SURPRISES — the checkpoint
 

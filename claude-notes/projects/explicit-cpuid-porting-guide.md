@@ -278,6 +278,48 @@ So:
 `wp_next false` on pop_off would claim the hart cannot move when it can. Note
 this cannot be caught by compiling: at `eb = false` both spellings typecheck.
 
+### A PARKING function's `wp_next` index is `true` UNCONDITIONALLY
+
+The table above reads the index as "were interrupts enabled at any point during
+the call", and for a leaf that is exactly right — one instruction can only
+change harts by being trapped. **For a whole function it is incomplete: a
+`swtch` moves the hart with interrupts OFF.** There are two independent reasons
+a hart can change, and only the first is about SIE:
+
+1. an interrupt-driven preemption, which needs SIE = 1 — this is what `b` tracks;
+2. a VOLUNTARY park (`sched`/`swtch`), which happens at SIE = 0 by construction
+   (`sched()` panics with "sched interruptible" otherwise).
+
+So any function that can reach a `swtch` — `sched`, `sleep`, `yield`, and
+everything that sleeps — is `wp_next true` no matter what its RESOURCE index
+is, and threading one `b` through both slots is a falsehood of exactly the kind
+this refactor exists to remove.
+
+`sleep` is the sharp case, because the two indices are opposite CONSTANTS:
+it runs at `noff = 1`, so `cpu_own 1 eb pj C b` forces the resource index to
+`false` (`cpu_own`'s enabled arm carries `⌜n = 0⌝`, so `b = true` is outright
+`False` and that instance of the contract is VACUOUS) — while its `wp_next`
+index must be `true`, because it parks. Stated with one `b` the live instance
+claims *"sleep returns on the hart that called it"*, which is false twice over:
+`sched`'s continuation is over an arbitrary hart, and even ignoring the park,
+the post-resume `release` exits at `outb = eb = true`.
+
+```coq
+  sie_cap_gpr m av false pj -∗          (* resource index: forced false *)
+  cpu_own 1 eb pj C false -∗
+  …
+  wp_next true (fun (CID : CpuId) => …) (* crossing index: it parks *)
+```
+and the `(b : bool)` binder is then dropped entirely.
+
+`yield` looks fine only by accident: its `cpu_own 0 eb pj C b` with `eb = true`
+makes `b` DERIVABLY true, so `wp_next b` happens to coincide with the correct
+`wp_next true`. Do not read that as the general rule.
+
+**Check every parking contract against this before porting its proof**, and
+remember the check cannot be a compile: at the wrong index both spellings
+typecheck.
+
 ## ORCHESTRATION: serialize changes to the central interface
 
 `sie_cap_gpr`'s arity is load-bearing for EVERY consumer, not just the ones
@@ -308,6 +350,49 @@ per-call-site edit:
   and after each leaf step re-anchor with
   `iDestruct (wp_next_shift Hsk with "Hcont") as "Hcont"` before recursing.
   `wp_next_chain` alone is for straight-line code only.
+- **…but there is a shape that needs NO re-anchoring at all, and it is the one
+  to reach for first.** Make the loop invariant ITSELF a `wp_next`:
+  ```coq
+  ∀ (fuel : nat), wp_next (CID0 := CID0) b (fun CID => ∀ k M, …)
+  ```
+  then `iIntros (fuel); iInduction fuel`. The IH *is* a `wp_next`, so it
+  re-enters at a migrated hart for free. Anchoring every hart-carrying
+  proposition at the lemma's own `CID0` makes forwarding one across an
+  iteration the IDENTITY; only a *use* costs anything
+  (`iSpecialize ("H" $! CIDn with "[%]"); [wp_next_chain|]`). Worked example:
+  `ProofWakeup.v`, where the loop head, the shared `p++`/test tail and the exit
+  continuation all carry the hart this way and `wp_next_shift` never appears.
+- **Inside a `b`-generic function, a HELD LOCK pins the hart.** From acquire's
+  return to release's call the index is the literal `false`, so every leaf in
+  that stretch is a plain `rewrite wp_next_off` and a helper lemma for the
+  locked region needs no hart binder at all. Only the entry and exit stretches
+  are generic. This is worth spotting early: it usually turns most of a
+  lock-taking function back into the cheap case.
+
+## `rewrite -Hbmatch` mangles the goal when the LEVEL IS A LITERAL
+
+`ProofKfree.kf_b_derive`'s idiom — re-folding a callee's exit index
+`outb = match n with O => eb | S _ => false end` back to `b` with
+`rewrite -Hbmatch` — works only while `n` is a VARIABLE. At `n = 0%nat` the
+elaborator has already ι-reduced `outb` to a plain `eb`, so the rewrite fires
+on **every** `eb` in the goal, including `cpu_own`'s unrelated *base-enable*
+argument. The symptom lands several lines later and reads as nonsense:
+
+```
+Error: Tactic failure: iSpecialize: cannot instantiate
+(cpu_own 0 eb pme C b -∗ cpu_own 0 eb pme C b)%I with (cpu_own 0 b pme C b).
+```
+
+Better recipe whenever the level is literal — collapse the two names once, at
+the top, and delete the `rewrite` entirely:
+
+```coq
+assert (Hbeb : eb = b) by (symmetry; exact Hbmatch). subst eb.
+```
+
+Substitute **`eb`**, not `b`: that leaves a *variable* named `b`, so
+`intr_count`'s `if eb` never reduces and you avoid the `iNext`-over-`cpu_own`
+trap from `sched-hart-generic.md`.
 
 ## Derive the SIE index rather than stating it
 
