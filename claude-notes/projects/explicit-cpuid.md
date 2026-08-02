@@ -166,9 +166,13 @@ boot chain links end to end against its callees' proofs.
 
 WHAT REMAINS is ten files with ONE cause between them: `ProofSleep`,
 `ProofYield`, `ProofBread`, `ProofBwrite`, `ProofAcquiresleep` and their
-`Link*` closure, all blocked on the crossing payload for `sched_vc` — see
-"THE LEVEL-0/ENABLED-BASE CONE" below, which is the section to read first and
-ends in a concrete recommendation.
+`Link*` closure, all blocked because `sched_vc` cannot cross an
+interrupts-enabled step. **The mechanism that fixes it is designed AND
+PROTOTYPED — `iris/ProtoSchedsInv.v` states it and closes every obligation
+with no `Admitted`.** Read "THE LEVEL-0/ENABLED-BASE CONE" below for why, and
+its subsection "THE ANSWER, PROTOTYPED" for what to build; the remaining work
+is wiring that mechanism into `SchedCtx`/`SwtchCtx` and re-porting five
+proofs, not design.
 
 The refactor's whole purpose was to make a class of silent falsehood visible,
 and the score is that it found **six** contracts that were stated falsely and
@@ -442,49 +446,75 @@ strip it at the FINAL hart rather than at `h`; `cpu_own` transports;
 stranded. So the blocked set is `sleep`, `yield`, `bread`, `bwrite`,
 `acquiresleep` — five proofs, one cause.
 
-### The alternative that may well be better: make the record GLOBAL
+### THE ANSWER, PROTOTYPED: make the record GLOBAL — `iris/ProtoSchedsInv.v`
 
-Worth weighing before building the payload at all. Every difficulty above
-comes from the parked-scheduler record being *threaded through contracts* as a
-thread-owned resource, so that a migration has to carry it. It does not have
-to be. `procs_inv Φ γs` is already the tree's model for "persistent,
-hart-free, carries per-index resources", and a sibling
-`scheds_inv Φ γs` — holding, per hart, either "hart h's scheduler is running"
-or "it is parked with record R_h" — would be **hart-free from the thread's
-point of view**, which is precisely the property that makes something cross a
-migration for free.
+**This is the design to build, and it is validated rather than sketched.**
+`ProtoSchedsInv.v` states the whole mechanism and closes every obligation with
+NO `Admitted` and no local axiom, against the real tree. Read it before
+implementing; what follows is the summary and the three ways it corrected the
+sketch that preceded it.
 
-Then `▷ sched_vc` leaves all nine contracts with no replacement at all: a
-thread that wants to `swtch` opens the invariant at whatever hart it is on and
-takes out THAT hart's record. The exclusive record moves in and out under a
-mask instead of riding a frame, and the `p = zero_reg` / running-vs-parked
-distinction the payload sketch encodes in `sie_pay`'s branch becomes the
-invariant's own two-state body — which is where it belongs, since it is a fact
-about the scheduler protocol and not about the SIE arm.
+Every difficulty above comes from the record being *thread-owned*, so a
+migration has to carry it. It does not have to be. `SchedCtx.sched_vc_at` is
+already **CID-free**, so a `procs_inv`-shaped sibling works:
 
-Cost: a real redesign of `SwtchCtx`/`SchedCtx`'s ownership story, against
-`kerneltrap`'s eventual contract. Benefit: nothing new in `IntrDefs`, nothing
-new in `riscvGS`, nine contracts get shorter, and the allocation problem above
-disappears (an invariant can be allocated by `main`, when `γs` exists, because
-nothing below needs to name it).
+```coq
+Definition sched_slot (h : CPU) : iProp Σ :=
+  (∃ p : mword 64,
+     cpu_proc_half h p ∗
+     (⌜p = zero_reg⌝
+      ∨ (∃ (j : nat) (r : bool),
+           ⌜p = proc_addr j /\ (j < NPROC)%nat⌝ ∗
+           park_hlf j r ∗
+           (if r then sched_vc_at Φ γs h (a_cpu_ctx (cid_word_of h)) p
+                 else emp))))%I.
 
-**Recommendation: prototype `scheds_inv` first.** The payload is the local
-patch; this is the shape. The project's own guiding principle — clean specs
-and good abstractions over avoiding rework — points here, and its own
-retrospective says the design forks that got escalated all came back better
-than the recommendation that preceded them.
+Definition scheds_inv : iProp Σ := inv schedsN ([∗ list] h ∈ enum CPU, sched_slot h).
+```
 
-Two cheaper things that do NOT work, recorded so nobody re-invents them:
-- **Folding `sched_vc` into `cpu_own`'s `C` slot.** `C` is an opaque `iProp`,
-  so it is the SAME proposition on both sides — it would carry hart A's
-  scheduler record onto hart B. Typechecks at Stage 1; a lie at Stage 2.
-- **Stating the nine at `b = false`.** Unsatisfiable together with `eb = true`
-  at level 0, so the contracts would verify VACUOUSLY. This is the failure
-  mode the vacuity checker exists for, arrived at from a new direction.
-- An `∃ h, sched_vc_at h …` (hart-free, so it crosses for free) is true but
-  useless: `sched()` swtches to the address computed from the live `tp`, and
-  nothing ties the existential back to `cpu_id`. Re-tying it is the agreement
-  ghost, i.e. strictly more work than the payload field.
+A thread at any hart opens it and takes out THAT hart's record
+(`scheds_take`); `scheds_put` / `scheds_dispatch` / `scheds_reclaim` are the
+other three moves, and `scheds_put_take` is the round-trip witness. The payoff
+typechecks: `wp_yield_sconf_body'` is today's contract minus `▷ sched_vc` in
+premise and post, plus `scheds_inv` (persistent, hart-free) and `park_hlf γk j
+true` (hart-free) — both of which cross `wp_next`'s lambda as ordinary frames,
+exactly as `procs_inv` already does.
+
+**Three corrections the prototype made to the sketch, all worth internalising:**
+
+1. **The exclusive token is per-PROC, not per-hart.** A per-hart token is
+   itself a hart-indexed resource with no transport — i.e. precisely the thing
+   being eliminated. `park_hlf j r` is half a `ghost_var bool` keyed by the
+   proc, so it survives a migration as a plain frame.
+2. **`IntrDefs.cpu_cells` must keep only `DfracOwn (1/2)` of `a_cpu_proc`, and
+   this is MANDATORY, not cosmetic.** Take-out has to pin the slot's `p` to the
+   thread's own `pj`, and the only fact in the system relating "hart CID" to
+   "proc pj" is `cpus[CID].proc` — literally what `myproc()` reads. Stated
+   against today's full cell the lemma is **VACUOUS**, which the prototype
+   proves outright (`cpu_own_full_is_vacuous`: fractions 1 + 1/2). Another
+   instance of this refactor's signature failure mode, caught by stating the
+   refutation instead of trusting the shape.
+3. **Put-back is the RESUMED THREAD's first move, not the scheduler's.**
+   `valid_context_pre`'s wand manufactures the resumer's record inside the
+   swtch proof and hands it to the resumed party, so the scheduler never holds
+   its own record to deposit. What the scheduler does instead is its two
+   `c->proc` stores, which — because of the shared half — become mask-changing
+   accessors landing exactly on the two state transitions.
+
+Escapes that were checked and fail, so nobody re-tries them: storing the
+record in proc `j`'s own lock (from `∃ h, sched_vc_at … h …` plus your own half
+you cannot conclude `h = CID`; only a hart-INDEXED container gives that);
+making the record index-free; and a token-free two-state slot (vacuous).
+
+**The ledger.** Costs: halve `a_cpu_proc` in `cpu_cells`; `cpu_own_set_proc`
+becomes a mask-changing accessor at ProofScheduler's two stores; a third
+guarded slot in `proc_lock_res` (guarded on `st ≠ RUNNING`, so the notes'
+"exactly two detachable slots" becomes three); `main` is handed half of every
+hart's `c->proc` at `zero_reg`; and every parking function's post-resume half
+gains one `iMod`. Benefits: nothing new in `IntrDefs` or `riscvGS`, no saved
+predicates, no "not yet published" one-shot, **no allocation-ordering problem
+at all** (nothing below `SchedCtx` names it, so `main` can allocate it once
+`γs` exists), and nine contracts get shorter.
 
 ### Two smaller blockers found alongside, both real bugs — BOTH FIXED
 
