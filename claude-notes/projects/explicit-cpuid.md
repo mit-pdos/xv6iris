@@ -335,6 +335,18 @@ over a deep tower. There are 7 `let wval := … rget …` statements in
 `WpPlic` / `WpSmodeHalf` / `SpecUart`. Any of them can hit this at sufficient
 depth.
 
+**…but "latent everywhere" is narrower than it reads, and the difference is
+actionable.** `ProofVirtioDiskIntr.v` is the LARGER file (2989 lines vs 2400)
+in the same cone and needed no opacity at all — measured, 38 s clean. The
+reason is structural: it is decomposed into `Qed`-sealed chunks that each state
+their register effect as a frame condition over an ABSTRACT output map, so no
+`pose`-chain exceeds ~6 links, while the Init file's 400 s sentence sits over a
+24-link chain. **The trigger is register-chain DEPTH, and a decomposed
+whole-function proof is immune to it.** So the central fix buys much less than
+the "7 + ~25 sites" count suggests — and decomposing a proof is a better answer
+than opacifying a definition tree-wide, because it is local and it improves the
+proof anyway.
+
 THE CENTRAL FIX, when someone wants it: either a global
 `Strategy opaque [tp_pin]` in `HartTp.v`, or seal `gpr_file (tp_pin m)` behind
 a named opaque wrapper in `IntrDefs.v`. Either makes the failure mode
