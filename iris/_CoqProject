@@ -647,3 +647,4 @@ SpecMainSecondary.v
 ProofMainSecondary.v
 LinkMainSecondary.v
 BootBridge.v
+ProtoCpuid.v
