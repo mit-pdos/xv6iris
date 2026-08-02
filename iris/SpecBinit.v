@@ -69,7 +69,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
   ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
   ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) -∗
   blink_raw bhead -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗

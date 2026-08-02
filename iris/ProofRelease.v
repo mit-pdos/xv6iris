@@ -380,7 +380,7 @@ Section ProofRelease.
     assert (Hra_final : ret_pc (E4 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    assert (Hchainf : (match n with O => eb | S _ => false end) = false -> (CIDe5 : CPU) = (CIDpo : CPU)) by wp_next_chain.
+    assert (Hchainf : (match n with O => eb | S _ => false end) = false \/ p = zero_reg -> (CIDe5 : CPU) = (CIDpo : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CIDpo CIDe5 n eb p C (match n with O => eb | S _ => false end) Hchainf with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "HOut Hcg Hpc [%] Hown").

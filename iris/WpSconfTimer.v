@@ -229,7 +229,7 @@ Section WpSconfTimer.
     pc_is pc -∗
     instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
     ( ∀ tv : mword 64,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
@@ -299,7 +299,7 @@ Section WpSconfTimer.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

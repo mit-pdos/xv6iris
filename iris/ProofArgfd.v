@@ -196,7 +196,7 @@ Section ProofArgfd.
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
         sie_cap_gpr mf av b p -∗

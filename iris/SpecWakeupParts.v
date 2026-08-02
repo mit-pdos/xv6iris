@@ -35,7 +35,7 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   sie_cap_gpr m K b p -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
       ∀ (M : regfile) (vpad : mword 64),
       ⌜ M !!! Regidx (mword_of_int 9)  = proc_addr 0
       /\ M !!! Regidx (mword_of_int 18) = proc_addr NPROC
@@ -76,7 +76,7 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
   wk_fcell spF 7 ↦₈ vra -∗ wk_fcell spF 6 ↦₈ vs0 -∗ wk_fcell spF 5 ↦₈ vs1 -∗
   wk_fcell spF 4 ↦₈ vs2 -∗ wk_fcell spF 3 ↦₈ vs3 -∗ wk_fcell spF 2 ↦₈ vs4 -∗
   wk_fcell spF 1 ↦₈ vs5 -∗ wk_fcell spF 0 ↦₈ vpad -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
       ⌜ Mf !!! Regidx (mword_of_int 1)  = vra
       /\ Mf !!! Regidx (mword_of_int 8)  = vs0

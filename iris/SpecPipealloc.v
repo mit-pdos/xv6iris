@@ -166,7 +166,7 @@ Definition wp_pipealloc_sconf_body
      their incoming contents are arbitrary *)
   pf0 ↦₈ v0 -∗
   pf1 ↦₈ v1 -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     cpu_own n eb p C b -∗

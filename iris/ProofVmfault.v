@@ -445,7 +445,7 @@ Section ProofVmfault.
             ⌜res = r⌝ ∗ ⌜page_valid r⌝ ∗ ⌜(uint va < uint szv)%Z⌝ ∗
             ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
             proc_pt (uptd_insert P (svpn_of va0) r)))%I)).
-    set (EPI := (wp_next (CID0 := CID) b (fun (CIDe : CpuId) =>
+    set (EPI := (wp_next (CID0 := CID) b p (fun (CIDe : CpuId) =>
         ∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Rs3 = res

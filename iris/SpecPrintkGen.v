@@ -149,7 +149,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   printk_env γpr γd γv -∗
   fmt ↦ₛ{ dqf } f -∗
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
     ∀ mf : regfile,
     sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗

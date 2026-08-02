@@ -103,7 +103,7 @@ Section IsmappedEpi.
       ⌜ (M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0 /\ m !! vpn = None)
         \/ (exists w, m !! vpn = Some w /\
              M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 1) ⌝ -∗
-      wp_next b (fun (CID' : CpuId) =>
+      wp_next b p (fun (CID' : CpuId) =>
         ∀ (mr : regfile),
         sie_cap_gpr mr K b p -∗
         pc_is ret_tgt -∗

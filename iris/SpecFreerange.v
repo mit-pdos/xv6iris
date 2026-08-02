@@ -61,7 +61,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   ([∗ list] p ∈ ps, page_own p) -∗
   panic_wp_any -∗
   kalloc_avail γk (Some 0%nat) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b pcur -∗
     cpu_own ncnt eb pcur C b -∗

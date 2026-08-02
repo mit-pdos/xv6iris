@@ -190,7 +190,7 @@ Section WpSconfCtl.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -240,7 +240,7 @@ Section WpSconfCtl.
     pc_is pc -∗
     instr pc false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
                            Regidx (mword_of_int 0), Regidx (mword_of_int 0))) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -273,7 +273,7 @@ Section WpSconfCtl.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (FENCE (fm, pred, succ, rs, rd)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ▷ ( sie_cap_gpr m n b p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
@@ -328,7 +328,7 @@ Section WpSconfCtl.
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (JAL (jimm, zreg)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ▷ ( sie_cap_gpr m n b p -∗
         pc_is tgt -∗
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
@@ -391,7 +391,7 @@ Section WpSconfCtl.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (JAL (imm, Regidx rd)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -481,7 +481,7 @@ Section WpSconfCtl.
     uint ra <> 0 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is tgt -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

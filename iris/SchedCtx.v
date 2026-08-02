@@ -132,13 +132,15 @@ Section SchedCtx.
      function -- so the crossing must carry them; the dispatch side is the
      scheduler, which provably holds exactly one set at every dispatch in
      both [eb] arms.
-     [intr_handler_avail g] rides on the DISPATCH direction only: it is the
-     persistent half the resumed thread's intena restore needs, and it must
-     be named at the RESUMING hart's ghost [g] (the SIE ghost is per-hart,
-     so the thread's own pre-park stash is about the wrong name). *)
-  Definition p_sched : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+     [intr_handler_avail (CID := h)] rides on the DISPATCH direction only: it
+     is the persistent half the resumed thread's intena restore needs, and it
+     must be named at the RESUMING hart's ghost (the SIE ghost is per-hart --
+     [sie_name h] -- so the thread's own pre-park stash is about the wrong
+     name).  That is also why the payload needs no ghost-name argument: [h]
+     determines the name. *)
+  Definition p_sched : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
                        mword 64 -d> mword 64 -d> iPropO Σ :=
-    fun h g A' c cret tpv p =>
+    fun h A' c cret tpv p =>
     (⌜tpv = cid_word_of h⌝ ∗
      trap_csrs (CID := h) ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
@@ -153,29 +155,29 @@ Section SchedCtx.
           proc_held h j γl st ch)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p.  [A']
-          is the scheduler's own record, PINNED at (h, g) -- cpus[h].context
+          is the scheduler's own record, PINNED at [h] -- cpus[h].context
           can only ever be resumed from hart h's own tp, and the parked
           scheduler's closure holds hart-h register resources. *)
        (intr_handler_avail (CID := h) ∗
         ∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h) /\
-           A' = Some (h, g)⌝ ∗
+           A' = Some h⌝ ∗
           proc_held h j γl RUNNING ch)))%I.
 
-  (* the scheduler-chain valid context, PINNED at hart [h] and its SIE
-     ghost [g] (fixed Phi / P instantiation); [p] = the context's c->proc
+  (* the scheduler-chain valid context, PINNED at hart [h]
+     (fixed Phi / P instantiation); [p] = the context's c->proc
      index (see SwtchCtx).  This is the CPU/scheduler record: [cpus[h].context]
      is only ever resumed from hart h's own tp, and the parked scheduler's
      closure holds hart-h register resources.  [sched_vc] is the ambient
      restatement -- the shape a thread running on THIS hart holds of ITS
      scheduler -- and every crossing hands its partner's record back at the
      partner's own hart, so a parking function's continuation states the
-     slot with [sched_vc_at h g]. *)
-  Definition sched_vc_at (h : CPU) (g : gname) (c p : mword 64) : iProp Σ :=
-    valid_context Φ p_sched (Some (h, g)) c p.
+     slot with [sched_vc_at h]. *)
+  Definition sched_vc_at (h : CPU) (c p : mword 64) : iProp Σ :=
+    valid_context Φ p_sched (Some h) c p.
 
-  Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id sie_gname c p.
+  Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id c p.
 
   (* ------------------------------------------------------------------ *)
   (* Payload intro/elim.  Discrimination is by the resumed context's own  *)
@@ -186,12 +188,12 @@ Section SchedCtx.
      [p = proc_addr j] is sched's own cpu_own/premise tie).  The parking
      proc's own record is MIGRATABLE, and it hands over the trap CSRs it
      took from its acquire. *)
-  Lemma p_sched_to_cpu (i : CPU) (g : gname) (j : nat) (γl : gname)
+  Lemma p_sched_to_cpu (i : CPU) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> needs_ctx st = true ->
     trap_csrs (CID := i) -∗
     proc_held i j γl st ch -∗
-    p_sched i g None (a_cpu_ctx (cid_word_of i))
+    p_sched i None (a_cpu_ctx (cid_word_of i))
       (p_context (proc_addr j)) (cid_word_of i) (proc_addr j).
   Proof.
     iIntros (Hj Hgl Hst) "Htc Hheld".
@@ -204,12 +206,12 @@ Section SchedCtx.
      proc_addr j).  It hands over its own trap CSRs and the persistent
      handler-avail at ITS ghost -- the dispatched thread's intena restore
      runs under [g]. *)
-  Lemma p_sched_to_proc (i : CPU) (g : gname) (j : nat) (γl : gname) (ch : mword 64) :
+  Lemma p_sched_to_proc (i : CPU) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
     trap_csrs (CID := i) -∗
     intr_handler_avail (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
-    p_sched i g (Some (i, g)) (p_context (proc_addr j))
+    p_sched i (Some i) (p_context (proc_addr j))
       (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
   Proof.
     iIntros (Hj Hgl) "Htc Havail Hheld".
@@ -220,12 +222,12 @@ Section SchedCtx.
   (* a resumed PROC context's payload: the resumer was hart [i]'s scheduler,
      the proc's own lock is held with state RUNNING, and the scheduler's
      record comes back pinned at that hart. *)
-  Lemma p_sched_at_proc (i : CPU) (g : gname) (A' : ctx_adm) (j : nat)
+  Lemma p_sched_at_proc (i : CPU) (A' : ctx_adm) (j : nat)
       (cret tpv p : mword 64) :
     (j < NPROC)%nat ->
-    p_sched i g A' (p_context (proc_addr j)) cret tpv p -∗
+    p_sched i A' (p_context (proc_addr j)) cret tpv p -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
-    ⌜p = proc_addr j⌝ ∗ ⌜A' = Some (i, g)⌝ ∗
+    ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗
     trap_csrs (CID := i) ∗ intr_handler_avail (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch.
@@ -251,10 +253,10 @@ Section SchedCtx.
      payload delivers with the lock its release is about to give back.  The
      parking proc's own record comes back at the index the payload pins,
      which is what the scheduler re-deposits into that proc's lock. *)
-  Lemma p_sched_at_cpu (i : CPU) (g : gname) (A' : ctx_adm) (j : nat)
+  Lemma p_sched_at_cpu (i : CPU) (A' : ctx_adm) (j : nat)
       (cret tpv : mword 64) :
     (j < NPROC)%nat ->
-    p_sched i g A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) -∗
+    p_sched i A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
     ⌜A' = None⌝ ∗ trap_csrs (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),

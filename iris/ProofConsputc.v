@@ -95,7 +95,7 @@ Section ProofConsputc.
     pc_is (mword_of_int (CP + 0x14) : mword 64) -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx ra_idx) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx s0_idx) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf K b p -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗

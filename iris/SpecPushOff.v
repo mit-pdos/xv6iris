@@ -55,7 +55,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.push_off + 0x00) : mword 64) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
     sie_cap_gpr mfin av false p -∗
@@ -99,7 +99,7 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
   kernel_text -∗ pc_is pcE -∗
-  wp_next bexit (fun (CID : CpuId) =>
+  wp_next bexit p (fun (CID : CpuId) =>
     ∀ mf,
     sie_cap_gpr mf av bexit p -∗
     cpu_own n eb p C bexit -∗

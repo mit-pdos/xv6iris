@@ -206,7 +206,7 @@ Section ProofMemmove.
     pc_is (CID := CID0) (mword_of_int (MM + 0x28)) -∗
     (pa_stk sp0 1) ↦₈ ra0 -∗
     (pa_stk sp0 2) ↦₈ s00 -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf n b pcur -∗
       pc_is (ret_pc ra0) -∗
@@ -336,7 +336,7 @@ Section ProofMemmove.
       (b : bool) (pcur : mword 64) (CIDh : CpuId) :
     (Z.of_nat len < 2 ^ 64)%Z ->
     forall (rem off : nat) (m : regfile) (CID0 : CpuId),
-    (b = false -> (CID0 : CPU) = (CIDh : CPU)) ->
+    (b = false \/ pcur = zero_reg -> (CID0 : CPU) = (CIDh : CPU)) ->
     (off + rem = len)%nat -> (1 <= rem)%nat ->
     m !!! Regidx (mword_of_int 11 : mword 5) = pa_add p_src off ->
     m !!! Regidx (mword_of_int 14 : mword 5) = pa_add p_dst off ->
@@ -347,7 +347,7 @@ Section ProofMemmove.
     pc_is (CID := CID0) (mword_of_int (MM + 0x18)) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
-    wp_next (CID0 := CIDh) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CIDh) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf n b pcur -∗
       pc_is (mword_of_int (MM + 0x28)) -∗
@@ -514,7 +514,7 @@ Section ProofMemmove.
                           (sign_extend' 64 (mword_of_int 0x1ff4 : mword 13))
                         = mword_of_int (MM + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hback18) in "Hpc".
-      assert (Hchain' : b = false -> (CID5 : CPU) = (CIDh : CPU)) by wp_next_chain.
+      assert (Hchain' : b = false \/ pcur = zero_reg -> (CID5 : CPU) = (CIDh : CPU)) by wp_next_chain.
       iApply (IH (S off) m3 CID5 Hchain' ltac:(lia) ltac:(lia) Ha1_3 Ha4v Ha5_3
                 with "Hcg Htext Hpc Hsrc Hdst [-]").
       iIntros (CIDr Hsr mf) "Hcg Hpc Hsrc Hdst %Ha0f %Hcsf".
@@ -560,7 +560,7 @@ Section ProofMemmove.
     (pa_stk sp0 2) ↦₈ s00 -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mfin,
       sie_cap_gpr mfin n b pcur -∗
       pc_is (ret_pc ra0) -∗

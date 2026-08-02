@@ -156,7 +156,7 @@ Section ProofSysSbrk.
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    wp_next b (fun (CID1 : CpuId) =>
+    wp_next b p (fun (CID1 : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗
@@ -348,7 +348,7 @@ Section ProofSysSbrk.
     proc_priv γf p pid V -∗
     kalloc_env γa None -∗
     word4_pointsto (pa_stk sp0 5) (DfracOwn 1) nw -∗
-    wp_next (CID0 := CID0) b (fun (CID1 : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID1 : CpuId) =>
       ∀ (Mf : regfile) (P' : uptd) (szv' rv : mword 64),
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
         ⌜Mf !!! Regidx Rs1 = rv⌝ -∗
@@ -969,7 +969,7 @@ Section ProofSysSbrk.
        arms reaches +0x64 at a different point in the crossing chain -- and
        carries the chain fact back to [CID] so [Hcont] can be discharged. *)
     iAssert (∀ (CIDx : CpuId) (Mf : regfile) (P' : uptd) (szv' rv : mword 64),
-        ⌜b = false -> (CIDx : CPU) = (CID : CPU)⌝ -∗
+        ⌜b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)⌝ -∗
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
         ⌜Mf !!! Regidx Rs1 = rv⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->

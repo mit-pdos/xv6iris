@@ -208,7 +208,7 @@ Section ProofWalkNoalloc.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 dq t -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K b p -∗
       pc_is ret_tgt -∗
@@ -469,7 +469,7 @@ Section ProofWalkNoalloc.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 dq t -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K b p -∗
       pc_is ret_tgt -∗
@@ -587,7 +587,7 @@ Section ProofWalkNoalloc.
     pa_stk sp0 7 ↦₈ (mm !!! Regidx (mword_of_int 21)) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 dq t -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K b p -∗
       pc_is ret_tgt -∗
@@ -725,7 +725,7 @@ Section ProofWalkNoalloc.
     kernel_text -∗
     pc_is (mword_of_int (WK + 0x26)) -∗
     slotaddr ↦₈{dqm} pte -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (and_vec pte (sign_extend' 64 (mword_of_int 1 : mword 12)))]>
                 (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg pte]>
                  (<[Regidx (mword_of_int 18 : mword 5) := regval_into_reg slotaddr]> M))) n b p -∗

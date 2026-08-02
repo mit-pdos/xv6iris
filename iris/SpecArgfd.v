@@ -176,7 +176,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   proc_priv γf p pid V -∗
   pfd ↦₄ oldfd -∗
   pf ↦₈ oldf -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗

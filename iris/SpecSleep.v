@@ -66,7 +66,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   (* a0 = the channel, a1 = the caller's condition lock *)
@@ -79,8 +79,17 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   eb = true ->
   (22 <= av)%nat ->
-  sie_cap_gpr m av b pj -∗
-  cpu_own 1 eb pj C b -∗
+  (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS (porting guide, "A PARKING
+     function's [wp_next] index is [true] UNCONDITIONALLY").  sleep runs at
+     noff = 1, so [cpu_own 1 eb pj C b] forces the RESOURCE index to [false]:
+     at [b = true] the enabled arm carries [⌜n = 0⌝], making the premise
+     [False] and that instance of the contract VACUOUS.  Its CROSSING index
+     is the literal [true] -- a [swtch] moves the hart with interrupts OFF,
+     so the park is a hart change that has nothing to do with SIE.  Stated
+     with one [b], the only live instance claimed "sleep returns on the hart
+     that called it", which is false twice over.  Hence no [b] binder. *)
+  sie_cap_gpr m av false pj -∗
+  cpu_own 1 eb pj C false -∗
   (* sleep is NOT push/pop-order-balanced: it pops p->lock to level 0
      BEFORE re-acquiring the condition lock, so at eb = true the interior
      pop deposits the trap CSRs into the re-enabled arm and the
@@ -96,11 +105,11 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b pj -∗
-      cpu_own 1 eb pj C b -∗
+      sie_cap_gpr mf av false pj -∗
+      cpu_own 1 eb pj C false -∗
       trap_csrs_pay 0 eb -∗
       pc_is ret_tgt -∗
       (* lk reacquired on the resuming hart, with its resource *)
@@ -118,8 +127,8 @@ Module Type SLEEP.
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_sleep_sconf_body Φ γs j γl γk lka sk Rk m av eb C b.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
+      wp_sleep_sconf_body Φ γs j γl γk lka sk Rk m av eb C.
 End SLEEP.
 
 (* ===================================================================== *)
@@ -145,7 +154,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   (* a0 = the channel, a1 = the caller's condition lock *)
@@ -164,8 +173,9 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (⊢ Tk -∗ Dk -∗ False) ->
   (forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False) ->
   (forall i : CPU, ⊢ locked_pre γk i -∗ Dk -∗ False) ->
-  sie_cap_gpr m av b pj -∗
-  cpu_own 1 eb pj C b -∗
+  (* same two-index note as [wp_sleep_sconf_body] above *)
+  sie_cap_gpr m av false pj -∗
+  cpu_own 1 eb pj C false -∗
   (* same pay note as [wp_sleep_sconf_body]: the interior pop reaches 0 *)
   trap_csrs_pay 0 eb -∗
   kernel_text -∗ pc_is pcE -∗
@@ -179,11 +189,11 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av b pj -∗
-      cpu_own 1 eb pj C b -∗
+      sie_cap_gpr mf av false pj -∗
+      cpu_own 1 eb pj C false -∗
       trap_csrs_pay 0 eb -∗
       pc_is ret_tgt -∗
       (* lk reacquired on the resuming hart, with its resource and the
@@ -203,6 +213,6 @@ Module Type SLEEP_GEN.
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_sleep_gen_sconf_body Φ γs j γl γk lka Rk Tk Dk m av eb C b.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
+      wp_sleep_gen_sconf_body Φ γs j γl γk lka Rk Tk Dk m av eb C.
 End SLEEP_GEN.

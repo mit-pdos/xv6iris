@@ -42,7 +42,7 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   kfree_pre p -∗
   kalloc_avail γk on -∗
   panic_wp_any -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b pcur -∗
     cpu_own n eb pcur C b -∗

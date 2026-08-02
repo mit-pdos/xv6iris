@@ -414,7 +414,7 @@ Section ProofFreewalk.
     pa_stk sp0 4 ↦₈ (mm !!! Regidx Rs2) -∗
     pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
     (∃ w : mword 64, pa_stk sp0 6 ↦₈ w) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       sie_cap_gpr mf K b p -∗
       cpu_own ilvl eb p C b -∗
@@ -661,7 +661,7 @@ Section ProofFreewalk.
     fw_done (pt_base t) d -∗
     fw_todo lvl t d -∗
     kalloc_env γa None -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ mj : regfile,
       ⌜ mj !!! Regidx csp_rs1 = spr
         /\ mj !!! Regidx Rs3 = page_base (pt_base t)
@@ -701,7 +701,7 @@ Section ProofFreewalk.
           /\ mt !!! Regidx Rs2 = add_vec (mword_of_int 4096) (page_base (pt_base t))
           /\ mt !!! Regidx Rs3 = page_base (pt_base t)
           /\ fw_thr mm mt
-          /\ (b = false -> (CIDx : CPU) = (CID : CPU)) ⌝ -∗
+          /\ (b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)) ⌝ -∗
         sie_cap_gpr (CID:=CIDx) mt (K - 6) b p -∗
         cpu_own (CID:=CIDx) ilvl eb p C b -∗
         pc_is (CID:=CIDx) (mword_of_int (FW + 0x24) : mword 64) -∗
@@ -768,7 +768,7 @@ Section ProofFreewalk.
       assert (Hp2a : add_vec_int (mword_of_int (FW + 0x26) : mword 64) 4
                      = mword_of_int (FW + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp2a) in "Hpc".
-      assert (Hshiftrec : b = false -> (CIDt3 : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDt3 : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".
       iDestruct (cpu_own_transport CIDx CIDt3 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -1242,7 +1242,7 @@ Section ProofFreewalk.
        have each moved it, so the loop's own entry hart [CID12] wants it
        re-anchored -- the sole [wp_next_shift] this lemma needs, since
        both callees below take a FRESH inline continuation ([-]). *)
-    assert (Hshift12 : b = false -> (CID12 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hshift12 : b = false \/ p = zero_reg -> (CID12 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift12 with "Hcont") as "Hcont".
     iDestruct (cpu_own_transport CID0 CID12 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".

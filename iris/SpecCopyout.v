@@ -93,7 +93,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   proc_pt P -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd),
     sie_cap_gpr mr K b p -∗
     cpu_own lvl eb p C b -∗

@@ -93,7 +93,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   pc_is pcE -∗
   ptree_own lvl (DfracOwn 1) t -∗
   kalloc_env γa None -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
     cpu_own ilvl eb p C b -∗

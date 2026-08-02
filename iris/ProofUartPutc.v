@@ -90,7 +90,7 @@ Section ProofUartPutc.
     sie_cap_gpr mentry n b p -∗ kernel_text -∗
     pc_is (mword_of_int (UPS + 0x26)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
       pc_is (mword_of_int (UPS + 0x30)) -∗
@@ -114,7 +114,7 @@ Section ProofUartPutc.
       ⌜ forall Y, <[Regidx (mword_of_int 15) := Y]> m
                 = <[Regidx (mword_of_int 15) := Y]> mentry ⌝ -∗
       sie_cap_gpr m n b p -∗ pc_is (mword_of_int (UPS + 0x26)) -∗ uart_tx_own γd l -∗
-      wp_next (CID0:=CID1) b (fun (CID : CpuId) =>
+      wp_next (CID0:=CID1) b p (fun (CID : CpuId) =>
         ∀ bt : bv 8, sie_cap_gpr (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
             pc_is (mword_of_int (UPS + 0x30)) -∗
             uart_tx_own γd l -∗ uart_out_lb γd l -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -148,7 +148,7 @@ Section ProofUartPutc.
                   with "Hcg Hpc Hi2e").
         iNext. iIntros (CIDt Hst) "Hcg Hpc".
         iEval (rewrite Htgt) in "Hpc".
-        assert (Hchain : b = false -> (CIDt : CPU) = (CID1 : CPU)) by wp_next_chain.
+        assert (Hchain : b = false \/ p = zero_reg -> (CIDt : CPU) = (CID1 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hchain with "Hk") as "Hk".
         iApply ("IH" $! CIDt (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> m)
                   with "[%] [%] Hcg Hpc Hown Hk").
@@ -163,7 +163,7 @@ Section ProofUartPutc.
         iIntros (CIDf Hsf) "Hcg Hpc".
         iEval (rewrite P30) in "Hpc".
         iEval (rewrite (Hagm (regval_into_reg (lsr_masked bt)))) in "Hcg".
-        assert (Hchainf : b = false -> (CIDf : CPU) = (CID1 : CPU)) by wp_next_chain.
+        assert (Hchainf : b = false \/ p = zero_reg -> (CIDf : CPU) = (CID1 : CPU)) by wp_next_chain.
         iSpecialize ("Hk" $! CIDf with "[%]"); [exact Hchainf|].
         iApply ("Hk" $! bt with "Hcg Hpc Hown").
         by iApply "Hlb". }
@@ -184,7 +184,7 @@ Section ProofUartPutc.
     sie_cap_gpr m n b p -∗ kernel_text -∗
     pc_is (mword_of_int (UPS + 0x20)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
       sie_cap_gpr (ppc_f6' m bt) n b p -∗ pc_is (mword_of_int (UPS + 0x3c)) -∗
       uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
@@ -257,7 +257,7 @@ Section ProofUartPutc.
     iIntros (CID5 Hs5) "Hcg Hpc Hown Hsent".
     iEval (rewrite Hsbb) in "Hown". iEval (rewrite Hsbb) in "Hsent".
     iEval (rewrite P3c) in "Hpc".
-    assert (Hchain : b = false -> (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hchain : b = false \/ p = zero_reg -> (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iSpecialize ("Hcont" $! CID5 with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! bt with "Hcg Hpc Hown Hsent").
   Qed.
@@ -279,7 +279,7 @@ Section ProofUartPutc.
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf n b p -∗ pc_is (mword_of_int (UPS + 0x46)) -∗
       ⌜ callee_saved m mf ⌝ -∗
@@ -406,7 +406,7 @@ Section ProofUartPutc.
               with "Hcg Hpc Hi44").
     iIntros (CID10 Hs10) "Hcg Hpc".
     iEval (rewrite P46) in "Hpc".
-    assert (Hchain : b = false -> (CID10 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hchain : b = false \/ p = zero_reg -> (CID10 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iSpecialize ("Hcont" $! CID10 with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! (<[Regidx (mword_of_int 15) := regval_into_reg (sign_extend' 64 pv)]> h3c)
               with "Hcg Hpc [%] Hpk Hpkd Hown Hsent").

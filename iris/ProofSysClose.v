@@ -159,7 +159,7 @@ Section ProofSysClose.
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
         sie_cap_gpr mf av b pp -∗

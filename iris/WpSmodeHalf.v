@@ -142,7 +142,7 @@ Section WpSmodeHalf.
     uint rd <> 0 -> rd_ok rd ->
     sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 2)) -∗ pa ↦₂{ dqm } v -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -165,7 +165,7 @@ Section WpSmodeHalf.
     uint rd <> 0 -> rd_ok rd ->
     sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 2)) -∗ pa ↦₂{ dqm } v -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -190,7 +190,7 @@ Section WpSmodeHalf.
     let storeval := trunc16 (rget m rs2) in
     sie_cap_gpr m n b p -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗ pa ↦₂ vold -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂ storeval -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

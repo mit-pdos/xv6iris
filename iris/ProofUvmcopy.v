@@ -330,7 +330,7 @@ Section UvmcopyDefs.
   Definition uc_exit `{CID0 : CpuId} (Φ : mval -> iProp Σ) (mm : regfile)
       (Pold Pnew : uptd) (vpn0 : mword 27) (n K : nat) (eb : bool)
       (p : mword 64) (C : iProp Σ) (spr : mword 64) (b : bool) : iProp Σ :=
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ( ∀ (mj : regfile) (res : mword 64),
       ⌜ mj !!! Regidx csp_rs1 = spr
         /\ mj !!! Regidx URa0 = res
@@ -615,7 +615,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hjt7c) in "Hpc".
     iDestruct (cpu_own_transport CIDe6 CIDe8 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    assert (Hshift : b = false -> (CIDe8 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hshift : b = false \/ p = zero_reg -> (CIDe8 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift with "Hexit") as "Hexit".
     iSpecialize ("Hexit" $! CIDe8 with "[%]"); [wp_next_chain|].
     iApply ("Hexit" $! N6 (mword_of_int (-1)) with "[%] Hcg Hcnt Hpc Hpo [Hpt]").
@@ -827,7 +827,7 @@ Section ProofUvmcopy.
         iEval (rewrite Hq80) in "Hpc".
         iDestruct (cpu_own_transport CIDt CIDt3 0%nat eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        assert (Hshiftexit : b = false -> (CIDt3 : CPU) = (CIDt : CPU)) by wp_next_chain.
+        assert (Hshiftexit : b = false \/ p = zero_reg -> (CIDt3 : CPU) = (CIDt : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftexit with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDt3 with "[%]"); [wp_next_chain|].
         iApply ("Hexit" $! T2 (mword_of_int 0) with "[%] Hcg Hcnt Hpc Hpo [Hpt]").
@@ -857,7 +857,7 @@ Section ProofUvmcopy.
       iEval (rewrite Hp2a) in "Hpc".
       iDestruct (cpu_own_transport CIDt CIDt4 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      assert (Hshiftrec : b = false -> (CIDt4 : CPU) = (CIDt : CPU)) by wp_next_chain.
+      assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDt4 : CPU) = (CIDt : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftrec with "Hexit") as "Hexit".
       iApply (IH (S j) Pk T1 (add_vec iv (mword_of_int 4096)) CIDt4
                 ltac:(clear -Hsum; lia) ltac:(clear -Hrne; lia) Hivs
@@ -971,7 +971,7 @@ Section ProofUvmcopy.
         by exact (proj2 (proj2 (proj1 (proj1 Hviewo (vpn_at vpn0 j)) Hnone))).
       iDestruct (cpu_own_transport CID0 CIDl6 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      assert (Hshiftl6 : b = false -> (CIDl6 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshiftl6 : b = false \/ p = zero_reg -> (CIDl6 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftl6 with "Hexit") as "Hexit".
       iApply ("TAIL" $! CIDl6 mw Pj with "[%] Hcg Hcnt Hpc Hpo Hpt Hexit").
       split_and!; try assumption.
@@ -1078,7 +1078,7 @@ Section ProofUvmcopy.
         by exact (proj2 (proj2 (proj1 (proj1 Hviewo (vpn_at vpn0 j)) Hnone))).
       iDestruct (cpu_own_transport CID0 CIDl9 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      assert (Hshiftl9 : b = false -> (CIDl9 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshiftl9 : b = false \/ p = zero_reg -> (CIDl9 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftl9 with "Hexit") as "Hexit".
       iApply ("TAIL" $! CIDl9 B2 Pj with "[%] Hcg Hcnt Hpc Hpo Hpt Hexit").
       split_and!; try assumption.
@@ -1207,7 +1207,7 @@ Section ProofUvmcopy.
       iEval (rewrite Htgt6c) in "Hpc".
       iDestruct (cpu_own_transport CIDl12 CIDl14 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      assert (Hshiftl14 : b = false -> (CIDl14 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshiftl14 : b = false \/ p = zero_reg -> (CIDl14 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftl14 with "Hexit") as "Hexit".
       iApply (uc_err (CID0 := CIDl14) γa Φ mm Pold Pnew Pj vpn0 n j K eb p C spr iv C1 b
                 HK Hvpn0 Hiv ltac:(clear -Hjb; lia) Hext Hout
@@ -1577,7 +1577,7 @@ Section ProofUvmcopy.
       iEval (rewrite Htgt24'') in "Hpc".
       iDestruct (cpu_own_transport CIDl26 CIDl27 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      assert (Hshiftl27 : b = false -> (CIDl27 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshiftl27 : b = false \/ p = zero_reg -> (CIDl27 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftl27 with "Hexit") as "Hexit".
       iApply ("TAIL" $! CIDl27 mg Pk with "[%] Hcg Hcnt Hpc Hpo Hpt Hexit").
       split_and!; assumption. }
@@ -1655,7 +1655,7 @@ Section ProofUvmcopy.
     assert (Hfthr : uc_thr mm mf).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       rewrite (callee_saved_lookup Hfcs c Hc). apply HF2thr; assumption. }
-    assert (Hshiftl30 : b = false -> (CIDl30 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hshiftl30 : b = false \/ p = zero_reg -> (CIDl30 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshiftl30 with "Hexit") as "Hexit".
     iApply (uc_err (CID0 := CIDl30) γa Φ mm Pold Pnew Pj vpn0 n j K eb p C spr iv mf b
               HK Hvpn0 Hiv ltac:(clear -Hjb; lia) Hext Hout
@@ -2049,7 +2049,7 @@ Section ProofUvmcopy.
       with "[Hcont Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10]" as "Hepi".
     { rewrite /uc_exit.
       iIntros (CIDep Hsep mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hcnt Hpc Hpo Hpost".
-      assert (Hshiftep : b = false -> (CIDep : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hshiftep : b = false \/ p = zero_reg -> (CIDep : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftep with "Hcont") as "Hcont".
       iApply (wp_cldsp_s_sconf Φ (mword_of_int (UC + 0x80)) (mword_of_int 9 : mword 6) Rra
                 mj (K - 10)%nat (mm !!! Regidx Rra) b (dqm:=DfracOwn 1)
@@ -2262,7 +2262,7 @@ Section ProofUvmcopy.
     iEval (rewrite Hjt22) in "Hpc".
     assert (Hiv0 : bv_unsigned (mword_of_int 0 : mword 64) = (4096 * Z.of_nat 0)%Z)
       by (vm_compute; reflexivity).
-    assert (Hshiftr18 : b = false -> (CIDr18 : CPU) = (CIDr17 : CPU)) by wp_next_chain.
+    assert (Hshiftr18 : b = false \/ p = zero_reg -> (CIDr18 : CPU) = (CIDr17 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshiftr18 with "Hepi") as "Hepi".
     iDestruct (cpu_own_transport CID CIDr18 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".

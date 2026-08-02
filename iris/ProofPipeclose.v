@@ -286,7 +286,7 @@ Section ProofPipeclose.
     (* [Hcont]'s [wp_next] obligation is stated.                           *)
     (* ================================================================= *)
     iAssert (∀ (CID0 : CpuId) (M : regfile),
-               ⌜ b = false -> (CID0 : CPU) = (CID : CPU) ⌝ -∗
+               ⌜ b = false \/ pme = zero_reg -> (CID0 : CPU) = (CID : CPU) ⌝ -∗
                ⌜ callee_saved A4 M ⌝ -∗
                sie_cap_gpr (CID := CID0) M (av - 4)%nat b pme -∗
                pc_is (CID := CID0) (mword_of_int (PC + 0x36) : mword 64) -∗
@@ -477,7 +477,7 @@ Section ProofPipeclose.
                  WP (Loop : expr riscv_lang) {{ Φ }})
                ∧ (kalloc_avail γk on ∗
                   (∀ (CIDx : CpuId) (M' : regfile),
-                     ⌜ b = false -> (CIDx : CPU) = (CID : CPU) ⌝ -∗
+                     ⌜ b = false \/ pme = zero_reg -> (CIDx : CPU) = (CID : CPU) ⌝ -∗
                      ⌜ callee_saved A4 M' ⌝ -∗
                      sie_cap_gpr (CID := CIDx) M' (av - 4)%nat b pme -∗
                      pc_is (CID := CIDx) (mword_of_int (PC + 0x36) : mword 64) -∗

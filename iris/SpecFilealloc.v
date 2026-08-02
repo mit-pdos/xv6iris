@@ -86,7 +86,7 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
   (* the new reference needs somewhere to live: one fd slot goes into the
      table and comes back out of fileclose. *)
   fd_slot -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     cpu_own n eb p C b -∗

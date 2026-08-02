@@ -167,7 +167,7 @@ Section ProofPrintk.
     sie_cap_gpr m K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int PK : mword 64) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mp : regfile,
       ⌜ mp !!! Regidx csp_rs1 = spd
         /\ mp !!! Regidx s0_idx = add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12))
@@ -446,7 +446,7 @@ Section ProofPrintk.
     pk_restore_instrs B -∗
     pc_is (mword_of_int (PK + B + 0) : mword 64) -∗
     pk_saved sp0 v9 v19 v20 v21 v22 v23 v24 v26 v27 -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ (forall c : mword 5,
            c <> mword_of_int 9 -> c <> mword_of_int 19 -> c <> mword_of_int 20 ->
@@ -664,7 +664,7 @@ Section ProofPrintk.
     pk_frame sp0 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s2_idx) -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     R -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -909,7 +909,7 @@ Section ProofPrintk.
     pk_slots_rest sp0 -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     R -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -954,7 +954,7 @@ Section ProofPrintk.
       - rewrite (Hkp (mword_of_int 25 : mword 5) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hs9.
       - exact E26.
       - exact E27. }
-    assert (Hshift : b = false -> (CIDr : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hshift : b = false \/ pcur = zero_reg -> (CIDr : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift with "Hcont") as "Hcont".
     iApply (wp_printk_epi (CID0 := CIDr) Φ m mf K pv pv dqm dqm R b pcur HK Hpv Hmfsp Hcsk
               with "Hcg Htext Hpc Hfr Hpanicking HR Hcont").
@@ -982,7 +982,7 @@ Section ProofPrintk.
     pk_slots_rest sp0 -∗
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     R -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -1035,7 +1035,7 @@ Section ProofPrintk.
       - rewrite (Hkp (mword_of_int 25 : mword 5) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq) ltac:(mw_neq)). exact Hs9.
       - exact E26.
       - exact E27. }
-    assert (Hshift : b = false -> (CIDj : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hshift : b = false \/ pcur = zero_reg -> (CIDj : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift with "Hcont") as "Hcont".
     iApply (wp_printk_epi (CID0 := CIDj) Φ m mf K pv pv dqm dqm R b pcur HK Hpv Hmfsp Hcsk
               with "Hcg Htext Hpc Hfr Hpanicking HR Hcont").
@@ -1123,7 +1123,7 @@ Section ProofPrintk.
        already in [pk_frame] shape and the epilogue can run at once.  The
        [beqz] at 0x34 was TAKEN, so the first byte is the terminator -- stated
        so the caller can decide which of the two continuations is live. *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -1134,7 +1134,7 @@ Section ProofPrintk.
       fmt ↦ₛ{ dqf } f -∗ R -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* (b) a nonempty one: the loop head, with i = 0 and a0 = fmt[0] *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mq : regfile),
       ⌜ mq !!! Regidx csp_rs1 = spd
         /\ mq !!! Regidx s0_idx = s0v
@@ -1619,7 +1619,7 @@ Section ProofPrintk.
     fmt ↦ₛ{ dqf } f -∗
     Rest -∗
     (* the string ended: leave through the restore block at 0x24e *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_adv_kept mf mc /\ pk_fbyte f (S p) = (mword_of_int 0 : mword 8) ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -1627,7 +1627,7 @@ Section ProofPrintk.
       fmt ↦ₛ{ dqf } f -∗ Rest -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* another character: the loop test at 0x86 *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_adv_kept mf mc
         /\ mf !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat (S p))
@@ -1773,7 +1773,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -1928,7 +1928,7 @@ Section ProofPrintk.
     pk_vaarg_instrs B -∗
     pc_is (mword_of_int (PK + B + 0) : mword 64) -∗
     (pa_stk sp0 23) ↦₈ (pk_ap s0v k) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ mf !!! Regidx a5_idx = pk_ap s0v k
         /\ mf !!! Regidx s0_idx = s0v
@@ -2044,7 +2044,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -2230,7 +2230,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -2391,7 +2391,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -2550,7 +2550,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -2711,7 +2711,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -2870,7 +2870,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -3021,7 +3021,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            mf !!! Regidx c = mc !!! Regidx c)
@@ -3184,7 +3184,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -3322,7 +3322,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -3463,7 +3463,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -3567,7 +3567,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -3637,7 +3637,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -3826,7 +3826,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 20 ->
           mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -3931,7 +3931,7 @@ Section ProofPrintk.
       iIntros (CID5 Hst5). iNext. iIntros "Hcg Hpc".
       assert (Htgth : add_vec (mword_of_int (PK + 0x234) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")))) = mword_of_int (PK + 0x22a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgth) in "Hpc".
-      assert (Hshift : b = false -> (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshift : b = false \/ pcur = zero_reg -> (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift with "Hcont") as "Hcont".
       iApply (IH (S i) CID5 L3 (l ++ bs)%list Rest ltac:(lia) Hlt HL3s4
                 with "Hcg Htext Hpc Hstr Hpanicking Hpanicked Hdev Htx Hdlab HR [-]").
@@ -3991,7 +3991,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 20 ->
           mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -4158,7 +4158,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 20 ->
           mf !!! Regidx c = mc !!! Regidx c ⌝ -∗
@@ -4357,7 +4357,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true ->
           c <> mword_of_int 20 -> c <> mword_of_int 21 ->
@@ -4532,7 +4532,7 @@ Section ProofPrintk.
       iIntros (CID8b Hst8b). iNext. iIntros "Hcg Hpc".
       assert (Htgth : add_vec (mword_of_int (PK + 0x1f2) : mword 64) (sign_extend' 64 (mword_of_int 8174 : mword 13)) = mword_of_int (PK + 0x1e0)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgth) in "Hpc".
-      assert (Hshift : b = false -> (CID8b : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshift : b = false \/ pcur = zero_reg -> (CID8b : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift with "Hcont") as "Hcont".
       iApply (IH CID8b P6 (l ++ bs)%list Rest ltac:(lia) HP6s4 HP6s9
                 with "Hcg Htext Hdig Hpc Hpanicking Hpanicked Hdev Htx Hdlab HR [-]").
@@ -4567,7 +4567,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true ->
           c <> mword_of_int 20 -> c <> mword_of_int 21 ->
@@ -4976,7 +4976,7 @@ Section ProofPrintk.
     fmt ↦ₛ{ dqf } f -∗
     Rest -∗
     (* (a) c0 = 0: the format string ends right after the '%' *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_disp_kept mf mc
         /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))
@@ -4987,7 +4987,7 @@ Section ProofPrintk.
       fmt ↦ₛ{ dqf } f -∗ Rest -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* (b) c0 <> 0, c1 = 0: one character of directive and no more *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_disp_kept mf mc
         /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))
@@ -5000,7 +5000,7 @@ Section ProofPrintk.
       fmt ↦ₛ{ dqf } f -∗ Rest -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* (c) both there: on into the comparison chain at 0xa4 *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_disp_kept mf mc
         /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))
@@ -5250,7 +5250,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2fa) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -5471,7 +5471,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2f0) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -5588,7 +5588,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2e2) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -5733,7 +5733,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2d8) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -5856,7 +5856,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2ca) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -6003,7 +6003,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2b6) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -6190,7 +6190,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x2aa) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -6303,7 +6303,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0x298) : mword 64) -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -6463,7 +6463,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (PK + 0xec) : mword 64) -∗
     fmt ↦ₛ{ dqf } f -∗ Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -6591,7 +6591,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (PK + 0xa4) : mword 64) -∗
     fmt ↦ₛ{ dqf } f -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_chain_kept mf mq ⌝ -∗
       sie_cap_gpr mf (K - 24)%nat b pcur -∗
@@ -6802,7 +6802,7 @@ Section ProofPrintk.
     pc_is (mword_of_int (PK + 0x8a) : mword 64) -∗
     fmt ↦ₛ{ dqf } f -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       ⌜ pk_disp_all mf mc
         /\ mf !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i)) ⌝ -∗
@@ -6958,7 +6958,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            c <> mword_of_int 20 -> c <> mword_of_int 21 ->
@@ -7206,7 +7206,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            c <> mword_of_int 20 -> c <> mword_of_int 21 ->
@@ -7307,7 +7307,7 @@ Section ProofPrintk.
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     Rest -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
            c <> mword_of_int 20 -> c <> mword_of_int 21 ->
@@ -7470,7 +7470,7 @@ Section ProofPrintk.
     (* what the whole loop owes at the end: the spec's continuation, relative
        to the byte list [l] the UART held when the loop was entered *)
     Definition pk_loop_post `{CID0 : CpuId} (l : list (bv 8)) : iProp Σ :=
-      wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+      wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
         ∀ (mf : regfile) (bs : list (bv 8)),
         sie_cap_gpr mf K b pcur -∗
         pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -7487,7 +7487,7 @@ Section ProofPrintk.
        head at 0x78.  [p'] is the new last-consumed index, [k'] the new
        vararg count, [bs] what the turn printed. *)
     Definition pk_loop_head `{CID0 : CpuId} (i : nat) (l : list (bv 8)) : iProp Σ :=
-      wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+      wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
         ∀ (mk : regfile) (k' p' : nat) (bs : list (bv 8)),
         ⌜ (i <= p')%nat /\ (p' < String.length f)%nat
           /\ pk_kinds (str_drop (S p') f) = map pk_desc_kind (drop k' descs)

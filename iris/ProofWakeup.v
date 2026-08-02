@@ -74,33 +74,6 @@ Definition wkl_regs (M : regfile) (spF chan : mword 64)
   M !!! Regidx (mword_of_int 27) = vs11 /\
   (forall r : regidx, r ∈ dom (rf_to_gmap M)).
 
-(* The ambient SIE index is DERIVABLE from the level and the saved base --
-   ghost agreement between [sie_arm]'s eighth and [intr_count]'s.  wakeup
-   needs it because release's exit index is spelled as that very [match],
-   and it has to be [b] again for the loop's back edge.  (Verbatim
-   ProofMyproc.mp_b_derive / ProofKfree.kf_b_derive, specialized here -- a
-   whole-function proof file must not Require another one.) *)
-Lemma wk_b_derive `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (av : nat) (p : mword 64) (n : nat) (eb b : bool) (C : iProp Σ) :
-  sie_cap_gpr m av b p -∗ cpu_own n eb p C b -∗
-  ⌜ b = match n with O => eb | S _ => false end ⌝.
-Proof.
-  iIntros "Hcg Hcnt".
-  destruct b.
-  - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-    destruct Hp as [-> Ht]. iPureIntro. exact (eq_sym Ht).
-  - destruct n as [|n'].
-    + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-      iPureIntro. destruct eb; [ | reflexivity ].
-      exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-    + iPureIntro. reflexivity.
-Qed.
 
 Module WakeupProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUPPARTS) : WAKEUP.
 
@@ -129,7 +102,7 @@ Section ProofWakeup.
     panic_wp_any -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x58],
        at whatever hart the scan ended on. *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
       ∀ Mexit : regfile,
         ⌜ Mexit !!! Regidx csp_rs1 = spF
           /\ Mexit !!! Regidx (mword_of_int 22) = vs6
@@ -158,11 +131,11 @@ Section ProofWakeup.
        iterations [NPROC - k] -- no Löb needed.  The body is a [wp_next b]
        so the induction hypothesis is re-enterable at a migrated hart. *)
     iAssert (∀ (fuel : nat),
-               wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+               wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                  ∀ (k : nat) (M : regfile),
                    ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
                    ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
-                   wp_next (CID0 := CID0) b (fun (CIDq : CpuId) =>
+                   wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
                      ∀ Mexit : regfile,
                        ⌜ Mexit !!! Regidx csp_rs1 = spF
                          /\ Mexit !!! Regidx (mword_of_int 22) = vs6
@@ -187,13 +160,13 @@ Section ProofWakeup.
         exfalso. lia. }
       iIntros (CIDk Hsk k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown #Htext Hpc Hframe".
       destruct Hregs as (Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11 & Hdom).
-      iDestruct (wk_b_derive with "Hcg Hown") as %Hbmatch.
+      iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       (* ---- shared tail [pc = wakeup+0x30]: p++ (0x30 addi s1,s1,360), then the
          termination test (0x34 beq s1,s2): exit to the epilogue at wakeup+0x58,
          else recurse into iteration k+1.  Captured once, reached from both the
          skip-self path (0x3c taken) and the release-return path (0x2c) -- and
          from DIFFERENT harts, hence the [wp_next] wrapper. ---- *)
-      iAssert (wp_next (CID0 := CID0) b (fun (CIDt : CpuId) =>
+      iAssert (wp_next (CID0 := CID0) b pme (fun (CIDt : CpuId) =>
                  ∀ Mt : regfile,
                    ⌜ wkl_regs Mt spF chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                    sie_cap_gpr Mt av b pme -∗

@@ -132,41 +132,6 @@ Section ProofAllocpid.
   Notation ai_a4 := (mword_of_int 14 : mword 5).
   Notation ai_a5 := (mword_of_int 15 : mword 5).
 
-  (* THE b/outb DERIVATION -- see the porting guide's "Derive the SIE index
-     rather than stating it": [release]'s exit index [outb := match n with O
-     => eb | S _ => false end] is not syntactically [b], but IS forced equal
-     to it by resources this function already holds at entry, held
-     SIMULTANEOUSLY at the same nominal [b]: at [b = true], [cpu_own]'s OWN
-     definition hands [n = 0 /\ eb = true] directly ([cpu_own_on]), so
-     [outb = eb = true = b]; at [b = false] with [n = S _], [outb = false = b]
-     with no further fact needed; at [b = false] with [n = O], [cpu_own]
-     gives [intr_count 0 eb] (the SIE ghost's complementary eighth at
-     [sie_bit eb]) while [sie_cap_gpr]'s own [sie_arm false p] carries the
-     SAME ghost's ARM eighth at zero -- ghost agreement between the two
-     pins [eb = false], hence [outb = eb = false = b].  A LOCAL lemma (not
-     exported by any Spec/leaf file) because no such combined fact exists
-     yet in CpuOwn.v/IntrDefs.v; kept [Local] so it never appears in the
-     file's top-level name list. *)
-  Local Lemma allocpid_b_outb (m0 : regfile) (av0 n0 : nat) (eb0 : bool)
-      (p0 : mword 64) (C0 : iProp Σ) (b0 : bool) :
-    sie_cap_gpr m0 av0 b0 p0 -∗ cpu_own n0 eb0 p0 C0 b0 -∗
-    ⌜ b0 = match n0 with O => eb0 | S _ => false end ⌝.
-  Proof.
-    iIntros "Hcg Hcpu".
-    destruct b0.
-    - iEval (rewrite /cpu_own) in "Hcpu". iDestruct "Hcpu" as "[%Hn0 _]".
-      destruct Hn0 as [-> ->]. done.
-    - destruct n0 as [|n0']; [ | done ].
-      iDestruct (sie_cap_gpr_split with "Hcg") as "(_&_&Hcap&_)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_&_&Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite /cpu_own) in "Hcpu". iDestruct "Hcpu" as "[Hh _]".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "[_ Hic]".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Hbit.
-      destruct eb0; [ | done ].
-      exfalso. cbn [sie_bit] in Hbit. vm_compute in Hbit. discriminate.
-  Qed.
 
   Lemma wp_allocpid_sconf (Φ : mval -> iProp Σ) (γp : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
@@ -176,7 +141,7 @@ Section ProofAllocpid.
     intros pcE ret_tgt Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hislock #Hpanic Hcont".
-    iDestruct (allocpid_b_outb m av n eb p C b with "Hcg Hcpu") as %Hbeq.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq. symmetry in Hbeq.
     (* ===================== PROLOGUE (generic b) ===================== *)
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
@@ -485,7 +450,7 @@ Section ProofAllocpid.
        [outb], syntactically [match n with O => eb | S _ => false end], not
        [b] -- fold it back to [b] via [Hbeq] right away so every leaf below
        (and the final [wp_next_chain]) sees a uniform [b]. *)
-    assert (Hsrelb : b = false -> CIDrel = CIDacq) by (rewrite Hbeq; exact Hsrel).
+    assert (Hsrelb : b = false \/ p = zero_reg -> CIDrel = CIDacq) by (rewrite Hbeq; exact Hsrel).
     clear Hsrel.
     iEval (rewrite -Hbeq) in "Hcg".
     iEval (rewrite -Hbeq) in "Hcpu".

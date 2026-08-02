@@ -15,37 +15,75 @@
    [wp_next_off] collapses the whole thing away, so an interrupts-off (or
    M-mode) contract is stated exactly as it is today, with no binder at all.
 
+   THERE IS A SECOND WAY THE HART IS PINNED, AND IT IS NOT ABOUT SIE: a thread
+   with NO CURRENT PROC cannot be yielded.  [kerneltrap] yields only when
+   [myproc() != 0], so the scheduler thread -- whose [cpus[cid].proc] is 0 --
+   provably stays where it is even with interrupts on.  That datum is already
+   threaded through the whole S-mode tier as [sie_arm] / [sie_cap_gpr]'s [p]
+   (the value of [cpus[cid].proc]), so [wp_next] takes it and offers the second
+   escape hatch [wp_next_idle].  [scheduler()] needs exactly this and no
+   crossing payload could serve instead: what it holds across its
+   interrupts-enabled window is REGISTER state naming the ENTRY hart's [cpus[]]
+   fields, so on another hart the [sd s1,48(s4)] at +0x68 would write the wrong
+   hart's [cpu->proc] -- the code would simply be wrong, which is why this is a
+   refutation of migration rather than a transport of resources across one.
+
+   This WEAKENS nothing.  The condition under which the continuation is pinned
+   got LARGER, so a consumer of [wp_next] receives a stronger hypothesis, and a
+   leaf that PRODUCES one still produces it at its own hart, where the
+   implication holds vacuously.
+
+   The soundness obligation this creates lands on Stage 2's
+   [intr_handler_spec]: NO CURRENT PROC IMPLIES THE TRAP RETURNS ON THE SAME
+   HART.  That is a true statement about [kerneltrap]; writing it down here
+   makes it a premise someone must discharge rather than an accident.
+
    THIS FILE IS THE ONLY PLACE THAT NAMES THE HART WE CAME FROM -- and it must
    therefore live outside any section that fixes [CpuId], because Rocq refuses
    to rebind a SECTION variable's name ("CID is already used"), which is
    exactly the shadowing every consumer relies on. *)
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own.
+Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
+Require Import Riscv.rv64d_types Riscv.rv64d.   (* [zero_reg]: the idle hatch *)
 Require Import RiscvLang.
 
 Section WpNext.
   Context {Σ : gFunctors}.
 
-  Definition wp_next `{CID0 : CpuId} (b : bool)
+  Definition wp_next `{CID0 : CpuId} (b : bool) (p : mword 64)
       (K : forall (CID : CpuId), iProp Σ) : iProp Σ :=
     (∀ CID : CpuId,
-       ⌜ b = false -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
+       ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
 
-  (* Always available, at ANY [b]: proving the hart-generic form discharges the
-     step's obligation.  (The converse needs [b = false].) *)
-  Lemma wp_next_intro `{CID0 : CpuId} (b : bool) K :
-    (∀ CID : CpuId, K CID) -∗ wp_next b K.
+  (* Always available, at ANY [b] and any [p]: proving the hart-generic form
+     discharges the step's obligation.  (The converse needs one of the two
+     pinning conditions.) *)
+  Lemma wp_next_intro `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+    (∀ CID : CpuId, K CID) -∗ wp_next b p K.
   Proof. iIntros "H" (CID _). iApply "H". Qed.
 
   (* Interrupts off: the hart is the one we started with (and hence so is its
      canonical SIE ghost), so the continuation is stated with no binder --
      today's spelling exactly. *)
-  Lemma wp_next_off `{CID0 : CpuId} K :
-    wp_next false K ⊣⊢ K CID0.
+  Lemma wp_next_off `{CID0 : CpuId} (p : mword 64) K :
+    wp_next false p K ⊣⊢ K CID0.
   Proof.
     iSplit.
-    - iIntros "H". iApply ("H" $! CID0). iPureIntro. done.
-    - iIntros "H" (CID Hs). pose proof (Hs eq_refl) as Hc.
+    - iIntros "H". iApply ("H" $! CID0). iPureIntro. intros _. reflexivity.
+    - iIntros "H" (CID Hs). pose proof (Hs (or_introl eq_refl)) as Hc.
+      rewrite (_ : CID = CID0); [ iExact "H" | exact Hc ].
+  Qed.
+
+  (* NO CURRENT PROC: the thread cannot be yielded, so the hart is pinned even
+     at [b = true].  Same collapse as [wp_next_off], from the other hatch. *)
+  Lemma wp_next_idle `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+    p = zero_reg -> wp_next b p K ⊣⊢ K CID0.
+  Proof.
+    intros Hp.
+    iSplit.
+    - iIntros "H". iApply ("H" $! CID0). iPureIntro. intros _. reflexivity.
+    - iIntros "H" (CID Hs). pose proof (Hs (or_intror Hp)) as Hc.
       rewrite (_ : CID = CID0); [ iExact "H" | exact Hc ].
   Qed.
 
@@ -53,11 +91,11 @@ Section WpNext.
      [b]-GENERIC whole-function proof thread one implication per instruction
      and still discharge its own continuation at the end -- with no case split
      on [b] anywhere. *)
-  Lemma wp_next_trans `{CID0 : CpuId} (b : bool)
+  Lemma wp_next_trans `{CID0 : CpuId} (b : bool) (p : mword 64)
       (CID1 : CpuId) (CID2 : CpuId) :
-    (b = false -> (CID1 : CPU) = (CID0 : CPU)) ->
-    (b = false -> (CID2 : CPU) = (CID1 : CPU)) ->
-    (b = false -> (CID2 : CPU) = (CID0 : CPU)).
+    (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+    (b = false \/ p = zero_reg -> (CID2 : CPU) = (CID1 : CPU)) ->
+    (b = false \/ p = zero_reg -> (CID2 : CPU) = (CID0 : CPU)).
   Proof.
     intros H1 H2 Hb. pose proof (H1 Hb) as Ha. pose proof (H2 Hb) as Hc.
     by rewrite Hc.
@@ -74,10 +112,10 @@ End WpNext.
    bare equation, not a conjunction, and a [split] on an equation is
    [constructor 1] = [eq_refl] and would fail on the first chained step.) *)
 Ltac wp_next_chain :=
-  let Hb := fresh "Hb" in
-  intros Hb;
+  let Hd := fresh "Hd" in
+  intros Hd;
   repeat match goal with
-         | H : _ = false -> _ = _ |- _ => specialize (H Hb)
+         | H : _ = false \/ _ = _ -> _ = _ |- _ => specialize (H Hd)
          end;
   solve [ congruence
         | repeat match goal with

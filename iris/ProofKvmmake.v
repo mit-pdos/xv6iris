@@ -655,7 +655,7 @@ Section KvmmakeHouse.
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
     lvl = 0%nat ->
     (48 <= K)%nat ->
-    (b = false -> (CID0 : CPU) = (CID : CPU)) ->
+    (b = false \/ p = zero_reg -> (CID0 : CPU) = (CID : CPU)) ->
     Mf !!! Regidx csp_rs1 = spr ->
     Mf !!! Regidx (mword_of_int 9 : mword 5)
       = zero_extend' 64 (concat_vec (pt_base tf) (zeros' 12 : mword 12)) ->
@@ -683,7 +683,7 @@ Section KvmmakeHouse.
     kalloc_env γa (avail_sub on K_kvmmake) -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
-    wp_next (CID0 := CID) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t : ptree) (pas' : nat -> mword 44),
       sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t -∗
@@ -954,7 +954,7 @@ Section KvmmakeBody.
     cpu_own 0%nat eb p C b -∗ kernel_text -∗
     pc_is (mword_of_int KMK) -∗
     kalloc_env γa (Some nb) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (M : regfile) (bppn : mword 44),
       sie_cap_gpr M (K - 4)%nat b p -∗
       cpu_own 0%nat eb p C b -∗
@@ -1211,7 +1211,7 @@ Section KvmmakeBody.
     pc_is (mword_of_int (KMK + 0x18)) -∗
     ptree_own 2 (DfracOwn 1) (pt_empty_node bppn) -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b -∗
       pc_is (mword_of_int (KMK + 0x28)) -∗
@@ -1358,7 +1358,7 @@ Section KvmmakeBody.
     pc_is (mword_of_int (KMK + 0x28)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b -∗
       pc_is (mword_of_int (KMK + 0x38)) -∗
@@ -1491,7 +1491,7 @@ Section KvmmakeBody.
     pc_is (mword_of_int (KMK + 0x38)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b -∗
       pc_is (mword_of_int (KMK + 0x4a)) -∗
@@ -1624,7 +1624,7 @@ Section KvmmakeBody.
     pc_is (mword_of_int (KMK + 0x4a)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b -∗
       pc_is (mword_of_int (KMK + 0x60)) -∗
@@ -1773,7 +1773,7 @@ Section KvmmakeBody.
     pc_is (mword_of_int (KMK + 0x60)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b -∗
       pc_is (mword_of_int (KMK + 0x82)) -∗
@@ -1948,7 +1948,7 @@ Section KvmmakeBody.
     pc_is (mword_of_int (KMK + 0x82)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b -∗
       pc_is (mword_of_int (KMK + 0x9c)) -∗

@@ -379,7 +379,7 @@ Section ProofFilealloc.
            closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
            at each concrete call site, is the one who both knows the full
            chain back to entry and holds the real [Hcont]. *)
-        wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+        wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
           ∀ mfin,
           sie_cap_gpr mfin K b p -∗
           cpu_own n eb p C b -∗

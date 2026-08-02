@@ -123,7 +123,7 @@ Section ProofFreerange.
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
     panic_wp_any -∗
     kalloc_avail γk onf -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr mr K b pcur -∗
       cpu_own ncnt eb pcur C b -∗
@@ -471,7 +471,7 @@ Section ProofFreerange.
        ambient hart -- must be re-anchored to CID11 before either branch
        below can use it (both eventually call a helper taking a wp_next
        argument at ITS OWN entry hart). *)
-    assert (Hshift11 : b = false -> (CID11 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hshift11 : b = false \/ pcur = zero_reg -> (CID11 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift11 with "Hcont") as "Hcont".
     (* ===================================================================== *)
     (* +0x1a bltu a1,s1,+0x3e : split on whether any full page fits.          *)
@@ -489,7 +489,7 @@ Section ProofFreerange.
       iEval (rewrite Htgt3e) in "Hpc".
       (* [Hcnt]/["Hcont"] were last anchored at CID11 (the prologue's own
          shift point); the taken branch moved one hart further, to CID12. *)
-      assert (Hshift12 : b = false -> (CID12 : CPU) = (CID11 : CPU)) by wp_next_chain.
+      assert (Hshift12 : b = false \/ pcur = zero_reg -> (CID12 : CPU) = (CID11 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift12 with "Hcont") as "Hcont".
       iDestruct (cpu_own_transport CID CID12 ncnt eb pcur C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -601,7 +601,7 @@ Section ProofFreerange.
         apply HR8cs; assumption. }
       (* the seven plain instructions since the shift point (0x1a..0x28) have
          moved further; re-anchor once more, to the loop's own entry hart. *)
-      assert (Hshift18 : b = false -> (CID18 : CPU) = (CID11 : CPU)) by wp_next_chain.
+      assert (Hshift18 : b = false \/ pcur = zero_reg -> (CID18 : CPU) = (CID11 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift18 with "Hcont") as "Hcont".
       (* ================================================================= *)
       (* THE LOOP.  Fuel induction over the remaining page list.           *)
@@ -627,7 +627,7 @@ Section ProofFreerange.
         (pa_stk sp0 4) ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5) : mword 64) -∗
         (pa_stk sp0 5) ↦₈ (m !!! Regidx (mword_of_int 19 : mword 5) : mword 64) -∗
         (pa_stk sp0 6) ↦₈ (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
-        wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+        wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
           ∀ mr, sie_cap_gpr mr K b pcur -∗
           cpu_own ncnt eb pcur C b -∗
           pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
@@ -806,7 +806,7 @@ Section ProofFreerange.
           iEval (rewrite Hcount) in "Havail".
           (* re-anchor ["Hcont"] and transport ["Hcnt"] from this iteration's
              entry [CID0] (via kfree's exit [CIDkf]) to the exit hart [CIDb7]. *)
-          assert (Hshiftexit : b = false -> (CIDb7 : CPU) = (CID0 : CPU)) by wp_next_chain.
+          assert (Hshiftexit : b = false \/ pcur = zero_reg -> (CIDb7 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftexit with "Hcont") as "Hcont".
           iDestruct (cpu_own_transport CIDkf CIDb7 ncnt eb pcur C b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
@@ -827,7 +827,7 @@ Section ProofFreerange.
                     with "Hcg Hpc Hi34 [-]").
           iNext. iIntros (CIDb4 Hsb4) "Hcg Hpc".
           iEval (rewrite Htgt2a) in "Hpc".
-          assert (Hshiftrec : b = false -> (CIDb4 : CPU) = (CID0 : CPU)) by wp_next_chain.
+          assert (Hshiftrec : b = false \/ pcur = zero_reg -> (CIDb4 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".
           iDestruct (cpu_own_transport CIDkf CIDb4 ncnt eb pcur C b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".

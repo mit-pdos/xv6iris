@@ -131,7 +131,7 @@ Section ProofMappages.
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on q) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
       pc_is ret_tgt -∗
@@ -473,7 +473,7 @@ Section ProofMappages.
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈ v00) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
     kalloc_env γa (avail_sub on consumed) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
       pc_is ret_tgt -∗
@@ -753,8 +753,8 @@ Section ProofMappages.
           (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> mr).
       assert (Hpp9c : add_vec_int (mword_of_int (MP + 0x9a) : mword 64) 2 = mword_of_int (MP + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp9c) in "Hpc".
-      assert (Hcrossn0 : b = false -> (CIDn2 : CPU) = (CID0 : CPU)) by wp_next_chain.
-      assert (Hcrossnw : b = false -> (CIDn2 : CPU) = (CIDw : CPU)) by wp_next_chain.
+      assert (Hcrossn0 : b = false \/ p = zero_reg -> (CIDn2 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hcrossnw : b = false \/ p = zero_reg -> (CIDn2 : CPU) = (CIDw : CPU)) by wp_next_chain.
       iDestruct (cpu_own_transport CIDw CIDn2 lvl eb p C b Hcrossnw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossn0 with "Hcont") as "Hcont".
@@ -1015,8 +1015,8 @@ Section ProofMappages.
       assert (Hf25 : F1 !!! Regidx (mword_of_int 25 : mword 5) = mr !!! Regidx (mword_of_int 25 : mword 5)) by peel_reg.
       assert (Hf26 : F1 !!! Regidx (mword_of_int 26 : mword 5) = mr !!! Regidx (mword_of_int 26 : mword 5)) by peel_reg.
       assert (Hf27 : F1 !!! Regidx (mword_of_int 27 : mword 5) = mr !!! Regidx (mword_of_int 27 : mword 5)) by peel_reg.
-      assert (Hcrossl0 : b = false -> (CIDl3 : CPU) = (CID0 : CPU)) by wp_next_chain.
-      assert (Hcrosslw : b = false -> (CIDl3 : CPU) = (CIDw : CPU)) by wp_next_chain.
+      assert (Hcrossl0 : b = false \/ p = zero_reg -> (CIDl3 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hcrosslw : b = false \/ p = zero_reg -> (CIDl3 : CPU) = (CIDw : CPU)) by wp_next_chain.
       iDestruct (cpu_own_transport CIDw CIDl3 lvl eb p C b Hcrosslw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossl0 with "Hcont") as "Hcont".
@@ -1130,8 +1130,8 @@ Section ProofMappages.
       assert (HSn : (S (npages - k - 1) = npages - k)%nat) by lia.
       rewrite HSn in Htel.
       lia. }
-    assert (Hcrossm0 : b = false -> (CIDm3 : CPU) = (CID0 : CPU)) by wp_next_chain.
-    assert (Hcrossmw : b = false -> (CIDm3 : CPU) = (CIDw : CPU)) by wp_next_chain.
+    assert (Hcrossm0 : b = false \/ p = zero_reg -> (CIDm3 : CPU) = (CID0 : CPU)) by wp_next_chain.
+    assert (Hcrossmw : b = false \/ p = zero_reg -> (CIDm3 : CPU) = (CIDw : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CIDw CIDm3 lvl eb p C b Hcrossmw
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift Hcrossm0 with "Hcont") as "Hcont".

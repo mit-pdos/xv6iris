@@ -64,7 +64,7 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   kernel_text -∗ pc_is pcE -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ src_bytes j) -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ dst_olds j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mfin,
     sie_cap_gpr mfin n b p -∗
     pc_is ret_tgt -∗

@@ -128,7 +128,7 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   (if user
    then proc_priv γf p pid V
    else [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗

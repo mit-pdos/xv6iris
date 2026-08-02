@@ -385,7 +385,7 @@ Section ProofWalkaddr.
     (* is blind to WHERE a [_ = false -> _ = _] hypothesis came from.      *)
     (* ================================================================= *)
     iAssert (∀ (CIDe : CpuId) (M : regfile),
-               ⌜b = false -> (CIDe : CPU) = (CID : CPU)⌝ -∗
+               ⌜b = false \/ p = zero_reg -> (CIDe : CPU) = (CID : CPU)⌝ -∗
                ⌜callee_saved mw M⌝ -∗
                sie_cap_gpr (CID := CIDe) M (K - 2)%nat b p -∗
                pc_is (CID := CIDe) (mword_of_int (WA + 0x2a) : mword 64) -∗

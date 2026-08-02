@@ -136,33 +136,6 @@ Section ProofBrelse.
      stored value are separate [rget]s at different indices). *)
   Local Ltac rgpeel := repeat rgne.
 
-  (* At level 0 the entry SIE index [b] and the saved base-enable [eb]
-     coincide: [sie_arm b]'s own eighth and [intr_count 0 eb]'s complementary
-     eighth are the SAME [ghost_var sie_gname], so holding both at once forces
-     their values -- hence [eb] and [b] -- to agree.  brelse needs it because
-     [release]'s exit index at level 0 is [eb], while its own contract's exit
-     index is [b]; see the porting guide's "Derive the SIE index rather than
-     stating it".  [Local]: the same derivation lives in ProofHoldingsleep.v
-     ([hsl_eb_agree]) and ProofAllocpid.v, and no Spec/definitional file
-     exports it yet. *)
-  Local Lemma br_eb_agree (m0 : regfile) (av : nat) (pme : mword 64)
-      (eb b : bool) (C : iProp Σ) :
-    sie_cap_gpr m0 av b pme -∗ cpu_own 0 eb pme C b -∗ ⌜eb = b⌝.
-  Proof.
-    iIntros "Hcg Hcnt".
-    destruct b.
-    - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-      iPureIntro. tauto.
-    - iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-      iPureIntro. destruct eb; [ | reflexivity ].
-      exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The mask-carrying [c.sdsp] leaf: the escrow is opened around this  *)
@@ -188,7 +161,7 @@ Section ProofBrelse.
        add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000"))) ↦₈ vold ∗
        (add_vec (m0 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec uimm ('b"000")))
           ↦₈ (rget m0 rs2) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b pme (fun (CID : CpuId) =>
       sie_cap_gpr m0 av b pme -∗
       pc_is (add_vec_int pc 2) -∗
       Ψ -∗
@@ -285,7 +258,7 @@ Section ProofBrelse.
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx Rs1) -∗
     pa_stk (m !!! Regidx csp_rs1) 4 ↦₈ (m !!! Regidx Rs2) -∗
-    wp_next eb (fun (CID : CpuId) =>
+    wp_next eb p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb p -∗
@@ -550,7 +523,7 @@ Section ProofBrelse.
        [eb]) literally [b], so one [wp_next_chain] composes across the whole
        acquire/release boundary.  See the porting guide's "Derive the SIE
        index rather than stating it". *)
-    iDestruct (br_eb_agree with "Hcg Hcnt") as %Heb. subst eb.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb. cbn in Heb. subst eb.
     iDestruct (bio_ctx_lock with "Hbio") as "#Hlock".
     iDestruct (bio_ctx_buf bn k Hk with "Hbio") as "[#Hslk #Hesc0]".
     iDestruct (buf_escrow_inv with "Hesc0") as "#Hesc".

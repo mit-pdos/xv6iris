@@ -98,7 +98,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗

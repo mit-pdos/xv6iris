@@ -116,26 +116,6 @@ Section ProofBpin.
             [vm_compute; reflexivity | assumption]
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
-  (* DERIVE THE SIE INDEX rather than stating it (see ProofSysUptime.v for
-     the full derivation comment -- identical algebra, function-agnostic). *)
-  Local Lemma cpu_own_b_eq (m : regfile) (av : nat) (p : mword 64)
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) :
-    sie_cap_gpr m av b p -∗ cpu_own n eb p C b -∗
-    ⌜ (match n with O => eb | S _ => false end) = b ⌝.
-  Proof.
-    iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hpure _]". iPureIntro. destruct Hpure as [-> ->]. done.
-    - iDestruct "Hcnt" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
-      destruct n as [|n'].
-      + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-        iDestruct "Hsie" as "(_ & _ & Hbit)".
-        destruct eb.
-        * iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
-          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
-        * iPureIntro. reflexivity.
-      + iPureIntro. reflexivity.
-  Qed.
-
   (* the value the [c.addiw a5,a5,1] leaves for the store, as a function of
      the loaded word -- what joins the two arms of the critical section. *)
   Local Definition incr32 (cw : mword 32) : mword 32 :=
@@ -156,7 +136,7 @@ Section ProofBpin.
     intros pcE ret_tgt HK Hnoffpos Hk Ha0.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hctx #Hpanic Hbslot Hcont".
-    iDestruct (cpu_own_b_eq m K p n eb C b with "Hcg Hcnt") as %Hbeq.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     iDestruct (bio_ctx_lock with "Hctx") as "#Hlock".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).

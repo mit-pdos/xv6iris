@@ -92,7 +92,7 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   proc_pt P -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
     sie_cap_gpr mr K b p -∗
     cpu_own lvl eb p C b -∗

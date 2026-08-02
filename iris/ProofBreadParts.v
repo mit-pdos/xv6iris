@@ -84,7 +84,7 @@ Section BreadEscrowLeaves.
        (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
           ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
     ( ∀ v : mword 32,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
         pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
         Ψ v -∗
@@ -114,7 +114,7 @@ Section BreadEscrowLeaves.
        add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
        (add_vec (rget m rs1) (sign_extend' 64 imm)
           ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m av b p -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
       Ψ -∗

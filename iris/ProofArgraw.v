@@ -450,7 +450,7 @@ Section ProofArgraw.
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) gapv -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
           Mf !!! Regidx ar_s0 = s00 /\
@@ -675,7 +675,7 @@ Section ProofArgraw.
     (k < NARG)%nat ->
     kernel_text -∗ sie_cap_gpr M av' b p -∗
     pc_is (mword_of_int (AR + ar_ld_off k + 2) : mword 64) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr M av' b p -∗ pc_is (mword_of_int (AR + 0x2c) : mword 64) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -735,7 +735,7 @@ Section ProofArgraw.
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) vgap -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
           Mf !!! Regidx ar_s0 = s00 /\

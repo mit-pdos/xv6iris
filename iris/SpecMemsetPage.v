@@ -37,7 +37,7 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr m0 n b pcur -∗
   kernel_text -∗ pc_is pcE -∗
   page_own p -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     ∀ mfin,
     sie_cap_gpr mfin n b pcur -∗
     pc_is ret_tgt -∗

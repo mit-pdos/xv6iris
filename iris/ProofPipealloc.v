@@ -296,7 +296,7 @@ Section ProofPipealloc.
     iPoseProof (pai_be with "Htext") as "Hibe".
     iPoseProof (pai_c0 with "Htext") as "Hic0".
     iPoseProof (pai_c2 with "Htext") as "Hic2".
-    set (EPI := (wp_next (CID0 := CID) b (fun (CIDe : CpuId) =>
+    set (EPI := (wp_next (CID0 := CID) b p (fun (CIDe : CpuId) =>
         ∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
@@ -473,7 +473,7 @@ Section ProofPipealloc.
     set (PF1 := ((pf1 ↦₈ (zero_reg : mword 64) ∗ fd_slot)
                  ∨ (∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat⌝ ∗ pf1 ↦₈ fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
-    set (T8 := (wp_next (CID0 := CID) b (fun (CIDt : CpuId) =>
+    set (T8 := (wp_next (CID0 := CID) b p (fun (CIDt : CpuId) =>
         ∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = spr
           /\ Mt !!! Regidx Rs4 = pf1
@@ -492,7 +492,7 @@ Section ProofPipealloc.
         PF1 -∗
         kalloc_avail γk on -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I).
-    set (T4C := (wp_next (CID0 := CID) b (fun (CIDu : CpuId) =>
+    set (T4C := (wp_next (CID0 := CID) b p (fun (CIDu : CpuId) =>
         ∀ (Mt : regfile) (k0 : nat) (Cf0 : fcontent),
         ⌜ Mt !!! Regidx csp_rs1 = spr
           /\ Mt !!! Regidx Rs4 = pf1

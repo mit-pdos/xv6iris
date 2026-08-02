@@ -213,7 +213,7 @@ Section ProofUvmunmap.
     pa_stk sp0 6 ↦₈ (mm !!! Regidx Rs4) -∗
     pa_stk sp0 7 ↦₈ (mm !!! Regidx Rs5) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
       sie_cap_gpr mf K b p -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
@@ -442,7 +442,7 @@ Section ProofUvmunmap.
     ptree_own 2 (DfracOwn 1) t -∗
     upt_pages_own (um_del_run um (svpn_of va) done) -∗
     kalloc_env γa None -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mj : regfile,
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜uu_thr mm mj⌝ -∗
@@ -512,7 +512,7 @@ Section ProofUvmunmap.
     (* ================================================================ *)
     (*  THE +0x4a JOIN: the loop tail, over the post-body descriptor.     *)
     (* ================================================================ *)
-    iAssert (wp_next b (fun (CIDt : CpuId) =>
+    iAssert (wp_next b p (fun (CIDt : CpuId) =>
         ∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
         ⌜ mt !!! Regidx csp_rs1 = spr
           /\ mt !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
@@ -1114,7 +1114,7 @@ Section ProofUvmunmap.
     pc_is pcE -∗
     uptg otf uroot um -∗
     kalloc_env γa None -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K b p -∗
       cpu_own ilvl eb p C b -∗

@@ -97,7 +97,7 @@ Lemma wp_sw_plic_pinv_s_sconf
   sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   plic_inv -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -256,7 +256,7 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
   sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γd γv -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -298,7 +298,7 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
   dev_inv γd γv -∗
   ( ∀ v : bv 32,
     ⌜ P v ⌝ -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n b p -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }})) -∗

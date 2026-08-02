@@ -113,7 +113,7 @@ Section ProofWalk.
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on q) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
       pc_is ret_tgt -∗
@@ -323,7 +323,7 @@ Section ProofWalk.
     iIntros (CIDe10 Hse10) "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
     iSpecialize ("Hcont" $! CIDe10 with "[%]"); [wp_next_chain|].
-    assert (HcntCE : b = false -> (CIDe10 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (HcntCE : b = false \/ p = zero_reg -> (CIDe10 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CID CIDe10 lvl eb p C b HcntCE with "Hcnt") as "Hcnt".
     iApply ("Hcont" $! E9 tf q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%] [%]").
     { exact Hnodes. }
@@ -404,7 +404,7 @@ Section ProofWalk.
     pa_stk sp0 8 ↦₈ (mm !!! Regidx (mword_of_int 22)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
     kalloc_env γa (avail_sub on q) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
       pc_is ret_tgt -∗
@@ -498,7 +498,7 @@ Section ProofWalk.
        THIS lemma's entry hart [CID]; the four plain instructions above
        (srli/andi/cslli/cadd) each landed on a fresh generic-[b] hart,
        ending at [CIDt4] -- re-anchor both once via the composed chain. *)
-    assert (Hchaint : b = false -> (CIDt4 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hchaint : b = false \/ p = zero_reg -> (CIDt4 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hchaint with "Hcont") as "Hcont".
     iDestruct (cpu_own_transport CID CIDt4 lvl eb p C b Hchaint with "Hcnt") as "Hcnt".
     iApply (wp_walk_epilogue_sconf γa Φ mm T4 t tf K lvl eb p C on q b HK
@@ -546,7 +546,7 @@ Section ProofWalk.
     kernel_text -∗
     pc_is (mword_of_int (WK + 0x26)) -∗
     slotaddr ↦₈{dqm} pte -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (and_vec pte (sign_extend' 64 (mword_of_int 1 : mword 12)))]>
                 (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg pte]>
                  (<[Regidx (mword_of_int 18 : mword 5) := regval_into_reg slotaddr]> M))) n b p -∗
@@ -670,7 +670,7 @@ Section ProofWalk.
     sie_cap_gpr m0 n b pcur -∗
     kernel_text -∗ pc_is pcE -∗
     page_own p -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b pcur (fun (CID : CpuId) =>
     ∀ mfin,
       sie_cap_gpr mfin n b pcur -∗
       pc_is ret_tgt -∗
@@ -744,7 +744,7 @@ Section ProofWalk.
     kalloc_env γa (avail_sub on g) -∗
     F -∗
     (* SUCCESS: page allocated, grafted; rejoin the loop at +0x40 *)
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (Mo : regfile) (bn : mword 44),
       ⌜forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
          Mo !!! Regidx c = Mf !!! Regidx c⌝ -∗
@@ -765,7 +765,7 @@ Section ProofWalk.
       F -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     (* FAILURE: kalloc returned 0; the tree is untouched, exit at +0x52 *)
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (Mo : regfile),
       ⌜forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
          Mo !!! Regidx c = Mf !!! Regidx c⌝ -∗
@@ -819,7 +819,7 @@ Section ProofWalk.
       by (rewrite /J upd_eq; reflexivity).
     (* [Hcnt] entered this lemma at [CID]; the [beqz]/[jal] pair landed on
        [CIDa2] -- transport it once before feeding kalloc. *)
-    assert (HcntCA0 : b = false -> (CIDa2 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (HcntCA0 : b = false \/ p = zero_reg -> (CIDa2 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CID CIDa2 lvl eb p C b HcntCA0 with "Hcnt") as "Hcnt".
     iApply (Kalloc.wp_kalloc_sconf Φ γa γk (mword_of_int (KernelSyms.kmem + 24))
               J (avail_sub on g) lvl eb p C (K - 8)%nat b
@@ -866,9 +866,9 @@ Section ProofWalk.
          this lemma's entry hart [CID]; [Hcnt] on the other hand was
          REFRESHED at [CIDa3] by kalloc's own postcondition -- each needs
          its own link to [CIDa5]. *)
-      assert (HcntCA1 : b = false -> (CIDa5 : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (HcntCA1 : b = false \/ p = zero_reg -> (CIDa5 : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift HcntCA1 with "Hfail") as "Hfail".
-      assert (HcntCA1' : b = false -> (CIDa5 : CPU) = (CIDa3 : CPU)) by wp_next_chain.
+      assert (HcntCA1' : b = false \/ p = zero_reg -> (CIDa5 : CPU) = (CIDa3 : CPU)) by wp_next_chain.
       iDestruct (cpu_own_transport CIDa3 CIDa5 lvl eb p C b HcntCA1' with "Hcnt") as "Hcnt".
       iSpecialize ("Hfail" $! CIDa5 with "[%]"); [wp_next_chain|].
       iApply ("Hfail" $! N1 with "[%] [%] [%] Hcg Hcnt Hpc
@@ -1074,9 +1074,9 @@ Section ProofWalk.
     (* [Hcont]-analogue "Hok" was anchored at [CID]; the SUCCESS arm's
        thirteen plain instructions (cbeqz.fall through cj) all landed on
        fresh generic-[b] harts, ending at [CIDa14] -- re-anchor once. *)
-    assert (HcntCA2 : b = false -> (CIDa14 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (HcntCA2 : b = false \/ p = zero_reg -> (CIDa14 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift HcntCA2 with "Hok") as "Hok".
-    assert (HcntCA2' : b = false -> (CIDa14 : CPU) = (CIDa3 : CPU)) by wp_next_chain.
+    assert (HcntCA2' : b = false \/ p = zero_reg -> (CIDa14 : CPU) = (CIDa3 : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CIDa3 CIDa14 lvl eb p C b HcntCA2' with "Hcnt") as "Hcnt".
     iSpecialize ("Hok" $! CIDa14 with "[%]"); [wp_next_chain|].
     iApply ("Hok" $! P3 bppn with "[%] [%] Hcg Hcnt Hpc
@@ -1248,7 +1248,7 @@ Section ProofWalk.
           ⌜ptree_offpath_eq vpn t tf⌝ ∗
           ⌜pt_present_mono t tf⌝)) -∗
     kalloc_env γa (avail_sub on g) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
       sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
       pc_is ret_tgt -∗
@@ -1424,7 +1424,7 @@ Section ProofWalk.
         (* [Hcont]/[Hcnt] entered this ITERATION at [CID]; the six plain
            instructions above (probe's own crossing plus cbeqz/csrli/cslli/
            caddiw/bne) landed on [CIDb6] -- re-anchor both once. *)
-        assert (Hchainb1 : b = false -> (CIDb6 : CPU) = (CID : CPU)) by wp_next_chain.
+        assert (Hchainb1 : b = false \/ p = zero_reg -> (CIDb6 : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hchainb1 with "Hcont") as "Hcont".
         iDestruct (cpu_own_transport CID CIDb6 lvl eb p C b Hchainb1 with "Hcnt") as "Hcnt".
         iApply (wp_walk_tail_sconf γa Φ mm M9 t tf (pt_base c) K lvl eb p C on g b HK Hva
@@ -1441,7 +1441,7 @@ Section ProofWalk.
         iIntros (CIDb6' Hsb6'). iNext. iIntros "Hcg Hpc".
         assert (Hbk26 : add_vec (mword_of_int (WK + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (WK + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hbk26) in "Hpc".
-        assert (Hchainb2 : b = false -> (CIDb6' : CPU) = (CID : CPU)) by wp_next_chain.
+        assert (Hchainb2 : b = false \/ p = zero_reg -> (CIDb6' : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hchainb2 with "Hcont") as "Hcont".
         iDestruct (cpu_own_transport CID CIDb6' lvl eb p C b Hchainb2 with "Hcnt") as "Hcnt".
         iApply (IH CIDb6' g M9 c w ltac:(lia) HspM9 HM9s3 HM9s4 HM9s5 HM9s1 HM9s6 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hnv
@@ -1505,7 +1505,7 @@ Section ProofWalk.
         iApply ("Hgw" $! bg with "Hcell Hchild"). }
       (* [Hcont]/[Hcnt] entered this iteration at [CID]; cbeqz.taken landed
          on [CIDc0] -- re-anchor once before feeding [wp_walk_alloc_sconf]. *)
-      assert (Hchainc0 : b = false -> (CIDc0 : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hchainc0 : b = false \/ p = zero_reg -> (CIDc0 : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (cpu_own_transport CID CIDc0 lvl eb p C b Hchainc0 with "Hcnt") as "Hcnt".
       iApply (wp_walk_alloc_sconf γa Φ mm M6 cur
                 (fun bg => pt_graft cur (vpn_idx (S L') vpn) bg) (S L') L'
@@ -1611,9 +1611,9 @@ Section ProofWalk.
           (* [Hcnt] was refreshed at [CIDok] by alloc's own "Hok"; [Hcont]
              rode through alloc UNTOUCHED inside the opaque [F], so it is
              STILL anchored at [CID].  caddiw+bne landed on [CIDc2]. *)
-          assert (Hchainc1 : b = false -> (CIDc2 : CPU) = (CID : CPU)) by wp_next_chain.
+          assert (Hchainc1 : b = false \/ p = zero_reg -> (CIDc2 : CPU) = (CID : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hchainc1 with "Hcont") as "Hcont".
-          assert (Hchainc1' : b = false -> (CIDc2 : CPU) = (CIDok : CPU)) by wp_next_chain.
+          assert (Hchainc1' : b = false \/ p = zero_reg -> (CIDc2 : CPU) = (CIDok : CPU)) by wp_next_chain.
           iDestruct (cpu_own_transport CIDok CIDc2 lvl eb p C b Hchainc1' with "Hcnt") as "Hcnt".
           iApply (wp_walk_tail_sconf γa Φ mm Rb t tf (pt_base (pt_empty_node bn)) K lvl eb p C on (S g) b HK Hva
                     HspRb HRbs3 HRbs1 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27 Hsame Hoff Hpres ltac:(lia) Hmiss
@@ -1629,9 +1629,9 @@ Section ProofWalk.
           iIntros (CIDc2' Hsc2'). iNext. iIntros "Hcg Hpc".
           assert (Hbk26 : add_vec (mword_of_int (WK + 0x42) : mword 64) (sign_extend' 64 (mword_of_int 8164 : mword 13)) = mword_of_int (WK + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hbk26) in "Hpc".
-          assert (Hchainc2 : b = false -> (CIDc2' : CPU) = (CID : CPU)) by wp_next_chain.
+          assert (Hchainc2 : b = false \/ p = zero_reg -> (CIDc2' : CPU) = (CID : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hchainc2 with "Hcont") as "Hcont".
-          assert (Hchainc2' : b = false -> (CIDc2' : CPU) = (CIDok : CPU)) by wp_next_chain.
+          assert (Hchainc2' : b = false \/ p = zero_reg -> (CIDc2' : CPU) = (CIDok : CPU)) by wp_next_chain.
           iDestruct (cpu_own_transport CIDok CIDc2' lvl eb p C b Hchainc2' with "Hcnt") as "Hcnt".
           iApply (IH CIDc2' (S g) Rb (pt_empty_node bn) w ltac:(lia) HspRb HRbs3 HRbs4 HRbs5 HRbs1 HRbs6 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27
                     (or_intror (ptree_blocks0_lvl_empty _ bn vpn))
@@ -1652,7 +1652,7 @@ Section ProofWalk.
         (* [Hcont] rode through alloc untouched inside [F], still anchored at
            [CID]; [Hcnt] was already refreshed to [CIDfl] by alloc's own
            "Hfail", so only [Hcont] needs re-anchoring here. *)
-        assert (Hchainf : b = false -> (CIDfl : CPU) = (CID : CPU)) by wp_next_chain.
+        assert (Hchainf : b = false \/ p = zero_reg -> (CIDfl : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hchainf with "Hcont") as "Hcont".
         iApply (wp_walk_epilogue_sconf γa Φ mm Mo t tf K lvl eb p C on g b HK
                   ltac:(rewrite (Hcs csp_rs1 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)); exact HspM6)
@@ -1989,7 +1989,7 @@ Section ProofWalk.
        bltu) each landed on a fresh generic-[b] hart, ending at [CIDw18] --
        re-anchor both once via the composed chain, shared by both branches
        of the [m !! vpn] case split below. *)
-    assert (Hchainw : b = false -> (CIDw18 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hchainw : b = false \/ p = zero_reg -> (CIDw18 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hchainw with "Hcont") as "Hcont".
     iDestruct (cpu_own_transport CID CIDw18 lvl eb p C b Hchainw with "Hcnt") as "Hcnt".
     destruct (m !! vpn) as [wv|] eqn:Hmv.

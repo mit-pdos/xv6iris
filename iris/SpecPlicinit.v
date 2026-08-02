@@ -67,7 +67,7 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      both writes preserve [plic_ok], so nothing is owed back to the caller *)
   plic_inv -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ m' : regfile,
     sie_cap_gpr m' n b p -∗
     pc_is ret_tgt -∗

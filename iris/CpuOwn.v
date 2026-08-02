@@ -40,6 +40,7 @@ From iris.base_logic.lib Require Import ghost_var invariants.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang HartTp.
+Require Import RegFile.   (* [regfile]: the index algebra below names the map *)
 Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom.
@@ -100,6 +101,71 @@ Section CpuOwn.
   Proof.
     iIntros "(_ & _ & _ & _ & _ & Hh) [Hh' _]".
     iApply (cpu_hart_excl with "Hh Hh'").
+  Qed.
+
+  (* ===================================================================== *)
+  (* THE INDEX ALGEBRA -- DERIVE the ambient SIE index, never state it.     *)
+  (*                                                                        *)
+  (* [b] (the index of the ambient [sie_cap_gpr]) and the [(n, eb)] pair    *)
+  (* this bundle carries are NOT independent: they are tied by ghost        *)
+  (* agreement between [sie_arm]'s eighth and [intr_count]'s complementary  *)
+  (* eighth, into exactly the expression every level-generic callee spells  *)
+  (* as its EXIT index, [match n with O => eb | S _ => false end].  So a    *)
+  (* contract that threads a plain [b] through a lock-holding function is   *)
+  (* not necessarily a bug -- check whether the derivation closes first.    *)
+  (*                                                                        *)
+  (* These live HERE, beside the resources they are about, because a        *)
+  (* whole-function [Proof*.v] may not [Require] another one and six of     *)
+  (* them had independently hand-rolled the same three lines.  The three    *)
+  (* facts are: the enabled base FORCES [b = true] at level 0; a level      *)
+  (* above 0 is outright incompatible with the enabled index; and the       *)
+  (* general agreement the other two specialize.                            *)
+  (* ===================================================================== *)
+
+  (* THE GENERAL FACT.  At [b = true] the bundle's own shape already packs
+     [n = 0 /\ eb = true].  At [b = false] with [n = 0], [sie_arm false p]'s
+     eighth (at '0') and [intr_count 0 eb]'s complementary eighth (at
+     [sie_bit eb]) are eighths of the SAME ghost var, so agreement pins
+     [eb = false].  At [b = false] with [n = S _] the match is [false]
+     unconditionally and there is nothing to derive. *)
+  Lemma cpu_own_eb_agree (m : regfile) (K : nat) (n : nat) (eb : bool)
+      (p : mword 64) (C : iProp Σ) (b : bool) :
+    sie_cap_gpr m K b p -∗ cpu_own n eb p C b -∗
+    ⌜ match n with O => eb | S _ => false end = b ⌝.
+  Proof.
+    iIntros "Hcg Hown". destruct b.
+    - iDestruct "Hown" as "[%Hpure _]". iPureIntro. destruct Hpure as [-> ->]. done.
+    - iDestruct "Hown" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
+      destruct n as [|n'].
+      + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
+        iDestruct "Hsie" as "(_ & _ & Hbit)".
+        destruct eb.
+        * iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
+          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
+          vm_compute in Hbad. discriminate.
+        * iPureIntro. reflexivity.
+      + iPureIntro. reflexivity.
+  Qed.
+
+  (* AN ENABLED BASE AT LEVEL 0 FORCES THE ENABLED INDEX.  This is what makes
+     "state the contract at [b = false]" a VACUITY rather than a weakening for
+     every level-0/enabled-base contract: there is no [b = false] instance. *)
+  Lemma cpu_own_forces_on (m : regfile) (K : nat) (p : mword 64)
+      (C : iProp Σ) (b : bool) :
+    sie_cap_gpr m K b p -∗ cpu_own 0 true p C b -∗ ⌜ b = true ⌝.
+  Proof.
+    destruct b; [ by iIntros "_ _" |].
+    iIntros "Hcg Hown".
+    iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbad.
+    cbn in Hbad. discriminate Hbad.
+  Qed.
+
+  (* ... and the dual, which needs no capability at all: the enabled index's
+     own arm carries [⌜n = 0⌝]. *)
+  Lemma cpu_own_forces_off (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+    cpu_own (S n) eb p C true -∗ False.
+  Proof.
+    iIntros "[%Hpure _]". destruct Hpure as [Hn _]. discriminate Hn.
   Qed.
 
   (* boot entry: raw cells + the SIE eighth at '0'.  [iv] arbitrary. *)
@@ -163,12 +229,12 @@ End CpuOwn.
 Lemma cpu_own_transport `{!riscvGS Σ} `{!sieG Σ}
     (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (b : bool) :
-  (b = false -> (CID1 : CPU) = (CID0 : CPU)) ->
+  (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   cpu_own (CID := CID0) n eb p C b -∗ cpu_own (CID := CID1) n eb p C b.
 Proof.
   intros Heq. destruct b.
   - (* enabled: the payload is in [sie_arm], nothing here mentions the hart *)
     iIntros "H". iExact "H".
   - (* disabled: no trap was taken, so the hart did not move *)
-    rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq eq_refl) ].
+    rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
 Qed.

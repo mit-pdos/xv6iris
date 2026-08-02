@@ -94,7 +94,7 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   pc_is pcE -∗
   proc_pt P -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_olds j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (dst_new : nat -> bv 8),
     sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗

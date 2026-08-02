@@ -407,6 +407,13 @@ migration"* — **came due during the consumer sweep, not at Stage 2**, and thre
 independent agents diagnosed it identically with compiled probes. It is the
 last real design decision in the project.
 
+**STATUS.** Four of the five central changes have LANDED: the index algebra is
+in `CpuOwn.v`, `WpSconfCsr.wp_csrci_sstatus_x0_s_sconf` is de-vacuified,
+`wp_next` carries `p` and offers `wp_next_idle`, and `ctx_adm` / the
+`SpecSleep`+`SpecSched` index split are done. **The CROSSING PAYLOAD below is
+NOT landed** — it is the remaining central change, and until it lands
+`ProofYield`, `ProofBread`, `ProofBwrite` and `ProofAcquiresleep` stay blocked.
+
 ### The forced index, and why it is not a mis-statement
 
 For a contract with `cpu_own 0 eb p C b` and `eb = true`, **`b = true` is
@@ -428,9 +435,10 @@ Qed.
 ```
 
 The dual is immediate: `cpu_own (S n) eb p C true` contains `⌜n = 0⌝`, so
-`n ≥ 1` forces `b = false`. **Both belong in `CpuOwn.v` as named lemmas** —
-"derive the SIE index rather than stating it" currently reads as optional
-advice, and for this cone it is mandatory.
+`n ≥ 1` forces `b = false`. Both are now named lemmas in `CpuOwn.v`
+(`cpu_own_forces_on` / `cpu_own_forces_off`, beside the general
+`cpu_own_eb_agree`) — "derive the SIE index rather than stating it" is not
+optional advice for this cone, it is mandatory, so never re-derive it locally.
 
 So the cut is exactly **level 0 with an enabled base**. `SpecSleep`
 (`cpu_own 1 …`) and `SpecSched` (`sie_cap_gpr … false …`) are single-hart and
@@ -546,9 +554,11 @@ Two cheaper things that do NOT work, recorded so nobody re-invents them:
   nothing ties the existential back to `cpu_id`. Re-tying it is the agreement
   ghost, i.e. strictly more work than the payload field.
 
-### Two smaller blockers found alongside, both real bugs
+### Two smaller blockers found alongside, both real bugs — BOTH FIXED
 
-1. **`WpSconfCsr.wp_csrci_sstatus_x0_s_sconf` (WpSconfCsr.v:892) is VACUOUS.**
+Kept for the durable lessons, which recur; the fixes are in the tree.
+
+1. **`WpSconfCsr.wp_csrci_sstatus_x0_s_sconf` was VACUOUS.**
    Its two siblings were updated when `cpu_own` moved into the arm; this one
    was not. It demands a separate `intr_count 0 true` BESIDE
    `sie_cap_gpr m n b p`, and nobody can hold that eighth: at `b = true` the
@@ -561,8 +571,8 @@ Two cheaper things that do NOT work, recorded so nobody re-invents them:
    `b = true` branch works verbatim, taking the flip's second eighth out of
    `Hcpu` instead of `Hcnt`.
 
-2. **The `gname` in `SwtchCtx.ctx_adm` is now VESTIGIAL, and the vestige is
-   what blocks `ProofSched`.** `SpecSwtch`'s continuation quantifies
+2. **The `gname` in `SwtchCtx.ctx_adm` was VESTIGIAL, and the vestige was
+   what blocked `ProofSched`.** `SpecSwtch`'s continuation quantifies
    `∀ (h : CPU) (g : gname)` with `adm None h g = True`, so `g` is free;
    `p_sched_at_proc` then yields `⌜A' = Some (h, g)⌝` while `sched_vc` needs
    `Some (h, sie_gname (CID:=h))`, and the two indices are incomparable
@@ -595,8 +605,9 @@ It is also not a real possibility. `kerneltrap` yields only when
 provably cannot migrate. **That datum is already threaded** — it is
 `sie_cap_gpr`/`sie_arm`'s `p`, and it is `zero_reg` at every point in that
 proof where `b` can be true (the one window with `p = proc_addr jj`, +0x68
-through +0x76, runs at `noff ≥ 1` hence `b = false`). So give `wp_next` a
-second escape hatch:
+through +0x76, runs at `noff ≥ 1` hence `b = false`). So `wp_next` has a
+second escape hatch (LANDED; the porting-guide section "`wp_next` HAS TWO
+ESCAPE HATCHES" is the consumer-side recipe):
 
 ```coq
 Definition wp_next `{CID0 : CpuId} (b : bool) (p : mword 64)
@@ -640,9 +651,10 @@ resumes at `∀ h`). `SpecYield` escapes only by accident: its `eb = true` at
 level 0 makes `b` derivably `true`, so `wp_next b` coincides with the right
 answer.
 
-Fix both: resource index at the literal `false`, `wp_next true`, and drop the
-`(b : bool)` binder. The rule is now written up in the porting guide under
-"A PARKING function's `wp_next` index is `true` UNCONDITIONALLY".
+Fixed in both (LANDED): resource index at the literal `false`, `wp_next true`,
+and no `(b : bool)` binder. The rule is written up in the porting guide under
+"A PARKING function's `wp_next` index is `true` UNCONDITIONALLY"; check any
+remaining parking contract against it, since the check cannot be a compile.
 
 ### THE TP-PREMISE SWEEP WAS NOT FINISHED — nine contracts still carry it
 
@@ -676,24 +688,27 @@ the tp slot in its POSTCONDITION** (`uvmcreate_post γa on (mm !!! Regidx
 something meaningless about the caller's map. It should name the hart directly
 (`cid_word_of cpu_id`, or `rget mm Rtp` which is equal to it by `rget_tp`).
 
-### While the tree is quiet, hoist the four hand-copied index derivations
+### The hand-copied index derivations are hoisted (LANDED)
 
-`kf_b_derive` / `ka_b_derive` / `mp_b_derive` / `rsl_b_derive` are four
-independent copies of the same three-line proof, written by four agents who
-could not `Require` each other's whole-function files. Four reinventions of the
-same bridge is this project's own signal that the contract is missing something
-(surprise 10). **Put them in `CpuOwn.v`** alongside the two forced-index lemmas
-above; they all belong to the same small algebra.
+FOURTEEN `Proof*.v` files had independently written the same three-line proof,
+because a whole-function proof file may not `Require` another one. That many
+reinventions of the same bridge is this project's own signal that the contract
+was missing something (surprise 10). They are all gone; the algebra is
+`CpuOwn.cpu_own_eb_agree` / `_forces_on` / `_forces_off`. The general lesson:
+**when a second file needs the same three-line ghost-agreement bridge, put it
+in the file that owns the resources, not in the consumer.**
 
 ### Sequencing
 
 All five changes (`sie_pay`, the csrci leaf, `ctx_adm`, `wp_next`'s second
-hatch, and the sleep/sched index) are CENTRAL. By this project's own
-orchestration rule they must land as one serialized change with NO consumer
-agents running, followed by one consumer wave over the parking/bio cone. Do not
-split them across waves: the csrci leaf and the arm payload touch the same
-definition, and `ctx_adm`, `wp_next` and the index fix all change the parking
-contracts' continuation shape.
+hatch, and the sleep/sched index) are CENTRAL: by this project's own
+orchestration rule each lands serialized, with NO consumer agents running,
+followed by a consumer wave. Four landed together as one change; **the crossing
+payload is the one left**, and it must likewise land alone.
+
+What the landed four unblock: `ProofSched`, `ProofSleep` and `ProofScheduler`
+(plus their `Link*`). What still waits on the crossing payload: `ProofYield`,
+`ProofBread`, `ProofBwrite`, `ProofAcquiresleep`.
 
 ## SURPRISES — the checkpoint
 

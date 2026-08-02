@@ -181,7 +181,7 @@ Definition wp_allocproc_sconf_body
   procs_inv Φ γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗

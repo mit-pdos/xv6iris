@@ -56,7 +56,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
     sie_cap_gpr mr K b p -∗
     cpu_own lvl eb p C b -∗

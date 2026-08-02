@@ -40,32 +40,6 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
-(* See ProofKfree.v (kf_b_derive) for the full rationale -- kalloc needs the
-   identical bridge: the entry [b]/[(n,eb)] agreement, so kalloc's own
-   top-level [wp_next b] can absorb release's [wp_next outb]. [SpecRelease.v]'s
-   entry-side tp premise is gone (HartTp.v -- the map's tp slot is ignored),
-   so no tp-forget bridge is needed any more. *)
-Lemma ka_b_derive `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (K : nat) (p : mword 64) (n : nat) (eb b : bool) (C : iProp Σ) :
-  sie_cap_gpr m K b p -∗ cpu_own n eb p C b -∗
-  ⌜ b = match n with O => eb | S _ => false end ⌝.
-Proof.
-  iIntros "Hcg Hcnt".
-  destruct b.
-  - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-    destruct Hp as [-> Ht]. iPureIntro. exact (eq_sym Ht).
-  - destruct n as [|n'].
-    + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-      iPureIntro. destruct eb; [ | reflexivity ].
-      exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-    + iPureIntro. reflexivity.
-Qed.
 
 Module KallocProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELEASE) : KALLOC.
 
@@ -85,7 +59,7 @@ Section ProofKalloc.
     intros pcE ret_tgt HK Hfl Hnoffpos.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail #Hpanic Hcont".
-    iDestruct (ka_b_derive with "Hcg Hcnt") as %Hbmatch.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbmatch. symmetry in Hbmatch.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (kai_00 with "Htext") as "Hi00".
     iPoseProof (kai_02 with "Htext") as "Hi02".

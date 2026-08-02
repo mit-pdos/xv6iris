@@ -51,6 +51,9 @@ stale `.vo`).
 | `rd <> csp_rs1` premise | `rd_ok rd` **in the same slot** |
 | `m !!! Regidx rs` in a GENERIC leaf's value premise | `rget m rs` |
 | `callee_saved` (with tp), `callee_saved_notp` | `callee_saved` (tp-free); the `_notp` twins are gone |
+| `wp_next b K` | `wp_next b p K` — `p` is the ambient `cpus[cid].proc`, the same one `sie_cap_gpr … b p` carries |
+| `ctx_adm = option (CPU * gname)`, `adm A h g`, `∀ h g` resume wands | `ctx_adm = option CPU`, `adm A h`, `∀ h` |
+| `SchedCtx.sched_vc_at h g c p`, `p_sched h g A' …` | `sched_vc_at h c p`, `p_sched h A' …` |
 
 The SIE ghost is now canonical per hart (`IntrDefs.sie_gname := sie_name
 cpu_id`), which is why `γ` disappeared. The one place an explicit ghost
@@ -128,8 +131,8 @@ not transitive, so `tp_pin` / `rget` / `wp_next` are not in scope just because
 Lemma L (γ : gname) … (m : regfile) (n : nat) :   Lemma L … (m : regfile) (n : nat) (b : bool) :
   rd <> csp_rs1 ->                                rd_ok rd ->
   … = m !!! Regidx rsa ->                         … = rget m rsa ->
-  sie_cap_gpr γ m n -∗                            sie_cap_gpr m n b -∗
-  ( sie_cap_gpr γ (<[Regidx rd := v]> m) n -∗     wp_next b (fun (CID : CpuId) =>
+  sie_cap_gpr γ m n -∗                            sie_cap_gpr m n b p -∗
+  ( sie_cap_gpr γ (<[Regidx rd := v]> m) n -∗     wp_next b p (fun (CID : CpuId) =>
     pc_is (add_vec_int pc 4) -∗                     sie_cap_gpr (<[Regidx rd := v]> m) n b -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗         pc_is (add_vec_int pc 4) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.              WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -255,6 +258,43 @@ so only its INTERIOR is interrupts-off — which is precisely where it gets to
 call `mycpu()` at `false`. A function that brackets its own critical section is
 b-generic on the outside no matter what it does inside.
 
+## `wp_next` HAS TWO ESCAPE HATCHES, and the second one is `p`
+
+```coq
+Definition wp_next `{CID0 : CpuId} (b : bool) (p : mword 64)
+    (K : forall (CID : CpuId), iProp Σ) : iProp Σ :=
+  (∀ CID : CpuId,
+     ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
+```
+
+Interrupts off pins the hart (`wp_next_off`); so does having NO CURRENT PROC
+(`wp_next_idle`, premise `p = zero_reg`), because `kerneltrap` yields only when
+`myproc() != 0`. The scheduler thread is the case that needs the second hatch,
+and no crossing payload could serve instead: what it holds across its enabled
+window is REGISTER state naming the ENTRY hart's `cpus[]` fields, so on another
+hart the `sd s1,48(s4)` at +0x68 would write the wrong hart's `cpu->proc`. The
+soundness obligation lands on Stage 2's `intr_handler_spec`: *no current proc ⇒
+the trap returns on the same hart.*
+
+Consequences for a port:
+
+- `p` is a section `Context {p : mword 64}` in every `Wp*` leaf, so the edit
+  there is uniformly `wp_next b` → `wp_next b p`. In a `Spec*`/`Proof*` file
+  the proc parameter has a per-file NAME (`p`, `pj`, `p0`, `pcur`, `pme`, …):
+  **use the one that appears in that body's own `sie_cap_gpr … b <name>`**, and
+  read the body rather than guessing — `ProofWalk`'s memset lemma binds a LOCAL
+  `p` that is a page address, not the proc.
+- The per-step hypothesis a leaf hands back is now a DISJUNCTION,
+  `b = false \/ p = zero_reg -> (CIDk : CPU) = (CID0 : CPU)`. Every hand-written
+  `assert (Hshift : b = false -> …)` and every transport lemma premise
+  (`CpuOwn.cpu_own_transport`, `WpSconfVc.wp_next_shift`, a file's own
+  `po_cells_transport`) has to be restated in that shape; `wp_next_chain` still
+  discharges them all. A `Heq eq_refl` that fed the old premise becomes
+  `Heq (or_introl eq_refl)`.
+- This WEAKENS nothing: the pinning condition got larger, so consumers get a
+  stronger hypothesis and leaf proofs (which instantiate at the current hart)
+  are unaffected.
+
 ## Two different indices: the resource's, and `wp_next`'s
 
 For a function that merely threads the SIE state through, both are `b` and
@@ -314,7 +354,9 @@ a hart can change, and only the first is about SIE:
 So any function that can reach a `swtch` — `sched`, `sleep`, `yield`, and
 everything that sleeps — is `wp_next true` no matter what its RESOURCE index
 is, and threading one `b` through both slots is a falsehood of exactly the kind
-this refactor exists to remove.
+this refactor exists to remove. `SpecSleep` and `SpecSched` are restated this
+way (resource index at the literal `false`, `wp_next true`, no `b` binder at
+all); check any remaining parking contract against the rule before porting it.
 
 `sleep` is the sharp case, because the two indices are opposite CONSTANTS:
 it runs at `noff = 1`, so `cpu_own 1 eb pj C b` forces the resource index to
@@ -326,10 +368,10 @@ claims *"sleep returns on the hart that called it"*, which is false twice over:
 the post-resume `release` exits at `outb = eb = true`.
 
 ```coq
-  sie_cap_gpr m av false pj -∗          (* resource index: forced false *)
+  sie_cap_gpr m av false pj -∗             (* resource index: forced false *)
   cpu_own 1 eb pj C false -∗
   …
-  wp_next true (fun (CID : CpuId) => …) (* crossing index: it parks *)
+  wp_next true pj (fun (CID : CpuId) => …) (* crossing index: it parks *)
 ```
 and the `(b : bool)` binder is then dropped entirely.
 
@@ -362,7 +404,7 @@ per-call-site edit:
 
 - **Every decomposed helper lemma needs its OWN `` `{CID0 : CpuId} `` binder**
   (shadowing the section's `Context`) and must wrap its own continuation in
-  `wp_next b (fun CID => …)`, closing with
+  `wp_next b p (fun CID => …)`, closing with
   `iSpecialize ("Hcont" $! CIDn with "[%]"); [wp_next_chain|]`.
   Worked example: `ProofConsputc.wp_consputc_epi`.
 - **A fuel/index induction that forwards `Hcont` across recursive calls** needs
@@ -374,7 +416,7 @@ per-call-site edit:
 - **…but there is a shape that needs NO re-anchoring at all, and it is the one
   to reach for first.** Make the loop invariant ITSELF a `wp_next`:
   ```coq
-  ∀ (fuel : nat), wp_next (CID0 := CID0) b (fun CID => ∀ k M, …)
+  ∀ (fuel : nat), wp_next (CID0 := CID0) b p (fun CID => ∀ k M, …)
   ```
   then `iIntros (fuel); iInduction fuel`. The IH *is* a `wp_next`, so it
   re-enters at a migrated hart for free. Anchoring every hart-carrying
@@ -392,7 +434,7 @@ per-call-site edit:
 
 ## `rewrite -Hbmatch` mangles the goal when the LEVEL IS A LITERAL
 
-`ProofKfree.kf_b_derive`'s idiom — re-folding a callee's exit index
+The `CpuOwn.cpu_own_eb_agree` idiom — re-folding a callee's exit index
 `outb = match n with O => eb | S _ => false end` back to `b` with
 `rewrite -Hbmatch` — works only while `n` is a VARIABLE. At `n = 0%nat` the
 elaborator has already ι-reduced `outb` to a plain `eb`, so the rewrite fires
@@ -415,7 +457,7 @@ Substitute **`eb`**, not `b`: that leaves a *variable* named `b`, so
 `intr_count`'s `if eb` never reduces and you avoid the `iNext`-over-`cpu_own`
 trap from `sched-hart-generic.md`.
 
-## Derive the SIE index rather than stating it
+## Derive the SIE index rather than stating it — and the lemmas are in `CpuOwn.v`
 
 `b = match n with O => eb | S _ => false end` is DERIVABLE from resources a
 caller already holds — ghost agreement between `sie_arm`'s eighth and
@@ -423,6 +465,25 @@ caller already holds — ghost agreement between `sie_arm`'s eighth and
 through a lock-holding function is not necessarily a bug; check whether the
 derivation closes before concluding the contract is wrong. (This is the same
 algebra that forces `SwtchCtx`'s resumed hart to `false`.)
+
+**Never re-derive it locally.** Fourteen `Proof*.v` files had independently
+hand-rolled the same three lines, because a whole-function proof file may not
+`Require` another one. The algebra now lives in `CpuOwn.v`, beside the
+resources it is about:
+
+```coq
+cpu_own_eb_agree : sie_cap_gpr m K b p -∗ cpu_own n eb p C b -∗
+                   ⌜ match n with O => eb | S _ => false end = b ⌝
+cpu_own_forces_on  : sie_cap_gpr m K b p -∗ cpu_own 0 true p C b -∗ ⌜ b = true ⌝
+cpu_own_forces_off : cpu_own (S n) eb p C true -∗ False
+```
+
+`cpu_own_eb_agree` is the general one; the direction is
+`match … = b`, so a proof that wants `b = match …` writes `symmetry in H`, and
+one at the literal level 0 writes `cbn in H` to get the bare `eb = b`.
+`cpu_own_forces_on` is the fact that makes "state the level-0/enabled-base
+contract at `b = false`" a VACUITY rather than a weakening — there is no
+`b = false` instance to verify.
 
 ## Two things about re-anchoring, learned the expensive way
 
@@ -481,7 +542,7 @@ to something trivially provable:
 ```
 
 **Nothing catches this.** It compiles, and the `Module Type` seal accepts it.
-It has already happened once, by dropping a `wp_next b (fun CID => …)` wrapper
+It has already happened once, by dropping a `wp_next b p (fun CID => …)` wrapper
 and its closing paren while re-indenting. The symptom, if you are lucky enough
 to get one, is remote from the cause: `iIntros "… Hcont"` failing with *"could
 not introduce Hcont, goal is not a wand or implication"* in the PROOF file.
@@ -504,7 +565,7 @@ premises) — the checker knows the difference.
   pure premise first: `iSpecialize ("Hcont" $! cpu_id with "[]");
   [iPureIntro; done|].` then a plain `iApply` for the rest.
 - **A `wp_next` obligation under a `▷`:** put the later OUTSIDE
-  (`▷ wp_next b (fun CID => …)`), so the existing `iNext` strips it from goal
+  (`▷ wp_next b p (fun CID => …)`), so the existing `iNext` strips it from goal
   and hypothesis exactly as before. Inside, one `iApply` cannot peel a later
   and a wand at once and you need an `iSpecialize` first.
 - **`iIntros (CID)` fails with "CID is already used"** against the section's

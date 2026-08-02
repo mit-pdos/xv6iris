@@ -193,7 +193,7 @@ Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names)
     virtio_proto γd v -∗ R ==∗
     ∃ w : bv 32, ⌜ virtio_read v (uint a8 - virtio_base)%Z = Some w ⌝ ∗
                  virtio_proto γd v ∗ S w ) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ w : bv 32,
     sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
@@ -378,7 +378,7 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
     ∃ v' : virtio_state,
       ⌜ virtio_write v (uint a8 - virtio_base)%Z storeword = Some v' ⌝ ∗
       ⌜ virtio_isr_ok v' ⌝ ∗ virtio_proto γd v' ∗ S ) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S -∗
@@ -554,7 +554,7 @@ Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
   sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γu γd -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ w : bv 32,
     ⌜ P w ⌝ -∗
     sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
@@ -609,7 +609,7 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
   sie_cap_gpr m n b p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗

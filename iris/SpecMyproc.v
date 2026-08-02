@@ -56,7 +56,7 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mf : regfile),
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr mf av b p -∗

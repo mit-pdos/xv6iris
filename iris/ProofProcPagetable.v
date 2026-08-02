@@ -29,7 +29,7 @@
    overwrites a map's tp slot unconditionally, so calling uvmcreate at
    [Jp := tp_pin J] instead of [J] makes the premise true BY CONSTRUCTION
    ([upd_eq]) while every other register lookup on [Jp] still equals the one
-   on [J] ([tp_pin] only touches slot 4) -- see [allocpid_b_outb]-style
+   on [J] ([tp_pin] only touches slot 4) -- see [CpuOwn.cpu_own_eb_agree]-style
    reasoning in ProofAllocpid.v for the sibling situation with release.
 
    [kalloc_env] used to be tp-indexed too (KvmSpec.v's comment: "unused in

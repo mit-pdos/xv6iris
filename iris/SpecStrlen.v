@@ -62,7 +62,7 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   kernel_text -∗
   pc_is pcE -∗
   ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr : regfile,
     sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗

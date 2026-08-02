@@ -79,7 +79,7 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   lock_finisher γl lka R Dc Out (⊤ ∖ ↑minstretN) -∗
   cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
-  wp_next outb (fun (CID : CpuId) =>
+  wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     Out -∗
     sie_cap_gpr mr av outb p -∗
@@ -105,7 +105,7 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   R -∗
   cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
-  wp_next outb (fun (CID : CpuId) =>
+  wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr av outb p -∗
     pc_is ret_tgt -∗
@@ -146,7 +146,7 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CI
   (lock_frag γl None -∗ R ==∗ D ∗ Out) -∗
   cpu_own (S n) eb p C false -∗
   trap_csrs_pay n eb -∗
-  wp_next outb (fun (CID : CpuId) =>
+  wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     lka ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lka ↦₈ (zero_reg : mword 64) -∗

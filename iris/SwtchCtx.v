@@ -35,16 +35,16 @@ Definition callee_img (m : regfile) : list (mword 64) :=
   map (fun r => m !!! Regidx r) ctx_regs.
 
 (* ---------------------------------------------------------------------- *)
-(* THE ADMISSIBILITY INDEX of a context record: at which (hart, SIE-ghost) *)
-(* pairs its stored continuation may be resumed.                          *)
+(* THE ADMISSIBILITY INDEX of a context record: at which HARTS its        *)
+(* stored continuation may be resumed.                                    *)
 (*                                                                        *)
-(*   [None]          -- MIGRATABLE: resumable on ANY hart, against ANY     *)
-(*                      hart's SIE ghost name.  This is a PROC context:    *)
+(*   [None]          -- MIGRATABLE: resumable on ANY hart.  This is a      *)
+(*                      PROC context:                                      *)
 (*                      real xv6 lets any hart's scheduler pick up any     *)
 (*                      RUNNABLE proc, and swtch does not even save tp --   *)
 (*                      the resumed thread inherits the resuming hart's,    *)
 (*                      and re-derives mycpu() from it.                     *)
-(*   [Some (h, g)]   -- PINNED at hart [h] with SIE ghost [g].  This is a   *)
+(*   [Some h]        -- PINNED at hart [h].  This is a                     *)
 (*                      CPU/scheduler context: [cpus[h].context] can only   *)
 (*                      ever be resumed by a thread already running on      *)
 (*                      hart [h] (the resumer computes &c->context from     *)
@@ -59,20 +59,30 @@ Definition callee_img (m : regfile) : list (mword 64) :=
 (* record at the resumer's own index, and the payload pins [A']).           *)
 (* See claude-notes/projects/sched-hart-generic.md.                          *)
 (* ---------------------------------------------------------------------- *)
-Definition ctx_adm : Type := option (CPU * gname).
+(* THE SLOT CARRIES NO GHOST NAME.  It used to be [option (CPU * gname)],
+   pairing the hart with the SIE ghost the record was parked against; since
+   the SIE ghost went CANONICAL per hart ([IntrDefs.sie_gname = sie_name
+   cpu_id]) the second component says nothing the first does not already
+   determine, and carrying it was actively harmful: a resume continuation
+   quantifying [∀ h g] hands out a FREE [g], so [p_sched_at_proc] yielded
+   [⌜A' = Some (h, g)⌝] at that free name while [sched_vc] needs
+   [Some (h, sie_gname (CID:=h))] -- two indices [adm_pin_inv] cannot
+   compare.  A [wp_next b p (fun CID => ...)] lambda has no [g] binder to
+   forward, so the datum had to be either PINNED at the crossing or dropped;
+   there was nothing left for it to say, so it is dropped. *)
+Definition ctx_adm : Type := option CPU.
 
-Definition adm (A : ctx_adm) (h : CPU) (g : gname) : Prop :=
+Definition adm (A : ctx_adm) (h : CPU) : Prop :=
   match A with
   | None => True
-  | Some (h0, g0) => h = h0 /\ g = g0
+  | Some h0 => h = h0
   end.
 
-Lemma adm_none (h : CPU) (g : gname) : adm None h g.
+Lemma adm_none (h : CPU) : adm None h.
 Proof. exact I. Qed.
-Lemma adm_pin (h : CPU) (g : gname) : adm (Some (h, g)) h g.
-Proof. split; reflexivity. Qed.
-Lemma adm_pin_inv (h0 h : CPU) (g0 g : gname) :
-  adm (Some (h0, g0)) h g -> h = h0 /\ g = g0.
+Lemma adm_pin (h : CPU) : adm (Some h) h.
+Proof. reflexivity. Qed.
+Lemma adm_pin_inv (h0 h : CPU) : adm (Some h0) h -> h = h0.
 Proof. intro H; exact H. Qed.
 
 (* The pc a coroutine resumes on is [ret_pc] of its saved return address
@@ -116,15 +126,16 @@ Section SwtchCtx.
   (* the wand from (the resuming hart's bundle + pc at c.ra + a gpr file       *)
   (* whose callee-saved regs are c's saved values, caller-saved arbitrary)     *)
   (* to that hart's whole-machine [WP (LoopE h) {{Phi}}].  [A] is the          *)
-  (* admissibility index (top of file): which (hart, SIE-ghost) pairs may      *)
+  (* admissibility index (top of file): which harts may                        *)
   (* resume it.  On resumption the continuation is handed, for the             *)
   (* (existentially quantified) context [cret] that resumed c and ITS OWN      *)
   (* index [A'], [▷ valid_context Phi P A' cret] together with                 *)
-  (* [P h g A' c cret tpv p] -- a caller-chosen SEVEN-place payload:           *)
-  (*   [h] [g] the RESUMING hart and its SIE ghost name -- the payload is      *)
+  (* [P h A' c cret tpv p] -- a caller-chosen SIX-place payload:               *)
+  (*   [h]    the RESUMING hart -- the payload is                              *)
   (*          the only channel that can tell the resumed party which hart it   *)
   (*          woke up on, and it is what re-ties the received per-cpu cells    *)
-  (*          to the fresh register file's tp;                                 *)
+  (*          to the fresh register file's tp.  There is no ghost-name slot    *)
+  (*          beside it: the SIE ghost is [sie_name h], determined by [h];     *)
   (*   [A']  the RESUMER's admissibility index.  The resumed party has to      *)
   (*          re-deposit its resumer's record (a parking proc stows the        *)
   (*          scheduler's; the scheduler stows the proc's in its lock          *)
@@ -176,20 +187,19 @@ Section SwtchCtx.
      noff==1-at-swtch invariant; slot [emp]: the in-flight context cells
      ride separately.  The stack-free crossing remainder ([swconf] below)
      is internal to the swtch proof. *)
-  (* THE ∀h∀g RESUME WAND.  The record's owned pieces (its cells, its parked
+  (* THE ∀h RESUME WAND.  The record's owned pieces (its cells, its parked
      stack) are hart-independent memory and sit OUTSIDE the quantifier -- which
      is what makes a MIGRATABLE record affordable: one copy of the resources,
      one continuation good at every hart.  Everything a resumption HANDS IN is
-     spelled at the resuming hart [h] and its SIE ghost [g] ([sie_cap_gpr],
+     spelled at the resuming hart [h] ([sie_cap_gpr],
      [cpu_own] and [pc_is] are ambient-instance predicates, instantiated here
      at [CID := h]), and the conclusion is that hart's own [WP (LoopE h)].
-     [g] is quantified alongside [h] because the SIE ghost is PER-HART (one
-     name's fractions are wholly consumed by one hart's sconf / arm / count),
-     so a migratable record cannot name any single hart's name -- and
-     [SchedCtx.procs_inv], which stores such records, must mention neither. *)
+     The SIE ghost needs no binder of its own: it is [sie_name h], so
+     rebinding [h] rebinds it -- and a MIGRATABLE record still names no
+     hart, which is what lets [SchedCtx.procs_inv] store one. *)
   Definition valid_context_pre
       (Phi : mval -> iProp Σ)
-      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
@@ -198,8 +208,8 @@ Section SwtchCtx.
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (nth 1 vs (mword_of_int 0)) (kv_frame_slots + av) ∗
-      (∀ (h : CPU) (g : gname) (m : regfile) (eb' : bool),
-         ⌜adm A h g⌝ -∗
+      (∀ (h : CPU) (m : regfile) (eb' : bool),
+         ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
          sie_cap_gpr (CID := h) m av false p -∗
          cpu_own (CID := h) 1 eb' p emp false -∗
@@ -207,11 +217,11 @@ Section SwtchCtx.
          ctx_cells c vs -∗
          (∃ (A' : ctx_adm) (cret : mword 64),
             ▷ rec A' cret p ∗
-            P h g A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
+            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
          WP (LoopE h : expr riscv_lang) {{ Phi }}))%I.
 
   Global Instance valid_context_pre_contractive Phi
-      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ) :
     Contractive (valid_context_pre Phi P).
   (* [solve_contractive] gets all the way to the recursive occurrence and
@@ -225,13 +235,13 @@ Section SwtchCtx.
   Qed.
 
   Definition valid_context (Phi : mval -> iProp Σ)
-      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ :=
     fixpoint (valid_context_pre Phi P).
 
   Lemma valid_context_unfold (Phi : mval -> iProp Σ)
-      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (A : ctx_adm) (c p : mword 64) :
     valid_context Phi P A c p ⊣⊢

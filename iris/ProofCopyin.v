@@ -266,7 +266,7 @@ Section ProofCopyin.
     pa_stk sp0 10 ↦₈ (mm !!! Regidx Rs8) -∗
     pa_stk sp0 11 ↦₈ (mm !!! Regidx Rs9) -∗
     (∃ w : mword 64, pa_stk sp0 12 ↦₈ w) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       sie_cap_gpr mf K b pcur -∗
       cpu_own ncnt eb pcur C b -∗
@@ -531,7 +531,7 @@ Section ProofCopyin.
     proc_pt Pc -∗
     kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ fd j) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (g : nat -> bv 8),
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜mj !!! Regidx Rs10 = v10⌝ -∗
@@ -564,7 +564,7 @@ Section ProofCopyin.
     (* the exit continuation, named so the two joins below can take it -- kept
        [wp_next]-shaped (matching ["Hcont"]'s own type verbatim), since it is
        specialised at whichever hart each exit finally reaches. *)
-    set (EXIT := (wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    set (EXIT := (wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (g : nat -> bv 8),
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜mj !!! Regidx Rs10 = v10⌝ -∗
@@ -606,7 +606,7 @@ Section ProofCopyin.
     (*  THE +0x2c JOIN: the chunk copy, over an arbitrary borrowed page.  *)
     (* ================================================================ *)
     iAssert (∀ (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd),
-        ⌜b = false -> (CIDb : CPU) = (CID0 : CPU)⌝ -∗
+        ⌜b = false \/ p = zero_reg -> (CIDb : CPU) = (CID0 : CPU)⌝ -∗
         ⌜uptd_ext_sz szv Pc Pd⌝ -∗
         ⌜mb !!! Regidx Ra0 = pa0⌝ -∗
         ⌜mb !!! Regidx csp_rs1 = spr⌝ -∗
@@ -667,7 +667,7 @@ Section ProofCopyin.
       (*  THE +0x38 JOIN: the copy proper, over the chunk length [n].     *)
       (* ============================================================== *)
       iAssert (∀ (CIDc : CpuId) (mc : regfile) (n : nat),
-          ⌜b = false -> (CIDc : CPU) = (CID0 : CPU)⌝ -∗
+          ⌜b = false \/ p = zero_reg -> (CIDc : CPU) = (CID0 : CPU)⌝ -∗
           ⌜(1 <= n)%nat⌝ -∗ ⌜(n <= rem)%nat⌝ -∗ ⌜(off + n <= 4096)%nat⌝ -∗
           ⌜mc !!! Regidx Rs1 = (mword_of_int (Z.of_nat n) : mword 64)⌝ -∗
           ⌜mc !!! Regidx Ra0 = pa0⌝ -∗
@@ -937,7 +937,7 @@ Section ProofCopyin.
           assert (HF1 : (rem - n <= fuel)%nat) by lia.
           assert (HF2 : (1 <= rem - n)%nat) by lia.
           assert (HF3 : (done + n + (rem - n) = len)%nat) by lia.
-          assert (HshiftIH : b = false -> (CIDg4' : CPU) = (CID0 : CPU)) by wp_next_chain.
+          assert (HshiftIH : b = false \/ p = zero_reg -> (CIDg4' : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift HshiftIH with "HEXIT") as "HEXIT".
           iDestruct (cpu_own_transport CIDb CIDg4' lvl eb p C b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".

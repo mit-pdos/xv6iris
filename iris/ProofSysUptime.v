@@ -21,7 +21,7 @@
    pinned at literal [false] (acquire disables; release requires disabled
    entry).  Acquire and release's own [n]/[eb] match this function's, so
    release hands back [cpu_own n eb p C outb] for [outb := match n with O =>
-   eb | S _ => false end]; [cpu_own_b_eq] derives [outb = b] UP FRONT from the
+   eb | S _ => false end]; [CpuOwn.cpu_own_eb_agree] derives [outb = b] from the
    entry resources (ghost agreement between [sie_arm]'s and [intr_count]'s
    eighths -- see the porting guide's "Derive the SIE index rather than
    stating it"), so the fact is in hand by the time release returns. *)
@@ -121,33 +121,6 @@ Section ProofSysUptime.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{CID : CpuId}.
 
-  (* ------------------------------------------------------------------- *)
-  (* DERIVE THE SIE INDEX rather than stating it: from the entry resources
-     [sie_cap_gpr m av b p] / [cpu_own n eb p C b], [match n with O => eb |
-     S _ => false end] is FORCED to equal [b].  At [b = true], [cpu_own]
-     itself packs [n = 0 /\ eb = true] (CpuOwn.cpu_own_on).  At [b = false]
-     and [n = 0], both bundles hold an eighth of the SAME SIE ghost var
-     ([sie_arm false p]'s eighth at '0', [intr_count 0 eb]'s eighth at
-     [sie_bit eb]); [ghost_var_agree] forces [eb = false] -- the same
-     agreement [IntrDefs.intr_count_push_off] uses.  At [S _] the match is
-     [false] unconditionally, matching [b] trivially. *)
-  Local Lemma cpu_own_b_eq (m : regfile) (av : nat) (p : mword 64)
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) :
-    sie_cap_gpr m av b p -∗ cpu_own n eb p C b -∗
-    ⌜ (match n with O => eb | S _ => false end) = b ⌝.
-  Proof.
-    iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hpure _]". iPureIntro. destruct Hpure as [-> ->]. done.
-    - iDestruct "Hcnt" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
-      destruct n as [|n'].
-      + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-        iDestruct "Hsie" as "(_ & _ & Hbit)".
-        destruct eb.
-        * iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
-          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
-        * iPureIntro. reflexivity.
-      + iPureIntro. reflexivity.
-  Qed.
 
   Lemma wp_sys_uptime_sconf (Φ : mval -> iProp Σ) (γl : gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
@@ -157,7 +130,7 @@ Section ProofSysUptime.
     intros pcE ret_tgt Htp Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hcont".
-    iDestruct (cpu_own_b_eq m av p n eb C b with "Hcg Hcnt") as %Hbeq.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     iDestruct (is_tickslock_lock with "Hlock") as "#Hlk".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (sui_00 with "Htext") as "Hi00".

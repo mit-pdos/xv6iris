@@ -70,7 +70,7 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   cpu_own lvl eb p C b -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗
   kalloc_env γa on -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
     cpu_own lvl eb p C b -∗

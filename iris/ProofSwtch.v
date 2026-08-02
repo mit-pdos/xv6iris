@@ -71,7 +71,7 @@ Section ProofSwtch.
   Qed.
 
   Lemma wp_swtch_sconf (Φ : mval -> iProp Σ)
-      (P : CPU -d> gname -d> ctx_adm -d> mword 64 -d> mword 64 -d>
+      (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
@@ -270,12 +270,12 @@ Section ProofSwtch.
     iEval (rewrite -(tp_pin_id (vregs_den rho swtch_regs1) Hm4_raw)) in "Hfile".
     iDestruct (sie_cap_gpr_join (vregs_den rho swtch_regs1) av_t false p
                  with "Hhs Hsc Hcap_t Hfile") as "Hcg_t".
-    (* the record's wand is [∀ h g m eb']; swtch resumes it HERE, so it is
-       applied at this hart and this hart's (now canonical) SIE ghost
-       [sie_gname], and the spec's [adm An cpu_id sie_gname] premise is
+    (* the record's wand is [∀ h m eb']; swtch resumes it HERE, so it is
+       applied at this hart -- whose SIE ghost is [sie_gname] by
+       construction -- and the spec's [adm An cpu_id] premise is
        exactly its admissibility obligation.  The hand-off names the OLD
        record's own index [Ao]. *)
-    iApply ("Hnewwand" $! cpu_id sie_gname (vregs_den rho swtch_regs1) eb
+    iApply ("Hnewwand" $! cpu_id (vregs_den rho swtch_regs1) eb
               with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }

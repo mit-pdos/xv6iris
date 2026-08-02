@@ -283,7 +283,7 @@ Section ProofFdalloc.
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) gapv -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗
@@ -692,7 +692,7 @@ Section ProofFdalloc.
        three post-myproc) have moved the hart since entry; re-anchor ["Hcont"]
        to the loop's own entry hart [CID12] and transport ["Hcpu"] there from
        myproc's exit [CID8] (the last hart it was freshly anchored at). *)
-    assert (Hshift_loop : b = false -> (CID12 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hshift_loop : b = false \/ p = zero_reg -> (CID12 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift_loop with "Hcont") as "Hcont".
     iDestruct (cpu_own_transport CID8 CID12 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ================================================================= *)
@@ -723,7 +723,7 @@ Section ProofFdalloc.
       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
       (pa_stk sp0 4) ↦₈ (vgap : mword 64) -∗
-      wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+      wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
         ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
           sie_cap_gpr mf av b p -∗
@@ -893,7 +893,7 @@ Section ProofFdalloc.
           pose proof (is_cs_idx_true_neq Ra5 r ltac:(vm_compute; reflexivity) Hr) as Na5.
           rewrite /G3 upd_ne; [| congruence]. rewrite /G2 upd_ne; [| congruence].
           rewrite /G1 upd_ne; [| congruence]. apply HL1cs; assumption. }
-        assert (Hshiftexit1 : b = false -> (CIDcj : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftexit1 : b = false \/ p = zero_reg -> (CIDcj : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftexit1 with "Hcont") as "Hcont".
         iApply (fda_tail (CID0 := CIDcj) Φ m G3 av (mword_of_int (Z.of_nat fd)) sp0
                   (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
@@ -1008,7 +1008,7 @@ Section ProofFdalloc.
           { intros r Hr Ncsp N8 N9.
             pose proof (is_cs_idx_true_neq Ra0 r ltac:(vm_compute; reflexivity) Hr) as Na0.
             rewrite /F1 upd_ne; [| congruence]. apply HN2cs; assumption. }
-          assert (Hshiftexit2 : b = false -> (CIDli : CPU) = (CID0 : CPU)) by wp_next_chain.
+          assert (Hshiftexit2 : b = false \/ p = zero_reg -> (CIDli : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftexit2 with "Hcont") as "Hcont".
           iApply (fda_tail (CID0 := CIDli) Φ m F1 av (mword_of_int (-1)) sp0
                     (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
@@ -1039,7 +1039,7 @@ Section ProofFdalloc.
                     with "Hcg Hpc Hi22 [-]").
           iNext. iIntros (CIDtaken HsTaken) "Hcg Hpc".
           iEval (rewrite Htgt1a) in "Hpc".
-          assert (Hshiftrec : b = false -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
+          assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".
           iDestruct (cpu_own_transport CID0 CIDtaken n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
           iApply ("IHf" $! (S fd) CIDtaken N2 with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpv Href Hc1 Hc2 Hc3 Hc4 Hcont").

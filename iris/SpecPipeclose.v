@@ -79,7 +79,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* wakeup's *)
   procs_inv Φ γs -∗
   panic_wp_any -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
     sie_cap_gpr mr av b pme -∗
     cpu_own n eb pme C b -∗

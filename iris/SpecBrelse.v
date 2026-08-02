@@ -77,7 +77,7 @@ Definition wp_brelse_sconf_body
   procs_inv Φ γs -∗
   (* the locked buffer being released *)
   bio_locked bn k pidv dev bno bs -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b p -∗

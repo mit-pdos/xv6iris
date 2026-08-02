@@ -50,7 +50,7 @@ Definition wp_memset_head_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   instr (add_vec_int pcE 2) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx ra_idx, sp, 8)) -∗
   instr (add_vec_int pcE 4) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx s0_idx, sp, 8)) -∗
   instr (add_vec_int pcE 6) true (ITYPE (caddi4spn_imm nzimm_s0, sp, Regidx s0_idx, ADDI)) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     sie_cap_gpr m2 (n - 2) b pcur -∗
     pc_is (add_vec_int pcE 8) -∗
     pa_ra ↦₈ ra0 -∗ pa_s0 ↦₈ s00 -∗
@@ -69,7 +69,7 @@ Definition wp_memset_skip_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   sie_cap_gpr M n b pcur -∗
   pc_is (add_vec_int pcE 8) -∗
   instr (add_vec_int pcE 8) true (BTYPE (sign_extend' 13 (concat_vec imm8_beqz ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 4)), BEQ)) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     sie_cap_gpr M n b pcur -∗
     pc_is (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -98,7 +98,7 @@ Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   instr (add_vec_int pcE 12) true (SHIFTIOP (shamt_l, Regidx a2_idx, Regidx a2_idx, SLLI)) -∗
   instr (add_vec_int pcE 14) true (SHIFTIOP (shamt_r, Regidx a2_idx, Regidx a2_idx, SRLI)) -∗
   instr (add_vec_int pcE 16) false (RTYPE (Regidx a0_idx, Regidx a2_idx, Regidx a4_idx, ADD)) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     sie_cap_gpr m6 n b pcur -∗
     pc_is (add_vec_int pcE 20) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -147,7 +147,7 @@ Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   kernel_text -∗
   pc_is pc0 -∗
   ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ olds j) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     sie_cap_gpr (<[Regidx ra5 := regval_into_reg (ms_addr p N)]> m) n b pcur -∗
     pc_is (add_vec_int pc6 4) -∗
     ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ cbyte) -∗
@@ -167,7 +167,7 @@ Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   pc_is (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) -∗
   add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ ra0e -∗
   add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ s00e -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     ∀ mf,
     sie_cap_gpr mf (n + 2) b pcur -∗
     pc_is ret_tgt -∗

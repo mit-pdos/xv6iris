@@ -75,7 +75,7 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
   ip ↦₄ old -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b p -∗

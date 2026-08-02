@@ -124,7 +124,7 @@ Section ProofUvmcreate.
     pa_stk sp0 3 ↦₈ (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈ v4 -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) rv -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mr : regfile,
       sie_cap_gpr mr K b p -∗
       cpu_own lvl eb p C b -∗

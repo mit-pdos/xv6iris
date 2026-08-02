@@ -114,7 +114,7 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 7) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -263,7 +263,7 @@ Section ProofPrintint.
     digits_tbl dg -∗
     pc_is (mword_of_int (PI + 0x22) : mword 64) -∗
     bytes_own (DfracOwn 1) buf 24 -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mb : regfile),
       ⌜ mb !!! Regidx a0_idx = mword_of_int (Z.quot (uint x) (uint (md !!! Regidx a1_idx))) /\
         mb !!! Regidx a3_idx = pa_add buf (S i) /\
@@ -504,7 +504,7 @@ Section ProofPrintint.
     digits_tbl dg -∗
     pc_is (mword_of_int (PI + 0x22) : mword 64) -∗
     bytes_own (DfracOwn 1) buf 24 -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (i' : nat),
       ⌜ (1 <= i')%nat /\ (i' <= 21)%nat /\
         mf !!! Regidx a2_idx = mword_of_int (Z.of_nat i') /\
@@ -568,7 +568,7 @@ Section ProofPrintint.
         destruct Hbase as [Hb1 _]. lia. }
       (* re-anchor ["Hcont"] (still at the entry hart [CID0]) to the hart
          reached by the back-edge branch ([CIDc]) before recursing. *)
-      assert (Hshiftc : b = false -> (CIDc : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshiftc : b = false \/ pcur = zero_reg -> (CIDc : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftc with "Hcont") as "Hcont".
       iApply (IH (S i) CIDc (mword_of_int (Z.quot (uint x) (uint (md !!! Regidx a1_idx)))) mb
                 ltac:(lia)
@@ -630,7 +630,7 @@ Section ProofPrintint.
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       ⌜ forall c : mword 5, is_cs_idx c = true -> c <> s1_idx ->
           mf !!! Regidx c = mp !!! Regidx c ⌝ -∗
@@ -750,7 +750,7 @@ Section ProofPrintint.
       assert (Htgtb : add_vec (mword_of_int (PI + 0x7e) : mword 64) (sign_extend' 64 (mword_of_int 8182 : mword 13)) = mword_of_int (PI + 0x74))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtb) in "Hpc".
-      assert (Hshiftbn : b = false -> (CIDbn : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshiftbn : b = false \/ pcur = zero_reg -> (CIDbn : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshiftbn with "Hcont") as "Hcont".
       iApply (IH CIDbn (l ++ bs)%list P3 ltac:(lia)
                 ltac:(rewrite HP3s1; apply pa_add_back1; reflexivity)
@@ -799,7 +799,7 @@ Section ProofPrintint.
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -1033,7 +1033,7 @@ Section ProofPrintint.
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs : list (bv 8)),
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
@@ -1178,7 +1178,7 @@ Section ProofPrintint.
       iNext. iIntros (CIDtk Hstk) "Hcg Hpc".
       assert (Htgt5c : add_vec (mword_of_int (PI + 0x44) : mword 64) (sign_extend' 64 (mword_of_int 24 : mword 13)) = mword_of_int (PI + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt5c) in "Hpc".
-      assert (HshiftA : b = false -> (CIDtk : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (HshiftA : b = false \/ pcur = zero_reg -> (CIDtk : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift HshiftA with "Hcont") as "Hcont".
       iApply (wp_printint_tail (CID0 := CIDtk) γd γv Φ m mf K i' l pv pkv dqm dqm2 b pcur HK Hpv Hpkv
                 Hi1 ltac:(lia) Hf4 Hmfsp Hmfs2 Hmfcs Hal7 Hal6 Hal5
@@ -1273,7 +1273,7 @@ Section ProofPrintint.
         rewrite /S2 upd_ne; [| congruence].
         rewrite /S1 upd_ne; [| congruence].
         exact (Hmfcs c Hc Nsp N8 N18). }
-      assert (HshiftB : b = false -> (CIDb5 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (HshiftB : b = false \/ pcur = zero_reg -> (CIDb5 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift HshiftB with "Hcont") as "Hcont".
       iApply (wp_printint_tail (CID0 := CIDb5) γd γv Φ m S4 K (i' + 1)%nat l pv pkv dqm dqm2 b pcur HK Hpv Hpkv
                 ltac:(lia) ltac:(lia) HS4a4
@@ -1440,7 +1440,7 @@ Section ProofPrintint.
       set (N1 := <[Regidx t1_idx := regval_into_reg (mword_of_int 0 : mword 64)]> W2).
       assert (Hp12 : add_vec_int (mword_of_int (PI + 0x10) : mword 64) 2 = mword_of_int (PI + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp12) in "Hpc".
-      assert (HshiftA : b = false -> (CID7 : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (HshiftA : b = false \/ pcur = zero_reg -> (CID7 : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift HshiftA with "Hcont") as "Hcont".
       iApply (wp_printint_main (CID0 := CID7) γd γv Φ m N1 K (m !!! Regidx a0_idx) l pv pkv dqm dqm2 b pcur HK Hpv Hpkv
                 ltac:(rewrite /N1 upd_ne; [rewrite HW2a1; exact Hbase | reg_neq])
@@ -1498,7 +1498,7 @@ Section ProofPrintint.
         iIntros (CID10b Hs10b). iNext. iIntros "Hcg Hpc".
         assert (Htgt12 : add_vec (mword_of_int (PI + 0x94) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1983 : mword 11) ('b"0")))) = mword_of_int (PI + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt12) in "Hpc".
-        assert (HshiftB : b = false -> (CID10b : CPU) = (CID : CPU)) by wp_next_chain.
+        assert (HshiftB : b = false \/ pcur = zero_reg -> (CID10b : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift HshiftB with "Hcont") as "Hcont".
         iApply (wp_printint_main (CID0 := CID10b) γd γv Φ m G2 K (sub_vec zero_reg (W2 !!! Regidx a0_idx)) l pv pkv dqm dqm2 b pcur HK Hpv Hpkv
                   ltac:(rewrite /G2 upd_ne; [| reg_neq]; rewrite /G1 upd_ne;
@@ -1529,7 +1529,7 @@ Section ProofPrintint.
         set (N1 := <[Regidx t1_idx := regval_into_reg (mword_of_int 0 : mword 64)]> W2).
         assert (Hp12 : add_vec_int (mword_of_int (PI + 0x10) : mword 64) 2 = mword_of_int (PI + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp12) in "Hpc".
-        assert (HshiftC : b = false -> (CID8c : CPU) = (CID : CPU)) by wp_next_chain.
+        assert (HshiftC : b = false \/ pcur = zero_reg -> (CID8c : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift HshiftC with "Hcont") as "Hcont".
         iApply (wp_printint_main (CID0 := CID8c) γd γv Φ m N1 K (m !!! Regidx a0_idx) l pv pkv dqm dqm2 b pcur HK Hpv Hpkv
                   ltac:(rewrite /N1 upd_ne; [rewrite HW2a1; exact Hbase | reg_neq])

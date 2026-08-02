@@ -123,7 +123,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   proc_pt Pold -∗
   proc_pt Pnew -∗
   kalloc_env γa None -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
     cpu_own 0%nat eb p C b -∗

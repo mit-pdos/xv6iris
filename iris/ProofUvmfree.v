@@ -409,7 +409,7 @@ Section ProofUvmfree.
     iPoseProof (ufi_18 with "Htext") as "Hi18".
     iPoseProof (ufi_1a with "Htext") as "Hi1a".
     iPoseProof (ufi_1c with "Htext") as "Hi1c".
-    iAssert (∀ (CIDj : CpuId), ⌜b = false -> (CIDj : CPU) = (CID : CPU)⌝ -∗
+    iAssert (∀ (CIDj : CpuId), ⌜b = false \/ p = zero_reg -> (CIDj : CPU) = (CID : CPU)⌝ -∗
         ∀ (mj : regfile),
         ⌜ mj !!! Regidx csp_rs1 = spd
           /\ mj !!! Regidx Rs1 = page_base uroot

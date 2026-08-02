@@ -131,7 +131,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
      the UART invariant can mint, so [uart_tx_own] alone cannot produce it.
      Persistent, so threading it costs nothing. *)
   dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_sent γd l -∗ uart_dlab_off γd -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mf bs,
     sie_cap_gpr mf K b p -∗
     pc_is ret_tgt -∗

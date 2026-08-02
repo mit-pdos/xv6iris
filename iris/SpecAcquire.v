@@ -66,7 +66,7 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID :
   lock_openable γl lk0 R Dc -∗
   Tc -∗
   panic_wp_any -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
     Tc -∗
@@ -98,7 +98,7 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cpu
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
   panic_wp_any -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
     (* [false], NOT [b]: acquire is UNBALANCED -- it opens with push_off(),

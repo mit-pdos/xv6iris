@@ -99,7 +99,7 @@ Definition wp_userinit_sconf_body
   kalloc_env γa on -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
     sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗

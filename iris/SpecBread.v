@@ -117,7 +117,7 @@ Definition wp_bread_sconf_body
   (* the requested block, and the slot unit backing the new reference *)
   disk_block γd (uint bno) bs_disk -∗
   bslot bn -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (k : nat) (bs_out : list (bv 8)),
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗

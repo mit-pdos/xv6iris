@@ -141,7 +141,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd) (szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       ⌜growproc_ok (pv_sz V) n (pv_upt V) P' szv'

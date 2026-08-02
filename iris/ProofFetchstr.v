@@ -156,7 +156,7 @@ Section ProofFetchstr.
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
     word_pointsto (pa_stk sp0 5) (DfracOwn 1) s30 -∗
     word_pointsto (pa_stk sp0 6) (DfracOwn 1) gap -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗

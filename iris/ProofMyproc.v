@@ -163,35 +163,6 @@ Local Ltac mp_gpeel :=
 (* peel a callee-saved s-register across pop_off (H2) then push_off (H1). *)
 Local Ltac mp_scs_tac H2 H1 := mp_gpeel; rewrite H2; mp_gpeel; rewrite H1; mp_gpeel; reflexivity.
 
-(* At entry, [b] (the ambient [sie_cap_gpr] index) and [(n, eb)] (what
-   [cpu_own] carries) are tied by ghost agreement into EXACTLY the same
-   expression pop_off's own exit index uses: [match n with O => eb | S _ =>
-   false end].  See ProofKfree.v (kf_b_derive) for the full rationale -- this
-   is a verbatim copy, specialized to myproc's names.  This is what lets
-   myproc's own top-level [wp_next b] obligation absorb pop_off's
-   [wp_next bexit] one: [bexit] and [b] are the SAME term once this fact is
-   in hand. *)
-Lemma mp_b_derive `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (av : nat) (p : mword 64) (n : nat) (eb b : bool) (C : iProp Σ) :
-  sie_cap_gpr m av b p -∗ cpu_own n eb p C b -∗
-  ⌜ b = match n with O => eb | S _ => false end ⌝.
-Proof.
-  iIntros "Hcg Hcnt".
-  destruct b.
-  - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-    destruct Hp as [-> Ht]. iPureIntro. exact (eq_sym Ht).
-  - destruct n as [|n'].
-    + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-      iPureIntro. destruct eb; [ | reflexivity ].
-      exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-    + iPureIntro. reflexivity.
-Qed.
 
 Module MyprocProof (PushOff : PUSHOFF) : MYPROC.
 
@@ -207,7 +178,7 @@ Section ProofMyproc.
     intros pcE ret_tgt Hpos Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc Hcont".
-    iDestruct (mp_b_derive with "Hcg Hown") as %Hbmatch.
+    iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
     iPoseProof (mpi_00 with "Htext") as "Hi00".
     iPoseProof (mpi_02 with "Htext") as "Hi02".
     iPoseProof (mpi_04 with "Htext") as "Hi04".

@@ -234,7 +234,7 @@ Section ProofFreeDesc.
     pa_add pd (16 * i + 8)%nat  ↦₄ vl -∗
     pa_add pd (16 * i + 12)%nat ↦₂ vf -∗
     pa_add pd (16 * i + 14)%nat ↦₂ vn -∗
-    wp_next (CID0 := CID0) b (fun (CIDk : CpuId) =>
+    wp_next (CID0 := CID0) b pme (fun (CIDk : CpuId) =>
       ∀ M' : regfile,
         ⌜ forall r : mword 5, r <> a0_idx -> r <> a3_idx -> r <> a4_idx -> r <> a5_idx ->
             M' !!! Regidx r = M !!! Regidx r ⌝ -∗

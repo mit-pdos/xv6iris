@@ -105,7 +105,7 @@ Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
   is_ftable γl γf -∗
   panic_wp_any -∗
   file_ref γf k q Cf -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     cpu_own n eb p C b -∗

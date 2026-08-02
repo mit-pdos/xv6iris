@@ -272,7 +272,7 @@ Section ProofProcinit.
     (pa_stk sp0 6) ↦₈ (m !!! Regidx s4i : mword 64) -∗
     (pa_stk sp0 7) ↦₈ (m !!! Regidx s5i : mword 64) -∗
     (pa_stk sp0 8) ↦₈ (m !!! Regidx s6i : mword 64) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr mr K b p -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
@@ -552,7 +552,7 @@ Section ProofProcinit.
     (pa_stk sp0 6) ↦₈ (m !!! Regidx s4i : mword 64) -∗
     (pa_stk sp0 7) ↦₈ (m !!! Regidx s5i : mword 64) -∗
     (pa_stk sp0 8) ↦₈ (m !!! Regidx s6i : mword 64) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mr, sie_cap_gpr mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -886,7 +886,7 @@ Section ProofProcinit.
       (* re-anchor the caller's continuation to the hart this iteration's own
          leaves + initlock migrated to, THEN hand it to [piepi] -- which is
          itself [wp_next]-wrapped, so [[-]] leaves exactly that obligation. *)
-      assert (Hshift : b = false -> (CID65 : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hshift : b = false \/ p = zero_reg -> (CID65 : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift with "Hpost") as "Hpost".
       iApply (piepi Φ m N8 K b p ltac:(lia) HN8sp HN8cs
                 with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 [-]").
@@ -907,7 +907,7 @@ Section ProofProcinit.
       iEval (rewrite Htgt78) in "Hpc".
       (* recurse at the hart THIS iteration ended on: re-anchor [Hpost] there
          first, exactly as the exit arm does. *)
-      assert (Hshift2 : b = false -> (CID66 : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hshift2 : b = false \/ p = zero_reg -> (CID66 : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift2 with "Hpost") as "Hpost".
       iApply (IHf CID66 (S j) N8 HK ltac:(lia) ltac:(lia)
                 HN8s1 HN8s2 HN8s3 HN8s4 HN8s5 HN8s6 HN8sp HN8cs
@@ -1517,7 +1517,7 @@ Section ProofProcinit.
     (* fold the two standalone locks into the shape the loop hands on --
        [wp_next]-wrapped, since the ORIGINAL "Hcont" is generic in [b] and its
        [wp_next] stays deferred until the loop's exit arm resolves it. *)
-    iAssert (wp_next (CID0 := CID) b (fun (CID' : CpuId) =>
+    iAssert (wp_next (CID0 := CID) b p (fun (CID' : CpuId) =>
               ∀ mr, sie_cap_gpr mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
               ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
               WP (Loop : expr riscv_lang) {{ Φ }}))%I
@@ -1528,7 +1528,7 @@ Section ProofProcinit.
     (* enter the loop at cursor 0 with NPROC units of fuel, at the hart the
        loop-setup leaves migrated to; [Hpost] is still anchored at
        wp_procinit_sconf's own entry hart, so shift it there once. *)
-    assert (Hshift0 : b = false -> (CID50 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hshift0 : b = false \/ p = zero_reg -> (CID50 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift0 with "Hpost") as "Hpost".
     iApply (procinit_loop Φ m K b p NPROC 0%nat U18 HK ltac:(lia)
               ltac:(unfold NPROC; lia)

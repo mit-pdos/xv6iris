@@ -101,7 +101,7 @@ Section WpUartgetc.
                            creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) -∗
     instr pcR false (LOAD (mword_of_int 0 : mword 12, Regidx rs_rhr, Regidx Ra0, true, 1)) -∗
     dev_inv γd γv -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       (* the two returns, as a CONJUNCTION: exactly one is taken, and they must
          share whatever the caller is carrying across the call *)
       ( (* "return -1": the rx FIFO was empty *)

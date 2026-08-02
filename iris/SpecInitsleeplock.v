@@ -58,7 +58,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
   sl_lkcpu slk ↦₈ vcpu -∗
   sl_name_field slk ↦₈ vname -∗
   sl_pid slk ↦₄ vpid -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr av b p -∗
     pc_is ret_tgt -∗

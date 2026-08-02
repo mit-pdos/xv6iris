@@ -61,7 +61,7 @@ Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CI
   panic_wp_any -∗
   (* THE premise that makes the unchecked [refcnt++] safe *)
   bslot bn -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
     cpu_own n eb p C b -∗

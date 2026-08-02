@@ -73,7 +73,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   procs_inv Φ γs -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pj -∗

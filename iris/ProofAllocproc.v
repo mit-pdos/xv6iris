@@ -267,33 +267,6 @@ Proof. unfold NPROC. lia. Qed.
 Lemma ap_fuel_init : (NPROC - 0 <= NPROC)%nat.
 Proof. unfold NPROC. lia. Qed.
 
-(* The ambient SIE index is DERIVABLE from the level and the saved base --
-   ghost agreement between [sie_arm]'s eighth and [intr_count]'s.  The scan
-   needs it because release's exit index is spelled as that very [match], and
-   it has to be [b] again on the loop's back edge.  (Verbatim
-   ProofWakeup.wk_b_derive; a whole-function proof file must not Require
-   another one.) *)
-Lemma ap_b_derive `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (mm : regfile) (av : nat) (pp : mword 64) (n : nat) (eb bb : bool) (C : iProp Σ) :
-  sie_cap_gpr mm av bb pp -∗ cpu_own n eb pp C bb -∗
-  ⌜ bb = match n with O => eb | S _ => false end ⌝.
-Proof.
-  iIntros "Hcg Hcnt".
-  destruct bb.
-  - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-    destruct Hp as [-> Ht]. iPureIntro. exact (eq_sym Ht).
-  - destruct n as [|n'].
-    + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-      iPureIntro. destruct eb; [ | reflexivity ].
-      exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-    + iPureIntro. reflexivity.
-Qed.
 
 (* The register names, hoisted above the module so that [ap_tail] below can
    use them. *)
@@ -361,7 +334,7 @@ Definition ap_tail `{!riscvGS Σ, !sieG Σ}
           Mt !!! Regidx r = m !!! Regidx r) ⌝ -∗
      sie_cap_gpr (CID := CIDt) Mt (K - 4)%nat xb pme -∗
      pc_is (CID := CIDt) (mword_of_int (AP + 0x78)) -∗
-     wp_next (CID0 := CIDt) xb (fun (CID : CpuId) =>
+     wp_next (CID0 := CIDt) xb pme (fun (CID : CpuId) =>
        ∀ (Mf : regfile),
          ⌜ callee_saved m Mf /\ Mf !!! Regidx ap_a0 = rv ⌝ -∗
          sie_cap_gpr Mf K xb pme -∗
@@ -713,7 +686,7 @@ Section ProofAllocproc.
        function's own continuation (anchored at [CID0]) are PREMISES of the
        statement, so forwarding either across an iteration is the IDENTITY. *)
     iAssert (∀ (fuel : nat),
-               wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+               wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                  ∀ (k : nat) (Mk : regfile),
                    ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
                    ⌜ Mk !!! Regidx csp_rs1 = spd /\
@@ -723,7 +696,7 @@ Section ProofAllocproc.
                         r <> csp_rs1 -> r <> ap_s0 -> r <> ap_s1 -> r <> ap_s2 ->
                         Mk !!! Regidx r = m !!! Regidx r) ⌝ -∗
                    ap_tail Φ m spd pme ret_tgt K -∗
-                   wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+                   wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                      ∀ (mr : regfile),
                        ⌜ callee_saved m mr ⌝ -∗
                        pc_is ret_tgt -∗
@@ -739,7 +712,7 @@ Section ProofAllocproc.
       { iIntros (CIDk Hsk k Mk) "%Hfuel %Hk _ _ _ _ _ _ _". exfalso. exact (ap_fuel0 k Hfuel Hk). }
       iIntros (CIDk Hsk k Mk) "%Hfuel %Hk %Hregs Htl Hcont Hcg Hcpu Henv Hpc".
       destruct Hregs as (Hksp & Hks1 & Hks2 & Hkrest).
-      iDestruct (ap_b_derive with "Hcg Hcpu") as %Hbmatch.
+      iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbmatch. symmetry in Hbmatch.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γl Hγl].
       iDestruct (procs_inv_lookup Φ γs k γl Hγl with "Hpinv") as "#Hislock".
       (* +0x1c c.mv a0,s1 *)

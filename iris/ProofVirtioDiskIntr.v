@@ -363,7 +363,7 @@ Section VtPrologue.
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
     panic_wp_any -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b pme (fun (CID : CpuId) =>
       ∀ (MA : regfile) (sp0 : mword 64),
         ⌜ sp0 = m !!! Regidx csp_rs1
           /\ MA !!! Regidx csp_rs1 = add_vec sp0
@@ -643,7 +643,7 @@ Section VtEpilogue.
     pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗
     (∃ vg : mword 64, pa_stk sp0 4 ↦₈ vg) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b pme (fun (CID : CpuId) =>
       ∀ MF : regfile,
         ⌜ callee_saved m MF ⌝ -∗
         sie_cap_gpr MF av b pme -∗
@@ -2953,28 +2953,6 @@ Section ProofVirtioDiskIntr.
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
 
-  (* ------------------------------------------------------------------- *)
-  (* DERIVE THE SIE INDEX rather than stating it: from the entry resources
-     [sie_cap_gpr m K b pme] / [cpu_own lvl eb pme C b], release's own exit
-     index [match lvl with O => eb | S _ => false end] is FORCED to equal
-     [b].  (Same derivation as ProofSysUptime.cpu_own_b_eq.) *)
-  Local Lemma cpu_own_b_eq (mm : regfile) (avail : nat) (pp : mword 64)
-      (n : nat) (ebb : bool) (Cc : iProp Σ) (bb : bool) :
-    sie_cap_gpr mm avail bb pp -∗ cpu_own n ebb pp Cc bb -∗
-    ⌜ (match n with O => ebb | S _ => false end) = bb ⌝.
-  Proof.
-    iIntros "Hcg Hcnt". destruct bb.
-    - iDestruct "Hcnt" as "[%Hpure _]". iPureIntro. destruct Hpure as [-> ->]. done.
-    - iDestruct "Hcnt" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
-      destruct n as [|n'].
-      + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-        iDestruct "Hsie" as "(_ & _ & Hbit)".
-        destruct ebb.
-        * iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
-          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
-        * iPureIntro. reflexivity.
-      + iPureIntro. reflexivity.
-  Qed.
 
   Lemma wp_virtio_disk_intr_sconf (Φ : mval -> iProp Σ) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -2988,7 +2966,7 @@ Section ProofVirtioDiskIntr.
     assert (HKav : (22 <= K)%nat) by (unfold K_virtio_disk_intr in HK; exact HK).
     pose proof (vt_lvl_weaken lvl Hlvl) as Hlvl1.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpi #Hdinv #Hgeom #Hlk Hcont".
-    iDestruct (cpu_own_b_eq m K pme lvl eb C b with "Hcg Hown") as %Hbeq.
+    iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq.
     (* ===================== PROLOGUE + acquire ===================== *)
     iApply (Pro.wp_vt_prologue γk γd Φ pd pav pu m K lvl eb pme C b
               Hlvl1 HKav

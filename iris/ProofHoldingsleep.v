@@ -60,37 +60,6 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma hcr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
 Proof. vm_compute. reflexivity. Qed.
 
-(* At level 0, the entry SIE index [b] and the saved base-enable ghost [eb]
-   coincide: [sie_arm b]'s own eighth and [intr_count 0 eb]'s complementary
-   eighth are the SAME [ghost_var sie_gname], so holding both at once (as
-   [Hcg]/[Hcnt] do at holdingsleep's entry) forces their bitvector values --
-   hence [eb] and [b] -- to agree.  This is the derivation the porting guide's
-   "Derive the SIE index rather than stating it" note describes; holdingsleep
-   is the first consumer that actually needs it, because acquire hands back
-   [cpu_own (S n) eb ...] while release's OWN exit index is [eb] (not [b]),
-   and closing holdingsleep's top-level [wp_next b] obligation over a chain
-   spanning both needs every link stated at the SAME boolean.  Substituting
-   [eb := b] right after entry (via [subst]) makes every later index literally
-   [b], so [wp_next_chain] composes across the acquire/release boundary with
-   no special-casing. *)
-Lemma hsl_eb_agree `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (av : nat) (p : mword 64) (eb b : bool) (C : iProp Σ) :
-  sie_cap_gpr m av b p -∗ cpu_own 0 eb p C b -∗ ⌜eb = b⌝.
-Proof.
-  iIntros "Hcg Hcnt".
-  destruct b.
-  - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-    iPureIntro. tauto.
-  - iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-    iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-    iEval (rewrite /sie_arm) in "Harm".
-    iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-    iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-    iEval (rewrite /intr_count) in "Hic".
-    iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-    iPureIntro. destruct eb; [ | reflexivity ].
-    exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-Qed.
 
 Module HoldingsleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC) : HOLDINGSLEEP.
 
@@ -115,7 +84,7 @@ Section ProofHoldingsleep.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield #Hpanic Hpidproc Hcont".
-    iDestruct (hsl_eb_agree with "Hcg Hcnt") as %Heb.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb. cbn in Heb.
     subst eb.
     (* stack-slot address bridges (spr-relative store offset -> pa_stk sp0 k). *)
     assert (Hspr6 : spr = pa_stk sp0 6).

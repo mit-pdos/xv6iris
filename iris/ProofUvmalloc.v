@@ -234,7 +234,7 @@ Section UvmallocDefs.
   Definition ua_exit `{CID0 : CpuId} (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (vpn0 : mword 27) (n K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool) (sp0 spr oldsz newsz : mword 64) : iProp Σ :=
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64),
       ⌜ mj !!! Regidx csp_rs1 = spr
         /\ mj !!! Regidx URa0 = res
@@ -1145,7 +1145,7 @@ Section ProofUvmalloc.
         (* re-anchor ["Hexit"] from this iteration's entry [CID0] to the next
            iteration's entry [CIDu28], and transport ["Hcnt"] there too (its
            last known-good anchor was [CIDu25], Mappages' own return hart). *)
-        assert (Hshiftrec : b = false -> (CIDu28 : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDu28 : CPU) = (CID0 : CPU)) by wp_next_chain.
         assert (Hexit_shift1 :
                   ⊢ (ua_exit (CID0 := CID0) Φ mm P (svpn_of (pgroundup oldsz)) n K eb p C b sp0 spr oldsz newsz -∗
                      ua_exit (CID0 := CIDu28) Φ mm P (svpn_of (pgroundup oldsz)) n K eb p C b sp0 spr oldsz newsz)).
@@ -2310,7 +2310,7 @@ Section ProofUvmalloc.
     assert (Hav0 : bv_unsigned (pgroundup oldsz) = (pu + 4096 * Z.of_nat 0)%Z).
     { rewrite Hpuv. change (Z.of_nat 0) with 0%Z.
       rewrite Z.mul_0_r Z.add_0_r. reflexivity. }
-    assert (Hshiftepi : b = false -> (CIDu85 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hshiftepi : b = false \/ p = zero_reg -> (CIDu85 : CPU) = (CID : CPU)) by wp_next_chain.
     assert (Hexit_shift0 : ⊢ (ua_exit (CID0 := CID) Φ mm P vpn0 n K eb p C b sp0 spr oldsz newsz -∗
                               ua_exit (CID0 := CIDu85) Φ mm P vpn0 n K eb p C b sp0 spr oldsz newsz)).
     { rewrite /ua_exit. exact (wp_next_shift Hshiftepi). }

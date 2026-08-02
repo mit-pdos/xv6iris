@@ -576,8 +576,8 @@ Section WpSconfVc.
      proves pointwise, here packaged as a proposition-level rewrite so it
      can be applied to a live "Hcont" resource with [iDestruct ... as]. *)
   Lemma wp_next_shift {K : CpuId -> iProp Σ} {b : bool} {CIDa CIDb : CpuId}
-      (Hs : b = false -> (CIDb : CPU) = (CIDa : CPU)) :
-    wp_next (CID0 := CIDa) b K -∗ wp_next (CID0 := CIDb) b K.
+      (Hs : b = false \/ p = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) :
+    wp_next (CID0 := CIDa) b p K -∗ wp_next (CID0 := CIDb) b p K.
   Proof.
     iEval (rewrite /wp_next). iIntros "H" (CID2 Hs2).
     iEval (rewrite /wp_next) in "H". iApply "H". iPureIntro.
@@ -602,7 +602,7 @@ Section WpSconfVc.
     vheap_own ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m0 ⌝ -∗
       sie_cap_gpr mf (n - vsu st') b p -∗
@@ -1219,7 +1219,7 @@ Section WpSconfVc.
     vheap_own ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       (∀ mf : regfile,
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m ⌝ -∗
       sie_cap_gpr mf (n - vsu st') b p -∗

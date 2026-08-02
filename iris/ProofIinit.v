@@ -90,7 +90,7 @@ Section ProofIinit.
     (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
     (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr mr K b p -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
@@ -310,7 +310,7 @@ Section ProofIinit.
     (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
     (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mr, sie_cap_gpr mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -490,7 +490,7 @@ Section ProofIinit.
          leaves + initsleeplock migrated to, THEN hand it to [iiepi] --
          which itself is [wp_next]-wrapped, so [[-]] leaves exactly that
          obligation, discharged the ProofConsputc.wp_consputc_epi way. *)
-      assert (Hshift : b = false -> (CIDf : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hshift : b = false \/ p = zero_reg -> (CIDf : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift with "Hpost") as "Hpost".
       iApply (iiepi Φ m N1 K b p ltac:(lia) HN1sp HN1cs
                 with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hf6 [-]").
@@ -512,7 +512,7 @@ Section ProofIinit.
       (* recurse via [IHf] at the hart THIS iteration ended up on: re-anchor
          [Hpost] there first ([wp_next_shift]), matching
          ProofProcMapstacks.v's loop. *)
-      assert (Hshift2 : b = false -> (CIDh : CPU) = (CID : CPU)) by wp_next_chain.
+      assert (Hshift2 : b = false \/ p = zero_reg -> (CIDh : CPU) = (CID : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift2 with "Hpost") as "Hpost".
       iApply (IHf CIDh (S j) N1 HK ltac:(lia) ltac:(lia) HN1s1 HN1s2 HN1s3 HN1sp HN1cs
                 with "Hcg Htext Hstr_sl Hstr_inode Hpc Hdone Hraw Hc1 Hc2 Hc3 Hc4 Hc5 Hf6 Hpost").
@@ -846,7 +846,7 @@ Section ProofIinit.
        [wp_next]-wrapped, since the ORIGINAL "Hcont" (wp_iinit_sconf's own)
        is generic in [b] and its wp_next stays deferred until [iinit_loop]'s
        exit arm resolves it. *)
-    iAssert (wp_next (CID0 := CID) b (fun (CID' : CpuId) =>
+    iAssert (wp_next (CID0 := CID) b p (fun (CID' : CpuId) =>
               ∀ mr, sie_cap_gpr mr K b p -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
               ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
               WP (Loop : expr riscv_lang) {{ Φ }}))%I
@@ -857,7 +857,7 @@ Section ProofIinit.
     (* the loop is entered at the hart the loop-setup leaves migrated to
        (CID19); [Hpost] is still anchored at wp_iinit_sconf's own entry
        hart, so shift it there once before the call. *)
-    assert (Hshift0 : b = false -> (CID19 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hshift0 : b = false \/ p = zero_reg -> (CID19 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift0 with "Hpost") as "Hpost".
     (* enter the loop at cursor 0 with NINODE units of fuel *)
     iApply (iinit_loop Φ m K b p NINODE 0%nat T6 HK ltac:(lia) ltac:(unfold NINODE; lia)

@@ -183,7 +183,7 @@ Section ProofGrowproc.
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗
@@ -378,7 +378,7 @@ Section ProofGrowproc.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.growproc + 0x36) : mword 64) -∗
     p_sz p ↦₈ szold -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ Ms' : regfile,
         ⌜Ms' !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ -∗
         ⌜forall r : mword 5, r <> Ra0 -> Ms' !!! Regidx r = Ms !!! Regidx r⌝ -∗
@@ -667,7 +667,7 @@ Section ProofGrowproc.
     (*  the arm ended at, run the epilogue, hand the caller its answer.    *)
     (* ================================================================= *)
     iAssert (∀ (CIDx : CpuId) (Mf : regfile) (P' : uptd) (szv' rv : mword 64),
-        ⌜b = false -> (CIDx : CPU) = (CID : CPU)⌝ -∗
+        ⌜b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)⌝ -∗
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 4⌝ -∗
         ⌜Mf !!! Regidx Ra0 = rv⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->

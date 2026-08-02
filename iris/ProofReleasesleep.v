@@ -25,7 +25,7 @@
    leaf hands back a fresh hart; acquire pins the index to [false] for the
    whole critical section (one hart from its return to release's entry), and
    release's exit index [match 0 with O => eb | S _ => false end] is
-   reconciled with [b] by [rsl_b_derive] -- the same ghost agreement kfree
+   reconciled with [b] by [CpuOwn.cpu_own_eb_agree] -- the same agreement kfree
    uses.  The entry tp premise is gone: [tp_pin] makes [rget m Rtp =
    cid_word_of cpu_id] true by construction, which is strictly more than the
    old premise said. *)
@@ -62,32 +62,6 @@ Local Open Scope Z_scope.
 (* Pure reconciliation lemmas (closed, so vm_compute decides).           *)
 (* ===================================================================== *)
 
-(* The entry index [b] and the [cpu_own] level/base pair are tied by ghost
-   agreement into exactly the expression release's own EXIT index uses.  See
-   ProofKfree.v (kf_b_derive) for the full rationale; releasesleep needs it
-   for the same reason kfree does -- to absorb release's [wp_next outb] into
-   its own top-level [wp_next b]. *)
-Lemma rsl_b_derive `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
-    (m : regfile) (K : nat) (pcur : mword 64) (n : nat) (eb b : bool) (C : iProp Σ) :
-  sie_cap_gpr m K b pcur -∗ cpu_own n eb pcur C b -∗
-  ⌜ b = match n with O => eb | S _ => false end ⌝.
-Proof.
-  iIntros "Hcg Hcnt".
-  destruct b.
-  - iEval (rewrite cpu_own_on) in "Hcnt". iDestruct "Hcnt" as "[%Hp _]".
-    destruct Hp as [-> Ht]. iPureIntro. exact (eq_sym Ht).
-  - destruct n as [|n'].
-    + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hcap & _)".
-      iEval (rewrite /sie_cap) in "Hcap". iDestruct "Hcap" as "(_ & _ & Harm)".
-      iEval (rewrite /sie_arm) in "Harm".
-      iEval (rewrite cpu_own_off) in "Hcnt". iDestruct "Hcnt" as "(Hh & _)".
-      iEval (rewrite /cpu_hart) in "Hh". iDestruct "Hh" as "(_ & Hic)".
-      iEval (rewrite /intr_count) in "Hic".
-      iDestruct (ghost_var_agree with "Harm Hic") as %Heq.
-      iPureIntro. destruct eb; [ | reflexivity ].
-      exfalso. apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
-    + iPureIntro. reflexivity.
-Qed.
 
 Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
@@ -113,7 +87,7 @@ Section ProofReleasesleep.
        is also release's own exit index.  Collapsing the two names is what
        lets releasesleep's top-level [wp_next b] absorb release's
        [wp_next (match 0 with O => eb | S _ => false end)]. *)
-    iDestruct (rsl_b_derive with "Hcg Hown") as %Hbmatch.
+    iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
     assert (Hbeb : eb = b) by (symmetry; exact Hbmatch). subst eb.
     iDestruct (is_sleeplock_lock with "Hslp") as "#Hlockinv".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.

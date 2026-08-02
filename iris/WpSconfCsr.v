@@ -176,7 +176,7 @@ Section WpSconfCsr.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -360,7 +360,7 @@ Section WpSconfCsr.
     intr_count_pre b k eb -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       ⌜ k = 0%nat -> _get_Mstatus_SIE ms = sie_bit eb ⌝ -∗
@@ -618,7 +618,7 @@ Section WpSconfCsr.
     cpu_cells 0 true p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
@@ -802,7 +802,7 @@ Section WpSconfCsr.
     intr_handler_avail -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
-    wp_next eb (fun (CID : CpuId) =>
+    wp_next eb p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
@@ -888,28 +888,38 @@ Section WpSconfCsr.
      (level 0 with a now-disabled base owes them explicitly), the [intr_inv]
      copy is simply dropped (it is persistent, and the caller keeps its own
      [intr_handler_avail]), and the count eighth comes back at
-     [sie_bit false] -- i.e. [intr_count 0 false], not [intr_count 1 _]. *)
+     [sie_bit false] -- i.e. [intr_count 0 false], not [intr_count 1 _].
+
+     THE TWO EIGHTHS ARE NOT THE CALLER'S TO SUPPLY AT [b = true].  This
+     leaf used to demand a separate [intr_count 0 true] BESIDE the bundle,
+     and hand back [cpu_hart 0 true p] (which CONTAINS an [intr_count 0
+     true]) beside an [intr_count 0 false] -- the same eighth at two
+     values, which the comment on [cpu_cells_pay] above forbids.  Nobody
+     could hold the premise: at [b = true] the arm owns BOTH eighths
+     ([sie_arm]'s own plus the one inside [cpu_hart 0 true p]), and at
+     [b = false] the last branch below refutes it outright, so the contract
+     was vacuous at every index.  It now takes [intr_count_pre b 0 true]
+     (the pure fact at the enabled arm, the token at the disabled one) and
+     returns the freed cells as [cpu_cells_pay b p], exactly like its
+     sibling [wp_csrci_sstatus_s_sconf]: the flip's second eighth is taken
+     out of the arm's own [cpu_hart], not out of the caller. *)
   Lemma wp_csrci_sstatus_x0_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
-    intr_count 0 true -∗
+    intr_count_pre b 0 true -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n false p -∗
       intr_count 0 false -∗
       trap_csrs -∗
-      cpu_hart 0 true p -∗
+      cpu_cells_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    replace (intr_count 0 true) with (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1))
-      by reflexivity.
-    replace (intr_count 0 false) with (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))
-      by reflexivity.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC))
@@ -936,9 +946,13 @@ Section WpSconfCsr.
       by (vm_compute; reflexivity).
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     destruct b.
-    - (* ---- b = true: the count eighth at '1' agrees with the arm; the
-           real flip ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hcpu)".
+    - (* ---- b = true: both eighths are in the arm -- its own, and the one
+           inside [cpu_hart 0 true p].  Take the second out of THERE (the
+           caller supplied only the pure fact) and do the real flip; the
+           cells that are left are what the leaf hands back. ---- *)
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & (Hcells & Hc1))".
+      iClear "Hcnt".
+      iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt)".
       destruct (csrci_sie_flip ms0 Hmsf) as [Hsie' Hmsf'].
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
       (* the trap-vector invariant: open it for the quarter, flip, reseal *)
@@ -981,13 +995,15 @@ Section WpSconfCsr.
         iExists ms1. iFrame "Hms Hhalf". iPureIntro. exact Hmsf'. }
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
-      iApply ("Hcont" $! ms0 with "[%] Hcg Htok
-                            [Hsepcx Hscausex Hstvalx] [Hcpu] [$Hpc' $Hnpc]").
+      iApply ("Hcont" $! ms0 with "[%] Hcg [Htok]
+                            [Hsepcx Hscausex Hstvalx] [Hcells] [$Hpc' $Hnpc]").
       { exact Hmsf. }
+      { iExact "Htok". }
       { iFrame "Hsepcx Hscausex Hstvalx". }
-      { iExact "Hcpu". }
+      { rewrite /cpu_cells_pay. iExact "Hcells". }
     - (* ---- b = false: impossible -- the count eighth at '1' contradicts
            the capability's '0' eighth ---- *)
+      iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
       iDestruct (ghost_var_agree with "Hcnt Harm") as %Hbad.
       exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
       vm_compute in Hbad. discriminate.
@@ -1011,7 +1027,7 @@ Section WpSconfCsr.
     stvec ↦ᵣ tv0 -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       stvec ↦ᵣ wval -∗
       pc_is (add_vec_int pc 4) -∗

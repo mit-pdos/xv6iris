@@ -319,7 +319,7 @@ Section WpSconfBtype.
     eq_vec (rget m rs1) (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -359,7 +359,7 @@ Section WpSconfBtype.
     neq_vec (rget m rs1) (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -399,7 +399,7 @@ Section WpSconfBtype.
     zopz0zI_u (rget m rs1) (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -442,7 +442,7 @@ Section WpSconfBtype.
     zopz0zI_s (rget m rs1) (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLT)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -483,7 +483,7 @@ Section WpSconfBtype.
     zopz0zKzJ_u (rget m rs1) (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -526,7 +526,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -588,7 +588,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -653,7 +653,7 @@ Section WpSconfBtype.
     zopz0zKzJ_s (rget m rs1) (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -694,7 +694,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BGE)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -754,7 +754,7 @@ Section WpSconfBtype.
     zopz0zKzJ_s zero_reg (rget m rs2) = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -798,7 +798,7 @@ Section WpSconfBtype.
     zopz0zI_s (rget m rs1) zero_reg = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -842,7 +842,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -909,7 +909,7 @@ Section WpSconfBtype.
     zopz0zKzJ_s (rget m rs1) zero_reg = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -950,7 +950,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1013,7 +1013,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1075,7 +1075,7 @@ Section WpSconfBtype.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1119,7 +1119,7 @@ Section WpSconfBtype.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc true (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BNE)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 2) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1168,7 +1168,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1229,7 +1229,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1292,7 +1292,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (BTYPE (imm, zreg, creg2reg_idx rs, BEQ)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1357,7 +1357,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (BTYPE (imm, zreg, creg2reg_idx rs, BNE)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1425,7 +1425,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BEQ)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1487,7 +1487,7 @@ Section WpSconfBtype.
     eq_vec (rget m rs1) zero_reg = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BEQ)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1537,7 +1537,7 @@ Section WpSconfBtype.
     eq_vec (access_vec_dec (add_vec pc (sign_extend' 64 imm)) 0) ('b"0") = true ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BNE)) -∗
-    ▷ wp_next b (fun (CID : CpuId) =>
+    ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -1598,7 +1598,7 @@ Section WpSconfBtype.
     neq_vec (rget m rs1) zero_reg = false ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (BTYPE (imm, zreg, Regidx rs1, BNE)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

@@ -127,7 +127,7 @@ Definition wp_virtio_disk_rw_sconf_body
      the disk starts at 1024 * blockno. *)
   buf_own bp bno dsk0 bs_buf -∗
   disk_block γd (uint bno) bs_disk -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

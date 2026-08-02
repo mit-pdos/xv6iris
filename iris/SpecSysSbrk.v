@@ -140,7 +140,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd) (szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       ⌜sys_sbrk_ok V v0 v1 P' szv'

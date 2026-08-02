@@ -74,7 +74,7 @@ Definition wp_walkaddr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   kernel_text -∗
   pc_is pcE -∗
   ptree_own 2 dq t -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗

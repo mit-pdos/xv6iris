@@ -89,7 +89,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (* the running-thread bundle (wakeup / consoleintr) *)
   procs_inv Φ γs -∗
   panic_wp_any -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
       sie_cap_gpr mf av b pme -∗

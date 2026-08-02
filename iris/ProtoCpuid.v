@@ -65,7 +65,7 @@ Section Proto.
       sie_cap_gpr m n b p -∗
       pc_is pc -∗
       instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -141,7 +141,7 @@ Section Proto.
        quantifies the hart internally.  So a decode fact derived before a step
        survives the step, at whatever hart execution resumes on. *)
     instr (add_vec_int pc 4) false (RTYPE (Regidx Ra5, Regidx Ra5, Regidx Ra5, ADD)) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx Ra5 := regval_into_reg
                          (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n b p -∗
       pc_is (add_vec_int (add_vec_int pc 4) 4) -∗

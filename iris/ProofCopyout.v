@@ -194,7 +194,7 @@ Section ProofCopyout.
     kernel_text -∗
     pc_is (CID:=CID0) (mword_of_int (CPO + 0x72) : mword 64) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    wp_next (CID0:=CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0:=CID0) b pcur (fun (CID : CpuId) =>
       ∀ (Mf : regfile) (wr : bool),
         ⌜callee_saved M Mf⌝ -∗
         sie_cap_gpr Mf n b pcur -∗
@@ -427,7 +427,7 @@ Section ProofCopyout.
     proc_pt Pc -∗
     kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-    wp_next (CID0:=CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0:=CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
@@ -580,7 +580,7 @@ Section ProofCopyout.
         page_own pa0 -∗
         (page_own pa0 -∗ proc_pt Pd) -∗
         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-        wp_next (CID0:=CIDh) b (fun (CID : CpuId) =>
+        wp_next (CID0:=CIDh) b p (fun (CID : CpuId) =>
           ∀ (mj : regfile) (res : mword 64) (P' : uptd),
             ⌜ mj !!! Regidx csp_rs1 = spr
               /\ mj !!! Regidx Ra0 = res
@@ -663,7 +663,7 @@ Section ProofCopyout.
           page_own pa0 -∗
           (page_own pa0 -∗ proc_pt Pd) -∗
           ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-          wp_next (CID0:=CIDc) b (fun (CID : CpuId) =>
+          wp_next (CID0:=CIDc) b p (fun (CID : CpuId) =>
             ∀ (mj : regfile) (res : mword 64) (P' : uptd),
               ⌜ mj !!! Regidx csp_rs1 = spr
                 /\ mj !!! Regidx Ra0 = res
@@ -970,7 +970,7 @@ Section ProofCopyout.
           iEval (rewrite Hp50) in "Hpc".
           iDestruct (cpu_own_transport CIDc CIDc10 lvl eb p C b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
-          assert (Hshiftrec : b = false -> (CIDc10 : CPU) = (CIDc : CPU)) by wp_next_chain.
+          assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDc10 : CPU) = (CIDc : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hexit") as "Hexit".
           iApply (IH (rem - nn)%nat (done + nn)%nat Pd W3
                     (add_vec va0 (mword_of_int 4096)) CIDc10
@@ -1011,7 +1011,7 @@ Section ProofCopyout.
         iEval (rewrite Htgt32) in "Hpc".
         iDestruct (cpu_own_transport CIDh CIDh3 lvl eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        assert (Hshifth3 : b = false -> (CIDh3 : CPU) = (CIDh : CPU)) by wp_next_chain.
+        assert (Hshifth3 : b = false \/ p = zero_reg -> (CIDh3 : CPU) = (CIDh : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshifth3 with "Hexit") as "Hexit".
         iApply ("Hcopy" $! CIDh3 T2 navail with "[%] Hcg Hcnt Hpc Hszc Hptc Hpage Hgive Hsrc Hexit").
         split_and!;
@@ -1069,7 +1069,7 @@ Section ProofCopyout.
         iEval (rewrite Hjt8e) in "Hpc".
         iDestruct (cpu_own_transport CIDh CIDh5 lvl eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        assert (Hshifth5 : b = false -> (CIDh5 : CPU) = (CIDh : CPU)) by wp_next_chain.
+        assert (Hshifth5 : b = false \/ p = zero_reg -> (CIDh5 : CPU) = (CIDh : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshifth5 with "Hexit") as "Hexit".
         iApply ("Hcopy" $! CIDh5 T3 rem with "[%] Hcg Hcnt Hpc Hszc Hptc Hpage Hgive Hsrc Hexit").
         split_and!;
@@ -1424,7 +1424,7 @@ Section ProofCopyout.
           as "[Hpage Hgive]".
         iDestruct (cpu_own_transport CIDm6 CIDms2 lvl eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        assert (Hshiftms2 : b = false -> (CIDms2 : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftms2 : b = false \/ p = zero_reg -> (CIDms2 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftms2 with "Hcont") as "Hcont".
         iApply ("Htail" $! CIDms2 Pd Mf r with "[%] Hcg Hcnt Hpc Hszc Hptc Hpage Hgive Hsrc Hcont").
         split_and!;
@@ -1537,7 +1537,7 @@ Section ProofCopyout.
         as "[Hpage Hgive]".
       iDestruct (cpu_own_transport CID0 CIDh2 lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      assert (Hshifth2 : b = false -> (CIDh2 : CPU) = (CID0 : CPU)) by wp_next_chain.
+      assert (Hshifth2 : b = false \/ p = zero_reg -> (CIDh2 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshifth2 with "Hcont") as "Hcont".
       iApply ("Htail" $! CIDh2 Pc Mf (page_base (pte_ppn w0))
                 with "[%] Hcg Hcnt Hpc Hszc Hptc Hpage Hgive Hsrc Hcont").
@@ -2075,7 +2075,7 @@ Section ProofCopyout.
     (*  and the return.  All four exits of the loop join here; nothing is  *)
     (*  shrink-wrapped, so the join takes no existential slot arguments.   *)
     (* ================================================================= *)
-    iAssert (wp_next b (fun (CIDe0 : CpuId) =>
+    iAssert (wp_next b p (fun (CIDe0 : CpuId) =>
         ∀ (mj : regfile) (res : mword 64) (P' : uptd),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res

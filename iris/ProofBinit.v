@@ -125,7 +125,7 @@ Section ProofBinit.
     (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
     (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
     (pa_stk sp0 6) ↦₈ (m !!! Regidx s4i : mword 64) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b pcur (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr mr K b pcur -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
@@ -766,7 +766,7 @@ Section ProofBinit.
        generic in [b] and its wp_next stays deferred until the loop's exit
        arm resolves it (ProofIinit.wp_iinit_sconf's "Hpost" is the worked
        example for this exact shape). *)
-    iAssert (wp_next (CID0 := CID) b (fun (CID' : CpuId) =>
+    iAssert (wp_next (CID0 := CID) b pcur (fun (CID' : CpuId) =>
               ∀ mr,
               sie_cap_gpr mr K b pcur -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
               ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
@@ -778,7 +778,7 @@ Section ProofBinit.
       iApply ("Hcont" $! mr with "Hcg Hpc [//] Hlock Hlnm Hcpu Hfresh Hlru"). }
     (* the loop-setup instructions have each moved the hart; re-anchor
        [Hpost] to the loop's own entry hart [CID26] before entering it. *)
-    assert (Hshift0 : b = false -> (CID26 : CPU) = (CID : CPU)) by wp_next_chain.
+    assert (Hshift0 : b = false \/ pcur = zero_reg -> (CID26 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift0 with "Hpost") as "Hpost".
     (* ================================================================= *)
     (* THE LOOP.  Fuel induction on the number of buffers left.  [CID0]   *)
@@ -810,7 +810,7 @@ Section ProofBinit.
       (pa_stk sp0 4) ↦₈ (m !!! Regidx s2i : mword 64) -∗
       (pa_stk sp0 5) ↦₈ (m !!! Regidx s3i : mword 64) -∗
       (pa_stk sp0 6) ↦₈ (m !!! Regidx s4i : mword 64) -∗
-      wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+      wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
         ∀ mr, sie_cap_gpr mr K b pcur -∗ pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
         ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
         bcache_lru bhead L -∗
@@ -1094,7 +1094,7 @@ Section ProofBinit.
         { rewrite HL. rewrite Hsplit Hnone. unfold blist. cbn [seq map rev app].
           reflexivity. }
         iEval (rewrite -HLfin) in "Hlru".
-        assert (Hshiftexit : b = false -> (CIDexit : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftexit : b = false \/ pcur = zero_reg -> (CIDexit : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftexit with "Hpost") as "Hpost".
         iApply (biepi (CID0 := CIDexit) Φ m N2 K b pcur ltac:(lia) HN2sp HN2cs
                   with "Htext Hcg Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 [-]").
@@ -1113,7 +1113,7 @@ Section ProofBinit.
                   with "Hcg Hpc Hi72 [-]").
         iNext. iIntros (CIDtaken Hstaken) "Hcg Hpc".
         iEval (rewrite Htgt50) in "Hpc".
-        assert (Hshiftrec : b = false -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftrec : b = false \/ pcur = zero_reg -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftrec with "Hpost") as "Hpost".
         iApply ("IHf" $! CIDtaken (S j) N2 (bnode j :: l)%list L
                   with "[] [] [] [] Hcg Hpc Hdone Hraw Hlnk Hlru Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hpost").

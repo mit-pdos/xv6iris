@@ -192,28 +192,6 @@ Section ProofKilled.
   Proof. mk_rvc (KL + 0x28)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KL + 0x28) : mword 64) (JALR (zeros' 12, Regidx kl_ra, zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
-  (* THE b / outb DERIVATION.  release's exit index is syntactically
-     [match n with O => eb | S _ => false end], not [b] -- but the two are
-     forced equal by resources this function already holds at entry (see the
-     porting guide's "Derive the SIE index rather than stating it").  [Local]
-     because no such combined fact is exported by CpuOwn.v / IntrDefs.v yet. *)
-  Local Lemma cpu_own_b_eq (m0 : regfile) (av0 : nat) (p0 : mword 64)
-      (n0 : nat) (eb0 : bool) (C0 : iProp Σ) (b0 : bool) :
-    sie_cap_gpr m0 av0 b0 p0 -∗ cpu_own n0 eb0 p0 C0 b0 -∗
-    ⌜ (match n0 with O => eb0 | S _ => false end) = b0 ⌝.
-  Proof.
-    iIntros "Hcg Hcnt". destruct b0.
-    - iDestruct "Hcnt" as "[%Hpure _]". iPureIntro. destruct Hpure as [-> ->]. done.
-    - iDestruct "Hcnt" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
-      destruct n0 as [|n'].
-      + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-        iDestruct "Hsie" as "(_ & _ & Hbit)".
-        destruct eb0.
-        * iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
-          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
-        * iPureIntro. reflexivity.
-      + iPureIntro. reflexivity.
-  Qed.
 
   Lemma wp_killed_sconf (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
@@ -223,7 +201,7 @@ Section ProofKilled.
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
-    iDestruct (cpu_own_b_eq m av p n eb C b with "Hcg Hcpu") as %Hbeq.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iDestruct (procs_inv_lookup Φ γs j γl Hgl with "Hprocs") as "#Hislock".
     (* ===================== PROLOGUE (32-byte frame, 4 slots) ============ *)
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).

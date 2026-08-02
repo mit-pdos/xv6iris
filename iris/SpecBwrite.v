@@ -105,7 +105,7 @@ Definition wp_bwrite_sconf_body
   (* the locked buffer and the disk block it names *)
   bio_locked bn k pidv dev bno bs -∗
   disk_block γd (uint bno) bs_disk -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗

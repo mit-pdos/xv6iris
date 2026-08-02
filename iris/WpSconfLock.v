@@ -97,7 +97,7 @@ Section WpSconfLock.
     lock_openable γl lk R Dc -∗
     Tc -∗
     ( ∀ v : mword 32,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         Tc -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
         pc_is (add_vec_int pc 2) -∗
@@ -149,7 +149,7 @@ Section WpSconfLock.
     lock_openable γl lk R Dc -∗
     locked γl h0 -∗
     ( ∀ v : mword 32,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ -∗
         locked γl h0 -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
@@ -213,7 +213,7 @@ Section WpSconfLock.
     locked_pre γl cpu_id -∗
     R -∗
     lock_finisher γl lk R Dc Out (⊤ ∖ ↑minstretN) -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       Out -∗
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
@@ -276,7 +276,7 @@ Section WpSconfLock.
     lock_openable γl lk R Dc -∗
     T -∗
     ( ∀ c : mword 64,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         ⌜phi c⌝ -∗
         T -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg c]> m) n b p -∗
@@ -327,7 +327,7 @@ Section WpSconfLock.
     lock_openable γl lk R Dc -∗
     Tc -∗
     ( ∀ c : mword 64,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         Tc -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg c]> m) n b p -∗
         pc_is (add_vec_int pc 2) -∗
@@ -369,7 +369,7 @@ Section WpSconfLock.
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     lock_openable γl lk R Dc -∗
     locked γl h0 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       locked γl h0 -∗
       sie_cap_gpr (<[Regidx rd := regval_into_reg cpuv]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
@@ -409,7 +409,7 @@ Section WpSconfLock.
     instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     lock_openable γl lk R Dc -∗
     T -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
       T' -∗
@@ -457,7 +457,7 @@ Section WpSconfLock.
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     lock_openable γl lk R Dc -∗
     locked_pre γl h0 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       locked γl h0 -∗
@@ -493,7 +493,7 @@ Section WpSconfLock.
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
     lock_openable γl lk R Dc -∗
     locked γl h0 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       locked_pre γl h0 -∗
@@ -546,7 +546,7 @@ Section WpSconfLock.
     lock_openable γl lk R Dc -∗
     Tc -∗
     ( ∀ w : mword 32,
-      wp_next b (fun (CID : CpuId) =>
+      wp_next b p (fun (CID : CpuId) =>
         Tc -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗

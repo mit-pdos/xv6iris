@@ -79,7 +79,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
   proc_pt P -∗
   kalloc_env γa None -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
     cpu_own lvl eb p C b -∗

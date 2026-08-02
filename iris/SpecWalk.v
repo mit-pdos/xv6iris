@@ -52,7 +52,7 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
     pc_is ret_tgt -∗
@@ -107,7 +107,7 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   kernel_text -∗
   pc_is pcE -∗
   ptree_own 2 dq t -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
     pc_is ret_tgt -∗

@@ -103,7 +103,7 @@ Section ProofPushOff.
     kernel_text -∗ pc_is (mword_of_int (PP + 0x28) : mword 64) -∗
     add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ ra0e -∗
     add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ s00e -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
     ∀ mf,
       sie_cap_gpr mf (av + 2) b p -∗
       pc_is ret_tgt -∗
@@ -234,13 +234,13 @@ Section ProofPushOff.
      [CpuOwn.cpu_own_transport]. *)
   Lemma po_cells_transport (CID0 CID1 : CpuId) (k : nat) (ebx : bool)
       (px : mword 64) (bx : bool) :
-    (bx = false -> (CID1 : CPU) = (CID0 : CPU)) ->
+    (bx = false \/ px = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
     (if bx then emp else cpu_cells (CID := CID0) k ebx px) -∗
     (if bx then emp else cpu_cells (CID := CID1) k ebx px).
   Proof.
     intros Heq. destruct bx.
     - iIntros "H". iExact "H".
-    - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq eq_refl) ].
+    - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
   Qed.
 
   (* ------------------------------------------------------------------- *)

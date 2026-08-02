@@ -52,7 +52,7 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   c_cpu ↦₈ vcpu -∗
   fl ↦₈ (mword_of_int 0 : mword 64) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pcur (fun (CID : CpuId) =>
     ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
     sie_cap_gpr mr K b pcur -∗
     cpu_own ncnt eb pcur C b -∗

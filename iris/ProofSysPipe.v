@@ -453,7 +453,7 @@ Section ProofSysPipe.
     instr (mword_of_int zd : mword 64) false
       (STORE (mword_of_int 0 : mword 12, Regidx Rz, Regidx Ra5, 8)) -∗
     p_ofile p fd ↦₈ old -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜forall c : mword 5, c <> Ra5 -> Mr !!! Regidx c = Mt !!! Regidx c⌝ -∗
         sie_cap_gpr Mr nav b p -∗
@@ -568,7 +568,7 @@ Section ProofSysPipe.
     word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
     file_ref γf k0 q0 Cf0 -∗
     file_ref γf k1 q1 Cf1 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ (forall c : mword 5, is_cs_idx c = true -> Mr !!! Regidx c = Mt !!! Regidx c)
           /\ Mr !!! Regidx Ra5 = (mword_of_int (-1) : mword 64) ⌝ -∗
@@ -706,7 +706,7 @@ Section ProofSysPipe.
     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
     word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    wp_next b (fun (CID : CpuId) =>
+    wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗
@@ -998,7 +998,7 @@ Section ProofSysPipe.
     (* ================================================================= *)
     iDestruct (word_pointsto_aligned_p with "Hb8") as %Hal8.
     iDestruct (word_pointsto_split4 with "Hb8") as "[Hlo Hhi]".
-    set (EPI := (wp_next b (fun (CIDe : CpuId) =>
+    set (EPI := (wp_next b p (fun (CIDe : CpuId) =>
       ∀ (mj : regfile) (P' : uptd) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = pa_stk sp0 8
           /\ mj !!! Regidx Ra5 = res
@@ -2041,7 +2041,7 @@ Section ProofSysPipe.
     (*  -- BOTH copyouts branch to it, so it is built once, before the    *)
     (*  first test, over the page-table descriptor the arm arrives with.  *)
     (* ================================================================= *)
-    set (T7C := (wp_next b (fun (CIDt : CpuId) =>
+    set (T7C := (wp_next b p (fun (CIDt : CpuId) =>
       ∀ (Mt : regfile) (P' : uptd),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8
           /\ Mt !!! Regidx Rs0 = sp0

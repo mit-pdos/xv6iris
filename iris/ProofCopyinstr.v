@@ -274,7 +274,7 @@ Section ProofCopyinstr.
     word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
     word_pointsto (pa_stk sp0 9) (DfracOwn 1) s70 -∗
     word_pointsto (pa_stk sp0 10) (DfracOwn 1) gap -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = res⌝ -∗
         sie_cap_gpr mf av b pcur -∗
@@ -518,7 +518,7 @@ Section ProofCopyinstr.
     sie_cap_gpr M Kv b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (CIS + 0x2c) : mword 64) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ Mo : regfile,
         ⌜Mo !!! Regidx Ra0 = resv⌝ -∗
         ⌜forall r : mword 5, r <> Ra0 -> r <> Ra5 -> Mo !!! Regidx r = M !!! Regidx r⌝ -∗
@@ -610,7 +610,7 @@ Section ProofCopyinstr.
        Both live under ONE [wp_next], anchored at [CID0] -- this loop's own
        per-iteration hart -- since either exit's resources (Hcg/Hpc) are
        whatever hart the inner loop's OWN leaf steps land on. *)
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ( ( ∀ (Mn : regfile) (i' : nat) (g : nat -> bv 8),
           ⌜(i' < n)%nat⌝ -∗
           ⌜bb_nonul g (done + i')⌝ -∗
@@ -818,7 +818,7 @@ Section ProofCopyinstr.
                   (sign_extend' 64 (mword_of_int 8174 : mword 13))
                   = mword_of_int (CIS + 0x88)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt88) in "Hpc".
-        assert (Hshift : b = false -> (CIDn9 : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshift : b = false \/ pcur = zero_reg -> (CIDn9 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshift with "HK") as "HK".
         iApply (IH (S i) CIDn9 I4 (bb_upd f (done + i)%nat (fsrc i))
                   ltac:(lia) ltac:(lia) Hnul' HI4a5 HI4a3 HI4a2 HthrI4
@@ -856,7 +856,7 @@ Section ProofCopyinstr.
     pc_is (mword_of_int (CIS + 0x5e) : mword 64) -∗
     proc_pt P -∗
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ f j) -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (g : nat -> bv 8),
       ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜mj !!! Regidx Rs8 = v8⌝ -∗
@@ -1072,7 +1072,7 @@ Section ProofCopyinstr.
              inside its own proof can relate [CIDb] back to the outer
              [CID0]; each call site below re-anchors cs_loop's own [Hcont]
              via [wp_next_shift] before handing it in. *)
-          wp_next (CID0 := CIDb) b (fun (CID : CpuId) =>
+          wp_next (CID0 := CIDb) b pcur (fun (CID : CpuId) =>
             ∀ (mj : regfile) (res : mword 64) (g : nat -> bv 8),
             ⌜mj !!! Regidx csp_rs1 = spr⌝ -∗
             ⌜mj !!! Regidx Rs8 = v8⌝ -∗
@@ -1470,7 +1470,7 @@ Section ProofCopyinstr.
             assert (Hf1 : (rem - n <= fuel)%nat) by lia.
             assert (Hf2 : (1 <= rem - n)%nat) by lia.
             assert (Hf3 : (done + n + (rem - n) = maxn)%nat) by lia.
-            assert (Hshift : b = false -> (CIDd6 : CPU) = (CIDb : CPU)) by wp_next_chain.
+            assert (Hshift : b = false \/ pcur = zero_reg -> (CIDd6 : CPU) = (CIDb : CPU)) by wp_next_chain.
             iDestruct (wp_next_shift Hshift with "Hcont") as "Hcont".
             iApply (IH (done + n)%nat (rem - n)%nat CIDd6 D5 g
                       Hf1 Hf2 Hf3 Hnulg
@@ -1537,7 +1537,7 @@ Section ProofCopyinstr.
                   (sign_extend' 64 (mword_of_int 6 : mword 13))
                   = mword_of_int (CIS + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt78) in "Hpc".
-        assert (Hshiftv4 : b = false -> (CIDv4 : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftv4 : b = false \/ pcur = zero_reg -> (CIDv4 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftv4 with "Hcont") as "Hcontv4".
         iApply ("BODY" $! CIDv4 V2 (4096 - off)%nat
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hcontv4").
@@ -1567,7 +1567,7 @@ Section ProofCopyinstr.
         iEval (rewrite Hq78) in "Hpc".
         assert (HV3a3 : V3 !!! Regidx Ra3 = (mword_of_int (Z.of_nat rem) : mword 64)).
         { rewrite /V3 upd_eq add_vec_zero_l. rgne. exact HV2s3. }
-        assert (Hshiftv5 : b = false -> (CIDv5 : CPU) = (CID0 : CPU)) by wp_next_chain.
+        assert (Hshiftv5 : b = false \/ pcur = zero_reg -> (CIDv5 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftv5 with "Hcont") as "Hcontv5".
         iApply ("BODY" $! CIDv5 V3 rem
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hpc Hcontv5").

@@ -68,7 +68,7 @@ Definition wp_free_desc_sconf_body
   pa_add pd (16 * i + 8)  ↦₄ vl -∗
   pa_add pd (16 * i + 12) ↦₂ vf -∗
   pa_add pd (16 * i + 14) ↦₂ vn -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
       sie_cap_gpr mf K b pme -∗

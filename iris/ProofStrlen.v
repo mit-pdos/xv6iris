@@ -166,7 +166,7 @@ Section ProofStrlen.
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf K b p -∗
@@ -306,7 +306,7 @@ Section ProofStrlen.
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x12) : mword 64) -∗
     (pa_add s (S t)) ↦ₘ{dq} bt -∗
-    wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ Mp : regfile,
         ⌜Mp !!! Regidx Ra3 = pa_add s (S t)⌝ -∗
         ⌜Mp !!! Regidx Ra5 = pa_add s (S (S t))⌝ -∗
@@ -405,7 +405,7 @@ Section ProofStrlen.
       (s sp0 : mword 64) (b : bool) (p : mword 64) (CIDh : CpuId) :
     (k < n)%nat -> bb_cstr f k -> (Z.of_nat k < 2147483648)%Z ->
     forall (rem t : nat) (M : regfile) (CID0 : CpuId),
-    (b = false -> (CID0 : CPU) = (CIDh : CPU)) ->
+    (b = false \/ p = zero_reg -> (CID0 : CPU) = (CIDh : CPU)) ->
     (S t + rem = k)%nat -> bb_nonul f (S t) ->
     M !!! Regidx csp_rs1 = pa_stk sp0 2 ->
     M !!! Regidx Ra0 = s ->
@@ -416,7 +416,7 @@ Section ProofStrlen.
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x12) : mword 64) -∗
     ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
-    wp_next (CID0 := CIDh) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ Mt : regfile,
         ⌜Mt !!! Regidx csp_rs1 = pa_stk sp0 2⌝ -∗
         ⌜Mt !!! Regidx Ra0 = (mword_of_int (Z.of_nat k) : mword 64)⌝ -∗
@@ -530,7 +530,7 @@ Section ProofStrlen.
         assert (N4 : r <> Ra4) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         assert (N5 : r <> Ra5) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         rewrite (Hpthr r N3 N4 N5). apply Hthr; assumption. }
-      assert (Hchain' : b = false -> (CID1 : CPU) = (CIDh : CPU)) by wp_next_chain.
+      assert (Hchain' : b = false \/ p = zero_reg -> (CID1 : CPU) = (CIDh : CPU)) by wp_next_chain.
       iApply (IH (S t) Mp CID1 Hchain' HS1 HS2 HS3 HS4 Hpa5 HS5 with "Hcg Htext Hpc Hbuf Hcont").
   Qed.
 

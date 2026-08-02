@@ -32,7 +32,7 @@
    clear, the wakeup) collapses by [wp_next_off] and the hart is pinned;
    that is what lets [locked γl cpu_id] and [trap_csrs_pay] be carried across
    it without transport.  release exits at
-   [outb = match lvl with O => eb | S _ => false end], which [ui_b_outb]
+   [outb = match lvl with O => eb | S _ => false end], which [cpu_own_eb_agree]
    derives to be [b] from the entry resources (porting guide, "Derive the SIE
    index rather than stating it").
 
@@ -150,7 +150,7 @@ Section UiCont.
   (* the caller's continuation, named once *)
   Definition ui_ret_cont `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) : iProp Σ :=
-    (wp_next (CID0 := CID0) b (fun (CID : CpuId) =>
+    (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
          sie_cap_gpr mf av b pme -∗
@@ -162,34 +162,11 @@ Section UiCont.
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
   Lemma ui_ret_cont_shift (CIDa CIDb : CpuId) (Φ : mval -> iProp Σ) (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :
-    (b = false -> (CIDb : CPU) = (CIDa : CPU)) ->
+    (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     ui_ret_cont (CID0 := CIDa) Φ m0 av lvl eb pme C b -∗
     ui_ret_cont (CID0 := CIDb) Φ m0 av lvl eb pme C b.
   Proof. intros Hs. rewrite /ui_ret_cont. exact (wp_next_shift Hs). Qed.
 
-  (* THE b/outb DERIVATION (porting guide): release's exit index is
-     [match lvl with O => eb | S _ => false end], and the entry resources
-     force it equal to [b].  At [b = true], [cpu_own] itself packs
-     [lvl = 0 /\ eb = true].  At [b = false] with [lvl = 0], [sie_arm false]'s
-     eighth (at '0') and [intr_count 0 eb]'s complementary eighth (at
-     [sie_bit eb]) are the SAME ghost, so agreement pins [eb = false]. *)
-  Lemma ui_b_outb `{CID1 : CpuId} (M : regfile) (av lvl : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (b : bool) :
-    sie_cap_gpr M av b pme -∗ cpu_own lvl eb pme C b -∗
-    ⌜ (match lvl with O => eb | S _ => false end) = b ⌝.
-  Proof.
-    iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hpure _]". iPureIntro. destruct Hpure as [-> ->]. done.
-    - iDestruct "Hcnt" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
-      destruct lvl as [|lvl'].
-      + iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-        iDestruct "Hsie" as "(_ & _ & Hbit)".
-        destruct eb.
-        * iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
-          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.
-        * iPureIntro. reflexivity.
-      + iPureIntro. reflexivity.
-  Qed.
 
 End UiCont.
 
@@ -665,7 +642,7 @@ Section ProofUartintr.
     iAssert (ui_ret_cont Φ m av lvl eb pme C b) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     iDestruct (is_txlock_lock with "Htxl") as "#Hlk".
-    iDestruct (ui_b_outb m av lvl eb pme C b with "Hcg Hcnt") as %Hbeq.
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     set (spd := pa_stk sp0 4%nat).

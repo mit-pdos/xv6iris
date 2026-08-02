@@ -63,7 +63,7 @@ Notation SD := KernelSyms.sched.
 Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-    (m : regfile) (av : nat) (eb : bool) (b : bool) :=
+    (m : regfile) (av : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -80,12 +80,17 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      nothing. *)
   eb = true ->
   (16 <= av)%nat ->
-  (* sched is entered holding p->lock at noff == 1, so its OWN resource
-     index is pinned [false] (cpu_own's [b = true] arm demands [n = 0]) --
-     that is DISTINCT from [b] below, which is [wp_next]'s index: whether
-     the swtch this function always performs may hand off to a hart other
-     than the one it entered on (it always may, hence the wrapper), not
-     what the SIE state IS at any point in sched's own body. *)
+  (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS.  sched is entered holding
+     p->lock at noff == 1, so its OWN resource index is pinned [false]
+     (cpu_own's [b = true] arm demands [n = 0], which would make the whole
+     premise [False] -- a vacuous instance, not a usable one).  Its crossing
+     index is the literal [true]: a PARKING function's [wp_next] index is
+     [true] UNCONDITIONALLY, because a [swtch] moves the hart with interrupts
+     OFF and so has nothing to do with SIE.  Threading one [b] through both
+     slots claimed, at the only live instance, that sched returns on the hart
+     that called it -- which is false twice over ([SpecSwtch]'s continuation
+     is over an arbitrary hart, and the post-resume release exits at
+     [outb = eb = true]).  There is consequently no [b] binder left. *)
   sie_cap_gpr m av false pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
@@ -101,7 +106,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   cpu_own 1 eb pj emp false -∗
   own_ctx (p_context pj) -∗
   ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
-  wp_next b (fun (CID : CpuId) =>
+  wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ch' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av false pj -∗
@@ -120,6 +125,6 @@ Module Type SCHED.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (b : bool),
-      wp_sched_sconf_body Φ γs j γl st ch m av eb b.
+      (m : regfile) (av : nat) (eb : bool),
+      wp_sched_sconf_body Φ γs j γl st ch m av eb.
 End SCHED.

@@ -118,7 +118,7 @@ Section ProofUvmdealloc.
       (mm mj : regfile) (P : uptd) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool) (oldsz newsz res ret_tgt : mword 64) :
     (4 <= K)%nat ->
-    (b = false -> (CID0 : CPU) = (CID : CPU)) ->
+    (b = false \/ p = zero_reg -> (CID0 : CPU) = (CID : CPU)) ->
     ret_tgt = ret_pc (mm !!! Regidx Rra) ->
     mj !!! Regidx csp_rs1
       = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) ->
@@ -151,7 +151,7 @@ Section ProofUvmdealloc.
        hart: this obligation is handed straight to the caller's own [Hcont],
        whose [wp_next] is relative to the function's TRUE entry, not to
        wherever this particular call site's leaf chain landed. *)
-    wp_next (CID0 := CID) b (fun (CID : CpuId) =>
+    wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K b p -∗
       cpu_own 0%nat eb p C b -∗
