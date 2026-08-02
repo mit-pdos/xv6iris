@@ -604,6 +604,21 @@ iIntros "Hcg Hpc".                                               (* byte-identic
 - Use `rgne` (IntrDefs.v) to meet a leaf's `rget`-spelled premise from an
   existing `m !!! Regidx k` fact. In an endgame peel loop **`rewrite Htp` must
   come BEFORE `rgne`** or the `repeat` stops early — see the comment at `rgne`.
+- **A STORE leaf's `rget` mismatch fails SILENTLY at the `iApply` and loudly
+  one line later.** `iApply` matches the leaf's `pa` and `storeval` by
+  CONVERSION (`rget`/`tp_pin` reduce at a closed non-tp index), so nothing
+  complains there; the symptom is the FOLLOWING
+  `iEval (rewrite Haddr Hval) in "Hcell"` reporting *"does not match any
+  subterm"* about a term you can see in the goal. Reflex: after any store
+  leaf, `rgne` the value side — and the address side too if you rewrote it in
+  `!!!` form going in — before touching the hypothesis.
+- **Map CHAINS need no hart annotation; only asserted VALUE FACTS about them
+  do.** A `set (V5 := <[… := regval_into_reg (add_vec (rget V4 a4) …)]> V4)`
+  written after `iIntros (CIDk …)` elaborates its `rget` at the NEW hart while
+  the goal still carries the previous one, and `change` closes it anyway —
+  both sides reduce to `V4 !!! Regidx _` at a closed non-tp index. So do not
+  pin harts in the `set`/`change` scaffolding; spend the `rgne`s on the
+  `assert`ed facts.
 - **`(rgne; exact H)` is the general one-liner for turning an existing `!!!`
   fact into its `rget` twin**, and deriving the twin UP FRONT beats splicing
   `rgne` into an `iEval` chain:
