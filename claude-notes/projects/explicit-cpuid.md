@@ -596,6 +596,38 @@ Fix both: resource index at the literal `false`, `wp_next true`, and drop the
 `(b : bool)` binder. The rule is now written up in the porting guide under
 "A PARKING function's `wp_next` index is `true` UNCONDITIONALLY".
 
+### THE TP-PREMISE SWEEP WAS NOT FINISHED — nine contracts still carry it
+
+Found by a consumer agent, missed by the orchestrator's own grep. **Grep for
+`Regidx (mword_of_int 4`, not for `mword_of_int 4) = cid_word`**: every
+survivor spells the ascription, `mm !!! Regidx (mword_of_int 4 : mword 5) =
+cid_word`, so the shorter pattern matches none of them and reports a clean
+sweep. That false negative is why this sat undetected through a whole wave.
+
+Still owed, all the entry-side premise: `SpecUvmalloc:88`, `SpecUvmcopy:111`,
+`SpecWalk:49`, `SpecUvmfree:85`, `SpecUvmcreate:68`, `SpecVmfault:64`,
+`SpecSysUptime:50`, `SpecVirtioDiskInit:205`, `SpecUsertrap:119`.
+`SpecUvmdealloc` has none — so growproc's two sibling callees disagree, which
+is how it surfaced.
+
+It is not cosmetic: with the premise present and no supplier (`SpecGrowproc`
+was swept, and `callee_saved` no longer says anything about tp), consumers
+re-invent the `tp_pin` re-tagging bridge — `ProofProcPagetable` and
+`ProofGrowproc` have now each done it independently, which is the fifth and
+sixth reinvention of that same bridge. Surprise 10 in this file says exactly
+what that means.
+
+Two occurrences that are NOT this premise and must be left alone: the
+trapframe register maps in `SpecUserret:58` / `SpecUservec:79,178`, where index
+4 is a saved-register slot in an M-mode map rather than a claim about the live
+tp.
+
+One that needs a decision rather than a deletion: **`SpecUvmcreate:79` reads
+the tp slot in its POSTCONDITION** (`uvmcreate_post γa on (mm !!! Regidx
+(mword_of_int 4))`). Under `tp_pin` that value is junk, so the post is saying
+something meaningless about the caller's map. It should name the hart directly
+(`cid_word_of cpu_id`, or `rget mm Rtp` which is equal to it by `rget_tp`).
+
 ### While the tree is quiet, hoist the four hand-copied index derivations
 
 `kf_b_derive` / `ka_b_derive` / `mp_b_derive` / `rsl_b_derive` are four
