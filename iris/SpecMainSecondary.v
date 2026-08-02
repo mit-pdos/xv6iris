@@ -141,7 +141,9 @@ Section SpecMainSecondary.
        The ghost is this hart's canonical [sie_gname] now, not a parameter. *)
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-    panic_wp -∗
+    (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
+       acquire wants [panic_wp_any], and one hart's copy does not yield it. *)
+    panic_wp_any -∗
     (* the handover channel, at the CONCRETE deposit *)
     started_inv (main_deposit γd γv Φ) -∗
     (* this hart's own translation and trap resources *)

@@ -59,7 +59,12 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   cpu_own 0 false p0 cpu_ctx_free false -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
-  panic_wp -∗
+  (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
+     and its [p = zero_reg] hatch express -- but that is not the point: the
+     [acquire] it calls in the scan asks for [panic_wp_any], a resource
+     quantified over EVERY hart, and one hart's copy does not yield it.  Same
+     propagation as SpecMain / SpecKinit / SpecUserinit / kalloc_env. *)
+  panic_wp_any -∗
   trap_csrs -∗
   intr_handler_avail -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

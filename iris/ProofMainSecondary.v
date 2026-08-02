@@ -556,7 +556,7 @@ Section ProofMainSecondary.
       (root : mword 44) (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
     (20 <= n)%nat ->
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
-    sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp -∗
+    sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (MN + 0x32) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
@@ -690,7 +690,10 @@ Section ProofMainSecondary.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
-    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpanic #Hsinv Hhart".
+    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv Hhart".
+    (* printk wants the ambient form; the scheduler join wants the generic one
+       (its acquire does), so keep both. *)
+    iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iApply (ms_entry Φ m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc %Ha4".
@@ -705,7 +708,7 @@ Section ProofMainSecondary.
     iIntros (m3) "Hcg Hpc Hcpu".
     iApply (ms_inithart_sched Φ γd γv γs m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc
-              with "Hcg Htext Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv").
+              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv").
   Qed.
 
 End ProofMainSecondary.

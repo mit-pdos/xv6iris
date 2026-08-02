@@ -1226,7 +1226,7 @@ Section ProofMain.
       (P : iProp Σ) `{!Persistent P} :
     (20 <= n)%nat ->
     sie_cap_gpr m n false p0 -∗
-    kernel_text -∗ panic_wp -∗
+    kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (MN + 0xa2) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
     trap_csrs -∗ intr_handler_avail -∗
@@ -1387,7 +1387,9 @@ Section ProofMain.
     (* main's boot arm reaches kinit -> freerange -> kfree -> acquire and
        userinit -> allocproc, whose contracts (and [KvmSpec.kalloc_env]) take
        the HART-GENERIC [panic_wp_any]; the printk / scheduler calls want the
-       ambient [panic_wp], which is one projection away. *)
+       ambient [panic_wp], which is one projection away.  scheduler() itself
+       needs the GENERIC form -- its acquire does -- so [mn_grp_started] takes
+       [Hpany] directly. *)
     iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
     (* --- 0x00 .. 0x14 : prologue, cpuid, the taken branch --- *)
     iApply (mn_boot_entry Φ m K p0 Hcid HK with "Hcg Htext Hpc").
@@ -1419,7 +1421,7 @@ Section ProofMain.
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started Φ γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia)
-              with "Hcg Htext Hpanic Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
+              with "Hcg Htext Hpany Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
                     Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
   Qed.
 
