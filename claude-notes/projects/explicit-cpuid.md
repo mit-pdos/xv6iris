@@ -550,6 +550,21 @@ and at that point the mechanism is no longer obviously simpler than the thing
 it replaced. **Do not implement this from the sketch above; it needs a
 scratchpad round-trip first.**
 
+### `sleep` is on the blocked list too — the same seam, byte for byte
+
+Confirmed by porting: `sleep`'s post-resume half crosses TWICE and carries
+`sched_vc` across both. After `sched` returns at hart `h`, its `release` runs
+at `cpu_own (S 0) eb …` with `eb = true`, so `SpecRelease`'s
+`outb = match 0 with O => eb | S _ => false end` is **`true`** and
+`pj = proc_addr j ≠ zero_reg` — neither escape hatch applies; then the
+following `acquire` is entered at level 0 with `eb = true`, which
+`cpu_own_forces_on` pins to `b = true`, giving a second unavoidable crossing.
+Everything else crossing those windows is fine (`Hcont` is itself a `wp_next`,
+strip it at the FINAL hart rather than at `h`; `cpu_own` transports;
+`Tk`/`C`/`own_ctx`/the frame cells are hart-free). Only `sched_vc` is
+stranded. So the blocked set is `sleep`, `yield`, `bread`, `bwrite`,
+`acquiresleep` — five proofs, one cause.
+
 ### The alternative that may well be better: make the record GLOBAL
 
 Worth weighing before building the payload at all. Every difficulty above

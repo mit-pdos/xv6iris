@@ -665,6 +665,26 @@ iIntros "Hcg Hpc".                                               (* byte-identic
 - Use `rgne` (IntrDefs.v) to meet a leaf's `rget`-spelled premise from an
   existing `m !!! Regidx k` fact. In an endgame peel loop **`rewrite Htp` must
   come BEFORE `rgne`** or the `repeat` stops early — see the comment at `rgne`.
+- **A LEFTOVER `!!!` IN A MAP CHAIN IS A NON-TERMINATING `iSpecialize`, one
+  leaf later.** This is the single most expensive trap in the sweep. A
+  gpr-write leaf returns its written value spelled with `rget`; if the
+  consumer's `set`/`change` chain still spells it `!!!`, the `change` SUCCEEDS
+  by conversion while leaving `Hcg`'s map in `rget` form. Nothing fails there.
+  The NEXT leaf's `iSpecialize ("HL" with "Hcg")` then has to convert
+  `rget`/`tp_pin`/`rf_upd`/`bool_decide` over a deep `set`-chain and runs
+  forever — measured >5 min at 1.3 GB RSS, no error, no output — so it presents
+  as a hang in the FOLLOWING leaf's `iApply`, several sentences from the cause.
+  **Pre-empt it**: `iEval (repeat rgne) in "Hcg".` immediately after the
+  `iIntros` of every leaf whose written value reads the map (`wp_caddiw`,
+  `wp_cslli`, `wp_cadd`, `wp_caddi`, `wp_candi`, `wp_addi4`; 18 sites in
+  `ProofSched.v`). That normalises back to `!!!`, so the existing
+  `set`/`change`/`upd_ne` machinery is untouched. For a `c.mv rd,tp` leaf do
+  the OPPOSITE — respell the `set` body as `rget m Rtp` and prove downstream
+  facts with `rget_tp` — since `rgne`'s side condition correctly refuses tp.
+  Debugging tools if you hit it anyway: `stdbuf -o0 coqc -time` (buffered
+  stdout mislocates it), and a truncated probe file with `Abort.` after the
+  suspect leaf plus `idtac` markers between `iPoseProof`/`iSpecialize`/`iApply`
+  — that took one agent's cycle from 10 minutes to 40 seconds.
 - **A STORE leaf's `rget` mismatch fails SILENTLY at the `iApply` and loudly
   one line later.** `iApply` matches the leaf's `pa` and `storeval` by
   CONVERSION (`rget`/`tp_pin` reduce at a closed non-tp index), so nothing
