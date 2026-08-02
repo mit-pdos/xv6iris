@@ -75,10 +75,10 @@ Section SpecClockintr.
   Definition tick_hart : bool := eq_vec (cid_word : mword 64) (zero_reg : mword 64).
 
   (* the tick machinery, owned by the tick keeper (see the header).
-     [panic_wp_any]: a migration can happen anywhere in a [b]-generic
-     stretch, and this bundle is threaded across the whole call, so the
-     acquire/wakeup panic arms it discharges may be reached at a hart other
-     than the one that entered. *)
+     HART-INDEXED, through [tick_hart]'s [cid_word] -- which is why this
+     contract is stated at [b = false] and not generically; see the note on
+     [wp_clockintr_sconf_body]. [panic_wp_any] rather than [panic_wp] because
+     the acquire/wakeup arms it discharges are stated hart-generically. *)
   Definition tick_keeper (Φ : mval -> iProp Σ)
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
@@ -88,25 +88,44 @@ Section SpecClockintr.
 
 End SpecClockintr.
 
+(* INTERRUPTS OFF, for two independent reasons -- neither of which is a
+   convenience, and the contract was b-GENERIC until the explicit-CPUID sweep
+   made them checkable.
+
+   (1) clockintr CALLS cpuid(), at CI+0x08, and does not bracket the call in
+   its own push_off/pop_off.  cpuid() is stated at [b = false] because it
+   reads tp mid-body (see the porting guide), so the constraint propagates UP
+   the call graph: a caller that invokes cpuid() unbracketed inherits it.
+   There is no way to reach [false] from a generic [b] here.
+
+   (2) [tick_keeper] is HART-INDEXED -- [tick_hart] names [cid_word] -- so it
+   cannot ride a generic-[b] [wp_next].  At [b = true] the left disjunct
+   "the ENTRY hart is not hart 0" says nothing about the RESUMED hart, and no
+   transport exists or could exist.  The whole proof shape depends on this
+   too: the [cpuid() == 0] case split is on the ambient hart, which is only
+   sound while the hart cannot move.
+
+   xv6 agrees on both counts: clockintr runs only from devintr, inside the
+   trap handler, with SIE already off.  Stated at the literal [false] there is
+   no [wp_next] wrapper at all ([wp_next_off] would collapse it). *)
 Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) :=
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* acquire's transient noff increments (one for the tickslock, one inside
      wakeup's per-proc acquire) stay in int range *)
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (20 <= av)%nat ->
-  sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  sie_cap_gpr m av false p -∗
+  cpu_own n eb p C false -∗
   kernel_text -∗ pc_is pcE -∗
   timer_cap -∗
   tick_keeper Φ γl γs -∗
-  wp_next b (fun (CID : CpuId) =>
-    ∀ mf : regfile,
+  ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b -∗
+      sie_cap_gpr mf av false p -∗
+      cpu_own n eb p C false -∗
       pc_is ret_tgt -∗
       tick_keeper Φ γl γs -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -116,6 +135,6 @@ Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool),
-      wp_clockintr_sconf_body Φ γl γs m n eb p C av b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
+      wp_clockintr_sconf_body Φ γl γs m n eb p C av.
 End CLOCKINTR.
