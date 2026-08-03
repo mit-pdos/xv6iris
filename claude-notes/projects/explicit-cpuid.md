@@ -155,7 +155,7 @@ ambient-`CpuId` shape this was not statable, let alone checkable.
 This is the refactor paying for itself: the falsehood was invisible before, and
 would have stayed invisible until `kerneltrap` was proved.
 
-## STATUS (2026-08-03): the MECHANISM HAS LANDED; the nine contracts have not
+## STATUS (2026-08-03): **642 of 642 GREEN — the refactor's file work is DONE**
 
 `scheds_inv` and its six moves are no longer a prototype: they live in
 `SchedCtx.v` (with `cpu_proc_half` / `park_own` / `park_at` and the
@@ -163,11 +163,29 @@ would have stayed invisible until `kerneltrap` was proved.
 half of `a_cpu_proc`, `ProofScheduler`'s two `c->proc` stores are the two
 mask-changing moves, `proc_slots` has its third guarded slot, and `main`
 allocates the invariant one line after `procs_inv_alloc` chooses γs.
-**632 of 642 targets green — the SAME ten red files as before the change**
-(`ProofSleep`/`Yield`/`Bread`/`Bwrite`/`Acquiresleep` + their `Link*`).
-What is still owed is the *consumer* half: steps 6 and 7 below — the nine
-contracts dropping `▷ sched_vc` for `scheds_inv` + `park_hlf j true`, and the
-five proofs. See "WHAT LANDED, AND THE ONE DESIGN CHANGE" below.
+
+**And the consumer half has now landed too.** The ten contracts
+(`SpecYield`, `SpecSleep` — both bodies —, `SpecBread`, `SpecBwrite`,
+`SpecAcquiresleep`, `SpecVirtioDiskRw`, `SpecUartwrite`, `SpecPiperead`,
+`SpecPipewrite`, `SpecSysPause`) dropped `▷ sched_vc Φ γs (a_cpu_ctx cid_word)
+pj` from premise AND postcondition and gained `scheds_inv Φ γs` (persistent,
+hart-free) plus `park_hlf j true` (hart-free); the edit was byte-uniform in all
+ten. The five proofs (`ProofYield`, `ProofSleep`, `ProofBread`, `ProofBwrite`,
+`ProofAcquiresleep`) and their five `Link*` are green. `spec_vacuity.py` is
+CLEAN, `proof_coverage.py --check` exits 0 with the assumption set UNCHANGED,
+and `lemma_diff.py` reports exactly two removals, both the prescribed
+`_notp`-twin collapse (`ProofAcquiresleep.asl_regs_notp`,
+`ProofBread.bd_notp_of`).
+
+`SpecSched` was NOT changed and did not need to be: it is entered at
+`sie_cap_gpr … false` holding p->lock, so it still takes `▷ sched_vc` in and
+hands one back. What moved is WHO produces and consumes it — the parking
+function does `scheds_take` immediately before the `jal sched` and
+`scheds_put` at its first act after sched returns (the deposit is the RESUMED
+thread's, not the scheduler's: `valid_context_pre` hands the resumer's record
+to the resumed party). Both are one `iApply fupd_wp. iMod …. iModIntro.`, and
+the `park_hlf j false` between them is exactly `proc_held`'s new fifth
+conjunct. Everything else in the five proofs was the standard recipe.
 
 ### WHAT LANDED, AND THE ONE DESIGN CHANGE
 
@@ -213,23 +231,35 @@ Two smaller consequences that had to be settled while wiring it in:
   (the crossing's share) so the second half goes to the caller, which is what
   lets it rebuild `proc_lock_res` at USED/RUNNABLE.
 
-### STILL OWED (steps 6 and 7 of the plan)
+### STEPS 6 AND 7 — DONE (2026-08-03)
 
-1. The nine contracts lose `▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj` from
-   premise AND postcondition and gain `scheds_inv Φ γs` (persistent,
-   hart-free) and `park_hlf j true` (hart-free): `SpecSleep`, `SpecYield`,
-   `SpecBread`, `SpecBwrite`, `SpecAcquiresleep`, `SpecVirtioDiskRw`,
-   `SpecUartwrite`, `SpecPiperead`, `SpecPipewrite`, `SpecSysPause`.
-   `ProtoSchedsInv.wp_yield_sconf_body'` is the exact target shape and still
-   typechecks.
+All three items below are landed and green; kept for the record of what the
+work actually was.
+
+1. The ten contracts lost `▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj` from
+   premise AND postcondition and gained `scheds_inv Φ γs` (persistent,
+   hart-free) and `park_hlf j true` (hart-free): `SpecSleep` (both bodies),
+   `SpecYield`, `SpecBread`, `SpecBwrite`, `SpecAcquiresleep`,
+   `SpecVirtioDiskRw`, `SpecUartwrite`, `SpecPiperead`, `SpecPipewrite`,
+   `SpecSysPause`. `ProtoSchedsInv.wp_yield_sconf_body'` was the exact target
+   shape and the edit was byte-uniform in all ten. The five `Axiom`-style
+   `Link*` above the four unproved contracts needed NO regeneration — they
+   reference the `_body` rather than copying its wand chain.
 2. `SpecSched`'s crossing payload: `p_sched`'s two disjuncts reach the
    scheduler through `proc_held`, which now carries `park_hlf j false`. A
    parking function's take-out is `scheds_take` just before its swtch; its
-   post-resume half gains exactly one `iMod` (`scheds_put`) at the resumed
-   hart.
-3. Port `ProofSleep` / `ProofYield` / `ProofBread` / `ProofBwrite` /
-   `ProofAcquiresleep` and compile the five `Link*` (functor instantiations;
-   expected to need no edit).
+   post-resume half gains exactly one `scheds_put` at the resumed hart.
+   `SpecSched` itself did not change.
+3. `ProofSleep` / `ProofYield` / `ProofBread` / `ProofBwrite` /
+   `ProofAcquiresleep` ported; all five `Link*` compiled with NO edit, as
+   predicted (pure functor instantiations).
+
+**The single most useful thing learned porting the five: an `acquire` pins the
+hart for its whole lock-held stretch, and in four of the five that is most of
+the function.** `ProofBread`'s two scan loops, its miss preamble, its recycle
+field rewrites and its refcnt update are ALL `rewrite wp_next_off`, and
+neither induction needed `wp_next_shift`. Look for that collapse before
+planning any hart-generic scaffolding.
 
 ## STATUS (2026-08-02, superseded above): 631 of 641 files green
 

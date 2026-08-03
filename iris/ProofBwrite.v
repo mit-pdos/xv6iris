@@ -137,7 +137,7 @@ Section ProofBwrite.
     unfold K_bwrite in HK.
     subst eb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs Hoctx Hvc
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs #Hscheds Hoctx Hpark
               Hdev Hgeom Hdlock Hlocked Hdisk Hcont".
     iDestruct "Hlocked" as "(%Hk2 & Hstok & Hpid & Hvalid & Hbdev & Hbuf)".
     iDestruct (bio_ctx_buf bn k Hk with "Hbio") as "[#Hslk _]".
@@ -184,6 +184,19 @@ Section ProofBwrite.
                     (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3).
     { rewrite HspR1. unfold spr, sp0, pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    (* the same three bridges spelled at [spr] rather than at [R1 !!! sp]:
+       the epilogue's callee-saved chain delivers sp as [spr], and the two
+       spellings are equal only through [HspR1] (a map lookup, not a
+       conversion), so a rewrite with [Hb_] would not fire there. *)
+    assert (Hc1 : add_vec spr
+                    (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1)
+      by (rewrite -HspR1; exact Hb1).
+    assert (Hc2 : add_vec spr
+                    (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) = pa_stk sp0 2)
+      by (rewrite -HspR1; exact Hb2).
+    assert (Hc3 : add_vec spr
+                    (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 3)
+      by (rewrite -HspR1; exact Hb3).
     iEval (rewrite -Hb1) in "Hr24". iEval (rewrite -Hb2) in "Hr16".
     iEval (rewrite -Hb3) in "Hr8".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (BW + 0x02))
@@ -389,35 +402,22 @@ Section ProofBwrite.
     iDestruct (cpu_own_transport CID9 CID13 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* ================================================================== *)
-    (* BLOCKED HERE, and NOT by an anchoring slip.  [Hvc] is                *)
-    (*   ▷ @sched_vc … CID Φ γs (a_cpu_ctx (@cid_word CID)) pj              *)
-    (* while rw's premise is the same proposition at CID13 -- a DIFFERENT   *)
-    (* context-slot ADDRESS ([a_cpu_ctx (cid_word_of CID13)], fourteen      *)
-    (* exclusive words of another hart's [struct cpu]) under a DIFFERENT    *)
-    (* admin index ([Some (CID13, sie_name CID13)]).  No transport exists   *)
-    (* and none can: this is the ONE resource in the level-0/enabled-base   *)
-    (* cone that has no vehicle across a [wp_next] at [b = true], and       *)
-    (* [b = true] is FORCED here ([cpu_own 0 true pj C b] + [sie_cap_gpr …  *)
-    (* b …] refute [b = false] by ghost agreement).  Neither                *)
-    (* [cpu_own_transport] nor [wp_next_shift] applies -- [Hcnt] above is   *)
-    (* already transported, and [wp_next_shift] re-anchors a wp_next        *)
-    (* OBLIGATION, not a held hart-indexed resource.                        *)
-    (*                                                                      *)
-    (* The fix is the interface change already written up in                *)
-    (* claude-notes/projects/explicit-cpuid.md, "THE LEVEL-0/ENABLED-BASE   *)
-    (* CONE": [sched_vc] must ride the crossing frame the way [cpu_hart]    *)
-    (* already does, via a [sie_pay : CPU -> mword 64 -> iProp Σ] field of  *)
-    (* [sieG] owned by [sie_arm true p].  SpecBwrite is one of the nine     *)
-    (* contracts that note lists; when it lands, [▷ sched_vc] leaves        *)
-    (* bwrite's premise and postcondition lists entirely and the two        *)
-    (* [Hvc] mentions here and at the return simply disappear.              *)
+    (* The one-time blocker here is GONE: bwrite no longer carries          *)
+    (* [▷ sched_vc] -- hart h's parked scheduler record, fourteen exclusive *)
+    (* words of ONE hart's [struct cpu], for which no [wp_next] transport   *)
+    (* exists or could exist.  The record now lives in the global           *)
+    (* [SchedCtx.scheds_inv], and what a thread carries instead is the      *)
+    (* persistent [scheds_inv] plus the per-PROC receipt [park_hlf j true]. *)
+    (* Both are HART-FREE, so they cross rw's [wp_next] as ordinary frames, *)
+    (* exactly the way [procs_inv] and [p_pid] already do.  bwrite itself   *)
+    (* never parks, so it does nothing with the receipt but pass it on.     *)
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bs_disk b
               HKrw Hbno Hkdata Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hoctx Hvc Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
+              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hoctx Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hvc Hbuf Hdisk".
+    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk".
     iEval (rewrite (bw_wr_true _ bs bs_disk HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bs_disk HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
@@ -434,7 +434,8 @@ Section ProofBwrite.
     assert (HmRsp : mR !!! Regidx csp_rs1 = spr)
       by (rewrite (callee_saved_lookup Hcs2 csp_rs1 ltac:(vm_compute; reflexivity)); exact HD3sp).
     assert (HmRthr : forall c : mword 5, is_cs_idx c = true ->
-              c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
+              Regidx c <> Regidx csp_rs1 -> Regidx c <> Regidx Rs0 ->
+              Regidx c <> Regidx Rs1 ->
               mR !!! Regidx c = m !!! Regidx c).
     { intros c Hcs Hsp H8 H9.
       rewrite (callee_saved_lookup Hcs2 c Hcs).
@@ -467,9 +468,9 @@ Section ProofBwrite.
               mR (K - 4)%nat (m !!! Regidx Rra) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hr24] [-]").
-    { iEval (rewrite HmRsp). iExact "Hr24". }
+    { iEval (rewrite HmRsp Hc1). iExact "Hr24". }
     iIntros (CID15 Hs15) "Hcg Hpc Hr24".
-    iEval (rewrite HmRsp Hb1) in "Hr24".
+    iEval (rewrite HmRsp Hc1) in "Hr24".
     set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra)]> mR).
     change (<[Regidx Rra := regval_into_reg (m !!! Regidx Rra)]> mR) with P1.
     assert (HP1sp : P1 !!! Regidx csp_rs1 = spr)
@@ -482,9 +483,9 @@ Section ProofBwrite.
               P1 (K - 4)%nat (m !!! Regidx Rs0) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hr16] [-]").
-    { iEval (rewrite HP1sp). iExact "Hr16". }
+    { iEval (rewrite HP1sp Hc2). iExact "Hr16". }
     iIntros (CID16 Hs16) "Hcg Hpc Hr16".
-    iEval (rewrite HP1sp Hb2) in "Hr16".
+    iEval (rewrite HP1sp Hc2) in "Hr16".
     set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0)]> P1).
     change (<[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0)]> P1) with P2.
     assert (HP2sp : P2 !!! Regidx csp_rs1 = spr)
@@ -497,9 +498,9 @@ Section ProofBwrite.
               P2 (K - 4)%nat (m !!! Regidx Rs1) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [Hr8] [-]").
-    { iEval (rewrite HP2sp). iExact "Hr8". }
+    { iEval (rewrite HP2sp Hc3). iExact "Hr8". }
     iIntros (CID17 Hs17) "Hcg Hpc Hr8".
-    iEval (rewrite HP2sp Hb3) in "Hr8".
+    iEval (rewrite HP2sp Hc3) in "Hr8".
     set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1)]> P2).
     change (<[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1)]> P2) with P3.
     assert (HP3sp : P3 !!! Regidx csp_rs1 = spr)
@@ -592,7 +593,7 @@ Section ProofBwrite.
     iDestruct (cpu_own_transport CID14 CID19 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hvc Hppid Hlocked Hdisk").
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlocked Hdisk").
     unfold callee_saved. repeat split; assumption.
   Qed.
 

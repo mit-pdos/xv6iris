@@ -116,8 +116,9 @@ Definition wp_virtio_disk_rw_sconf_body
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  park_hlf j true -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -134,7 +135,7 @@ Definition wp_virtio_disk_rw_sconf_body
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      park_hlf j true -∗
       (* the exchange: a read fills the buffer from the block, a write
          moves the buffer's bytes onto the disk; b->disk ends at 0 *)
       buf_own bp bno (mword_of_int 0 : mword 32)

@@ -481,6 +481,23 @@ cpu_own_forces_off : cpu_own (S n) eb p C true -∗ False
 `cpu_own_eb_agree` is the general one; the direction is
 `match … = b`, so a proof that wants `b = match …` writes `symmetry in H`, and
 one at the literal level 0 writes `cbn in H` to get the bare `eb = b`.
+
+**…and that bare `eb = b` is a trap if you also derived `b = true`.** With both
+`Hbm : eb = b` and `Hb : b = true` in scope, `subst b` picks `Hbm` and
+identifies `b` with `eb` instead of with `true`. Nothing fails there; the
+symptom lands a leaf later as *"cannot instantiate … with
+`sie_cap_gpr m av eb pj`"*. `clear Hbm` first, then `subst b`.
+(`ProofAcquiresleep.v` is the worked case; `cpu_own_forces_on` is unusable
+there because `eb` has to stay a VARIABLE in the two bodies that run `iNext`
+over `cpu_own`.)
+
+**A decomposed body lemma should take its hart anchor as `(CID0 : CPU)`, not
+as `` `{CID0 : CpuId} ``, whenever the lemma also has an ambient
+`` `{CID : CpuId} ``.** A second `CpuId` in scope is an instance candidate and
+competes with the ambient one; at type `CPU` the anchor is inert yet still
+accepted wherever `wp_next` wants a `CpuId` (singleton class). Pin the hart at
+the application site (`asl_post_sleep_body (CID := CIDs) …`) so a trailing
+`ltac:(wp_next_chain)` argument is not elaborated against an unsolved `?CID`.
 `cpu_own_forces_on` is the fact that makes "state the level-0/enabled-base
 contract at `b = false`" a VACUITY rather than a weakening — there is no
 `b = false` instance to verify.
@@ -560,6 +577,21 @@ premises) — the checker knows the difference.
 
 ## Discharge gotchas (all found the hard way)
 
+- **A bare `iMod` at a `WP … {{ Φ }}` goal does NOT work in this tree.**
+  `elim_modal_fupd_wp` reports *"iMod: cannot eliminate modality … in
+  (WP Loop {{v, Φ v}})"*. The idiom every existing caller uses
+  (`ProofMain*`, `ProofSwtch`, `ProofKinit`, and now the two `scheds_*` moves
+  in `ProofYield`/`ProofSleep`) is:
+  ```coq
+  iApply fupd_wp.
+  iMod (SchedCtx.scheds_take Φ γs ⊤ CIDk j with "Hscheds Hph Hpark")
+    as "(Hvc & Hph & Hpark)"; [solve_ndisj|exact Hj|].
+  iModIntro.
+  ```
+  Note also that `scheds_take` / `scheds_put` take **no `CpuId` argument at
+  all** — the hart is the explicit `h` parameter. Pass the current `CIDk`
+  binder by name; `cpu_id` is ambiguous once several `CpuId` hypotheses are in
+  scope, and it silently resolves to the wrong one.
 - **`$!` cannot skip an intervening wand or nested `∀`.** `iApply ("Hcont" $!
   cpu_id v with …)` mis-targets the wand's antecedent or fails to parse. Do the
   pure premise first: `iSpecialize ("Hcont" $! cpu_id with "[]");

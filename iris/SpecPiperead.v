@@ -95,9 +95,10 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  park_hlf j true -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -109,7 +110,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
       pipe_ref γp w q -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      park_hlf j true -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

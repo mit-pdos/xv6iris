@@ -71,8 +71,9 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
   procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  park_hlf j true -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
@@ -85,7 +86,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      park_hlf j true -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

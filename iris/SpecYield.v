@@ -69,9 +69,10 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  park_hlf j true -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -79,7 +80,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      park_hlf j true -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

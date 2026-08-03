@@ -96,8 +96,9 @@ Definition wp_bwrite_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle rw's sleeps thread through *)
   procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  park_hlf j true -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -112,7 +113,7 @@ Definition wp_bwrite_sconf_body
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
       bio_locked bn k pidv dev bno bs -∗
       (* the write-through: the disk now holds the buffer's bytes *)

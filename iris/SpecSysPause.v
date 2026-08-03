@@ -119,9 +119,10 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_tickslock γt -∗
   (* the running-thread bundle killed() and sleep() need *)
   procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
   panic_wp_any -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  park_hlf j true -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : mword 64),
       ⌜ callee_saved m mf /\
@@ -133,7 +134,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      park_hlf j true -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
