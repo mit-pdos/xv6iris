@@ -202,12 +202,11 @@ about. Check the report after touching any parking contract.
 
 Landed: **bwrite** (`0670a72`), **acquiresleep** (`cc2e436`), **bread**
 (`72eb2b6` for the spec fix below, then the port), and — after the
-explicit-CPUID sweep, i.e. in the COLLAPSED `wp_next` form — **sys_pause** and
-**uartwrite**. Remaining axioms are exactly three: **piperead**, **pipewrite**,
-**virtio_disk_rw** (`LinkPiperead.v` / `LinkPipewrite.v` /
-`LinkVirtioDiskRw.v`; the other `Axiom`s in `Link*.v` — consoleintr,
-kerneltrap, userinit, printk-general — are long-standing assumed callees and
-are NOT this project's).
+explicit-CPUID sweep, i.e. in the COLLAPSED `wp_next` form — **sys_pause**,
+**uartwrite**, **piperead** and **pipewrite**. ONE axiom remains:
+**virtio_disk_rw** (`LinkVirtioDiskRw.v`; the other `Axiom`s in `Link*.v` —
+consoleintr, kerneltrap, userinit, printk-general — are long-standing assumed
+callees and are NOT this project's).
 
 `acquiresleep` is the worked example for the remaining LOOP sleepers —
 read `ProofAcquiresleep.v` (and now `ProofSysPause.v` / `ProofUartwrite.v`)
@@ -312,11 +311,49 @@ above acquiresleep's:
   (`sp_base`, `uw_loop_regs`, …) drops its `!!! Rtp = cid_word` conjunct
   together with the entry premise that used to feed it.
 
-#### WHAT THE THREE REMAINING PORTS STILL NEED
+#### WHICH JOINS ACTUALLY NEED ANCHORING (piperead / pipewrite)
 
-`ProofPiperead.v` (2731 lines), `ProofPipewrite.v` (2708) and the
-`ProofVirtioDiskRw{,B,C,CSeam,D,DSeam,E,F}.v` tower (8734) are recoverable from
-`git show 0cfc644^:iris/<file>`. Each needs, mechanically:
+Not every continuation does, and the ones that do not are worth NOT paying
+for. The rule: a join needs a `wp_next` anchor iff two DIFFERENT harts can
+reach it. Inside the lock the index is `false` and the hart is pinned, so a
+join established and consumed within one locked stretch is an ordinary wand.
+
+  * piperead: `EPI` (+0xd6), `EPIC`/`CPP` and the wait loop (+0x34) are
+    crossed by the sleep and are anchored; `WEXIT` (+0xc2) and the bounded
+    copy loop are established inside `CPP`'s body and consumed there with the
+    lock held — copyout does not park — so they stay plain.
+  * pipewrite: `pw_epi` / `pw_tail` / `pw_minus1` / `pw_loop` are anchored and
+    `pw_guard_step` takes `CID` as a lemma binder; `pw_restore5` instead went
+    INDEX-GENERIC (a `b` parameter and a `wp_next` conclusion), because its
+    three callers are at both indices and a plain wand could say neither.
+
+Two failure modes these two ports added to the list:
+
+  * **`Typeclasses Opaque cpu_own`.** With the parking premise substituted the
+    base enable is the literal `true`, so `intr_count`'s `if eb` reduces and
+    `iNext` descends THROUGH `cpu_own`, strips the later off
+    `intr_handler_spec`, and the bundle can no longer be folded back. Either
+    keep `eb` symbolic (acquiresleep's answer) or make the bundle opaque to
+    typeclass search (piperead's and pipewrite's, which is what lets the index
+    stay literal everywhere else).
+  * **A `cid_word` fact is per-hart.** `mycpu_ret cid_word <> 0` proved at the
+    entry hart is the WRONG proposition inside a join's body; wakeup's premise
+    has to be re-derived there from `rget_tp`. This compiles as a unification
+    failure whose two sides print identically.
+
+#### WHAT THE LAST PORT STILL NEEDS
+
+The `ProofVirtioDiskRw{,B,C,CSeam,D,DSeam,E,F}.v` tower (8734 lines) is
+recoverable from `git show 0cfc644^:iris/<file>`. Beyond the mechanical steps
+below it has two of its own: the contract no longer threads a caller-held
+`trap_csrs_pay` (the function is trap-CSR-BALANCED — its own acquire mints the
+pay its interior sleeps need and its release spends it), and `SpecVirtioDiskRw`
+renamed the buf-pointer local `b` to `bp` because `b` is now the SIE index, so
+the phase lemmas' `b` must be renamed with it. The two parks (the alloc3
+sleep-retry in the B file, the completion wait in E) are the only hart changes
+between acquire and release, so the seams AFTER each are what need anchoring.
+
+It needs, mechanically:
 
 1. every `wp_*_s_sconf γ Φ …` call to drop `γ` and gain the index argument in
    the `b` slot of the new signature, with the `rd_ok` premise switched from
@@ -330,18 +367,27 @@ above acquiresleep's:
    `▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj → park_hlf j true` plus a
    `scheds_inv Φ γs` premise, `kalloc_env γa None cid_word → kalloc_env γa
    None`;
-5. every `iAssert`ed continuation wrapped in `wp_next (CID0 := CID) true pj
-   (fun CID => …)`, with `iIntros (CIDx Hsx)` opening its proof and
+5. every continuation a park can cross wrapped in `wp_next (CID0 := CID) true
+   pj (fun CID => …)`, with `iIntros (CIDx Hsx)` opening its proof and
    `iSpecialize ("X" $! CIDk with "[%]"); [wp_next_chain|]` at each use.
-   piperead has four (`EPIP`/`EPIC`+`CPP`/`WXP`, plus the copy loop and the
-   wait-loop iLöb); pipewrite mirrors it; the rw tower's seams are already cut
-   at the park, so its later seam lemmas take the hart as a binder.
 
-Step 1 is worth scripting — the leaf signatures can be read out of
-`Wp*.v` mechanically and the `b` slot located by counting the explicit binders
-before it. Steps 3 and 5 are not: they change proof STRUCTURE, and a script
+Steps 1 and 2 are worth scripting and were: the leaf signatures read out of
+`Wp*.v` mechanically (the `b` slot is located by counting explicit binders, the
+`rd_ok` premise by scanning the premise list), and the `wp_next_off` /
+`iIntros (CIDk Hsk)` insertion follows the leaf's index. Two scripted rules
+that are easy to get wrong: a leaf whose `▷` is INSIDE the `wp_next`
+(`wp_cj_s_sconf`) needs `rewrite wp_next_off` BEFORE the `iNext`, the
+branch-taken leaves the other way round; and `rget` normalisation is best done
+as one tactic over the whole proofmode goal
+(`Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate])`)
+inserted after every leaf continuation and inside every `ltac:(…)` premise,
+rather than per-occurrence.
+
+Steps 3 and 5 are NOT scriptable: they change proof STRUCTURE, and a script
 that half-applies them produces a file whose errors do not point at the real
-mistake.
+mistake. The tp unthreading in particular leaves orphans a compiler reports far
+from their cause — a bullet whose body was deleted but whose head survives, a
+`destruct` pattern one name too long, an `exact H…tp` on its own line.
 
 #### bread's port (the two-park shape)
 
