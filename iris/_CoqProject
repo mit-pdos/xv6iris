@@ -458,6 +458,7 @@ ProofKilled.v
 LinkKilled.v
 SpecSysPause.v
 CodeSysPause.v
+ProofSysPause.v
 LinkSysPause.v
 SpecArgfd.v
 CodeArgfd.v
@@ -613,6 +614,7 @@ LinkEitherCopyin.v
 UartTxInv.v
 SpecUartwrite.v
 CodeUartwrite.v
+ProofUartwrite.v
 LinkUartwrite.v
 SpecConsoleintr.v
 LinkConsoleintr.v
