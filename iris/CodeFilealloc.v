@@ -148,7 +148,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section FileallocInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FA := KernelSyms.filealloc.
 

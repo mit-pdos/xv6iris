@@ -53,7 +53,7 @@ Import Defs.
 Module UserretUser (R : USERRET) (U : USER).
 Section UserretUser.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd) (kroot : mword 44)
       (Φ : mval -> iProp Σ)

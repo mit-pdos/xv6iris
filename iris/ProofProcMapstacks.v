@@ -83,7 +83,7 @@ Module ProcMapstacksProof (K : KALLOC) (KM : KVMMAP) : PROC_MAPSTACKS.
 
 Section ProofPMS.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  (* NOTE: no shared [Context `{CID : CpuId}] here -- the epilogue/loop/
+  (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop/
      prologue lemmas below apply EACH OTHER at a hart that a [wp_next]
      crossing may have migrated to, so each needs its OWN implicit
      per-lemma [CID] binder (shadowing what a section Context would give)
@@ -113,7 +113,7 @@ Section ProofPMS.
   (* THE SEALED EPILOGUE (+0x80..+0x96): restore the 10-slot frame and  *)
   (* ret, producing the success-only proc_mapstacks post.               *)
   (* ================================================================= *)
-  Lemma wp_proc_mapstacks_epilogue_sconf `{CID : CpuId} (γa : gname)
+  Lemma wp_proc_mapstacks_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (Φ : mval -> iProp Σ)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (K lvl : nat)
@@ -422,7 +422,7 @@ Section ProofPMS.
   (* ================================================================= *)
   (* THE LOOP (+0x52 entry): fuel induction on [rem], [i + rem = 64].    *)
   (* ================================================================= *)
-  Lemma wp_proc_mapstacks_loop_sconf `{CID : CpuId} (γa : gname)
+  Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree)
       (m0 : gmap (mword 27) (mword 64)) (K lvl : nat)
@@ -1017,7 +1017,7 @@ Section ProofPMS.
   (* THE PROLOGUE (+0x00..+0x4e) + loop entry: the whole-function spec. *)
   (* ================================================================= *)
   Lemma wp_proc_mapstacks_sconf
-      `{CID : CpuId} (γa : gname) (Φ : mval -> iProp Σ)
+      `{GEN : GenId} `{CID : CpuId} (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
     : wp_proc_mapstacks_sconf_body γa Φ mm t m lvl K eb p C on b.

@@ -50,7 +50,7 @@ Qed.
 
 Section WpHoldingInv.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- [smode_config] leaf wrappers for holding.  All config-preserving
      (holding never touches mstatus), so each just unbundles → raw leaf →

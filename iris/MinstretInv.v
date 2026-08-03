@@ -281,7 +281,7 @@ Qed.
 
 Section MinstretInv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---------------------------------------------------------------------- *)
   (* The clock invariant: value-agnostic ownership of the three registers    *)

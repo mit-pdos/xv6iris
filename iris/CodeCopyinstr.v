@@ -275,7 +275,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section InstrsCS.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma csi_00 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x00) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 88 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 5)), BEQ)).  (* c.beqz a3,+0xb0    # max == 0 -> return -1, no frame *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x00)%Z (mword_of_int 0xcac5 : mword 16)

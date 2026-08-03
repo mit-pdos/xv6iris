@@ -81,7 +81,7 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
   (<[Regidx (mword_of_int 5) := regval_into_reg (g !!! Regidx (mword_of_int 10) : mword 64)]>
   (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> g)))))).
 
-Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
     (sscr0 : mword 64)
     (vksat vksp vktr vkhart : bv 64)
@@ -208,7 +208,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type USERVEC.
   Parameter wp_uservec_pt :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
       (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)

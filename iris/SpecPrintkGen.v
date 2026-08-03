@@ -74,7 +74,7 @@ Definition pr_lock : mword 64 := mword_of_int KernelSyms.pr.
 Section SpecPrintkGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* The two panic flags, in their OWN invariant.                         *)
@@ -122,7 +122,7 @@ Section SpecPrintkGen.
 End SpecPrintkGen.
 
 Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-    `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) :=
@@ -163,7 +163,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool),

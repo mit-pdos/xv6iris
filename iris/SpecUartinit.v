@@ -80,7 +80,7 @@ Notation UART_INIT := KernelSyms.uartinit.
    [b], with no [wp_next] wrapper at all (it would collapse via
    [wp_next_off] anyway, since the hart cannot move). *)
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
-    `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
@@ -121,7 +121,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
 
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64),
       wp_uartinit_sconf_body γd Φ m K l b0 vlock vname vcpu p.

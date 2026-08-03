@@ -60,7 +60,7 @@ Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
 Section ProofKilled.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation kl_s0 := (mword_of_int 8 : mword 5).
   Notation kl_s1 := (mword_of_int 9 : mword 5).

@@ -22,7 +22,7 @@ Import Defs.
 
 Section CodeCpuid.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 (* ---- the two a0-flavoured RVC decodes not shared with the frame set ---- *)

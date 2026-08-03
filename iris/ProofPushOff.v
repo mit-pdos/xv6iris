@@ -83,7 +83,7 @@ Section ProofPushOff.
   (* resource), so it needs a genuine per-lemma CID binder and the full   *)
   (* fresh-hart-per-leaf template, not the M-mode shortcut.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_pop_off_epi_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_pop_off_epi_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ)
       (M : regfile) (av : nat) (ra0e s00e : mword 64) (b : bool) (p : mword 64) :
     let spd := M !!! Regidx csp_rs1 in
     let sp0up := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) in
@@ -198,7 +198,7 @@ Section ProofPushOff.
   (* [cpu_own] and the cells never move.  These three lemmas are the       *)
   (* consumer side of exactly that, with no case split in the proof body.  *)
   (* ------------------------------------------------------------------- *)
-  Lemma po_own_split `{CIDx : CpuId} (k : nat) (ebx : bool)
+  Lemma po_own_split `{GEN : GenId} `{CIDx : CpuId} (k : nat) (ebx : bool)
       (px : mword 64) (Cx : iProp Σ) (bx : bool) :
     cpu_own k ebx px Cx bx -∗
     ⌜ bx = true -> k = 0%nat /\ ebx = true ⌝ ∗
@@ -244,7 +244,7 @@ Section ProofPushOff.
   (* mycpu() call returns, by [rget_tp], with NO premise at all -- the    *)
   (* whole [Ha0cid]/tp-preservation chain the pre-port code carried       *)
   (* through N1..N8/M1..M7 is gone. *)
-  Lemma wp_push_off_suffix_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_push_off_suffix_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ)
       (ms : regfile) (av : nat)
       (noff : mword 32) (ra0e s00e s10e vgap : mword 64) (p : mword 64)
       :
@@ -577,7 +577,7 @@ Section ProofPushOff.
   (* half and the freed [cpu_cells_pay].  From PO+0x0e on, [b] is LITERALLY    *)
   (* false and every [wp_next] collapses by [wp_next_off].                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_push_off_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_push_off_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
     : wp_push_off_sconf_body Φ m av n eb p C b.
@@ -1174,7 +1174,7 @@ Section ProofPushOff.
   (* the first two branches and at literal [true] in the restore branch,  *)
   (* whose own internal [wp_next true] discharge is simply forwarded as   *)
   (* pop_off's OWN [wp_next bexit] obligation ([bexit = true] there). *)
-  Lemma wp_pop_off_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_pop_off_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     : wp_pop_off_sconf_body Φ m av n eb p C.
   Proof.

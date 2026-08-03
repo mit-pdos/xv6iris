@@ -73,7 +73,7 @@ Section ProofBinit.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{!lockG Σ}.
-  (* NOTE: no shared [Context `{CID : CpuId}] here -- [biepi] and the loop
+  (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- [biepi] and the loop
      below apply each other (and are applied by [wp_binit_sconf]) at a hart a
      [wp_next] crossing may have migrated to, so each needs its OWN implicit
      per-lemma [CID] binder; see the file header and ProofIinit.v. *)
@@ -107,7 +107,7 @@ Section ProofBinit.
   (*  (shadowing any ambient hart) is the "decomposed helper" rule --     *)
   (*  worked example ProofFreerange.frepi / ProofIinit.iiepi.             *)
   (* ================================================================= *)
-  Lemma biepi `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m Me : regfile) (K : nat) (b : bool) (pcur : mword 64) :
+  Lemma biepi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m Me : regfile) (K : nat) (b : bool) (pcur : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -331,7 +331,7 @@ Section ProofBinit.
   (* ================================================================= *)
   (*  binit's whole-function WP.                                        *)
   (* ================================================================= *)
-  Lemma wp_binit_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_binit_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (pcur : mword 64)
     : wp_binit_sconf_body Φ m K vlock vname vcpu b pcur.

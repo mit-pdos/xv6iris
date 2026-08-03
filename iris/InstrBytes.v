@@ -20,7 +20,7 @@ Local Open Scope Z_scope.
 
 Section InstrBytes.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* The instruction at [pc] is [r] (bytes + geometry, in duplicable [↦ₓ□]).
      [pc] is always (at least) 2-aligned -- that single fact is hoisted out of

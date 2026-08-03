@@ -24,7 +24,7 @@ Local Notation PH := KernelSyms.plicinithart.
 
 Section CodePlicinithart.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 (* +0x08  c30fc0ef  jal ra,cpuid   (target = pc - 15312) *)

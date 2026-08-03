@@ -14,7 +14,7 @@ Import Defs.
 (* from WpGprJalr.v *)
 Section WpJalrGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic JALR WP, built on
      [wp_instr].  Like [wp_addi_gpr] it reads rs1 off the [gpr_file] and writes
@@ -27,7 +27,7 @@ End WpJalrGpr.
 (* from WpGprRvc.v *)
 Section RvcRet.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [wp_cret_gpr] for a c.ret return target.  Under the C extension (misa.C,
      held by [mmode_config]'s [hw_config]) the model's jalr accepts a 2-aligned

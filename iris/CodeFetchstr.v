@@ -73,7 +73,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section InstrsFS.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma fsi_00 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)).  (* c.addi16sp sp,-48   # 48-byte frame: ra/s0/s1/s2/s3 *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x00)%Z (mword_of_int 0x7179 : mword 16)

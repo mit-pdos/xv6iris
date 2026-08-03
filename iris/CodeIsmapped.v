@@ -82,7 +82,7 @@ Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
 
 Section CodeIsmapped.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation IMP off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (IM + off) : mword 64) rvc ast).

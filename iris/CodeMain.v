@@ -253,7 +253,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section CodeMain.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation MN := KernelSyms.main.
 

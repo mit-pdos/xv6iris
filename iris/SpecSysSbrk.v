@@ -123,7 +123,7 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
        (uint (pv_sz V) + sint (sbrk_arg v0) <= uvm_maxsz)%Z /\
        szv' = add_vec (pv_sz V) (sbrk_arg v0) ) )).
 
-Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) :=
@@ -154,7 +154,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 
 Module Type SYSSBRK.
   Parameter wp_sys_sbrk_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool),

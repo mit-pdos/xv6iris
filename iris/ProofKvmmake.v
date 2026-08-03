@@ -616,7 +616,7 @@ Proof. lia. Qed.
 
 Section KvmmakeHouse.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KMK := KernelSyms.kvmmake.
 
@@ -898,7 +898,7 @@ Proof. unfold K_kvmmake. lia. Qed.
 (* ===================================================================== *)
 Section KvmmakeBody.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KMK := KernelSyms.kvmmake.
 
@@ -2245,7 +2245,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      BARE, at this [Definition]'s own ambient [CID], implicit-argument
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
-  Definition wp_kvmmake_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+  Definition wp_kvmmake_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
       : wp_kvmmake_sconf_body γa Φ mm lvl K eb p C on b :=
     wp_kvmmake_sconf_gen

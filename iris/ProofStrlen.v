@@ -88,7 +88,7 @@ Module StrlenProof : STRLEN.
 
 Section ProofStrlen.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

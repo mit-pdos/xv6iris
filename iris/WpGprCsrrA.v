@@ -215,7 +215,7 @@ Proof. unfold mcounteren_rdval, set_reg; cbn [sregs].
 (* ====================================================================== *)
 Section WpCsrrMhartidGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_csrr_mhartid_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
       (mhartid_in : mword 64) (m : regfile)
@@ -318,7 +318,7 @@ End WpCsrrMhartidGpr.
 (* ====================================================================== *)
 Section WpCsrrGprA.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* mstatus (0x300): machine CSR, no extra gate. *)
   (* [dqm]-generic mstatus cell: mstatus lives INSIDE [mmode_config], so a

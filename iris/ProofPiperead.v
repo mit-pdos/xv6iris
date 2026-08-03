@@ -304,7 +304,7 @@ Qed.
 Section PrLeaves.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* copyin/copyout's one-byte buffer, in and out of the [seq 0 1] big-sep *)
   Lemma pr_buf1_intro (a : mword 64) (b : bv 8) :
@@ -341,7 +341,7 @@ Module PipereadProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN)
 
 Section ProofPiperead.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register disequality guard (perf rule): [unify] settles convertibility
      cheaply, so [discriminate] only ever runs on a genuine miss. *)

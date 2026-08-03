@@ -92,7 +92,7 @@ End ForwardMRET.
 (* ====================================================================== *)
 Section StepMRET.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* Clean MRET post-state in terms of the OWNED register values             *)

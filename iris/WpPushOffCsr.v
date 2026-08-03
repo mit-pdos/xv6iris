@@ -215,7 +215,7 @@ Qed.
 
 Section WpPushOffCsr.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- csrrci rd,sstatus,imm5 at Supervisor, SIE already 0 (idempotent) ----
      4-byte instruction: PC advances +4; needs fetch geom at pc and pc+2.

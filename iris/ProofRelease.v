@@ -39,7 +39,7 @@ Module ReleaseGenProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE_GEN.
 
 Section ProofRelease.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
@@ -468,7 +468,7 @@ Module ReleaseOfGen (G : RELEASE_GEN) : RELEASE.
 
 Section OfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_release_sconf (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
@@ -502,7 +502,7 @@ Module ReleaseCancelOfGen (G : RELEASE_GEN) : RELEASE_CANCEL.
 
 Section CancelOfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_release_cancel_sconf (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (R D Out : iProp Σ)

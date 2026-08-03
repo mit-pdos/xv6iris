@@ -25,7 +25,7 @@ Local Open Scope Z_scope.
 Module SpinProof : SPIN.
 Section ProofSpin.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition h_spin : mword 16 := mword_of_int 0xa001.
   Definition imm_spin : mword 11 :=

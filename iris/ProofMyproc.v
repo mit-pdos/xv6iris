@@ -151,7 +151,7 @@ Module MyprocProof (PushOff : PUSHOFF) : MYPROC.
 
 Section ProofMyproc.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_myproc_sconf (Φ : mval -> iProp Σ)
       (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)

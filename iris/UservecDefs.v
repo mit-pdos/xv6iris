@@ -326,7 +326,7 @@ Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
 
 Section UservecInstrs.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma uvi_csrw_sscratch :
     kernel_text -∗ instr (upa 0x00) false uvai_csrw_sscratch.

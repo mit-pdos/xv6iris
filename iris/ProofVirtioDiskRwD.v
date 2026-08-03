@@ -599,7 +599,7 @@ Qed.
 Section VdrwdLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the avail-ring INDEX read: [lhu rd,2(rs1)] with rs1 = disk.avail.
      Drives [virtio_proto_avail_idx_acc]: the value is the driver's OWN
@@ -1365,7 +1365,7 @@ Qed.
 
 Section VdrwdP4.
   Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation VRW := KernelSyms.virtio_disk_rw.
 

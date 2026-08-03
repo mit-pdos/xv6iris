@@ -143,7 +143,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 Section WkLeaves.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* c.li rd, imm  ==  addi rd, x0, sext(imm) : writes sext(imm) into rd.
      Mirrors wp_caddi_gpr_s_config_pt but with rs1 = x0 (so the value is the
@@ -253,7 +253,7 @@ End WkLeaves.
 
 Section WkScfgLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -272,7 +272,7 @@ End WkScfgLeaves.
    CodeWakeup keeps only the decode/leaf/loop-arithmetic content below. *)
 Section ProcInv.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ===================================================================== *)
   (* Resource layout for the wakeup() WP.                                   *)

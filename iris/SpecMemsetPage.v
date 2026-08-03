@@ -21,7 +21,7 @@ From Kernel Require KernelSyms.
 
 Notation MS := KernelSyms.memset.
 
-Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -48,7 +48,7 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type MEMSETPAGE.
   Parameter wp_memset_page_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_page_sconf_body Φ m0 n cval b pcur.
 End MEMSETPAGE.

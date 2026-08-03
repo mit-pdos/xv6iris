@@ -103,7 +103,7 @@ Proof. change (2 ^ 31) with 2147483648. lia. Qed.
 (* ===================================================================== *)
 Section EitherCopyEpilogue.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -366,7 +366,7 @@ Module EitherCopyoutProof (Myproc : MYPROC) (Copyout : COPYOUT) (Memmove : MEMMO
 
 Section ProofEitherCopyout.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -1050,7 +1050,7 @@ Module EitherCopyinProof (Myproc : MYPROC) (Copyin : COPYIN) (Memmove : MEMMOVE)
 
 Section ProofEitherCopyin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

@@ -39,7 +39,7 @@ Module UartProof : UART.
 Section ProofUart.
 Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ, !diskGhostG Σ}.
-Context `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
     (off : Z) (Φ : mval -> iProp Σ)

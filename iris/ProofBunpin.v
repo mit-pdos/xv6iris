@@ -96,7 +96,7 @@ Module BunpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BUNPIN.
 
 Section ProofBunpin.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BU := KernelSyms.bunpin.
 

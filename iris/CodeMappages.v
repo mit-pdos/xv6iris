@@ -82,7 +82,7 @@ Import Defs.
 
 Section MappagesInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation MPP off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.mappages + off) : mword 64) rvc ast).

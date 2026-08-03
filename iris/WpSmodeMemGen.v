@@ -27,7 +27,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Section SmodeMemGenLoad.
-Context `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId}.
 Variable width : Z.
 Hypothesis Hw0 : 0 < width.
 Hypothesis Hw8 : width <= 8.
@@ -324,7 +324,7 @@ End SmodeMemGenLoad.
 (* above is proved once over the abstract width.                          *)
 (* ===================================================================== *)
 Section SmodeMemGenStore.
-Context `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId}.
 Variable width : Z.
 Hypothesis Hw0 : 0 < width.
 Hypothesis Hw8 : width <= 8.

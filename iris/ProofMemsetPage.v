@@ -31,7 +31,7 @@ Module MemsetPageProof (MemsetArray : MEMSET) : MEMSETPAGE.
 
 Section ProofMemsetPage.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_memset_page_sconf (Φ : mval -> iProp Σ)
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)

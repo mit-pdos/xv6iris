@@ -260,7 +260,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 
 Section CodeScheduler.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- +0x00..+0x16: 80-byte frame, saves ra/s0/s1/s2/s3/s4/s5/s6/s7/s8 ---- *)
   Lemma schi_00 : kernel_text -∗ instr (mword_of_int (SC + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 59 : mword 6), sp, sp, ADDI)).

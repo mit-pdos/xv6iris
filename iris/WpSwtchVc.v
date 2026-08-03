@@ -146,7 +146,7 @@ Proof. vm_compute. reflexivity. Qed.
 Section WpSwtchVc.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 

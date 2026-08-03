@@ -70,7 +70,7 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
 
 Section ProofPipealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PA := KernelSyms.pipealloc.
 

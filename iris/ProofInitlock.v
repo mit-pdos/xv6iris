@@ -50,7 +50,7 @@ Module InitlockProof : INITLOCK.
 Section ProofInitlock.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation IL := KernelSyms.initlock.
 

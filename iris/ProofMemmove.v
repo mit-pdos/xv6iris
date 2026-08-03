@@ -149,7 +149,7 @@ Module MemmoveProof : MEMMOVE.
 
 Section ProofMemmove.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   (* [callee_saved] from agreement on the twelve registers the function never

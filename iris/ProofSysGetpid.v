@@ -73,7 +73,7 @@ Module SysGetpidProof (Myproc : MYPROC) : SYSGETPID.
 
 Section ProofSysGetpid.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 

@@ -79,7 +79,7 @@ Module PlicinitProof : PLICINIT.
 
 Section ProofPlicinit.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PL := KernelSyms.plicinit.
 

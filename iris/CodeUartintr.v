@@ -145,7 +145,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeUartintr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UI := KernelSyms.uartintr.
 

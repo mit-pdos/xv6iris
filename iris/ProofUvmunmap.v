@@ -126,7 +126,7 @@ Module UvmunmapCore (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE).
 
 Section ProofUvmunmap.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
@@ -1537,7 +1537,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmap.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [proc_pt] IS the [Some] instance; the round trip owes [uptg] the two
      conjuncts it does not carry -- [upt_acc_wf] (preserved along the run
@@ -1578,7 +1578,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapBare.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [bare_pt] IS the [None] instance, definitionally -- there is nothing
      to owe. *)

@@ -21,7 +21,7 @@ Require Import KernelRvcDecode.
 
 Section CodeKvminit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation KIN off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + off) : mword 64) rvc ast).

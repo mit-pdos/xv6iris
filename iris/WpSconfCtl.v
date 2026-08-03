@@ -88,7 +88,7 @@ Qed.
 Section WpSconfCtl.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.

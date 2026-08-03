@@ -72,7 +72,7 @@ Import Defs.
 
 Notation UU := KernelSyms.uvmunmap.
 
-Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (ilvl : nat) (b : bool) :=
@@ -115,7 +115,7 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 
 Module Type UVMUNMAP.
   Parameter wp_uvmunmap_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (ilvl : nat) (b : bool),
@@ -135,7 +135,7 @@ End UVMUNMAP.
 (* the [proc_pt] statement above, unchanged.                              *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
@@ -172,7 +172,7 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
 
 Module Type UVMUNMAP_BARE.
   Parameter wp_uvmunmap_bare_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)

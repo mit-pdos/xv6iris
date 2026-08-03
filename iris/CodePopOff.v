@@ -191,7 +191,7 @@ Qed.
 (* ===================================================================== *)
 Section WpPopOffLeaves.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- c.beqz rs',imm8 FALL-THROUGH (register nonzero) ---- *)
 
@@ -208,7 +208,7 @@ End WpPopOffLeaves.
 (* ===================================================================== *)
 Section WpPopOffInstr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PP := KernelSyms.pop_off.
 
@@ -296,7 +296,7 @@ End WpPopOffInstr.
 (* c.bnez / c.beqz TAKEN with only 2-aligned targets (Zca from hw_config). *)
 Section WpPopOffTakenZca.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -364,7 +364,7 @@ Qed.
 Section WpPopOffTopSec.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PP := KernelSyms.pop_off.
 

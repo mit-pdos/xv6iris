@@ -127,7 +127,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeDevintr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation DI := KernelSyms.devintr.
 

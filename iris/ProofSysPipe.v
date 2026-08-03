@@ -367,7 +367,7 @@ Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC
 
 Section ProofSysPipe.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)
   Notation Rra := (mword_of_int 1 : mword 5).

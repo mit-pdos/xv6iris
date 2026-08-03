@@ -98,7 +98,7 @@ Module UvmclearProof (WalkNoalloc : WALK_NOALLOC) : UVMCLEAR.
 
 Section ProofUvmclear.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* read the node claim's [page_valid] without consuming it (persistent) *)
   Local Lemma ucl_claim_pv (b : mword 44) :

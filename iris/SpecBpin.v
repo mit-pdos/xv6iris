@@ -42,7 +42,7 @@ Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CID : CpuId}
+Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bpin in
@@ -73,7 +73,7 @@ Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CI
 
 Module Type BPIN.
   Parameter wp_bpin_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
       wp_bpin_sconf_body Φ bn k m n eb p C K b.

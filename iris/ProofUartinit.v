@@ -67,7 +67,7 @@ Module UartinitProof (Uart : UART) (Initlock : INITLOCK) : UARTINIT.
 Section ProofUartinit.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UI := KernelSyms.uartinit.
 

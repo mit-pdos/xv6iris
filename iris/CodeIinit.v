@@ -106,7 +106,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeIinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation II := KernelSyms.iinit.
 

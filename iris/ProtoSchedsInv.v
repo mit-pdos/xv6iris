@@ -77,7 +77,7 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 Section Payoff.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition wp_yield_sconf_body'
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)

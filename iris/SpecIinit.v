@@ -74,7 +74,7 @@ Definition inode_name_str : Z := 0x80007428.
 
 (* ------------------------------------------------------------------ *)
 
-Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iinit in
@@ -105,7 +105,7 @@ Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
 
 Module Type IINIT.
   Parameter wp_iinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
       wp_iinit_sconf_body Φ m K vlock vname vcpu b p.

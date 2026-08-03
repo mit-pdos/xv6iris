@@ -263,7 +263,7 @@ Proof. unfold sie_rdval, set_reg; cbn [sregs].
 (* ====================================================================== *)
 Section WpCsrrGprB.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* time (0xC01): Ext_Zicntr-gated, no misa premise needed (holds for any state).
      [mtime] lives in [clock_inv] and advances nondeterministically with the

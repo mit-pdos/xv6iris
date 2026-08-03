@@ -26,7 +26,7 @@ Require Import ProcGeom.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
-Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -53,7 +53,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}
 
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
       wp_wakeup_sconf_body Φ m γs a0f pme lvl K eb C b.
 End WAKEUP.

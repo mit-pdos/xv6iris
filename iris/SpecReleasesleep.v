@@ -42,7 +42,7 @@ Import Defs.
 
 Notation RSL := KernelSyms.releasesleep.
 
-Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
@@ -74,7 +74,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
 
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)

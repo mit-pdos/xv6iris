@@ -62,7 +62,7 @@ Section SpecAllocpid.
 
 End SpecAllocpid.
 
-Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γp : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
@@ -86,7 +86,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : Cp
 
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γp : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
       wp_allocpid_sconf_body Φ γp m av n eb p C b.

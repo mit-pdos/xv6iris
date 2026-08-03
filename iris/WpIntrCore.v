@@ -477,7 +477,7 @@ End StepInterrupt.
 (* ===================================================================== *)
 Section WpIntrEngine.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* mstate_interp absorbs a same-value register write (the trap's
      [reset_elp], whose cell is pinned ↦ᵣ□ by hw_config). *)

@@ -22,7 +22,7 @@ Require Import SpecKerneltrap.
 
 Module Kerneltrap : KERNELTRAP.
   Axiom kerneltrap_returns :
-    forall `{!riscvGS Σ} `{CpuId} `{!sieG Σ}
+    forall `{!riscvGS Σ} `{GenId} `{CpuId} `{!sieG Σ}
       (γ : gname) (dq : dfrac)
       (m : regfile) (spv rava : mword 64)
       (satp0 : mword 64)

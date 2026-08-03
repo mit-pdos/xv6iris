@@ -36,7 +36,7 @@ Local Open Scope Z_scope.
    [uname]/[iname] are the auipc/addi pair that materializes a1 = the name
    string, [ulk]/[ilk] the pair that materializes a0 = the lock, and [j] the
    jal displacement to initlock -- the only things that vary across members. *)
-Definition ilw_code `{!riscvGS Σ} `{CID : CpuId} (F : Z)
+Definition ilw_code `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (F : Z)
     (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21) : iProp Σ :=
   (* prologue: 16-byte frame, save ra/s0, s0 := frame top *)
   instr (mword_of_int F) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) ∗
@@ -67,7 +67,7 @@ Definition ilw_code `{!riscvGS Σ} `{CID : CpuId} (F : Z)
    [kernel_data]: WHERE the bytes come from is the member's business (each reads
    them out of the image with [kernel_data_string], at its own literal's length),
    and the shape stays independent of the data image. *)
-Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
+Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
     (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
@@ -104,7 +104,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{CID : Cpu
 
 Module Type INITLOCK_WRAPPER.
   Parameter wp_initlock_wrapper_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
       (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),

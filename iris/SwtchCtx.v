@@ -91,7 +91,7 @@ Proof. intro H; exact H. Qed.
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ================================================================== *)
   (* struct context: ownership of its 14 saved-register cells.           *)
@@ -218,7 +218,7 @@ Section SwtchCtx.
          (∃ (A' : ctx_adm) (cret : mword 64),
             ▷ rec A' cret p ∗
             P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
-         WP (LoopE h : expr riscv_lang) {{ Phi }}))%I.
+         WP (LoopE gen_id h : expr riscv_lang) {{ Phi }}))%I.
 
   Global Instance valid_context_pre_contractive Phi
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
@@ -252,7 +252,7 @@ End SwtchCtx.
 
 Section Swconf.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)
   (* The swtch-crossing configuration bundle: what a scheduler context    *)

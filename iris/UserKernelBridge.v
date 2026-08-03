@@ -47,7 +47,7 @@ Import Defs.
 
 Section UserKernelBridge.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* -------------------------------------------------------------------- *)
   (* The pure mstatus obligation, factored out: the User-execution mstatus *)

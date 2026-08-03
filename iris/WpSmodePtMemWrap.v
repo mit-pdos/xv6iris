@@ -22,7 +22,7 @@ Import Defs.
 
 Section WpSmodePtMemWrap.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_cldsp_gpr_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)

@@ -154,7 +154,7 @@ Qed.
 (* ===================================================================== *)
 Section DataFaultComposers.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_vmem_read_addr_load_err (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z) (σ : mstate) :
@@ -369,7 +369,7 @@ Qed.
 (* ===================================================================== *)
 Section TranslationModeU.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma utlb_inv_pt_translationMode_U (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (s : mstate) :
@@ -402,7 +402,7 @@ End TranslationModeU.
 (* ===================================================================== *)
 Section AlignedClassify.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
@@ -515,7 +515,7 @@ End AlignedClassify.
 (* the width instances (the names the memory arms consume) *)
 Section AlignedClassifyInstances.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition user_pt_vmem_read_addr_load_classify_1 :=
     user_pt_vmem_read_addr_load_classify 1 ltac:(lia) ltac:(lia)
@@ -861,7 +861,7 @@ End SplitFaultWrite.
 (* ===================================================================== *)
 Section MisReadClassify.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
   Context (Hread_plain : forall (addr : mword 64) (ww : mword (8 * bytes)) s,
@@ -1011,7 +1011,7 @@ End MisReadClassify.
 (* ===================================================================== *)
 Section MisReadTotal.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
   Context (Hread_plain : forall (addr : mword 64) (ww : mword (8 * bytes)) s,
@@ -1539,7 +1539,7 @@ Qed.
 (* ===================================================================== *)
 Section MemArmGlue.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma u_result_ok_trap (e : ExceptionType) (xv pcx : mword 64) :
     user_exc e = true ->
@@ -1639,7 +1639,7 @@ End MemArmGlue.
 
 Section MemReadTotal.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   Lemma mem_read_total (k : Z)
@@ -1838,7 +1838,7 @@ Qed.
 
 Section MemArmsU.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   Local Notation uroot := (pt.(ud_root)).
@@ -2029,7 +2029,7 @@ Lemma exec_execute_C_LBU_U (uimm : mword 2) (rdc rsc1 : cregidx) (s : mstate) :
     = Some (ExecuteAs (LOAD (zero_extend' 12 uimm, creg2reg_idx rsc1, creg2reg_idx rdc, true, 1)), s).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_LBU_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_LBU_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -2072,7 +2072,7 @@ Qed.
 
 Section MemArmsU2.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (pt : uptd).
 
   Lemma mem_exec_store_1 (imm : mword 12) (rs2 rs1 : mword 5)
@@ -2167,7 +2167,7 @@ Lemma exec_execute_C_SB_U (uimm : mword 2) (rsc1 rsc2 : cregidx) (s : mstate) :
     = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx rsc2, creg2reg_idx rsc1, 1)), s).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_SB_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_SB_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -2218,7 +2218,7 @@ Unset Keyed Unification.
 
 Section MisWriteClassify.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
   Context (Hwrite_plain : forall (addr : mword 64) (dd : mword (8 * bytes)) s,
@@ -2347,7 +2347,7 @@ Proof. induction N as [|N IH]; [reflexivity | cbn [ws_seq]; rewrite IH; reflexiv
 
 Section MemWriteTot.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
   Context (Hwrite_plain : forall (addr : mword 64) (dd : mword (8 * bytes)) s,
@@ -2434,7 +2434,7 @@ End MemWriteTot.
 
 Section MemWriteTotalDisp.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_write_total (k : Z)
       (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)) (Huintk : uint (to_bits 64 k) = k)
@@ -2516,7 +2516,7 @@ End MemWriteTotalDisp.
 
 Section MemStoreEngine.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_exec_store_k (pt : uptd) (k : Z)
       (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)) (Huintk : uint (to_bits 64 k) = k)
@@ -2610,7 +2610,7 @@ End MemStoreEngine.
 (* ===================================================================== *)
 Section MemLoadRd0.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_exec_load_k_rd0 (pt : uptd) (k : Z)
       (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)) (Huintk : uint (to_bits 64 k) = k)
@@ -2703,7 +2703,7 @@ End MemLoadRd0.
 (* ===================================================================== *)
 Section MemArmGenericK.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma arm_c_store_u (C : ucfg) (pt : uptd) (E : coPset) (sigma sigma_f : mstate)
       (va : mword 64) (g : regfile) (h : mword 16) (ci : instruction)
@@ -2919,7 +2919,7 @@ Lemma exec_execute_C_SW_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
     = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), creg2reg_idx b, creg2reg_idx a, 4)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_SW_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_SW_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -2944,7 +2944,7 @@ Lemma exec_execute_C_SD_U (uimm : mword 5) (a b : cregidx) (st : mstate) :
     = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), creg2reg_idx b, creg2reg_idx a, 8)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_SD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_SD_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 5 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -2969,7 +2969,7 @@ Lemma exec_execute_C_SH_U (uimm : mword 2) (a b : cregidx) (st : mstate) :
     = Some (ExecuteAs (STORE (zero_extend' 12 uimm, creg2reg_idx b, creg2reg_idx a, 2)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_SH_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_SH_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 2 * cregidx * cregidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -2994,7 +2994,7 @@ Lemma exec_execute_C_SWSP_U (uimm : mword 6) (rs2 : regidx) (st : mstate) :
     = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"00")), rs2, sp, 4)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_SWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_SWSP_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -3018,7 +3018,7 @@ Lemma exec_execute_C_SDSP_U (uimm : mword 6) (rs2 : regidx) (st : mstate) :
     = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm ('b"000")), rs2, sp, 8)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_SDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_SDSP_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -3042,7 +3042,7 @@ Lemma exec_execute_C_LWSP_U (uimm : mword 6) (rd : regidx) (st : mstate) :
     = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")), sp, rd, false, 4)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_LWSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_LWSP_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -3066,7 +3066,7 @@ Lemma exec_execute_C_LDSP_U (uimm : mword 6) (rd : regidx) (st : mstate) :
     = Some (ExecuteAs (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")), sp, rd, false, 8)), st).
 Proof. apply exec_returnm. Qed.
 
-Lemma arm_C_LDSP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_C_LDSP_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (h : mword 16) (p : bits 6 * regidx) :
   post_fetch_cfg sigma_f va (register_lookup (R_bool minstret_increment) sigma.(sregs)) ->
@@ -3261,7 +3261,7 @@ Qed.
 
 Section BaseMemArms.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* Shared closer: the engine's (retire | delegated trap) result -> base_post. *)
@@ -3301,7 +3301,7 @@ Section BaseMemArms.
 
 End BaseMemArms.
 
-Lemma arm_LOAD_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_LOAD_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (w : mword 32)
     (imm : bits 12) (rs1 rd : regidx) (is_unsigned : bool) (width : word_width) :
@@ -3457,7 +3457,7 @@ Proof.
                   with "Hint Hgpr Hnpc Hupt Hcfg").
 Qed.
 
-Lemma arm_STORE_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_STORE_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (w : mword 32)
     (imm : bits 12) (rs2 rs1 : regidx) (width : word_width) :
@@ -3800,7 +3800,7 @@ Qed.
 (* ---- Part C: aq/rl-generic LR aligned-Ok composers ---- *)
 Section LRComposersG.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_vmem_read_addr_lr_g4 (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -4017,7 +4017,7 @@ End LRComposersG.
 (* ---- Part D: LR translate-fault composer (aq/rl-generic, width-generic) ---- *)
 Section LRFaultComposer.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_vmem_read_addr_lr_err (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z) (σ : mstate) :
@@ -4090,7 +4090,7 @@ Qed.
 (* ---- Part F: LR total classify (width-generic) + engine ---- *)
 Section LREngine.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_read_lr_total (k : Z) (aq rl : bool)
       (HkW : k = 4 \/ k = 8)
@@ -4183,7 +4183,7 @@ End LREngine.
 (* ---- Part G: LR execute engine ---- *)
 Section LRExecEngine.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_exec_lr_k (pt : uptd) (k : Z) (aq rl : bool)
       (HkW : k = 4 \/ k = 8)
@@ -4308,7 +4308,7 @@ Section LRExecEngine.
 End LRExecEngine.
 
 (* ---- Part H: arm_LOADRES_u ---- *)
-Lemma arm_LOADRES_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_LOADRES_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (w : mword 32)
     (aq rl : bool) (rs1 : regidx) (width : word_width) (rd : regidx) :
@@ -4572,7 +4572,7 @@ Qed.
 (* ---- Part C': aq/rl-generic SC aligned composers ---- *)
 Section SCComposersG.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_vmem_write_addr_sc_g4 (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -4715,7 +4715,7 @@ End SCComposersG.
 (* ---- SC g8 composer ---- *)
 Section SCComposersG8.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_vmem_write_addr_sc_g8 (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -4858,7 +4858,7 @@ End SCComposersG8.
 (* ---- Part D': SC translate-fault composer ---- *)
 Section SCFaultComposer.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_vmem_write_addr_sc_err (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z)
@@ -4943,7 +4943,7 @@ Qed.
 (* ---- Part F'/G': SC total classify + execute engine ---- *)
 Section SCEngine.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the aligned-Ok composer contract (matches user_pt_vmem_write_addr_sc_g4/_g8) *)
   Definition sc_ok_contract (k : Z) : Prop :=
@@ -5137,7 +5137,7 @@ Section SCEngine.
 End SCEngine.
 
 (* ---- Part H': arm_STORECON_u ---- *)
-Lemma arm_STORECON_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_STORECON_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (w : mword 32)
     (aq rl : bool) (rs2 rs1 : regidx) (width : word_width) (rd : regidx) :
@@ -5580,7 +5580,7 @@ Section AmoGeneric.
 
   (* The Iris composer: at a mapped-ok page, the physical AMO facts. *)
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_amo_data_k (op : amoop) (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -5802,7 +5802,7 @@ Qed.
 (* ===================================================================== *)
 Section AmoFault.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma user_pt_amo_translate_fault (op : amoop) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va : mword 64) (σ : mstate) :
@@ -5851,7 +5851,7 @@ Section AmoEngine.
       exec (write_ram wk (Physaddr addr) k data tt) s
       = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev))).
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_exec_amo_k (pt : uptd) (op : amoop) (aq rl : bool)
       (rs2 rs1 rd : mword 5) (g : regfile) (s : mstate) :
@@ -6110,7 +6110,7 @@ Qed.
 (* ===================================================================== *)
 Section AmoDeny16.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -6294,7 +6294,7 @@ Qed.
 (* ===================================================================== *)
 Section AmoEngine16.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma mem_exec_amo_16 (pt : uptd) (op : amoop) (aq rl : bool)
       (rs2 rs1 rd : mword 5) (g : regfile) (s : mstate) :
@@ -6498,7 +6498,7 @@ End AmoEngine16.
 (* (AMOSWAP retires, all other ops trap); width 16 via mem_exec_amo_16     *)
 (* (AMOSWAP retires with a register-pair write, all other ops trap).       *)
 (* ===================================================================== *)
-Lemma arm_AMO_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_AMO_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (w : mword 32)
     (op : amoop) (aq rl : bool) (rs2 rs1 rd : regidx) (width : word_width_wide) :
@@ -6839,7 +6839,7 @@ Qed.
 
 Section ZicbopExec.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma exec_execute_ZICBOP_u (cbop : cbop_zicbop) (rs1 : mword 5) (offset : mword 12)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
@@ -6997,7 +6997,7 @@ Section ZicbopExec.
 
 End ZicbopExec.
 
-Lemma arm_ZICBOP_u `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd)
+Lemma arm_ZICBOP_u `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd)
     (E : coPset) (sigma sigma_f : mstate) (va : mword 64)
     (g : regfile) (w : mword 32)
     (p : cbop_zicbop * regidx * bits 12) :

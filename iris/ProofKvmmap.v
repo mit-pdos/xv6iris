@@ -39,7 +39,7 @@ Module KvmmapProof (Mappages : MAPPAGES) : KVMMAP.
 
 Section ProofKvmmap.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KM := KernelSyms.kvmmap.
 

@@ -35,7 +35,7 @@
        ([prim_step]/[run]/[uart_step]/[disk_step]/[plic_step]).
 
    [LoopE c] is [Loop] with ambient hart [c]: a caller proves each hart's WP
-   in the usual single-CPU spelling ([Context `{CID : CpuId}.] ... [WP Loop])
+   in the usual single-CPU spelling ([Context `{GEN : GenId} `{CID : CpuId}.] ... [WP Loop])
    and instantiates [cpu_id := c].
 
    Registers not in [D c] are simply never owned by anyone (their ghost cells
@@ -301,14 +301,14 @@ Qed.
 (*    THREE device execution contexts (one per device -- RiscvLang §3c).   *)
 (* ---------------------------------------------------------------------- *)
 
-Definition cpu_pool (cs : list CPU) : list (expr riscv_lang) :=
-  (LoopE <$> cs) ++ [UartLoopE; DiskLoopE; PlicLoopE].
+Definition cpu_pool `{GEN : GenId} (cs : list CPU) : list (expr riscv_lang) :=
+  (LoopE gen_id <$> cs) ++ [UartLoop; DiskLoop; PlicLoop].
 
 (* ---------------------------------------------------------------------- *)
 (* 5. The adequacy theorem.                                                *)
 (* ---------------------------------------------------------------------- *)
 
-Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
+Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
     (cs : list CPU) (g : gstate) (D : CPU -> gset register)
     (* how many proc slots the kernel's proc[] array has: the boot client is
        handed one park receipt per slot ([ProcGeom.park_own], minted at
@@ -361,7 +361,7 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio))
        ={⊤}=∗
-       ([∗ list] c ∈ cs, WP (LoopE c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
+       ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
        WP (UartLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
        WP (DiskLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
        WP (PlicLoop : expr riscv_lang) @ ⊤ {{ _, True }}) ->
@@ -520,7 +520,7 @@ Qed.
 (*    same way, with a richer [D].                                          *)
 (* ---------------------------------------------------------------------- *)
 
-Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
+Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* NOTE: there is deliberately NO hypothesis about the power-on DLAB.
        [uart_ghosts_alloc] hands the caller its half of the DLAB agreement

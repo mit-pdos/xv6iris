@@ -89,7 +89,7 @@ Notation FC := KernelSyms.fileclose.
    known, so this will grow. *)
 Definition fileclose_stack : nat := 18%nat.
 
-Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl γf : gname)
     (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
@@ -117,7 +117,7 @@ Definition wp_fileclose_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),

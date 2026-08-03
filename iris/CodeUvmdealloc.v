@@ -174,7 +174,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section UvmdeallocInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UD := KernelSyms.uvmdealloc.
 

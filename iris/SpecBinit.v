@@ -50,7 +50,7 @@ Notation BI := KernelSyms.binit.
 Definition bcache_name_str : Z := 0x80007390.
 Definition buffer_name_str : Z := 0x80007398.
 
-Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.binit in
@@ -84,7 +84,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId
 
 Module Type BINIT.
   Parameter wp_binit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
       wp_binit_sconf_body Φ m K vlock vname vcpu b p.

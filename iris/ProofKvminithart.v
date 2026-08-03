@@ -32,7 +32,7 @@ Import Defs.
 
 Section KvminithartBody.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KVI := KernelSyms.kvminithart.
 
@@ -444,7 +444,7 @@ End KvminithartBody.
 
 Module KvminithartProof : KVMINITHART.
   Definition wp_kvminithart_sconf
-      `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+      `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (pcur : mword 64)

@@ -67,7 +67,7 @@ Import Defs.
 
 Notation UF := KernelSyms.uvmfree.
 
-Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) :=
@@ -106,7 +106,7 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 
 Module Type UVMFREE.
   Parameter wp_uvmfree_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool),

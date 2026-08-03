@@ -127,7 +127,7 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Pr
    ( ((uint (add_vec szv n) < uint szv)%Z /\ szv' = add_vec szv n)
      \/ ((uint szv <= uint (add_vec szv n))%Z /\ szv' = szv) )).
 
-Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (b : bool) :=
@@ -155,7 +155,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 
 Module Type GROWPROC.
   Parameter wp_growproc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool),

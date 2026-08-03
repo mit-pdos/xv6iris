@@ -311,7 +311,7 @@ Lemma st_mout_tp (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
 Proof. bb_unfold; bb_look. Qed.
 
 (* the tp/cid convention at the boot hart: start() writes tp = mhartid. *)
-Lemma st_tpv_cid_boot `{CID : CpuId} (mh : mword 64) :
+Lemma st_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} (mh : mword 64) :
   mh = (mword_of_int 0 : mword 64) ->
   cid_word = (zero_reg : mword 64) ->
   st_tpv mh = cid_word.
@@ -374,7 +374,7 @@ Qed.
 
 Section BootBridge.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [mmode_config]'s two persistent conjuncts, kept while the bundle is
      handed to [wp_entry_boot] (which consumes it and never gives it back).

@@ -166,7 +166,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section CodeBinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BI := KernelSyms.binit.
 

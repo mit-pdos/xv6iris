@@ -26,7 +26,7 @@ Import Defs.
 Section CodeSwtch.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 (* ---- base sd rs2,off(a0) : STORE (off, rs2, a0, 8) ---- *)
 Lemma swb_00153023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

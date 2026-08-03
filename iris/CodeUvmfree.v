@@ -128,7 +128,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section UvmfreeInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UF := KernelSyms.uvmfree.
 

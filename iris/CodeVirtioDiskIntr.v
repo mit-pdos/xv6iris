@@ -323,7 +323,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section VirtioDiskIntrInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- prologue: 32-byte frame, saves ra/s0/s1 ---- *)
   Lemma vti_00 : kernel_text -∗ instr (mword_of_int (VDT + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).

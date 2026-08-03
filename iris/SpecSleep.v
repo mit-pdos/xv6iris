@@ -62,7 +62,7 @@ Import Defs.
 
 Notation SL := KernelSyms.sleep.
 
-Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
@@ -124,7 +124,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
@@ -151,7 +151,7 @@ End SLEEP.
 
    [wp_sleep_sconf_body] is the [Tk := emp], [Dk := False] instance
    (via WpLock.is_lock_openable); ProofSleep.SleepOfGen restates it. *)
-Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
@@ -211,7 +211,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type SLEEP_GEN.
   Parameter wp_sleep_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)

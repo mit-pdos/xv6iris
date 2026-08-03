@@ -38,7 +38,7 @@ Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Definition wp_bunpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CID : CpuId}
+Definition wp_bunpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
     (q : Qp) (dev bno : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
@@ -69,7 +69,7 @@ Definition wp_bunpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{
 
 Module Type BUNPIN.
   Parameter wp_bunpin_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
       (q : Qp) (dev bno : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),

@@ -170,7 +170,7 @@ Section ProofProcinit.
   Context `{!lockG Σ}.
   Context `{!fileG Σ}.
   Context `{!fdslotG Σ}.
-  (* NOTE: no shared [Context `{CID : CpuId}] here -- the epilogue/loop
+  (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]
      binder (shadowing what a section Context would give); see the porting
@@ -250,7 +250,7 @@ Section ProofProcinit.
   (* [CID0] is its OWN binder here: this "post-resume half" gets applied at
      whichever hart the loop's own leaf steps actually migrated to, not
      necessarily the entry hart of [wp_procinit_sconf]. *)
-  Lemma piepi `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m Me : regfile) (K : nat)
+  Lemma piepi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m Me : regfile) (K : nat)
       (b : bool) (p : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -517,7 +517,7 @@ Section ProofProcinit.
       continuation to the hart THIS iteration's leaves migrated to with
       [wp_next_shift] before recursing or handing off to [piepi].       *)
   (* ================================================================= *)
-  Lemma procinit_loop `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile)
+  Lemma procinit_loop `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile)
       (K : nat) (b : bool) (p : mword 64) (fuel : nat) :
     let sp0 := (m !!! Regidx csp_rs1 : mword 64) in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -917,7 +917,7 @@ Section ProofProcinit.
   (* ================================================================= *)
   (*  procinit's whole-function WP.                                     *)
   (* ================================================================= *)
-  Lemma wp_procinit_sconf `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+  Lemma wp_procinit_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (b : bool) (p : mword 64)
     : wp_procinit_sconf_body Φ m K b p.
   Proof.

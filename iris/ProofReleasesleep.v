@@ -67,7 +67,7 @@ Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEU
 
 Section ProofReleasesleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_releasesleep_sconf (Φ : mval -> iProp Σ)
       (γs : list gname)

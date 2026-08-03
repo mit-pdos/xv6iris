@@ -166,7 +166,7 @@ Definition K_main : nat := 52%nat.
 Section SpecMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* The nine spinlocks and two standalone locks the init sequence brings *)
@@ -379,7 +379,7 @@ End SpecMain.
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)

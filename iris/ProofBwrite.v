@@ -114,7 +114,7 @@ Local Ltac bwidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 
 Section ProofBwrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bwrite_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

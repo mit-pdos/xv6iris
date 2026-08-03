@@ -53,7 +53,7 @@ Module WakeupPartsProof : WAKEUPPARTS.
 
 Section ProofWakeupPartsEpi.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation WK := KernelSyms.wakeup.
 
@@ -241,7 +241,7 @@ End ProofWakeupPartsEpi.
 
 Section ProofWakeupPartsPro.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation WK := KernelSyms.wakeup.
 

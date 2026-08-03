@@ -183,7 +183,7 @@ Definition kadm_ident (va : mword 64) (ppn : mword 44) : Prop :=
 
 Section SRegimeDef.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Record s_regime := SRegime {
     sr_inv : iProp Σ;
@@ -376,7 +376,7 @@ End SRegimeDef.
 
 Section SRegimeShared.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma res_transform (root_ppn : mword 44) :
     forall (acc : MemoryAccessType mem_payload) (ea : mword 64) (σ : mstate),

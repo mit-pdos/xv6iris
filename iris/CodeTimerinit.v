@@ -248,7 +248,7 @@ Ltac boot_static :=
 
 Section WpTimerinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* PCs of the 21 instructions. *)
   Definition ti_pc9  : mword 64 := mword_of_int (KernelSyms.timerinit).

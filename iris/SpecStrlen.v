@@ -47,7 +47,7 @@ Local Open Scope Z_scope.
 
 Notation SL := KernelSyms.strlen.
 
-Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile)
     (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.strlen in
@@ -75,7 +75,7 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type STRLEN.
   Parameter wp_strlen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile)
       (n k : nat) (f : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
       wp_strlen_sconf_body Φ mm n k f K dq b p.

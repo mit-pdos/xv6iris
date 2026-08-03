@@ -210,7 +210,7 @@ End ExecSRET.
 (* ===================================================================== *)
 Section WpSretGpr.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   (* ------------------------------------------------------------------- *)

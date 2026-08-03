@@ -94,7 +94,7 @@ Qed.
 
 Section UptTranslateStore.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma utlb_inv_pt_translateAddr_tf_store (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate) :
@@ -147,7 +147,7 @@ End UptTranslateStore.
 
 Section WpUsdPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_usd_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (Φ : mval -> iProp Σ)
@@ -536,7 +536,7 @@ Qed.
 
 Section WpUCsrPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ucsrw_sscratch_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (Φ : mval -> iProp Σ)

@@ -308,7 +308,7 @@ Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmcopyDefs.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmcopy's post disjunction, at an abstract return value *)
   Definition uc_pay (Pold Pnew : uptd) (vpn0 : mword 27) (n : nat)
@@ -355,7 +355,7 @@ Module UvmcopyProof (WalkNoalloc : WALK_NOALLOC) (Kalloc : KALLOC)
 
 Section ProofUvmcopy.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := URra.
   Notation Rtp := URtp.

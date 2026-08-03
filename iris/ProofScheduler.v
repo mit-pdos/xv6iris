@@ -168,7 +168,7 @@ Proof. intro H. apply eq_vec_false_iff. exact H. Qed.
    twice per dispatch round: c->proc goes 0 -> proc_addr jj at +0x68 and back
    at +0x76, while [wp_swtch_sconf] wants the bundle and [cpu_own] at the SAME
    index. *)
-Lemma sc_retag_p `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Lemma sc_retag_p `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (mm : regfile) (n : nat) (px qx : mword 64) :
   sie_cap_gpr mm n false px ⊣⊢ sie_cap_gpr mm n false qx.
 Proof. reflexivity. Qed.
@@ -177,7 +177,7 @@ Proof. reflexivity. Qed.
    and it is opened / rebuilt at five points.  Three one-liners rather than
    five hand-rolled destructuring patterns (the bundle is LEFT-nested now:
    [((cells ∗ count) ∗ C)]). *)
-Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (px : mword 64) (C : iProp Σ) (eb : bool) :
   cpu_own 0 eb px C false -∗
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
@@ -189,7 +189,7 @@ Proof.
   iIntros "(((_ & Hn & Hi & Hp) & Hc) & HC)". iFrame.
 Qed.
 
-Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{CID : CpuId} (px : mword 64) :
+Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) :
   a_cpu_noff cid_word ↦₄ noff_val 0 -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
@@ -200,7 +200,7 @@ Proof.
   iFrame "Hn Hi Hc Hp". iPureIntro. vm_compute. reflexivity.
 Qed.
 
-Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (px : mword 64) (eb : bool) :
   cpu_cells 0 eb px -∗ intr_count 0 false -∗ cpu_own 0 false px emp false.
 Proof.
@@ -215,7 +215,7 @@ Qed.
    This is exactly what [cpu_own 0 eb p emp eb] carries -- note the index is
    [eb] and NOT a blanket [false] (CpuOwn.cpu_own_eb_agree forces them equal
    at level 0). *)
-Lemma sc_flip_pre `{!riscvGS Σ, !sieG Σ} `{CID : CpuId} (px : mword 64) (eb : bool) :
+Lemma sc_flip_pre `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (eb : bool) :
   cpu_own 0 eb px emp eb -∗
   (if eb then emp else intr_count 0 false) ∗
   (if eb then emp else cpu_cells 0 true px).
@@ -233,7 +233,7 @@ Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (Swtch : SWTCH) : 
 
 Section ProofScheduler.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)
   Notation Rra := (mword_of_int 1 : mword 5).

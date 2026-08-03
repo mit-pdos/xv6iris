@@ -834,7 +834,7 @@ Qed.
 
 Section WpCsrwGprNewA.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   (* ---- medeleg (Ext_S, pure legalize) ---- *)
   Lemma wp_csrw_medeleg_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (medeleg0 : mword 64)

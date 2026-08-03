@@ -95,7 +95,7 @@ Proof. rewrite <- (data2_ext_4 w). rewrite autocast_id. reflexivity. Qed.
 Section VtLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -342,7 +342,7 @@ End VtLeaves.
 Module VtPrologue (Acquire : ACQUIRE).
 Section VtPrologue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -610,7 +610,7 @@ End VtPrologue.
 Module VtEpilogue (Release : RELEASE).
 Section VtEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -1059,7 +1059,7 @@ Qed.
 Section VtDevRam.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the used-ring INDEX read: [lhu a5,2(a5)] at +0x36 and [lhu a4,2(a4)]
      at +0x82.  Drives [virtio_proto_used_idx_acc]; the value is the
@@ -1845,7 +1845,7 @@ End VtSurgery.
 
 Section VtBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -2591,7 +2591,7 @@ Definition vt_regs_ok (m MB : regfile) (sp0 : mword 64) : Prop :=
 
 Section VtLoopDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition vt_exit (Φ : mval -> iProp Σ) (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av lvl : nat) (eb : bool)
@@ -2654,7 +2654,7 @@ Qed.
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -2933,7 +2933,7 @@ Module Lp  := VtLoopProof Wakeup.
 
 Section ProofVirtioDiskIntr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).

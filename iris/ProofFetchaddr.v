@@ -112,7 +112,7 @@ Module FetchaddrProof (Myproc : MYPROC) (Copyin : COPYIN) : FETCHADDR.
 
 Section ProofFetchaddr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

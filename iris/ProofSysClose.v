@@ -105,7 +105,7 @@ Module SysCloseProof (Argfd : ARGFD) (Myproc : MYPROC) (Fileclose : FILECLOSE) :
 
 Section ProofSysClose.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the frame's sp is sound: read the bound out of the ambient capability's
      own stack carve (the conclusion is pure, so the bundle survives). *)

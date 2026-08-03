@@ -527,7 +527,7 @@ Qed.
 
 Section VcGenIris.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* one fully-owned 8-byte points-to per heap cell *)
   Definition vheap_own (ρ : nat -> mword 64) (h : list (sval * sval)) : iProp Σ :=

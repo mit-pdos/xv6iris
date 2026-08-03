@@ -24,7 +24,7 @@ Local Notation PC := KernelSyms.plic_complete.
 
 Section CodePlicComplete.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 Lemma pc_imm4 : zero_extend' 12 (concat_vec (mword_of_int 1 : mword 5) ('b"00")) = (mword_of_int 4 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.

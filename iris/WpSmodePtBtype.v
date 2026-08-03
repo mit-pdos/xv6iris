@@ -120,7 +120,7 @@ Local Lemma exec_execute_BTYPE_BEQ_taken_zca (imm : mword 13) (rs2 rs1 : mword 5
 
 Section WpSmodePtBtype.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_beq_fall_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)

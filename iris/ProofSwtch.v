@@ -60,7 +60,7 @@ Import Defs.
 Module SwtchProof : SWTCH.
 Section ProofSwtch.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
     Timeless (stack_own sp n).

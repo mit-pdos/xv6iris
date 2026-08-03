@@ -14,7 +14,7 @@ Import Defs.
 (* from WpGprAuipc.v *)
 Section WpAuipcGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic AUIPC WP, built on
      [wp_instr] -- stated exactly like [wp_addi_gpr] but with no source
@@ -87,7 +87,7 @@ End WpAuipcGpr.
 (* from WpGprLui.v *)
 Section WpLuiGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic LUI WP, built on
      [wp_instr] -- stated exactly like [wp_auipc_gpr] but the written value is

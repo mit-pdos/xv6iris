@@ -94,7 +94,7 @@ Qed.
 
 (* ===================================================================== *)
 (* [ui_regs] / [ui_ret_cont] live ABOVE the section on purpose: a constant
-   defined INSIDE a section carrying [Context `{CID : CpuId}] is applied at
+   defined INSIDE a section carrying [Context `{GEN : GenId} `{CID : CpuId}] is applied at
    that section variable at every use, and would then BEAT the [fun CID =>]
    binder of the [wp_next] it contains (porting guide, "a section-defined
    constant silently beats the wp_next lambda").  [CID0] is the anchor the
@@ -148,7 +148,7 @@ Section UiCont.
      pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
-  Definition ui_ret_cont `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m0 : regfile)
+  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
@@ -160,7 +160,7 @@ Section UiCont.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
-  Lemma ui_ret_cont_shift (CIDa CIDb : CpuId) (Φ : mval -> iProp Σ) (m0 : regfile)
+  Lemma ui_ret_cont_shift `{GEN : GenId} (CIDa CIDb : CpuId) (Φ : mval -> iProp Σ) (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :
     (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     ui_ret_cont (CID0 := CIDa) Φ m0 av lvl eb pme C b -∗
@@ -179,7 +179,7 @@ Module UG := UartgetcProof Uart.
 Section ProofUartintr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

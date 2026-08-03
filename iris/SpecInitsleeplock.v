@@ -34,7 +34,7 @@ Notation ISL := KernelSyms.initsleeplock.
    [kernel_data] via [kernel_data_string]. *)
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007548.
 
-Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
@@ -76,7 +76,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID
 
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)

@@ -125,7 +125,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section AllocpidInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation API := KernelSyms.allocpid.
 

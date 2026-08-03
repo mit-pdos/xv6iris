@@ -208,7 +208,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 
 Section CodeSleeplock.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
   (*  initsleeplock @ 0x80003e96, offsets 0x00 .. 0x34.                   *)

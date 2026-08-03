@@ -162,7 +162,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeUartwrite.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UW := KernelSyms.uartwrite.
 

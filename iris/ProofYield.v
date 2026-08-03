@@ -117,14 +117,14 @@ Section YieldPostSched.
      a lemma sharing an enclosing section's [Context CID] would silently pin
      to the entry hart (porting guide, "a helper lemma sharing the enclosing
      Section's Context"). *)
-  Lemma cpu_own_ctx_take `{CID0 : CpuId}
+  Lemma cpu_own_ctx_take `{GEN : GenId} `{CID0 : CpuId}
       (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) :
     cpu_own n eb p D false -∗ D ∗ cpu_own n eb p emp false.
   Proof.
     iIntros "[Hh HD]". iFrame "HD". rewrite cpu_own_off. iFrame "Hh".
   Qed.
 
-  Lemma yield_post_sched `{CID0 : CpuId}
+  Lemma yield_post_sched `{GEN : GenId} `{CID0 : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m msch : regfile) (av : nat) (C : iProp Σ)
@@ -427,7 +427,7 @@ End YieldPostSched.
 
 Section ProofYield.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_yield_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

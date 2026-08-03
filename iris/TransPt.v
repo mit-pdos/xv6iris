@@ -357,7 +357,7 @@ End Pt2Translate.
 
 Section Pt2Inv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [pmp_config]'s content is root-independent (the root is a phantom
      index); re-index it across the switch by conversion *)
@@ -478,7 +478,7 @@ End Pt2Inv.
 
 Section Pt2TranslateIris.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_inv_pt2_translateAddr (rc : mword 44) (Sp Sc : ptree -> Prop)
@@ -689,7 +689,7 @@ End Pt2TranslateIris.
 
 Section Pt2TrampInst.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the spec-side premises the trampoline instantiation needs: a
      trampoline clause + an A/D write-back closure, per side *)
@@ -844,7 +844,7 @@ Proof. intros t Hspec. exact (proj1 Hspec). Qed.
 (* the instantiated switch-window trampoline fetch + step engine *)
 Section Pt2TrampEngines.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   Definition wp_instr_pt2_tramp (rc : mword 44) (Sp Sc : ptree -> Prop)

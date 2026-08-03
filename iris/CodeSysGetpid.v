@@ -25,7 +25,7 @@ Local Notation SG := KernelSyms.sys_getpid.
 
 Section CodeSysGetpid.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 (* +0x0c  0x5908  c.lw a0,48(a0)  -- a0 := myproc()->pid *)

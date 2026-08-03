@@ -32,7 +32,7 @@ Qed.
 
 Section UserExecProducerU.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* 5-way BASE totality: decode w -> instr; execute (possibly one base
@@ -220,7 +220,7 @@ Section UserExecProducerU.
 End UserExecProducerU.
 Section UserFetchFaultActive.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* Odd pc -> E_Fetch_Addr_Align, state unchanged. *)
@@ -384,7 +384,7 @@ Section UserFetchFaultActive.
 End UserFetchFaultActive.
 Section UserExecProducer2U.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma user_exec_step_producer_2_u (E : coPset) (σ : mstate) (va : mword 64)

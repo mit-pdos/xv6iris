@@ -79,7 +79,7 @@ Module FileallocProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEALLOC.
 
 Section ProofFilealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FA := KernelSyms.filealloc.
 

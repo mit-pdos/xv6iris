@@ -96,7 +96,7 @@ Import Defs.
 
 Notation UC := KernelSyms.uvmcopy.
 
-Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (b : bool) :=
@@ -155,7 +155,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool),

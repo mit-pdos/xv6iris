@@ -301,7 +301,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section SysPipeInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation SP := KernelSyms.sys_pipe.
 

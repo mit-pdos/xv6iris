@@ -59,7 +59,7 @@ Module HoldingsleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPRO
 
 Section ProofHoldingsleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)
   Local Ltac hpeel :=

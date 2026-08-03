@@ -35,7 +35,7 @@ Module UserProof : USER.
 
 Section ProofUser.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* The base execute totality, closed by instantiating the 6 base memory

@@ -38,7 +38,7 @@ Import Defs.
 
 Section KvCell.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   (* the 8-byte stack cell at address [a] currently holding [v]: a
      doubleword points-to, bundling the 8 byte facts with 8-alignment. *)
   Definition kv_cell (a : mword 64) (v : bv 64) : iProp Σ :=
@@ -59,7 +59,7 @@ Definition kt_clobbered : gset regidx :=
      Regidx (mword_of_int 28 : mword 5); Regidx (mword_of_int 29 : mword 5);
      Regidx (mword_of_int 30 : mword 5); Regidx (mword_of_int 31 : mword 5) ]}.
 
-Definition wp_kerneltrap_returns_body `{!riscvGS Σ} `{CpuId} `{!sieG Σ}
+Definition wp_kerneltrap_returns_body `{!riscvGS Σ} `{GenId} `{CpuId} `{!sieG Σ}
     (γ : gname) (dq : dfrac)
     (m : regfile) (spv rava : mword 64)
     (satp0 : mword 64)
@@ -96,7 +96,7 @@ Definition wp_kerneltrap_returns_body `{!riscvGS Σ} `{CpuId} `{!sieG Σ}
 
 Module Type KERNELTRAP.
   Parameter kerneltrap_returns :
-    forall `{!riscvGS Σ} `{CpuId} `{!sieG Σ}
+    forall `{!riscvGS Σ} `{GenId} `{CpuId} `{!sieG Σ}
       (γ : gname) (dq : dfrac)
       (m : regfile) (spv rava : mword 64)
       (satp0 : mword 64)

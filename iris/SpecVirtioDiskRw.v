@@ -56,7 +56,7 @@ Definition K_virtio_disk_rw : nat := 34%nat.
 
 Definition wp_virtio_disk_rw_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
-    `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* fabric + lock ghosts *)
@@ -147,7 +147,7 @@ Definition wp_virtio_disk_rw_sconf_body
 Module Type VIRTIODISKRW.
   Parameter wp_virtio_disk_rw_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
-      `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

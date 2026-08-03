@@ -207,7 +207,7 @@ Qed.
 
 Section UserMemPtGhost.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma udata_own_upd (data : gset Arch.pa) (l : list nat) (pa : Arch.pa)
         {wd : N} (v : bv wd) (m : _) :
@@ -248,7 +248,7 @@ End UserMemPtGhost.
 
 Section UserMemPtGeneric.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
@@ -685,7 +685,7 @@ End UserMemPtGeneric.
 
 Section UserMemPtInstances.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -709,7 +709,7 @@ End UserMemPtInstances.
 
 Section UserMemPtAmo.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 End UserMemPtAmo.

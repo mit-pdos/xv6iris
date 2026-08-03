@@ -692,7 +692,7 @@ Qed.
 
 Section WpCsrwGprNewB.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   (* ---- mideleg ---- *)
   Lemma wp_csrw_mideleg_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (mideleg0 : type_of_register mideleg)

@@ -82,7 +82,7 @@ Qed.
 
 Section StartedInv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition startedN : namespace := nroot .@ "started".
 

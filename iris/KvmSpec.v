@@ -104,7 +104,7 @@ Import Defs.
 
 Section KvmSpecs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* kalloc's ambient resources, bundled so callers can invoke kalloc
      REPEATEDLY: the kmem lock, the count ghost, and panic's contract (which

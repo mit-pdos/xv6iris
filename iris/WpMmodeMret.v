@@ -17,7 +17,7 @@ Import Defs.
 (* from WpGprMretNew.v *)
 Section WpMretGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* wp_mret_gpr: the new-layer MRET WP.  Unbundled config premises with the
      mstatus value [ms_cur] explicit; premises mirror [wp_mret]'s execute

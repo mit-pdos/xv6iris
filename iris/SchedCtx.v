@@ -62,7 +62,7 @@ Local Open Scope Z_scope.
    14-word save area (boot; and while the scheduler itself runs).
    (Here rather than CpuOwn.v: it names [ctx_cells], and SwtchCtx now
    sits above CpuOwn so the ambient-bundle wand can mention [cpu_own].) *)
-Definition cpu_ctx_free `{!riscvGS Σ} `{CID : CpuId} : iProp Σ :=
+Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ :=
   (∃ vs : list (mword 64),
      ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
 
@@ -99,7 +99,7 @@ Qed.
 
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   (* the ambient S-mode world: the whole-machine postcondition.  (The SIE
      ghost is canonical per hart now -- [IntrDefs.sie_gname] -- so no [γ]
      binder survives here; the kernel page table rides inside [swconf]'s

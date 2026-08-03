@@ -61,17 +61,34 @@ template for milestones 1–4.
    Touches RiscvPtsto/RiscvExec — bottom of tree, so every iteration is a
    full rebuild: validate with `make -f CoqMakefile -j16 -k`, run
    `tools/lemma_diff.py` and `tools/spec_vacuity.py` on touched files.
-2. **Language + the GenId sweep**: `ggen`/`gpow` gstate fields, generation
-   indices on the four loop expressions + corpse arms, `PowerLoopE`
-   (PowerOff bumps ggen; PowerOn forks), `PowerModel.v` (`boot_shape`,
-   `dev_reset`, pure). Ambient generation: `Class GenId := { gen_id : nat }`,
-   `Notation Loop := (LoopE gen_id cpu_id)` — a Context-binder sweep
-   across the WP files with statements textually unchanged; follow
-   [`../completed/explicit-cpuid-porting-guide.md`](../completed/explicit-cpuid-porting-guide.md)
-   (the failure modes that compile are the risk). Every lifting rule's
-   `prim_step` inversion gains the corpse/power disjuncts. Fix the two or
-   three representative files by hand first; the rest is subagent
-   fan-out.
+2. **Language + the GenId sweep** — **STAGE 2a LANDED (green, checkers
+   clean, baseline 5 axioms)**: the four loop expressions carry an INERT
+   generation index (`LoopE gen cpu`, …; no `prim_step` arm reads it, so
+   the tree is exactly as strong as before), `Class GenId := gen_id : nat`
+   ambient alongside CpuId, `Notation Loop := (LoopE gen_id cpu_id)`, and
+   the tree-wide binder sweep. Lessons from the sweep (recurring):
+   - **Never insert `GenId` blindly next to `CpuId`**: a PURE helper
+     (`rget`/`tp_pin`, HartTp.v) gains a PHANTOM implicit that no use
+     site can infer — undefined-evar errors far away. `wp_next` is pure
+     transport and takes no GenId at all.
+   - **Callee-parameter foralls stay gen-free**: a `_gen` function's
+     per-callee parameter `forall (CID : CpuId), <wp body>` quantifies
+     the RESUMING hart only; the body's GEN resolves from the enclosing
+     section (the callee runs at the caller's generation).
+   - **Hart-free continuation sections** (the `wp_next`-shaped `asl_*`/
+     `pw_*`/`sp_*`/`uw_*`/`fw_*` blocks binding `(CID0 : CPU)`): one
+     section-level `Context \`{GEN : GenId}.` (or a per-definition
+     binder) — and mind digit-containing names when scripting
+     (`pw_minus1`, `sp_exit0` escape `[a-z_]*`).
+   - The `wp_next (fun (CID : CpuId) => …)` continuation lambdas — all
+     ~250 — need NO change: gen stays ambient across a migration, which
+     is exactly the intended same-generation-resumption semantics.
+   **STAGE 2b (next)**: `ggen`/`gpow` gstate fields (inert: every arm
+   preserves them). **STAGE 2c**: state_interp fixed conjuncts (mono-nat
+   + registry + durable tie) + adequacy allocation. **STAGE 2d**: birth
+   lb + era registration into per-era `minstret_inv`. **STAGE 2e** (the
+   semantic switch, with milestone 3): gating premises + corpse arms +
+   `PowerLoopE` + fork + `PowerModel.v` (`boot_shape`, `dev_reset`).
 3. **Death machinery**: `wp_dead`, the base rules' four-way case split
    (`> gen` dead / live / off-refuted-by-registry / `< gen`
    refuted-by-birth-bound), birth lb + era registration folded into the

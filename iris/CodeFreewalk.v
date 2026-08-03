@@ -193,7 +193,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section FreewalkInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FW := KernelSyms.freewalk.
 

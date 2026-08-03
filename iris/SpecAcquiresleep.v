@@ -45,7 +45,7 @@ Import Defs.
 
 Notation ASL := KernelSyms.acquiresleep.
 
-Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
@@ -92,7 +92,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
 
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)

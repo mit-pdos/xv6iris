@@ -104,7 +104,7 @@ Import Defs.
 
 Section WalkInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation WLK off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.walk + off) : mword 64) rvc ast).

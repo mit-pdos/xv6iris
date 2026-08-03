@@ -328,7 +328,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section BreadInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BD := KernelSyms.bread.
 

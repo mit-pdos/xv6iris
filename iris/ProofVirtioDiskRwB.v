@@ -93,7 +93,7 @@ Section VdrwbFreeAt.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_vdrw_free_at `{CID : CpuId} (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ) (γs : list gname)
       (pd : mword 64) (i : nat) (fr : nat -> bool)
       (M : regfile) (av : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (idxa : Arch.pa) (off : Z) (imm : mword 12) (jimm : mword 21) :
@@ -194,7 +194,7 @@ End VdrwbFreeAt.
 
 Section ProofVirtioDiskRwB.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   Local Ltac reg_neq :=

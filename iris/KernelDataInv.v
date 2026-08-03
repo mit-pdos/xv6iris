@@ -29,7 +29,7 @@ Import Defs.
 
 Section KernelDataInv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* The initialized global-data image, RE-SCOPED to the kernel-DATA region
      (rwx-kmap): the dump also carries 5332 sub-etext bytes (inter-function

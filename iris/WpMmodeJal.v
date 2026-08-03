@@ -39,7 +39,7 @@ Qed.
 
 Section WpJalGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [instr]/[mmode_config]-formulated register-generic JAL WP, built on
      [wp_instr] -- stated like [wp_auipc_gpr] (no source register) BUT it is a

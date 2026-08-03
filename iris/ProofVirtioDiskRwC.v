@@ -64,7 +64,7 @@ Require Import VirtioDiskRwDefs.
 
 Section ProofVirtioDiskRwC.
   Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation VRW := KernelSyms.virtio_disk_rw.
 

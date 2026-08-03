@@ -27,7 +27,7 @@ Require Import SpecUserinit.
 Module Userinit : USERINIT.
   Axiom wp_userinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
-      `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64) (C : iProp Σ)

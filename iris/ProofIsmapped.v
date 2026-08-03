@@ -79,7 +79,7 @@ Section IsmappedEpi.
     [ | let H1 := fresh in let H2 := fresh in
         intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
-  Lemma ismapped_epi `{CID : CpuId}
+  Lemma ismapped_epi `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (vpn : mword 27) (K : nat) (HK2 : (2 <= K)%nat) (dq : dfrac) (b : bool) (p : mword 64) (ret_tgt : mword 64)
       (Hrt_def : ret_tgt = ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5)))
@@ -234,7 +234,7 @@ End IsmappedEpi.
 
 Section ProofIsmapped.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac rgne :=
     rewrite rget_ne;

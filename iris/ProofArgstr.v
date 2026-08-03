@@ -57,7 +57,7 @@ Module ArgstrProof (Argraw : ARGRAW) (Fetchstr : FETCHSTR) : ARGSTR.
 
 Section ProofArgstr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

@@ -62,7 +62,7 @@ Import Defs.
 
 Notation SG := KernelSyms.sys_getpid.
 
-Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (b : bool) :=
@@ -89,7 +89,7 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG
 
 Module Type SYSGETPID.
   Parameter wp_sys_getpid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool),

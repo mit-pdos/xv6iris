@@ -133,7 +133,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section CodeConsoleinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation CI := KernelSyms.consoleinit.
 

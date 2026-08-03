@@ -2725,7 +2725,7 @@ Proof. apply um_pas_cov. Qed.
 
 Section ProcPt.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* one physical byte, contents existential (the [↦ₚ] analogue of
      KallocInv's [byte_any]) *)

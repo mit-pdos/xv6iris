@@ -53,7 +53,7 @@ Local Open Scope Z_scope.
 
 (* The whole M-mode boot as one WP: [_entry] -> start() -> timerinit() ->
    MRET -> <main> in Supervisor mode. *)
-Definition wp_entry_boot_body `{!riscvGS Σ} `{CID : CpuId}
+Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
     (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
@@ -122,7 +122,7 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{CID : CpuId}
 
 Module Type ENTRY.
   Parameter wp_entry_boot :
-    forall `{!riscvGS Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)

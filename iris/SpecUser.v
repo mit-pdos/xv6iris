@@ -50,7 +50,7 @@ Require Import UserPtTree UserExec.
 Local Open Scope Z_scope.
 Import Defs.
 
-Definition wp_user_exec_closed_body `{!riscvGS Σ} `{CID : CpuId}
+Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     (C : ucfg) (pt : uptd) (Φ : mval -> iProp Σ) :=
   hw_config -∗ minstret_inv -∗ wire_inv -∗
   user_inv C pt -∗ stvec_handler_wp C pt Φ -∗
@@ -58,6 +58,6 @@ Definition wp_user_exec_closed_body `{!riscvGS Σ} `{CID : CpuId}
 
 Module Type USER.
   Parameter wp_user_exec_closed :
-    forall `{!riscvGS Σ} `{CID : CpuId} (C : ucfg) (pt : uptd) (Φ : mval -> iProp Σ),
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd) (Φ : mval -> iProp Σ),
       wp_user_exec_closed_body C pt Φ.
 End USER.

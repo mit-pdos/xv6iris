@@ -58,7 +58,7 @@ Module InitsleeplockProof (Initlock : INITLOCK) : INITSLEEPLOCK.
 
 Section ProofInitsleeplock.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ISL := KernelSyms.initsleeplock.
 

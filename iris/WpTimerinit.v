@@ -162,7 +162,7 @@ Local Ltac ti_unfold :=
 (* ===================================================================== *)
 Section WpTimerinitThm.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [wp_timerinit]: the whole-function spec over the [stack_own_phys] abstraction. *)
   Lemma wp_timerinit (Φ : mval -> iProp Σ) (q : Qp)

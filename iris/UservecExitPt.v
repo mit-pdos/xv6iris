@@ -118,7 +118,7 @@ Qed.
 
 Section UservecExitPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_uservec_exit_pt (kroot uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)

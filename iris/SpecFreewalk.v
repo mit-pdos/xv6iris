@@ -69,7 +69,7 @@ Import Defs.
 
 Notation FW := KernelSyms.freewalk.
 
-Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (ilvl : nat) (b : bool) :=
@@ -104,7 +104,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 
 Module Type FREEWALK.
   Parameter wp_freewalk_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (ilvl : nat) (b : bool),

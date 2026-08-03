@@ -78,7 +78,7 @@ Notation UW := KernelSyms.uartwrite.
 Definition uartwrite_stack : nat := 32%nat.
 
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
-    `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
@@ -130,7 +130,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)

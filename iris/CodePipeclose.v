@@ -160,7 +160,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 (* ===================================================================== *)
 Section WpPipecloseInstr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma pci_00 : kernel_text -∗ instr (mword_of_int (PC + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
   Proof. mk_rvc (PC + 0x00)%Z (mword_of_int 0x1101 : mword 16)

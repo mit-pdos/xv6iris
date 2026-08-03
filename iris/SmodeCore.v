@@ -945,7 +945,7 @@ Proof. solve_inG. Qed.
 
 Section SmodeCoreIris.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* The static kernel-mapping claims (KMap.v), off the ambient config bundle.
      [hw_config] is persistent, so this consumes nothing.  It is THE interface
@@ -1325,7 +1325,7 @@ Qed.
 
 Section SmodeDemo.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition kv_pc1 : mword 64 := mword_of_int (KernelSyms.kernelvec).
 

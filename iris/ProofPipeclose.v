@@ -81,7 +81,7 @@ Module PipecloseProof (Acquire : ACQUIRE_GEN) (Wakeup : WAKEUP)
 
 Section ProofPipeclose.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
      two independent presentations of the same SIE state; the ghost eighth
@@ -472,7 +472,7 @@ Section ProofPipeclose.
                      pc_is (CID := CIDx) (mword_of_int (PC + 0x36) : mword 64) -∗
                      cpu_own (CID := CIDx) n eb pme C b -∗
                      kalloc_avail γk (avail_inc on) -∗
-                     WP (LoopE CIDx : expr riscv_lang) {{ Φ }})))%I
+                     WP (LoopE gen_id CIDx : expr riscv_lang) {{ Φ }})))%I
         with "[EPI Havail]" as "TAILS".
       { iSplit.
         2:{ iFrame "Havail". iIntros (CIDf M') "%Hch' %Hcs' Hcg Hpc Hown Hav".

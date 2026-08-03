@@ -50,7 +50,7 @@ From Kernel Require KernelSyms.
 
 Notation VF := KernelSyms.vmfault.
 
-Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
@@ -99,7 +99,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dqs dqp : dfrac) (b : bool),

@@ -28,7 +28,7 @@ Import Defs.
 
 Section TrapinithartBody.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -222,7 +222,7 @@ End TrapinithartBody.
 
 Module TrapinithartProof : TRAPINITHART.
   Definition wp_trapinithart_sconf
-      `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+      `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (K : nat)
       (tv0 : mword 64) (p : mword 64)
       : wp_trapinithart_sconf_body Φ mm K tv0 p :=

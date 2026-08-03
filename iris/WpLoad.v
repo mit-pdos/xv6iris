@@ -476,7 +476,7 @@ End ForwardLD.
 
 Section StepLD.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 End StepLD.

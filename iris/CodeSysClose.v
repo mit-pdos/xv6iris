@@ -113,7 +113,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section SysCloseInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation SC := KernelSyms.sys_close.
 

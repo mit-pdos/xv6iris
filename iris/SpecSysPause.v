@@ -87,7 +87,7 @@ Import Defs.
 
 Notation SP := KernelSyms.sys_pause.
 
-Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
     (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
@@ -140,7 +140,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type SYSPAUSE.
   Parameter wp_sys_pause_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
       (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)

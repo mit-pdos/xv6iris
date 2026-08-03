@@ -110,7 +110,7 @@ Module ProcPagetableProof (UV : UVMCREATE) (MP : MAPPAGES) : PROC_PAGETABLE.
 
 Section ProofProcPagetable.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PPT := KernelSyms.proc_pagetable.
 

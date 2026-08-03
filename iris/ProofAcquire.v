@@ -34,7 +34,7 @@ Module AcquireGenProof (Mycpu : MYCPU) (Holding : HOLDING) (PushOff : PUSHOFF) :
 
 Section ProofAcquire.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* The amoswap spin loop (AQ+0x1a..0x22) over the funnel leaves: a      *)
@@ -761,7 +761,7 @@ Module AcquireOfGen (G : ACQUIRE_GEN) : ACQUIRE.
 
 Section OfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_acquire_sconf (Φ : mval -> iProp Σ)
       (γl : gname) (s : string) (R : iProp Σ)

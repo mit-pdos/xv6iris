@@ -21,7 +21,7 @@ Import Defs.
 
 Section WpSmodePtAlu.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- from WpSmodeItype.v ---- *)
 

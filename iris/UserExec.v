@@ -220,7 +220,7 @@ Definition post_fetch_cfg (σf : mstate) (va : mword 64) (miσ : bool) : Prop :=
 (* ===================================================================== *)
 Section UserExec.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   Local Notation dqc := (uc_dqc C).

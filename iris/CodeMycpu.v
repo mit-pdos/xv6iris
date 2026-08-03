@@ -110,7 +110,7 @@ Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
 
 Section CodeMycpu.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* [instr] facts for the fourteen mycpu instructions from [kernel_text]. *)

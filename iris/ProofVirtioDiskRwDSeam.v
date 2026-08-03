@@ -76,7 +76,7 @@ Module P3 := VirtioDiskRwRestC Acquire Release Sleep FreeDesc.
 
 Section ProofVirtioDiskRwDSeam.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation VRW := KernelSyms.virtio_disk_rw.
 

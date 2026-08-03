@@ -141,7 +141,7 @@ Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivit
 (* ===================================================================== *)
 Section ProcinitInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PI := KernelSyms.procinit.
 

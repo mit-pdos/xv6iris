@@ -85,7 +85,7 @@ Module AllocpidProof (Acquire : ACQUIRE) (Release : RELEASE) : ALLOCPID.
 
 Section ProofAllocpid.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ai_ra := (mword_of_int 1 : mword 5).
   Notation ai_s0 := (mword_of_int 8 : mword 5).

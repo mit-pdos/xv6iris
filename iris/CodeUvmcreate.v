@@ -22,7 +22,7 @@ Import Defs.
 
 Section UvmcreateInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation UVC off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + off) : mword 64) rvc ast).

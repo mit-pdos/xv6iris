@@ -297,7 +297,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section SysSbrkInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation SB := KernelSyms.sys_sbrk.
 

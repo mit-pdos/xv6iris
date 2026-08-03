@@ -90,7 +90,7 @@ Module WalkaddrProof (WalkNoalloc : WALK_NOALLOC) : WALKADDR.
 
 Section ProofWalkaddr.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_walkaddr_sconf
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)

@@ -15,7 +15,7 @@ Import Defs.
 (* from WpGprLogic.v *)
 Section WpLogicRTypeGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma wp_or_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)

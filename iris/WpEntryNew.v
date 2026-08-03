@@ -60,7 +60,7 @@ Ltac boot_static :=
 
 Section WpEntryNew.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   (* The load effective address: sp (just set by AUIPC) + sext(imm_ld). *)

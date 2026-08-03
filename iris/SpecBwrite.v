@@ -51,7 +51,7 @@ Definition K_bwrite : nat := 38%nat.
 
 Definition wp_bwrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
-    `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -123,7 +123,7 @@ Definition wp_bwrite_sconf_body
 Module Type BWRITE.
   Parameter wp_bwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
-      `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

@@ -14,7 +14,7 @@ Import Defs.
 (* from WpGprAddi.v *)
 Section WpAddiGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* [instr]/[mmode_config]-formulated register-generic ADDI WP, built on
@@ -99,7 +99,7 @@ End WpAddiGpr.
 (* from WpGprLogic.v *)
 Section WpLogicITypeGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Lemma wp_ori_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)

@@ -41,7 +41,7 @@ Import Defs.
 
 Notation SU := KernelSyms.sys_uptime.
 
-Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_uptime in
@@ -68,7 +68,7 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : 
 
 Module Type SYSUPTIME.
   Parameter wp_sys_uptime_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl : gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool),
       wp_sys_uptime_sconf_body Φ γl m n eb p C av b.

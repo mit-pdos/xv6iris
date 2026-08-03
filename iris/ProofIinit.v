@@ -48,7 +48,7 @@ Section ProofIinit.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{!lockG Σ}.
-  (* NOTE: no shared [Context `{CID : CpuId}] here -- the epilogue/loop
+  (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]
      binder (shadowing what a section Context would give) rather than
@@ -72,7 +72,7 @@ Section ProofIinit.
      loop's own leaf steps actually migrated to, not necessarily the entry
      hart of [wp_iinit_sconf] -- the same rule ProofConsputc.wp_consputc_epi
      follows (worked example the porting guide names for this exact shape). *)
-  Lemma iiepi `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m Me : regfile) (K : nat) (b : bool) (p : mword 64) :
+  Lemma iiepi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m Me : regfile) (K : nat) (b : bool) (p : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -280,7 +280,7 @@ Section ProofIinit.
       [wp_next_shift] before recursing or handing off to [iiepi] (worked
       example for both: ProofProcMapstacks.v's loop). *)
   (* ================================================================= *)
-  Lemma iinit_loop `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64)
+  Lemma iinit_loop `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64)
       (fuel : nat) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
@@ -521,7 +521,7 @@ Section ProofIinit.
   (* ================================================================= *)
   (*  iinit's whole-function WP.                                        *)
   (* ================================================================= *)
-  Lemma wp_iinit_sconf `{CID : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_iinit_sconf `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64)
     : wp_iinit_sconf_body Φ m K vlock vname vcpu b p.

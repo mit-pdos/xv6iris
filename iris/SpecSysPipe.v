@@ -152,7 +152,7 @@ Section SpecSysPipe.
 End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
@@ -197,7 +197,7 @@ Definition wp_sys_pipe_sconf_body
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),

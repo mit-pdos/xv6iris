@@ -330,7 +330,7 @@ Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 Section CopyoutInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation CO := KernelSyms.copyout.
 

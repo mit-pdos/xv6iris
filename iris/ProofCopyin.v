@@ -159,7 +159,7 @@ Module CopyinProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) (Memmove : MEMMOVE)
 
 Section ProofCopyin.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).

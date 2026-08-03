@@ -74,7 +74,7 @@ Qed.
 
 Section Kfree.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   (* ============================================================= *)

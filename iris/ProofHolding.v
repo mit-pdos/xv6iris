@@ -53,7 +53,7 @@ Module HoldingProof (Mycpu : MYCPU) : HOLDING.
 
 Section ProofHolding.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_holding_lockinv_s_sconf (Φ : mval -> iProp Σ)
       (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ)

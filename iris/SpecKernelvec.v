@@ -50,7 +50,7 @@ Lemma kernelvec_stvec_base :
     = (mword_of_int KernelSyms.kernelvec : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
-Definition kernelvec_handler_spec_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId} :=
+Definition kernelvec_handler_spec_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} :=
   hw_config -∗
   minstret_inv -∗
   kernel_text -∗
@@ -58,6 +58,6 @@ Definition kernelvec_handler_spec_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId} :
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId},
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId},
       kernelvec_handler_spec_body.
 End KERNELVEC.

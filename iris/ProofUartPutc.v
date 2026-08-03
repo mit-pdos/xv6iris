@@ -68,7 +68,7 @@ Module UAcc := UartAccessProof Uart.
 Section ProofUartPutc.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UPS := KernelSyms.uartputc_sync.
 

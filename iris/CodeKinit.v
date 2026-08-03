@@ -73,7 +73,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeKinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KI := KernelSyms.kinit.
 

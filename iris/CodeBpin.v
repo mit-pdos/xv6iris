@@ -113,7 +113,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section BpinInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BP := KernelSyms.bpin.
   Notation BU := KernelSyms.bunpin.

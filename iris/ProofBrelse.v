@@ -107,7 +107,7 @@ Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
 
 Section ProofBrelse.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BR := KernelSyms.brelse.
 

@@ -14,7 +14,7 @@ Import Defs.
 (* from WpGprLoad.v *)
 Section WpLdGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* reg_pointsto Fractional/AsFractional, reg_pointsto_agree, and
      mmode_config_split_half / mmode_config_combine_half now live in InstrBytes.v
@@ -187,7 +187,7 @@ End WpLdGpr.
 (* from WpGprRvcTor.v (RvcTorEngines, load leaves) *)
 Section MmodeLoadTor.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ld_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile) (v : bv 64)

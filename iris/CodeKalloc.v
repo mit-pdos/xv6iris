@@ -176,7 +176,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeKalloc.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* The three [instr]-builder templates, copied verbatim from CodeMycpu.   *)

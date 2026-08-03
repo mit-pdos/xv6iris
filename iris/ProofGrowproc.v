@@ -127,7 +127,7 @@ Module GrowprocProof (Myproc : MYPROC) (Uvmalloc : UVMALLOC)
 
 Section ProofGrowproc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

@@ -24,7 +24,7 @@ Import Defs.
 
 Section CodeKvmmake.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation KMK off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.kvmmake + off) : mword 64) rvc ast).

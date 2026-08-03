@@ -121,7 +121,7 @@ Definition cfg_ok (s : mstate) : Prop :=
 
 Section HwConfig.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* mcountinhibit / minstretcfg are no longer bundled here (the minstret step
      no longer needs their values -- [should_inc] is total).  [elp] IS bundled,

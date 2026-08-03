@@ -26,7 +26,7 @@ Import Defs.
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -54,7 +54,7 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
@@ -78,11 +78,11 @@ Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type MYCPU.
   Parameter wp_mycpu_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
       wp_mycpu_sconf_body Φ m0 n p.
   Parameter wp_call_mycpu_sconf_cs :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
       wp_call_mycpu_sconf_cs_body Φ P jimm m n p.
 End MYCPU.

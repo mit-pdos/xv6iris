@@ -113,7 +113,7 @@ Qed.
 (* ===== slli ===== *)
 Section Wp_slli.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_slli_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : regfile)
@@ -186,7 +186,7 @@ End Wp_slli.
 (* ===== srli ===== *)
 Section Wp_srli.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
   Lemma wp_srli_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : regfile)

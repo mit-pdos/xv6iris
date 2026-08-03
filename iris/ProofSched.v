@@ -156,7 +156,7 @@ Module SchedProof (Myproc : MYPROC) (Holding : HOLDING) (Swtch : SWTCH) : SCHED.
 Section SchedPostSwtch.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
 
-  Lemma sched_post_swtch `{CID : CpuId}
+  Lemma sched_post_swtch `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m m' : regfile) (av : nat) (eb eb' : bool)
@@ -530,7 +530,7 @@ End SchedPostSwtch.
 
 Section ProofSched.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sched_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)

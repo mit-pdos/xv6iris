@@ -106,7 +106,7 @@ Module MainSecondaryProof
 Section ProofMainSecondary.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Ltac reg_neq :=
     lazymatch goal with

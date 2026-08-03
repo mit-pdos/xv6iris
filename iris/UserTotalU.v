@@ -90,7 +90,7 @@ Qed.
 
 Section UserTotalU.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

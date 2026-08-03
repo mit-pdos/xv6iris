@@ -67,7 +67,7 @@ Module VirtioDiskRwPhases (Acquire : ACQUIRE) (Release : RELEASE)
 
 Section ProofVirtioDiskRw.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation VRW := KernelSyms.virtio_disk_rw.
 

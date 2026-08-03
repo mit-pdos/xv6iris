@@ -84,7 +84,7 @@ Section SpecEitherCopyin.
 
 End SpecEitherCopyin.
 
-Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
@@ -123,7 +123,7 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
 
 Module Type EITHER_COPYIN.
   Parameter wp_either_copyin_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)

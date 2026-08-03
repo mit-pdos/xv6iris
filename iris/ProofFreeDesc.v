@@ -194,7 +194,7 @@ Module FreeDescProof (Wakeup : WAKEUP) : FREEDESC.
 
 Section ProofFreeDesc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).

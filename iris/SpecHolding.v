@@ -50,7 +50,7 @@ Notation HD := KernelSyms.holding.
    also makes the holder token's hart identity track a SINGLE ambient [CID]
    throughout the body (no migrated-hart mismatch can arise at the +0x12
    [lk->cpu] read below). *)
-Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -80,7 +80,7 @@ Definition wp_holding_lockinv_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `
    where a [b]-generic statement would otherwise hand that leaf a token about
    the entry hart while it demands one about its own (post-migration)
    ambient hart. *)
-Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holding in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -107,11 +107,11 @@ Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !sieG Σ, !lock
 
 Module Type HOLDING.
   Parameter wp_holding_lockinv_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64),
       wp_holding_lockinv_s_sconf_body Φ γl lka R Tc Dc m n p.
   Parameter wp_holding_lockinv_locked_s_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (R Dc : iProp Σ) (m : regfile) (n : nat) (p : mword 64),
       wp_holding_lockinv_locked_s_sconf_body Φ γl lka R Dc m n p.
 End HOLDING.

@@ -1051,7 +1051,7 @@ End RegAt.
 
 Section Bridge.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* reading a register cell agrees with the model's [register_lookup]. *)
   Lemma reg_valid rs r v :

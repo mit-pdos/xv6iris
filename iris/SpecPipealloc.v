@@ -129,7 +129,7 @@ Section SpecPipealloc.
 End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
@@ -178,7 +178,7 @@ Definition wp_pipealloc_sconf_body
 
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)

@@ -1031,7 +1031,7 @@ End ExecLoadGSwalk.
 (* ===================================================================== *)
 Section WpInstrSConfig.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   (* ------------------------------------------------------------------- *)
@@ -1063,7 +1063,7 @@ End WpInstrSConfig.
 (* ===================================================================== *)
 Section SmodeGprClients.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* C.1 GENERIC S-mode RVC gpr-write engine (TLB-hit fetch): mirror of   *)

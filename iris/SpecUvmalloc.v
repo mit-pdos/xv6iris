@@ -73,7 +73,7 @@ Import Defs.
 
 Notation UA := KernelSyms.uvmalloc.
 
-Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (b : bool) :=
@@ -130,7 +130,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 
 Module Type UVMALLOC.
   Parameter wp_uvmalloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool),

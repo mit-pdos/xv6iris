@@ -273,7 +273,7 @@ Local Lemma exec_execute_BTYPE_BGEU_taken_zca (imm : mword 13) (rs2 rs1 : mword 
 Section WpSconfBtype.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.

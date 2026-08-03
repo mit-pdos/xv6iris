@@ -619,7 +619,7 @@ Qed.
 
 Section UptTreeInv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition utlb_inv_pt (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) : iProp Σ :=
@@ -662,7 +662,7 @@ End UptTreeInv.
 
 Section UptTranslateIris.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   (* PRIVILEGE-GENERIC: the mode dispatch comes in as a callback premise
@@ -762,7 +762,7 @@ End UptTranslateIris.
    the caller-friendly [tramp_ppn]/[tfp] compose forms. *)
 Section UptTranslateIrisAcc.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma utlb_inv_pt_translateAddr_tramp_fetch (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pa : mword 64) (σ : mstate) :

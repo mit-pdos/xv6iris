@@ -91,7 +91,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section FiledupInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FD := KernelSyms.filedup.
 

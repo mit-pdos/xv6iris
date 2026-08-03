@@ -33,7 +33,7 @@ Notation ar_a5 := (mword_of_int 15 : mword 5).
 
 Section CodeArgraw.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 Definition ar_case_off (k : nat) : Z :=
 match k with 0%nat => 0x28 | 1%nat => 0x36 | 2%nat => 0x3c

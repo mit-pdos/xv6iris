@@ -46,7 +46,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodePrintkinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PK := KernelSyms.printkinit.
 

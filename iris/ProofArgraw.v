@@ -106,7 +106,7 @@ Module ArgrawProof (Myproc : MYPROC) : ARGRAW.
 
 Section ProofArgraw.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 

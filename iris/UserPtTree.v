@@ -140,7 +140,7 @@ Record uptd := UPTD {
 
 Section UserPtInv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the owned bytes of the mapped pages, contents EXISTENTIAL: user-mode
      safety never depends on what the pages hold.  One aggregated byte
@@ -168,7 +168,7 @@ End UserPtInv.
 
 Section UserPtTranslate.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma utlb_inv_pt_translateAddr_u (uroot tfp : mword 44)
@@ -244,7 +244,7 @@ End UserPtTranslate.
 
 Section UserPtFault.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   (* NON-CANONICAL va: faults at the canonicality test; the invariant is
@@ -541,7 +541,7 @@ Definition u_fault_flavor (acc : MemoryAccessType mem_payload)
 
 Section UserPtFaultCombined.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma utlb_inv_pt_translateAddr_u_fault (uroot tfp : mword 44)

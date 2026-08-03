@@ -271,7 +271,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section KernelvecCore.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* Congruence for [gpr_file]: two register files that agree on every
      register total-lookup hold the SAME resource (regfile is a total
@@ -1466,7 +1466,7 @@ Qed.
 Section KernelvecHandler.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
   (* [root_ppn] is introduced per trap (the contract's leading universal);

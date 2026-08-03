@@ -32,7 +32,7 @@ Import Defs.
 Module UservecProof : USERVEC.
 Section UservecAllPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the user invariant already carries the map well-formedness the exit
      switch needs *)

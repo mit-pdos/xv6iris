@@ -215,7 +215,7 @@ Local Ltac regne :=
 Section BreadDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
 
-  Definition bd_cont `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (j : nat) (γd : disk_names) (bn : bio_names)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
@@ -238,7 +238,7 @@ Section BreadDefs.
      hands the continuation on at.  [WpSconfVc.wp_next_shift] proves exactly
      this, but cannot see [wp_next]'s [K] through the named [Definition]
      (durable-notes), so it is re-proved here at the unfolded body. *)
-  Lemma bd_cont_shift `{CIDa : CpuId} `{CIDb : CpuId} (Φ : mval -> iProp Σ)
+  Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} (Φ : mval -> iProp Σ)
       (j : nat) (γd : disk_names) (bn : bio_names)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
@@ -289,7 +289,7 @@ Section BreadBlocks.
   (*  THE EPILOGUE (0xb8 .. 0xc6), reached from both arms of the tail.   *)
   (* ================================================================== *)
 
-  Local Lemma bread_epi `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_epi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (j : nat) (γd : disk_names) (bn : bio_names) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
@@ -535,7 +535,7 @@ Section BreadBlocks.
   (*  that reads b->valid, the valid test, and the disk-read arm.         *)
   (* ================================================================== *)
 
-  Local Lemma bread_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_tail `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -837,7 +837,7 @@ Section BreadBlocks.
   (*  [false] index, hence at this lemma's own hart.                      *)
   (* ================================================================== *)
 
-  Local Lemma bread_hit `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_hit `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1108,7 +1108,7 @@ Section BreadBlocks.
   (*  0x90..0xa8 hold the bcache lock, hence the literal [false] index.    *)
   (* ================================================================== *)
 
-  Local Lemma bread_recyc `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_recyc `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1436,7 +1436,7 @@ Section BreadBlocks.
   (*  needs re-anchoring.                                                 *)
   (* ================================================================== *)
 
-  Local Lemma bread_bloop `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_bloop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1712,7 +1712,7 @@ Section BreadBlocks.
   (*  real buffer.  Still inside the critical section: index [false].      *)
   (* ================================================================== *)
 
-  Local Lemma bread_miss `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_miss `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1915,7 +1915,7 @@ Section BreadBlocks.
   (*  IH -- stay at this lemma's own hart.                                 *)
   (* ================================================================== *)
 
-  Local Lemma bread_floop `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bread_floop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2265,7 +2265,7 @@ End BreadBlocks.
 
 Section ProofBread.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bread_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

@@ -516,7 +516,7 @@ Qed.
 
 Section UTrapGhost.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma utrap_ghost (s_x : mstate) (c : TrapCause) (info : option (mword 64))
       (pcx ms_v sc_v stval_v sepc_v va va' : mword 64)

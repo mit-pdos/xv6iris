@@ -24,7 +24,7 @@ Local Notation PL := KernelSyms.plicinit.
 
 Section CodePlicinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 Lemma plexec_sw40 s :
 exec (execute (C_SW (mword_of_int 10, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)))) s

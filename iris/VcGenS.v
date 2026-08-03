@@ -330,7 +330,7 @@ Qed.
 
 Section VcGenSIris.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)
   (* 4-byte (word) cells: the [word_pointsto] analogue for lw/sw.  Both   *)

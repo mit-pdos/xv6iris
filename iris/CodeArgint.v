@@ -24,7 +24,7 @@ Local Notation AI := KernelSyms.argint.
 
 Section CodeArgint.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 Lemma aidec_jal_argraw s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

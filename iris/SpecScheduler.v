@@ -48,7 +48,7 @@ Import Defs.
 
 Notation SC := KernelSyms.scheduler.
 
-Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
@@ -79,7 +79,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
       wp_scheduler_sconf_body Φ γs m av p0.

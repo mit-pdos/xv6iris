@@ -160,7 +160,7 @@ Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
 Section CodePushOff.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* [instr] facts for the push_off instructions from [kernel_text].      *)

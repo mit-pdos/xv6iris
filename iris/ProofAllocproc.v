@@ -254,21 +254,21 @@ Notation ap_x0 := (mword_of_int 0 : mword 5).
 (* [rget] is the plain map lookup at every register this function reads --
    none of them is tp.  Stated once per register, with the hart IMPLICIT, so a
    [rewrite] fires at whatever hart the leaf's [let]-bound value carries. *)
-Lemma ap_rg_ra `{CID : CpuId} (MM : regfile) : rget MM ap_ra = MM !!! Regidx ap_ra.
+Lemma ap_rg_ra `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_ra = MM !!! Regidx ap_ra.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s0 `{CID : CpuId} (MM : regfile) : rget MM ap_s0 = MM !!! Regidx ap_s0.
+Lemma ap_rg_s0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s0 = MM !!! Regidx ap_s0.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s1 `{CID : CpuId} (MM : regfile) : rget MM ap_s1 = MM !!! Regidx ap_s1.
+Lemma ap_rg_s1 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s1 = MM !!! Regidx ap_s1.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s2 `{CID : CpuId} (MM : regfile) : rget MM ap_s2 = MM !!! Regidx ap_s2.
+Lemma ap_rg_s2 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s2 = MM !!! Regidx ap_s2.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a0 `{CID : CpuId} (MM : regfile) : rget MM ap_a0 = MM !!! Regidx ap_a0.
+Lemma ap_rg_a0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a0 = MM !!! Regidx ap_a0.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a4 `{CID : CpuId} (MM : regfile) : rget MM ap_a4 = MM !!! Regidx ap_a4.
+Lemma ap_rg_a4 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a4 = MM !!! Regidx ap_a4.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a5 `{CID : CpuId} (MM : regfile) : rget MM ap_a5 = MM !!! Regidx ap_a5.
+Lemma ap_rg_a5 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a5 = MM !!! Regidx ap_a5.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_x0 `{CID : CpuId} (MM : regfile) : rget MM ap_x0 = MM !!! Regidx ap_x0.
+Lemma ap_rg_x0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_x0 = MM !!! Regidx ap_x0.
 Proof. rgne. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -294,7 +294,7 @@ Proof. rgne. reflexivity. Qed.
 (* is the ARM's job, which is exactly why the post's SIE index can be     *)
 (* per-arm.                                                               *)
 (* ===================================================================== *)
-Definition ap_tail `{!riscvGS Σ, !sieG Σ}
+Definition ap_tail `{!riscvGS Σ, !sieG Σ} `{GEN : GenId}
     (Φ : mval -> iProp Σ) (m : regfile) (spd pme ret_tgt : mword 64) (K : nat) : iProp Σ :=
   (∀ (xb : bool) (CIDt : CpuId) (Mt : regfile) (rv : mword 64),
      ⌜ Mt !!! Regidx csp_rs1 = spd /\
@@ -310,7 +310,7 @@ Definition ap_tail `{!riscvGS Σ, !sieG Σ}
          sie_cap_gpr Mf K xb pme -∗
          pc_is ret_tgt -∗
          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-     WP (LoopE CIDt : expr riscv_lang) {{ Φ }})%I.
+     WP (LoopE gen_id CIDt : expr riscv_lang) {{ Φ }})%I.
 
 Module AllocprocProof (Acquire : ACQUIRE) (Release : RELEASE) (Allocpid : ALLOCPID)
                       (AK : KALLOC) (PPT : PROC_PAGETABLE) (MS : MEMSET) : ALLOCPROC.
@@ -322,7 +322,7 @@ Section ProofAllocproc.
      variable of that name would be shadowed by them -- while the lemma's own
      anchor has to stay nameable from INSIDE those lambdas (that is what
      [wp_next (CID0 := CID0)] and [wp_next_chain] compose against). *)
-  Context `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_sconf
       (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)

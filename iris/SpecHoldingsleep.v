@@ -40,7 +40,7 @@ Import Defs.
 
 Notation HSL := KernelSyms.holdingsleep.
 
-Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) :=
@@ -74,7 +74,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID 
 
 Module Type HOLDINGSLEEP.
   Parameter wp_holdingsleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool),

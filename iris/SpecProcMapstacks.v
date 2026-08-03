@@ -38,7 +38,7 @@ Notation PMS := KernelSyms.proc_mapstacks.
    graft -- see KvmMap; the proof telescopes it), so every kalloc-null /
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
-Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
@@ -76,7 +76,7 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
       wp_proc_mapstacks_sconf_body γa Φ mm t m lvl K eb p C on b.
 End PROC_MAPSTACKS.

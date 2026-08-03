@@ -286,7 +286,7 @@ Qed.
 (* ====================================================================== *)
 Section WpCsrwGprNewC.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- csrw mstatus (0x300): the continuation receives the RAW UNBUNDLED
      cells with the EXPLICIT legalized mstatus value, universally quantified

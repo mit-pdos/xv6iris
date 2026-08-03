@@ -40,7 +40,7 @@ Module KinitProof (Freerange : FREERANGE) (Initlock : INITLOCK) : KINIT.
 
 Section ProofKinit.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KI := KernelSyms.kinit.
 

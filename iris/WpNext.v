@@ -51,7 +51,7 @@ Require Import RiscvLang.
 Section WpNext.
   Context {Σ : gFunctors}.
 
-  Definition wp_next `{CID0 : CpuId} (b : bool) (p : mword 64)
+  Definition wp_next `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64)
       (K : forall (CID : CpuId), iProp Σ) : iProp Σ :=
     (∀ CID : CpuId,
        ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID)%I.
@@ -59,14 +59,14 @@ Section WpNext.
   (* Always available, at ANY [b] and any [p]: proving the hart-generic form
      discharges the step's obligation.  (The converse needs one of the two
      pinning conditions.) *)
-  Lemma wp_next_intro `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+  Lemma wp_next_intro `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
     (∀ CID : CpuId, K CID) -∗ wp_next b p K.
   Proof. iIntros "H" (CID _). iApply "H". Qed.
 
   (* Interrupts off: the hart is the one we started with (and hence so is its
      canonical SIE ghost), so the continuation is stated with no binder --
      today's spelling exactly. *)
-  Lemma wp_next_off `{CID0 : CpuId} (p : mword 64) K :
+  Lemma wp_next_off `{GEN : GenId} `{CID0 : CpuId} (p : mword 64) K :
     wp_next false p K ⊣⊢ K CID0.
   Proof.
     iSplit.
@@ -83,13 +83,13 @@ Section WpNext.
      ProofVirtioDiskInit's 576 s, and 12 s once switched).  [iApply
      wp_next_off_intro] only has to match the goal's head, and leaves exactly
      the same continuation. *)
-  Lemma wp_next_off_intro `{CID0 : CpuId} (p : mword 64) K :
+  Lemma wp_next_off_intro `{GEN : GenId} `{CID0 : CpuId} (p : mword 64) K :
     K CID0 -∗ wp_next false p K.
   Proof. iIntros "H". by iApply wp_next_off. Qed.
 
   (* NO CURRENT PROC: the thread cannot be yielded, so the hart is pinned even
      at [b = true].  Same collapse as [wp_next_off], from the other hatch. *)
-  Lemma wp_next_idle `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+  Lemma wp_next_idle `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
     p = zero_reg -> wp_next b p K ⊣⊢ K CID0.
   Proof.
     intros Hp.
@@ -103,7 +103,7 @@ Section WpNext.
      [b]-GENERIC whole-function proof thread one implication per instruction
      and still discharge its own continuation at the end -- with no case split
      on [b] anywhere. *)
-  Lemma wp_next_trans `{CID0 : CpuId} (b : bool) (p : mword 64)
+  Lemma wp_next_trans `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64)
       (CID1 : CpuId) (CID2 : CpuId) :
     (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
     (b = false \/ p = zero_reg -> (CID2 : CPU) = (CID1 : CPU)) ->

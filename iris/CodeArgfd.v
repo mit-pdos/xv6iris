@@ -142,7 +142,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section ArgfdInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation AF := KernelSyms.argfd.
 

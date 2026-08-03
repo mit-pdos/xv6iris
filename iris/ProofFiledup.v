@@ -80,7 +80,7 @@ Module FiledupProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEDUP.
 
 Section ProofFiledup.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FD := KernelSyms.filedup.
 

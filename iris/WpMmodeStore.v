@@ -15,7 +15,7 @@ Import Defs.
 (* from WpGprStore.v *)
 Section WpStoreGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* reg_pointsto fractional instances + mmode_config_split_half /
      mmode_config_combine_half now live in InstrBytes.v (shared). *)
@@ -168,7 +168,7 @@ End WpStoreGpr.
 (* from WpGprRvcTor.v (RvcTorEngines, store leaves) *)
 Section MmodeStoreTor.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_store_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
       (imm : mword 12) (m : regfile) (vold : bv 64)

@@ -137,7 +137,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeClockintr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- prologue: 16-byte frame, saves ra/s0 (shared cdec_* decodes) ---- *)
   Lemma cii_00 : kernel_text -∗ instr (mword_of_int (CI + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).

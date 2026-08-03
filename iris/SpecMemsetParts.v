@@ -29,7 +29,7 @@ Notation MS := KernelSyms.memset.
    cells, and the c.addi4spn s0.  Ends at the c.beqz on the count (+0x08),
    which is where the two arms -- SKIP (count = 0) and SETUP (count <> 0) --
    part ways.  Hands the two full frame cells (ra0/s0) out to whichever arm. *)
-Definition wp_memset_head_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_memset_head_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8) (b : bool) (pcur : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let s0_idx : mword 5 := mword_of_int 8 in
@@ -59,7 +59,7 @@ Definition wp_memset_head_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 (* SKIP (memset+0x08, taken): the count is zero, so the c.beqz jumps straight
    to the epilogue at +0x1e -- no byte is written and no register moves. *)
-Definition wp_memset_skip_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_memset_skip_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (imm8_beqz : mword 8) (b : bool) (pcur : mword 64) :=
   let a2_idx : mword 5 := mword_of_int 12 in
   let pcE := mword_of_int KernelSyms.memset in
@@ -78,7 +78,7 @@ Definition wp_memset_skip_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 (* SETUP (memset+0x08..+0x10): the count is nonzero, so the c.beqz falls
    through; the (unsigned int) count truncation (c.slli/c.srli) and the a5
    cursor / a4 end-pointer setup run, and control reaches the loop top. *)
-Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8) (wval_add : mword 64) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -104,7 +104,7 @@ Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64) :=
   let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
   let pc4 := add_vec_int pc0 4 in
@@ -154,7 +154,7 @@ Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64) :=
   let spd := M !!! Regidx csp_rs1 in
   let sp0up := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) in
@@ -179,23 +179,23 @@ Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type MEMSET_PARTS.
   Parameter wp_memset_head_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (imm_entry : mword 6) (nzimm_s0 : mword 8) (b : bool) (pcur : mword 64),
       wp_memset_head_sconf_body Φ m0 n imm_entry nzimm_s0 b pcur.
   Parameter wp_memset_skip_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (imm8_beqz : mword 8) (b : bool) (pcur : mword 64),
       wp_memset_skip_sconf_body Φ M n imm8_beqz b pcur.
   Parameter wp_memset_setup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8) (wval_add : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_setup_sconf_body Φ M n shamt_l shamt_r imm8_beqz wval_add b pcur.
   Parameter wp_memset_loop_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64),
       wp_memset_loop_sconf_body Φ N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Parameter wp_memset_suffix_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_suffix_sconf_body Φ M n ra0e s00e b pcur.
 End MEMSET_PARTS.

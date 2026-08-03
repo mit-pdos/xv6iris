@@ -79,7 +79,7 @@ Notation PW := KernelSyms.pipewrite.
    killed 14, myproc/acquire/release 10. *)
 Definition pipewrite_stack : nat := 64%nat.
 
-Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
@@ -135,7 +135,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type PIPEWRITE.
   Parameter wp_pipewrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)

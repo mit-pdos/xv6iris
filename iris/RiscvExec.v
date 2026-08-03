@@ -148,7 +148,7 @@ Qed.
 
 Section WPExec.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* The single per-hart framing point: [wp_lift_step] hands us the GLOBAL
      [state_interp] (all harts' register bridges + shared memory); we focus the
@@ -175,16 +175,16 @@ Section WPExec.
     pose proof (exec_run_det _ _ _ _ Hexect) as [Hrunt Huniqt].
     iModIntro. iSplitR.
     { iPureIntro.
-      exists [], (LoopE cpu_id),
+      exists [], (LoopE gen_id cpu_id),
              (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev)), [].
       left.
-      exists cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
+      exists gen_id, cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
       exists false, tt, σ'. split; [exact Hrunf|done]. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(cpu2 & Hcpu2 & -> & _ & -> & tick2 & u2 & σ2' & Hrun2 & ->)
-                      |[(Hcontra & _) | [(Hcontra & _) | (Hcontra & _)]]];
+    destruct Hstep as [(gen2 & cpu2 & Hcpu2 & -> & _ & -> & tick2 & u2 & σ2' & Hrun2 & ->)
+                      |[(gen2 & Hcontra & _) | [(gen2 & Hcontra & _) | (gen2 & Hcontra & _)]]];
       [| discriminate Hcontra | discriminate Hcontra | discriminate Hcontra ].
-    injection Hcpu2 as <-.
+    injection Hcpu2 as <- <-.
     iSpecialize ("Hk" $! tick2).
     destruct tick2;
       [ destruct (Huniqt _ _ Hrun2) as [_ ->]
@@ -198,6 +198,7 @@ End WPExec.
 
 Section WPDev.
   Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
 
   (* The device-thread analogues of [wp_exec_step]: one step of each of the
      THREE device execution contexts.  Every device relation is total (each
@@ -228,15 +229,16 @@ Section WPDev.
     iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right; left.
+    { iPureIntro. do 4 eexists. right; left. eexists.
       split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. split; [reflexivity|].
       eexists. split; [apply UartStepIdle | reflexivity]. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(cpu2 & Hcontra & _)
-                      |[(_ & -> & _ & -> & d' & Hdstep & ->)
-                       |[(Hcontra & _) | (Hcontra & _)]]];
+    destruct Hstep as [(gen2 & cpu2 & Hcontra & _)
+                      |[(gen2 & Hue & -> & _ & -> & d' & Hdstep & ->)
+                       |[(gen2 & Hcontra & _) | (gen2 & Hcontra & _)]]];
       [ discriminate Hcontra | | discriminate Hcontra | discriminate Hcontra ].
+    injection Hue as <-.
     iMod ("Hk" $! d' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
     iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.
@@ -259,16 +261,17 @@ Section WPDev.
     iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right; right; left.
+    { iPureIntro. do 4 eexists. right; right; left. eexists.
       split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. split; [reflexivity|].
       do 2 eexists. split; [apply DiskStepIdle | reflexivity]. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(cpu2 & Hcontra & _)
-                      |[(Hcontra & _)
-                       |[(_ & -> & _ & -> & d' & m' & Hdstep & ->)
-                        |(Hcontra & _)]]];
+    destruct Hstep as [(gen2 & cpu2 & Hcontra & _)
+                      |[(gen2 & Hcontra & _)
+                       |[(gen2 & Hde & -> & _ & -> & d' & m' & Hdstep & ->)
+                        |(gen2 & Hcontra & _)]]];
       [ discriminate Hcontra | discriminate Hcontra | | discriminate Hcontra ].
+    injection Hde as <-.
     iMod ("Hk" $! d' m' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
     iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.
@@ -289,16 +292,17 @@ Section WPDev.
     iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right; right; right.
+    { iPureIntro. do 4 eexists. right; right; right. eexists.
       split; [reflexivity|]. split; [reflexivity|].
       split; [reflexivity|]. split; [reflexivity|].
       eexists. split; [apply (PlicStepWire _ _ 0%fin) | reflexivity]. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(cpu2 & Hcontra & _)
-                      |[(Hcontra & _)
-                       |[(Hcontra & _)
-                        |(_ & -> & _ & -> & gr' & Hdstep & ->)]]];
+    destruct Hstep as [(gen2 & cpu2 & Hcontra & _)
+                      |[(gen2 & Hcontra & _)
+                       |[(gen2 & Hcontra & _)
+                        |(gen2 & Hpe & -> & _ & -> & gr' & Hdstep & ->)]]];
       [ discriminate Hcontra | discriminate Hcontra | discriminate Hcontra | ].
+    injection Hpe as <-.
     iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
     iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
   Qed.

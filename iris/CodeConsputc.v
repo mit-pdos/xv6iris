@@ -87,7 +87,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeConsputc.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation CP := KernelSyms.consputc.
 

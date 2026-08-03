@@ -660,7 +660,7 @@ Qed.
 
 Section PtWriteIris.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* update an owned 8-byte slot to a new word, in step with the model's
      [write_bytes] memory update *)

@@ -321,7 +321,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section PipeallocInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PA := KernelSyms.pipealloc.
 

@@ -1027,7 +1027,7 @@ Local Lemma exec_mem_write_ea_1 (addr : mword 64) s :
 
 Section WpSmodePtMemLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   Lemma wp_clw_s_r (R : s_regime) (Φ : mval -> iProp Σ)

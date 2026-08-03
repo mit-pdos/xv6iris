@@ -212,7 +212,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section GrowprocInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation GP := KernelSyms.growproc.
 

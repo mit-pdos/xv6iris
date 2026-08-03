@@ -49,7 +49,7 @@ Local Open Scope Z_scope.
 Section CpuOwn.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool) : iProp Σ :=
@@ -232,7 +232,7 @@ End CpuOwn.
 (* the term), at [b = false] by [wp_next]'s conditional equality.  Chain   *)
 (* the per-step equalities with [wp_next_chain] and apply this once.       *)
 (* ===================================================================== *)
-Lemma cpu_own_transport `{!riscvGS Σ} `{!sieG Σ}
+Lemma cpu_own_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (b : bool) :
   (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->

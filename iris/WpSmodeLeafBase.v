@@ -25,7 +25,7 @@ Local Open Scope Z_scope.
    former WpSmodeToBeDeleted.v so callers use the specific per-instruction lemmas. *)
 Section WpSmodeGprEngine.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 

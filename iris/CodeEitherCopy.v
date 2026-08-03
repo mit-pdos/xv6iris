@@ -141,7 +141,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section EitherCopyInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ECO := KernelSyms.either_copyout.
   Notation ECI := KernelSyms.either_copyin.

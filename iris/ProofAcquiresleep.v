@@ -42,7 +42,7 @@
    USE costs a [wp_next_chain].  The three straight-line stretches stay their
    own lemmas -- [asl_exit_body] (+0x28..ret), [asl_post_sleep_body]
    (+0x24..the branch) and [asl_loop_body] (+0x1c..the sleep call) -- each with
-   its OWN ambient [`{CID : CpuId}] plus the anchor [CID0] and the one chained
+   its OWN ambient [`{GEN : GenId} `{CID : CpuId}] plus the anchor [CID0] and the one chained
    equality that links them.  The anchor is taken at type [CPU] rather than
    [CpuId] on purpose: it must NOT be an instance candidate, or it would
    compete with the lemma's ambient hart.
@@ -158,7 +158,7 @@ Section AslProps.
      section [Context {CID : CpuId}] here, so the [fun CID => ...] binder is
      the only hart in scope inside the body and every resource resolves at
      it automatically. *)
-  Definition asl_exit (CID0 : CPU)
+  Definition asl_exit `{GEN : GenId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
@@ -182,7 +182,7 @@ Section AslProps.
       pc_is (mword_of_int (ASL + 0x28)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
-  Definition asl_loop (CID0 : CPU)
+  Definition asl_loop `{GEN : GenId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
@@ -220,7 +220,7 @@ Local Ltac reg_neq :=
 
 (* ===================================================================== *)
 (*  THE STRAIGHT-LINE STRETCHES.  Each has its OWN ambient hart binder     *)
-(*  [`{CID : CpuId}] plus the function's entry anchor [CID0 : CPU] and the *)
+(*  [`{GEN : GenId} `{CID : CpuId}] plus the function's entry anchor [CID0 : CPU] and the *)
 (*  chained equality that links the two, which is what lets it use the     *)
 (*  [wp_next]-shaped [asl_loop] / [asl_exit] / [Hcont] at its own hart.    *)
 (* ===================================================================== *)
@@ -228,7 +228,7 @@ Section AslBodies.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
 
   (* ---- the exit path: +0x28 (locked:=1) .. +0x44 (c.ret) ---- *)
-  Lemma asl_exit_body `{CID : CpuId} (CID0 : CPU)
+  Lemma asl_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
@@ -566,7 +566,7 @@ Section AslBodies.
      two instructions are interrupts-off and the hart does not move again
      inside this lemma.  Its two arms are the two anchored propositions: the
      exit path, or the loop's own Löb IH. ---- *)
-  Lemma asl_post_sleep_body `{CID : CpuId} (CID0 : CPU)
+  Lemma asl_post_sleep_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
@@ -662,7 +662,7 @@ Section AslBodies.
   Qed.
 
   (* ---- one loop iteration: +0x1c .. the sleep() call, which parks ---- *)
-  Lemma asl_loop_body `{CID : CpuId} (CID0 : CPU)
+  Lemma asl_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
       (γpl γl γsl : gname) (s : string) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
@@ -777,7 +777,7 @@ End AslBodies.
 
 Section ProofAcquiresleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_acquiresleep_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat)

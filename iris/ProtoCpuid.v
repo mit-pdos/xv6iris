@@ -39,7 +39,8 @@ Notation Rzero := (mword_of_int 0 : mword 5).
 Section Proto.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  (* NOTE: no [Context `{CID : CpuId}].  The hart is a per-statement binder --
+  Context `{GEN : GenId}.
+  (* NOTE: no [Context `{GEN : GenId} `{CID : CpuId}].  The hart is a per-statement binder --
      which is what lets a lemma in THIS file be applied at a migrated hart. *)
 
   (* The current proc.  A THREAD invariant, not a hart one: it is the same on

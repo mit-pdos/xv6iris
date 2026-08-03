@@ -69,7 +69,7 @@ Section SpecFilealloc.
 
 End SpecFilealloc.
 
-Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
@@ -98,7 +98,7 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
       wp_filealloc_sconf_body Φ γl γf m n eb p C K b.

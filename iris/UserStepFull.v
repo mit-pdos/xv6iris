@@ -32,7 +32,7 @@ Import Defs.
 
 Section UserStepFull.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

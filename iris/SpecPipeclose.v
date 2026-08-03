@@ -48,7 +48,7 @@ Import Defs.
 
 Notation PC := KernelSyms.pipeclose.
 
-Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γs : list gname)
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
@@ -93,7 +93,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type PIPECLOSE.
   Parameter wp_pipeclose_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)

@@ -270,7 +270,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section AllocprocInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation AP := KernelSyms.allocproc.
 

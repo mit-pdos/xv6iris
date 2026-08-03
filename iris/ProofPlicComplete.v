@@ -76,7 +76,7 @@ Module PlicCompleteProof (Cpuid : CPUID) : PLIC_COMPLETE.
 Section ProofPlicComplete.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PC := KernelSyms.plic_complete.
 

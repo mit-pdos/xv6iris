@@ -43,7 +43,7 @@ Notation MP := KernelSyms.myproc.
    (the resource is re-established at the new hart by push_off/mycpu/pop_off
    run there), so nothing here needs [b = false].  Contrast [cpuid()]/
    [mycpu()] itself, whose returned hart id a migration WOULD invalidate. *)
-Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.myproc in
@@ -68,7 +68,7 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type MYPROC.
   Parameter wp_myproc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
       wp_myproc_sconf_body Φ m av n eb p C b.

@@ -116,7 +116,7 @@ Section CodeUartPutcSync.
   Context `{!sieG Σ}.
   (* the device leaves open [dev_inv], whose ghosts need this *)
   Context `{!uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* The three [instr]-builder templates, copied verbatim from CodeMycpu.   *)
@@ -371,7 +371,7 @@ End CodeUartPutcSync.
 Section CodeUartPutcSyncFrame.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [instr]-builder templates, copied verbatim from CodeUartPutcSync.v. *)
   (* --- [instr] facts for the three structural RVC instructions --- *)

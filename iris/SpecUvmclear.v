@@ -71,7 +71,7 @@ Import Defs.
 
 Notation UCL := KernelSyms.uvmclear.
 
-Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
@@ -102,7 +102,7 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 
 Module Type UVMCLEAR.
   Parameter wp_uvmclear_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64),
       wp_uvmclear_sconf_body Φ mm P w K b p.

@@ -27,7 +27,7 @@ Notation WK := KernelSyms.wakeup.
    threads the [cur_proc] resource so it can use [wp_myproc_sconf] directly
    (SpecWakeup.v).  There is no myproc axiom. *)
 
-Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -64,7 +64,7 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
-Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64) :=
   let spF := M !!! Regidx csp_rs1 in
   let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) in
@@ -100,11 +100,11 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{C
 
 Module Type WAKEUPPARTS.
   Parameter wp_wakeup_prologue_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64),
       wp_wakeup_prologue_sconf_body Φ m K b p.
   Parameter wp_wakeup_epilogue_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64),
       wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
 End WAKEUPPARTS.

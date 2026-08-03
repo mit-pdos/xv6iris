@@ -29,7 +29,7 @@ Import Defs.
 
 Section ProcPagetableInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation PPT off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.proc_pagetable + off) : mword 64) rvc ast).

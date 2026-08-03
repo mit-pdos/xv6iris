@@ -48,7 +48,7 @@ Import Defs.
 
 Notation SW := KernelSyms.swtch.
 
-Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
          mword 64 -d> mword 64 -d> iPropO Σ)
@@ -97,12 +97,12 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
       (∃ (A' : ctx_adm) (cret : mword 64),
          ▷ valid_context Φ P A' cret p ∗
          P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
-      WP (LoopE h : expr riscv_lang) {{ Φ }} ) -∗
+      WP (LoopE gen_id h : expr riscv_lang) {{ Φ }} ) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)

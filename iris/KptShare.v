@@ -53,7 +53,7 @@ Import Defs.
 
 Section KptShare.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* §1 The shared invariant.                                            *)
@@ -205,7 +205,7 @@ End KptShare.
 
 Section KptShareTranslate.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   Lemma tlb_res_pt_translateAddr_at (root_ppn : mword 44) (va pa : mword 64)

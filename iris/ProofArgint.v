@@ -68,7 +68,7 @@ Module ArgintProof (Argraw : ARGRAW) : ARGINT.
 
 Section ProofArgint.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 

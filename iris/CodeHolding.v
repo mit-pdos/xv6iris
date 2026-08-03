@@ -166,7 +166,7 @@ Qed.
 
 Section CodeHolding.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* c.bnez rs NOT taken (rs = 0): fall through to pc+2.  Mirrors          *)

@@ -47,7 +47,7 @@ Proof. reflexivity. Qed.
 
 Section TimerCap.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* S-mode may read [time] and write [stimecmp]: persistent, duplicable. *)
   Definition sstc_enabled : iProp Σ :=

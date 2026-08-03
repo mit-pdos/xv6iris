@@ -86,7 +86,7 @@ Definition K_main_secondary : nat := 40%nat.
 Section SpecMainSecondary.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* THE DEPOSIT: the canonical instantiation of SpecMain's payload [P].  *)
@@ -162,7 +162,7 @@ End SpecMainSecondary.
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)

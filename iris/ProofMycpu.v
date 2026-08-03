@@ -49,7 +49,7 @@ Module MycpuProof : MYCPU.
 
 Section ProofMycpu.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_mycpu_sconf (Φ : mval -> iProp Σ)
       (m0 : regfile) (n : nat) (p : mword 64)

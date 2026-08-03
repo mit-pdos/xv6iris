@@ -60,7 +60,7 @@ Import Defs.
 
 Notation SD := KernelSyms.sched.
 
-Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
@@ -122,7 +122,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 
 Module Type SCHED.
   Parameter wp_sched_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),

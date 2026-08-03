@@ -92,7 +92,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 
 Section CodeSleep.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- prologue: 48-byte frame, saves ra/s0/s1/s2/s3 (freerange decodes) ---- *)
   Lemma sli_00 : kernel_text -∗ instr (mword_of_int (SL + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 61 : mword 6), sp, sp, ADDI)).

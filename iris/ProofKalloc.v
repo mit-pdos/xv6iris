@@ -45,7 +45,7 @@ Module KallocProof (Acquire : ACQUIRE) (MemsetPage : MEMSETPAGE) (Release : RELE
 
 Section ProofKalloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation AK := KernelSyms.kalloc.
 

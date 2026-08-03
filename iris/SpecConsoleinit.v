@@ -75,7 +75,7 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    [wp_next] wrapper, the same shape as SpecCpuid.v / SpecTrapinithart.v /
    SpecPlicClaim.v. *)
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
-    `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
@@ -136,7 +136,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)

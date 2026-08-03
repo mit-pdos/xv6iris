@@ -51,7 +51,7 @@ Import Defs.
 
 Section WpSmodePtGprEngine.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
   (* The generic RVC (2-byte) gpr-write engine over [tlb_inv_pt].         *)
@@ -158,7 +158,7 @@ End WpSmodePtGprEngine.
 (* ===================================================================== *)
 Section WpSmodePtItype.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -371,7 +371,7 @@ End ExecLoadGSwalkPt.
 (* ===================================================================== *)
 Section WpSmodePtLoad.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_cld_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
@@ -803,7 +803,7 @@ End ExecStoreGSwalkPt.
 (* ===================================================================== *)
 Section WpSmodePtStore.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_csd_s_r (R : s_regime) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
@@ -1008,7 +1008,7 @@ End WpSmodePtStore.
 (* the PC-reading 4-byte gpr-write engine (auipc), over [tlb_inv_pt] *)
 Section WpSmodePtGprEnginePc.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 End WpSmodePtGprEnginePc.
@@ -1017,7 +1017,7 @@ End WpSmodePtGprEnginePc.
    c.addi16sp, jal rd) over [tlb_inv_pt] via [wp_instr_s_tlbinv_pt]. *)
 Section WpSmodePtGprGamma.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_rvc_gpr_write_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rsa rsb : mword 5)

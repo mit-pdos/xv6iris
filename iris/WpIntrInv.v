@@ -70,7 +70,7 @@ Import Defs.
 Section WpIntrInv.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
   (* §6 The dispatch outcome read straight off σ.  mip lives in            *)

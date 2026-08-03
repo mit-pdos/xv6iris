@@ -29,7 +29,7 @@ Import Defs.
 
 Section KvminithartInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation KVI off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.kvminithart + off) : mword 64) rvc ast).

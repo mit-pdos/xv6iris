@@ -54,7 +54,7 @@ End ForwardAUIPC.
 
 Section StepAUIPC.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* ---------------------------------------------------------------------- *)

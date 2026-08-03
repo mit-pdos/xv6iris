@@ -232,7 +232,7 @@ Qed.
 
 Section UserMemAccessGeneric.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
@@ -347,7 +347,7 @@ End UserMemAccessGeneric.
 (* the width instances -- the names the memory arms consume *)
 Section UserMemAccessInstances.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -1348,7 +1348,7 @@ Qed.
 
 Section UserMemAccessBundle.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -1368,7 +1368,7 @@ End UserMemAccessBundle.
 
 Section UserMemAccessBundleSC.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 
@@ -1392,7 +1392,7 @@ End UserMemAccessBundleSC.
 
 Section SplitLoadBundle.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)).
   Context (Huintb : uint (to_bits 64 bytes) = bytes).
@@ -1437,7 +1437,7 @@ End SplitLoadBundle.
 
 Section SplitStoreBundle.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (bytes : Z).
   Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)).
   Context (Huintb : uint (to_bits 64 bytes) = bytes).

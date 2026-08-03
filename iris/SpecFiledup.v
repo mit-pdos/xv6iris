@@ -72,7 +72,7 @@ Notation FD := KernelSyms.filedup.
 
 (* ------------------------------------------------------------------ *)
 
-Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl γf : gname)
     (k : nat) (q : Qp) (Cf : fcontent)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
@@ -107,7 +107,7 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, 
 
 Module Type FILEDUP.
   Parameter wp_filedup_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),

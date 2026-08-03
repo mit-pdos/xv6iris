@@ -21,7 +21,7 @@ Import Defs.
 
 Section TrampFetchPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Variable INV : iProp Σ.
   Variable Habs : forall (va pa : mword 64) (σ : mstate),
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -555,7 +555,7 @@ End TrampFetchPt.
 
 Section TrampFetchInst.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the KERNEL instance (stage C): the trampoline is an ordinary M entry
      [tramp_vpn ↦ (tramp_ppn, KP_rx)], so the fetch is absorbed by the

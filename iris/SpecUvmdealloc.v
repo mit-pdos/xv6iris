@@ -51,7 +51,7 @@ Import Defs.
 
 Notation UD := KernelSyms.uvmdealloc.
 
-Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmdealloc in
@@ -89,7 +89,7 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
 
 Module Type UVMDEALLOC.
   Parameter wp_uvmdealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
       wp_uvmdealloc_sconf_body γa Φ mm P K eb p C b.

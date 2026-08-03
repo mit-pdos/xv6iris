@@ -65,7 +65,7 @@ Import Defs.
 
 Notation CPO := KernelSyms.copyout.
 
-Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
@@ -111,7 +111,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 
 Module Type COPYOUT.
   Parameter wp_copyout_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool),

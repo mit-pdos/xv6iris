@@ -120,7 +120,7 @@ Qed.
 (* ====================================================================== *)
 Section WpMulGpr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* [instr]/[mmode_config]-formulated register-generic MUL WP, built on

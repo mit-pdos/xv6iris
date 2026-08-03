@@ -74,7 +74,7 @@ Module ClockintrProof (Cpuid : CPUID) (Acquire : ACQUIRE) (Release : RELEASE)
 
 Section ProofClockintr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).

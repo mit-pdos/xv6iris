@@ -120,7 +120,7 @@ Proof. unfold intr_ms_facts, sconf_ms_facts. tauto. Qed.
 Section IntrDefs.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
   (* §2 The SIE ghost choreography: 1/2 (live-bit tie) + 1/4 (kernel-code *)
@@ -136,7 +136,7 @@ Section IntrDefs.
      ghost argument at all, and what lets a step's continuation (WpNext.v)
      rebind the ghost by rebinding [CID] alone.
 
-     (Written without an explicit [`{CID : CpuId}] binder because the section
+     (Written without an explicit [`{GEN : GenId} `{CID : CpuId}] binder because the section
      already fixes one and Rocq refuses to rebind a section variable's name;
      the section closes it over exactly [riscvGS] and [CpuId] regardless.) *)
   Definition sie_gname : gname := sie_name cpu_id.

@@ -314,40 +314,51 @@ Inductive plic_step (d : dev_state) (gr : CPU -> regstate)
 
 Class CpuId := cpu_id : CPU.
 
+(* The GENERATION a thread belongs to (claude-notes/design/crash.md).
+   Ambient, like [CpuId], and deliberately SEPARATE from it: parking /
+   [wp_next] contracts quantify their continuations over the RESUMING
+   CpuId, and that quantifier must range over harts of the SAME
+   generation -- a parked proc's payload is era resources and dies with
+   its generation.  Until the power thread lands, the semantics is
+   GENERATION-BLIND: no [prim_step] arm reads or constrains the index
+   (every arm preserves it), so a WP is provable at any fixed ambient
+   generation and the tree is exactly as strong as before. *)
+Class GenId := gen_id : nat.
+
 Inductive mexpr :=
-  | LoopE (cpu : CPU)
-  | UartLoopE
-  | DiskLoopE
-  | PlicLoopE.
+  | LoopE (gen : nat) (cpu : CPU)
+  | UartLoopE (gen : nat)
+  | DiskLoopE (gen : nat)
+  | PlicLoopE (gen : nat).
 Definition mval := Empty_set.
 Definition mobs := Empty_set.
 Definition of_val (v : mval) : mexpr := match v with end.
 Definition to_val (_ : mexpr) : option mval := None.
 
-Notation Loop := (LoopE cpu_id).
-Notation UartLoop := UartLoopE.
-Notation DiskLoop := DiskLoopE.
-Notation PlicLoop := PlicLoopE.
+Notation Loop := (LoopE gen_id cpu_id).
+Notation UartLoop := (UartLoopE gen_id).
+Notation DiskLoop := (DiskLoopE gen_id).
+Notation PlicLoop := (PlicLoopE gen_id).
 
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
-  (exists cpu, e = LoopE cpu /\ e' = LoopE cpu /\ κ = [] /\ efs = [] /\
+  (exists gen cpu, e = LoopE gen cpu /\ e' = LoopE gen cpu /\ κ = [] /\ efs = [] /\
     exists (tick : bool) (u : unit) (s' : mstate),
       run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
       g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev))
   \/
-  (e = UartLoopE /\ e' = UartLoopE /\ κ = [] /\ efs = [] /\
+  (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
     exists d',
       uart_step g.(gdev) d' /\
       g' = GState g.(gregs) g.(gmem) d')
   \/
-  (e = DiskLoopE /\ e' = DiskLoopE /\ κ = [] /\ efs = [] /\
+  (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
     exists d' m',
       disk_step g.(gdev) g.(gmem) d' m' /\
       g' = GState g.(gregs) m' d')
   \/
-  (e = PlicLoopE /\ e' = PlicLoopE /\ κ = [] /\ efs = [] /\
+  (exists gen, e = PlicLoopE gen /\ e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
     exists gr',
       plic_step g.(gdev) g.(gregs) gr' /\
       g' = GState gr' g.(gmem) g.(gdev)).
@@ -358,7 +369,8 @@ Proof.
   - intros [].
   - intros e v Hv. discriminate Hv.
   - intros e s κ e' s' efs
-      [(cpu & -> & _) | [(-> & _) | [(-> & _) | (-> & _)]]]; reflexivity.
+      [(gen & cpu & -> & _) | [(gen & -> & _) | [(gen & -> & _) | (gen & -> & _)]]];
+      reflexivity.
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.

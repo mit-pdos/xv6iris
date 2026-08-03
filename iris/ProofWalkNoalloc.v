@@ -136,7 +136,7 @@ Module WalkNoallocProof : WALK_NOALLOC.
 
 Section ProofWalkNoalloc.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation WK := KernelSyms.walk.
 

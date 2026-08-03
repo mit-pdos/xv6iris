@@ -281,7 +281,7 @@ Qed.
 
 Section WpUldPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ld rd, imm(a0) inside userret: instruction on the TRAMPOLINE page,
      data through the user table's TRAPFRAME leaf.  All the walk-PTE cell
@@ -762,7 +762,7 @@ End ExecSRETU.
 
 Section WpUaluUsretPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ualu_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
       (off : Z) (is_rvc : bool) (ast : instruction)

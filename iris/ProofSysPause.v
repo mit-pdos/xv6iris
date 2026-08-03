@@ -76,7 +76,7 @@
    function's entry hart [CID0], at the generic index [true]: forwarding one
    is the identity and only a USE costs a [wp_next_chain].  Each straight-line
    stretch between two joins is its OWN lemma with its OWN ambient
-   [`{CID : CpuId}] plus the anchor [CID0 : CPU] and the chained equality that
+   [`{GEN : GenId} `{CID : CpuId}] plus the anchor [CID0 : CPU] and the chained equality that
    links the two -- [CID0] is taken at type [CPU], not [CpuId], on purpose: it
    must not be an instance candidate competing with the ambient hart.
 
@@ -288,7 +288,7 @@ Section SpProps.
     (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈ w)%I.
 
   (* +0x7e -- the shared epilogue.  [r] is the value already parked in a0. *)
-  Definition sp_tail (CID0 : CPU) (Φ : mval -> iProp Σ) (j : nat)
+  Definition sp_tail `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -307,7 +307,7 @@ Section SpProps.
         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* +0x70 -- release(&tickslock); return 0. *)
-  Definition sp_exit0 (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
+  Definition sp_exit0 `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -327,7 +327,7 @@ Section SpProps.
 
   (* +0x8c -- release(&tickslock); return -1.  Only the loop gets here, so the
      register shape is the loop's and slots 3/4/5 hold the spilled s1/s2/s3. *)
-  Definition sp_exitk (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
+  Definition sp_exitk `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj tk : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -350,7 +350,7 @@ Section SpProps.
         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* +0x4a -- the wait loop's head. *)
-  Definition sp_loop (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
+  Definition sp_loop `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj tk : mword 64) (nv : mword 32) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -377,7 +377,7 @@ Section SpProps.
   (* +0x1a -- a0 := &tickslock, acquire, the [n == 0] dispatch, the loop set-up.
      Quantified over the [n] cell's value: BOTH the [blt]'s fall-through and
      the [n < 0] fixup's back edge land here. *)
-  Definition sp_acq (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
+  Definition sp_acq `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -411,7 +411,7 @@ Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 
 (* ===================================================================== *)
 (*  THE STRAIGHT-LINE STRETCHES.  Each has its OWN ambient hart binder     *)
-(*  [`{CID : CpuId}] plus the function's entry anchor [CID0 : CPU] and the *)
+(*  [`{GEN : GenId} `{CID : CpuId}] plus the function's entry anchor [CID0 : CPU] and the *)
 (*  chained equality that links the two, which is what lets it use the     *)
 (*  [wp_next]-shaped joins at its own hart.                                *)
 (* ===================================================================== *)
@@ -419,7 +419,7 @@ Section SpBodies.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
 
   (* ---- the shared epilogue: +0x7e .. +0x84 (c.ret) ---- *)
-  Lemma sp_tail_body `{CID : CpuId} (CID0 : CPU)
+  Lemma sp_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (j : nat)
       (m M : regfile) (r : mword 64) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj : mword 64) (tfp : mword 44) (ws : list (mword 64)) (dqt : dfrac) :
@@ -581,7 +581,7 @@ Section SpBodies.
   Qed.
 
   (* ---- the normal (return 0) exit: +0x70 .. the join at +0x7e ---- *)
-  Lemma sp_exit0_body `{CID : CpuId} (CID0 : CPU)
+  Lemma sp_exit0_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m N : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj : mword 64) :
@@ -693,7 +693,7 @@ Section SpBodies.
   Qed.
 
   (* ---- the killed (-1) exit: +0x8c .. the join at +0x7e ---- *)
-  Lemma sp_exitk_body `{CID : CpuId} (CID0 : CPU)
+  Lemma sp_exitk_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m N : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj tk : mword 64) :
@@ -899,7 +899,7 @@ Section SpBodies.
      two arms it dispatches to (the back edge at +0x4a, or the +0x6a reloads
      into the 0 exit).  This runs at the hart sleep() resumed on; the
      tickslock is HELD, so nothing inside moves the hart again. ---- *)
-  Lemma sp_post_sleep_body `{CID : CpuId} (CID0 : CPU)
+  Lemma sp_post_sleep_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
       (m M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj tk : mword 64) (nv : mword 32) :
@@ -1108,7 +1108,7 @@ Section SpBodies.
   Qed.
 
   (* ---- one loop iteration: +0x4a .. the sleep() call, which parks ---- *)
-  Lemma sp_loop_body `{CID : CpuId} (CID0 : CPU)
+  Lemma sp_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (γt γl : gname) (j : nat)
       (m M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj tk : mword 64) (nv : mword 32) :
@@ -1316,7 +1316,7 @@ Section SpBodies.
 
   (* ---- +0x1a: a0 := &tickslock, acquire, the [n == 0] dispatch, the loop
      set-up, and the wait loop's own Löb ---- *)
-  Lemma sp_acq_body `{CID : CpuId} (CID0 : CPU)
+  Lemma sp_acq_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (γt γl : gname) (j : nat)
       (m M : regfile) (nv : mword 32) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 pj : mword 64) :
@@ -1666,7 +1666,7 @@ End SpBodies.
 
 Section ProofSysPause.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sys_pause_sconf (Φ : mval -> iProp Σ) (γs : list gname)
       (j : nat) (γl : gname) (γt : gname) (m : regfile) (av : nat) (eb : bool)

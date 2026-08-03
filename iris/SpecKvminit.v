@@ -33,7 +33,7 @@ Notation KVMI := KernelSyms.kvminit.
    construction whose post feeds the boot switch [wp_kvminithart] through
    [kvm_bridge].
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
-Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
@@ -64,7 +64,7 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 
 Module Type KVMINIT.
   Parameter wp_kvminit_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool),
       wp_kvminit_sconf_body γa Φ mm lvl K eb p C on kpt0 b.
 End KVMINIT.

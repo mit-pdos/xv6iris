@@ -60,7 +60,7 @@ Notation PR := KernelSyms.piperead.
    wakeup 18, killed 14, myproc/acquire/release 10. *)
 Definition piperead_stack : nat := 62%nat.
 
-Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
@@ -116,7 +116,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 
 Module Type PIPEREAD.
   Parameter wp_piperead_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)

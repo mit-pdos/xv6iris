@@ -31,7 +31,7 @@ Import Defs.
 
 Section UserCompute.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* Peel the [rd] fragment out of an existential gpr file and hand back an

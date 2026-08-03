@@ -40,7 +40,7 @@ Import Defs.
 Definition K_free_desc : nat := 20%nat.
 
 Definition wp_free_desc_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
@@ -84,7 +84,7 @@ Definition wp_free_desc_sconf_body
 
 Module Type FREEDESC.
   Parameter wp_free_desc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)

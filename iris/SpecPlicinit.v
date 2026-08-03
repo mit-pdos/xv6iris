@@ -55,7 +55,7 @@ Notation PLICINIT := KernelSyms.plicinit.
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
-Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
@@ -77,7 +77,7 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (b : bool) (p : mword 64),
       wp_plicinit_sconf_body Φ m0 n b p.
 End PLICINIT.

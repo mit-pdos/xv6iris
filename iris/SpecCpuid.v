@@ -38,7 +38,7 @@ Notation CPUID := KernelSyms.cpuid.
 Definition cpuid_ret (tp : mword 64) : mword 64 :=
   sign_extend' 64 (subrange_vec_dec tp 31 0 : mword 32).
 
-Lemma cpuid_ret_cid `{CID : CpuId} : cpuid_ret cid_word = cid_word.
+Lemma cpuid_ret_cid `{GEN : GenId} `{CID : CpuId} : cpuid_ret cid_word = cid_word.
 Proof.
   destruct tp_ok_cid as [_ H].
   rewrite uint_unsigned in H.
@@ -55,7 +55,7 @@ Qed.
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -90,7 +90,7 @@ Definition wp_cpuid_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -116,11 +116,11 @@ Definition wp_call_cpuid_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type CPUID.
   Parameter wp_cpuid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
       wp_cpuid_sconf_body Φ m0 n p.
   Parameter wp_call_cpuid_sconf_cs :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
       wp_call_cpuid_sconf_cs_body Φ P jimm m n p.
 End CPUID.

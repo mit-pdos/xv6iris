@@ -242,7 +242,7 @@ Import Defs.
 Section WpSmodePtUart.
 Context `{!riscvGS Σ, !sieG Σ}.
 Context `{!uartGhostG Σ}.
-Context `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId}.
 Existing Instance riscv_memGS.
 
 

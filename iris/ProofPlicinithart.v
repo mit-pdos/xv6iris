@@ -89,7 +89,7 @@ Module PlicinithartProof (Cpuid : CPUID) : PLICINITHART.
 Section ProofPlicinithart.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PH := KernelSyms.plicinithart.
 

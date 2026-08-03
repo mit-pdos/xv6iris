@@ -492,7 +492,7 @@ Section VdrwfP6.
   (* s1 = desc[i].flags and s2 = desc[i].next (both callee-saved, so they   *)
   (* survive the call), and descriptor [i] back in the free pool.           *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrwf_iter `{CID : CpuId} (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ) (γs : list gname)
       (pd : SailStdpp.Values.mword 64) (i : nat) (fr : nat -> bool)
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
@@ -711,7 +711,7 @@ Section VdrwfP6.
   (* interrupts (level 0, base [eb = true]) and the epilogue below it is    *)
   (* interruptible.                                                        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrw_p6_seam `{CID : CpuId} (γk : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} (γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
@@ -1723,7 +1723,7 @@ End VdrwfP6.
 
 Section ProofVirtioDiskRwF.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Typeclasses Opaque cpu_own.
 

@@ -247,7 +247,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section UvmunmapInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UU := KernelSyms.uvmunmap.
 

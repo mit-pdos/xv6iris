@@ -82,7 +82,7 @@ Definition pk_desc_kind (d : pk_arg_desc) : pk_kind :=
   | PkAStr _ _ => PkStr
   end.
 
-Definition pk_desc_res `{!riscvGS Σ} `{CID : CpuId} (v : mword 64) (d : pk_arg_desc) : iProp Σ :=
+Definition pk_desc_res `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (v : mword 64) (d : pk_arg_desc) : iProp Σ :=
   match d with
   | PkANum => True
   | PkANull => ⌜v = zero_reg⌝
@@ -97,7 +97,7 @@ Definition pk_desc_res `{!riscvGS Σ} `{CID : CpuId} (v : mword 64) (d : pk_arg_
 Definition pk_vararg (m : regfile) (j : nat) : mword 64 :=
   m !!! Regidx (mword_of_int (11 + Z.of_nat j) : mword 5).
 
-Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
     (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 dqf : dfrac)
     (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) :=
@@ -147,7 +147,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64),

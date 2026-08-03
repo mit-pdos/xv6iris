@@ -61,7 +61,7 @@ Definition K_proc_pagetable : nat := 3.
    that was built ([avail_sub on (pt_nodes t)], [pt_nodes t <= 3]).
 
    stack_own bound 36 = own 4-slot frame + mappages' 32 (uvmcreate needs 18). *)
-Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
@@ -94,7 +94,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
       wp_proc_pagetable_sconf_body γa Φ mm tf dqtf lvl K eb p C on b.
 End PROC_PAGETABLE.

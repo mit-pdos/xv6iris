@@ -87,7 +87,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section BwriteInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BW := KernelSyms.bwrite.
 

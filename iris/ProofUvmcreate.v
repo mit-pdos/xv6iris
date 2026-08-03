@@ -59,7 +59,7 @@ Module UvmcreateProof (AK : KALLOC) (MS : MEMSET) : UVMCREATE.
 
 Section ProofUvmcreate.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UVC := KernelSyms.uvmcreate.
 

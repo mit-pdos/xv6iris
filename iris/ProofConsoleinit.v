@@ -61,7 +61,7 @@ Section ConsoleinitBody.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{!uartGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation CI := KernelSyms.consoleinit.
 
@@ -495,7 +495,7 @@ End ConsoleinitBody.
 (* their proven specs, discharging the CONSOLEINIT Module Type.            *)
 (* ===================================================================== *)
 Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINIT.
-  Definition wp_consoleinit_sconf `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{CID : CpuId}
+  Definition wp_consoleinit_sconf `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)

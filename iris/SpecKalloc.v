@@ -26,7 +26,7 @@ From Kernel Require KernelSyms.
 
 Notation AK := KernelSyms.kalloc.
 
-Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -51,7 +51,7 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 
 Module Type KALLOC.
   Parameter wp_kalloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
       wp_kalloc_sconf_body Φ γl γk fl m on n eb p C K b.
 End KALLOC.

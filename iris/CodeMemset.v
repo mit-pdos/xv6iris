@@ -86,7 +86,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 (* ===================================================================== *)
 Section CodeMemset.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [mk_rvc] targets the ExecuteAs-EXPANDED base instruction:
      [instr pc true base], where [decname] decodes the compressed form i0 and

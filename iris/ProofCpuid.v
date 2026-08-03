@@ -82,7 +82,7 @@ Module CpuidProof : CPUID.
 
 Section ProofCpuid.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 

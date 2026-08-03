@@ -69,7 +69,7 @@ Module PrintkProof (Consputc : CONSPUTC) (Printint : PRINTINT) : PRINTK.
 Section ProofPrintk.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PK := KernelSyms.printk.
 
@@ -8082,7 +8082,7 @@ End ProofPrintk.
 (* THE SEALED FUNCTOR: instantiate the callees' WP hypotheses with their  *)
 (* proven specs, discharging the PRINTK Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_printk_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+  Definition wp_printk_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64)

@@ -66,7 +66,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section InitlockLeaf.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ===== the plain 4-byte zero store [sw zero, imm(rs1)] over a PLAINLY-  *)
   (*       owned word.  Width-4 sibling of [wp_sd_zero_s_r]; cloned from    *)
@@ -79,7 +79,7 @@ End InitlockLeaf.
 
 Section Initlock.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation IL := KernelSyms.initlock.
 

@@ -32,7 +32,7 @@ Import Defs.
 
 Section ProcMapstacksInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Notation PMS off rvc ast :=
     (kernel_text -∗ instr (mword_of_int (KernelSyms.proc_mapstacks + off) : mword 64) rvc ast).

@@ -213,7 +213,7 @@ Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmallocDefs.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
   Definition ua_pay (P : uptd) (vpn0 : mword 27) (n : nat)
@@ -232,7 +232,7 @@ Section UvmallocDefs.
      +0x78 at different harts, so [ua_exit] carries its own fresh [CID0]
      binder and wraps its whole body in [wp_next], exactly like [frepi] in
      ProofFreerange. *)
-  Definition ua_exit `{CID0 : CpuId} (Φ : mval -> iProp Σ) (mm : regfile)
+  Definition ua_exit `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ) (mm : regfile)
       (P : uptd) (vpn0 : mword 27) (n K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool) (sp0 spr oldsz newsz : mword 64) : iProp Σ :=
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
@@ -264,7 +264,7 @@ Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
 
 Section ProofUvmalloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := URra.
   Notation Rtp := URtp.

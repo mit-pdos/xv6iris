@@ -78,7 +78,7 @@ Module WakeupProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEASE) (Wa
 
 Section ProofWakeup.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
-  (* NO [Context `{CID : CpuId}]: the loop lemma is applied at the hart the
+  (* NO [Context `{GEN : GenId} `{CID : CpuId}]: the loop lemma is applied at the hart the
      prologue's own [wp_next] hands back, which a section variable could not
      express.  Every lemma below takes its own implicit [CID0]. *)
 
@@ -86,7 +86,7 @@ Section ProofWakeup.
      resumes them, so [proc_lock_res] (SchedCtx.v, whose context slot is the
      ▷-guarded [proc_ctx] over the scheduler swtch chain) is threaded OPAQUELY
      here: the ▷-slot is carried between elim and intro/wakeup, never stripped. *)
-  Lemma wp_wakeup_loop_sconf `{CID0 : CpuId}
+  Lemma wp_wakeup_loop_sconf `{GEN : GenId} `{CID0 : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (spF pme chan : mword 64)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
@@ -461,7 +461,7 @@ Section ProofWakeup.
                    sie_cap_gpr (CID := CIDf) Mr av false pme -∗
                    pc_is (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
                    locked γk CIDf -∗ proc_lock_res Φ γs γk (proc_addr k) -∗
-                   WP (LoopE CIDf : expr riscv_lang) {{ Φ }})%I
+                   WP (LoopE gen_id CIDf : expr riscv_lang) {{ Φ }})%I
           with "[Hown Hpay Hframe Htail]"
           as "Hrel".
         { iIntros (Mr) "%Hmr Hcg Hpc Htok HR".
@@ -854,7 +854,7 @@ Section ProofWakeup.
   (* procs_inv.  proc_lock_res (SchedCtx.v) is threaded opaquely, ▷-slot     *)
   (* untouched.                                                             *)
   (* ===================================================================== *)
-  Lemma wp_wakeup_sconf `{CID0 : CpuId}
+  Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId}
       (Φ : mval -> iProp Σ)
       (m : regfile) (γs : list gname) (a0f pme : mword 64)
       (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool)

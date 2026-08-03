@@ -352,7 +352,7 @@ Ltac boot_static :=
 
 Section WpStartInstr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* PCs of the 34 instructions. *)
   Definition st_pc30 : mword 64 := mword_of_int (KernelSyms.start).

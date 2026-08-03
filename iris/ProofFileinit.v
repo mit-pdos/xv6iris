@@ -33,7 +33,7 @@ Module ILW := InitlockWrapperProof Initlock.
 Section ProofFileinit.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_fileinit_sconf (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)

@@ -333,7 +333,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section PipereadInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00  711d  addi sp,sp,-96 *)
   Lemma pri_00 : kernel_text -∗ instr (mword_of_int (PR + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 58 : mword 6), sp, sp, ADDI)).

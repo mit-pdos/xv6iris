@@ -92,7 +92,7 @@ Module FetchstrProof (Myproc : MYPROC) (Copyinstr : COPYINSTR) (Strlen : STRLEN)
 
 Section ProofFetchstr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

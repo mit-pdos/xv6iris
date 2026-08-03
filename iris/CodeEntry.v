@@ -257,14 +257,14 @@ End ForwardADDI.
 (* ====================================================================== *)
 Section WpFetchRVC.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 End WpFetchRVC.
 
 Section StepLUI.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Section CleanLUI.
@@ -278,7 +278,7 @@ End StepLUI.
 
 Section StepADD.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 
@@ -297,7 +297,7 @@ End StepADD.
 
 Section StepMUL.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 
@@ -337,14 +337,14 @@ End ForwardCSRR.
 
 Section WpFetchRVC2.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 End WpFetchRVC2.
 
 Section StepADDI.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 
@@ -363,7 +363,7 @@ End StepADDI.
 
 Section StepCSRR.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
 
@@ -382,7 +382,7 @@ End StepCSRR.
 
 Section StepJAL2.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   Section CleanJAL.
@@ -397,7 +397,7 @@ End StepJAL2.
 
 Section CodeEntry.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 Lemma decode_auipc s :
 register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

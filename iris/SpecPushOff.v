@@ -39,7 +39,7 @@ Notation PP := KernelSyms.pop_off.
    ([= trap_csrs] at the only index reachable from [b = true], n = 0 and
    eb = true) below.  At [b = false] nothing moves and the statement reads
    exactly as it always did. *)
-Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
@@ -85,7 +85,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
    indexed by [bexit] rather than [false]: at [bexit = true] the caller keeps
    only its frame [C] and the pure fact, and reaches the cells through the
    bundle, at whatever hart it resumes on. *)
-Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
@@ -110,12 +110,12 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
       wp_push_off_sconf_body Φ m av n eb p C b.
   Parameter wp_pop_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
       wp_pop_off_sconf_body Φ m av n eb p C.

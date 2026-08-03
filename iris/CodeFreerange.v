@@ -94,7 +94,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeFreerange.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FR := KernelSyms.freerange.
 

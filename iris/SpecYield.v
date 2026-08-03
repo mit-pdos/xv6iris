@@ -53,7 +53,7 @@ Import Defs.
 
 Notation YD := KernelSyms.yield.
 
-Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
@@ -86,7 +86,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 
 Module Type YIELD.
   Parameter wp_yield_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),

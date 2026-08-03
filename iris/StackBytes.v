@@ -76,7 +76,7 @@ Proof. intro Hj. apply nth_byte_assemble_len; cbn [length]; lia. Qed.
 
 Section StackBytes.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [n] bytes at [base], individually owned, contents unspecified. *)
   Definition bytes_own (dq : dfrac) (base : Arch.pa) (n : nat) : iProp Σ :=

@@ -295,7 +295,7 @@ Qed.
 (* ===================================================================== *)
 Section CodeKernelvec.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kv_i2 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 1 : mword 5), sp, 8)).

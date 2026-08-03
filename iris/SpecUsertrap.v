@@ -96,7 +96,7 @@ Definition satp_rooted (v : mword 64) (root : mword 44) : Prop :=
    everything usertrap needs beyond the boundary, for the process whose
    user table is [pt] and whose kernel stack top is [ksp]).  The module
    type instantiates it with its own [usertrap_res]. *)
-Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
@@ -261,10 +261,10 @@ Module Type USERTRAP.
      defined concretely by the (future) proof; threaded opaquely by
      consumers. *)
   Parameter usertrap_res :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId},
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId},
       uptd -> mword 64 -> iProp Σ.
   Parameter wp_usertrap :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
       (w0 w8 w16 w24 w32 : bv 64)

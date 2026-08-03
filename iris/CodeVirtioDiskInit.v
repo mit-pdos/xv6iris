@@ -579,7 +579,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section CodeVirtioDiskInit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation VDI := KernelSyms.virtio_disk_init.
 

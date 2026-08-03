@@ -58,7 +58,7 @@ Import Defs.
 
 Notation WA := KernelSyms.walkaddr.
 
-Definition wp_walkaddr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_walkaddr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
     (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.walkaddr in
@@ -89,7 +89,7 @@ Definition wp_walkaddr_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type WALKADDR.
   Parameter wp_walkaddr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
       wp_walkaddr_sconf_body Φ mm t m K dq b p.

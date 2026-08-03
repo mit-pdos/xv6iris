@@ -175,7 +175,7 @@ Module SleepGenProof (Myproc : MYPROC) (Acquire : ACQUIRE) (AcquireGen : ACQUIRE
 Section SleepPostSched.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
 
-  Lemma sleep_post_sched `{CID0 : CpuId}
+  Lemma sleep_post_sched `{GEN : GenId} `{CID0 : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (γk : gname) (lka lk0 : mword 64) (Rk Tk Dk : iProp Σ)
@@ -597,7 +597,7 @@ End SleepPostSched.
 
 Section ProofSleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* extract the opaque context-slot payload, leaving the bundle at slot
      [emp] (what the sched call-site hands across the swtch). *)
@@ -1093,7 +1093,7 @@ Module SleepOfGen (G : SLEEP_GEN) : SLEEP.
 
 Section OfGen.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sleep_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

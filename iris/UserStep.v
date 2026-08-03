@@ -366,7 +366,7 @@ End StepWaitWake.
 (* ===================================================================== *)
 Section UserStepIris.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   (* ------------------------------------------------------------------- *)
@@ -530,7 +530,7 @@ End UserStepIris.
 (* ===================================================================== *)
 Section UserStepObligation.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   Theorem user_step_obligation_holds (Φ : mval -> iProp Σ) :

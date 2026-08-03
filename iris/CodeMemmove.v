@@ -116,7 +116,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 (* ===================================================================== *)
 Section CodeMemmove.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00  c.addi16sp sp,-16  ->  addi sp,sp,-16 *)
   Lemma minstr_mm_00 : kernel_text -∗ instr (mword_of_int (MM + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).

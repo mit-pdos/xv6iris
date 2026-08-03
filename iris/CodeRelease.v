@@ -80,7 +80,7 @@ Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[
 (* ===================================================================== *)
 Section WpReleaseInstr.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation RL := KernelSyms.release.
 
@@ -162,7 +162,7 @@ End WpReleaseInstr.
 Section WpJalZca.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
 End WpJalZca.
@@ -185,7 +185,7 @@ End WpJalZca.
 (* ===================================================================== *)
 Section WpReleaseTop.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation RL := KernelSyms.release.
 

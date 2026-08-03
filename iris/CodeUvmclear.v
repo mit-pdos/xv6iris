@@ -146,7 +146,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section UvmclearInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UC := KernelSyms.uvmclear.
 

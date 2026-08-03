@@ -130,7 +130,7 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
    actually true, and it is what fork will need, since fork must [release] the
    proc it gets back and [release] demands [sie_cap_gpr … false …]. *)
 Definition allocproc_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
     (mr : regfile) (K : nat)
@@ -168,7 +168,7 @@ Definition allocproc_post
        kalloc_env γa (avail_sub on nc)))%I.
 
 Definition wp_allocproc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
@@ -198,7 +198,7 @@ Definition wp_allocproc_sconf_body
 
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),

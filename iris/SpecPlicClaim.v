@@ -72,7 +72,7 @@ Definition plic_claim_a0_ok (v : mword 64) : Prop :=
    stated at the literal index [false] rather than a generic [b], with no
    [wp_next] wrapper (it would collapse via [wp_next_off] anyway, since the
    hart cannot move). *)
-Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names)
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -98,7 +98,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !
 
 Module Type PLIC_CLAIM.
   Parameter wp_plic_claim_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
       wp_plic_claim_sconf_body γd γv Φ m0 n p.

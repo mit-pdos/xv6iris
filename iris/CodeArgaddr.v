@@ -58,7 +58,7 @@ Import Defs.
 (* ===================================================================== *)
 Section ArgaddrInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation AA := KernelSyms.argaddr.
 

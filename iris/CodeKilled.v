@@ -26,7 +26,7 @@ Notation kl_ra := (mword_of_int 1 : mword 5).
 
 Section CodeKilled.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KLI o t d := (kernel_text -∗ instr (mword_of_int (KL + o) : mword 64) t d).
 

@@ -226,7 +226,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section SysPauseInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation SP := KernelSyms.sys_pause.
 

@@ -38,7 +38,7 @@ Local Open Scope Z_scope.
 Module EntryProof : ENTRY.
 Section ProofEntry.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_entry_boot (Φ : mval -> iProp Σ)
       (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)

@@ -34,7 +34,7 @@ Local Notation idx0f := (subrange_vec_dec tf_vpn 8 0).
 Module UserretProof : USERRET.
 Section UserretAllPt.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_pt (kroot uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)

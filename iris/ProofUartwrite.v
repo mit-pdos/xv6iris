@@ -348,7 +348,7 @@ Section UwProps.
   (* ------------------------------------------------------------------ *)
 
   (* the byte loop's two exits (+0x6c back edge, +0x72 leave) *)
-  Definition uw_next_cont (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
+  Definition uw_next_cont `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac) (i : nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
@@ -365,7 +365,7 @@ Section UwProps.
        park_hlf j true -∗
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
-  Definition uw_exit_cont (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
+  Definition uw_exit_cont `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
@@ -382,7 +382,7 @@ Section UwProps.
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* the loop head at +0x6c, ENTERED at whatever hart the last park landed on *)
-  Definition uw_head (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
+  Definition uw_head `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac) (i : nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
@@ -400,7 +400,7 @@ Section UwProps.
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* the tail's own continuation: uartwrite's postcondition, at ANY hart *)
-  Definition uw_ret (CID0 : CPU) (γu : uart_names) (Φ : mval -> iProp Σ)
+  Definition uw_ret `{GEN : GenId} (CID0 : CPU) (γu : uart_names) (Φ : mval -> iProp Σ)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (bs : list (bv 8)) (Rbuf : iProp Σ) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
@@ -437,7 +437,7 @@ Section UwBodies.
   (* ------------------------------------------------------------------ *)
   (*  The epilogue, shared by both paths: +0x7c -> return.                *)
   (* ------------------------------------------------------------------ *)
-  Lemma uw_tail `{CID : CpuId} (CID0 : CPU)
+  Lemma uw_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
       (j : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (sp0 : mword 64)
       (bs : list (bv 8)) (Rbuf : iProp Σ) :
@@ -692,7 +692,7 @@ Section UwBodies.
   (* ------------------------------------------------------------------ *)
   (*  ONE ITERATION: the head at +0x6c, the sleep retry, the body.        *)
   (* ------------------------------------------------------------------ *)
-  Lemma uw_one `{CID : CpuId} (CID0 : CPU)
+  Lemma uw_one `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γl : gname) (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
@@ -1057,7 +1057,7 @@ Section UwBodies.
   (* The head is only ever entered with at least one byte left ([i + S k =
      n]).  The conclusion IS a [wp_next], so the induction hypothesis is
      re-enterable at whatever hart the next park lands on. *)
-  Lemma uw_iter (CID0 : CPU)
+  Lemma uw_iter `{GEN : GenId} (CID0 : CPU)
       (γl : gname) (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
@@ -1107,7 +1107,7 @@ End UwBodies.
 Section ProofUartwrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_uartwrite_sconf (γu : uart_names) (γv : disk_names)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)

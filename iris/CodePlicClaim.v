@@ -24,7 +24,7 @@ Local Notation PQ := KernelSyms.plic_claim.
 
 Section CodePlicClaim.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 Lemma pq_imm4 : zero_extend' 12 (concat_vec (mword_of_int 1 : mword 5) ('b"00")) = (mword_of_int 4 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.

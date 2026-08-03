@@ -260,7 +260,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section CopyinInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation CI := KernelSyms.copyin.
 

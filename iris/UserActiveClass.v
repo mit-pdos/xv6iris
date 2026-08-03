@@ -104,7 +104,7 @@ Definition u_fetchable (um : gmap (mword 27) (mword 64)) (va : mword 64) : Prop 
 
 Section UserActiveClass.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* every canonical/non-canonical va either fetches or faults; the

@@ -71,7 +71,7 @@ From Kernel Require KernelSyms.
 Notation KVMIH := KernelSyms.kvminithart.
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
-Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
     (root : mword 44)
     (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64) :=
@@ -102,7 +102,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64),

@@ -69,7 +69,7 @@ Notation UI := KernelSyms.uartintr.
 Definition uartintr_stack : nat := 36%nat.
 
 Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
-    `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γl : gname)
     (Φ : mval -> iProp Σ) (γs : list gname)
     (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
@@ -101,7 +101,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (Φ : mval -> iProp Σ) (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),

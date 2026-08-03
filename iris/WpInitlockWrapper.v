@@ -45,7 +45,7 @@ Module InitlockWrapperProof (Initlock : INITLOCK) : INITLOCK_WRAPPER.
 Section WpInitlockWrapper.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_initlock_wrapper_sconf (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)

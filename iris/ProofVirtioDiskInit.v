@@ -359,7 +359,7 @@ Ltac vcr :=
 
 Section VdiLeaves.
   Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* -- a CONFIG-ONLY store ------------------------------------------- *)
   Lemma wp_vdi_sw (γv : disk_names) (Φ : mval -> iProp Σ)
@@ -709,7 +709,7 @@ End VdiLease.
 Module VirtioDiskInitProof (IL : INITLOCK) (AK : KALLOC) (MS : MEMSET) : VIRTIODISKINIT.
 Section ProofVirtioDiskInit.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation VDI := KernelSyms.virtio_disk_init.
 

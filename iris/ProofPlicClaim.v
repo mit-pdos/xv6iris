@@ -80,7 +80,7 @@ Module PlicClaimProof (Cpuid : CPUID) : PLIC_CLAIM.
 Section ProofPlicClaim.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PQ := KernelSyms.plic_claim.
 

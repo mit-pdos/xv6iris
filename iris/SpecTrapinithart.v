@@ -42,7 +42,7 @@ Notation TIH := KernelSyms.trapinithart.
    contract is stated at the literal index [false] rather than a generic
    [b], with no [wp_next] wrapper at all (it would collapse via
    [wp_next_off] anyway, since the hart cannot move). *)
-Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (K : nat)
     (tv0 : mword 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.trapinithart in
@@ -62,7 +62,7 @@ Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
 
 Module Type TRAPINITHART.
   Parameter wp_trapinithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (mm : regfile) (K : nat)
       (tv0 : mword 64) (p : mword 64),
       wp_trapinithart_sconf_body Φ mm K tv0 p.

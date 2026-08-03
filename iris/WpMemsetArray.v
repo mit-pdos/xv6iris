@@ -39,7 +39,7 @@ Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
 
 Section WpMemsetArray.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)
   (*  The zero-count arm: the c.beqz at +0x08 is taken straight to the    *)

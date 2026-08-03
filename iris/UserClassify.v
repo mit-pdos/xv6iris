@@ -15,7 +15,7 @@ Import Defs.
 
 Section UserClassify.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* The full execute-result outcome space at U-mode: retire, delegated

@@ -98,7 +98,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section InstrsSL.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma sli_00 : kernel_text -∗ instr (mword_of_int (KernelSyms.strlen + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).  (* c.addi sp,sp,-16    # 2-slot frame: ra/s0 *)
   Proof. mk_rvc (KernelSyms.strlen + 0x00)%Z (mword_of_int 0x1141 : mword 16)

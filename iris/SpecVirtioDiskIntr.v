@@ -46,7 +46,7 @@ Definition K_virtio_disk_intr : nat := 22%nat.
 
 Definition wp_virtio_disk_intr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
-    `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
@@ -76,7 +76,7 @@ Definition wp_virtio_disk_intr_sconf_body
 Module Type VIRTIODISKINTR.
   Parameter wp_virtio_disk_intr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
-      `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

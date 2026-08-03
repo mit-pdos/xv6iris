@@ -47,7 +47,7 @@ Module MemsetProof : MEMSET_PARTS.
 
 Section ProofMemset.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a

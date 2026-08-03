@@ -317,7 +317,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section UvmallocInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation UA := KernelSyms.uvmalloc.
 

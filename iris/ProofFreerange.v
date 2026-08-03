@@ -68,7 +68,7 @@ Module FreerangeProof (Kfree : KFREE) : FREERANGE.
 
 Section ProofFreerange.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ================================================================= *)
   (*  §2  The page-run predicate and freerange's whole-function WP.     *)

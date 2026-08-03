@@ -48,7 +48,7 @@ Notation UVMC := KernelSyms.uvmcreate.
    ([avail_zero on]), so a COUNTED caller refutes it from its own budget
    premise and an uncounted one (the fork path) handles it.  That is why
    this spec has no [0 < nb] premise any more. *)
-Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (on : option nat) (tp : mword 64) (rv : mword 64) : iProp Σ :=
   ( (* out of memory: nothing allocated, the budget untouched *)
     (⌜rv = (zero_reg : mword 64)⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_env γa on)
@@ -59,7 +59,7 @@ Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID
        ptree_own 2 (DfracOwn 1) (pt_empty_node b) ∗
        kalloc_env γa (avail_sub on 1)))%I.
 
-Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
@@ -83,7 +83,7 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 
 Module Type UVMCREATE.
   Parameter wp_uvmcreate_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
       wp_uvmcreate_sconf_body γa Φ mm lvl K eb p C on b.
 End UVMCREATE.

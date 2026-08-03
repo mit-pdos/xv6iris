@@ -96,7 +96,7 @@ Module BpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BPIN.
 
 Section ProofBpin.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BP := KernelSyms.bpin.
 

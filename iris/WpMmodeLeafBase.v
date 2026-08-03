@@ -931,7 +931,7 @@ End ExecStoreG.
 (* WpGprStore.v : MemUpdate *)
 Section MemUpdate.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
   (* window update over an arbitrary index list (write_bytes is a foldr).
@@ -1461,7 +1461,7 @@ Definition cli_wval (imm6 : mword 6) : mword 64 :=
 (* WpGprRvc.v : GprFileX0 *)
 Section GprFileX0.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma gpr_file_x0 (m : regfile) (i : mword 5) :
     uint i = 0 ->

@@ -45,7 +45,7 @@ Import Defs.
 
 Section WpMemsetS.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the entry halfword [c.addi sp,sp,-16], and the 4-byte fetch window it sits
      in (its own 0x1141 in the low half, the next halfword 0xe406 in the high). *)

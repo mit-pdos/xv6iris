@@ -102,7 +102,7 @@ Qed.
 Section SmodeCorePt.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
   (* WINDOW COLLAPSE (uniform-claims): a non-straddling [len]-byte chunk   *)

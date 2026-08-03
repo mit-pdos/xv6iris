@@ -55,7 +55,7 @@ Set Printing Depth 40.
 
 Section BreadEscrowLeaves.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !bioG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)

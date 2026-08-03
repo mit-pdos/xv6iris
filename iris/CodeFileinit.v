@@ -59,7 +59,7 @@ Proof. decode_bridge_ms. Qed.
 
 Section CodeFileinit.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FI := KernelSyms.fileinit.
 

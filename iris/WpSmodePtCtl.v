@@ -139,7 +139,7 @@ Qed.
 
 Section WpSmodePtCtl.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- from WpSmodeFence.v ---- *)
 

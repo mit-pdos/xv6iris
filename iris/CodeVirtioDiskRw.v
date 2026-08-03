@@ -700,7 +700,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section VirtioDiskRwInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma rwi_000 : kernel_text -∗ instr (mword_of_int (VRW + 0x000) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 58 : mword 6), sp, sp, ADDI)).
   Proof. mk_rvc (VRW + 0x000)%Z (mword_of_int 0x711d : mword 16)

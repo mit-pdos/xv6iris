@@ -52,7 +52,7 @@ Section WpUartgetc.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).

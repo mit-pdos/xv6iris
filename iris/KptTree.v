@@ -576,7 +576,7 @@ End PtSlotBridge.
 
 Section KptTreeInv.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* The generalized invariant (rwx-kmap): the table is constrained by the
      M-INDEXED spec [kpt_tree_spec_gen], and the kernel-mapping auth
@@ -969,7 +969,7 @@ End KptTranslateAddr.
 
 Section PtTranslateOwn.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege).
 
   (* THE GENERIC ABSORPTION CORE, over the raw pieces: any owned tree, any
@@ -1117,7 +1117,7 @@ End PtTranslateOwn.
 
 Section KptTranslateIris.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload).
 
   (* THE re-keyed absorption (rwx-kmap): keyed on a kernel-mapping CLAIM

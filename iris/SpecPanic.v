@@ -25,7 +25,7 @@ Import Defs.
 
 Section Panic.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* a0 = msg.  Everything else the caller still holds is simply dropped. *)
   Definition panic_wp : iProp Σ :=
@@ -64,14 +64,14 @@ End Panic.
 (* form and are out of this port's scope; retiring it is a consumer-side   *)
 (* cleanup for whoever ports those files, not a change owed here.          *)
 (* ---------------------------------------------------------------------- *)
-Definition panic_wp_any `{!riscvGS Σ, !sieG Σ} : iProp Σ :=
+Definition panic_wp_any `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} : iProp Σ :=
   (□ ∀ h : CPU, panic_wp (CID := h))%I.
 
-Global Instance panic_wp_any_persistent `{!riscvGS Σ, !sieG Σ} :
+Global Instance panic_wp_any_persistent `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} :
   Persistent panic_wp_any.
 Proof. rewrite /panic_wp_any. apply _. Qed.
 
-Lemma panic_wp_any_at `{!riscvGS Σ, !sieG Σ} (h : CPU) :
+Lemma panic_wp_any_at `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} (h : CPU) :
   panic_wp_any -∗ panic_wp (CID := h).
 Proof.
   iIntros "#H". rewrite /panic_wp_any.

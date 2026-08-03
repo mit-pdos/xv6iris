@@ -329,6 +329,7 @@ Proof. solve_inG. Qed.
 
 Section DevLoops.
   Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
   Context `{!uartGhostG Σ}.
   Context `{!diskGhostG Σ}.
 

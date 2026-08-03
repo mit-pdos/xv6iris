@@ -501,10 +501,10 @@ Proof. apply mycpu_ret_nonzero, tp_ok_cid_of. Qed.
 (* the ambient hart id as a tp-register value.  mycpu()'s return for this
    hart is [mycpu_ret cid_word] = &cpus[cpu_id] = [cpus_ptr cpu_id]. *)
 
-Lemma cpus_ptr_cid `{CID : CpuId} : cpus_ptr cpu_id = mycpu_ret cid_word.
+Lemma cpus_ptr_cid `{GEN : GenId} `{CID : CpuId} : cpus_ptr cpu_id = mycpu_ret cid_word.
 Proof. reflexivity. Qed.
 
-Lemma tp_ok_cid `{CID : CpuId} : tp_ok cid_word.
+Lemma tp_ok_cid `{GEN : GenId} `{CID : CpuId} : tp_ok cid_word.
 Proof. apply tp_ok_cid_of. Qed.
 
 (* ===================================================================== *)
@@ -526,7 +526,7 @@ Proof. apply tp_ok_cid_of. Qed.
 (* ===================================================================== *)
 Section CurProc.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition cur_proc (p : mword 64) : iProp Σ :=
     a_cpu_proc cid_word ↦₈ p.

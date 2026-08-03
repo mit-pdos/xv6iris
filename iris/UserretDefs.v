@@ -509,7 +509,7 @@ Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
 
 Section UserretInstrs.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma ui_sfence1 :
     kernel_text -∗ instr (upa 0x9c) false ai_sfence.

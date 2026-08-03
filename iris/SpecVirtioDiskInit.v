@@ -138,7 +138,7 @@ Definition K_virtio_disk_init : nat := 18%nat.
    [Typeclasses Opaque] (never [Opaque]) so instance search never walks in
    while [rewrite /vdi_post] at the return still does. *)
 Definition vdi_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
@@ -186,7 +186,7 @@ Global Typeclasses Opaque vdi_post.
    [wp_next_off] anyway, since the hart cannot move); [vdi_post] above drops
    its own [b] parameter for the same reason. *)
 Definition wp_virtio_disk_init_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
@@ -231,7 +231,7 @@ Definition wp_virtio_disk_init_sconf_body
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ}
-      `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId}
       (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)

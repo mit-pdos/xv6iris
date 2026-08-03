@@ -45,12 +45,12 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section KvminitBody.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation KVI := KernelSyms.kvminit.
 
   (* [CID] is bound HERE, per-hypothesis, rather than reused from the
-     Section's own [Context `{CID : CpuId}] -- this Hypothesis stands in for
+     Section's own [Context `{GEN : GenId} `{CID : CpuId}] -- this Hypothesis stands in for
      [KMK.wp_kvmmake_sconf] (a Module Type Parameter, hence ALREADY fully
      CID-generic), and the body below must be able to apply it at a hart
      other than the section's own (after several b-generic leaf steps below
@@ -278,7 +278,7 @@ End KvminitBody.
 (* proven spec, discharging the KVMINIT Module Type.                       *)
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
-  Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{CID : CpuId}
+  Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool)
       : wp_kvminit_sconf_body γa Φ mm lvl K eb p C on kpt0 b :=
     (* eta-expand the module argument: passed bare, implicit-argument

@@ -112,7 +112,7 @@ Module SysUptimeProof (Acquire : ACQUIRE) (Release : RELEASE) : SYSUPTIME.
 
 Section ProofSysUptime.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
 
   Lemma wp_sys_uptime_sconf (Φ : mval -> iProp Σ) (γl : gname)

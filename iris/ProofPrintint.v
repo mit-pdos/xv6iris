@@ -68,7 +68,7 @@ Module PrintintProof (Consputc : CONSPUTC) : PRINTINT.
 Section ProofPrintint.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation PI := KernelSyms.printint.
 
@@ -1549,7 +1549,7 @@ End ProofPrintint.
 (* THE SEALED FUNCTOR: instantiate the callee's WP hypothesis with its     *)
 (* proven spec, discharging the PRINTINT Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_printint_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{CID : CpuId}
+  Definition wp_printint_sconf `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac} (b : bool) (pcur : mword 64)
       : wp_printint_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 b pcur :=

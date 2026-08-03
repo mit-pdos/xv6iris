@@ -623,7 +623,7 @@ Local Ltac st_unfold :=
 (* ===================================================================== *)
 Section WpStartThm.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* two halves of a register cell rejoin to the full cell. *)
   Lemma reg_half_join (r : register) (v : type_of_register r) :

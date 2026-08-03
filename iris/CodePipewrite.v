@@ -511,7 +511,7 @@ Proof. decode_bridge_ms. Qed.
 (* ===================================================================== *)
 Section PipewriteInstrs.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00  7159  addi sp,sp,-112 *)
   Lemma pwi_00 : kernel_text -∗ instr (mword_of_int (PW + 0x00) : mword 64) true (ITYPE (caddi16sp_imm (mword_of_int 57 : mword 6), sp, sp, ADDI)).
