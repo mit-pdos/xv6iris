@@ -47,7 +47,7 @@
    userinit's [initproc] cell, the leftover pages, the frame slots) are simply
    DROPPED -- Iris is affine. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List Ascii String.
-From stdpp Require Import gmap list list_numbers bitvector.definitions.
+From stdpp Require Import gmap list list_numbers finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac excl.
 From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map own.
@@ -692,6 +692,8 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 NPROC,
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
     fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
+    ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
+    ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
     ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr m' n false p0 -∗
@@ -699,6 +701,7 @@ Section ProofMain.
         cpu_own 0 false p0 cpu_ctx_free false -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
         procs_inv Φ γs -∗
+        scheds_inv Φ γs -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
         (* what kvminithart published about the kernel page table: all four
            PERSISTENT, and exactly what the [started] deposit carries *)
@@ -713,7 +716,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hhalves Hparks Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -834,10 +837,20 @@ Section ProofMain.
                  (fun _ i => ((∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
                               proc_pub (proc_addr i))%I)
                  (seq 0 NPROC) with "Hready Hppub") as "Hin".
+    iDestruct (big_sepL_sep_2
+                 (fun _ i => (proc_ready i ∗
+                              ((∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+                               proc_pub (proc_addr i)))%I)
+                 (fun _ i => park_full i false)
+                 (seq 0 NPROC) with "Hin Hparks") as "Hin".
     iMod (procs_inv_alloc Φ ⊤ with "Hin") as (γs) "#Hpinv".
+    (* ---- ASSEMBLY 2b: the eight c->proc halves -> scheds_inv ----
+       Nothing below [SchedCtx] names [scheds_inv], which is exactly what
+       makes this allocation legal HERE, one line after γs is chosen. *)
+    iMod (scheds_alloc Φ γs ⊤ with "Hhalves") as "#Hsched".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
-              with "Hcg Hpc Hcpu Hkenv Hpinv Hstvec Hkinv Hkptp Htramp Hkstx").
+              with "Hcg Hpc Hcpu Hkenv Hpinv Hsched Hstvec Hkinv Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1225,6 +1238,7 @@ Section ProofMain.
       (root : mword 44) (pas : nat -> mword 44)
       (P : iProp Σ) `{!Persistent P} :
     (20 <= n)%nat ->
+    p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (MN + 0xa2) : mword 64) -∗
@@ -1235,6 +1249,7 @@ Section ProofMain.
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
          procs_inv Φ γs' -∗
+         scheds_inv Φ γs' -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
@@ -1245,6 +1260,7 @@ Section ProofMain.
          P) -∗
     printk_env γpr γd γv -∗
     procs_inv Φ γs -∗
+    scheds_inv Φ γs -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
@@ -1254,9 +1270,9 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hn.
+    intros Hn Hp0.
     iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hintr #Hsinv #Hwand".
-    iIntros "#Hpenv #Hpinv #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
+    iIntros "#Hpenv #Hpinv #Hsched #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
     iPoseProof (mni_a8 with "Htext") as "Hia8".
@@ -1266,7 +1282,7 @@ Section ProofMain.
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
-                with "Hpenv Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
+                with "Hpenv Hpinv Hsched Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
     (* ---- +0xa2 fence rw,rw : the release barrier ---- *)
     iApply (wp_fence_gen_s_sconf Φ (mword_of_int (MN + 0xa2))
               (mword_of_int 0 : mword 4) (mword_of_int 3 : mword 4)
@@ -1355,8 +1371,8 @@ Section ProofMain.
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
-    iApply (Scheduler.wp_scheduler_sconf Φ γs SS n p0 ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr Hintr").
+    iApply (Scheduler.wp_scheduler_sconf Φ γs SS n p0 Hp0 ltac:(lia)
+              with "Hcg Hcpu Htext Hpc Hpinv Hsched Hpanic Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)
@@ -1373,9 +1389,10 @@ Section ProofMain.
         γd γv l0 b0 c0 tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
-    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive.
+    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50).
     iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
+    iIntros "Hhalves Hparks".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -1403,9 +1420,10 @@ Section ProofMain.
     iApply (mn_grp_kvm Φ m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpany Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds").
+                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds
+                    Hhalves Hparks").
     iIntros (γa γs m3 root pas)
-      "Hcg Hpc Hcpu Hkenv #Hpinv Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
+      "Hcg Hpc Hcpu Hkenv #Hpinv #Hsched Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap Φ γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
@@ -1420,9 +1438,9 @@ Section ProofMain.
     iIntros (γk pd pav pu m5) "Hcg Hpc Hcpu #Hdlock #Hgeom".
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started Φ γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
-              root pas P ltac:(lia)
+              root pas P ltac:(lia) Hp0
               with "Hcg Htext Hpany Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
-                    Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
+                    Hpinv Hsched Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
   Qed.
 
 End ProofMain.

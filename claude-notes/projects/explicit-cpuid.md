@@ -155,7 +155,83 @@ ambient-`CpuId` shape this was not statable, let alone checkable.
 This is the refactor paying for itself: the falsehood was invisible before, and
 would have stayed invisible until `kerneltrap` was proved.
 
-## STATUS (2026-08-02): 631 of 641 files green
+## STATUS (2026-08-03): the MECHANISM HAS LANDED; the nine contracts have not
+
+`scheds_inv` and its six moves are no longer a prototype: they live in
+`SchedCtx.v` (with `cpu_proc_half` / `park_own` / `park_at` and the
+`not_running` state guard in `ProcGeom.v`), `IntrDefs.cpu_cells` keeps only
+half of `a_cpu_proc`, `ProofScheduler`'s two `c->proc` stores are the two
+mask-changing moves, `proc_slots` has its third guarded slot, and `main`
+allocates the invariant one line after `procs_inv_alloc` chooses γs.
+**632 of 642 targets green — the SAME ten red files as before the change**
+(`ProofSleep`/`Yield`/`Bread`/`Bwrite`/`Acquiresleep` + their `Link*`).
+What is still owed is the *consumer* half: steps 6 and 7 below — the nine
+contracts dropping `▷ sched_vc` for `scheds_inv` + `park_hlf j true`, and the
+five proofs. See "WHAT LANDED, AND THE ONE DESIGN CHANGE" below.
+
+### WHAT LANDED, AND THE ONE DESIGN CHANGE
+
+Everything the prototype validated, with ONE deliberate deviation, made for a
+cost reason and worth internalising:
+
+**The park receipt's ghost name is CANONICAL (`RiscvPtsto.park_name : nat ->
+gname`), not a `γk : list gname` parameter.** The prototype carried `γk` as a
+section variable; but the receipt is named inside `proc_lock_res`, hence
+inside `procs_inv`, and `procs_inv` is mentioned by 48 files whose `Spec*`
+bodies, `Module Type`s, `Link*` axioms and positional `Proof*` applications
+would ALL have gained a parameter. That is the exact situation
+`RiscvPtsto`'s own comments give as the reason `sie_name` / `kmap_name` /
+`strans_name` are canonical rather than parameters, so the same device is
+used: adequacy mints one `ghost_var bool` per proc slot at `false`
+(`riscv_system_adequacy` gained an `nproc` parameter and a client conjunct),
+hands them to the boot client, and `procs_inv_alloc` spends them.
+**Net: `procs_inv Φ γs` keeps its arity and not one of those 48 files was
+touched.**
+
+Two smaller consequences that had to be settled while wiring it in:
+
+- **`proc_slots` / `proc_lock_res` did NOT need an index argument** either.
+  `ProcGeom.park_at pa q r` is the receipt spelled at a proc ADDRESS
+  (`∃ j, ⌜pa = proc_addr j ∧ j < NPROC⌝ ∗ park_own j q r`), interchangeable
+  with the index form by `proc_addr_inj` (`park_at_intro` / `park_at_elim`).
+  Same trick applies to any future per-proc ghost that has to live in the
+  lock.
+- **`SpecScheduler` / `SpecMain` / `SpecMainSecondary` are now stated at
+  `p0 = zero_reg`.** scheduler() and main have no current proc, and
+  `scheds_inv`'s slot for every hart is allocated at that literal index, so a
+  generic `p0` was never inhabited for them. Stated as a premise rather than
+  by dropping the binder, so no call site changed arity.
+- **`ProofScheduler`'s three `c->proc` stores had to become
+  `wp_store_s_sconf_au` applications** (the AU form in `WpSconfMem.v`, at mask
+  `⊤ ∖ ↑minstretN ∖ ↑schedsN`), because with half the cell in an invariant the
+  store is a mask-changing step. The x0 stores get their stored value from
+  `IntrDefs.sie_cap_gpr_x0` + `rgne` instead of `wp_sd_zero_s_sconf`. The
+  prologue's `c->proc = 0` is a third transition, `SchedCtx.scheds_idle`
+  (0 -> 0), whose zero value refutes the dispatched disjunct outright.
+- **`SpecAllocproc`'s found arm gained `park_hlf j false`.** allocproc empties
+  a UNUSED slot, which owns the WHOLE receipt; `proc_held` carries one half
+  (the crossing's share) so the second half goes to the caller, which is what
+  lets it rebuild `proc_lock_res` at USED/RUNNABLE.
+
+### STILL OWED (steps 6 and 7 of the plan)
+
+1. The nine contracts lose `▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj` from
+   premise AND postcondition and gain `scheds_inv Φ γs` (persistent,
+   hart-free) and `park_hlf j true` (hart-free): `SpecSleep`, `SpecYield`,
+   `SpecBread`, `SpecBwrite`, `SpecAcquiresleep`, `SpecVirtioDiskRw`,
+   `SpecUartwrite`, `SpecPiperead`, `SpecPipewrite`, `SpecSysPause`.
+   `ProtoSchedsInv.wp_yield_sconf_body'` is the exact target shape and still
+   typechecks.
+2. `SpecSched`'s crossing payload: `p_sched`'s two disjuncts reach the
+   scheduler through `proc_held`, which now carries `park_hlf j false`. A
+   parking function's take-out is `scheds_take` just before its swtch; its
+   post-resume half gains exactly one `iMod` (`scheds_put`) at the resumed
+   hart.
+3. Port `ProofSleep` / `ProofYield` / `ProofBread` / `ProofBwrite` /
+   `ProofAcquiresleep` and compile the five `Link*` (functor instantiations;
+   expected to need no edit).
+
+## STATUS (2026-08-02, superseded above): 631 of 641 files green
 
 Every cone is ported and linked except one. What is DONE, and no longer worth
 re-reading the play-by-play for: the foundation (`HartTp`, `WpNext`,

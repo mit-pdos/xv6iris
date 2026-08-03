@@ -36,6 +36,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import WpMmodeLeafBase.
+Require Import MinstretInv.   (* [minstretN]: the mask the store-AU leaf leaves open *)
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import HartTp WpNext.
@@ -210,7 +211,7 @@ Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{CID : CpuId}
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) ∗
   intr_count 0 eb ∗
-  a_cpu_proc cid_word ↦₈ px ∗ C.
+  cpu_proc_half cpu_id px ∗ C.
 Proof.
   rewrite cpu_own_off /cpu_hart /cpu_cells.
   iIntros "(((_ & Hn & Hi & Hp) & Hc) & HC)". iFrame.
@@ -220,7 +221,7 @@ Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{CID : CpuId} (px : mword 64) :
   a_cpu_noff cid_word ↦₄ noff_val 0 -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
-  a_cpu_proc cid_word ↦₈ px -∗
+  cpu_proc_half cpu_id px -∗
   cpu_own 0 false px emp false.
 Proof.
   iIntros "Hn Hi Hc Hp". rewrite cpu_own_off /cpu_hart /cpu_cells.
@@ -284,9 +285,9 @@ Section ProofScheduler.
     : wp_scheduler_sconf_body Φ γs m av p0.
   Proof.
     cbv beta delta [wp_scheduler_sconf_body].
-    intros pcE Hav.
+    intros pcE Hp0 Hav. subst p0.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcsrs #Havail".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hsched #Hpanic Hcsrs #Havail".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hprocs" as "[%H _]". iPureIntro. exact H. }
     (* split the entry cpu bundle: the context save area becomes [own_ctx],
@@ -585,12 +586,31 @@ Section ProofScheduler.
     assert (Hrec_proc0r : add_vec (rget A7 Ra4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                           = a_cpu_proc cid_word) by (rgne; exact Hrec_proc0).
     iPoseProof (schi_2a with "Htext") as "Hi2a".
-    iApply (wp_sd_zero_s_sconf Φ (mword_of_int (SC + 0x2a)) Ra4 (mword_of_int 48 : mword 12)
-              A7 (av - 10)%nat p0 false with "Hcg Hpc Hi2a [Hproc] [-]").
-    { iEval (rewrite Hrec_proc0r). iExact "Hproc". }
+    (* THE STORE IS MASK-CHANGING NOW.  [IntrDefs.cpu_cells] keeps only HALF
+       of [cpus[cid].proc]; the other half lives in [scheds_inv]'s slot for
+       this hart, so the FULL cell the store needs has to be reassembled with
+       the invariant open ([SchedCtx.scheds_idle]: 0 -> 0, which the slot's
+       zero value shows cannot orphan a record). *)
+    iDestruct (sie_cap_gpr_x0 A7 (av - 10)%nat false zero_reg (mword_of_int 0 : mword 5)
+                 ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx02a Hcg]".
+    assert (Hx02ar : rget A7 (mword_of_int 0 : mword 5) = zero_reg)
+      by (rgne; exact Hx02a).
+    iApply (wp_store_s_sconf_au 8 false Φ (mword_of_int (SC + 0x2a))
+              (mword_of_int 0 : mword 5) Ra4 (mword_of_int 48 : mword 12)
+              A7 (av - 10)%nat (rget A7 (mword_of_int 0 : mword 5))
+              (cpu_proc_half cpu_id zero_reg) (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
+              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
+              with "Hcg Hpc Hi2a [Hproc] [-]").
+    { iMod (scheds_idle Φ γs (⊤ ∖ ↑minstretN) cpu_id ltac:(solve_ndisj)
+              with "Hsched Hproc") as "[Hcell Hclose]".
+      iModIntro. iExists zero_reg.
+      iSplitL "Hcell"; [ iEval (rewrite Hrec_proc0r); iExact "Hcell" |].
+      iIntros "Hcell". iEval (rewrite Hx02ar Hrec_proc0r) in "Hcell".
+      iMod ("Hclose" with "Hcell") as "$". done. }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
     iIntros "Hcg Hpc Hproc".
-    iEval (rewrite Hrec_proc0r) in "Hproc".
     assert (Hpc2e : add_vec_int (mword_of_int (SC + 0x2a) : mword 64) 4 = mword_of_int (SC + 0x2e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
@@ -1178,8 +1198,10 @@ Section ProofScheduler.
         iPoseProof (schi_7a with "Htext") as "Hi7a".
         iPoseProof (schi_7c with "Htext") as "Hi7c".
         (* the RUNNABLE slot carries the parked context; the dormant half is emp *)
-        iEval (rewrite /proc_slots needs_ctx_RUNNABLE inv_dormant_RUNNABLE) in "Hslot".
-        iDestruct "Hslot" as "[Hvc _]".
+        iEval (rewrite /proc_slots needs_ctx_RUNNABLE inv_dormant_RUNNABLE
+                       not_running_RUNNABLE) in "Hslot".
+        iDestruct "Hslot" as "[Hvc [_ Hpark]]".
+        iDestruct (park_at_full_elim jj false Hjj with "Hpark") as "Hpark".
         (* +0x64 sw s8,24(s1) : p->state = RUNNING.  Both the base and the
            stored value are read through [rget], so both need respelling. *)
         assert (HM2s1r : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
@@ -1197,12 +1219,30 @@ Section ProofScheduler.
         assert (HM2s4r : add_vec (rget M2 Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                          = a_cpu_proc cid_word) by (rgne; exact HM2s4).
         iDestruct (cpu_own_set_proc 1 ebc zero_reg (proc_addr jj) emp with "Hcpu") as "[Hproc Hback]".
-        iApply (wp_sd_s_sconf Φ (mword_of_int (SC + 0x68)) Rs1 Rs4 (mword_of_int 48 : mword 12)
-                  M2 (av - 10)%nat zero_reg false with "Hcg Hpc Hi68 [Hproc] [-]").
-        { iEval (rewrite HM2s4r). iExact "Hproc". }
+        (* DISPATCH: c->proc : 0 -> &proc[jj].  The slot enters its
+           "checked out" state and the receipt splits -- one half stays in
+           the invariant, the other travels to the dispatched thread inside
+           the swtch payload ([SchedCtx.proc_held]). *)
+        iApply (wp_store_s_sconf_au 8 false Φ (mword_of_int (SC + 0x68))
+                  Rs1 Rs4 (mword_of_int 48 : mword 12)
+                  M2 (av - 10)%nat (rget M2 Rs1)
+                  (cpu_proc_half cpu_id (proc_addr jj) ∗ park_hlf jj false)
+                  (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
+                  ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
+                  with "Hcg Hpc Hi68 [Hproc Hpark] [-]").
+        { iMod (scheds_dispatch Φ γs (⊤ ∖ ↑minstretN) cpu_id jj
+                  ltac:(solve_ndisj) Hjj with "Hsched Hproc Hpark")
+            as "[Hcell Hclose]".
+          iModIntro. iExists zero_reg.
+          iSplitL "Hcell"; [ iEval (rewrite HM2s4r); iExact "Hcell" |].
+          iIntros "Hcell".
+          assert (HM2s1rr : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
+          iEval (rewrite HM2s1rr HM2s4r) in "Hcell".
+          iMod ("Hclose" with "Hcell") as "[$ $]". done. }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc Hproc".
-        iEval (rewrite HM2s4r HM2s1r) in "Hproc".
+        iIntros "Hcg Hpc [Hproc Hpark]".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
         assert (Hr6c : add_vec_int (mword_of_int (SC + 0x68) : mword 64) 4 = mword_of_int (SC + 0x6c))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1269,8 +1309,8 @@ Section ProofScheduler.
            dispatched thread's own intena retune runs under THIS hart's
            (now canonical) SIE ghost. *)
         iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl
-                      with "Hcsrs Havail [Hlocked Hstate Hchan Hpub]") as "HP".
-        { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
+                      with "Hcsrs Havail [Hlocked Hstate Hchan Hpub Hpark]") as "HP".
+        { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hpark". }
         (* the TARGET is proc jj's record, which is MIGRATABLE ([None]) -- any
            hart may dispatch any RUNNABLE proc, so its stored continuation is
            good at every hart, and this hart's [adm] obligation is trivial.
@@ -1300,7 +1340,7 @@ Section ProofScheduler.
         destruct Hfacts as [Hgl' Hneeds'].
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
         iEval (rewrite /proc_held) in "Hheld'".
-        iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub)".
+        iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub & Hpark)".
         (* the callee-saved image equalities *)
         unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
         injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
@@ -1323,12 +1363,33 @@ Section ProofScheduler.
         assert (Hm's4r : add_vec (rget m' Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                          = a_cpu_proc cid_word) by (rgne; exact Hm's4).
         iDestruct (cpu_own_set_proc 1 eb' (proc_addr jj) zero_reg emp with "Hcpu") as "[Hproc Hback]".
-        iApply (wp_sd_zero_s_sconf Φ (mword_of_int (SC + 0x76)) Rs4 (mword_of_int 48 : mword 12)
-                  m' (av - 10)%nat (proc_addr jj) false with "Hcg Hpc Hi76 [Hproc] [-]").
-        { iEval (rewrite Hm's4r). iExact "Hproc". }
+        (* RECLAIM: c->proc : &proc[jj] -> 0.  The slot is provably
+           record-free (the parking proc checked its record out before its
+           own swtch), so the two receipt halves rejoin and go back into
+           proc jj's lock below. *)
+        iDestruct (sie_cap_gpr_x0 m' (av - 10)%nat false (proc_addr jj)
+                     (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
+                     with "Hcg") as "[%Hx076 Hcg]".
+        assert (Hx076r : rget m' (mword_of_int 0 : mword 5) = zero_reg)
+          by (rgne; exact Hx076).
+        iApply (wp_store_s_sconf_au 8 false Φ (mword_of_int (SC + 0x76))
+                  (mword_of_int 0 : mword 5) Rs4 (mword_of_int 48 : mword 12)
+                  m' (av - 10)%nat (rget m' (mword_of_int 0 : mword 5))
+                  (cpu_proc_half cpu_id zero_reg ∗ park_full jj false)
+                  (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
+                  ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
+                  with "Hcg Hpc Hi76 [Hproc Hpark] [-]").
+        { iMod (scheds_reclaim Φ γs (⊤ ∖ ↑minstretN) cpu_id jj
+                  ltac:(solve_ndisj) Hjj with "Hsched Hproc Hpark")
+            as "[Hcell Hclose]".
+          iModIntro. iExists (proc_addr jj).
+          iSplitL "Hcell"; [ iEval (rewrite Hm's4r); iExact "Hcell" |].
+          iIntros "Hcell". iEval (rewrite Hx076r Hm's4r) in "Hcell".
+          iMod ("Hclose" with "Hcell") as "[$ $]". done. }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc Hproc".
-        iEval (rewrite Hm's4r) in "Hproc".
+        iIntros "Hcg Hpc [Hproc Hpark]".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
         assert (Hr7a : add_vec_int (mword_of_int (SC + 0x76) : mword 64) 4 = mword_of_int (SC + 0x7a))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1377,12 +1438,15 @@ Section ProofScheduler.
           rewrite (HMcthr Rs7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
           rewrite HM2s7. intro Hbad. discriminate. }
         (* rebuild the lock resource at the parked state *)
-        iAssert (proc_lock_res Φ γs γl (proc_addr jj)) with "[Hstate Hchan Hpub Hvc']" as "HR".
+        iAssert (proc_lock_res Φ γs γl (proc_addr jj))
+          with "[Hstate Hchan Hpub Hvc' Hpark]" as "HR".
         { rewrite /proc_lock_res. iExists st', ch'. iFrame "Hstate Hchan Hpub".
-          rewrite /proc_slots Hneeds' (sc_needs_ctx_not_dormant st' Hneeds').
+          rewrite /proc_slots Hneeds' (sc_needs_ctx_not_dormant st' Hneeds')
+                  (not_running_of_needs_ctx st' Hneeds').
           iSplitL "Hvc'".
           - iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'".
-          - done. }
+          - iSplitR; [done|].
+            iApply (park_at_full_intro jj false Hjj with "Hpark"). }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 10)%nat (proc_addr jj) zero_reg)) in "Hcg".
@@ -1662,8 +1726,8 @@ Section ProofScheduler.
                       (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 31 : mword 11) ('b"0"))))
                     = mword_of_int (SC + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc86) in "Hpc".
-    (* the entry bundle was tagged at the caller's [p0]; c->proc is 0 now. *)
-    iEval (rewrite (sc_retag_p A16 (av - 10)%nat p0 zero_reg)) in "Hcg".
+    (* the entry bundle is already tagged at [zero_reg] (the scheduler thread
+       has no proc), so no re-tag is owed here. *)
     iApply ("Outer" $! A16 false with "[%] Hcg Hpc Hcpu Hcsrs Hown").
     { split_and!; assumption. }
   Qed.

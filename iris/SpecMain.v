@@ -111,7 +111,7 @@
 
    Requires only Spec files and the definitional layer -- never a [Proof*] file. *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap list finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language lifting.
@@ -288,6 +288,10 @@ Section SpecMain.
     (* the disk's protocol is in its not-live arm at boot: virtio_disk_init
        makes it live, and its config half [c0] is how main knows so *)
     virtio_live c0 = false ->
+    (* main has no current proc, and neither does the scheduler() it tail-
+       calls; [SchedCtx.scheds_inv]'s slot for every hart is allocated at
+       that literal index below. *)
+    p0 = zero_reg ->
     sie_cap_gpr m K false p0 -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
@@ -310,6 +314,7 @@ Section SpecMain.
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
          procs_inv Φ γs -∗
+         scheds_inv Φ γs -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗
@@ -321,6 +326,17 @@ Section SpecMain.
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
+    (* HALF of EVERY hart's [cpus[h].proc] cell, at 0.  [IntrDefs.cpu_cells]
+       keeps the other half; these eight are what main hands to
+       [SchedCtx.scheds_alloc] once γs exists.  They are a boot-time split of
+       the .bss cells each hart's boot bridge is given ([BootBridge.
+       boot_bridge] returns its hart's spare half), and main is the natural
+       collector: it is the only code that runs before any scheduler. *)
+    ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
+    (* every proc slot's PARK RECEIPT, minted at adequacy
+       ([RiscvAdequacy.riscv_system_adequacy]) at [false]: main spends them
+       in [SpecProcinit.procs_inv_alloc], one per proc lock. *)
+    ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗

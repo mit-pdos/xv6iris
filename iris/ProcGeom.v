@@ -22,7 +22,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants.
+From iris.base_logic.lib Require Import gen_heap invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
@@ -291,12 +291,54 @@ Qed.
 Lemma needs_ctx_RUNNING : needs_ctx RUNNING = false.
 Proof. vm_compute. reflexivity. Qed.
 
+(* THE THIRD flat state predicate the proc-lock invariant keys on (beside
+   [needs_ctx] and [inv_dormant]): the states in which this slot's PARK
+   RECEIPT ([park_own] below) is not out on loan.  While the proc is
+   RUNNING its two receipt halves are elsewhere -- one in
+   [SchedCtx.scheds_inv]'s slot for the hart running it, one with the
+   running thread -- and at every other state both sit in [p->lock]. *)
+Definition not_running (st : mword 32) : bool :=
+  negb (bool_decide (st = RUNNING)).
+
+Lemma not_running_RUNNING : not_running RUNNING = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma not_running_UNUSED : not_running UNUSED = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma not_running_USED : not_running USED = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma not_running_SLEEPING : not_running SLEEPING = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma not_running_RUNNABLE : not_running RUNNABLE = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma not_running_ZOMBIE : not_running ZOMBIE = true.
+Proof. vm_compute. reflexivity. Qed.
+
 (* a parked state is not RUNNING (refutes sched's "sched RUNNING" panic arm). *)
 Lemma needs_ctx_not_RUNNING (st : mword 32) :
   needs_ctx st = true -> st <> RUNNING.
 Proof.
   intros Hn ->.
   rewrite needs_ctx_RUNNING in Hn. discriminate.
+Qed.
+
+(* the two guard classes are disjoint: a state that owns a saved context
+   does not also own the dormant private block. *)
+Lemma inv_dormant_of_needs_ctx (st : mword 32) :
+  needs_ctx st = true -> inv_dormant st = false.
+Proof.
+  rewrite /needs_ctx. intros Hn.
+  apply orb_true_iff in Hn as [Hn|Hn]; apply bool_decide_eq_true in Hn; subst.
+  - exact inv_dormant_RUNNABLE.
+  - exact inv_dormant_SLEEPING.
+Qed.
+
+(* every state that owns a saved context is not RUNNING *)
+Lemma not_running_of_needs_ctx (st : mword 32) :
+  needs_ctx st = true -> not_running st = true.
+Proof.
+  intros Hn. rewrite /not_running.
+  rewrite (bool_decide_eq_false_2 (st = RUNNING)); [done|].
+  exact (needs_ctx_not_RUNNING st Hn).
 Qed.
 
 (* p++ : &proc[k] + sizeof(proc) = &proc[k+1].  The addi's 12-bit immediate
@@ -523,3 +565,131 @@ Section CurProc.
   Global Instance cur_proc_timeless p : Timeless (cur_proc p).
   Proof. rewrite /cur_proc /word_pointsto /mem_pointsto. apply _. Qed.
 End CurProc.
+
+(* ===================================================================== *)
+(* THE SHARED HALF OF [cpus[h].proc], AND THE PER-PROC PARK RECEIPT.      *)
+(*                                                                        *)
+(* Both belong to the global parked-scheduler protocol [SchedCtx.         *)
+(* scheds_inv], but they are stated HERE, at the bottom of the proc/cpu   *)
+(* geometry, because [IntrDefs.cpu_cells] (far below SchedCtx) has to     *)
+(* name the half, and [SchedCtx.proc_lock_res] the receipt.               *)
+(*                                                                        *)
+(* [cpu_proc_half h p]: HALF of [cpus[h].proc], holding [p].  The other   *)
+(* half is permanently owned by [scheds_inv]'s slot for hart [h].  This    *)
+(* is the ONLY channel by which the logic can learn "the proc running on  *)
+(* hart h is p" -- exactly the fact myproc() reads -- and halving the     *)
+(* cell is MANDATORY rather than cosmetic: stated against a FULL cell the *)
+(* take-out move is vacuous (fractions 1 + 1/2), which                    *)
+(* [SchedCtx.cpu_own_full_is_vacuous] proves outright.                    *)
+(*                                                                        *)
+(* [park_own j q r]: fraction [q] of proc j's park receipt, at value [r].  *)
+(*   [r = true]  -- hart h's scheduler record is RESIDENT in slot h;       *)
+(*   [r = false] -- it is checked out by the thread running proc j (or     *)
+(*                  not yet deposited by a freshly dispatched one).        *)
+(* KEYED BY THE PROC, NOT BY THE HART, which is what makes the            *)
+(* entitlement hart-free: proc j is dispatched by whatever hart's         *)
+(* scheduler picked it up, and after a migration it is still proc j.  The *)
+(* name is CANONICAL ([RiscvPtsto.park_name]) for the same reason         *)
+(* [sie_name] is: the receipt is named inside [proc_lock_res], hence      *)
+(* inside [procs_inv], and a [γk] parameter there would have to be        *)
+(* threaded through every file that mentions [procs_inv].                 *)
+(* ===================================================================== *)
+Section ParkGhost.
+  Context `{!riscvGS Σ}.
+
+  Definition cpu_proc_half (h : CPU) (p : mword 64) : iProp Σ :=
+    (a_cpu_proc (cid_word_of h) ↦₈{DfracOwn (1/2)} p)%I.
+
+  Global Instance cpu_proc_half_timeless h p : Timeless (cpu_proc_half h p).
+  Proof. rewrite /cpu_proc_half /word_pointsto /mem_pointsto. apply _. Qed.
+
+  Lemma cpu_proc_halve (h : CPU) (p : mword 64) :
+    a_cpu_proc (cid_word_of h) ↦₈ p ⊣⊢ cpu_proc_half h p ∗ cpu_proc_half h p.
+  Proof. rewrite /cpu_proc_half -word_pointsto_frac_split Qp.div_2 //. Qed.
+
+  Lemma cpu_proc_half_agree (h : CPU) (p p' : mword 64) :
+    cpu_proc_half h p -∗ cpu_proc_half h p' -∗ ⌜p = p'⌝.
+  Proof. iIntros "H1 H2". iApply (word_pointsto_agree with "H1 H2"). Qed.
+
+  (* a FULL word cell excludes every further fraction of the same cell --
+     what makes "the invariant permanently holds a half" incompatible with
+     any resource still stating the cell in full. *)
+  Lemma word_pointsto_full_excl (a : Arch.pa) (dq : dfrac) (w w' : mword 64) :
+    a ↦₈ w -∗ a ↦₈{dq} w' -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (word_pointsto_bytes with "H1") as "Hb1".
+    iDestruct (word_pointsto_bytes with "H2") as "Hb2".
+    cbn [seq]. iDestruct "Hb1" as "[Hc1 _]". iDestruct "Hb2" as "[Hc2 _]".
+    iDestruct (mem_pointsto_ne with "Hc1 Hc2") as %Hne. done.
+  Qed.
+
+  Definition park_own (j : nat) (q : Qp) (r : bool) : iProp Σ :=
+    ghost_var (park_name j) q r.
+
+  Definition park_hlf (j : nat) (r : bool) : iProp Σ := park_own j (1/2) r.
+  Definition park_full (j : nat) (r : bool) : iProp Σ := park_own j 1 r.
+
+  Global Instance park_own_timeless j q r : Timeless (park_own j q r).
+  Proof. rewrite /park_own. apply _. Qed.
+
+  Lemma park_own_agree (j : nat) (q1 q2 : Qp) (r1 r2 : bool) :
+    park_own j q1 r1 -∗ park_own j q2 r2 -∗ ⌜r1 = r2⌝.
+  Proof.
+    iIntros "Hg1 Hg2".
+    by iDestruct (ghost_var_agree with "Hg1 Hg2") as %->.
+  Qed.
+
+  Local Lemma ghost_var_halve (γ : gname) (r : bool) :
+    ghost_var γ 1 r ⊣⊢ ghost_var γ (1/2) r ∗ ghost_var γ (1/2) r.
+  Proof.
+    iSplit.
+    - iIntros "H". iApply (ghost_var_split γ r (1/2) (1/2)).
+      rewrite Qp.half_half. iExact "H".
+    - iIntros "[H1 H2]". iCombine "H1 H2" as "H".
+      try rewrite Qp.half_half. iExact "H".
+  Qed.
+
+  Lemma park_split (j : nat) (r : bool) :
+    park_full j r ⊣⊢ park_hlf j r ∗ park_hlf j r.
+  Proof. rewrite /park_full /park_hlf /park_own ghost_var_halve //. Qed.
+
+  Lemma park_update (j : nat) (r r' : bool) :
+    park_hlf j r -∗ park_hlf j r ==∗ park_hlf j r' ∗ park_hlf j r'.
+  Proof.
+    rewrite /park_hlf /park_own. iIntros "Hg1 Hg2".
+    iMod (ghost_var_update_halves r' with "Hg1 Hg2") as "[$ $]". done.
+  Qed.
+
+  (* THE RECEIPT SPELLED AT A PROC ADDRESS.  [SchedCtx.proc_slots] is keyed
+     on the proc's ADDRESS, not on its array index, so the receipt's home in
+     the lock has to be too -- and giving [proc_slots] / [proc_lock_res] an
+     extra index argument would change the arity of [procs_inv] and of every
+     file that mentions it.  [proc_addr] is injective on the array range
+     ([proc_addr_inj]), so the two spellings are interchangeable there. *)
+  Definition park_at (pa : mword 64) (q : Qp) (r : bool) : iProp Σ :=
+    (∃ j : nat, ⌜pa = proc_addr j /\ (j < NPROC)%nat⌝ ∗ park_own j q r)%I.
+
+  Definition park_at_full (pa : mword 64) (r : bool) : iProp Σ :=
+    park_at pa 1 r.
+
+  Lemma park_at_intro (j : nat) (q : Qp) (r : bool) :
+    (j < NPROC)%nat -> park_own j q r -∗ park_at (proc_addr j) q r.
+  Proof. iIntros (Hj) "Hg". iExists j. iFrame "Hg". done. Qed.
+
+  Lemma park_at_elim (j : nat) (q : Qp) (r : bool) :
+    (j < NPROC)%nat -> park_at (proc_addr j) q r -∗ park_own j q r.
+  Proof.
+    iIntros (Hj) "(%j' & [%Hpa %Hj'] & Hg)".
+    rewrite (_ : j' = j); [iExact "Hg"|].
+    exact (proc_addr_inj j' j Hj' Hj (eq_sym Hpa)).
+  Qed.
+
+  Lemma park_at_full_intro (j : nat) (r : bool) :
+    (j < NPROC)%nat -> park_full j r -∗ park_at_full (proc_addr j) r.
+  Proof. exact (park_at_intro j 1 r). Qed.
+
+  Lemma park_at_full_elim (j : nat) (r : bool) :
+    (j < NPROC)%nat -> park_at_full (proc_addr j) r -∗ park_full j r.
+  Proof. exact (park_at_elim j 1 r). Qed.
+End ParkGhost.

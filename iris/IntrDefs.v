@@ -497,6 +497,16 @@ Section IntrDefs.
   (* push/pop level cell [noff], the saved base-enable [intena], and the  *)
   (* current-process field [proc].  Split out of [CpuOwn.cpu_own] and     *)
   (* moved down here for the same reason as §6a.                          *)
+  (*                                                                      *)
+  (* [proc] is held at HALF ([ProcGeom.cpu_proc_half]): the other half is *)
+  (* permanently owned by [SchedCtx.scheds_inv]'s slot for this hart, so  *)
+  (* that the global parked-scheduler protocol can read "the proc running *)
+  (* on hart h is p".  Keeping the FULL cell here would make that         *)
+  (* protocol's take-out move vacuous -- see                              *)
+  (* [SchedCtx.cpu_own_full_is_vacuous].  The two [c->proc] STORES the    *)
+  (* scheduler makes therefore have to reassemble the cell out of the     *)
+  (* invariant, which is what [SchedCtx.scheds_dispatch] /                *)
+  (* [scheds_reclaim] are.                                                *)
   (* ------------------------------------------------------------------- *)
   Definition noff_val (n : nat) : mword 32 := mword_of_int (Z.of_nat n).
   Definition intena_val (eb : bool) : mword 32 :=
@@ -509,7 +519,7 @@ Section IntrDefs.
       | O => (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv)%I
       | S _ => a_cpu_int cid_word ↦₄ intena_val eb
       end) ∗
-     a_cpu_proc cid_word ↦₈ p)%I.
+     cpu_proc_half cpu_id p)%I.
 
   (* the cells PLUS the counting token -- the whole per-cpu bundle minus
      the caller's context-slot payload [C] (which is an ordinary caller

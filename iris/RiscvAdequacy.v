@@ -90,6 +90,12 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      boot client spends it in main's kvm assembly, where the tree kvminit
      actually built is known. *)
   riscv_pre_kptGS :: inG Σ kptR;
+  (* the PER-PROC park receipt (ProcGeom.park_own): capacity only -- the
+     theorem below mints one [ghost_var bool] per proc slot, at [false], and
+     hands all of them to the boot client, which spends them in
+     [SpecProcinit.procs_inv_alloc] as the third guarded slot of every
+     proc's lock resource. *)
+  riscv_pre_parkGS :: ghost_varG Σ bool;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -103,7 +109,8 @@ Definition riscvΣ : gFunctors :=
      diskGhostΣ;
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
-     GFunctor kptR ].
+     GFunctor kptR;
+     ghost_varΣ bool ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -257,6 +264,26 @@ Section reg_alloc.
       intros ->. apply Hc. by eapply elem_of_list_lookup_2.
   Qed.
 
+  (* the PER-PROC-SLOT allocation the CANONICAL park receipt needs: one
+     fresh name per index below [n], each at full fraction.  Same induction
+     as [ghost_var_alloc_halves_cpus], over [seq 0 n] rather than the (finite)
+     hart enumeration -- what [park_name : nat -> gname] needs. *)
+  Lemma ghost_var_alloc_nats {A : Type} `{!ghost_varG Σ A} (a : A) (n : nat) :
+    ⊢ |==> ∃ f : nat -> gname, [∗ list] j ∈ seq 0 n, ghost_var (f j) 1 a.
+  Proof.
+    induction n as [|n IH].
+    - iModIntro. iExists (fun _ => 1%positive). done.
+    - iMod IH as (fr) "Hrest".
+      iMod (ghost_var_alloc a) as (γ) "Hg".
+      iModIntro. iExists (fun j => if decide (j = n) then γ else fr j).
+      rewrite seq_S big_sepL_app. iSplitL "Hrest".
+      + iApply (big_sepL_mono with "Hrest").
+        intros k j Hk. simpl.
+        rewrite decide_False; [done|].
+        intros ->. apply lookup_seq in Hk. lia.
+      + rewrite big_sepL_singleton Nat.add_0_l decide_True //.
+  Qed.
+
 End reg_alloc.
 
 (* Bridge a big-sep over the LIST [enum CPU] to one over the SET
@@ -283,6 +310,11 @@ Definition cpu_pool (cs : list CPU) : list (expr riscv_lang) :=
 
 Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
     (cs : list CPU) (g : gstate) (D : CPU -> gset register)
+    (* how many proc slots the kernel's proc[] array has: the boot client is
+       handed one park receipt per slot ([ProcGeom.park_own], minted at
+       [false]).  A hart client passes [NPROC]; the device-only corollary
+       below passes 0. *)
+    (nproc : nat)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) :
   (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
@@ -322,6 +354,10 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        (* the shared kernel page table's one-shot agreement, UNSET: spent
           once, in main's kvm assembly, to allocate [kpt_inv]. *)
        kpt_unset ∗
+       (* EVERY proc slot's PARK RECEIPT, minted at [false] -- nobody is
+          dispatched at boot.  Both halves of each: they sit in the proc's
+          own p->lock until its first dispatch (SchedCtx.proc_slots). *)
+       ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 false) ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio))
        ={⊤}=∗
@@ -366,7 +402,9 @@ Proof.
     as (γsie) "Hsie".
   (* the shared kernel table's one-shot agreement, unset *)
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk _ γkpt γs γsie).
+  (* EVERY proc slot's park receipt, minted at [false] *)
+  iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
+  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk _ γkpt γs γsie _ γpark).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
@@ -422,7 +460,7 @@ Proof.
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt HuF HpF HvF]")
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
@@ -434,6 +472,7 @@ Proof.
     iSplitL "Hsie".
     { iApply big_sepL_enum_to_set. iExact "Hsie". }
     iSplitL "Hkpt"; [iExact "Hkpt" |].
+    iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }
   iModIntro.
@@ -514,9 +553,9 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} (g : gstate)
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
   apply (riscv_system_adequacy Σ [] g
-           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) Hram).
+           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0 Hram).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt
      and the (unfrozen) DLAB half -- are what a boot chain would thread through

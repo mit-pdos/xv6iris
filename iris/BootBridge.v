@@ -480,6 +480,13 @@ Section BootBridge.
     ∃ mf : regfile,
       sie_cap_gpr mf K false p0 ∗
       cpu_own 0 false p0 cpu_ctx_free false ∗
+      (* THE SPARE HALF of [cpus[cid].proc].  [IntrDefs.cpu_cells] keeps only
+         half of that cell now; the other half belongs to the global parked-
+         scheduler invariant [SchedCtx.scheds_inv], which main allocates once
+         γs exists ([SchedCtx.scheds_alloc]).  So each hart's boot bridge
+         hands its spare half out here, and the eight of them are exactly
+         what main's [scheds_alloc] consumes. *)
+      cpu_proc_half cpu_id p0 ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
@@ -535,6 +542,7 @@ Section BootBridge.
                  (st_mdl1 mideleg0) MENVCFG_S Hmsf Hmiez eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
+    rewrite cpu_proc_halve. iDestruct "Hproc" as "[Hproc Hprocs]".
     iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
                  with "Hnoff Hint He2 Hproc Hctx") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY
@@ -547,7 +555,7 @@ Section BootBridge.
     iExists (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in).
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
-    iFrame "Hcpu Hg4a".
+    iFrame "Hcpu Hprocs Hg4a".
     rewrite /main_hart_raw /trap_csrs. iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
   Qed.
 

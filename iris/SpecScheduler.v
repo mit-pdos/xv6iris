@@ -54,11 +54,21 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (Φ : mval -> iProp Σ)
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
+  (* scheduler() runs with NO current proc -- that is the fact [wp_next_idle]
+     turns into "the scheduler thread cannot migrate", and it is also what
+     [scheds_inv]'s slot for this hart says at entry (main allocates every
+     slot at 0).  So the index is the literal zero, not a binder. *)
+  p0 = zero_reg ->
   (20 <= av)%nat ->
   sie_cap_gpr m av false p0 -∗
   cpu_own 0 false p0 cpu_ctx_free false -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
+  (* the global parked-scheduler invariant (SchedCtx.v): this hart's slot of
+     it holds HALF of [cpus[cid].proc], so the two [c->proc] stores the scan
+     makes are mask-changing steps ([scheds_dispatch] / [scheds_reclaim]).
+     Persistent and hart-free, like [procs_inv]; main allocates it. *)
+  scheds_inv Φ γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
      and its [p = zero_reg] hatch express -- but that is not the point: the
      [acquire] it calls in the scan asks for [panic_wp_any], a resource

@@ -102,6 +102,11 @@ Section SpecMainSecondary.
        (root : mword 44) (pas : nat -> mword 44),
        printk_env γpr γd γv ∗
        procs_inv Φ γs ∗
+       (* the global parked-scheduler invariant: persistent and hart-free,
+          so it rides the one-shot [started] escrow exactly as [procs_inv]
+          does -- and a secondary hart's scheduler() needs it for its two
+          [c->proc] stores. *)
+       scheds_inv Φ γs ∗
        is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗
@@ -130,6 +135,9 @@ Section SpecMainSecondary.
     (* plicinithart indexes the PLIC's per-hart banks with cpuid() *)
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
     (K_main_secondary <= K)%nat ->
+    (* a hart entering main has no current proc; scheduler() at the far end
+       is stated at that literal index (SpecScheduler.v). *)
+    p0 = zero_reg ->
     (* [b = false]: main's secondary arm runs entirely with interrupts off --
        it is scheduler() at the far end that first enables them.  So the hart
        provably cannot move under this contract, and (as on the boot arm) it

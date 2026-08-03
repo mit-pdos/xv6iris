@@ -556,6 +556,7 @@ Section ProofMainSecondary.
       (root : mword 44) (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
     (20 <= n)%nat ->
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
+    p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (MN + 0x32) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
@@ -566,10 +567,11 @@ Section ProofMainSecondary.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
     procs_inv Φ γs -∗
+    scheds_inv Φ γs -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hn Hdc.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv".
+    intros Hn Hdc Hp0.
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hsched".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -672,8 +674,8 @@ Section ProofMainSecondary.
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
-    iApply (Scheduler.wp_scheduler_sconf Φ γs Q4 n p0 ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr Hintr").
+    iApply (Scheduler.wp_scheduler_sconf Φ γs Q4 n p0 Hp0 ltac:(lia)
+              with "Hcg Hcpu Htext Hpc Hpinv Hsched Hpanic Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)
@@ -688,7 +690,7 @@ Section ProofMainSecondary.
      never touches them, so the section would not generalize over them. *)
   Proof using All.
     cbv beta delta [wp_main_secondary_sconf_body].
-    intros pcE Hcid Hdc HK.
+    intros pcE Hcid Hdc HK Hp0.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
     iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
@@ -700,15 +702,15 @@ Section ProofMainSecondary.
     iApply (ms_spin Φ γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
-      "(#Hpenv & #Hpinv & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
+      "(#Hpenv & #Hpinv & #Hsched & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev & _)".
     iApply (ms_printk γpr Φ γd γv m2 (K - 2)%nat p0 Hn38
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hcpu".
     iApply (ms_inithart_sched Φ γd γv γs m3 (K - 2)%nat p0 root tlbvec0
-              Hn20 Hdc
-              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv").
+              Hn20 Hdc Hp0
+              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv Hsched").
   Qed.
 
 End ProofMainSecondary.

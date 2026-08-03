@@ -834,7 +834,9 @@ Section ProofAllocproc.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt38) in "Hpc".
         (* the dormant block comes out of the invariant *)
-        iDestruct (proc_slots_unused Φ γs (proc_addr k) with "Hslots") as "Hdorm".
+        iDestruct (proc_slots_unused Φ γs (proc_addr k) with "Hslots") as "[Hdorm Hpark]".
+        iDestruct (park_at_full_elim k false Hk with "Hpark") as "Hpark".
+        rewrite park_split. iDestruct "Hpark" as "[Hparka Hparkb]".
         iDestruct (proc_dormant_unused γf (proc_addr k) with "Hdorm")
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hrest)".
         iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles)".
@@ -1404,10 +1406,10 @@ Section ProofAllocproc.
           cbn [upd_pt pv_ofile pv_cwd].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
-        iSplitL "Hlocked Hstate Hchan Hkilled Hxstate Hpidinv".
-        { rewrite /proc_held. iFrame "Hlocked Hstate Hchan".
+        iSplitL "Hlocked Hstate Hchan Hkilled Hxstate Hpidinv Hparka".
+        { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hparka".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
-        iFrame "Hpriv Hspare Hks".
+        iFrame "Hparkb Hpriv Hspare Hks".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

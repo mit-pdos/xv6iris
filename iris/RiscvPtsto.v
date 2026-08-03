@@ -162,6 +162,27 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      parameterized.  The functor instance comes from [sieG] at the use sites,
      for the same reason spelled out for [strans_name] above. *)
   sie_name : CPU -> gname;
+  (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
+     entry of the proc[] array, recording whether hart-h's parked scheduler
+     record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
+     that is running that proc ([true]) or CHECKED OUT by the running thread
+     ([false]).  Two halves: one in the invariant, one with the thread --
+     and while the proc is not RUNNING both sit in its [p->lock]
+     ([SchedCtx.proc_slots]).
+
+     KEYED BY THE PROC, NOT BY THE HART: that is what makes the entitlement
+     HART-FREE, so a thread carries it across a migration as a plain frame
+     (a per-hart receipt would be exactly the kind of stranded resource the
+     explicit-cpuid refactor exists to remove).
+
+     CANONICAL rather than an explicit [γk : list gname] parameter, for
+     precisely the reason spelled out for [sie_name] and [kmap_name] above:
+     the receipt is named inside [SchedCtx.proc_lock_res], hence inside
+     [procs_inv], and a parameter there would have to be threaded through
+     every one of the ~50 files that mention [procs_inv].  The function is
+     total; only indices below [NPROC] are ever owned. *)
+  riscv_parkGS :: ghost_varG Σ bool;
+  park_name : nat -> gname;
 }.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is

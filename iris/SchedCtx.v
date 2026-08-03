@@ -39,7 +39,7 @@
    parked context from the ▷ valid_context its own swtch handed it, and
    every consumer feeds the slot straight into wp_swtch_sconf's ▷ premise. *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap list bitvector.definitions.
+From stdpp Require Import gmap list finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 From iris.algebra Require Import excl ofe.
@@ -65,6 +65,37 @@ Local Open Scope Z_scope.
 Definition cpu_ctx_free `{!riscvGS Σ} `{CID : CpuId} : iProp Σ :=
   (∃ vs : list (mword 64),
      ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
+
+(* the namespace of the global parked-scheduler invariant [scheds_inv]. *)
+Definition schedsN : namespace := nroot .@ "scheds".
+
+(* ---------------------------------------------------------------------- *)
+(* Pure plumbing for the [∗ list] over [enum CPU] that [scheds_inv]'s body  *)
+(* is: a hart's own index into the enumeration.                            *)
+(* ---------------------------------------------------------------------- *)
+Lemma fin_enum_lookup (n : nat) (h : fin n) :
+  fin_enum n !! (fin_to_nat h) = Some h.
+Proof.
+  induction h as [|n h IH]; simpl; [done|].
+  by rewrite list_lookup_fmap IH.
+Qed.
+
+Lemma cpu_enum_lookup (h : CPU) : enum CPU !! (fin_to_nat h) = Some h.
+Proof. apply fin_enum_lookup. Qed.
+
+(* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the invariant's two
+   live states, and they are DISJOINT: proc[] does not start at address 0. *)
+Lemma proc_addr_nonzero (j : nat) :
+  (j < NPROC)%nat -> proc_addr j <> (zero_reg : mword 64).
+Proof.
+  intros Hj Heq.
+  apply (f_equal (@bv_unsigned 64)) in Heq.
+  rewrite (proc_addr_unsigned j Hj) in Heq.
+  assert (bv_unsigned (zero_reg : mword 64) = 0) as Hz
+    by (vm_compute; reflexivity).
+  rewrite Hz in Heq.
+  unfold KernelSyms.proc, proc_size in Heq. lia.
+Qed.
 
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
@@ -106,11 +137,19 @@ Section SchedCtx.
      [cpu_id]; the parameter is the seam the hart-generic protocol
      (claude-notes/projects/sched-hart-generic.md) moves into the payload's
      own binder. *)
+  (* [park_hlf j false] rides here on BOTH directions of a crossing, and it
+     has to: at its take-out the parking thread flipped the receipt to
+     [false] and it must reach the scheduler, which rejoins it with the
+     invariant's half at [scheds_reclaim] and puts the whole receipt back
+     into the lock; symmetrically the dispatching scheduler splits the
+     receipt at [scheds_dispatch] and the half it keeps must reach the
+     dispatched thread, whose first move after swtch is [scheds_put]. *)
   Definition proc_held (i : CPU) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
     (locked γl i ∗
      p_state (proc_addr j) ↦₄ st ∗
      p_chan (proc_addr j) ↦₈ ch ∗
-     proc_pub (proc_addr j))%I.
+     proc_pub (proc_addr j) ∗
+     park_hlf j false)%I.
 
   (* ------------------------------------------------------------------ *)
   (* The chain payload predicate.  The FOURTH argument is the crossing's  *)
@@ -276,6 +315,324 @@ Section SchedCtx.
     exfalso. exact (a_cpu_ctx_ne_p_context (cid_word_of i) j' (tp_ok_cid_of i) Hj' Hc).
   Qed.
 
+  (* ==================================================================== *)
+  (* THE GLOBAL PARKED-SCHEDULER INVARIANT.                                *)
+  (*                                                                      *)
+  (* A hart's parked scheduler record used to be THREAD-OWNED: a running  *)
+  (* kernel thread carried [▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj], and *)
+  (* that record owns fourteen EXCLUSIVE words of ITS hart's context slot *)
+  (* plus a hart-pinned admission index -- so it could not cross a        *)
+  (* migration, and every level-0/enabled-base contract that held one     *)
+  (* (sleep, yield, bread, bwrite, acquiresleep and the four axiom-linked *)
+  (* contracts beside them) was unprovable under [wp_next].               *)
+  (*                                                                      *)
+  (* It does not have to be thread-owned.  [sched_vc_at] is already       *)
+  (* CID-free, so the records live in a [procs_inv]-shaped GLOBAL         *)
+  (* invariant, one slot per hart, and a thread holds only two HART-FREE  *)
+  (* things: [scheds_inv] itself (persistent) and [park_hlf j true] (the  *)
+  (* per-PROC receipt).  Both cross [wp_next]'s lambda as ordinary        *)
+  (* frames, exactly as [procs_inv] and [p_pid] already do.               *)
+  (*                                                                      *)
+  (* Three states per hart, discriminated by TIMELESS data only (a        *)
+  (* pointsto value and a ghost bool), so every case split below is       *)
+  (* available inside a bare fancy update -- no program step is needed to *)
+  (* strip the [inv]'s ▷:                                                 *)
+  (*                                                                      *)
+  (*   c->proc = 0                : hart h's SCHEDULER is running.  No    *)
+  (*                                record exists; the scheduler owns its *)
+  (*                                own context cells as [cpu_ctx_free].  *)
+  (*   c->proc = &proc[j], r=1    : proc j runs on h and hart h's         *)
+  (*                                scheduler is parked; ITS RECORD LIVES *)
+  (*                                HERE.                                 *)
+  (*   c->proc = &proc[j], r=0    : the record is checked out by the      *)
+  (*                                running thread (inside sched(),       *)
+  (*                                between the take-out and the swtch),  *)
+  (*                                or not yet deposited (between the     *)
+  (*                                dispatcher's c->proc store and the    *)
+  (*                                resumed thread's deposit).            *)
+  (*                                                                      *)
+  (* The record is stored BARE, not under ▷: [inv] access already supplies *)
+  (* the ▷ that every consumer (wp_swtch_sconf's premise) wants.           *)
+  (* ==================================================================== *)
+  Definition sched_slot (h : CPU) : iProp Σ :=
+    (∃ p : mword 64,
+       cpu_proc_half h p ∗
+       (⌜p = zero_reg⌝
+        ∨ (∃ (j : nat) (r : bool),
+             ⌜p = proc_addr j /\ (j < NPROC)%nat⌝ ∗
+             park_hlf j r ∗
+             (if r then sched_vc_at h (a_cpu_ctx (cid_word_of h)) p
+                   else emp))))%I.
+
+  Definition scheds_inv : iProp Σ :=
+    inv schedsN ([∗ list] h ∈ enum CPU, sched_slot h).
+
+  Global Instance scheds_inv_persistent : Persistent scheds_inv.
+  Proof. apply _. Qed.
+
+  (* the per-hart slot, extracted from the global body (under ▷) *)
+  Local Lemma slot_acc (h : CPU) :
+    (▷ [∗ list] h' ∈ enum CPU, sched_slot h') -∗
+    ▷ sched_slot h ∗ (▷ sched_slot h -∗ ▷ [∗ list] h' ∈ enum CPU, sched_slot h').
+  Proof.
+    iIntros "Hb". iEval (rewrite big_sepL_later) in "Hb".
+    iDestruct (big_sepL_lookup_acc _ _ (fin_to_nat h) h with "Hb")
+      as "[$ Hback]"; [ apply cpu_enum_lookup |].
+    iIntros "Hs". iEval (rewrite big_sepL_later).
+    iApply ("Hback" with "Hs").
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (* MOVE 1 -- TAKE-OUT: what a thread does just before its own swtch.      *)
+  (*                                                                       *)
+  (* The entitlement is exactly two things:                                *)
+  (*   - [park_hlf j true]        -- keyed by the PROC.  HART-FREE: it      *)
+  (*                                 crosses a migration as a plain frame. *)
+  (*   - [cpu_proc_half h pj]     -- hart-indexed, but it is the fragment   *)
+  (*                                 [IntrDefs.cpu_cells] carries, and     *)
+  (*                                 those ride [sie_arm]'s enabled arm, so *)
+  (*                                 [wp_next] RE-DELIVERS them at the new  *)
+  (*                                 hart.  It has a transport by           *)
+  (*                                 construction.                          *)
+  (* Both come back; the invariant is re-closed in the r = false state.     *)
+  (* -------------------------------------------------------------------- *)
+  Lemma scheds_take (E : coPset) (h : CPU) (j : nat) :
+    ↑schedsN ⊆ E -> (j < NPROC)%nat ->
+    scheds_inv -∗
+    cpu_proc_half h (proc_addr j) -∗
+    park_hlf j true
+    ={E}=∗
+      ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j) ∗
+      cpu_proc_half h (proc_addr j) ∗
+      park_hlf j false.
+  Proof.
+    iIntros (HE Hj) "#Hinv Hhalf Htok".
+    rewrite /scheds_inv.
+    iInv "Hinv" as "Hbody" "Hclose".
+    iDestruct (slot_acc h with "Hbody") as "[Hslot Hback]".
+    rewrite /sched_slot.
+    iDestruct "Hslot" as (p) "[>Hph Hst]".
+    iDestruct (cpu_proc_half_agree with "Hph Hhalf") as %->.
+    iDestruct "Hst" as "[>%Hz | Hst]".
+    { exfalso. exact (proc_addr_nonzero j Hj Hz). }
+    iDestruct "Hst" as (j' r) "(>[%Hp' %Hj'] & >Htok' & Hrec)".
+    assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
+    iDestruct (park_own_agree with "Htok Htok'") as %<-.
+    (* r = true: the record is resident.  Take it, flip to false. *)
+    iMod (park_update j true false with "Htok Htok'") as "[Htok Htok']".
+    iMod ("Hclose" with "[Hback Hph Htok']") as "_".
+    { iApply "Hback". iNext. iExists (proc_addr j). iFrame "Hph".
+      iRight. iExists j, false. iFrame "Htok'". done. }
+    iModIntro. iFrame "Hhalf Htok". iExact "Hrec".
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (* MOVE 2 -- PUT-BACK: the RESUMED thread's first move.                   *)
+  (*                                                                       *)
+  (* NOT the scheduler's, and that is a real finding rather than an         *)
+  (* accident of the encoding: at its own swtch the scheduler does NOT hold *)
+  (* its record -- the record is MANUFACTURED by the swtch proof out of the *)
+  (* scheduler's continuation and handed to the RESUMED party through       *)
+  (* [valid_context_pre]'s wand.  So the deposit is the resumed thread's    *)
+  (* first move, at its first instruction after swtch returns, at whatever  *)
+  (* hart it woke up on.  [scheds_dispatch] is what the scheduler does      *)
+  (* instead.                                                              *)
+  (* -------------------------------------------------------------------- *)
+  Lemma scheds_put (E : coPset) (h : CPU) (j : nat) :
+    ↑schedsN ⊆ E -> (j < NPROC)%nat ->
+    scheds_inv -∗
+    cpu_proc_half h (proc_addr j) -∗
+    park_hlf j false -∗
+    ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j)
+    ={E}=∗ cpu_proc_half h (proc_addr j) ∗ park_hlf j true.
+  Proof.
+    iIntros (HE Hj) "#Hinv Hhalf Htok Hrec".
+    rewrite /scheds_inv.
+    iInv "Hinv" as "Hbody" "Hclose".
+    iDestruct (slot_acc h with "Hbody") as "[Hslot Hback]".
+    rewrite /sched_slot.
+    iDestruct "Hslot" as (p) "[>Hph Hst]".
+    iDestruct (cpu_proc_half_agree with "Hph Hhalf") as %->.
+    iDestruct "Hst" as "[>%Hz | Hst]".
+    { exfalso. exact (proc_addr_nonzero j Hj Hz). }
+    iDestruct "Hst" as (j' r) "(>[%Hp' %Hj'] & >Htok' & Hemp)".
+    assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
+    iDestruct (park_own_agree with "Htok Htok'") as %<-.
+    iMod (park_update j false true with "Htok Htok'") as "[Htok Htok']".
+    iMod ("Hclose" with "[Hback Hph Htok' Hrec]") as "_".
+    { iApply "Hback". iNext. iExists (proc_addr j). iFrame "Hph".
+      iRight. iExists j, true. iFrame "Htok'". iSplit; [done|]. iExact "Hrec". }
+    iModIntro. iFrame.
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (* MOVES 3 and 4 -- THE SCHEDULER'S TWO [c->proc] STORES.                 *)
+  (*                                                                       *)
+  (* Because the invariant permanently holds half of [cpus[h].proc], those  *)
+  (* two stores must happen with the invariant OPEN.  They are exactly the  *)
+  (* two state transitions of the slot, so this is alignment rather than    *)
+  (* accident -- but it does make [CpuOwn.cpu_own_set_proc]'s output only a *)
+  (* half, and the store itself a mask-changing step.                       *)
+  (* -------------------------------------------------------------------- *)
+
+  (* DISPATCH: c->proc : 0 -> &proc[j]; the slot enters the "checked out"
+     state.  [park_full j false] comes out of proc j's lock, and the half
+     that does not stay behind travels to the dispatched thread. *)
+  Lemma scheds_dispatch (E : coPset) (h : CPU) (j : nat) :
+    ↑schedsN ⊆ E -> (j < NPROC)%nat ->
+    scheds_inv -∗
+    cpu_proc_half h zero_reg -∗
+    park_full j false
+    ={E,E∖↑schedsN}=∗
+      a_cpu_proc (cid_word_of h) ↦₈ zero_reg ∗
+      (a_cpu_proc (cid_word_of h) ↦₈ proc_addr j
+         ={E∖↑schedsN,E}=∗ cpu_proc_half h (proc_addr j) ∗ park_hlf j false).
+  Proof.
+    iIntros (HE Hj) "#Hinv Hhalf Hfull".
+    rewrite /scheds_inv.
+    iInv "Hinv" as "Hbody" "Hclose".
+    iDestruct (slot_acc h with "Hbody") as "[Hslot Hback]".
+    rewrite /sched_slot.
+    iDestruct "Hslot" as (p) "[>Hph Hst]".
+    iDestruct (cpu_proc_half_agree with "Hph Hhalf") as %->.
+    iCombine "Hph Hhalf" as "Hcell". rewrite -cpu_proc_halve.
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    rewrite cpu_proc_halve. iDestruct "Hcell" as "[Hph Hhalf]".
+    rewrite park_split. iDestruct "Hfull" as "[Ht1 Ht2]".
+    iMod ("Hclose" with "[Hback Hph Ht1]") as "_".
+    { iApply "Hback". iNext. iExists (proc_addr j). iFrame "Hph".
+      iRight. iExists j, false. iFrame "Ht1". done. }
+    iModIntro. iFrame.
+  Qed.
+
+  (* THE IDLE STORE: c->proc : 0 -> 0.  scheduler()'s prologue clears
+     [c->proc] before entering its scan; the field is already 0 there (the
+     scheduler thread has no proc), so the slot does not change state -- but
+     the store still needs the FULL cell, hence still needs the invariant
+     open.  The zero value REFUTES the dispatched disjunct outright
+     ([proc_addr_nonzero]), so nothing can be orphaned by it. *)
+  Lemma scheds_idle (E : coPset) (h : CPU) :
+    ↑schedsN ⊆ E ->
+    scheds_inv -∗
+    cpu_proc_half h zero_reg
+    ={E,E∖↑schedsN}=∗
+      a_cpu_proc (cid_word_of h) ↦₈ zero_reg ∗
+      (a_cpu_proc (cid_word_of h) ↦₈ zero_reg
+         ={E∖↑schedsN,E}=∗ cpu_proc_half h zero_reg).
+  Proof.
+    iIntros (HE) "#Hinv Hhalf".
+    rewrite /scheds_inv.
+    iInv "Hinv" as "Hbody" "Hclose".
+    iDestruct (slot_acc h with "Hbody") as "[Hslot Hback]".
+    rewrite /sched_slot.
+    iDestruct "Hslot" as (p) "[>Hph Hst]".
+    iDestruct (cpu_proc_half_agree with "Hph Hhalf") as %->.
+    iCombine "Hph Hhalf" as "Hcell". rewrite -cpu_proc_halve.
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    rewrite cpu_proc_halve. iDestruct "Hcell" as "[Hph Hhalf]".
+    iMod ("Hclose" with "[Hback Hph Hst]") as "_".
+    { iApply "Hback". iNext. iExists zero_reg. iFrame "Hph". iExact "Hst". }
+    iModIntro. iFrame.
+  Qed.
+
+  (* RECLAIM: c->proc : &proc[j] -> 0, after the parking proc's swtch resumed
+     us.  The slot is provably record-free (r = false), so nothing is
+     orphaned; the two receipt halves rejoin and go back into proc j's lock. *)
+  Lemma scheds_reclaim (E : coPset) (h : CPU) (j : nat) :
+    ↑schedsN ⊆ E -> (j < NPROC)%nat ->
+    scheds_inv -∗
+    cpu_proc_half h (proc_addr j) -∗
+    park_hlf j false
+    ={E,E∖↑schedsN}=∗
+      a_cpu_proc (cid_word_of h) ↦₈ proc_addr j ∗
+      (a_cpu_proc (cid_word_of h) ↦₈ zero_reg
+         ={E∖↑schedsN,E}=∗ cpu_proc_half h zero_reg ∗ park_full j false).
+  Proof.
+    iIntros (HE Hj) "#Hinv Hhalf Htok".
+    rewrite /scheds_inv.
+    iInv "Hinv" as "Hbody" "Hclose".
+    iDestruct (slot_acc h with "Hbody") as "[Hslot Hback]".
+    rewrite /sched_slot.
+    iDestruct "Hslot" as (p) "[>Hph Hst]".
+    iDestruct (cpu_proc_half_agree with "Hph Hhalf") as %->.
+    iDestruct "Hst" as "[>%Hz | Hst]".
+    { exfalso. exact (proc_addr_nonzero j Hj Hz). }
+    iDestruct "Hst" as (j' r) "(>[%Hp' %Hj'] & >Htok' & Hemp)".
+    assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
+    iDestruct (park_own_agree with "Htok Htok'") as %<-.
+    iCombine "Hph Hhalf" as "Hcell". rewrite -cpu_proc_halve.
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    rewrite cpu_proc_halve. iDestruct "Hcell" as "[Hph Hhalf]".
+    iMod ("Hclose" with "[Hback Hph]") as "_".
+    { iApply "Hback". iNext. iExists zero_reg. iFrame "Hph". by iLeft. }
+    iModIntro. iFrame "Hhalf". rewrite park_split. iFrame.
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (* MOVE 5 -- ALLOCATION.  Nothing below [SchedCtx] names [scheds_inv], so *)
+  (* [main] allocates it once γs exists; that is what makes this design's   *)
+  (* boot story trivial where a [sieG]-field or saved-predicate design's    *)
+  (* was not.  The one genuine boot cost is that main must be HANDED half   *)
+  (* of EVERY hart's c->proc cell, since the body is a [∗ list] over all    *)
+  (* eight harts.                                                          *)
+  (* -------------------------------------------------------------------- *)
+  Lemma scheds_alloc (E : coPset) :
+    ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) ={E}=∗ scheds_inv.
+  Proof.
+    iIntros "Hcells". rewrite /scheds_inv.
+    iApply inv_alloc. iNext.
+    iApply (big_sepL_mono with "Hcells").
+    iIntros (k h Hk) "Hc". iExists zero_reg. iFrame "Hc". by iLeft.
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
+  (* THE VACUITY TRAP, recorded because it is easy to fall into: with the   *)
+  (* invariant holding a permanent HALF of c->proc, a take-out lemma stated *)
+  (* against a FULL-cell [cpu_own … false] is VACUOUS (fractions 1 + 1/2).  *)
+  (* Halving [IntrDefs.cpu_cells]' proc field is therefore MANDATORY, not   *)
+  (* cosmetic, and this lemma is the proof of that.                         *)
+  (* -------------------------------------------------------------------- *)
+  Lemma cpu_own_full_is_vacuous (E : coPset)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+    ↑schedsN ⊆ E ->
+    scheds_inv -∗
+    (⌜ (Z.of_nat n < 2 ^ 31)%Z ⌝ ∗
+     a_cpu_noff cid_word ↦₄ noff_val n ∗
+     (match n with
+      | O => (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv)%I
+      | S _ => a_cpu_int cid_word ↦₄ intena_val eb
+      end) ∗
+     a_cpu_proc cid_word ↦₈ p) ∗ C
+    ={E}=∗ False.
+  Proof.
+    iIntros (HE) "#Hinv [(%Hb & Hnoff & Hint & Hproc) HC]".
+    iInv "Hinv" as "Hbody" "Hclose".
+    iDestruct (slot_acc cpu_id with "Hbody") as "[Hslot _]".
+    rewrite /sched_slot. iDestruct "Hslot" as (p0) "[>Hph _]".
+    iDestruct (word_pointsto_full_excl with "Hproc Hph") as %[].
+  Qed.
+
+  (* PUT then TAKE.  The two directions compose -- which is simultaneously
+     the NON-VACUITY witness for both: [scheds_put]'s output is exactly
+     [scheds_take]'s entitlement, so neither premise set is empty. *)
+  Lemma scheds_put_take (E : coPset) (h : CPU) (j : nat) :
+    ↑schedsN ⊆ E -> (j < NPROC)%nat ->
+    scheds_inv -∗
+    cpu_proc_half h (proc_addr j) -∗
+    park_hlf j false -∗
+    ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j)
+    ={E}=∗
+      ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j) ∗
+      cpu_proc_half h (proc_addr j) ∗ park_hlf j false.
+  Proof.
+    iIntros (HE Hj) "#Hinv Hhalf Htok Hrec".
+    iMod (scheds_put E h j with "Hinv Hhalf Htok Hrec")
+      as "[Hhalf Htok]"; [done|done|].
+    iMod (scheds_take E h j with "Hinv Hhalf Htok")
+      as "(Hrec & Hhalf & Htok)"; [done|done|].
+    iModIntro. iFrame.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* The per-proc lock invariant.                                        *)
   (* ------------------------------------------------------------------ *)
@@ -314,9 +671,17 @@ Section SchedCtx.
   (* nested chain, so no caller destructs more than one.  See              *)
   (* claude-notes/design/proc-struct.md.                                   *)
   (* ------------------------------------------------------------------ *)
+  (*   - the PARK RECEIPT ([ProcGeom.park_at_full]), resident exactly while  *)
+  (*     the proc is not RUNNING ([not_running]): while it IS running one    *)
+  (*     half sits in [scheds_inv]'s slot for the hart running it and the    *)
+  (*     other travels with the thread.  This is the third detachable slot;  *)
+  (*     it moves on exactly the two transitions the scheduler makes         *)
+  (*     ([scheds_dispatch] / [scheds_reclaim]), so wakeup and kill -- which *)
+  (*     never change running-ness -- are unaffected.                        *)
   Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
     ((if needs_ctx st   then ▷ proc_ctx pa   else emp) ∗
-     (if inv_dormant st then proc_dormant pa st else emp))%I.
+     (if inv_dormant st then proc_dormant pa st else emp) ∗
+     (if not_running st then park_at_full pa false else emp))%I.
 
   Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
     (∃ (st : mword 32) (ch : mword 64),
@@ -335,20 +700,55 @@ Section SchedCtx.
      resources and is freeproc's job, not a recast. *)
   Lemma proc_slots_recast (pa : mword 64) (st st' : mword 32) :
     needs_ctx st' = needs_ctx st ->
+    not_running st' = not_running st ->
     inv_dormant st = false -> inv_dormant st' = false ->
     proc_slots pa st -∗ proc_slots pa st'.
-  Proof. intros Hn Hd Hd'. rewrite /proc_slots Hn Hd Hd'. iIntros "$". Qed.
+  Proof. intros Hn Hr Hd Hd'. rewrite /proc_slots Hn Hr Hd Hd'. iIntros "$". Qed.
 
-  (* allocproc's move: a slot found UNUSED yields the dormant block and
-     nothing else -- [needs_ctx UNUSED] is false, so the context guard is
-     [emp].  (The converse direction is [proc_lock_res_intro] at USED, where
-     BOTH guards are false and the release owes nothing.) *)
+  (* allocproc's move: a slot found UNUSED yields the dormant block and the
+     park receipt -- [needs_ctx UNUSED] is false, so the context guard is
+     [emp], but UNUSED is not RUNNING, so the receipt IS here and allocproc
+     has to carry it to the USED state it re-establishes. *)
   Lemma proc_slots_unused (pa : mword 64) :
-    proc_slots pa UNUSED -∗ proc_dormant pa UNUSED.
+    proc_slots pa UNUSED -∗ proc_dormant pa UNUSED ∗ park_at_full pa false.
   Proof.
-    rewrite /proc_slots inv_dormant_UNUSED.
+    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED.
     rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-    iIntros "[_ $]".
+    iIntros "[_ [$ $]]".
+  Qed.
+
+  (* ... and its inverse at USED, where BOTH the context and the dormant
+     guards are false and only the receipt is owed. *)
+  Lemma proc_slots_used (pa : mword 64) :
+    park_at_full pa false -∗ proc_slots pa USED.
+  Proof.
+    rewrite /proc_slots inv_dormant_USED not_running_USED.
+    rewrite (_ : needs_ctx USED = false); [| vm_compute; reflexivity].
+    iIntros "H". iSplitR; [done|]. iSplitR; [done|]. iExact "H".
+  Qed.
+
+  (* THE SCHEDULER'S TWO SLOT MOVES, spelled at the proc-lock end.
+     Dispatch takes the receipt out of a parked slot (which also yields the
+     saved context the scheduler is about to resume); reclaim puts it back
+     into the state the parking proc left behind. *)
+  Lemma proc_slots_dispatch (pa : mword 64) (st : mword 32) :
+    needs_ctx st = true ->
+    proc_slots pa st -∗ ▷ proc_ctx pa ∗ park_at_full pa false.
+  Proof.
+    intros Hn. rewrite /proc_slots Hn.
+    rewrite (not_running_of_needs_ctx st Hn).
+    rewrite (inv_dormant_of_needs_ctx st Hn).
+    iIntros "[$ [_ $]]".
+  Qed.
+
+  Lemma proc_slots_park (pa : mword 64) (st : mword 32) :
+    needs_ctx st = true ->
+    ▷ proc_ctx pa -∗ park_at_full pa false -∗ proc_slots pa st.
+  Proof.
+    intros Hn. rewrite /proc_slots Hn.
+    rewrite (not_running_of_needs_ctx st Hn).
+    rewrite (inv_dormant_of_needs_ctx st Hn).
+    iIntros "$ $".
   Qed.
 
   (* the global proc-array invariant: an [is_lock] over every proc's
@@ -421,7 +821,8 @@ Section SchedCtx.
     intros ->. iIntros "Hs Hc Hpub Hsl". iExists RUNNABLE, ch. iFrame "Hs Hc Hpub".
     iApply (proc_slots_recast pa SLEEPING RUNNABLE
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity) with "Hsl").
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+              with "Hsl").
   Qed.
 
 End SchedCtx.
