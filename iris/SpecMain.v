@@ -39,7 +39,7 @@
    assembly, before the kvminithart call -- so every hart can spin on
    [started] in its own Bare arm at once.
    [SchedCtx.procs_inv] is no longer an obstacle: since proc contexts became
-   MIGRATABLE (claude-notes/projects/sched-hart-generic.md) it mentions
+   MIGRATABLE (claude-notes/completed/sched-hart-generic.md) it mentions
    neither a hart nor a per-hart SIE ghost, it is persistent, and it is
    exactly what the [started] payload can carry to every secondary.
 

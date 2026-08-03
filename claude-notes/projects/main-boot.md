@@ -364,7 +364,7 @@ STATUS: all three parts LANDED — the shared kernel table
 (`completed/kpt-share.md`: `kpt_inv` + the per-hart residue `tlb_res_pt` +
 the mask-carrying `sr_absorb` + per-CPU `strans_name`, and the hart-generic
 kvminithart contract with the publication moved into main's boot arm), the
-hart-generic proc protocol (`projects/sched-hart-generic.md`: `procs_inv`
+hart-generic proc protocol (`../completed/sched-hart-generic.md`: `procs_inv`
 is one hart-independent persistent proposition; that file stays open only
 for the five loop-sleeper re-proofs, which do not gate main), and the
 per-hart Bare arm (`completed/bare-inv-generic.md`: `bare_inv` holds only

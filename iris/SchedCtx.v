@@ -135,7 +135,7 @@ Section SchedCtx.
   (* [i] is the hart the lock is held ON -- the hart whose scheduler chain
      this payload half belongs to.  Every current user instantiates it at
      [cpu_id]; the parameter is the seam the hart-generic protocol
-     (claude-notes/projects/sched-hart-generic.md) moves into the payload's
+     (claude-notes/completed/sched-hart-generic.md) moves into the payload's
      own binder. *)
   (* [park_hlf j false] rides here on BOTH directions of a crossing, and it
      has to: at its take-out the parking thread flipped the receipt to

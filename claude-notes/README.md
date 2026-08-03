@@ -109,14 +109,6 @@ are working on that effort — the relevant `projects/` file.
   later-stripping fence leaf, G5's three sweeps), the callee-by-callee
   resource inventory, the assemblies main performs, and what remains:
   the whole-system adequacy composition.
-- **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
-  2: the parked-proc resumption contract (`p_sched`) quantifies the
-  RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE
-  h)`) instead of pinning the ambient `cid_word`, so `procs_inv` becomes
-  one hart-independent proposition the `started` payload can carry. Keeps
-  the seam analysis (park/resume, the SLEEP interface's ∀h continuation,
-  allocproc's forkret deposit) and the blast-radius checklist. Design
-  approved.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`ProcPtOwn.v`): `proc_pt`, one
   predicate for a valid parked user table — trampoline + trapframe + the pages
@@ -186,6 +178,17 @@ are working on that effort — the relevant `projects/` file.
   interface sweep of this kind: most of it is about failure modes that COMPILE
   (a vacuous contract, a wrong-hart read, a dropped conjunct, a non-terminating
   `iSpecialize` one leaf after the mistake).
+- **[`sched-hart-generic.md`](completed/sched-hart-generic.md)** — G5 part 2:
+  the parked-proc resumption contract (`p_sched`) quantifies the RESUMING hart
+  inside the payload instead of pinning the ambient `cid_word`, so
+  `procs_inv Φ γs` is one hart-independent proposition the `started` payload
+  can carry. All EIGHT sleepers (acquiresleep, sys_pause, piperead, pipewrite,
+  uartwrite, virtio_disk_rw, bread, bwrite) were re-proven against the new
+  contracts; no `Axiom` of this project remains. Keeps the extraction recipe
+  (`CID` as a lemma binder outside the fixing section), the collapsed-`wp_next`
+  port recipe, WHICH joins actually need anchoring, the resolved
+  `trap_csrs_pay`-across-a-park blocker, and the failure modes that compile
+  (`Typeclasses Opaque cpu_own`, per-hart `cid_word` facts, per-hart `instr`).
 - **[`kpt-share.md`](completed/kpt-share.md)** — G5 part 1: the kernel page
   table SHARED across harts, so `kvminithart` has ONE hart-generic contract
   (consumes only the persistent `kpt_inv root` + the `↦₈□` root cell; the

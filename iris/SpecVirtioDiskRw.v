@@ -112,7 +112,7 @@ Definition wp_virtio_disk_rw_sconf_body
      one the pushing acquire minted, so the extra copy would be [trap_csrs] at
      the parking hart with the postcondition wanting it at the resuming one
      (and at [eb = true] two of them at one hart are outright contradictory).
-     See claude-notes/projects/sched-hart-generic.md. *)
+     See claude-notes/completed/sched-hart-generic.md. *)
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv Φ γs -∗

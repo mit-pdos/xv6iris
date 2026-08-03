@@ -203,10 +203,11 @@ about. Check the report after touching any parking contract.
 Landed: **bwrite** (`0670a72`), **acquiresleep** (`cc2e436`), **bread**
 (`72eb2b6` for the spec fix below, then the port), and — after the
 explicit-CPUID sweep, i.e. in the COLLAPSED `wp_next` form — **sys_pause**,
-**uartwrite**, **piperead** and **pipewrite**. ONE axiom remains:
-**virtio_disk_rw** (`LinkVirtioDiskRw.v`; the other `Axiom`s in `Link*.v` —
-consoleintr, kerneltrap, userinit, printk-general — are long-standing assumed
-callees and are NOT this project's).
+**uartwrite**, **piperead**, **pipewrite** and finally the **virtio_disk_rw**
+tower. ALL EIGHT SLEEPERS ARE RE-PROVEN; no `Axiom` of this project remains.
+(The `Axiom`s still in `Link*.v` — consoleintr, kerneltrap, userinit,
+printk-general — are long-standing assumed callees and are NOT this
+project's.)
 
 `acquiresleep` is the worked example for the remaining LOOP sleepers —
 read `ProofAcquiresleep.v` (and now `ProofSysPause.v` / `ProofUartwrite.v`)
@@ -341,11 +342,12 @@ Two failure modes these two ports added to the list:
     has to be re-derived there from `rget_tp`. This compiles as a unification
     failure whose two sides print identically.
 
-#### WHAT THE LAST PORT STILL NEEDS
+#### THE LAST PORT, AS LANDED (the rw tower)
 
-The `ProofVirtioDiskRw{,B,C,CSeam,D,DSeam,E,F}.v` tower (8734 lines) is
-recoverable from `git show 0cfc644^:iris/<file>`. Beyond the mechanical steps
-below it has two of its own: the contract no longer threads a caller-held
+The `ProofVirtioDiskRw{,B,C,CSeam,D,DSeam,E,F}.v` tower (8734 lines) was
+recovered from `git show 0cfc644^:iris/<file>` and re-threaded. Beyond the
+mechanical steps below it had two of its own: the contract no longer threads a
+caller-held
 `trap_csrs_pay` (the function is trap-CSR-BALANCED — its own acquire mints the
 pay its interior sleeps need and its release spends it), and `SpecVirtioDiskRw`
 renamed the buf-pointer local `b` to `bp` because `b` is now the SIE index, so
@@ -421,3 +423,40 @@ blocks straddle more than one crossing:
 - `panic_wp_any` replaces `panic_wp` on every block; the two consumers that
   still want the ambient form (bcache's `acquire`, and bloop's "bget: no
   buffers" arm) use `panic_wp_any_at cpu_id`.
+
+#### THE F FILE: THE COMPOSITION, AND WHERE THE SECTION BOUNDARY GOES
+
+`ProofVirtioDiskRwF.v` is the only file in the tower with a post-release
+(index-`true`) region, and it is where the six phases are composed. Three
+things about it are worth keeping:
+
+- **A seam lemma applied at a hart the caller INTRODUCED cannot live in the
+  CID-fixing section.** The composition's shape is
+  `iApply (P1.wp_vdrw_p1 …)` → `iIntros (CIDa Hsa M)` → every later phase at
+  `(CID := CIDa)`, because P1's continuation (acquire is index-`true` on its
+  first instruction) already quantifies the hart. So `wp_vdrw_p6_seam` AND its
+  helper `wp_vdrwf_iter` sit in a `Section VdrwfP6` that binds no `CpuId`, with
+  `` `{CID : CpuId} `` as a lemma binder; only `wp_virtio_disk_rw_sconf` itself
+  stays in the CID-fixing section, since the entry hart is the anchor of the
+  spec's own `wp_next`. Getting this wrong reads as "CID is already used" or as
+  a `(CID := CIDa)` that Rocq silently refuses.
+- **The exit index after `release` is `eb`, not `true`.** `RELEASE`'s
+  post-condition index is `match n with O => eb | S _ => false end`, so the
+  twelve epilogue leaves are stated at `eb`. With the parking premise
+  `eb = true` this is the enabled index — but only after `subst eb`, which
+  (per the extraction recipe, step 6) then forces the four remaining textual
+  `eb` tactic arguments in that proof to be spelled `true`. This is the one
+  place in the tower where `subst eb` is right; `Typeclasses Opaque cpu_own`
+  is what keeps `iNext` from then descending through the bundle.
+- **`cpu_own_eb_agree` does the whole `b` question.** The spec is index-generic
+  (`b : bool`), but at level 0 with `eb = true` the agreement pins `b = true`,
+  so `P1`'s hardcoded `true` prologue fits with no case split:
+  `iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm. cbn in Hbm.
+   assert (Hbt : b = true) by (rewrite -Hbm; exact Heb). clear Hbm. subst b.`
+
+Two smaller notes: `vdrw_regs` lost its `M !!! Rtp = cid_word` conjunct (five
+conjuncts, not six) together with every entry premise that fed it, so the
+`callee_saved` rebuild in P6's epilogue has twelve bullets; and
+`Release.wp_release_sconf` needs `(CID := CIDx)` explicitly (its `ltac:`-free
+premises elaborate before unification can pin the hart), while every ordinary
+leaf in the same stretch needs no annotation at all.

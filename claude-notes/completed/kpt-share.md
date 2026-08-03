@@ -119,7 +119,7 @@ only for user-mode-under-shared-table.
 1. The central sweep (SRegime mask-carrying absorb, the kpt ghost,
    call-site plumbing) — landed earlier; see §4 above.
 2. Hart-generic `p_sched`/`procs_inv` — landed as its own sweep
-   ([`sched-hart-generic.md`](../projects/sched-hart-generic.md); five loop
+   ([`sched-hart-generic.md`](sched-hart-generic.md); five loop
    sleepers remain axiomatized there, which does not gate main).
 3. The kvminithart respec/reproof + main's publication assembly + the
    secondary arm itself — all landed; the secondary arm's record (deposit

@@ -57,7 +57,7 @@ Definition callee_img (m : regfile) : list (mword 64) :=
 (* because the two kinds hand each other's records back along the chain     *)
 (* (a resumed party receives [▷ valid_context A' cret p] for its resumer's   *)
 (* record at the resumer's own index, and the payload pins [A']).           *)
-(* See claude-notes/projects/sched-hart-generic.md.                          *)
+(* See claude-notes/completed/sched-hart-generic.md.                          *)
 (* ---------------------------------------------------------------------- *)
 (* THE SLOT CARRIES NO GHOST NAME.  It used to be [option (CPU * gname)],
    pairing the hart with the SIE ghost the record was parked against; since
