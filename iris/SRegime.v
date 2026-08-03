@@ -35,7 +35,6 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import SmodePte KptPt.
 Require Import WpGpr WpMmodeLeafBase ExecCommon.
 Require Import SmodeCore KptTree.
-Require Import KMap.
 Require Import KptGhost.   (* kptN: the shared kernel table's namespace, named in [sr_absorb]'s mask premise *)
 Require Import KptShare.   (* the SHARED-table regime instance (§3) *)
 Require Import Riscv.rv64d_types Riscv.rv64d.

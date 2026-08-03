@@ -25,7 +25,7 @@ Require Import RegFile.
 Require Import WpLock WpMmodeLeafBase.
 Require Import CalleeSaved StackOwn.
 Require Import KallocInv.
-Require Import PtTree.
+Require Import PtreeType.
 Require Import Riscv.riscv_extras.
 Require Import WpKvmmap.
 Require Import SpecMappages.

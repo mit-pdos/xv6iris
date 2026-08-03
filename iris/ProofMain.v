@@ -68,7 +68,8 @@ Require Import KallocInv KvmSpec PageGeom.
    [kpt_unset] + [kmap_auth kmap_M0] here ([WpKvminithart.kvm_M_mint],
    [KptShare.kpt_inv_alloc], [KvmMap.kvm_bridge]) and the deposit wand
    carries the resulting [kpt_inv] / 65 claims / persistent root cell *)
-Require Import PtTree KptGhost KptShare KptExecMap KvmMap.
+Require Import KptGhost KptShare KptExecMap KvmMap.
+Require Import PtreeType.
 Require Import WpKvminithart.
 Require Import ProcGeom CpuOwn SchedCtx FdSlots FileInv.
 Require Import BcacheInv SleepLock.

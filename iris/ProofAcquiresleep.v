@@ -83,7 +83,7 @@ Require Import HartTp WpNext.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import KernelRvcDecode.
 Require Import WpSmodeIntr.
-Require Import WpMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.

@@ -56,7 +56,8 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import KallocInv.
-Require Import PtTree PtBuild.
+Require Import PtBuild.
+Require Import PtreeType.
 Require Import UptTree UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.

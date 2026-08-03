@@ -67,10 +67,9 @@ Require Import VcGen.
 Require Import WpPushOffBridges.
 Require Import KptGhost.
 Require Import MinstretInv.
-Require Import WpLock SleepLock.
+Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import ProcGeom CpuOwn.
-Require Import SchedCtx.
 Require Import FdSlots.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
@@ -80,7 +79,6 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import WpBrelseDecode.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
-Require Import SpecPanic.
 Require Import SpecBrelse.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

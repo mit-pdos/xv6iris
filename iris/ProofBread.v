@@ -87,7 +87,6 @@ Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import MinstretInv.
-Require Import KptGhost.
 Require Import WpLock SleepLock.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -99,7 +98,7 @@ Require Import HartTp WpNext.
 Require Import KernelText.
 Require Import InstrBytes.
 Require Import WpUart.
-Require Import ByteCursor ArrCursor.
+Require Import ArrCursor.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import BreadLru.

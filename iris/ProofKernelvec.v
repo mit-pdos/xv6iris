@@ -51,7 +51,6 @@ Require Import RegFile.
 Require Import WpMmodeLeafBase StackOwn.
 Require Import SmodeCore MstatusBits KernelText WpKvInstr.
 Require Import VcGen VcGenS.
-Require Import KptTree.
 Require Import KptShare.
 Require Import WpSmodePtLeaves WpSmodePtCtl.
 Require Import IntrDefs.

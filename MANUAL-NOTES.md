@@ -44,6 +44,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - swtch WP for a runnable proc must be for LoopE on any CPUID; not the "current" CPUID from ambient CpuId instance; this bubbles through the entire WP postcondition pattern
 - KPT shared across cores: concurrent updates to A/D bits, so PT must be owned by invariant
 - TLB invariant must allow for page table to be updated by another core, so TLB has stale A/D bits
+- ownership of cpu struct goes into interrupt-handling invariant when interrupts are enabled (but expose stable cur_proc)
+- big refactors get mired in complexity on the first pass: kpt-rwx refactor, explicit-cpuid refactor, cleaning up first version of instruction leaf specs
 
 Big things that still need to be done/explored:
 

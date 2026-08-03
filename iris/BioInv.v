@@ -48,10 +48,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
-Require Import InstrBytes.
 Require Import WpLock.
 Require Import SleepLock.
-Require Import ArrCursor.
 Require Import BufOwn.
 Require Import BcacheInv.
 From Kernel Require KernelSyms.

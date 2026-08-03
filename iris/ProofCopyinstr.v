@@ -108,7 +108,7 @@ Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext WpSconfVc.
 Require Import ByteCursor ByteBuf.
-Require Import PtTree.
+Require Import PtreeType.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import WpCopyinstrDecode.

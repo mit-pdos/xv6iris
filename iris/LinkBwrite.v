@@ -3,8 +3,6 @@
    three ever meet.  virtio_disk_rw's own contract is still assumed
    (LinkVirtioDiskRw.v); bwrite consumes its INTERFACE, so this link is
    independent of that. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import SpecBwrite SpecHoldingsleep SpecVirtioDiskRw.
 Require Import LinkHoldingsleep LinkVirtioDiskRw ProofBwrite.
 
 Module Bwrite := BwriteProof Holdingsleep VirtioDiskRw.

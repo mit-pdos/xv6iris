@@ -112,7 +112,7 @@ Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import ByteCursor ByteBuf.
-Require Import PtTree.
+Require Import PtreeType.
 Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.

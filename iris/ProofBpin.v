@@ -49,16 +49,13 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import WpLock SleepLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import ProcGeom CpuOwn.
 Require Import IntrDefs.
-Require Import KernelText.
-Require Import InstrBytes.
+Require Import ProcGeom CpuOwn.
+Require Import WpLock.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import BufOwn BcacheInv BioInv.
 Require Import WpBpinDecode.
 Require Import SpecAcquire SpecRelease.
-Require Import SpecPanic.
 Require Import SpecBpin.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
