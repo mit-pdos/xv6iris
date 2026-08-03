@@ -200,13 +200,18 @@ about. Check the report after touching any parking contract.
 
 ### RE-PROOF PROGRESS + THE ONE SPEC BLOCKER FOUND
 
-Landed: **bwrite** (`0670a72`), **acquiresleep** (`cc2e436`) and **bread**
-(`72eb2b6` for the spec fix below, then the port). Remaining axioms are exactly
-the five loop sleepers: sys_pause, piperead, pipewrite, uartwrite,
-virtio_disk_rw.
+Landed: **bwrite** (`0670a72`), **acquiresleep** (`cc2e436`), **bread**
+(`72eb2b6` for the spec fix below, then the port), and — after the
+explicit-CPUID sweep, i.e. in the COLLAPSED `wp_next` form — **sys_pause** and
+**uartwrite**. Remaining axioms are exactly three: **piperead**, **pipewrite**,
+**virtio_disk_rw** (`LinkPiperead.v` / `LinkPipewrite.v` /
+`LinkVirtioDiskRw.v`; the other `Axiom`s in `Link*.v` — consoleintr,
+kerneltrap, userinit, printk-general — are long-standing assumed callees and
+are NOT this project's).
 
-`acquiresleep` is the worked example for the four remaining LOOP sleepers —
-read `ProofAcquiresleep.v` rather than re-deriving the shape. Its lessons:
+`acquiresleep` is the worked example for the remaining LOOP sleepers —
+read `ProofAcquiresleep.v` (and now `ProofSysPause.v` / `ProofUartwrite.v`)
+rather than re-deriving the shape. Its lessons:
 
 - **The loop invariant is the thing that goes ∀h∀g, not a trailing half.**
   `asl_loop` / `asl_exit` stay `Definition`s but move OUT of the CID-fixing
@@ -254,6 +259,89 @@ continuation), which makes them strictly stronger and bread provable. The old
 in `git show 0cfc644^:iris/ProofVirtioDiskRwF.v`, where `Hpay0` is handed
 straight to the continuation across the park. **The rw re-proof therefore has
 one less resource to thread than the removed proof did.**
+
+#### THE COLLAPSED-FORM RECIPE, as validated on sys_pause and uartwrite
+
+These two were ported AFTER the explicit-CPUID sweep, so they are the current
+worked examples: there is no `g` to thread and no `(CID := h)` on any resource,
+only on the extracted BODY LEMMAS. What the two ports established, over and
+above acquiresleep's:
+
+- **Every JOIN is a `wp_next` anchored at an explicit hart, at index `true`.**
+  Not just the loop head: any control-flow join that two different harts can
+  reach. In sys_pause that is five (`sp_tail` +0x7e, `sp_exit0` +0x70,
+  `sp_exitk` +0x8c, `sp_loop` +0x4a, `sp_acq` +0x1a) — including `sp_acq`,
+  which no park precedes but which is reached from two index-`true` stretches
+  and therefore from two harts. The index inside the `fun CID => …` is the
+  RESOURCE index (`false` while the lock is held); the `wp_next` index is
+  `true` because that is the hart-generic form.
+- **The anchor is whichever hart the joins were ESTABLISHED at**, because that
+  is the hart the function's own `wp_next` obligation (`Hcont`) is anchored at.
+  Both files anchor everything at the section's ambient `CID`.
+- **`(CID := …)` is MANDATORY on a body lemma, and only there.** A leaf's hart
+  is pinned by unification with the `sie_cap_gpr` you hand it, so leaves need
+  no annotation; a body lemma's `` `{CID : CpuId} `` is resolved eagerly by
+  typeclass search and silently picks the WRONG local hart. The symptom is
+  `iSpecialize: cannot instantiate` on a premise that prints identically to
+  what you are giving it (`locked γt cpu_id`). Same for
+  `iSpecialize ("Hjoin" $! CIDk …)`: `CIDk` is the CURRENT hart, which inside a
+  lemma with a `CID` binder is `CID` only while the index has been `false`
+  since entry.
+- **A BOUNDED loop's induction hypothesis must itself conclude a `wp_next`.**
+  uartwrite's byte loop is a `nat` induction, and the IH is re-entered after a
+  park; `uw_iter`'s conclusion is therefore `… -∗ uw_head CID0 … i` with
+  `uw_head` a `wp_next`. Quantify `i` and its bound as ORDINARY Coq premises
+  after `k` (`forall i, (i + S k)%nat = n -> ⊢ …`), so `induction k` gives an IH
+  usable at `S i`; putting `∀ i` inside the `iProp` makes it unapplicable.
+- **`subst pj` before a `sleep` call.** `SpecSleep` names the parking proc as
+  the literal `proc_addr j`; a caller carrying an opaque `pj` with
+  `pj = proc_addr j` gets `iSpecialize: cannot instantiate` on
+  `cpu_own 1 eb pj C false`. Substitute, then spell the remaining textual `pj`s
+  as `(proc_addr j)`.
+- **Derive the entry index, never case-split on it.** `cpu_own_eb_agree` plus
+  the `eb = true` parking premise pins `b = true`; `clear` the agreement fact
+  BEFORE `subst b` or the substitution identifies `b` with `eb` instead.
+- **`rget` is where most of the port's friction is.** Every leaf premise that
+  reads a register now says `rget m k`, and every value a leaf WRITES back
+  (`c.mv`, `c.addi`, `subw`, the stored word of `c.sdsp`/`sw`, `c.ret`'s
+  target) is spelled with `rget`. Discharge premises with
+  `ltac:(rgne; exact H)` and normalise outputs with `iEval (rgne) in "…"` —
+  twice for a two-source instruction (`subw`, `c.add`, `bltu`).
+- **`callee_saved` lost tp**, so a whole-function postcondition's
+  `repeat split` has thirteen conjuncts, and every register invariant
+  (`sp_base`, `uw_loop_regs`, …) drops its `!!! Rtp = cid_word` conjunct
+  together with the entry premise that used to feed it.
+
+#### WHAT THE THREE REMAINING PORTS STILL NEED
+
+`ProofPiperead.v` (2731 lines), `ProofPipewrite.v` (2708) and the
+`ProofVirtioDiskRw{,B,C,CSeam,D,DSeam,E,F}.v` tower (8734) are recoverable from
+`git show 0cfc644^:iris/<file>`. Each needs, mechanically:
+
+1. every `wp_*_s_sconf γ Φ …` call to drop `γ` and gain the index argument in
+   the `b` slot of the new signature, with the `rd_ok` premise switched from
+   `ltac:(vm_compute; discriminate)` to `ltac:(rdok)`;
+2. `rewrite wp_next_off` before the `iIntros` of every leaf whose index is
+   `false`, and `iIntros (CIDk Hsk)` for every leaf whose index is `true`;
+3. the tp threading deleted end to end (the entry premise, ~15 `assert
+   (H…tp : … Regidx Rtp = cid_word)` chains, the conjuncts they feed, and the
+   `callee_saved` split that consumed them);
+4. `procs_inv γ Φ γs → procs_inv Φ γs`, `panic_wp → panic_wp_any`,
+   `▷ sched_vc γ Φ γs (a_cpu_ctx cid_word) pj → park_hlf j true` plus a
+   `scheds_inv Φ γs` premise, `kalloc_env γa None cid_word → kalloc_env γa
+   None`;
+5. every `iAssert`ed continuation wrapped in `wp_next (CID0 := CID) true pj
+   (fun CID => …)`, with `iIntros (CIDx Hsx)` opening its proof and
+   `iSpecialize ("X" $! CIDk with "[%]"); [wp_next_chain|]` at each use.
+   piperead has four (`EPIP`/`EPIC`+`CPP`/`WXP`, plus the copy loop and the
+   wait-loop iLöb); pipewrite mirrors it; the rw tower's seams are already cut
+   at the park, so its later seam lemmas take the hart as a binder.
+
+Step 1 is worth scripting — the leaf signatures can be read out of
+`Wp*.v` mechanically and the `b` slot located by counting the explicit binders
+before it. Steps 3 and 5 are not: they change proof STRUCTURE, and a script
+that half-applies them produces a file whose errors do not point at the real
+mistake.
 
 #### bread's port (the two-park shape)
 
