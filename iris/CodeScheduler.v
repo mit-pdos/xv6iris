@@ -118,11 +118,6 @@ Lemma schdec_498d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   = Some (C_LI (mword_of_int 3, Regidx (mword_of_int 19)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0xa2  0xbf5d  c.j -0x4a  (back to the acquire at +0x58) *)
-Lemma schdec_bf5d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbf5d : mword 16)) s
-  = Some (C_J (mword_of_int 2011), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Fresh base (32-bit) decode templates (keyed by word).                  *)
@@ -506,6 +501,6 @@ Section CodeScheduler.
   (* ---- +0xa2: c.j -0x4a (back to the acquire at +0x58) ---- *)
   Lemma schi_a2 : kernel_text -∗ instr (mword_of_int (SC + 0xa2) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2011 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (SC + 0xa2)%Z (mword_of_int 0xbf5d : mword 16)
-    (mword_of_int (SC + 0xa2) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2011 : mword 11) ('b"0")), zreg)) schdec_bf5d exec_execute_C_J. Qed.
+    (mword_of_int (SC + 0xa2) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2011 : mword 11) ('b"0")), zreg)) cdec_bf5d exec_execute_C_J. Qed.
 
 End CodeScheduler.

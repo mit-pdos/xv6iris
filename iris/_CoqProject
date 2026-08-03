@@ -634,6 +634,10 @@ SpecUartintr.v
 CodeUartintr.v
 ProofUartintr.v
 LinkUartintr.v
+SpecDevintr.v
+CodeDevintr.v
+ProofDevintr.v
+LinkDevintr.v
 SpecAllocpid.v
 CodeAllocpid.v
 ProofAllocpid.v

@@ -31,6 +31,12 @@ Lemma exec_read_CSR_time s :
     = Some (subrange_vec_dec (register_lookup mtime s.(sregs)) (Z.sub xlen 1) 0, s).
 Proof. drive_csr. rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mtime s)). apply exec_returnM. Qed.
 
+(* scause (0x142) reads the register straight out, with no subrange and no
+   lowering -- it is an S-level CSR with no M-level counterpart to narrow. *)
+Lemma exec_read_CSR_scause s :
+  exec (read_CSR (Ox"142")) s = Some (register_lookup scause s.(sregs), s).
+Proof. drive_csr. reflexivity. Qed.
+
 (* ===== menvcfg (0x30A): Ext_U-gated, read = subrange of menvcfg ===== *)
 Definition csr_menvcfg : mword 12 := Ox"30A".
 Definition menvcfg_rdval (s : mstate) : mword 64 :=
@@ -220,6 +226,18 @@ Proof.
   - rewrite (exec_wX_bits_gpr rd (time_rdval s) s).
     replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
     reflexivity.
+Qed.
+
+(* ===== scause (0x142): Ext_S-gated, read = the register itself.  The     *)
+(* privilege-free half; the Supervisor accessibility check and the          *)
+(* [execute] instance are next to their leaf, in WpSconfCsr.v. ===== *)
+Definition csr_scause : mword 12 := Ox"142".
+
+Lemma exec_csr_id_read_callback_scause s d :
+  exec (csr_id_read_callback csr_scause d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_read_callback csr_scause d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnm.
 Qed.
 
 Lemma menvcfg_rdval_set_nextPC (s : mstate) (v : mword 64) :

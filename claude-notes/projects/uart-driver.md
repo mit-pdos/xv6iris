@@ -240,8 +240,10 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
   transmitter token from `uart_ghosts_alloc` — into `is_txlock`.  Nothing calls
   it yet; it belongs with the rest of the parked boot wiring
   (`completed/interrupt-sweep.md`).
-- **devintr** is uartintr's caller (via the PLIC claim); wiring it up is what
-  puts the handler on the trap path.
+- ~~**devintr**~~ — DONE.  uartintr's caller is proven and linked; the handler
+  is on the trap path as far as devintr, and its whole axiom footprint is this
+  cone's `consoleintr` (plus the model baseline).  See
+  [`../design/interrupts.md`](../design/interrupts.md).
 - The `uartputc_sync` token tension above.
 - Decode hygiene: four base words (`lui a5,0x10000`, `andi a5,a5,32`,
   `auipc a5,0xa`, `lbu a0,0(s2)`) moved into KernelBaseDecode.v for uartintr;

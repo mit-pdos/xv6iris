@@ -250,11 +250,6 @@ Lemma vtb_0027d783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 2 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), true, 2), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x3a  beq a4,a5,+0x50 -- the loop-entry test *)
-Lemma vtb_04f70863 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x04f70863 : mword 32)) s
-  = Some (BTYPE (mword_of_int 80 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x44 / +0x72  lhu a5,32(s1) -- disk.used_idx *)
 Lemma vtb_0204d783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -412,7 +407,7 @@ Section VirtioDiskIntrInstrs.
 
   Lemma vti_3a : kernel_text -∗ instr (mword_of_int (VDT + 0x3a) : mword 64) false (BTYPE (mword_of_int 80 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)).
   Proof. mk_base (VDT + 0x3a)%Z (mword_of_int 0x04f70863 : mword 32)
-    (mword_of_int (VDT + 0x3a) : mword 64) (BTYPE (mword_of_int 80 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)) vtb_04f70863. Qed.
+    (mword_of_int (VDT + 0x3a) : mword 64) (BTYPE (mword_of_int 80 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)) bdec_04f70863. Qed.
 
   (* ---- the loop body ---- *)
   Lemma vti_3e : kernel_text -∗ instr (mword_of_int (VDT + 0x3e) : mword 64) false (FENCE (mword_of_int 0 : mword 4, mword_of_int 3 : mword 4, mword_of_int 3 : mword 4, Regidx (mword_of_int 0), Regidx (mword_of_int 0))).

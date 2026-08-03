@@ -1978,3 +1978,39 @@ Lemma cdec_fbfd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xfbfd : mword 16)) s
   = Some (C_BNEZ (mword_of_int 251, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* --------------------------------------------------------------------- *)
+(* Words promoted when devintr became their second user (the private      *)
+(* copies in CodeSysSbrk / CodeMemmove / CodeGrowproc / WpWakeup /        *)
+(* CodeScheduler were retired at the same time).                          *)
+(* --------------------------------------------------------------------- *)
+
+(* c.li a0,1 *)
+Lemma cdec_4505 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4505 : mword 16)) s
+  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.mv a4,a0 *)
+Lemma cdec_872a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x872a : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.j +0x10 *)
+Lemma cdec_a801 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa801 : mword 16)) s
+  = Some (C_J (mword_of_int 8 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.j -0x4a *)
+Lemma cdec_bf5d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbf5d : mword 16)) s
+  = Some (C_J (mword_of_int 2011 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.j -0x24 *)
+Lemma cdec_bff1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbff1 : mword 16)) s
+  = Some (C_J (mword_of_int 2030 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.

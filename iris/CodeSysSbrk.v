@@ -128,11 +128,6 @@ Import Defs.
 (* 0x72  c.j -0x0e          -- [cdec_bfcd] *)
 (* 0x76  c.j -0x12          -- [cdec_b7fd] *)
 
-(* 0x18  c.li a0,1 *)
-Lemma ssdc_4505 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4505 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x22  c.ld s1,72(a0)   (creg 2 = a0, creg 1 = s1; imm = 72/8) *)
 Lemma ssdc_6524 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -348,7 +343,7 @@ Section SysSbrkInstrs.
 
   Lemma ssi_18 : kernel_text -∗ instr (mword_of_int (SB + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (SB + 0x18)%Z (mword_of_int 0x4505 : mword 16)
-    (mword_of_int (SB + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) ssdc_4505 exec_execute_C_LI. Qed.
+    (mword_of_int (SB + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4505 exec_execute_C_LI. Qed.
 
   Lemma ssi_1a : kernel_text -∗ instr (mword_of_int (SB + 0x1a) : mword 64) false (JAL (mword_of_int 2096818 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (SB + 0x1a)%Z (mword_of_int 0xeb3ff0ef : mword 32)

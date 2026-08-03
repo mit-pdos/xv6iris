@@ -49,11 +49,6 @@ Section Kvmmap.
     = Some (C_BNEZ (mword_of_int 5, Cregidx (mword_of_int 2)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
 
-  (* ---- the base jals ---- *)
-  Lemma kvdec_jal_mp s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0xf3dff0ef : mword 32)) s
-    = Some (JAL (mword_of_int 2096956 : mword 21, Regidx (mword_of_int 1)), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
   (* ---- instr facts ---- *)
   Local Notation KMP off rvc ast :=
@@ -74,7 +69,7 @@ Section Kvmmap.
   Lemma ki_0c : KMP 0x0c true (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (KM + 0x0c)%Z (mword_of_int 0x863e : mword 16) (mword_of_int (KM + 0x0c) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 12), ADD)) kvdec_mv_a2a5 exec_execute_C_MV. Qed.
   Lemma ki_0e : KMP 0x0e false (JAL (mword_of_int 2096956 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KM + 0x0e)%Z (mword_of_int 0xf3dff0ef : mword 32) (mword_of_int (KM + 0x0e) : mword 64) (JAL (mword_of_int 2096956 : mword 21, Regidx (mword_of_int 1))) kvdec_jal_mp. Qed.
+  Proof. mk_base (KM + 0x0e)%Z (mword_of_int 0xf3dff0ef : mword 32) (mword_of_int (KM + 0x0e) : mword 64) (JAL (mword_of_int 2096956 : mword 21, Regidx (mword_of_int 1))) bdec_f3dff0ef. Qed.
   Lemma ki_12 : KMP 0x12 true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc (KM + 0x12)%Z (mword_of_int 0xe509 : mword 16) (mword_of_int (KM + 0x12) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)) kvdec_bnez exec_execute_C_BNEZ. Qed.
   Lemma ki_14 : KMP 0x14 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).

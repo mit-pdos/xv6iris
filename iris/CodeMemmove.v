@@ -45,11 +45,6 @@ Lemma mmdc_c205 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 16, Cregidx (mword_of_int 4)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x16  0x872a  c.mv a4,a0  (the dst cursor) *)
-Lemma mmdc_872a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x872a : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x18  0x0585  c.addi a1,1  (src++) *)
 Lemma mmdc_0585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -171,7 +166,7 @@ Section CodeMemmove.
   (* +0x16  c.mv a4,a0 *)
   Lemma minstr_mm_16 : kernel_text -∗ instr (mword_of_int (MM + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 14), ADD)).
   Proof. mk_rvc (MM + 0x16)%Z (mword_of_int 0x872a : mword 16)
-           (mword_of_int (MM + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 14), ADD)) mmdc_872a exec_execute_C_MV. Qed.
+           (mword_of_int (MM + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 14), ADD)) cdec_872a exec_execute_C_MV. Qed.
 
   (* +0x18  c.addi a1,1 *)
   Lemma minstr_mm_18 : kernel_text -∗ instr (mword_of_int (MM + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).

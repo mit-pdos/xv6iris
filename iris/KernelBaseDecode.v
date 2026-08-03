@@ -517,3 +517,20 @@ Lemma bdec_eefff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xeefff0ef : mword 32)) s
   = Some (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
+
+(* --------------------------------------------------------------------- *)
+(* Words promoted when devintr became their second user (the private      *)
+(* copies in CodeVirtioDiskIntr / WpKvmmap were retired at the same time).*)
+(* --------------------------------------------------------------------- *)
+
+(* beq a4,a5,+0x50 *)
+Lemma bdec_04f70863 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x04f70863 : mword 32)) s
+  = Some (BTYPE (mword_of_int 80 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ), s).
+Proof. decode_bridge_ms. Qed.
+
+(* jal ra,-0xc4 *)
+Lemma bdec_f3dff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf3dff0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2096956 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.

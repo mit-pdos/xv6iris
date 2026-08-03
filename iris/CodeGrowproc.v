@@ -153,11 +153,6 @@ Proof.
 Qed.
 
 
-(* 0x60  c.j -0x24  (offset/2 = -18; 11-bit residue 2030) *)
-Lemma gpdc_bff1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbff1 : mword 16)) s
-  = Some (C_J (mword_of_int 2030 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts -- all six distinct words are growproc's.   *)
@@ -387,6 +382,6 @@ Section GrowprocInstrs.
 
   Lemma gpi_60 : kernel_text -∗ instr (mword_of_int (GP + 0x60) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2030 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (GP + 0x60)%Z (mword_of_int 0xbff1 : mword 16)
-    (mword_of_int (GP + 0x60) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2030 : mword 11) ('b"0")), zreg)) gpdc_bff1 exec_execute_C_J. Qed.
+    (mword_of_int (GP + 0x60) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2030 : mword 11) ('b"0")), zreg)) cdec_bff1 exec_execute_C_J. Qed.
 
 End GrowprocInstrs.

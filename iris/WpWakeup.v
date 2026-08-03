@@ -118,11 +118,6 @@ Lemma wkd_f62 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0x4a8d : mword 16)) s
   = Some (C_LI (mword_of_int 3, Regidx (mword_of_int 21)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
-(* 0x80001f6c c.j +16 ; 0x80001f9a c.j -44 *)
-Lemma wkd_f6c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa801 : mword 16)) s
-  = Some (C_J (mword_of_int 8 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 (* 0x80001f8a c.lw a5,24(s1): [cdec_4c9c] -- shared, see KernelRvcDecode.v *)
 (* 0x80001f90 c.ld a5,32(s1) *)
 Lemma wkd_f90 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -196,7 +191,7 @@ Section WkLeaves.
   Lemma wki_24 : WKI 0x24 false (ITYPE (mword_of_int 518 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)).
   Proof. mk_base (KernelSyms.wakeup + 0x24)%Z (mword_of_int 0x20690913 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x24) : mword 64) (ITYPE (mword_of_int 518 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADDI)) wkd_f68. Qed.
   Lemma wki_28 : WKI 0x28 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.wakeup + 0x28)%Z (mword_of_int 0xa801 : mword 16) (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")), zreg)) wkd_f6c exec_execute_C_J. Qed.
+  Proof. mk_rvc (KernelSyms.wakeup + 0x28)%Z (mword_of_int 0xa801 : mword 16) (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")), zreg)) cdec_a801 exec_execute_C_J. Qed.
   (* ---- loop / release path ---- *)
   Lemma wki_2a : WKI 0x2a true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.wakeup + 0x2a)%Z (mword_of_int 0x8526 : mword 16) (mword_of_int (KernelSyms.wakeup + 0x2a) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
