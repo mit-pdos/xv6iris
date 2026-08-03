@@ -97,6 +97,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -151,11 +152,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* 0x32  c.mv a1,a0 *)
-Lemma gpdc_85aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x60  c.j -0x24  (offset/2 = -18; 11-bit residue 2030) *)
 Lemma gpdc_bff1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -215,11 +211,6 @@ Lemma gpdb_fe04d7e3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 8174 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 9), BGE), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x52  jal ra,uvmdealloc *)
-Lemma gpdb_e2cff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xe2cff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
 
 (* ===================================================================== *)
 (*  The per-instruction [instr] facts.                                    *)
@@ -314,7 +305,7 @@ Section GrowprocInstrs.
 
   Lemma gpi_32 : kernel_text -∗ instr (mword_of_int (GP + 0x32) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (GP + 0x32)%Z (mword_of_int 0x85aa : mword 16)
-    (mword_of_int (GP + 0x32) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)) gpdc_85aa exec_execute_C_MV. Qed.
+    (mword_of_int (GP + 0x32) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)) cdec_85aa exec_execute_C_MV. Qed.
 
   Lemma gpi_34 : kernel_text -∗ instr (mword_of_int (GP + 0x34) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 21 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (GP + 0x34)%Z (mword_of_int 0xc50d : mword 16)
@@ -370,11 +361,11 @@ Section GrowprocInstrs.
 
   Lemma gpi_52 : kernel_text -∗ instr (mword_of_int (GP + 0x52) : mword 64) false (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (GP + 0x52)%Z (mword_of_int 0xe2cff0ef : mword 32)
-    (mword_of_int (GP + 0x52) : mword 64) (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1))) gpdb_e2cff0ef. Qed.
+    (mword_of_int (GP + 0x52) : mword 64) (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1))) bdec_e2cff0ef. Qed.
 
   Lemma gpi_56 : kernel_text -∗ instr (mword_of_int (GP + 0x56) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (GP + 0x56)%Z (mword_of_int 0x85aa : mword 16)
-    (mword_of_int (GP + 0x56) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)) gpdc_85aa exec_execute_C_MV. Qed.
+    (mword_of_int (GP + 0x56) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)) cdec_85aa exec_execute_C_MV. Qed.
 
   Lemma gpi_58 : kernel_text -∗ instr (mword_of_int (GP + 0x58) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (GP + 0x58)%Z (mword_of_int 0xbff9 : mword 16)

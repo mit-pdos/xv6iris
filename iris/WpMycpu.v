@@ -76,11 +76,6 @@ Local Ltac my_close2 s HmisaC :=
    in KernelRvcDecode.v. ---- *)
 (* +0x16  953e  c.add a0,a0,a5 -- [cdec_953e] (KernelRvcDecode.v) *)
 
-(* +0x12  a9450513  addi a0,a0,-1388 *)
-Lemma mydec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xa8650513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* ===================================================================== *)
 (* The closed-form return value a0 = &cpus[cpuid].                        *)
@@ -155,7 +150,7 @@ Section WpMycpu.
 
   Lemma myi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) false (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KernelSyms.mycpu + 0x12)%Z (mword_of_int 0xa8650513 : mword 32)
-    (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) mydec_addi. Qed.
+    (mword_of_int (KernelSyms.mycpu + 0x12) : mword 64) (ITYPE (mword_of_int 0xa86 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) bdec_a8650513. Qed.
 
   Lemma myi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.mycpu + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.mycpu + 0x16)%Z (mword_of_int 0x953e : mword 16)

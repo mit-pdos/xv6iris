@@ -71,17 +71,7 @@ Lemma sddec_bnez_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('
   = Some (C_BNEZ (mword_of_int 55, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x52  0x97ca  c.add a5,a5,s2 *)
-Lemma sddec_add_a5_s2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x97ca : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x5e  0x07a1  c.addi a5,a5,8 *)
-Lemma sddec_addi_a5_8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x07a1 : mword 16)) s
-  = Some (C_ADDI (mword_of_int 8, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x68  0x95be  c.add a1,a1,a5 *)
 (* [cdec_95be] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
@@ -128,11 +118,6 @@ Lemma sddec_beq s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 108 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x3c  0x100027f3  csrr a5,sstatus  (csrrs a5,sstatus,x0) *)
-Lemma sddec_csrr s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x100027f3 : mword 32)) s
-  = Some (CSRReg (Ox"100", Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* +0x46  0x00010917  auipc s2,0x10 *)
 Lemma sddec_auipc_s2 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -290,7 +275,7 @@ Section CodeSched.
   (* ---- +0x3c: csrr a5,sstatus ---- *)
   Lemma sdi_3c : kernel_text -∗ instr (mword_of_int (SD + 0x3c) : mword 64) false (CSRReg (Ox"100", Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS)).
   Proof. mk_base (SD + 0x3c)%Z (mword_of_int 0x100027f3 : mword 32)
-    (mword_of_int (SD + 0x3c) : mword 64) (CSRReg (Ox"100", Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS)) sddec_csrr. Qed.
+    (mword_of_int (SD + 0x3c) : mword 64) (CSRReg (Ox"100", Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS)) bdec_100027f3. Qed.
 
   (* ---- +0x40: c.andi a5,a5,2 ---- *)
   Lemma sdi_40 : kernel_text -∗ instr (mword_of_int (SD + 0x40) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
@@ -330,7 +315,7 @@ Section CodeSched.
   (* ---- +0x52: c.add a5,a5,s2 ---- *)
   Lemma sdi_52 : kernel_text -∗ instr (mword_of_int (SD + 0x52) : mword 64) true (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (SD + 0x52)%Z (mword_of_int 0x97ca : mword 16)
-    (mword_of_int (SD + 0x52) : mword 64) (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) sddec_add_a5_s2 exec_execute_C_ADD. Qed.
+    (mword_of_int (SD + 0x52) : mword 64) (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) cdec_97ca exec_execute_C_ADD. Qed.
 
   (* ---- +0x54: lw s3,172(a5) ---- *)
   Lemma sdi_54 : kernel_text -∗ instr (mword_of_int (SD + 0x54) : mword 64) false (LOAD (mword_of_int 172 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 19), false, 4)).
@@ -353,7 +338,7 @@ Section CodeSched.
   (* ---- +0x5e: c.addi a5,a5,8 ---- *)
   Lemma sdi_5e : kernel_text -∗ instr (mword_of_int (SD + 0x5e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (SD + 0x5e)%Z (mword_of_int 0x07a1 : mword 16)
-    (mword_of_int (SD + 0x5e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) sddec_addi_a5_8 exec_execute_C_ADDI. Qed.
+    (mword_of_int (SD + 0x5e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) cdec_07a1 exec_execute_C_ADDI. Qed.
 
   (* ---- +0x60: auipc a1,0x10 ---- *)
   Lemma sdi_60 : kernel_text -∗ instr (mword_of_int (SD + 0x60) : mword 64) false (UTYPE (mword_of_int 0x10 : mword 20, Regidx (mword_of_int 11), AUIPC)).

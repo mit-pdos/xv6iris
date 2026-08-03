@@ -22,6 +22,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -39,28 +40,9 @@ Lemma uidc_461d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 7, Regidx (mword_of_int 12)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma uidc_8732 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8732 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* ===================================================================== *)
-(* Base (32-bit) decode facts.                                            *)
-(* ===================================================================== *)
-Lemma uidb_100007b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x100007b7 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
-Lemma uidb_10000737 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x10000737 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
-Lemma uidb_10000637 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x10000637 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 12), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma uidb_f8000693 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf8000693 : mword 32)) s
@@ -92,20 +74,12 @@ Lemma uidb_00d780a3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 1 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 15), 1), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma uidb_00006597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00006597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma uidb_77058593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x77058593 : mword 32)) s
   = Some (ITYPE (mword_of_int 1904 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma uidb_00012517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00012517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma uidb_a4850513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xa4850513 : mword 32)) s
@@ -143,7 +117,7 @@ Section CodeUartinit.
   (* --- body (0x08..0x36): LUI/SB/ADDI/c.li/c.mv --- *)
   Lemma uii_08 : kernel_text -∗ instr (mword_of_int (UI + 0x08) : mword 64) false (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (UI + 0x08)%Z (mword_of_int 0x100007b7 : mword 32)
-    (mword_of_int (UI + 0x08) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)) uidb_100007b7. Qed.
+    (mword_of_int (UI + 0x08) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100007b7. Qed.
 
   Lemma uii_0c : kernel_text -∗ instr (mword_of_int (UI + 0x0c) : mword 64) false (STORE (mword_of_int 1 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 1)).
   Proof. mk_base (UI + 0x0c)%Z (mword_of_int 0x000780a3 : mword 32)
@@ -151,7 +125,7 @@ Section CodeUartinit.
 
   Lemma uii_10 : kernel_text -∗ instr (mword_of_int (UI + 0x10) : mword 64) false (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)).
   Proof. mk_base (UI + 0x10)%Z (mword_of_int 0x10000737 : mword 32)
-    (mword_of_int (UI + 0x10) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)) uidb_10000737. Qed.
+    (mword_of_int (UI + 0x10) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)) bdec_10000737. Qed.
 
   Lemma uii_14 : kernel_text -∗ instr (mword_of_int (UI + 0x14) : mword 64) false (ITYPE (mword_of_int 3968 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 13), ADDI)).
   Proof. mk_base (UI + 0x14)%Z (mword_of_int 0xf8000693 : mword 32)
@@ -167,7 +141,7 @@ Section CodeUartinit.
 
   Lemma uii_1e : kernel_text -∗ instr (mword_of_int (UI + 0x1e) : mword 64) false (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 12), LUI)).
   Proof. mk_base (UI + 0x1e)%Z (mword_of_int 0x10000637 : mword 32)
-    (mword_of_int (UI + 0x1e) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 12), LUI)) uidb_10000637. Qed.
+    (mword_of_int (UI + 0x1e) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 12), LUI)) bdec_10000637. Qed.
 
   Lemma uii_22 : kernel_text -∗ instr (mword_of_int (UI + 0x22) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 12), 1)).
   Proof. mk_base (UI + 0x22)%Z (mword_of_int 0x00d60023 : mword 32)
@@ -183,7 +157,7 @@ Section CodeUartinit.
 
   Lemma uii_2e : kernel_text -∗ instr (mword_of_int (UI + 0x2e) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 14), ADD)).
   Proof. mk_rvc (UI + 0x2e)%Z (mword_of_int 0x8732 : mword 16)
-    (mword_of_int (UI + 0x2e) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 14), ADD)) uidc_8732 exec_execute_C_MV. Qed.
+    (mword_of_int (UI + 0x2e) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 14), ADD)) cdec_8732 exec_execute_C_MV. Qed.
 
   Lemma uii_30 : kernel_text -∗ instr (mword_of_int (UI + 0x30) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 7 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_rvc (UI + 0x30)%Z (mword_of_int 0x461d : mword 16)
@@ -200,7 +174,7 @@ Section CodeUartinit.
   (* --- args (0x3a..0x46): auipc/addi for a1="uart", a0=&tx_lock --- *)
   Lemma uii_3a : kernel_text -∗ instr (mword_of_int (UI + 0x3a) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (UI + 0x3a)%Z (mword_of_int 0x00006597 : mword 32)
-    (mword_of_int (UI + 0x3a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) uidb_00006597. Qed.
+    (mword_of_int (UI + 0x3a) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00006597. Qed.
 
   Lemma uii_3e : kernel_text -∗ instr (mword_of_int (UI + 0x3e) : mword 64) false (ITYPE (mword_of_int 1904 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (UI + 0x3e)%Z (mword_of_int 0x77058593 : mword 32)
@@ -208,7 +182,7 @@ Section CodeUartinit.
 
   Lemma uii_42 : kernel_text -∗ instr (mword_of_int (UI + 0x42) : mword 64) false (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (UI + 0x42)%Z (mword_of_int 0x00012517 : mword 32)
-    (mword_of_int (UI + 0x42) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) uidb_00012517. Qed.
+    (mword_of_int (UI + 0x42) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00012517. Qed.
 
   Lemma uii_46 : kernel_text -∗ instr (mword_of_int (UI + 0x46) : mword 64) false (ITYPE (mword_of_int 2632 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (UI + 0x46)%Z (mword_of_int 0xa4850513 : mword 32)

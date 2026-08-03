@@ -34,17 +34,7 @@ Import Defs.
 (* Compressed decode facts for this function's own words.                 *)
 (* ===================================================================== *)
 
-(* c.mv s1,a2          # s1 := max *)
-Lemma asdc_84b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84b2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.mv a2,s1 *)
-Lemma asdc_8626 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8626 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -99,7 +89,7 @@ Section InstrsAS.
 
   Lemma asi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)).  (* c.mv s1,a2          # s1 := max *)
   Proof. mk_rvc (KernelSyms.argstr + 0x0e)%Z (mword_of_int 0x84b2 : mword 16)
-    (mword_of_int (KernelSyms.argstr + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)) asdc_84b2 exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.argstr + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 9), ADD)) cdec_84b2 exec_execute_C_MV. Qed.
 
   Lemma asi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x10) : mword 64) false (JAL (mword_of_int 2096846 : mword 21, Regidx (mword_of_int 1))).  (* jal ra,argraw       # -306 -> 0x8000271a *)
   Proof. mk_base (KernelSyms.argstr + 0x10)%Z (mword_of_int 0xecfff0ef : mword 32)
@@ -107,7 +97,7 @@ Section InstrsAS.
 
   Lemma asi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)).  (* c.mv a2,s1 *)
   Proof. mk_rvc (KernelSyms.argstr + 0x14)%Z (mword_of_int 0x8626 : mword 16)
-    (mword_of_int (KernelSyms.argstr + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)) asdc_8626 exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.argstr + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)) cdec_8626 exec_execute_C_MV. Qed.
 
   Lemma asi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.argstr + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)).  (* c.mv a1,s2 *)
   Proof. mk_rvc (KernelSyms.argstr + 0x16)%Z (mword_of_int 0x85ca : mword 16)

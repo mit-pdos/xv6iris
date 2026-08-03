@@ -53,12 +53,6 @@ Local Ltac m_close0 s HmisaC :=
 
 (* ---- the three fresh RVC decodes (the c.slli/c.srli count-truncation pair
    is shared with memmove and lives in KernelRvcDecode as cdec_1602/cdec_9201) ---- *)
-(* cd6: 0x87aa -> c.mv a5,a0 *)
-Lemma mdec_cd6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x87aa : mword 16)) s = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
 
 (* cd4: 0xca19 -> c.beqz a2,cea *)
 Lemma mdec_cd4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -67,12 +61,6 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* ce4: 0x0785 -> c.addi a5,1 *)
-Lemma mdec_ce4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0785 : mword 16)) s = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
 
 (* ---- the three base decodes (one-shot decode_any) ---- *)
 (* cdc: 0x00a60733 -> add a4,a2,a0 *)
@@ -137,7 +125,7 @@ Section CodeMemset.
   (* +0x0a  c.mv a5,a0  ->  add a5,x0,a0 *)
   Lemma minstr_cc4 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0a) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.memset + 0x0a)%Z (mword_of_int 0x87aa : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) mdec_cd6 exec_execute_C_MV. Qed.
+           (mword_of_int (KernelSyms.memset + 0x0a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) cdec_87aa exec_execute_C_MV. Qed.
 
   (* +0x0c  c.slli a2,32  ->  slli a2,a2,32 *)
   Lemma minstr_cc6 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x0c) : mword 64) true (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 12), Regidx (mword_of_int 12), SLLI)).
@@ -162,7 +150,7 @@ Section CodeMemset.
   (* +0x18  c.addi a5,1  ->  addi a5,a5,1 *)
   Lemma minstr_cd2 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.memset + 0x18)%Z (mword_of_int 0x0785 : mword 16)
-           (mword_of_int (KernelSyms.memset + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) mdec_ce4 exec_execute_C_ADDI. Qed.
+           (mword_of_int (KernelSyms.memset + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) cdec_0785 exec_execute_C_ADDI. Qed.
 
   (* +0x1a  bne a5,a4,+0x14     (base, 4-aligned) *)
   Lemma minstr_cd4 : kernel_text -∗ instr (mword_of_int (KernelSyms.memset + 0x1a) : mword 64) false (BTYPE (mword_of_int 0x1ffa, Regidx (mword_of_int 14), Regidx (mword_of_int 15), BNE)).

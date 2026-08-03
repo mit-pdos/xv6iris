@@ -37,11 +37,6 @@ Import Defs.
 (* Base (32-bit) decode facts unique to fileinit.                        *)
 (* ===================================================================== *)
 
-(* auipc a1,0x3 *)
-Lemma fidb_00003597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00003597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* addi a1,a1,1468  -- a1 := &"ftable" *)
 Lemma fidb_5bc58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -86,7 +81,7 @@ Section CodeFileinit.
 
   Lemma fii_08 : kernel_text -∗ instr (mword_of_int (FI + 0x08) : mword 64) false (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (FI + 0x08)%Z (mword_of_int 0x00003597 : mword 32)
-    (mword_of_int (FI + 0x08) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) fidb_00003597. Qed.
+    (mword_of_int (FI + 0x08) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00003597. Qed.
 
   Lemma fii_0c : kernel_text -∗ instr (mword_of_int (FI + 0x0c) : mword 64) false (ITYPE (mword_of_int 1468 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (FI + 0x0c)%Z (mword_of_int 0x5bc58593 : mword 32)

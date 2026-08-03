@@ -42,6 +42,7 @@ Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -51,10 +52,6 @@ Import Defs.
 
 (* +0x0c  jal ra,argraw   (0x8000282c -> 0x8000271a is -274; the 21-bit
    field is 2^21 - 274 = 2096878) *)
-Lemma aadb_eefff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xeefff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
 
 (* ===================================================================== *)
 (*  The per-instruction [instr] facts.                                    *)
@@ -91,7 +88,7 @@ Section ArgaddrInstrs.
 
   Lemma aai_0c : kernel_text -∗ instr (mword_of_int (AA + 0x0c) : mword 64) false (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (AA + 0x0c)%Z (mword_of_int 0xeefff0ef : mword 32)
-    (mword_of_int (AA + 0x0c) : mword 64) (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))) aadb_eefff0ef. Qed.
+    (mword_of_int (AA + 0x0c) : mword 64) (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))) bdec_eefff0ef. Qed.
 
   (* the store's AST is already in leaf shape (a literal displacement and
      plain [Regidx]es) -- [cexec_sd0_s1_a0] does that normalisation. *)

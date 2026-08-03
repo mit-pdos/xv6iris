@@ -52,11 +52,6 @@ Lemma sldc_86be s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 15)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.addi a5,a5,1 *)
-Lemma sldc_0785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0785 : mword 16)) s
-  = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* c.bnez a4,-0x08     # -> +0x12 *)
 Lemma sldc_ff65 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -139,7 +134,7 @@ Section InstrsSL.
 
   Lemma sli_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.strlen + 0x14) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).  (* c.addi a5,a5,1 *)
   Proof. mk_rvc (KernelSyms.strlen + 0x14)%Z (mword_of_int 0x0785 : mword 16)
-    (mword_of_int (KernelSyms.strlen + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) sldc_0785 exec_execute_C_ADDI. Qed.
+    (mword_of_int (KernelSyms.strlen + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) cdec_0785 exec_execute_C_ADDI. Qed.
 
   Lemma sli_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.strlen + 0x16) : mword 64) false (LOAD (mword_of_int 4095 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), true, 1)).  (* lbu a4,-1(a5)       # the byte AT a3 *)
   Proof. mk_base (KernelSyms.strlen + 0x16)%Z (mword_of_int 0xfff7c703 : mword 32)

@@ -174,23 +174,8 @@ Lemma ucdc_8bae s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 23), Regidx (mword_of_int 11)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x1c  c.mv s5,a2 *)
-Lemma ucdc_8ab2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8ab2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x1e  c.li s1,0 *)
-Lemma ucdc_4481 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4481 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x20  c.lui s4,0x1 *)
-Lemma ucdc_6a05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6a05 : mword 16)) s
-  = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x24  c.add s1,s4  -- i += PGSIZE *)
 Lemma ucdc_94d2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -226,17 +211,7 @@ Lemma ucdc_8652 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 20)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x4e  c.slli a1,a1,0xc *)
-Lemma ucdc_05b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x05b2 : mword 16)) s
-  = Some (C_SLLI (mword_of_int 12, Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x58  c.mv a3,s2 *)
-Lemma ucdc_86ca s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x86ca : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 18)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x64  c.beqz a0,-0x40  (offset/2 = -32; 8-bit residue 224) *)
 Lemma ucdc_d161 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -244,17 +219,7 @@ Lemma ucdc_d161 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 224, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x6c  c.li a3,1 *)
-Lemma ucdc_4685 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4685 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 13)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x7c  c.j +0x04  (offset/2 = 2) *)
-Lemma ucdc_a011 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa011 : mword 16)) s
-  = Some (C_J (mword_of_int 2), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts -- all twelve are uvmcopy's own.            *)
@@ -407,15 +372,15 @@ Section UvmcopyInstrs.
 
   Lemma uci_1c : kernel_text -∗ instr (mword_of_int (UC + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (UC + 0x1c)%Z (mword_of_int 0x8ab2 : mword 16)
-    (mword_of_int (UC + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)) ucdc_8ab2 exec_execute_C_MV. Qed.
+    (mword_of_int (UC + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)) cdec_8ab2 exec_execute_C_MV. Qed.
 
   Lemma uci_1e : kernel_text -∗ instr (mword_of_int (UC + 0x1e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (UC + 0x1e)%Z (mword_of_int 0x4481 : mword 16)
-    (mword_of_int (UC + 0x1e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) ucdc_4481 exec_execute_C_LI. Qed.
+    (mword_of_int (UC + 0x1e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) cdec_4481 exec_execute_C_LI. Qed.
 
   Lemma uci_20 : kernel_text -∗ instr (mword_of_int (UC + 0x20) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), LUI)).
   Proof. mk_rvc (UC + 0x20)%Z (mword_of_int 0x6a05 : mword 16)
-    (mword_of_int (UC + 0x20) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), LUI)) ucdc_6a05 exec_execute_C_LUI. Qed.
+    (mword_of_int (UC + 0x20) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), LUI)) cdec_6a05 exec_execute_C_LUI. Qed.
 
   Lemma uci_22 : kernel_text -∗ instr (mword_of_int (UC + 0x22) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UC + 0x22)%Z (mword_of_int 0xa021 : mword 16)
@@ -491,7 +456,7 @@ Section UvmcopyInstrs.
 
   Lemma uci_4e : kernel_text -∗ instr (mword_of_int (UC + 0x4e) : mword 64) true (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)).
   Proof. mk_rvc (UC + 0x4e)%Z (mword_of_int 0x05b2 : mword 16)
-    (mword_of_int (UC + 0x4e) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) ucdc_05b2 exec_execute_C_SLLI. Qed.
+    (mword_of_int (UC + 0x4e) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) cdec_05b2 exec_execute_C_SLLI. Qed.
 
   Lemma uci_50 : kernel_text -∗ instr (mword_of_int (UC + 0x50) : mword 64) false (JAL (mword_of_int 2095316 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (UC + 0x50)%Z (mword_of_int 0x8d5ff0ef : mword 32)
@@ -505,7 +470,7 @@ Section UvmcopyInstrs.
 
   Lemma uci_58 : kernel_text -∗ instr (mword_of_int (UC + 0x58) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)).
   Proof. mk_rvc (UC + 0x58)%Z (mword_of_int 0x86ca : mword 16)
-    (mword_of_int (UC + 0x58) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) ucdc_86ca exec_execute_C_MV. Qed.
+    (mword_of_int (UC + 0x58) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 13), ADD)) cdec_86ca exec_execute_C_MV. Qed.
 
   Lemma uci_5a : kernel_text -∗ instr (mword_of_int (UC + 0x5a) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (UC + 0x5a)%Z (mword_of_int 0x8652 : mword 16)
@@ -541,7 +506,7 @@ Section UvmcopyInstrs.
 
   Lemma uci_6c : kernel_text -∗ instr (mword_of_int (UC + 0x6c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).
   Proof. mk_rvc (UC + 0x6c)%Z (mword_of_int 0x4685 : mword 16)
-    (mword_of_int (UC + 0x6c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) ucdc_4685 exec_execute_C_LI. Qed.
+    (mword_of_int (UC + 0x6c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) cdec_4685 exec_execute_C_LI. Qed.
 
   Lemma uci_6e : kernel_text -∗ instr (mword_of_int (UC + 0x6e) : mword 64) false (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 12), SRLI)).
   Proof. mk_base (UC + 0x6e)%Z (mword_of_int 0x00c4d613 : mword 32)
@@ -565,7 +530,7 @@ Section UvmcopyInstrs.
 
   Lemma uci_7c : kernel_text -∗ instr (mword_of_int (UC + 0x7c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UC + 0x7c)%Z (mword_of_int 0xa011 : mword 16)
-    (mword_of_int (UC + 0x7c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0")), zreg)) ucdc_a011 exec_execute_C_J. Qed.
+    (mword_of_int (UC + 0x7c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0")), zreg)) cdec_a011 exec_execute_C_J. Qed.
 
   (* --- success: return 0 ----------------------------------------------- *)
 

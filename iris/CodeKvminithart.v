@@ -48,10 +48,6 @@ Section KvminithartInstrs.
     exec (ext_decode (mword_of_int 0x2fc7b783 : mword 32)) s
     = Some (LOAD (mword_of_int 764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8), s).
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-  Lemma kvidec_16 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0x577d : mword 16)) s
-    = Some (C_LI (mword_of_int 63, Regidx (mword_of_int 14)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
   Lemma kvidec_18 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0x177e : mword 16)) s
     = Some (C_SLLI (mword_of_int 63, Regidx (mword_of_int 14)), s).
@@ -82,7 +78,7 @@ Section KvminithartInstrs.
   Lemma kvi_14 : KVI 0x14 true (SHIFTIOP (mword_of_int 12 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).  (* srli a5,a5,0xc *)
   Proof. mk_rvc (KernelSyms.kvminithart + 0x14)%Z (mword_of_int 0x83b1 : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x14) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83b1 exec_execute_C_SRLI. Qed.
   Lemma kvi_16 : KVI 0x16 true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).  (* li a4,-1 *)
-  Proof. mk_rvc (KernelSyms.kvminithart + 0x16)%Z (mword_of_int 0x577d : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x16) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) kvidec_16 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.kvminithart + 0x16)%Z (mword_of_int 0x577d : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x16) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) cdec_577d exec_execute_C_LI. Qed.
   Lemma kvi_18 : KVI 0x18 true (SHIFTIOP (mword_of_int 63 : mword 6, Regidx (mword_of_int 14), Regidx (mword_of_int 14), SLLI)).  (* slli a4,a4,0x3f *)
   Proof. mk_rvc (KernelSyms.kvminithart + 0x18)%Z (mword_of_int 0x177e : mword 16) (mword_of_int (KernelSyms.kvminithart + 0x18) : mword 64) (SHIFTIOP (mword_of_int 63 : mword 6, Regidx (mword_of_int 14), Regidx (mword_of_int 14), SLLI)) kvidec_18 exec_execute_C_SLLI. Qed.
   Lemma kvi_1a : KVI 0x1a true (RTYPE (creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), OR)).  (* or a5,a5,a4 *)

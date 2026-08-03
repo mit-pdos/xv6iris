@@ -101,11 +101,6 @@ Import Defs.
      0x1a  c.addi sp,sp,16     [cdec_0141]
      0x1c  c.ret               [cdec_8082]                               *)
 
-(* 0x0e  c.beqz a0,+0x10  (creg 2 = a0; offset/2 = 8) *)
-Lemma ucldc_c901 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc901 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 8, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x12  c.andi a5,a5,-17  (creg 7 = a5; 6-bit residue of -17 is 47) *)
 Lemma ucldc_9bbd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -113,13 +108,8 @@ Lemma ucldc_9bbd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_ANDI (mword_of_int 47, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x14  c.sd a5,0(a0)  (creg 2 = a0 the base, creg 7 = a5 the datum) *)
-Lemma ucldc_e11c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe11c : mword 16)) s
-  = Some (C_SD (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* [ucldc_e11c]'s AST in the shape a WP store leaf takes -- the twin of the
+(* [cdec_e11c]'s AST in the shape a WP store leaf takes -- the twin of the
    shared [cexec_611c] the load at 0x10 uses. *)
 Lemma ucexec_e11c s :
   exec (execute (C_SD (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
@@ -190,7 +180,7 @@ Section UvmclearInstrs.
 
   Lemma ucli_0e : kernel_text -∗ instr (mword_of_int (UC + 0x0e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (UC + 0x0e)%Z (mword_of_int 0xc901 : mword 16)
-    (mword_of_int (UC + 0x0e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) ucldc_c901 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (UC + 0x0e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c901 exec_execute_C_BEQZ. Qed.
 
   (* --- *pte &= ~PTE_U ------------------------------------------------- *)
 
@@ -204,7 +194,7 @@ Section UvmclearInstrs.
 
   Lemma ucli_14 : kernel_text -∗ instr (mword_of_int (UC + 0x14) : mword 64) true (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 8)).
   Proof. mk_rvc (UC + 0x14)%Z (mword_of_int 0xe11c : mword 16)
-    (mword_of_int (UC + 0x14) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 8)) ucldc_e11c ucexec_e11c. Qed.
+    (mword_of_int (UC + 0x14) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 8)) cdec_e11c ucexec_e11c. Qed.
 
   (* --- epilogue ------------------------------------------------------- *)
 

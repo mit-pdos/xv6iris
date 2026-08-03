@@ -99,6 +99,7 @@ Require Import WpDecode WpDecodeBridge WpRvcBridge.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import KernelBaseDecode.
 Import Defs.
 
 Section WalkInstrs.
@@ -128,10 +129,6 @@ Section WalkInstrs.
     exec (ext_decode_compressed (mword_of_int 0x9926 : mword 16)) s
     = Some (C_ADD (Regidx (mword_of_int 18), Regidx (mword_of_int 9)), s).
   Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma wdec_3a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0xcf85 : mword 16)) s
-    = Some (C_BEQZ (mword_of_int 28, Cregidx (mword_of_int 7)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
   Lemma wdec_3c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0x80a9 : mword 16)) s
     = Some (C_SRLI (mword_of_int 10, Cregidx (mword_of_int 1)), s).
@@ -156,14 +153,6 @@ Section WalkInstrs.
   Lemma wdec_7c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0xd979 : mword 16)) s
     = Some (C_BEQZ (mword_of_int 235, Cregidx (mword_of_int 2)), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma wdec_94 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0xb775 : mword 16)) s
-    = Some (C_J (mword_of_int 2006 : mword 11), s).
-  Proof. intro H. rvc_oneshot s H. Qed.
-  Lemma wdec_98 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-    exec (ext_decode_compressed (mword_of_int 0xbf6d : mword 16)) s
-    = Some (C_J (mword_of_int 2013 : mword 11), s).
   Proof. intro H. rvc_oneshot s H. Qed.
   (* ---- base decode facts (concrete-state bridge) ---- *)
   Lemma wdec_22 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -214,10 +203,6 @@ Section WalkInstrs.
     exec (ext_decode (mword_of_int 0x00c4d793 : mword 32)) s
     = Some (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 15), SRLI), s).
   Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
-  Lemma wdec_8c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-    exec (ext_decode (mword_of_int 0x0017e793 : mword 32)) s
-    = Some (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ORI), s).
-  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
   Lemma wdec_90 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
     exec (ext_decode (mword_of_int 0x00f93023 : mword 32)) s
     = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 18), 8), s).
@@ -262,7 +247,7 @@ Section WalkInstrs.
   Lemma wi_30 : WLK 0x30 true (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.walk + 0x30)%Z (mword_of_int 0x9926 : mword 16) (mword_of_int (KernelSyms.walk + 0x30) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADD)) wdec_30 exec_execute_C_ADD. Qed.
   Lemma wi_3a : WLK 0x3a true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
-  Proof. mk_rvc (KernelSyms.walk + 0x3a)%Z (mword_of_int 0xcf85 : mword 16) (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) wdec_3a exec_execute_C_BEQZ. Qed.
+  Proof. mk_rvc (KernelSyms.walk + 0x3a)%Z (mword_of_int 0xcf85 : mword 16) (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) cdec_cf85 exec_execute_C_BEQZ. Qed.
   Lemma wi_3c : WLK 0x3c true (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 1)), SRLI)).
   Proof. mk_rvc (KernelSyms.walk + 0x3c)%Z (mword_of_int 0x80a9 : mword 16) (mword_of_int (KernelSyms.walk + 0x3c) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 1)), SRLI)) wdec_3c exec_execute_C_SRLI. Qed.
   Lemma wi_3e : WLK 0x3e true (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 9), SLLI)).
@@ -302,13 +287,13 @@ Section WalkInstrs.
   Lemma wi_8a : WLK 0x8a true (SHIFTIOP (mword_of_int 10 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)).
   Proof. mk_rvc (KernelSyms.walk + 0x8a)%Z (mword_of_int 0x07aa : mword 16) (mword_of_int (KernelSyms.walk + 0x8a) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SLLI)) cdec_07aa exec_execute_C_SLLI. Qed.
   Lemma wi_94 : WLK 0x94 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.walk + 0x94)%Z (mword_of_int 0xb775 : mword 16) (mword_of_int (KernelSyms.walk + 0x94) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)) wdec_94 exec_execute_C_J. Qed.
+  Proof. mk_rvc (KernelSyms.walk + 0x94)%Z (mword_of_int 0xb775 : mword 16) (mword_of_int (KernelSyms.walk + 0x94) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)) cdec_b775 exec_execute_C_J. Qed.
   (* the alloc = 0 arm (+0x96/+0x98): dead under the alloc = 1 premise, live
      for walk(_,_,0) -- ProofWalkNoalloc's path. *)
   Lemma wi_96 : WLK 0x96 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.walk + 0x96)%Z (mword_of_int 0x4501 : mword 16) (mword_of_int (KernelSyms.walk + 0x96) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
   Lemma wi_98 : WLK 0x98 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.walk + 0x98)%Z (mword_of_int 0xbf6d : mword 16) (mword_of_int (KernelSyms.walk + 0x98) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)) wdec_98 exec_execute_C_J. Qed.
+  Proof. mk_rvc (KernelSyms.walk + 0x98)%Z (mword_of_int 0xbf6d : mword 16) (mword_of_int (KernelSyms.walk + 0x98) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)) cdec_bf6d exec_execute_C_J. Qed.
   Lemma wi_7a : WLK 0x7a true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.walk + 0x7a)%Z (mword_of_int 0x84aa : mword 16) (mword_of_int (KernelSyms.walk + 0x7a) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) cdec_84aa exec_execute_C_MV. Qed.
   Lemma wi_22 : WLK 0x22 false (BTYPE (mword_of_int 68 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 15), BLTU)).
@@ -336,7 +321,7 @@ Section WalkInstrs.
   Lemma wi_86 : WLK 0x86 false (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 15), SRLI)).
   Proof. mk_base (KernelSyms.walk + 0x86)%Z (mword_of_int 0x00c4d793 : mword 32) (mword_of_int (KernelSyms.walk + 0x86) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 9), Regidx (mword_of_int 15), SRLI)) wdec_86. Qed.
   Lemma wi_8c : WLK 0x8c false (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ORI)).
-  Proof. mk_base (KernelSyms.walk + 0x8c)%Z (mword_of_int 0x0017e793 : mword 32) (mword_of_int (KernelSyms.walk + 0x8c) : mword 64) (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ORI)) wdec_8c. Qed.
+  Proof. mk_base (KernelSyms.walk + 0x8c)%Z (mword_of_int 0x0017e793 : mword 32) (mword_of_int (KernelSyms.walk + 0x8c) : mword 64) (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ORI)) bdec_0017e793. Qed.
   Lemma wi_90 : WLK 0x90 false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 18), 8)).
   Proof. mk_base (KernelSyms.walk + 0x90)%Z (mword_of_int 0x00f93023 : mword 32) (mword_of_int (KernelSyms.walk + 0x90) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 18), 8)) wdec_90. Qed.
 End WalkInstrs.

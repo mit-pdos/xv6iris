@@ -123,10 +123,6 @@ Lemma wkd_f6c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0xa801 : mword 16)) s
   = Some (C_J (mword_of_int 8 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
-Lemma wkd_f9a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfd1 : mword 16)) s
-  = Some (C_J (mword_of_int 2026 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 (* 0x80001f8a c.lw a5,24(s1): [cdec_4c9c] -- shared, see KernelRvcDecode.v *)
 (* 0x80001f90 c.ld a5,32(s1) *)
 Lemma wkd_f90 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -229,7 +225,7 @@ Section WkLeaves.
   Lemma wki_52 : WKI 0x52 false (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 9), 4)).
   Proof. mk_base (KernelSyms.wakeup + 0x52)%Z (mword_of_int 0x0154ac23 : mword 32) (mword_of_int (KernelSyms.wakeup + 0x52) : mword 64) (STORE (mword_of_int 24 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 9), 4)) wkd_f96. Qed.
   Lemma wki_56 : WKI 0x56 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (KernelSyms.wakeup + 0x56)%Z (mword_of_int 0xbfd1 : mword 16) (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0")), zreg)) wkd_f9a exec_execute_C_J. Qed.
+  Proof. mk_rvc (KernelSyms.wakeup + 0x56)%Z (mword_of_int 0xbfd1 : mword 16) (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0")), zreg)) cdec_bfd1 exec_execute_C_J. Qed.
   (* ---- epilogue ---- *)
   Lemma wki_58 : WKI 0x58 true (LOAD (csdsp_imm 7, sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.wakeup + 0x58)%Z (mword_of_int 0x70e2 : mword 16) (mword_of_int (KernelSyms.wakeup + 0x58) : mword 64) (LOAD (csdsp_imm 7, sp, Regidx (mword_of_int 1), false, 8)) cdec_70e2 exec_execute_C_LDSP. Qed.

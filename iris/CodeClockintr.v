@@ -29,6 +29,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 From iris.base_logic.lib Require Import invariants.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -38,17 +39,7 @@ Notation CI := KernelSyms.clockintr.
 (* Fresh decode templates (bit patterns unique to clockintr).             *)
 (* ===================================================================== *)
 
-(* +0x08  0xc12ff0ef  jal ra,cpuid (target 0x800018d0; 2^21 - 3054) *)
-Lemma cidec_jal_cpuid s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xc12ff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
 
-(* +0x0c  0xcd11  c.beqz a0,+0x1c  (to the tick block at CI+0x28) *)
-Lemma cidec_beqz_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xcd11 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 14, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x0e  0xc01027f3  rdtime a5  (= csrr a5,time) *)
 Lemma cidec_rdtime s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -74,11 +65,6 @@ Lemma cidec_csrw_stimecmp s : register_lookup misa (sregs s) = MISA_C -> cfg_ok 
   = Some (CSRReg (csr_stimecmp, Regidx (mword_of_int 15), zreg, CSRRW), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x28/+0x48  0x00016517  auipc a0,0x16  (the &tickslock high half) *)
-Lemma cidec_auipc_a0 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00016517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x2c  0xc9a50513  addi a0,a0,-870  -- a0 := &tickslock *)
 Lemma cidec_addi_a0_lk1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -104,11 +90,6 @@ Lemma cidec_addi_a4_ticks s : register_lookup misa (sregs s) = MISA_C -> cfg_ok 
   = Some (ITYPE (mword_of_int 0xd5e : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x3c  0x431c  c.lw a5,0(a4) *)
-Lemma cidec_clw_ticks s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x431c : mword 16)) s
-  = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma cidec_exec_clw s :
   exec (execute (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)))) s
@@ -153,11 +134,6 @@ Lemma cidec_jal_rel s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2090890 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x54  0xbf6d  c.j -70  (back to the timer tail at CI+0x0e) *)
-Lemma cidec_cj_back s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbf6d : mword 16)) s
-  = Some (C_J (mword_of_int 2013 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Section CodeClockintr.
   Context `{!riscvGS Σ}.
@@ -183,11 +159,11 @@ Section CodeClockintr.
   (* ---- +0x08: jal ra,cpuid ; +0x0c: c.beqz a0 over the tick block ---- *)
   Lemma cii_08 : kernel_text -∗ instr (mword_of_int (CI + 0x08) : mword 64) false (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (CI + 0x08)%Z (mword_of_int 0xc12ff0ef : mword 32)
-    (mword_of_int (CI + 0x08) : mword 64) (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))) cidec_jal_cpuid. Qed.
+    (mword_of_int (CI + 0x08) : mword 64) (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))) bdec_c12ff0ef. Qed.
 
   Lemma cii_0c : kernel_text -∗ instr (mword_of_int (CI + 0x0c) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (CI + 0x0c)%Z (mword_of_int 0xcd11 : mword 16)
-    (mword_of_int (CI + 0x0c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cidec_beqz_a0 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (CI + 0x0c) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_cd11 exec_execute_C_BEQZ. Qed.
 
   (* ---- the timer tail: a5 := time + 1000000; csrw stimecmp,a5 ---- *)
   Lemma cii_0e : kernel_text -∗ instr (mword_of_int (CI + 0x0e) : mword 64) false (CSRReg (csr_time, zreg, Regidx (mword_of_int 15), CSRRS)).
@@ -230,7 +206,7 @@ Section CodeClockintr.
   (* ---- the tick block (hart 0 only): a0 := &tickslock ---- *)
   Lemma cii_28 : kernel_text -∗ instr (mword_of_int (CI + 0x28) : mword 64) false (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (CI + 0x28)%Z (mword_of_int 0x00016517 : mword 32)
-    (mword_of_int (CI + 0x28) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC)) cidec_auipc_a0. Qed.
+    (mword_of_int (CI + 0x28) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00016517. Qed.
 
   Lemma cii_2c : kernel_text -∗ instr (mword_of_int (CI + 0x2c) : mword 64) false (ITYPE (mword_of_int 0xc9a : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (CI + 0x2c)%Z (mword_of_int 0xc9a50513 : mword 32)
@@ -251,7 +227,7 @@ Section CodeClockintr.
 
   Lemma cii_3c : kernel_text -∗ instr (mword_of_int (CI + 0x3c) : mword 64) true (LOAD (mword_of_int 0, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (CI + 0x3c)%Z (mword_of_int 0x431c : mword 16)
-    (mword_of_int (CI + 0x3c) : mword 64) (LOAD (mword_of_int 0, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)) cidec_clw_ticks cidec_exec_clw. Qed.
+    (mword_of_int (CI + 0x3c) : mword 64) (LOAD (mword_of_int 0, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)) cdec_431c cidec_exec_clw. Qed.
 
   Lemma cii_3e : kernel_text -∗ instr (mword_of_int (CI + 0x3e) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (CI + 0x3e)%Z (mword_of_int 0x2785 : mword 16)
@@ -272,7 +248,7 @@ Section CodeClockintr.
   (* ---- release(&tickslock) and back to the timer tail ---- *)
   Lemma cii_48 : kernel_text -∗ instr (mword_of_int (CI + 0x48) : mword 64) false (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (CI + 0x48)%Z (mword_of_int 0x00016517 : mword 32)
-    (mword_of_int (CI + 0x48) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC)) cidec_auipc_a0. Qed.
+    (mword_of_int (CI + 0x48) : mword 64) (UTYPE (mword_of_int 0x16 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00016517. Qed.
 
   Lemma cii_4c : kernel_text -∗ instr (mword_of_int (CI + 0x4c) : mword 64) false (ITYPE (mword_of_int 0xc7a : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (CI + 0x4c)%Z (mword_of_int 0xc7a50513 : mword 32)
@@ -284,6 +260,6 @@ Section CodeClockintr.
 
   Lemma cii_54 : kernel_text -∗ instr (mword_of_int (CI + 0x54) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (CI + 0x54)%Z (mword_of_int 0xbf6d : mword 16)
-    (mword_of_int (CI + 0x54) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)) cidec_cj_back exec_execute_C_J. Qed.
+    (mword_of_int (CI + 0x54) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0")), zreg)) cdec_bf6d exec_execute_C_J. Qed.
 
 End CodeClockintr.

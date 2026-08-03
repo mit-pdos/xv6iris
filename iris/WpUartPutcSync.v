@@ -30,6 +30,7 @@ Require Import WpUart.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import KernelBaseDecode.
 
 Import Defs.
 
@@ -38,11 +39,6 @@ Import Defs.
 (*  Base decodes go through [decode_bridge_ms]; RVC through [rvc_oneshot]. *)
 (* ===================================================================== *)
 
-(* 0x982  10000737  lui a4,0x10000 *)
-Lemma updc_10000737 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x10000737 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x988  00074783  lbu a5,0(a4) *)
 Lemma updc_00074783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -50,11 +46,6 @@ Lemma updc_00074783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), true, 1), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x98c  0207f793  andi a5,a5,32 *)
-Lemma updc_0207f793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0207f793 : mword 32)) s
-  = Some (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x992  0ff4f513  zext.b a0,s1  (andi a0,s1,255) *)
 Lemma updc_0ff4f513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -62,11 +53,6 @@ Lemma updc_0ff4f513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 255 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ANDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x996  100007b7  lui a5,0x10000 *)
-Lemma updc_100007b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x100007b7 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x99a  00a78023  sb a0,0(a5) *)
 Lemma updc_00a78023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -86,11 +72,6 @@ Lemma uprvc_dfe5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_BEQZ (mword_of_int 252, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x96e / 0x99e  0000a797  auipc a5,0xa *)
-Lemma updc_0000a797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0000a797 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x972  8a87a783  lw a5,-1880(a5)  (panicking) *)
 Lemma updc_8a87a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -142,7 +123,7 @@ Section WpUartPutcSync.
   (* ------------------------------------------------------------------- *)
   Lemma upi_20 : kernel_text -∗ instr (mword_of_int (UPS + 0x20) : mword 64) false (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)).
   Proof. mk_base (UPS + 0x20)%Z (mword_of_int 0x10000737 : mword 32)
-    (mword_of_int (UPS + 0x20) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)) updc_10000737. Qed.
+    (mword_of_int (UPS + 0x20) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 14), LUI)) bdec_10000737. Qed.
 
   Lemma upi_24 : kernel_text -∗ instr (mword_of_int (UPS + 0x24) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (UPS + 0x24)%Z (mword_of_int 0x0715 : mword 16)
@@ -154,7 +135,7 @@ Section WpUartPutcSync.
 
   Lemma upi_2a : kernel_text -∗ instr (mword_of_int (UPS + 0x2a) : mword 64) false (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_base (UPS + 0x2a)%Z (mword_of_int 0x0207f793 : mword 32)
-    (mword_of_int (UPS + 0x2a) : mword 64) (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) updc_0207f793. Qed.
+    (mword_of_int (UPS + 0x2a) : mword 64) (ITYPE (mword_of_int 32 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) bdec_0207f793. Qed.
 
   Lemma upi_2e : kernel_text -∗ instr (mword_of_int (UPS + 0x2e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (UPS + 0x2e)%Z (mword_of_int 0xdfe5 : mword 16)
@@ -166,7 +147,7 @@ Section WpUartPutcSync.
 
   Lemma upi_34 : kernel_text -∗ instr (mword_of_int (UPS + 0x34) : mword 64) false (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (UPS + 0x34)%Z (mword_of_int 0x100007b7 : mword 32)
-    (mword_of_int (UPS + 0x34) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)) updc_100007b7. Qed.
+    (mword_of_int (UPS + 0x34) : mword 64) (UTYPE (mword_of_int 0x10000 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100007b7. Qed.
 
   Lemma upi_38 : kernel_text -∗ instr (mword_of_int (UPS + 0x38) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 1)).
   Proof. mk_base (UPS + 0x38)%Z (mword_of_int 0x00a78023 : mword 32)
@@ -175,7 +156,7 @@ Section WpUartPutcSync.
   (* --- panic-check instructions (0x96e auipc / 0x972 lw / 0x976 c.beqz) --- *)
   Lemma upi_0c : kernel_text -∗ instr (mword_of_int (UPS + 0x0c) : mword 64) false (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (UPS + 0x0c)%Z (mword_of_int 0x0000a797 : mword 32)
-    (mword_of_int (UPS + 0x0c) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) updc_0000a797. Qed.
+    (mword_of_int (UPS + 0x0c) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0000a797. Qed.
 
   Lemma upi_10 : kernel_text -∗ instr (mword_of_int (UPS + 0x10) : mword 64) false (LOAD (mword_of_int 0x8a8 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (UPS + 0x10)%Z (mword_of_int 0x8a87a783 : mword 32)
@@ -188,7 +169,7 @@ Section WpUartPutcSync.
   (* --- panicked-check (0x978 auipc / 0x97c lw / 0x980 c.bnez) --- *)
   Lemma upi_16 : kernel_text -∗ instr (mword_of_int (UPS + 0x16) : mword 64) false (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (UPS + 0x16)%Z (mword_of_int 0x0000a797 : mword 32)
-    (mword_of_int (UPS + 0x16) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) updc_0000a797. Qed.
+    (mword_of_int (UPS + 0x16) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0000a797. Qed.
 
   Lemma upi_1a : kernel_text -∗ instr (mword_of_int (UPS + 0x1a) : mword 64) false (LOAD (mword_of_int 0x89a : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (UPS + 0x1a)%Z (mword_of_int 0x89a7a783 : mword 32)
@@ -201,7 +182,7 @@ Section WpUartPutcSync.
   (* --- 2nd panicking-check (0x99e auipc / 0x9a2 lw / 0x9a6 c.beqz) --- *)
   Lemma upi_3c : kernel_text -∗ instr (mword_of_int (UPS + 0x3c) : mword 64) false (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)).
   Proof. mk_base (UPS + 0x3c)%Z (mword_of_int 0x0000a797 : mword 32)
-    (mword_of_int (UPS + 0x3c) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) updc_0000a797. Qed.
+    (mword_of_int (UPS + 0x3c) : mword 64) (UTYPE (mword_of_int 0xa : mword 20, Regidx (mword_of_int 15), AUIPC)) bdec_0000a797. Qed.
 
   Lemma upi_40 : kernel_text -∗ instr (mword_of_int (UPS + 0x40) : mword 64) false (LOAD (mword_of_int 0x878 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (UPS + 0x40)%Z (mword_of_int 0x8787a783 : mword 32)

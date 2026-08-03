@@ -78,11 +78,6 @@ Lemma fadc_46a1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 8, Regidx (mword_of_int 13)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x24  c.mv a2,s1 *)
-Lemma fadc_8626 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8626 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 12), Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* [cdec_6928] -- shared, see KernelRvcDecode.v *)
 
@@ -199,7 +194,7 @@ Section FetchaddrInstrs.
 
   Lemma fai_24 : kernel_text -∗ instr (mword_of_int (FA + 0x24) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)).
   Proof. mk_rvc (FA + 0x24)%Z (mword_of_int 0x8626 : mword 16)
-    (mword_of_int (FA + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)) fadc_8626 exec_execute_C_MV. Qed.
+    (mword_of_int (FA + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 12), ADD)) cdec_8626 exec_execute_C_MV. Qed.
 
   Lemma fai_26 : kernel_text -∗ instr (mword_of_int (FA + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (FA + 0x26)%Z (mword_of_int 0x85ca : mword 16)

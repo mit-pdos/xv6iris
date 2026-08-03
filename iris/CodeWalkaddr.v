@@ -71,11 +71,6 @@ Import Defs.
 (* 0x02  c.srli a5,a5,0x1a -- [cdec_83e9] (KernelRvcDecode.v) *)
 (* 0x14  c.li a2,0        -- [cdec_4601] (KernelRvcDecode.v) *)
 
-(* 0x1a  c.beqz a0,+0x10 *)
-Lemma wadc_c901 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc901 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 8, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x22  c.li a4,17 *)
 Lemma wadc_4745 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -178,7 +173,7 @@ Section WalkaddrInstrs.
 
   Lemma wai_1a : WAP 0x1a true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (WA + 0x1a)%Z (mword_of_int 0xc901 : mword 16)
-    (mword_of_int (WA + 0x1a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) wadc_c901 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (WA + 0x1a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c901 exec_execute_C_BEQZ. Qed.
 
   Lemma wai_1c : WAP 0x1c true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (WA + 0x1c)%Z (mword_of_int 0x611c : mword 16)

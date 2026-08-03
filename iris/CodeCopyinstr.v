@@ -69,6 +69,7 @@ Require Import KernelRvcDecode.
 Require Import UserExecFacts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -82,11 +83,6 @@ Lemma csdc_cac5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 88, Cregidx (mword_of_int 5)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.mv s5,a0          # s5 := pagetable *)
-Lemma csdc_8aaa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8aaa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* c.mv s7,a2          # s7 := srcva *)
 Lemma csdc_8bb2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -106,29 +102,9 @@ Lemma csdc_7b7d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LUI (mword_of_int 63, Regidx (mword_of_int 22)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.lui s4,0x1        # s4 := PGSIZE *)
-Lemma csdc_6a05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6a05 : mword 16)) s
-  = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.j +0x5e           # enter the outer loop at its head *)
-Lemma csdc_a82d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa82d : mword 16)) s
-  = Some (C_J (mword_of_int 29), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.add a4,a4,s1      # a4 := dst_base + (rem-1) *)
-Lemma csdc_9726 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x9726 : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 14), Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.mv a0,s5 *)
-Lemma csdc_8556 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8556 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 21)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* c.beqz a0,+0xa4     # unmapped -> return -1 *)
 Lemma csdc_cd0d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -184,17 +160,7 @@ Lemma csdc_db51 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 202, Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.addi a5,a5,1 *)
-Lemma csdc_0785 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0785 : mword 16)) s
-  = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.j -0x54           # -> +0x4a, the chunk is done *)
-Lemma csdc_b775 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb775 : mword 16)) s
-  = Some (C_J (mword_of_int 2006), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* c.j -0x76           # -> +0x2c *)
 Lemma csdc_b769 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -202,11 +168,6 @@ Lemma csdc_b769 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 1989), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* c.j -0x72           # -> +0x34, the epilogue *)
-Lemma csdc_b779 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb779 : mword 16)) s
-  = Some (C_J (mword_of_int 1991), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -290,11 +251,6 @@ Lemma csdb_41260633 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 12), Regidx (mword_of_int 12), SUB), s).
 Proof. decode_bridge_ms. Qed.
 
-(* add a4,a2,a5        # a4 := the source byte's address *)
-Lemma csdb_00f60733 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00f60733 : mword 32)) s
-  = Some (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD), s).
-Proof. decode_bridge_ms. Qed.
 
 (* lbu a4,0(a4) *)
 Lemma csdb_00074703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -371,7 +327,7 @@ Section InstrsCS.
 
   Lemma csi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x18) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)).  (* c.mv s5,a0          # s5 := pagetable *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x18)%Z (mword_of_int 0x8aaa : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)) csdc_8aaa exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x18) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)) cdec_8aaa exec_execute_C_MV. Qed.
 
   Lemma csi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x1a) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)).  (* c.mv s1,a1          # s1 := dst *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x1a)%Z (mword_of_int 0x84ae : mword 16)
@@ -391,11 +347,11 @@ Section InstrsCS.
 
   Lemma csi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x22) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), LUI)).  (* c.lui s4,0x1        # s4 := PGSIZE *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x22)%Z (mword_of_int 0x6a05 : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x22) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), LUI)) csdc_6a05 exec_execute_C_LUI. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x22) : mword 64) (UTYPE (sign_extend' 20 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), LUI)) cdec_6a05 exec_execute_C_LUI. Qed.
 
   Lemma csi_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x24) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 29 : mword 11) ('b"0")), zreg)).  (* c.j +0x5e           # enter the outer loop at its head *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x24)%Z (mword_of_int 0xa82d : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x24) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 29 : mword 11) ('b"0")), zreg)) csdc_a82d exec_execute_C_J. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x24) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 29 : mword 11) ('b"0")), zreg)) cdec_a82d exec_execute_C_J. Qed.
 
   Lemma csi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x26) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 1)).  (* sb zero,0(a5)       # *dst = '\0' *)
   Proof. mk_base (KernelSyms.copyinstr + 0x26)%Z (mword_of_int 0x00078023 : mword 32)
@@ -463,7 +419,7 @@ Section InstrsCS.
 
   Lemma csi_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) true (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADD)).  (* c.add a4,a4,s1      # a4 := dst_base + (rem-1) *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x4e)%Z (mword_of_int 0x9726 : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADD)) csdc_9726 exec_execute_C_ADD. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADD)) cdec_9726 exec_execute_C_ADD. Qed.
 
   Lemma csi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x50) : mword 64) false (RTYPE (Regidx (mword_of_int 11), Regidx (mword_of_int 14), Regidx (mword_of_int 19), SUB)).  (* sub s3,a4,a1        # max -= n *)
   Proof. mk_base (KernelSyms.copyinstr + 0x50)%Z (mword_of_int 0x40b709b3 : mword 32)
@@ -491,7 +447,7 @@ Section InstrsCS.
 
   Lemma csi_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x64) : mword 64) true (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)).  (* c.mv a0,s5 *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x64)%Z (mword_of_int 0x8556 : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x64) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) csdc_8556 exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x64) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) cdec_8556 exec_execute_C_MV. Qed.
 
   Lemma csi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x66) : mword 64) false (JAL (mword_of_int 2095816 : mword 21, Regidx (mword_of_int 1))).  (* jal ra,walkaddr     # -1336 -> 0x80000ff6 *)
   Proof. mk_base (KernelSyms.copyinstr + 0x66)%Z (mword_of_int 0xac9ff0ef : mword 32)
@@ -547,7 +503,7 @@ Section InstrsCS.
 
   Lemma csi_8a : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) false (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)).  (* add a4,a2,a5        # a4 := the source byte's address *)
   Proof. mk_base (KernelSyms.copyinstr + 0x8a)%Z (mword_of_int 0x00f60733 : mword 32)
-    (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)) csdb_00f60733. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)) bdec_00f60733. Qed.
 
   Lemma csi_8e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x8e) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), true, 1)).  (* lbu a4,0(a4) *)
   Proof. mk_base (KernelSyms.copyinstr + 0x8e)%Z (mword_of_int 0x00074703 : mword 32)
@@ -563,7 +519,7 @@ Section InstrsCS.
 
   Lemma csi_98 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x98) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).  (* c.addi a5,a5,1 *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x98)%Z (mword_of_int 0x0785 : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x98) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) csdc_0785 exec_execute_C_ADDI. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x98) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) cdec_0785 exec_execute_C_ADDI. Qed.
 
   Lemma csi_9a : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x9a) : mword 64) false (BTYPE (mword_of_int 8174 : mword 13, Regidx (mword_of_int 13), Regidx (mword_of_int 15), BNE)).  (* bne a5,a3,-0x12     # -> +0x88 *)
   Proof. mk_base (KernelSyms.copyinstr + 0x9a)%Z (mword_of_int 0xfed797e3 : mword 32)
@@ -571,7 +527,7 @@ Section InstrsCS.
 
   Lemma csi_9e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0x9e) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)).  (* c.j -0x54           # -> +0x4a, the chunk is done *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0x9e)%Z (mword_of_int 0xb775 : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0x9e) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)) csdc_b775 exec_execute_C_J. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0x9e) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2006 : mword 11) ('b"0")), zreg)) cdec_b775 exec_execute_C_J. Qed.
 
   Lemma csi_a0 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0xa0) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).  (* c.li a5,0           # got_null = 0 *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0xa0)%Z (mword_of_int 0x4781 : mword 16)
@@ -587,7 +543,7 @@ Section InstrsCS.
 
   Lemma csi_a6 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0xa6) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")), zreg)).  (* c.j -0x72           # -> +0x34, the epilogue *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0xa6)%Z (mword_of_int 0xb779 : mword 16)
-    (mword_of_int (KernelSyms.copyinstr + 0xa6) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")), zreg)) csdc_b779 exec_execute_C_J. Qed.
+    (mword_of_int (KernelSyms.copyinstr + 0xa6) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")), zreg)) cdec_b779 exec_execute_C_J. Qed.
 
   Lemma csi_b0 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyinstr + 0xb0) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).  (* c.li a5,0           # max == 0: got_null = 0 *)
   Proof. mk_rvc (KernelSyms.copyinstr + 0xb0)%Z (mword_of_int 0x4781 : mword 16)

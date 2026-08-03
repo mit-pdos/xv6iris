@@ -47,6 +47,7 @@ From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 Require Export WpSmodeLeafBase.
 From iris.base_logic.lib Require Import invariants.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -71,11 +72,6 @@ Lemma ppdec_jal_mycpu s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 0xc94 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
-(* +0x0c  0x100027f3  csrr a5,sstatus  (csrrs a5,sstatus,x0) *)
-Lemma ppdec_csrr s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x100027f3 : mword 32)) s
-  = Some (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pp_dbase s Hpriv ]. Qed.
 
 (* +0x16  0x02f05363  blez a5,+0x26  (bge x0,a5) *)
 Lemma ppdec_blez s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -108,11 +104,6 @@ Lemma ppdec_beqz06 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b
   = Some (C_BEQZ (mword_of_int 3, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* release +0x10  0xcd11  c.beqz a0,+0x1c *)
-Lemma ppdec_beqz1c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xcd11 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 14, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x20  0x5d7c  c.lw a5,124(a0) *)
 Lemma ppdec_lw124 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -243,7 +234,7 @@ Section WpPopOffInstr.
 
   Lemma ppi_0c : kernel_text -∗ instr (mword_of_int (PP + 0x0c) : mword 64) false (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS)).
   Proof. mk_base (PP + 0x0c)%Z (mword_of_int 0x100027f3 : mword 32)
-    (mword_of_int (PP + 0x0c) : mword 64) (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS)) ppdec_csrr. Qed.
+    (mword_of_int (PP + 0x0c) : mword 64) (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx (mword_of_int 15), CSRRS)) bdec_100027f3. Qed.
 
   Lemma ppi_10 : kernel_text -∗ instr (mword_of_int (PP + 0x10) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_rvc (PP + 0x10)%Z (mword_of_int 0x8b89 : mword 16)

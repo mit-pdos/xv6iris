@@ -213,11 +213,6 @@ Lemma uudb_de6ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2094566 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x46  sd zero,0(s1)  -- *pte = 0 (a base STORE with rs2 = x0) *)
-Lemma uudb_0004b023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0004b023 : mword 32)) s
-  = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x4c  bgeu s2,s3,+0x2a  -- the loop-exit test (rs1 = s2, rs2 = s3) *)
 Lemma uudb_03397563 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -231,11 +226,6 @@ Lemma uudb_d09ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2096392 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x60  andi a4,a5,1  -- PTE_V *)
-Lemma uudb_0017f713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0017f713 : mword 32)) s
-  = Some (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x66  beq s5,zero,-0x20  -- do_free == 0 (13-bit residue 8160) *)
 Lemma uudb_fe0a80e3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -387,7 +377,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_46 : kernel_text -∗ instr (mword_of_int (UU + 0x46) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)).
   Proof. mk_base (UU + 0x46)%Z (mword_of_int 0x0004b023 : mword 32)
-    (mword_of_int (UU + 0x46) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)) uudb_0004b023. Qed.
+    (mword_of_int (UU + 0x46) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)) bdec_0004b023. Qed.
 
   Lemma uui_4a : kernel_text -∗ instr (mword_of_int (UU + 0x4a) : mword 64) true (RTYPE (Regidx (mword_of_int 22), Regidx (mword_of_int 18), Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (UU + 0x4a)%Z (mword_of_int 0x995a : mword 16)
@@ -431,7 +421,7 @@ Section UvmunmapInstrs.
 
   Lemma uui_60 : kernel_text -∗ instr (mword_of_int (UU + 0x60) : mword 64) false (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI)).
   Proof. mk_base (UU + 0x60)%Z (mword_of_int 0x0017f713 : mword 32)
-    (mword_of_int (UU + 0x60) : mword 64) (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI)) uudb_0017f713. Qed.
+    (mword_of_int (UU + 0x60) : mword 64) (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI)) bdec_0017f713. Qed.
 
   Lemma uui_64 : kernel_text -∗ instr (mword_of_int (UU + 0x64) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 243 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 6)), BEQ)).
   Proof. mk_rvc (UU + 0x64)%Z (mword_of_int 0xd37d : mword 16)

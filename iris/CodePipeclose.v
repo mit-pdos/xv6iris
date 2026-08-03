@@ -64,6 +64,7 @@ Require Import WpRvcBridge.
 Require Import WpDecodeBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -79,17 +80,7 @@ Lemma pcdc_e781 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BNEZ (mword_of_int 4, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xc38d  c.beqz a5,+0x22 *)
-Lemma pcdc_c38d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc38d : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 17, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xbfe9  c.j -0x26 *)
-Lemma pcdc_bfe9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfe9 : mword 16)) s
-  = Some (C_J (mword_of_int 2029), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* 4-byte decode facts.                                                   *)
@@ -124,11 +115,6 @@ Lemma pcdb_sw_wo s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 548, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
-(* +0x1c  0x21848513  addi a0,s1,536 *)
-Lemma pcdb_addi_nread s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x21848513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 536, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
 (* +0x20  0xaf3fd0ef  jal ra,wakeup *)
 Lemma pcdb_wakeup1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -136,17 +122,7 @@ Lemma pcdb_wakeup1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2087666 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
-(* +0x24  0x2204a783  lw a5,544(s1) *)
-Lemma pcdb_lw_ro s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x2204a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 544, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
-(* +0x2a  0x2244a783  lw a5,548(s1) *)
-Lemma pcdb_lw_wo s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x2244a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 548, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
 (* +0x32  0x81ffc0ef  jal ra,release *)
 Lemma pcdb_release1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -160,11 +136,6 @@ Lemma pcdb_sw_ro s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 544, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 4), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
-(* +0x46  0x21c48513  addi a0,s1,540 *)
-Lemma pcdb_addi_nwrite s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x21c48513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 540, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; pc_dbase s Hpriv ]. Qed.
 
 (* +0x4a  0xac9fd0ef  jal ra,wakeup *)
 Lemma pcdb_wakeup2 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -237,7 +208,7 @@ Section WpPipecloseInstr.
 
   Lemma pci_1c : kernel_text -∗ instr (mword_of_int (PC + 0x1c) : mword 64) false (ITYPE (mword_of_int 536, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (PC + 0x1c)%Z (mword_of_int 0x21848513 : mword 32)
-    (mword_of_int (PC + 0x1c) : mword 64) (ITYPE (mword_of_int 536, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) pcdb_addi_nread. Qed.
+    (mword_of_int (PC + 0x1c) : mword 64) (ITYPE (mword_of_int 536, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) bdec_21848513. Qed.
 
   Lemma pci_20 : kernel_text -∗ instr (mword_of_int (PC + 0x20) : mword 64) false (JAL (mword_of_int 2087666 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PC + 0x20)%Z (mword_of_int 0xaf3fd0ef : mword 32)
@@ -245,7 +216,7 @@ Section WpPipecloseInstr.
 
   Lemma pci_24 : kernel_text -∗ instr (mword_of_int (PC + 0x24) : mword 64) false (LOAD (mword_of_int 544, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PC + 0x24)%Z (mword_of_int 0x2204a783 : mword 32)
-    (mword_of_int (PC + 0x24) : mword 64) (LOAD (mword_of_int 544, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) pcdb_lw_ro. Qed.
+    (mword_of_int (PC + 0x24) : mword 64) (LOAD (mword_of_int 544, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_2204a783. Qed.
 
   Lemma pci_28 : kernel_text -∗ instr (mword_of_int (PC + 0x28) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 4 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (PC + 0x28)%Z (mword_of_int 0xe781 : mword 16)
@@ -253,11 +224,11 @@ Section WpPipecloseInstr.
 
   Lemma pci_2a : kernel_text -∗ instr (mword_of_int (PC + 0x2a) : mword 64) false (LOAD (mword_of_int 548, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PC + 0x2a)%Z (mword_of_int 0x2244a783 : mword 32)
-    (mword_of_int (PC + 0x2a) : mword 64) (LOAD (mword_of_int 548, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) pcdb_lw_wo. Qed.
+    (mword_of_int (PC + 0x2a) : mword 64) (LOAD (mword_of_int 548, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_2244a783. Qed.
 
   Lemma pci_2e : kernel_text -∗ instr (mword_of_int (PC + 0x2e) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (PC + 0x2e)%Z (mword_of_int 0xc38d : mword 16)
-    (mword_of_int (PC + 0x2e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) pcdc_c38d exec_execute_C_BEQZ. Qed.
+    (mword_of_int (PC + 0x2e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) cdec_c38d exec_execute_C_BEQZ. Qed.
 
   Lemma pci_30 : kernel_text -∗ instr (mword_of_int (PC + 0x30) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PC + 0x30)%Z (mword_of_int 0x8526 : mword 16)
@@ -297,7 +268,7 @@ Section WpPipecloseInstr.
 
   Lemma pci_46 : kernel_text -∗ instr (mword_of_int (PC + 0x46) : mword 64) false (ITYPE (mword_of_int 540, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (PC + 0x46)%Z (mword_of_int 0x21c48513 : mword 32)
-    (mword_of_int (PC + 0x46) : mword 64) (ITYPE (mword_of_int 540, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) pcdb_addi_nwrite. Qed.
+    (mword_of_int (PC + 0x46) : mword 64) (ITYPE (mword_of_int 540, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) bdec_21c48513. Qed.
 
   Lemma pci_4a : kernel_text -∗ instr (mword_of_int (PC + 0x4a) : mword 64) false (JAL (mword_of_int 2087624 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PC + 0x4a)%Z (mword_of_int 0xac9fd0ef : mword 32)
@@ -325,6 +296,6 @@ Section WpPipecloseInstr.
 
   Lemma pci_5c : kernel_text -∗ instr (mword_of_int (PC + 0x5c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PC + 0x5c)%Z (mword_of_int 0xbfe9 : mword 16)
-    (mword_of_int (PC + 0x5c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)) pcdc_bfe9 exec_execute_C_J. Qed.
+    (mword_of_int (PC + 0x5c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)) cdec_bfe9 exec_execute_C_J. Qed.
 
 End WpPipecloseInstr.

@@ -126,6 +126,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -135,17 +136,7 @@ Notation PR := KernelSyms.piperead.
 (* Compressed decode facts for the words no other function uses.          *)
 (* ===================================================================== *)
 
-(* 0x8ab2  mv s5,a2 *)
-Lemma prdc_8ab2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8ab2 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xcf85  beqz a5,80004606 <piperead+0x70> *)
-Lemma prdc_cf85 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xcf85 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 28, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xe11d  bnez a0,800045fc <piperead+0x66> *)
 Lemma prdc_e11d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -153,11 +144,6 @@ Lemma prdc_e11d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BNEZ (mword_of_int 19, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x854e  mv a0,s3 *)
-Lemma prdc_854e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x854e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xa829  j 8000460c <piperead+0x76> *)
 Lemma prdc_a829 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -165,11 +151,6 @@ Lemma prdc_a829 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 13), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xa809  j 8000460c <piperead+0x76> *)
-Lemma prdc_a809 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa809 : mword 16)) s
-  = Some (C_J (mword_of_int 9), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x59fd  li s3,-1 *)
 Lemma prdc_59fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -183,31 +164,11 @@ Lemma prdc_a0a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 52), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x4981  li s3,0 *)
-Lemma prdc_4981 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4981 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* [cdec_4b85] (li s7,1) -- shared, see KernelRvcDecode.v *)
 
-(* 0x5b7d  li s6,-1 *)
-Lemma prdc_5b7d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x5b7d : mword 16)) s
-  = Some (C_LI (mword_of_int 63, Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x97a6  add a5,a5,s1 *)
-Lemma prdc_97a6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x97a6 : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x86de  mv a3,s7 *)
-Lemma prdc_86de s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x86de : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 23)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x8662  mv a2,s8 *)
 Lemma prdc_8662 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -252,11 +213,6 @@ Lemma prdb_2184a703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x21c4a783  lw a5,540(s1) *)
-Lemma prdb_21c4a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x21c4a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x21848993  addi s3,s1,536 *)
 Lemma prdb_21848993 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -270,11 +226,6 @@ Lemma prdb_02f71763 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 46 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BNE), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x2244a783  lw a5,548(s1) *)
-Lemma prdb_2244a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x2244a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 548 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0xb71fd0ef  jal 80002142 <killed> *)
 Lemma prdb_b71fd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -312,17 +263,7 @@ Lemma prdb_05505163 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 66 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 0), BGE), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x2184a783  lw a5,536(s1) *)
-Lemma prdb_2184a783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x2184a783 : mword 32)) s
-  = Some (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4), s).
-Proof. decode_bridge_ms. Qed.
 
-(* 0x21c4a703  lw a4,540(s1) *)
-Lemma prdb_21c4a703 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x21c4a703 : mword 32)) s
-  = Some (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x02f70b63  beq a4,a5,80004658 <piperead+0xc2> *)
 Lemma prdb_02f70b63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -330,17 +271,7 @@ Lemma prdb_02f70b63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 54 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x1ff7f793  andi a5,a5,511 *)
-Lemma prdb_1ff7f793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x1ff7f793 : mword 32)) s
-  = Some (ITYPE (mword_of_int 511 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI), s).
-Proof. decode_bridge_ms. Qed.
 
-(* 0x0187c783  lbu a5,24(a5) *)
-Lemma prdb_0187c783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0187c783 : mword 32)) s
-  = Some (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), true, 1), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0xfaf407a3  sb a5,-81(s0) *)
 Lemma prdb_faf407a3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -378,11 +309,6 @@ Lemma prdb_fd3a93e3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 8134 : mword 13, Regidx (mword_of_int 19), Regidx (mword_of_int 21), BNE), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x21c48513  addi a0,s1,540 *)
-Lemma prdb_21c48513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x21c48513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x8f7fd0ef  jal 80001f52 <wakeup> *)
 Lemma prdb_8f7fd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -467,7 +393,7 @@ Section PipereadInstrs.
   (* +0x16  8ab2  mv s5,a2 *)
   Lemma pri_16 : kernel_text -∗ instr (mword_of_int (PR + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (PR + 0x16)%Z (mword_of_int 0x8ab2 : mword 16)
-    (mword_of_int (PR + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)) prdc_8ab2 exec_execute_C_MV. Qed.
+    (mword_of_int (PR + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 21), ADD)) cdec_8ab2 exec_execute_C_MV. Qed.
 
   (* +0x18  b56fd0ef  jal 80001904 <myproc> *)
   Lemma pri_18 : kernel_text -∗ instr (mword_of_int (PR + 0x18) : mword 64) false (JAL (mword_of_int 2085718 : mword 21, Regidx (mword_of_int 1))).
@@ -497,7 +423,7 @@ Section PipereadInstrs.
   (* +0x28  21c4a783  lw a5,540(s1) *)
   Lemma pri_28 : kernel_text -∗ instr (mword_of_int (PR + 0x28) : mword 64) false (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PR + 0x28)%Z (mword_of_int 0x21c4a783 : mword 32)
-    (mword_of_int (PR + 0x28) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) prdb_21c4a783. Qed.
+    (mword_of_int (PR + 0x28) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_21c4a783. Qed.
 
   (* +0x2c  21848993  addi s3,s1,536 *)
   Lemma pri_2c : kernel_text -∗ instr (mword_of_int (PR + 0x2c) : mword 64) false (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 19), ADDI)).
@@ -512,12 +438,12 @@ Section PipereadInstrs.
   (* +0x34  2244a783  lw a5,548(s1) *)
   Lemma pri_34 : kernel_text -∗ instr (mword_of_int (PR + 0x34) : mword 64) false (LOAD (mword_of_int 548 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PR + 0x34)%Z (mword_of_int 0x2244a783 : mword 32)
-    (mword_of_int (PR + 0x34) : mword 64) (LOAD (mword_of_int 548 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) prdb_2244a783. Qed.
+    (mword_of_int (PR + 0x34) : mword 64) (LOAD (mword_of_int 548 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_2244a783. Qed.
 
   (* +0x38  cf85  beqz a5,80004606 <piperead+0x70> *)
   Lemma pri_38 : kernel_text -∗ instr (mword_of_int (PR + 0x38) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (PR + 0x38)%Z (mword_of_int 0xcf85 : mword 16)
-    (mword_of_int (PR + 0x38) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) prdc_cf85 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (PR + 0x38) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) cdec_cf85 exec_execute_C_BEQZ. Qed.
 
   (* +0x3a  8552  mv a0,s4 *)
   Lemma pri_3a : kernel_text -∗ instr (mword_of_int (PR + 0x3a) : mword 64) true (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)).
@@ -542,7 +468,7 @@ Section PipereadInstrs.
   (* +0x44  854e  mv a0,s3 *)
   Lemma pri_44 : kernel_text -∗ instr (mword_of_int (PR + 0x44) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PR + 0x44)%Z (mword_of_int 0x854e : mword 16)
-    (mword_of_int (PR + 0x44) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) prdc_854e exec_execute_C_MV. Qed.
+    (mword_of_int (PR + 0x44) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) cdec_854e exec_execute_C_MV. Qed.
 
   (* +0x46  92bfd0ef  jal 80001f06 <sleep> *)
   Lemma pri_46 : kernel_text -∗ instr (mword_of_int (PR + 0x46) : mword 64) false (JAL (mword_of_int 2087210 : mword 21, Regidx (mword_of_int 1))).
@@ -557,7 +483,7 @@ Section PipereadInstrs.
   (* +0x4e  21c4a783  lw a5,540(s1) *)
   Lemma pri_4e : kernel_text -∗ instr (mword_of_int (PR + 0x4e) : mword 64) false (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PR + 0x4e)%Z (mword_of_int 0x21c4a783 : mword 32)
-    (mword_of_int (PR + 0x4e) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) prdb_21c4a783. Qed.
+    (mword_of_int (PR + 0x4e) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_21c4a783. Qed.
 
   (* +0x52  fef701e3  beq a4,a5,800045ca <piperead+0x34> *)
   Lemma pri_52 : kernel_text -∗ instr (mword_of_int (PR + 0x52) : mword 64) false (BTYPE (mword_of_int 8162 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)).
@@ -602,7 +528,7 @@ Section PipereadInstrs.
   (* +0x64  a809  j 8000460c <piperead+0x76> *)
   Lemma pri_64 : kernel_text -∗ instr (mword_of_int (PR + 0x64) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (PR + 0x64)%Z (mword_of_int 0xa809 : mword 16)
-    (mword_of_int (PR + 0x64) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")), zreg)) prdc_a809 exec_execute_C_J. Qed.
+    (mword_of_int (PR + 0x64) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")), zreg)) cdec_a809 exec_execute_C_J. Qed.
 
   (* +0x66  8526  mv a0,s1 *)
   Lemma pri_66 : kernel_text -∗ instr (mword_of_int (PR + 0x66) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
@@ -642,7 +568,7 @@ Section PipereadInstrs.
   (* +0x76  4981  li s3,0 *)
   Lemma pri_76 : kernel_text -∗ instr (mword_of_int (PR + 0x76) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)).
   Proof. mk_rvc (PR + 0x76)%Z (mword_of_int 0x4981 : mword 16)
-    (mword_of_int (PR + 0x76) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)) prdc_4981 exec_execute_C_LI. Qed.
+    (mword_of_int (PR + 0x76) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 19), ADDI)) cdec_4981 exec_execute_C_LI. Qed.
 
   (* +0x78  faf40c13  addi s8,s0,-81 *)
   Lemma pri_78 : kernel_text -∗ instr (mword_of_int (PR + 0x78) : mword 64) false (ITYPE (mword_of_int 4015 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 24), ADDI)).
@@ -657,7 +583,7 @@ Section PipereadInstrs.
   (* +0x7e  5b7d  li s6,-1 *)
   Lemma pri_7e : kernel_text -∗ instr (mword_of_int (PR + 0x7e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)).
   Proof. mk_rvc (PR + 0x7e)%Z (mword_of_int 0x5b7d : mword 16)
-    (mword_of_int (PR + 0x7e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)) prdc_5b7d exec_execute_C_LI. Qed.
+    (mword_of_int (PR + 0x7e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)) cdec_5b7d exec_execute_C_LI. Qed.
 
   (* +0x80  05505163  blez s5,80004658 <piperead+0xc2> *)
   Lemma pri_80 : kernel_text -∗ instr (mword_of_int (PR + 0x80) : mword 64) false (BTYPE (mword_of_int 66 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 0), BGE)).
@@ -667,12 +593,12 @@ Section PipereadInstrs.
   (* +0x84  2184a783  lw a5,536(s1) *)
   Lemma pri_84 : kernel_text -∗ instr (mword_of_int (PR + 0x84) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PR + 0x84)%Z (mword_of_int 0x2184a783 : mword 32)
-    (mword_of_int (PR + 0x84) : mword 64) (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) prdb_2184a783. Qed.
+    (mword_of_int (PR + 0x84) : mword 64) (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_2184a783. Qed.
 
   (* +0x88  21c4a703  lw a4,540(s1) *)
   Lemma pri_88 : kernel_text -∗ instr (mword_of_int (PR + 0x88) : mword 64) false (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_base (PR + 0x88)%Z (mword_of_int 0x21c4a703 : mword 32)
-    (mword_of_int (PR + 0x88) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)) prdb_21c4a703. Qed.
+    (mword_of_int (PR + 0x88) : mword 64) (LOAD (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)) bdec_21c4a703. Qed.
 
   (* +0x8c  02f70b63  beq a4,a5,80004658 <piperead+0xc2> *)
   Lemma pri_8c : kernel_text -∗ instr (mword_of_int (PR + 0x8c) : mword 64) false (BTYPE (mword_of_int 54 : mword 13, Regidx (mword_of_int 15), Regidx (mword_of_int 14), BEQ)).
@@ -682,17 +608,17 @@ Section PipereadInstrs.
   (* +0x90  1ff7f793  andi a5,a5,511 *)
   Lemma pri_90 : kernel_text -∗ instr (mword_of_int (PR + 0x90) : mword 64) false (ITYPE (mword_of_int 511 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)).
   Proof. mk_base (PR + 0x90)%Z (mword_of_int 0x1ff7f793 : mword 32)
-    (mword_of_int (PR + 0x90) : mword 64) (ITYPE (mword_of_int 511 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) prdb_1ff7f793. Qed.
+    (mword_of_int (PR + 0x90) : mword 64) (ITYPE (mword_of_int 511 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ANDI)) bdec_1ff7f793. Qed.
 
   (* +0x94  97a6  add a5,a5,s1 *)
   Lemma pri_94 : kernel_text -∗ instr (mword_of_int (PR + 0x94) : mword 64) true (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (PR + 0x94)%Z (mword_of_int 0x97a6 : mword 16)
-    (mword_of_int (PR + 0x94) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) prdc_97a6 exec_execute_C_ADD. Qed.
+    (mword_of_int (PR + 0x94) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)) cdec_97a6 exec_execute_C_ADD. Qed.
 
   (* +0x96  0187c783  lbu a5,24(a5) *)
   Lemma pri_96 : kernel_text -∗ instr (mword_of_int (PR + 0x96) : mword 64) false (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), true, 1)).
   Proof. mk_base (PR + 0x96)%Z (mword_of_int 0x0187c783 : mword 32)
-    (mword_of_int (PR + 0x96) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), true, 1)) prdb_0187c783. Qed.
+    (mword_of_int (PR + 0x96) : mword 64) (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), true, 1)) bdec_0187c783. Qed.
 
   (* +0x9a  faf407a3  sb a5,-81(s0) *)
   Lemma pri_9a : kernel_text -∗ instr (mword_of_int (PR + 0x9a) : mword 64) false (STORE (mword_of_int 4015 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 8), 1)).
@@ -702,7 +628,7 @@ Section PipereadInstrs.
   (* +0x9e  86de  mv a3,s7 *)
   Lemma pri_9e : kernel_text -∗ instr (mword_of_int (PR + 0x9e) : mword 64) true (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 13), ADD)).
   Proof. mk_rvc (PR + 0x9e)%Z (mword_of_int 0x86de : mword 16)
-    (mword_of_int (PR + 0x9e) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 13), ADD)) prdc_86de exec_execute_C_MV. Qed.
+    (mword_of_int (PR + 0x9e) : mword 64) (RTYPE (Regidx (mword_of_int 23), zreg, Regidx (mword_of_int 13), ADD)) cdec_86de exec_execute_C_MV. Qed.
 
   (* +0xa0  8662  mv a2,s8 *)
   Lemma pri_a0 : kernel_text -∗ instr (mword_of_int (PR + 0xa0) : mword 64) true (RTYPE (Regidx (mword_of_int 24), zreg, Regidx (mword_of_int 12), ADD)).
@@ -732,7 +658,7 @@ Section PipereadInstrs.
   (* +0xb0  2184a783  lw a5,536(s1) *)
   Lemma pri_b0 : kernel_text -∗ instr (mword_of_int (PR + 0xb0) : mword 64) false (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (PR + 0xb0)%Z (mword_of_int 0x2184a783 : mword 32)
-    (mword_of_int (PR + 0xb0) : mword 64) (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) prdb_2184a783. Qed.
+    (mword_of_int (PR + 0xb0) : mword 64) (LOAD (mword_of_int 536 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)) bdec_2184a783. Qed.
 
   (* +0xb4  2785  addiw a5,a5,1 *)
   Lemma pri_b4 : kernel_text -∗ instr (mword_of_int (PR + 0xb4) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
@@ -762,7 +688,7 @@ Section PipereadInstrs.
   (* +0xc2  21c48513  addi a0,s1,540 *)
   Lemma pri_c2 : kernel_text -∗ instr (mword_of_int (PR + 0xc2) : mword 64) false (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (PR + 0xc2)%Z (mword_of_int 0x21c48513 : mword 32)
-    (mword_of_int (PR + 0xc2) : mword 64) (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) prdb_21c48513. Qed.
+    (mword_of_int (PR + 0xc2) : mword 64) (ITYPE (mword_of_int 540 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) bdec_21c48513. Qed.
 
   (* +0xc6  8f7fd0ef  jal 80001f52 <wakeup> *)
   Lemma pri_c6 : kernel_text -∗ instr (mword_of_int (PR + 0xc6) : mword 64) false (JAL (mword_of_int 2087158 : mword 21, Regidx (mword_of_int 1))).
@@ -797,7 +723,7 @@ Section PipereadInstrs.
   (* +0xd6  854e  mv a0,s3 *)
   Lemma pri_d6 : kernel_text -∗ instr (mword_of_int (PR + 0xd6) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (PR + 0xd6)%Z (mword_of_int 0x854e : mword 16)
-    (mword_of_int (PR + 0xd6) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) prdc_854e exec_execute_C_MV. Qed.
+    (mword_of_int (PR + 0xd6) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) cdec_854e exec_execute_C_MV. Qed.
 
   (* +0xd8  60e6  ld ra,88(sp) *)
   Lemma pri_d8 : kernel_text -∗ instr (mword_of_int (PR + 0xd8) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).

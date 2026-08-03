@@ -103,6 +103,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -142,11 +143,6 @@ Lemma padc_4985 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 19)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x609c  c.ld a5,0(s1) *)
-Lemma padc_609c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x609c : mword 16)) s
-  = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xa01d  c.j +0x26 *)
 Lemma padc_a01d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -154,11 +150,6 @@ Lemma padc_a01d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_J (mword_of_int 19), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x6088  c.ld a0,0(s1) *)
-Lemma padc_6088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6088 : mword 16)) s
-  = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xc119  c.beqz a0,+0x06 -- [cdec_c119] (KernelRvcDecode.v) *)
 
@@ -210,11 +201,6 @@ Lemma padb_0005b023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 11), 8), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x00053023  sd zero,0(a0) *)
-Lemma padb_00053023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00053023 : mword 32)) s
-  = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x00aa3023  sd a0,0(s4) *)
 Lemma padb_00aa3023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -288,11 +274,6 @@ Lemma padb_000a3783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), false, 8), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x00003597  auipc a1,0x3 *)
-Lemma padb_00003597 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00003597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x1d858593  addi a1,a1,472 *)
 Lemma padb_1d858593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -392,7 +373,7 @@ Section PipeallocInstrs.
   (* +0x14  00053023  sd zero,0(a0) *)
   Lemma pai_14 : kernel_text -∗ instr (mword_of_int (PA + 0x14) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8)).
   Proof. mk_base (PA + 0x14)%Z (mword_of_int 0x00053023 : mword 32)
-    (mword_of_int (PA + 0x14) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8)) padb_00053023. Qed.
+    (mword_of_int (PA + 0x14) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8)) bdec_00053023. Qed.
 
   (* +0x18  c29ff0ef  jal ra,filealloc *)
   Lemma pai_18 : kernel_text -∗ instr (mword_of_int (PA + 0x18) : mword 64) false (JAL (mword_of_int 0x1ffc28 : mword 21, Regidx (mword_of_int 1))).
@@ -477,7 +458,7 @@ Section PipeallocInstrs.
   (* +0x48  00003597  auipc a1,0x3 *)
   Lemma pai_48 : kernel_text -∗ instr (mword_of_int (PA + 0x48) : mword 64) false (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (PA + 0x48)%Z (mword_of_int 0x00003597 : mword 32)
-    (mword_of_int (PA + 0x48) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) padb_00003597. Qed.
+    (mword_of_int (PA + 0x48) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00003597. Qed.
 
   (* +0x4c  1d858593  addi a1,a1,472 *)
   Lemma pai_4c : kernel_text -∗ instr (mword_of_int (PA + 0x4c) : mword 64) false (ITYPE (mword_of_int 0x1d8 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
@@ -492,7 +473,7 @@ Section PipeallocInstrs.
   (* +0x54  609c  c.ld a5,0(s1) *)
   Lemma pai_54 : kernel_text -∗ instr (mword_of_int (PA + 0x54) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (PA + 0x54)%Z (mword_of_int 0x609c : mword 16)
-    (mword_of_int (PA + 0x54) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) padc_609c paexec_ld0_a5. Qed.
+    (mword_of_int (PA + 0x54) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) cdec_609c paexec_ld0_a5. Qed.
 
   (* +0x56  0137a023  sw s3,0(a5) *)
   Lemma pai_56 : kernel_text -∗ instr (mword_of_int (PA + 0x56) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 15), 4)).
@@ -502,7 +483,7 @@ Section PipeallocInstrs.
   (* +0x5a  609c  c.ld a5,0(s1) *)
   Lemma pai_5a : kernel_text -∗ instr (mword_of_int (PA + 0x5a) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (PA + 0x5a)%Z (mword_of_int 0x609c : mword 16)
-    (mword_of_int (PA + 0x5a) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) padc_609c paexec_ld0_a5. Qed.
+    (mword_of_int (PA + 0x5a) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) cdec_609c paexec_ld0_a5. Qed.
 
   (* +0x5c  01378423  sb s3,8(a5) *)
   Lemma pai_5c : kernel_text -∗ instr (mword_of_int (PA + 0x5c) : mword 64) false (STORE (mword_of_int 8 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 15), 1)).
@@ -512,7 +493,7 @@ Section PipeallocInstrs.
   (* +0x60  609c  c.ld a5,0(s1) *)
   Lemma pai_60 : kernel_text -∗ instr (mword_of_int (PA + 0x60) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (PA + 0x60)%Z (mword_of_int 0x609c : mword 16)
-    (mword_of_int (PA + 0x60) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) padc_609c paexec_ld0_a5. Qed.
+    (mword_of_int (PA + 0x60) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) cdec_609c paexec_ld0_a5. Qed.
 
   (* +0x62  000784a3  sb zero,9(a5) *)
   Lemma pai_62 : kernel_text -∗ instr (mword_of_int (PA + 0x62) : mword 64) false (STORE (mword_of_int 9 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 1)).
@@ -522,7 +503,7 @@ Section PipeallocInstrs.
   (* +0x66  609c  c.ld a5,0(s1) *)
   Lemma pai_66 : kernel_text -∗ instr (mword_of_int (PA + 0x66) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (PA + 0x66)%Z (mword_of_int 0x609c : mword 16)
-    (mword_of_int (PA + 0x66) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) padc_609c paexec_ld0_a5. Qed.
+    (mword_of_int (PA + 0x66) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) cdec_609c paexec_ld0_a5. Qed.
 
   (* +0x68  0127b823  sd s2,16(a5) *)
   Lemma pai_68 : kernel_text -∗ instr (mword_of_int (PA + 0x68) : mword 64) false (STORE (mword_of_int 16 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15), 8)).
@@ -592,7 +573,7 @@ Section PipeallocInstrs.
   (* +0x94  6088  c.ld a0,0(s1) *)
   Lemma pai_94 : kernel_text -∗ instr (mword_of_int (PA + 0x94) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)).
   Proof. mk_rvc (PA + 0x94)%Z (mword_of_int 0x6088 : mword 16)
-    (mword_of_int (PA + 0x94) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) padc_6088 paexec_ld0_a0. Qed.
+    (mword_of_int (PA + 0x94) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) cdec_6088 paexec_ld0_a0. Qed.
 
   (* +0x96  c119  c.beqz a0,+0x06 *)
   Lemma pai_96 : kernel_text -∗ instr (mword_of_int (PA + 0x96) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)).
@@ -622,7 +603,7 @@ Section PipeallocInstrs.
   (* +0xa0  6088  c.ld a0,0(s1) *)
   Lemma pai_a0 : kernel_text -∗ instr (mword_of_int (PA + 0xa0) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)).
   Proof. mk_rvc (PA + 0xa0)%Z (mword_of_int 0x6088 : mword 16)
-    (mword_of_int (PA + 0xa0) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) padc_6088 paexec_ld0_a0. Qed.
+    (mword_of_int (PA + 0xa0) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) cdec_6088 paexec_ld0_a0. Qed.
 
   (* +0xa2  c10d  c.beqz a0,+0x22 *)
   Lemma pai_a2 : kernel_text -∗ instr (mword_of_int (PA + 0xa2) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, Regidx (mword_of_int 10), BEQ)).

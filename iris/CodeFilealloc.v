@@ -80,17 +80,7 @@ Lemma fadc_cf89 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 13, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x3e  0x4481  c.li s1,0 *)
-Lemma fadc_4481 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4481 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x40  0xa809  c.j +0x12 *)
-Lemma fadc_a809 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa809 : mword 16)) s
-  = Some (C_J (mword_of_int 9), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -250,11 +240,11 @@ Section FileallocInstrs.
 
   Lemma fai_3e : kernel_text -∗ instr (mword_of_int (FA + 0x3e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (FA + 0x3e)%Z (mword_of_int 0x4481 : mword 16)
-    (mword_of_int (FA + 0x3e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) fadc_4481 exec_execute_C_LI. Qed.
+    (mword_of_int (FA + 0x3e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) cdec_4481 exec_execute_C_LI. Qed.
 
   Lemma fai_40 : kernel_text -∗ instr (mword_of_int (FA + 0x40) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (FA + 0x40)%Z (mword_of_int 0xa809 : mword 16)
-    (mword_of_int (FA + 0x40) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")), zreg)) fadc_a809 exec_execute_C_J. Qed.
+    (mword_of_int (FA + 0x40) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")), zreg)) cdec_a809 exec_execute_C_J. Qed.
 
   (* ---- found arm: f->ref = 1, release, return f ---- *)
 

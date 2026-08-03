@@ -33,11 +33,6 @@ Import Defs.
 (* Compressed decode facts for this function's own words.                 *)
 (* ===================================================================== *)
 
-(* c.mv s2,a2          # s2 := max *)
-Lemma fsdc_8932 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8932 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* [cdec_86ca] -- shared, see KernelRvcDecode.v *)
 
@@ -45,11 +40,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* [cdec_6928] -- shared, see KernelRvcDecode.v *)
 
-(* c.j -0x0c           # -> +0x2e, the epilogue *)
-Lemma fsdc_bfc5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfc5 : mword 16)) s
-  = Some (C_J (mword_of_int 2040), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -124,7 +114,7 @@ Section InstrsFS.
 
   Lemma fsi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x12) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 18), ADD)).  (* c.mv s2,a2          # s2 := max *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x12)%Z (mword_of_int 0x8932 : mword 16)
-    (mword_of_int (KernelSyms.fetchstr + 0x12) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 18), ADD)) fsdc_8932 exec_execute_C_MV. Qed.
+    (mword_of_int (KernelSyms.fetchstr + 0x12) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 18), ADD)) cdec_8932 exec_execute_C_MV. Qed.
 
   Lemma fsi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x14) : mword 64) false (JAL (mword_of_int 2093356 : mword 21, Regidx (mword_of_int 1))).  (* jal ra,myproc       # -3796 -> 0x80001904 *)
   Proof. mk_base (KernelSyms.fetchstr + 0x14)%Z (mword_of_int 0x92cff0ef : mword 32)
@@ -196,6 +186,6 @@ Section InstrsFS.
 
   Lemma fsi_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.fetchstr + 0x3e) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)).  (* c.j -0x0c           # -> +0x2e, the epilogue *)
   Proof. mk_rvc (KernelSyms.fetchstr + 0x3e)%Z (mword_of_int 0xbfc5 : mword 16)
-    (mword_of_int (KernelSyms.fetchstr + 0x3e) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)) fsdc_bfc5 exec_execute_C_J. Qed.
+    (mword_of_int (KernelSyms.fetchstr + 0x3e) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)) cdec_bfc5 exec_execute_C_J. Qed.
 
 End InstrsFS.

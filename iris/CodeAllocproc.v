@@ -93,11 +93,6 @@ Import Defs.
 
 (* +0x22  c.lw a5,24(s1) -- p->state -- is the shared KernelRvcDecode.cdec_4c9c *)
 
-(* +0x34  c.li s1,0 *)
-Lemma apdc_4481 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4481 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x36  c.j +0x42 *)
 Lemma apdc_a089 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -111,11 +106,6 @@ Lemma apdc_d888 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_SW (mword_of_int 12, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x46 / +0x52  c.mv s2,a0 *)
-Lemma apdc_892a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x892a : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 18), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x48  c.sd a0,88(s1)  -- p->trapframe *)
 Lemma apdc_eca8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -135,11 +125,6 @@ Lemma apdc_e8a8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_SD (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x56  c.beqz a0,+0x40 *)
-Lemma apdc_c121 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc121 : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 32, Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x6e  c.sd a5,96(s1)  -- p->context.ra *)
 Lemma apdc_f0bc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -363,7 +348,7 @@ Section AllocprocInstrs.
 
   Lemma api_34 : kernel_text -∗ instr (mword_of_int (AP + 0x34) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (AP + 0x34)%Z (mword_of_int 0x4481 : mword 16)
-    (mword_of_int (AP + 0x34) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) apdc_4481 exec_execute_C_LI. Qed.
+    (mword_of_int (AP + 0x34) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) cdec_4481 exec_execute_C_LI. Qed.
 
   Lemma api_36 : kernel_text -∗ instr (mword_of_int (AP + 0x36) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 33 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AP + 0x36)%Z (mword_of_int 0xa089 : mword 16)
@@ -391,7 +376,7 @@ Section AllocprocInstrs.
 
   Lemma api_46 : kernel_text -∗ instr (mword_of_int (AP + 0x46) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (AP + 0x46)%Z (mword_of_int 0x892a : mword 16)
-    (mword_of_int (AP + 0x46) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) apdc_892a exec_execute_C_MV. Qed.
+    (mword_of_int (AP + 0x46) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) cdec_892a exec_execute_C_MV. Qed.
 
   Lemma api_48 : kernel_text -∗ instr (mword_of_int (AP + 0x48) : mword 64) true (STORE (mword_of_int 88 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (AP + 0x48)%Z (mword_of_int 0xeca8 : mword 16)
@@ -411,7 +396,7 @@ Section AllocprocInstrs.
 
   Lemma api_52 : kernel_text -∗ instr (mword_of_int (AP + 0x52) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (AP + 0x52)%Z (mword_of_int 0x892a : mword 16)
-    (mword_of_int (AP + 0x52) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) apdc_892a exec_execute_C_MV. Qed.
+    (mword_of_int (AP + 0x52) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) cdec_892a exec_execute_C_MV. Qed.
 
   Lemma api_54 : kernel_text -∗ instr (mword_of_int (AP + 0x54) : mword 64) true (STORE (mword_of_int 80 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (AP + 0x54)%Z (mword_of_int 0xe8a8 : mword 16)
@@ -419,7 +404,7 @@ Section AllocprocInstrs.
 
   Lemma api_56 : kernel_text -∗ instr (mword_of_int (AP + 0x56) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 32 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (AP + 0x56)%Z (mword_of_int 0xc121 : mword 16)
-    (mword_of_int (AP + 0x56) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 32 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) apdc_c121 exec_execute_C_BEQZ. Qed.
+    (mword_of_int (AP + 0x56) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 32 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c121 exec_execute_C_BEQZ. Qed.
 
   Lemma api_58 : kernel_text -∗ instr (mword_of_int (AP + 0x58) : mword 64) false (ITYPE (mword_of_int 112 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 12), ADDI)).
   Proof. mk_base (AP + 0x58)%Z (mword_of_int 0x07000613 : mword 32)

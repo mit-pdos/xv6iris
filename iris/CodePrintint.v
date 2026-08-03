@@ -27,6 +27,7 @@ Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -66,17 +67,7 @@ Lemma pidc_88ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 17), Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x8732  c.mv a4,a2 *)
-Lemma pidc_8732 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8732 : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x87aa  c.mv a5,a0 *)
-Lemma pidc_87aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x87aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x97c2  c.add a5,a5,a6 *)
 Lemma pidc_97c2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -191,11 +182,6 @@ Lemma pidb_0007c783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), true, 1), s).
 Proof. decode_bridge_ms. Qed.
 
-(* lbu a0,0(s1) -- buf[i] *)
-Lemma pidb_0004c503 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0004c503 : mword 32)) s
-  = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), true, 1), s).
-Proof. decode_bridge_ms. Qed.
 
 (* sb a5,0(a3) -- buf[i++] = digit *)
 Lemma pidb_00f68023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -349,7 +335,7 @@ Section CodePrintint.
 
   Lemma pii_28 : kernel_text -∗ instr (mword_of_int (PI + 0x28) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 14), ADD)).
   Proof. mk_rvc (PI + 0x28)%Z (mword_of_int 0x8732 : mword 16)
-    (mword_of_int (PI + 0x28) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 14), ADD)) pidc_8732 exec_execute_C_MV. Qed.
+    (mword_of_int (PI + 0x28) : mword 64) (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 14), ADD)) cdec_8732 exec_execute_C_MV. Qed.
 
   Lemma pii_2a : kernel_text -∗ instr (mword_of_int (PI + 0x2a) : mword 64) false (REM (Regidx (mword_of_int 11), Regidx (mword_of_int 10), Regidx (mword_of_int 15), true)).
   Proof. mk_base (PI + 0x2a)%Z (mword_of_int 0x02b577b3 : mword 32)
@@ -369,7 +355,7 @@ Section CodePrintint.
 
   Lemma pii_38 : kernel_text -∗ instr (mword_of_int (PI + 0x38) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (PI + 0x38)%Z (mword_of_int 0x87aa : mword 16)
-    (mword_of_int (PI + 0x38) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) pidc_87aa exec_execute_C_MV. Qed.
+    (mword_of_int (PI + 0x38) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) cdec_87aa exec_execute_C_MV. Qed.
 
   Lemma pii_3a : kernel_text -∗ instr (mword_of_int (PI + 0x3a) : mword 64) false (DIV (Regidx (mword_of_int 11), Regidx (mword_of_int 10), Regidx (mword_of_int 10), true)).
   Proof. mk_base (PI + 0x3a)%Z (mword_of_int 0x02b55533 : mword 32)
@@ -449,7 +435,7 @@ Section CodePrintint.
 
   Lemma pii_74 : kernel_text -∗ instr (mword_of_int (PI + 0x74) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), true, 1)).
   Proof. mk_base (PI + 0x74)%Z (mword_of_int 0x0004c503 : mword 32)
-    (mword_of_int (PI + 0x74) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), true, 1)) pidb_0004c503. Qed.
+    (mword_of_int (PI + 0x74) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), true, 1)) bdec_0004c503. Qed.
 
   Lemma pii_78 : kernel_text -∗ instr (mword_of_int (PI + 0x78) : mword 64) false (JAL (mword_of_int 2096542 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PI + 0x78)%Z (mword_of_int 0xd9fff0ef : mword 32)

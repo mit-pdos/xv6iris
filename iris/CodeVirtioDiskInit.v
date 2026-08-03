@@ -61,10 +61,6 @@ Lemma vdc_2701 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_ADDIW (mword_of_int 0, Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_43dc s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x43dc : mword 16)) s
-  = Some (C_LW (mword_of_int 1, Cregidx (mword_of_int 7), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma vdc_4709 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4709 : mword 16)) s
@@ -81,10 +77,6 @@ Lemma vdc_47d8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_LW (mword_of_int 3, Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_4705 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4705 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma vdc_dbb8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xdbb8 : mword 16)) s
@@ -101,10 +93,6 @@ Lemma vdc_4b18 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_LW (mword_of_int 4, Cregidx (mword_of_int 6), Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_8f75 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8f75 : mword 16)) s
-  = Some (C_AND (Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma vdc_d298 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xd298 : mword 16)) s
@@ -141,30 +129,14 @@ Lemma vdc_471d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_LI (mword_of_int 7, Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_e088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe088 : mword 16)) s
-  = Some (C_SD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma vdc_e488 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xe488 : mword 16)) s
   = Some (C_SD (mword_of_int 1, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_87aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x87aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 15), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_e888 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe888 : mword 16)) s
-  = Some (C_SD (mword_of_int 2, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_6088 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x6088 : mword 16)) s
-  = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma vdc_cb71 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xcb71 : mword 16)) s
@@ -216,10 +188,6 @@ Lemma vdc_9781 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_SRAI (mword_of_int 32, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma vdc_689c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x689c : mword 16)) s
-  = Some (C_LD (mword_of_int 2, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma vdc_c37c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xc37c : mword 16)) s
@@ -381,10 +349,6 @@ Lemma vdb_de4fb0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2078180 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma vdb_100017b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x100017b7 : mword 32)) s
-  = Some (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma vdb_747277b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x747277b7 : mword 32)) s
@@ -431,10 +395,6 @@ Lemma vdb_0607a823 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 4), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma vdb_10001737 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x10001737 : mword 32)) s
-  = Some (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma vdb_c7ffe6b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xc7ffe6b7 : mword 32)) s
@@ -536,10 +496,6 @@ Lemma vdb_e34fb0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2078260 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma vdb_08e7a023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x08e7a023 : mword 32)) s
-  = Some (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma vdb_08e7a223 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x08e7a223 : mword 32)) s
@@ -675,7 +631,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_020 : kernel_text -∗ instr (mword_of_int (VDI + 0x020) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x020)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x020) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x020) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_024 : kernel_text -∗ instr (mword_of_int (VDI + 0x024) : mword 64) true (LOAD (mword_of_int 0, Regidx (mword_of_int 15), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_rvc (VDI + 0x024)%Z (mword_of_int 0x4398 : mword 16)
@@ -699,11 +655,11 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_034 : kernel_text -∗ instr (mword_of_int (VDI + 0x034) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x034)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x034) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x034) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_038 : kernel_text -∗ instr (mword_of_int (VDI + 0x038) : mword 64) true (LOAD (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (VDI + 0x038)%Z (mword_of_int 0x43dc : mword 16)
-    (mword_of_int (VDI + 0x038) : mword 64) (LOAD (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) vdc_43dc vde_43dc. Qed.
+    (mword_of_int (VDI + 0x038) : mword 64) (LOAD (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)) cdec_43dc vde_43dc. Qed.
 
   Lemma vdi_03a : kernel_text -∗ instr (mword_of_int (VDI + 0x03a) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
   Proof. mk_rvc (VDI + 0x03a)%Z (mword_of_int 0x2781 : mword 16)
@@ -719,7 +675,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_042 : kernel_text -∗ instr (mword_of_int (VDI + 0x042) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x042)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x042) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x042) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_046 : kernel_text -∗ instr (mword_of_int (VDI + 0x046) : mword 64) true (LOAD (mword_of_int 8, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (VDI + 0x046)%Z (mword_of_int 0x479c : mword 16)
@@ -735,7 +691,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_04e : kernel_text -∗ instr (mword_of_int (VDI + 0x04e) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x04e)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x04e) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x04e) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_052 : kernel_text -∗ instr (mword_of_int (VDI + 0x052) : mword 64) true (LOAD (mword_of_int 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_rvc (VDI + 0x052)%Z (mword_of_int 0x47d8 : mword 16)
@@ -759,7 +715,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_062 : kernel_text -∗ instr (mword_of_int (VDI + 0x062) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x062)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x062) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x062) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_066 : kernel_text -∗ instr (mword_of_int (VDI + 0x066) : mword 64) false (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 4)).
   Proof. mk_base (VDI + 0x066)%Z (mword_of_int 0x0607a823 : mword 32)
@@ -767,7 +723,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_06a : kernel_text -∗ instr (mword_of_int (VDI + 0x06a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (VDI + 0x06a)%Z (mword_of_int 0x4705 : mword 16)
-    (mword_of_int (VDI + 0x06a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) vdc_4705 exec_execute_C_LI. Qed.
+    (mword_of_int (VDI + 0x06a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) cdec_4705 exec_execute_C_LI. Qed.
 
   Lemma vdi_06c : kernel_text -∗ instr (mword_of_int (VDI + 0x06c) : mword 64) true (STORE (mword_of_int 112, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)).
   Proof. mk_rvc (VDI + 0x06c)%Z (mword_of_int 0xdbb8 : mword 16)
@@ -783,7 +739,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_072 : kernel_text -∗ instr (mword_of_int (VDI + 0x072) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI)).
   Proof. mk_base (VDI + 0x072)%Z (mword_of_int 0x10001737 : mword 32)
-    (mword_of_int (VDI + 0x072) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI)) vdb_10001737. Qed.
+    (mword_of_int (VDI + 0x072) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI)) bdec_10001737. Qed.
 
   Lemma vdi_076 : kernel_text -∗ instr (mword_of_int (VDI + 0x076) : mword 64) true (LOAD (mword_of_int 16, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_rvc (VDI + 0x076)%Z (mword_of_int 0x4b18 : mword 16)
@@ -799,7 +755,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_080 : kernel_text -∗ instr (mword_of_int (VDI + 0x080) : mword 64) true (RTYPE (Regidx (mword_of_int 13), Regidx (mword_of_int 14), Regidx (mword_of_int 14), AND)).
   Proof. mk_rvc (VDI + 0x080)%Z (mword_of_int 0x8f75 : mword 16)
-    (mword_of_int (VDI + 0x080) : mword 64) (RTYPE (Regidx (mword_of_int 13), Regidx (mword_of_int 14), Regidx (mword_of_int 14), AND)) vdc_8f75 vde_8f75. Qed.
+    (mword_of_int (VDI + 0x080) : mword 64) (RTYPE (Regidx (mword_of_int 13), Regidx (mword_of_int 14), Regidx (mword_of_int 14), AND)) cdec_8f75 vde_8f75. Qed.
 
   Lemma vdi_082 : kernel_text -∗ instr (mword_of_int (VDI + 0x082) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 13), LUI)).
   Proof. mk_base (VDI + 0x082)%Z (mword_of_int 0x100016b7 : mword 32)
@@ -839,7 +795,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_09c : kernel_text -∗ instr (mword_of_int (VDI + 0x09c) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x09c)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x09c) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x09c) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_0a0 : kernel_text -∗ instr (mword_of_int (VDI + 0x0a0) : mword 64) false (STORE (mword_of_int 48 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 15), 4)).
   Proof. mk_base (VDI + 0x0a0)%Z (mword_of_int 0x0207a823 : mword 32)
@@ -859,7 +815,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_0ac : kernel_text -∗ instr (mword_of_int (VDI + 0x0ac) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x0ac)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x0ac) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x0ac) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_0b0 : kernel_text -∗ instr (mword_of_int (VDI + 0x0b0) : mword 64) true (LOAD (mword_of_int 52, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (VDI + 0x0b0)%Z (mword_of_int 0x5bdc : mword 16)
@@ -895,7 +851,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_0ca : kernel_text -∗ instr (mword_of_int (VDI + 0x0ca) : mword 64) true (STORE (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (VDI + 0x0ca)%Z (mword_of_int 0xe088 : mword 16)
-    (mword_of_int (VDI + 0x0ca) : mword 64) (STORE (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) vdc_e088 vde_e088. Qed.
+    (mword_of_int (VDI + 0x0ca) : mword 64) (STORE (mword_of_int 0, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) cdec_e088 vde_e088. Qed.
 
   Lemma vdi_0cc : kernel_text -∗ instr (mword_of_int (VDI + 0x0cc) : mword 64) false (JAL (mword_of_int 2077914 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (VDI + 0x0cc)%Z (mword_of_int 0xcdafb0ef : mword 32)
@@ -911,15 +867,15 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_0d6 : kernel_text -∗ instr (mword_of_int (VDI + 0x0d6) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (VDI + 0x0d6)%Z (mword_of_int 0x87aa : mword 16)
-    (mword_of_int (VDI + 0x0d6) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) vdc_87aa exec_execute_C_MV. Qed.
+    (mword_of_int (VDI + 0x0d6) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)) cdec_87aa exec_execute_C_MV. Qed.
 
   Lemma vdi_0d8 : kernel_text -∗ instr (mword_of_int (VDI + 0x0d8) : mword 64) true (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (VDI + 0x0d8)%Z (mword_of_int 0xe888 : mword 16)
-    (mword_of_int (VDI + 0x0d8) : mword 64) (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) vdc_e888 vde_e888. Qed.
+    (mword_of_int (VDI + 0x0d8) : mword 64) (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) cdec_e888 vde_e888. Qed.
 
   Lemma vdi_0da : kernel_text -∗ instr (mword_of_int (VDI + 0x0da) : mword 64) true (LOAD (mword_of_int 0, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)).
   Proof. mk_rvc (VDI + 0x0da)%Z (mword_of_int 0x6088 : mword 16)
-    (mword_of_int (VDI + 0x0da) : mword 64) (LOAD (mword_of_int 0, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) vdc_6088 vde_6088. Qed.
+    (mword_of_int (VDI + 0x0da) : mword 64) (LOAD (mword_of_int 0, Regidx (mword_of_int 9), Regidx (mword_of_int 10), false, 8)) cdec_6088 vde_6088. Qed.
 
   Lemma vdi_0dc : kernel_text -∗ instr (mword_of_int (VDI + 0x0dc) : mword 64) false (BTYPE (mword_of_int 224 : mword 13, zreg, Regidx (mword_of_int 10), BEQ)).
   Proof. mk_base (VDI + 0x0dc)%Z (mword_of_int 0x0e050063 : mword 32)
@@ -995,7 +951,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_110 : kernel_text -∗ instr (mword_of_int (VDI + 0x110) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (VDI + 0x110)%Z (mword_of_int 0x100017b7 : mword 32)
-    (mword_of_int (VDI + 0x110) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) vdb_100017b7. Qed.
+    (mword_of_int (VDI + 0x110) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI)) bdec_100017b7. Qed.
 
   Lemma vdi_114 : kernel_text -∗ instr (mword_of_int (VDI + 0x114) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (VDI + 0x114)%Z (mword_of_int 0x4721 : mword 16)
@@ -1011,7 +967,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_11a : kernel_text -∗ instr (mword_of_int (VDI + 0x11a) : mword 64) false (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)).
   Proof. mk_base (VDI + 0x11a)%Z (mword_of_int 0x08e7a023 : mword 32)
-    (mword_of_int (VDI + 0x11a) : mword 64) (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)) vdb_08e7a023. Qed.
+    (mword_of_int (VDI + 0x11a) : mword 64) (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)) bdec_08e7a023. Qed.
 
   Lemma vdi_11e : kernel_text -∗ instr (mword_of_int (VDI + 0x11e) : mword 64) true (LOAD (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 4)).
   Proof. mk_rvc (VDI + 0x11e)%Z (mword_of_int 0x40d8 : mword 16)
@@ -1031,7 +987,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_12a : kernel_text -∗ instr (mword_of_int (VDI + 0x12a) : mword 64) false (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI)).
   Proof. mk_base (VDI + 0x12a)%Z (mword_of_int 0x10001737 : mword 32)
-    (mword_of_int (VDI + 0x12a) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI)) vdb_10001737. Qed.
+    (mword_of_int (VDI + 0x12a) : mword 64) (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 14), LUI)) bdec_10001737. Qed.
 
   Lemma vdi_12e : kernel_text -∗ instr (mword_of_int (VDI + 0x12e) : mword 64) false (STORE (mword_of_int 144 : mword 12, Regidx (mword_of_int 13), Regidx (mword_of_int 14), 4)).
   Proof. mk_base (VDI + 0x12e)%Z (mword_of_int 0x08d72823 : mword 32)
@@ -1047,7 +1003,7 @@ Section CodeVirtioDiskInit.
 
   Lemma vdi_138 : kernel_text -∗ instr (mword_of_int (VDI + 0x138) : mword 64) true (LOAD (mword_of_int 16, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (VDI + 0x138)%Z (mword_of_int 0x689c : mword 16)
-    (mword_of_int (VDI + 0x138) : mword 64) (LOAD (mword_of_int 16, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) vdc_689c vde_689c. Qed.
+    (mword_of_int (VDI + 0x138) : mword 64) (LOAD (mword_of_int 16, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)) cdec_689c vde_689c. Qed.
 
   Lemma vdi_13a : kernel_text -∗ instr (mword_of_int (VDI + 0x13a) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13))).
   Proof. mk_base (VDI + 0x13a)%Z (mword_of_int 0x0007869b : mword 32)

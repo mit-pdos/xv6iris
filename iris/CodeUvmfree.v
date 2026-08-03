@@ -99,11 +99,6 @@ Lemma ufdc_e989 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BNEZ (mword_of_int 9, Cregidx (mword_of_int 3)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x24  c.li a3,1 *)
-Lemma ufdc_4685 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4685 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 13)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts -- all three are uvmfree's own.             *)
@@ -215,7 +210,7 @@ Section UvmfreeInstrs.
 
   Lemma ufi_24 : kernel_text -∗ instr (mword_of_int (UF + 0x24) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).
   Proof. mk_rvc (UF + 0x24)%Z (mword_of_int 0x4685 : mword 16)
-    (mword_of_int (UF + 0x24) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) ufdc_4685 exec_execute_C_LI. Qed.
+    (mword_of_int (UF + 0x24) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) cdec_4685 exec_execute_C_LI. Qed.
 
   Lemma ufi_26 : kernel_text -∗ instr (mword_of_int (UF + 0x26) : mword 64) false (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 12), SRLI)).
   Proof. mk_base (UF + 0x26)%Z (mword_of_int 0x00c5d613 : mword 32)

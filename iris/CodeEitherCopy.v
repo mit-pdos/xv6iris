@@ -71,6 +71,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -103,11 +104,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* Base (4-byte) decode facts.                                            *)
 (* ===================================================================== *)
 
-(* +0x3a  sext.w a2,s2  =  addiw a2,s2,0  (both functions) *)
-Lemma ecdb_0009061b s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0009061b : mword 32)) s
-  = Some (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12)), s).
-Proof. decode_bridge_ms. Qed.
 
 (* either_copyout +0x18  jal ra,myproc   (0x80002278 -> 0x80001904 is -2420) *)
 Lemma ecdb_e8cff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -133,11 +129,6 @@ Lemma ecdb_e42ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2094658 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* either_copyin +0x26  jal ra,copyin    (0x800022d0 -> 0x800016e2 is -3054) *)
-Lemma ecdb_c12ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xc12ff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
 
 (* either_copyin +0x42  jal ra,memmove   (0x800022ec -> 0x80000d28 is -5572) *)
 Lemma ecdb_a3dfe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -267,7 +258,7 @@ Section EitherCopyInstrs.
 
   Lemma eco_3a : kernel_text -∗ instr (mword_of_int (ECO + 0x3a) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).
   Proof. mk_base (ECO + 0x3a)%Z (mword_of_int 0x0009061b : mword 32)
-    (mword_of_int (ECO + 0x3a) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) ecdb_0009061b. Qed.
+    (mword_of_int (ECO + 0x3a) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) bdec_0009061b. Qed.
 
   Lemma eco_3e : kernel_text -∗ instr (mword_of_int (ECO + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (ECO + 0x3e)%Z (mword_of_int 0x85ce : mword 16)
@@ -365,7 +356,7 @@ Section EitherCopyInstrs.
 
   Lemma eci_26 : kernel_text -∗ instr (mword_of_int (ECI + 0x26) : mword 64) false (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (ECI + 0x26)%Z (mword_of_int 0xc12ff0ef : mword 32)
-    (mword_of_int (ECI + 0x26) : mword 64) (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))) ecdb_c12ff0ef. Qed.
+    (mword_of_int (ECI + 0x26) : mword 64) (JAL (mword_of_int 2094098 : mword 21, Regidx (mword_of_int 1))) bdec_c12ff0ef. Qed.
 
   Lemma eci_2a : kernel_text -∗ instr (mword_of_int (ECI + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (ECI + 0x2a)%Z (mword_of_int 0x70a2 : mword 16)
@@ -401,7 +392,7 @@ Section EitherCopyInstrs.
 
   Lemma eci_3a : kernel_text -∗ instr (mword_of_int (ECI + 0x3a) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).
   Proof. mk_base (ECI + 0x3a)%Z (mword_of_int 0x0009061b : mword 32)
-    (mword_of_int (ECI + 0x3a) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) ecdb_0009061b. Qed.
+    (mword_of_int (ECI + 0x3a) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) bdec_0009061b. Qed.
 
   Lemma eci_3e : kernel_text -∗ instr (mword_of_int (ECI + 0x3e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (ECI + 0x3e)%Z (mword_of_int 0x85ce : mword 16)

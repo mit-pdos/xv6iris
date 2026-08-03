@@ -72,6 +72,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -110,11 +111,6 @@ Lemma uddc_76fd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LUI (mword_of_int 63, Regidx (mword_of_int 13)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x1c  c.and a4,a4,a3  (creg 6 = a4, creg 5 = a3) *)
-Lemma uddc_8f75 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8f75 : mword 16)) s
-  = Some (C_AND (Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x1e  c.add a5,a5,a1 *)
 Lemma uddc_97ae s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -134,11 +130,6 @@ Lemma uddc_8f99 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_SUB (Cregidx (mword_of_int 7), Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x36  c.li a3,1 *)
-Lemma uddc_4685 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4685 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 13)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x3c  c.mv a1,a4 *)
 Lemma uddc_85ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -159,11 +150,6 @@ Lemma uddb_00b67d63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 26 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 12), BGEU), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x16  add a4,a2,a5  -- newsz + 0xfff *)
-Lemma uddb_00f60733 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00f60733 : mword 32)) s
-  = Some (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x22  bltu a4,a5,+0x10  -- PGROUNDUP(newsz) < PGROUNDUP(oldsz) *)
 Lemma uddb_00f76863 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -240,7 +226,7 @@ Section UvmdeallocInstrs.
 
   Lemma udi_16 : kernel_text -∗ instr (mword_of_int (UD + 0x16) : mword 64) false (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)).
   Proof. mk_base (UD + 0x16)%Z (mword_of_int 0x00f60733 : mword 32)
-    (mword_of_int (UD + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)) uddb_00f60733. Qed.
+    (mword_of_int (UD + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 15), Regidx (mword_of_int 12), Regidx (mword_of_int 14), ADD)) bdec_00f60733. Qed.
 
   Lemma udi_1a : kernel_text -∗ instr (mword_of_int (UD + 0x1a) : mword 64) true (UTYPE (sign_extend' 20 (mword_of_int 63 : mword 6), Regidx (mword_of_int 13), LUI)).
   Proof. mk_rvc (UD + 0x1a)%Z (mword_of_int 0x76fd : mword 16)
@@ -248,7 +234,7 @@ Section UvmdeallocInstrs.
 
   Lemma udi_1c : kernel_text -∗ instr (mword_of_int (UD + 0x1c) : mword 64) true (RTYPE (creg2reg_idx (Cregidx (mword_of_int 5)), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 6)), AND)).
   Proof. mk_rvc (UD + 0x1c)%Z (mword_of_int 0x8f75 : mword 16)
-    (mword_of_int (UD + 0x1c) : mword 64) (RTYPE (creg2reg_idx (Cregidx (mword_of_int 5)), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 6)), AND)) uddc_8f75 exec_execute_C_AND. Qed.
+    (mword_of_int (UD + 0x1c) : mword 64) (RTYPE (creg2reg_idx (Cregidx (mword_of_int 5)), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 6)), AND)) cdec_8f75 exec_execute_C_AND. Qed.
 
   Lemma udi_1e : kernel_text -∗ instr (mword_of_int (UD + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 11), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (UD + 0x1e)%Z (mword_of_int 0x97ae : mword 16)
@@ -300,7 +286,7 @@ Section UvmdeallocInstrs.
 
   Lemma udi_36 : kernel_text -∗ instr (mword_of_int (UD + 0x36) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).
   Proof. mk_rvc (UD + 0x36)%Z (mword_of_int 0x4685 : mword 16)
-    (mword_of_int (UD + 0x36) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) uddc_4685 exec_execute_C_LI. Qed.
+    (mword_of_int (UD + 0x36) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) cdec_4685 exec_execute_C_LI. Qed.
 
   Lemma udi_38 : kernel_text -∗ instr (mword_of_int (UD + 0x38) : mword 64) false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 12))).
   Proof. mk_base (UD + 0x38)%Z (mword_of_int 0x0007861b : mword 32)

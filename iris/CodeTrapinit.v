@@ -41,11 +41,6 @@ Lemma tdb_e3e58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 3646 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* auipc a0,0x16 *)
-Lemma tdb_00016517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00016517 : mword 32)) s
-  = Some (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 (* addi a0,a0,-666  -- a0 := &tickslock  (4096-666) *)
 Lemma tdb_d6650513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -91,7 +86,7 @@ Section CodeTrapinit.
 
   Lemma tri_10 : kernel_text -∗ instr (mword_of_int (TI + 0x10) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (TI + 0x10)%Z (mword_of_int 0x00016517 : mword 32)
-    (mword_of_int (TI + 0x10) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)) tdb_00016517. Qed.
+    (mword_of_int (TI + 0x10) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00016517. Qed.
 
   Lemma tri_14 : kernel_text -∗ instr (mword_of_int (TI + 0x14) : mword 64) false (ITYPE (mword_of_int 3430 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (TI + 0x14)%Z (mword_of_int 0xd6650513 : mword 32)

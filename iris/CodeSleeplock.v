@@ -58,10 +58,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x409c  c.lw a5,0(s1) -- the bit-keyed decode now lives in the shared base
    (sys_pause steps the same word); kept under its old name for the call sites. *)
-Lemma sldec_lw_locked s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x409c : mword 16)) s
-  = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. exact (cdec_409c s). Qed.
 
 (* 0x591c  c.lw a5,48(a0) *)
 Lemma sldec_lw_pid_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -87,11 +83,6 @@ Lemma sldec_beqz s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_BEQZ (mword_of_int 7, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xfbfd  c.bnez a5,-10  (acquiresleep +0x26 -> +0x1c) *)
-Lemma sldec_bnez_back s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xfbfd : mword 16)) s
-  = Some (C_BNEZ (mword_of_int 251, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xef81  c.bnez a5,+24  (holdingsleep +0x1a -> +0x32) *)
 Lemma sldec_bnez_fwd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -99,21 +90,11 @@ Lemma sldec_bnez_fwd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
   = Some (C_BNEZ (mword_of_int 12, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x4481  c.li s1,0 *)
-Lemma sldec_li_s1_0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4481 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Fresh base (32-bit) decode templates (words unique to sleeplock).      *)
 (* ===================================================================== *)
 
-(* 0x00003597  auipc a1,0x3   (initsleeplock +0x10) *)
-Lemma sldec_auipc_a1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00003597 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x3 : mword 20, Regidx (mword_of_int 11), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* 0x6a258593  addi a1,a1,1698  (= 0x6a2)  (initsleeplock +0x14) *)
 Lemma sldec_addi_a1 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -266,7 +247,7 @@ Section CodeSleeplock.
 
   Lemma isl_10 : kernel_text -∗ instr (mword_of_int (ISL + 0x10) : mword 64) false (UTYPE (mword_of_int 0x3 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (ISL + 0x10)%Z (mword_of_int 0x00003597 : mword 32)
-    (mword_of_int (ISL + 0x10) : mword 64) (UTYPE (mword_of_int 0x3 : mword 20, Regidx (mword_of_int 11), AUIPC)) sldec_auipc_a1. Qed.
+    (mword_of_int (ISL + 0x10) : mword 64) (UTYPE (mword_of_int 0x3 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00003597. Qed.
 
   Lemma isl_14 : kernel_text -∗ instr (mword_of_int (ISL + 0x14) : mword 64) false (ITYPE (mword_of_int 0x6a2 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
   Proof. mk_base (ISL + 0x14)%Z (mword_of_int 0x6a258593 : mword 32)
@@ -361,7 +342,7 @@ Section CodeSleeplock.
 
   Lemma asl_18 : kernel_text -∗ instr (mword_of_int (ASL + 0x18) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)).
   Proof. mk_rvc (ASL + 0x18)%Z (mword_of_int 0x409c : mword 16)
-    (mword_of_int (ASL + 0x18) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) sldec_lw_locked exec_execute_C_LW. Qed.
+    (mword_of_int (ASL + 0x18) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_409c exec_execute_C_LW. Qed.
 
   Lemma asl_1a : kernel_text -∗ instr (mword_of_int (ASL + 0x1a) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 7 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (ASL + 0x1a)%Z (mword_of_int 0xc799 : mword 16)
@@ -381,11 +362,11 @@ Section CodeSleeplock.
 
   Lemma asl_24 : kernel_text -∗ instr (mword_of_int (ASL + 0x24) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)).
   Proof. mk_rvc (ASL + 0x24)%Z (mword_of_int 0x409c : mword 16)
-    (mword_of_int (ASL + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) sldec_lw_locked exec_execute_C_LW. Qed.
+    (mword_of_int (ASL + 0x24) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_409c exec_execute_C_LW. Qed.
 
   Lemma asl_26 : kernel_text -∗ instr (mword_of_int (ASL + 0x26) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (ASL + 0x26)%Z (mword_of_int 0xfbfd : mword 16)
-    (mword_of_int (ASL + 0x26) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) sldec_bnez_back exec_execute_C_BNEZ. Qed.
+    (mword_of_int (ASL + 0x26) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) cdec_fbfd exec_execute_C_BNEZ. Qed.
 
   Lemma asl_28 : kernel_text -∗ instr (mword_of_int (ASL + 0x28) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (ASL + 0x28)%Z (mword_of_int 0x4785 : mword 16)
@@ -575,7 +556,7 @@ Section CodeSleeplock.
 
   Lemma hsl_18 : kernel_text -∗ instr (mword_of_int (HSL + 0x18) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)).
   Proof. mk_rvc (HSL + 0x18)%Z (mword_of_int 0x409c : mword 16)
-    (mword_of_int (HSL + 0x18) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) sldec_lw_locked exec_execute_C_LW. Qed.
+    (mword_of_int (HSL + 0x18) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_409c exec_execute_C_LW. Qed.
 
   Lemma hsl_1a : kernel_text -∗ instr (mword_of_int (HSL + 0x1a) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 12 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (HSL + 0x1a)%Z (mword_of_int 0xef81 : mword 16)
@@ -583,7 +564,7 @@ Section CodeSleeplock.
 
   Lemma hsl_1c : kernel_text -∗ instr (mword_of_int (HSL + 0x1c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (HSL + 0x1c)%Z (mword_of_int 0x4481 : mword 16)
-    (mword_of_int (HSL + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) sldec_li_s1_0 exec_execute_C_LI. Qed.
+    (mword_of_int (HSL + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) cdec_4481 exec_execute_C_LI. Qed.
 
   Lemma hsl_1e : kernel_text -∗ instr (mword_of_int (HSL + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (HSL + 0x1e)%Z (mword_of_int 0x854a : mword 16)

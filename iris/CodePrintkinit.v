@@ -37,11 +37,6 @@ Lemma fdb_7be58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1982 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* addi a0,a0,-1402  -- a0 := &pr  (the decoder's positive residue: 4096-1402) *)
-Lemma fdb_a8650513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xa8650513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 2694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* jal ra,initlock *)
 Lemma fdb_30e000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -85,7 +80,7 @@ Section CodePrintkinit.
 
   Lemma pki_14 : kernel_text -∗ instr (mword_of_int (PK + 0x14) : mword 64) false (ITYPE (mword_of_int 2694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (PK + 0x14)%Z (mword_of_int 0xa8650513 : mword 32)
-    (mword_of_int (PK + 0x14) : mword 64) (ITYPE (mword_of_int 2694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) fdb_a8650513. Qed.
+    (mword_of_int (PK + 0x14) : mword 64) (ITYPE (mword_of_int 2694 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) bdec_a8650513. Qed.
 
   Lemma pki_18 : kernel_text -∗ instr (mword_of_int (PK + 0x18) : mword 64) false (JAL (mword_of_int 782 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (PK + 0x18)%Z (mword_of_int 0x30e000ef : mword 32)

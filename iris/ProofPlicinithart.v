@@ -93,11 +93,6 @@ Lemma phdec_li_1026 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1026 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 14), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x1a  08e7a023  sw a4,128(a5) *)
-Lemma phdec_sw_128 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x08e7a023 : mword 32)) s
-  = Some (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x28  0007a023  sw zero,0(a5) *)
 Lemma phdec_sw_zero s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -164,7 +159,7 @@ Section ProofPlicinithart.
 
   Lemma phi_1a : kernel_text -∗ instr (mword_of_int (PH + 0x1a) : mword 64) false (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)).
   Proof. mk_base (PH + 0x1a)%Z (mword_of_int 0x08e7a023 : mword 32)
-    (mword_of_int (PH + 0x1a) : mword 64) (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)) phdec_sw_128. Qed.
+    (mword_of_int (PH + 0x1a) : mword 64) (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4)) bdec_08e7a023. Qed.
 
   Lemma phi_1e : kernel_text -∗ instr (mword_of_int (PH + 0x1e) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 10), SLLIW)).
   Proof. mk_base (PH + 0x1e)%Z (mword_of_int 0x00d5151b : mword 32)

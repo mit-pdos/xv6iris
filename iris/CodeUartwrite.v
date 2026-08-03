@@ -37,11 +37,6 @@ Import Defs.
 (* Compressed decode facts unique to uartwrite.                           *)
 (* ===================================================================== *)
 
-(* 0x8aaa  c.mv s5,a0 *)
-Lemma uwdc_8aaa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8aaa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x8a56  c.mv s4,s5 *)
 Lemma uwdc_8a56 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -49,35 +44,10 @@ Lemma uwdc_8a56 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_MV (Regidx (mword_of_int 20), Regidx (mword_of_int 21)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x9aa6  c.add s5,s5,s1 *)
-Lemma uwdc_9aa6 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x9aa6 : mword 16)) s
-  = Some (C_ADD (Regidx (mword_of_int 21), Regidx (mword_of_int 9)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x4b05  c.li s6,1 *)
-Lemma uwdc_4b05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4b05 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 22)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xa005  c.j +32   (+0x4c -> the loop head at +0x6c) *)
-Lemma uwdc_a005 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa005 : mword 16)) s
-  = Some (C_J (mword_of_int 16 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x85ce  c.mv a1,s3 *)
-Lemma uwdc_85ce s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85ce : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xfbfd  c.bnez a5,-10  (+0x58 -> the sleep block at +0x4e) *)
-Lemma uwdc_fbfd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xfbfd : mword 16)) s
-  = Some (C_BNEZ (mword_of_int 251, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xf3e5  c.bnez a5,-32  (+0x6e -> the sleep block at +0x4e) *)
 Lemma uwdc_f3e5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -85,17 +55,7 @@ Lemma uwdc_f3e5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BNEZ (mword_of_int 240, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xb7ed  c.j -22  (+0x70 -> the body at +0x5a) *)
-Lemma uwdc_b7ed s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7ed : mword 16)) s
-  = Some (C_J (mword_of_int 2037), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x0a05  c.addi s4,s4,1 *)
-Lemma uwdc_0a05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0a05 : mword 16)) s
-  = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 20)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (32-bit) decode facts.                                            *)
@@ -233,7 +193,7 @@ Section CodeUartwrite.
 
   Lemma uwi_0c : kernel_text -∗ instr (mword_of_int (UW + 0x0c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (UW + 0x0c)%Z (mword_of_int 0x8aaa : mword 16)
-    (mword_of_int (UW + 0x0c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)) uwdc_8aaa exec_execute_C_MV. Qed.
+    (mword_of_int (UW + 0x0c) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)) cdec_8aaa exec_execute_C_MV. Qed.
 
   Lemma uwi_0e : kernel_text -∗ instr (mword_of_int (UW + 0x0e) : mword 64) true (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (UW + 0x0e)%Z (mword_of_int 0x84ae : mword 16)
@@ -284,7 +244,7 @@ Section CodeUartwrite.
 
   Lemma uwi_2c : kernel_text -∗ instr (mword_of_int (UW + 0x2c) : mword 64) true (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (UW + 0x2c)%Z (mword_of_int 0x9aa6 : mword 16)
-    (mword_of_int (UW + 0x2c) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADD)) uwdc_9aa6 exec_execute_C_ADD. Qed.
+    (mword_of_int (UW + 0x2c) : mword 64) (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 21), Regidx (mword_of_int 21), ADD)) cdec_9aa6 exec_execute_C_ADD. Qed.
 
   Lemma uwi_2e : kernel_text -∗ instr (mword_of_int (UW + 0x2e) : mword 64) false (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (UW + 0x2e)%Z (mword_of_int 0x0000a497 : mword 32)
@@ -316,16 +276,16 @@ Section CodeUartwrite.
 
   Lemma uwi_4a : kernel_text -∗ instr (mword_of_int (UW + 0x4a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)).
   Proof. mk_rvc (UW + 0x4a)%Z (mword_of_int 0x4b05 : mword 16)
-    (mword_of_int (UW + 0x4a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)) uwdc_4b05 exec_execute_C_LI. Qed.
+    (mword_of_int (UW + 0x4a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 22), ADDI)) cdec_4b05 exec_execute_C_LI. Qed.
 
   Lemma uwi_4c : kernel_text -∗ instr (mword_of_int (UW + 0x4c) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 16 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UW + 0x4c)%Z (mword_of_int 0xa005 : mword 16)
-    (mword_of_int (UW + 0x4c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 16 : mword 11) ('b"0")), zreg)) uwdc_a005 exec_execute_C_J. Qed.
+    (mword_of_int (UW + 0x4c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 16 : mword 11) ('b"0")), zreg)) cdec_a005 exec_execute_C_J. Qed.
 
   (* --- the sleep block (+0x4e .. +0x58) --- *)
   Lemma uwi_4e : kernel_text -∗ instr (mword_of_int (UW + 0x4e) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (UW + 0x4e)%Z (mword_of_int 0x85ce : mword 16)
-    (mword_of_int (UW + 0x4e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) uwdc_85ce exec_execute_C_MV. Qed.
+    (mword_of_int (UW + 0x4e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 11), ADD)) cdec_85ce exec_execute_C_MV. Qed.
 
   Lemma uwi_50 : kernel_text -∗ instr (mword_of_int (UW + 0x50) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (UW + 0x50)%Z (mword_of_int 0x854a : mword 16)
@@ -341,7 +301,7 @@ Section CodeUartwrite.
 
   Lemma uwi_58 : kernel_text -∗ instr (mword_of_int (UW + 0x58) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)).
   Proof. mk_rvc (UW + 0x58)%Z (mword_of_int 0xfbfd : mword 16)
-    (mword_of_int (UW + 0x58) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) uwdc_fbfd exec_execute_C_BNEZ. Qed.
+    (mword_of_int (UW + 0x58) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BNE)) cdec_fbfd exec_execute_C_BNEZ. Qed.
 
   (* --- the loop body (+0x5a .. +0x68) --- *)
   Lemma uwi_5a : kernel_text -∗ instr (mword_of_int (UW + 0x5a) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), true, 1)).
@@ -358,7 +318,7 @@ Section CodeUartwrite.
 
   Lemma uwi_66 : kernel_text -∗ instr (mword_of_int (UW + 0x66) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
   Proof. mk_rvc (UW + 0x66)%Z (mword_of_int 0x0a05 : mword 16)
-    (mword_of_int (UW + 0x66) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) uwdc_0a05 exec_execute_C_ADDI. Qed.
+    (mword_of_int (UW + 0x66) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) cdec_0a05 exec_execute_C_ADDI. Qed.
 
   Lemma uwi_68 : kernel_text -∗ instr (mword_of_int (UW + 0x68) : mword 64) false (BTYPE (mword_of_int 10 : mword 13, Regidx (mword_of_int 21), Regidx (mword_of_int 20), BEQ)).
   Proof. mk_base (UW + 0x68)%Z (mword_of_int 0x015a0563 : mword 32)
@@ -375,7 +335,7 @@ Section CodeUartwrite.
 
   Lemma uwi_70 : kernel_text -∗ instr (mword_of_int (UW + 0x70) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UW + 0x70)%Z (mword_of_int 0xb7ed : mword 16)
-    (mword_of_int (UW + 0x70) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0")), zreg)) uwdc_b7ed exec_execute_C_J. Qed.
+    (mword_of_int (UW + 0x70) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0")), zreg)) cdec_b7ed exec_execute_C_J. Qed.
 
   (* --- the shrink-wrapped restores (+0x72 .. +0x7a) --- *)
   Lemma uwi_72 : kernel_text -∗ instr (mword_of_int (UW + 0x72) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")), sp, Regidx (mword_of_int 18), false, 8)).

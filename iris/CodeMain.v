@@ -59,11 +59,6 @@ Lemma mndc_c51d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 23, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x431c  lw a5,0(a4)  -- the [started] read *)
-Lemma mndc_431c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x431c : mword 16)) s
-  = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xdff5  beqz a5,-4  -- the spin loop's back edge (imm[8:1] = 254) *)
 Lemma mndc_dff5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -71,17 +66,7 @@ Lemma mndc_dff5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BEQZ (mword_of_int 254, Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x85aa  mv a1,a0  -- the cpuid() result becomes printk's vararg *)
-Lemma mndc_85aa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x85aa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 11), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xb779  j -0x72  -- the boot arm's jump back to the [jal scheduler] join *)
-Lemma mndc_b779 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb779 : mword 16)) s
-  = Some (C_J (mword_of_int 1991), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (32-bit) decode facts unique to main.  Every immediate here is    *)
@@ -175,10 +160,6 @@ Lemma mndb_99fff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->  
   = Some (JAL (mword_of_int 2095518 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma mndb_e2cff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->  (* printk *)
-  exec (ext_decode (mword_of_int 0xe2cff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma mndb_e20ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->  (* printk *)
   exec (ext_decode (mword_of_int 0xe20ff0ef : mword 32)) s
@@ -318,7 +299,7 @@ Section CodeMain.
   Proof.
     rewrite -mnd_clw_imm0 -creg_c6 -creg_c7.
     mk_rvc (MN + 0x16)%Z (mword_of_int 0x431c : mword 16)
-      (mword_of_int (MN + 0x16) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) mndc_431c exec_execute_C_LW.
+      (mword_of_int (MN + 0x16) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 6)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_431c exec_execute_C_LW.
   Qed.
 
   Lemma mni_18 : kernel_text -∗ instr (mword_of_int (MN + 0x18) : mword 64) true (ADDIW (sign_extend' 12 (mword_of_int 0 : mword 6), Regidx (mword_of_int 15), Regidx (mword_of_int 15))).
@@ -341,7 +322,7 @@ Section CodeMain.
 
   Lemma mni_24 : kernel_text -∗ instr (mword_of_int (MN + 0x24) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (MN + 0x24)%Z (mword_of_int 0x85aa : mword 16)
-    (mword_of_int (MN + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)) mndc_85aa exec_execute_C_MV. Qed.
+    (mword_of_int (MN + 0x24) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)) cdec_85aa exec_execute_C_MV. Qed.
 
   Lemma mni_26 : kernel_text -∗ instr (mword_of_int (MN + 0x26) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (MN + 0x26)%Z (mword_of_int 0x00006517 : mword 32)
@@ -397,7 +378,7 @@ Section CodeMain.
 
   Lemma mni_52 : kernel_text -∗ instr (mword_of_int (MN + 0x52) : mword 64) false (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (MN + 0x52)%Z (mword_of_int 0xe2cff0ef : mword 32)
-    (mword_of_int (MN + 0x52) : mword 64) (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1))) mndb_e2cff0ef. Qed.
+    (mword_of_int (MN + 0x52) : mword 64) (JAL (mword_of_int 2094636 : mword 21, Regidx (mword_of_int 1))) bdec_e2cff0ef. Qed.
 
   Lemma mni_56 : kernel_text -∗ instr (mword_of_int (MN + 0x56) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (MN + 0x56)%Z (mword_of_int 0x00006517 : mword 32)
@@ -501,6 +482,6 @@ Section CodeMain.
 
   Lemma mni_b0 : kernel_text -∗ instr (mword_of_int (MN + 0xb0) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (MN + 0xb0)%Z (mword_of_int 0xb779 : mword 16)
-    (mword_of_int (MN + 0xb0) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")), zreg)) mndc_b779 exec_execute_C_J. Qed.
+    (mword_of_int (MN + 0xb0) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")), zreg)) cdec_b779 exec_execute_C_J. Qed.
 
 End CodeMain.

@@ -114,7 +114,7 @@ Section WpReleaseInstr.
 
   Lemma rli_10 : kernel_text -∗ instr (mword_of_int (RL + 0x10) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (RL + 0x10)%Z (mword_of_int 0xcd11 : mword 16)
-    (mword_of_int (RL + 0x10) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) ppdec_beqz1c exec_execute_C_BEQZ. Qed.
+    (mword_of_int (RL + 0x10) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_cd11 exec_execute_C_BEQZ. Qed.
 
   Lemma rli_12 : kernel_text -∗ instr (mword_of_int (RL + 0x12) : mword 64) false (STORE (mword_of_int 16, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)).
   Proof. mk_base (RL + 0x12)%Z (mword_of_int 0x0004b823 : mword 32)

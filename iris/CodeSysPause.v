@@ -112,11 +112,6 @@ Lemma spdb_0607c863 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 112 : mword 13, Regidx (mword_of_int 0), Regidx (mword_of_int 15), BLT), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x1e  addi a0,a0,1966  -- a0 := &tickslock *)
-Lemma spdb_7ae50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x7ae50513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x22  jal ra,acquire   (0x800029d2 -> 0x80000c08 is -7626) *)
 Lemma spdb_a36fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -281,7 +276,7 @@ Section SysPauseInstrs.
 
   Lemma spi_1e : kernel_text -∗ instr (mword_of_int (SP + 0x1e) : mword 64) false (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (SP + 0x1e)%Z (mword_of_int 0x7ae50513 : mword 32)
-    (mword_of_int (SP + 0x1e) : mword 64) (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) spdb_7ae50513. Qed.
+    (mword_of_int (SP + 0x1e) : mword 64) (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) bdec_7ae50513. Qed.
 
   Lemma spi_22 : kernel_text -∗ instr (mword_of_int (SP + 0x22) : mword 64) false (JAL (mword_of_int 2089526 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (SP + 0x22)%Z (mword_of_int 0xa36fe0ef : mword 32)

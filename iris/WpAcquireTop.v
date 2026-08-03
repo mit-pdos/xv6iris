@@ -80,13 +80,6 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x16  0x4705  c.li a4,1 *)
-Lemma aqdec_li_a4_1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4705 : mword 16)) s
-  = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 14)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
 
 (* +0x18  0xed11  c.bnez a0,+0x1c *)
 Lemma aqdec_bnez_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -104,13 +97,6 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x28  0xe888  c.sd a0,16(s1) *)
-Lemma aqdec_sd s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xe888 : mword 16)) s
-  = Some (C_SD (mword_of_int 2, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
-Proof.
-  intro H. rvc_oneshot s H.
-Qed.
 
 (* ---- base (4-byte) decodes: the three jal's ---- *)
 Local Ltac aq_dbase s Hpriv :=
@@ -256,7 +242,7 @@ Section WpAcquireTop.
 
   Lemma aqi_16 : kernel_text -∗ instr (mword_of_int (AQ + 0x16) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (AQ + 0x16)%Z (mword_of_int 0x4705 : mword 16)
-    (mword_of_int (AQ + 0x16) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) aqdec_li_a4_1 exec_execute_C_LI. Qed.
+    (mword_of_int (AQ + 0x16) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) cdec_4705 exec_execute_C_LI. Qed.
 
   Lemma aqi_18 : kernel_text -∗ instr (mword_of_int (AQ + 0x18) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BNE)).
   Proof. mk_rvc (AQ + 0x18)%Z (mword_of_int 0xed11 : mword 16)
@@ -284,7 +270,7 @@ Section WpAcquireTop.
 
   Lemma aqi_28 : kernel_text -∗ instr (mword_of_int (AQ + 0x28) : mword 64) true (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (AQ + 0x28)%Z (mword_of_int 0xe888 : mword 16)
-    (mword_of_int (AQ + 0x28) : mword 64) (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) aqdec_sd aqexec_sd. Qed.
+    (mword_of_int (AQ + 0x28) : mword 64) (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)) cdec_e888 aqexec_sd. Qed.
 
   Lemma aqi_2a : kernel_text -∗ instr (mword_of_int (AQ + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (AQ + 0x2a)%Z (mword_of_int 0x60e2 : mword 16)

@@ -53,17 +53,7 @@ Lemma uidc2_0495 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1
   = Some (C_ADDI (mword_of_int 5, Regidx (mword_of_int 9)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xc38d  c.beqz a5,+0x22  (uartgetc returned -1 -> leave the rx loop) *)
-Lemma uidc2_c38d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xc38d : mword 16)) s
-  = Some (C_BEQZ (mword_of_int 17, Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0xbfc5  c.j -0x10  (the rx loop's back edge) *)
-Lemma uidc2_bfc5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfc5 : mword 16)) s
-  = Some (C_J (mword_of_int 2040), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0xb7d1  c.j -0x3c  (the tx branch rejoins at the release) *)
 Lemma uidc2_b7d1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -260,7 +250,7 @@ Section CodeUartintr.
 
   Lemma uii2_4a : kernel_text -∗ instr (mword_of_int (UI + 0x4a) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)).
   Proof. mk_rvc (UI + 0x4a)%Z (mword_of_int 0xc38d : mword 16)
-    (mword_of_int (UI + 0x4a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) uidc2_c38d exec_execute_C_BEQZ. Qed.
+    (mword_of_int (UI + 0x4a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) cdec_c38d exec_execute_C_BEQZ. Qed.
 
   Lemma uii2_4c : kernel_text -∗ instr (mword_of_int (UI + 0x4c) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), true, 1)).
   Proof. mk_base (UI + 0x4c)%Z (mword_of_int 0x00094503 : mword 32)
@@ -272,7 +262,7 @@ Section CodeUartintr.
 
   Lemma uii2_54 : kernel_text -∗ instr (mword_of_int (UI + 0x54) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UI + 0x54)%Z (mword_of_int 0xbfc5 : mword 16)
-    (mword_of_int (UI + 0x54) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)) uidc2_bfc5 exec_execute_C_J. Qed.
+    (mword_of_int (UI + 0x54) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")), zreg)) cdec_bfc5 exec_execute_C_J. Qed.
 
   (* --- the tx branch (+0x56 .. +0x6a) --- *)
   Lemma uii2_56 : kernel_text -∗ instr (mword_of_int (UI + 0x56) : mword 64) false (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 15), AUIPC)).

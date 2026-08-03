@@ -127,6 +127,7 @@ Require Import WpRvcBridge.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -167,11 +168,6 @@ Lemma codc_6c05 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LUI (mword_of_int 1, Regidx (mword_of_int 24)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x30  j     +0x50 *)
-Lemma codc_a005 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa005 : mword 16)) s
-  = Some (C_J (mword_of_int 16 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x3c  add   a0,a0,s3 *)
 Lemma codc_954e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -251,11 +247,6 @@ Lemma codb_409a0533 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (RTYPE (Regidx (mword_of_int 9), Regidx (mword_of_int 20), Regidx (mword_of_int 10), SUB), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x36  sext.w a2,s2 *)
-Lemma codb_0009061b s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0009061b : mword 32)) s
-  = Some (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12)), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x3e  jal   memmove *)
 Lemma codb_ec6ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -444,7 +435,7 @@ Section CopyoutInstrs.
 
   Lemma coi_30 : COP 0x30 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 16 : mword 11) ('b"0")), zreg)).  (* j     +0x50 -- into the loop test *)
   Proof. mk_rvc (CO + 0x30)%Z (mword_of_int 0xa005 : mword 16)
-    (mword_of_int (CO + 0x30) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 16 : mword 11) ('b"0")), zreg)) codc_a005 exec_execute_C_J. Qed.
+    (mword_of_int (CO + 0x30) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 16 : mword 11) ('b"0")), zreg)) cdec_a005 exec_execute_C_J. Qed.
 
   (* --- the memmove body and the cursor bumps (loop tail) --------------- *)
 
@@ -454,7 +445,7 @@ Section CopyoutInstrs.
 
   Lemma coi_36 : COP 0x36 false (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))).  (* sext.w a2,s2 -- a2 := (uint)n *)
   Proof. mk_base (CO + 0x36)%Z (mword_of_int 0x0009061b : mword 32)
-    (mword_of_int (CO + 0x36) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) codb_0009061b. Qed.
+    (mword_of_int (CO + 0x36) : mword 64) (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 12))) bdec_0009061b. Qed.
 
   Lemma coi_3a : COP 0x3a true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).  (* mv    a1,s6 -- a1 := src *)
   Proof. mk_rvc (CO + 0x3a)%Z (mword_of_int 0x85da : mword 16)

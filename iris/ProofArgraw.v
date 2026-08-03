@@ -76,10 +76,6 @@ Definition ar_cj_imm (k : nat) : Z :=
 
 (* ======================= fresh decode templates ======================= *)
 
-(* +0x0a  c.mv s1,a0   -- s1 := n *)
-Lemma ardec_mv_s1_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x84aa : mword 16)) s = Some (C_MV (Regidx (mword_of_int 9), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x10  c.li a5,5 *)
 Lemma ardec_li_a5_5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -96,15 +92,7 @@ Lemma ardec_add_s1_a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) 
   exec (ext_decode_compressed (mword_of_int 0x94ba : mword 16)) s = Some (C_ADD (Regidx (mword_of_int 9), Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x22  c.lw a5,0(s1)   -- the table entry *)
-Lemma ardec_lw_tbl s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x409c : mword 16)) s = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x24  c.add a5,a5,a4  -- a5 := the case target *)
-Lemma ardec_add_a5_a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x97ba : mword 16)) s = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x26  c.jr a5         -- THE indirect jump *)
 Lemma ardec_jr_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -146,27 +134,15 @@ Lemma ardec_ld_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   exec (ext_decode_compressed (mword_of_int 0x6fc8 : mword 16)) s = Some (C_LD (mword_of_int 19, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* case 1 tail: c.j +0x2c *)
-Lemma ardec_cj1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfcd : mword 16)) s = Some (C_J (mword_of_int 2041 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* case 2 tail: c.j +0x2c *)
 Lemma ardec_cj2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xb7f5 : mword 16)) s = Some (C_J (mword_of_int 2038 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* case 3 tail: c.j +0x2c *)
-Lemma ardec_cj3 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xb7dd : mword 16)) s = Some (C_J (mword_of_int 2035 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* case 4 tail: c.j +0x2c *)
 
-(* case 5 tail: c.j +0x2c *)
-Lemma ardec_cj5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xbfe9 : mword 16)) s = Some (C_J (mword_of_int 2029 : mword 11), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x0c  jal ra,myproc  (0x80002726 -> 0x80001904 = -3618) *)
 Lemma ardec_jal_myproc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -253,7 +229,7 @@ Section ProofArgraw.
 
   Lemma ari_0a : ARI 0x0a true (RTYPE (Regidx ar_a0, zreg, Regidx ar_s1, ADD)).
   Proof. mk_rvc (AR + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
-    (mword_of_int (AR + 0x0a) : mword 64) (RTYPE (Regidx ar_a0, zreg, Regidx ar_s1, ADD)) ardec_mv_s1_a0 exec_execute_C_MV. Qed.
+    (mword_of_int (AR + 0x0a) : mword 64) (RTYPE (Regidx ar_a0, zreg, Regidx ar_s1, ADD)) cdec_84aa exec_execute_C_MV. Qed.
 
   Lemma ari_0c : ARI 0x0c false (JAL (mword_of_int 2093534 : mword 21, Regidx ar_ra)).
   Proof. mk_base (AR + 0x0c)%Z (mword_of_int 0x9deff0ef : mword 32)
@@ -285,11 +261,11 @@ Section ProofArgraw.
 
   Lemma ari_22 : ARI 0x22 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)).
   Proof. mk_rvc (AR + 0x22)%Z (mword_of_int 0x409c : mword 16)
-    (mword_of_int (AR + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) ardec_lw_tbl exec_execute_C_LW. Qed.
+    (mword_of_int (AR + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_409c exec_execute_C_LW. Qed.
 
   Lemma ari_24 : ARI 0x24 true (RTYPE (Regidx ar_a4, Regidx ar_a5, Regidx ar_a5, ADD)).
   Proof. mk_rvc (AR + 0x24)%Z (mword_of_int 0x97ba : mword 16)
-    (mword_of_int (AR + 0x24) : mword 64) (RTYPE (Regidx ar_a4, Regidx ar_a5, Regidx ar_a5, ADD)) ardec_add_a5_a4 exec_execute_C_ADD. Qed.
+    (mword_of_int (AR + 0x24) : mword 64) (RTYPE (Regidx ar_a4, Regidx ar_a5, Regidx ar_a5, ADD)) cdec_97ba exec_execute_C_ADD. Qed.
 
   Lemma ari_26 : ARI 0x26 true (JALR (zeros' 12, Regidx ar_a5, zreg)).
   Proof. mk_rvc (AR + 0x26)%Z (mword_of_int 0x8782 : mword 16)
@@ -345,7 +321,7 @@ Section ProofArgraw.
 
   Lemma ari_3a : ARI 0x3a true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AR + 0x3a)%Z (mword_of_int 0xbfcd : mword 16)
-    (mword_of_int (AR + 0x3a) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) ardec_cj1 exec_execute_C_J. Qed.
+    (mword_of_int (AR + 0x3a) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) cdec_bfcd exec_execute_C_J. Qed.
 
   Lemma ari_40 : ARI 0x40 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AR + 0x40)%Z (mword_of_int 0xb7f5 : mword 16)
@@ -353,7 +329,7 @@ Section ProofArgraw.
 
   Lemma ari_46 : ARI 0x46 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AR + 0x46)%Z (mword_of_int 0xb7dd : mword 16)
-    (mword_of_int (AR + 0x46) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")), zreg)) ardec_cj3 exec_execute_C_J. Qed.
+    (mword_of_int (AR + 0x46) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")), zreg)) cdec_b7dd exec_execute_C_J. Qed.
 
   Lemma ari_4c : ARI 0x4c true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AR + 0x4c)%Z (mword_of_int 0xb7c5 : mword 16)
@@ -361,7 +337,7 @@ Section ProofArgraw.
 
   Lemma ari_52 : ARI 0x52 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (AR + 0x52)%Z (mword_of_int 0xbfe9 : mword 16)
-    (mword_of_int (AR + 0x52) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)) ardec_cj5 exec_execute_C_J. Qed.
+    (mword_of_int (AR + 0x52) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)) cdec_bfe9 exec_execute_C_J. Qed.
 
   Lemma ari_2c : ARI 0x2c true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (AR + 0x2c)%Z (mword_of_int 0x60e2 : mword 16)

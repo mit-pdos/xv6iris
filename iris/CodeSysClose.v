@@ -74,11 +74,6 @@ Lemma scdb_fec40593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 0xfec : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-(* +0x12  jal ra,argfd     (0x80004cc4 -> 0x80004a04 is -704) *)
-Lemma scdb_d41ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xd41ff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2096448 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x18  blt a0,x0,+0x22  -- the [argfd(...) < 0] test *)
 Lemma scdb_02054163 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -100,11 +95,6 @@ Proof. decode_bridge_ms. Qed.
 
 (* +0x26  addi a5,a5,208 -- [bdec_0d078793] (KernelBaseDecode.v) *)
 
-(* +0x2c  sd x0,0(a0)      -- p->ofile[fd] = 0 *)
-Lemma scdb_00053023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00053023 : mword 32)) s
-  = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8), s).
-Proof. decode_bridge_ms. Qed.
 
 (* +0x30  ld a0,-32(s0) *)
 Lemma scdb_fe043503 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -157,7 +147,7 @@ Section SysCloseInstrs.
 
   Lemma sci_12 : kernel_text -∗ instr (mword_of_int (SC + 0x12) : mword 64) false (JAL (mword_of_int 2096448 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (SC + 0x12)%Z (mword_of_int 0xd41ff0ef : mword 32)
-    (mword_of_int (SC + 0x12) : mword 64) (JAL (mword_of_int 2096448 : mword 21, Regidx (mword_of_int 1))) scdb_d41ff0ef. Qed.
+    (mword_of_int (SC + 0x12) : mword 64) (JAL (mword_of_int 2096448 : mword 21, Regidx (mword_of_int 1))) bdec_d41ff0ef. Qed.
 
   Lemma sci_16 : kernel_text -∗ instr (mword_of_int (SC + 0x16) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (SC + 0x16)%Z (mword_of_int 0x57fd : mword 16)
@@ -189,7 +179,7 @@ Section SysCloseInstrs.
 
   Lemma sci_2c : kernel_text -∗ instr (mword_of_int (SC + 0x2c) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8)).
   Proof. mk_base (SC + 0x2c)%Z (mword_of_int 0x00053023 : mword 32)
-    (mword_of_int (SC + 0x2c) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8)) scdb_00053023. Qed.
+    (mword_of_int (SC + 0x2c) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 10), 8)) bdec_00053023. Qed.
 
   Lemma sci_30 : kernel_text -∗ instr (mword_of_int (SC + 0x30) : mword 64) false (LOAD (mword_of_int 0xfe0 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 8)).
   Proof. mk_base (SC + 0x30)%Z (mword_of_int 0xfe043503 : mword 32)

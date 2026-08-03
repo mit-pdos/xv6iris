@@ -26,6 +26,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 From iris.base_logic.lib Require Import invariants.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -47,11 +48,6 @@ Lemma mpdec_jal_popoff s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s -
   = Some (JAL (mword_of_int 2093858 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x14  0x00011717  auipc a4,0x11 *)
-Lemma mpdec_auipc s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011717 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* +0x18  0xa3070713  addi a4,a4,-1488  (= 0xa30 as a 12-bit residue) *)
 Lemma mpdec_addi s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -111,7 +107,7 @@ Section CodeMyproc.
   (* ---- +0x14: auipc a4,0x11 ---- *)
   Lemma mpi_14 : kernel_text -∗ instr (mword_of_int (MP + 0x14) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (MP + 0x14)%Z (mword_of_int 0x00011717 : mword 32)
-    (mword_of_int (MP + 0x14) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)) mpdec_auipc. Qed.
+    (mword_of_int (MP + 0x14) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_00011717. Qed.
 
   (* ---- +0x18: addi a4,a4,-1488 ---- *)
   Lemma mpi_18 : kernel_text -∗ instr (mword_of_int (MP + 0x18) : mword 64) false (ITYPE (mword_of_int 0xa30 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).

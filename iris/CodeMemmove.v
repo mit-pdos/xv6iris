@@ -57,11 +57,6 @@ Lemma mmdc_0585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 11)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* +0x1a  0x0705  c.addi a4,1  (dst++) *)
-Lemma mmdc_0705 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x0705 : mword 16)) s
-  = Some (C_ADDI (mword_of_int 1, Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* +0x34  0x9281  c.srli a3,32  (second half of the overlap test's cast) *)
 Lemma mmdc_9281 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -186,7 +181,7 @@ Section CodeMemmove.
   (* +0x1a  c.addi a4,1 *)
   Lemma minstr_mm_1a : kernel_text -∗ instr (mword_of_int (MM + 0x1a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
   Proof. mk_rvc (MM + 0x1a)%Z (mword_of_int 0x0705 : mword 16)
-           (mword_of_int (MM + 0x1a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) mmdc_0705 exec_execute_C_ADDI. Qed.
+           (mword_of_int (MM + 0x1a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) cdec_0705 exec_execute_C_ADDI. Qed.
 
   (* +0x1c  lbu a3,-1(a1) *)
   Lemma minstr_mm_1c : kernel_text -∗ instr (mword_of_int (MM + 0x1c) : mword 64) false (LOAD (mword_of_int 0xfff, Regidx (mword_of_int 11), Regidx (mword_of_int 13), true, 1)).

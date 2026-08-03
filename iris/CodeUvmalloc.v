@@ -159,11 +159,6 @@ Import Defs.
 (*   0x88 c.mv  a0,s1            [cdec_8526]                              *)
 (* ===================================================================== *)
 
-(* 0x14  c.mv s5,a0 *)
-Lemma uadc_8aaa s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x8aaa : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 21), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x16  c.mv s4,a2 *)
 (* [cdec_8a32] -- shared, see KernelRvcDecode.v / KernelBaseDecode.v *)
@@ -223,11 +218,6 @@ Lemma uadc_994e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADD (Regidx (mword_of_int 18), Regidx (mword_of_int 19)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x64  c.j +0x14  (offset/2 = 10) *)
-Lemma uadc_a811 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa811 : mword 16)) s
-  = Some (C_J (mword_of_int 10), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x66 / 0x8e  c.mv a2,s7 *)
 Lemma uadc_865e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -375,7 +365,7 @@ Section UvmallocInstrs.
 
   Lemma uai_14 : kernel_text -∗ instr (mword_of_int (UA + 0x14) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (UA + 0x14)%Z (mword_of_int 0x8aaa : mword 16)
-    (mword_of_int (UA + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)) uadc_8aaa exec_execute_C_MV. Qed.
+    (mword_of_int (UA + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 21), ADD)) cdec_8aaa exec_execute_C_MV. Qed.
 
   Lemma uai_16 : kernel_text -∗ instr (mword_of_int (UA + 0x16) : mword 64) true (RTYPE (Regidx (mword_of_int 12), zreg, Regidx (mword_of_int 20), ADD)).
   Proof. mk_rvc (UA + 0x16)%Z (mword_of_int 0x8a32 : mword 16)
@@ -513,7 +503,7 @@ Section UvmallocInstrs.
 
   Lemma uai_64 : kernel_text -∗ instr (mword_of_int (UA + 0x64) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (UA + 0x64)%Z (mword_of_int 0xa811 : mword 16)
-    (mword_of_int (UA + 0x64) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")), zreg)) uadc_a811 exec_execute_C_J. Qed.
+    (mword_of_int (UA + 0x64) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")), zreg)) cdec_a811 exec_execute_C_J. Qed.
 
   (* --- kalloc returned 0: uvmdealloc back and return 0 ---------------- *)
 

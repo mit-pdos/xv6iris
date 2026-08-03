@@ -25,6 +25,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
 From iris.base_logic.lib Require Import invariants.
+Require Import KernelBaseDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -70,11 +71,6 @@ Lemma sldec_sd_s3_32 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (STORE (mword_of_int 32 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 9), 8), s).
 Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
-(* +0x2a  0xeefff0ef  jal ra,sched (target 0x80001e1e; offset -274) *)
-Lemma sldec_jal_sched s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xeefff0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
 
 (* +0x2e  0x0204b023  sd x0,32(s1) *)
 Lemma sldec_sd_x0_32 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -180,7 +176,7 @@ Section CodeSleep.
   (* ---- +0x2a: jal sched ---- *)
   Lemma sli_2a : kernel_text -∗ instr (mword_of_int (SL + 0x2a) : mword 64) false (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (SL + 0x2a)%Z (mword_of_int 0xeefff0ef : mword 32)
-    (mword_of_int (SL + 0x2a) : mword 64) (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))) sldec_jal_sched. Qed.
+    (mword_of_int (SL + 0x2a) : mword 64) (JAL (mword_of_int 2096878 : mword 21, Regidx (mword_of_int 1))) bdec_eefff0ef. Qed.
 
   (* ---- +0x2e: sd x0,32(s1) ---- *)
   Lemma sli_2e : kernel_text -∗ instr (mword_of_int (SL + 0x2e) : mword 64) false (STORE (mword_of_int 32 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)).

@@ -119,11 +119,6 @@ Lemma fwdc_992a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADD (Regidx (mword_of_int 18), Regidx (mword_of_int 10)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x16  c.j +0x14  (offset/2 = 10) *)
-Lemma fwdc_a811 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0xa811 : mword 16)) s
-  = Some (C_J (mword_of_int 10), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x24  c.addi s1,s1,8 *)
 Lemma fwdc_04a1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -131,11 +126,6 @@ Lemma fwdc_04a1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_ADDI (mword_of_int 8, Regidx (mword_of_int 9)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x2a  c.ld a5,0(s1)  (creg 1 = s1, creg 7 = a5) *)
-Lemma fwdc_609c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x609c : mword 16)) s
-  = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* 0x30  c.beqz a4,-0x0c  (offset/2 = -6; 8-bit residue 250; creg 6 = a4) *)
 Lemma fwdc_db75 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -149,11 +139,6 @@ Lemma fwdc_f36d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_BNEZ (mword_of_int 241, Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* 0x48  c.mv a0,s3 *)
-Lemma fwdc_854e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x854e : mword 16)) s
-  = Some (C_MV (Regidx (mword_of_int 10), Regidx (mword_of_int 19)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ===================================================================== *)
 (* Base (4-byte) decode facts.                                            *)
@@ -183,11 +168,6 @@ Lemma fwdb_03248163 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (BTYPE (mword_of_int 34 : mword 13, Regidx (mword_of_int 18), Regidx (mword_of_int 9), BEQ), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x2c  andi a4,a5,1  -- PTE_V *)
-Lemma fwdb_0017f713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0017f713 : mword 32)) s
-  = Some (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x32  andi a4,a5,14  -- PTE_R|PTE_W|PTE_X: a leaf? *)
 Lemma fwdb_00e7f713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -201,11 +181,6 @@ Lemma fwdb_fc3ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2097090 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
-(* 0x42  sd zero,0(s1)  -- *pte = 0 *)
-Lemma fwdb_0004b023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x0004b023 : mword 32)) s
-  = Some (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8), s).
-Proof. decode_bridge_ms. Qed.
 
 (* 0x4a  jal ra,kfree  (0x800013c0 -> 0x80000a46 is -2426) *)
 Lemma fwdb_e86ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -272,7 +247,7 @@ Section FreewalkInstrs.
 
   Lemma fwi_16 : kernel_text -∗ instr (mword_of_int (FW + 0x16) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (FW + 0x16)%Z (mword_of_int 0xa811 : mword 16)
-    (mword_of_int (FW + 0x16) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")), zreg)) fwdc_a811 exec_execute_C_J. Qed.
+    (mword_of_int (FW + 0x16) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")), zreg)) cdec_a811 exec_execute_C_J. Qed.
 
   (* --- the panic arm: a leaf PTE at a non-leaf level ------------------- *)
 
@@ -302,11 +277,11 @@ Section FreewalkInstrs.
 
   Lemma fwi_2a : kernel_text -∗ instr (mword_of_int (FW + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
   Proof. mk_rvc (FW + 0x2a)%Z (mword_of_int 0x609c : mword 16)
-    (mword_of_int (FW + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) fwdc_609c exec_execute_C_LD. Qed.
+    (mword_of_int (FW + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) cdec_609c exec_execute_C_LD. Qed.
 
   Lemma fwi_2c : kernel_text -∗ instr (mword_of_int (FW + 0x2c) : mword 64) false (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI)).
   Proof. mk_base (FW + 0x2c)%Z (mword_of_int 0x0017f713 : mword 32)
-    (mword_of_int (FW + 0x2c) : mword 64) (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI)) fwdb_0017f713. Qed.
+    (mword_of_int (FW + 0x2c) : mword 64) (ITYPE (mword_of_int 1 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), ANDI)) bdec_0017f713. Qed.
 
   Lemma fwi_30 : kernel_text -∗ instr (mword_of_int (FW + 0x30) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 250 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 6)), BEQ)).
   Proof. mk_rvc (FW + 0x30)%Z (mword_of_int 0xdb75 : mword 16)
@@ -336,7 +311,7 @@ Section FreewalkInstrs.
 
   Lemma fwi_42 : kernel_text -∗ instr (mword_of_int (FW + 0x42) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)).
   Proof. mk_base (FW + 0x42)%Z (mword_of_int 0x0004b023 : mword 32)
-    (mword_of_int (FW + 0x42) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)) fwdb_0004b023. Qed.
+    (mword_of_int (FW + 0x42) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 0), Regidx (mword_of_int 9), 8)) bdec_0004b023. Qed.
 
   Lemma fwi_46 : kernel_text -∗ instr (mword_of_int (FW + 0x46) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (FW + 0x46)%Z (mword_of_int 0xbff9 : mword 16)
@@ -346,7 +321,7 @@ Section FreewalkInstrs.
 
   Lemma fwi_48 : kernel_text -∗ instr (mword_of_int (FW + 0x48) : mword 64) true (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (FW + 0x48)%Z (mword_of_int 0x854e : mword 16)
-    (mword_of_int (FW + 0x48) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) fwdc_854e exec_execute_C_MV. Qed.
+    (mword_of_int (FW + 0x48) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) cdec_854e exec_execute_C_MV. Qed.
 
   Lemma fwi_4a : kernel_text -∗ instr (mword_of_int (FW + 0x4a) : mword 64) false (JAL (mword_of_int 2094726 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (FW + 0x4a)%Z (mword_of_int 0xe86ff0ef : mword 32)

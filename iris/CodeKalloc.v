@@ -45,10 +45,6 @@ Lemma kdc_c49d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1")
   = Some (C_BEQZ (mword_of_int 23, Cregidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma kdc_609c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x609c : mword 16)) s
-  = Some (C_LD (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma kdc_4595 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4595 : mword 16)) s
@@ -73,10 +69,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* Base (4-byte) decode facts (one per distinct 32-bit encoding).         *)
 
 
-Lemma kdb_00011717 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x00011717 : mword 32)) s
-  = Some (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma kdb_00023797 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00023797 : mword 32)) s
@@ -99,10 +91,6 @@ Lemma kdb_7d050513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 0x7d0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma kdb_7ae50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x7ae50513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
-Proof. decode_bridge_ms. Qed.
 
 Lemma kdb_b0678793 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xb0678793 : mword 32)) s
@@ -245,11 +233,11 @@ Section CodeKalloc.
 
   Lemma kai_20 : kernel_text -∗ instr (mword_of_int (KA + 0x20) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
   Proof. mk_rvc (KA + 0x20)%Z (mword_of_int 0x609c : mword 16)
-    (mword_of_int (KA + 0x20) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) kdc_609c exec_execute_C_LD. Qed.
+    (mword_of_int (KA + 0x20) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) cdec_609c exec_execute_C_LD. Qed.
 
   Lemma kai_22 : kernel_text -∗ instr (mword_of_int (KA + 0x22) : mword 64) false (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)).
   Proof. mk_base (KA + 0x22)%Z (mword_of_int 0x00011717 : mword 32)
-    (mword_of_int (KA + 0x22) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)) kdb_00011717. Qed.
+    (mword_of_int (KA + 0x22) : mword 64) (UTYPE (mword_of_int 0x11 : mword 20, Regidx (mword_of_int 14), AUIPC)) bdec_00011717. Qed.
 
   Lemma kai_26 : kernel_text -∗ instr (mword_of_int (KA + 0x26) : mword 64) false (STORE (mword_of_int 0x7f0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 14), 8)).
   Proof. mk_base (KA + 0x26)%Z (mword_of_int 0x7ef73823 : mword 32)
@@ -313,7 +301,7 @@ Section CodeKalloc.
 
   Lemma kai_50 : kernel_text -∗ instr (mword_of_int (KA + 0x50) : mword 64) false (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
   Proof. mk_base (KA + 0x50)%Z (mword_of_int 0x7ae50513 : mword 32)
-    (mword_of_int (KA + 0x50) : mword 64) (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kdb_7ae50513. Qed.
+    (mword_of_int (KA + 0x50) : mword 64) (ITYPE (mword_of_int 0x7ae : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) bdec_7ae50513. Qed.
 
   Lemma kai_54 : kernel_text -∗ instr (mword_of_int (KA + 0x54) : mword 64) false (JAL (mword_of_int 0x10e : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KA + 0x54)%Z (mword_of_int 0x10e000ef : mword 32)
