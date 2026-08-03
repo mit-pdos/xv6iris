@@ -404,7 +404,8 @@ Proof.
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
   (* EVERY proc slot's park receipt, minted at [false] *)
   iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
-  set (HR := RiscvGS Σ Hinv _ f Hgen _ _ _ γu γp γv _ γk _ γkpt γs γsie _ γpark).
+  set (HR := RiscvGS Σ (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _)
+               (RiscvEraGS Σ f Hgen γu γp γv γk γkpt γs γsie γpark)).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".

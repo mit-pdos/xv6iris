@@ -85,38 +85,52 @@ Proof. solve_decision. Defined.
    the A/D-canonical table. *)
 Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
 
-Class riscvGS (Σ : gFunctors) := RiscvGS {
-  riscv_invGS :: invGS Σ;
-  riscv_regGS :: ghost_mapG Σ register (sigT type_of_register);
-  (* one register-map ghost name PER hart.  A [ghost_map] element on
-     [cpu_reg_name c] owns a register of hart [c].  The function is total (every
-     [CPU] is a real hart) and its per-hart authoritative maps are threaded by
-     [gregs_interp] below. *)
-  cpu_reg_name : CPU -> gname;
-  riscv_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
+(* The ghost layer is SPLIT IN TWO (claude-notes/design/crash.md): the
+   FIXED layer -- [invGS] plus every functor (inG) class -- will survive
+   power cycles; the ERA layer -- every ghost NAME -- is one boot's worth
+   of ghost state, to be reallocated fresh at each power-on so that a new
+   boot's memory/register resources are independent of the previous
+   boot's.  [riscvGS] bundles both, and every proof file keeps taking
+   exactly it: the pre-split field names are preserved verbatim as
+   definitions below the class, so no statement anywhere changes. *)
+
+Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
+  riscvF_invGS :: invGS Σ;
+  riscvF_regGS :: ghost_mapG Σ register (sigT type_of_register);
   (* the device fabric (DevModel.v): one [ghost_var] per device, in the
      standard halves pattern -- [state_interp] holds one half (the "auth"),
      the other half (the "frag") floats freely and is typically stored in an
      invariant shared between the driver's hart and the device thread. *)
-  riscv_uartGS :: ghost_varG Σ uart_state;
-  riscv_plicGS :: ghost_varG Σ plic_state;
-  riscv_virtioGS :: ghost_varG Σ virtio_state;
-  uart_name : gname;
-  plic_name : gname;
-  virtio_name : gname;
-  (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): one global
-     vpn ↦ (ppn, class) map.  Lives here -- not as a separate class --
-     because [tlb_inv_pt] rides inside [sie_cap_gpr], and a separate
-     class would have to be threaded through every sconf-tier file;
-     like [uart_name]/[plic_name] it is global (not per-hart). *)
+  riscvF_uartGS :: ghost_varG Σ uart_state;
+  riscvF_plicGS :: ghost_varG Σ plic_state;
+  riscvF_virtioGS :: ghost_varG Σ virtio_state;
   (* pinned to the SAIL key instances (Decidable_eq_mword/Countable_mword),
      because every use site (KMap/KptPt/adequacy) imports Sail and elaborates
      [gmap (mword 27)] with them; without pinning, this field would take
      stdpp's bv_eq_dec/bv_countable (RiscvPtsto does not import the Sail
      instance modules) and the ghost_mapG key-instance args would not unify. *)
-  riscv_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+  riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
-  kmap_name : gname;
+  riscvF_kptGS :: inG Σ kptR;
+  riscvF_parkGS :: ghost_varG Σ bool;
+}.
+
+Class riscvEraGS (Σ : gFunctors) := RiscvEraGS {
+  (* one register-map ghost name PER hart.  A [ghost_map] element on
+     [cpu_reg_name c] owns a register of hart [c].  The function is total (every
+     [CPU] is a real hart) and its per-hart authoritative maps are threaded by
+     [gregs_interp] below. *)
+  era_reg_name : CPU -> gname;
+  era_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
+  era_uart_name : gname;
+  era_plic_name : gname;
+  era_virtio_name : gname;
+  (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): one global
+     vpn ↦ (ppn, class) map.  Lives here -- not as a separate class --
+     because [tlb_inv_pt] rides inside [sie_cap_gpr], and a separate
+     class would have to be threaded through every sconf-tier file;
+     like [uart_name]/[plic_name] it is global (not per-hart). *)
+  era_kmap_name : gname;
   (* THE SHARED KERNEL PAGE TABLE's ghost (claude-notes/projects/
      kpt-share.md): a ONE-SHOT agreement on the table's A/D-CANONICAL form
      ([PtTree.ptree_canon]).  Adequacy mints the unset token [Cinl (Excl ())];
@@ -128,8 +142,7 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      at all.  Lives HERE, not in a separate class, for exactly the reason
      [kmap_name] does: the residue rides inside [sie_cap]/[intr_frame], so a
      class would have to be threaded through every sconf-tier file. *)
-  riscv_kptGS :: inG Σ kptR;
-  kpt_name : gname;
+  era_kpt_name : gname;
   (* the S-mode translation-slot arm bit ('b"0" = Bare, 'b"1" = kernel PT
      installed): a global ghost name (like [kmap_name]) tracking which arm
      of [strans_inv] the capability's translation slot is in.  A client
@@ -142,7 +155,7 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      which arm a hart's translation slot is in is a per-hart fact, and the
      shared-kernel-table sweep (claude-notes/completed/kpt-share.md) needs
      every hart to flip its own bit at its own kvminithart. *)
-  strans_name : CPU -> gname;
+  era_strans_name : CPU -> gname;
   (* the SIE ghost, CANONICALLY per hart -- the same shape as [strans_name],
      and for the same reason: mstatus.SIE is a per-hart register, so which
      value a hart's SIE choreography (1/2 live-bit tie + 1/4 kernel-code token
@@ -161,7 +174,7 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      share a name; [wp_kernelvec] takes a raw [ghost_var γ (1/2) _] and stays
      parameterized.  The functor instance comes from [sieG] at the use sites,
      for the same reason spelled out for [strans_name] above. *)
-  sie_name : CPU -> gname;
+  era_sie_name : CPU -> gname;
   (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
      entry of the proc[] array, recording whether hart-h's parked scheduler
      record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
@@ -181,9 +194,41 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
      [procs_inv], and a parameter there would have to be threaded through
      every one of the ~50 files that mention [procs_inv].  The function is
      total; only indices below [NPROC] are ever owned. *)
-  riscv_parkGS :: ghost_varG Σ bool;
-  park_name : nat -> gname;
+  era_park_name : nat -> gname;
 }.
+
+Class riscvGS (Σ : gFunctors) := RiscvGS {
+  riscv_fixedGS :: riscvFixedGS Σ;
+  riscv_eraGS :: riscvEraGS Σ;
+}.
+
+(* Compatibility names: the tree references these; signatures verbatim.
+   Each is a plain definition (NOT an instance -- the [::] substructures
+   above already provide the unique resolution path), so a use site
+   elaborates to the same projection chain resolution produces. *)
+Definition riscv_invGS `{!riscvGS Σ} : invGS Σ := riscvF_invGS.
+Definition riscv_regGS `{!riscvGS Σ} :
+  ghost_mapG Σ register (sigT type_of_register) := riscvF_regGS.
+Definition riscv_uartGS `{!riscvGS Σ} : ghost_varG Σ uart_state := riscvF_uartGS.
+Definition riscv_plicGS `{!riscvGS Σ} : ghost_varG Σ plic_state := riscvF_plicGS.
+Definition riscv_virtioGS `{!riscvGS Σ} : ghost_varG Σ virtio_state :=
+  riscvF_virtioGS.
+Definition riscv_kmapGS `{!riscvGS Σ} :
+  @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+    (@SailStdpp.Instances.Decidable_eq_mword 27)
+    (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
+Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
+Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
+Definition riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ := era_memGS.
+Definition cpu_reg_name `{!riscvGS Σ} : CPU -> gname := era_reg_name.
+Definition uart_name `{!riscvGS Σ} : gname := era_uart_name.
+Definition plic_name `{!riscvGS Σ} : gname := era_plic_name.
+Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name.
+Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name.
+Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name.
+Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name.
+Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name.
+Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks
