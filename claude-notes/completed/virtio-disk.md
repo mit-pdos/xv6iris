@@ -317,6 +317,15 @@ touching it:
   `kalloc_avail`, the mycpu scratch cell); use it rather than threading the
   pieces, as `wp_kvmmake_sconf` does.
 - `K_virtio_disk_init = 18`: this function's 4-slot frame plus kalloc's 14.
+- **It is the tree's most transparency-sensitive proof, and the explicit-cpuid
+  sweep made it 3.8× slower before anyone noticed** (149.8 s at 459da64 →
+  575.6 s, of which the `Qed` alone went 30 s → 235 s). The cause was the
+  `rget → tp_pin → rf_upd` tower being walked by CONVERSION over this file's
+  20+-link `pose` chains; the sweep sealed only `rget`, which cannot help while
+  `rf_upd` is transparent. Sealing all three plus switching the 115
+  `rewrite wp_next_off` sites to `iApply wp_next_off_intro` restored it. If
+  this file ever goes slow again, that is the first thing to check — and the
+  general rule is in [`optimization.md`](../optimization.md).
 - The queue obligation at the QUEUE_READY / DRIVER_OK writes is
   `virtio_queue_ok` with `S = ∅` and `ai = 0`: the rings are freshly zeroed and
   nothing is published yet, so `v_seen = ai = 0` and there is no slot to prove

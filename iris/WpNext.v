@@ -75,6 +75,18 @@ Section WpNext.
       rewrite (_ : CID = CID0); [ iExact "H" | exact Hc ].
   Qed.
 
+  (* THE INTRODUCTION HALF OF [wp_next_off], AS A WAND -- and the spelling a
+     whole-function proof should use.  [rewrite wp_next_off] is a SETOID
+     rewrite of an [⊣⊢] over the whole proofmode goal, so it re-traverses the
+     entire Iris context once per instruction; at ~130 instructions over a
+     syscall-sized context that is tens of seconds a file (measured 45 s of
+     ProofVirtioDiskInit's 576 s, and 12 s once switched).  [iApply
+     wp_next_off_intro] only has to match the goal's head, and leaves exactly
+     the same continuation. *)
+  Lemma wp_next_off_intro `{CID0 : CpuId} (p : mword 64) K :
+    K CID0 -∗ wp_next false p K.
+  Proof. iIntros "H". by iApply wp_next_off. Qed.
+
   (* NO CURRENT PROC: the thread cannot be yielded, so the hart is pinned even
      at [b = true].  Same collapse as [wp_next_off], from the other hatch. *)
   Lemma wp_next_idle `{CID0 : CpuId} (b : bool) (p : mword 64) K :
