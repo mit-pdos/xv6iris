@@ -60,7 +60,7 @@ Require Import KallocInv.
 Require Import PtBuild KptExecMap TrampPt.
 Require Import PtreeType.
 Require Import ProcPt.
-Require Import WpProcPagetableInstr.
+Require Import CodeProcPagetable.
 Require Import SpecUvmcreate SpecMappages SpecProcPagetable.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

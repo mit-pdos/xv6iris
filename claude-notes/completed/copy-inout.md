@@ -267,7 +267,7 @@ Two things specific to copyout:
       (orchestrator)
 - [ ] **A** `ProcPtOwn.v`: `pte_ppn_set_ad`, `pte_vu_not_tramp`/`_not_tf`,
       `upt_ad_view_vu`, `proc_pt_page_acc`, `proc_pt_page_acc_vmfault`.
-- [x] **B** `WpWalkaddrDecode.v` (24 `wai_<off>` facts) + `ProofWalkaddr.v`
+- [x] **B** `CodeWalkaddr.v` (24 `wai_<off>` facts) + `ProofWalkaddr.v`
       (`Module WalkaddrProof (WalkNoalloc : WALK_NOALLOC) : WALKADDR`, 12.6 s
       isolated) + `LinkWalkaddr.v`.  SpecWalkaddr was NOT changed; structure
       exactly as planned (MAXVA arm returns at +0x0a with no stack traffic and
@@ -302,7 +302,7 @@ Two things specific to copyout:
         pass by name.  And `lia` cannot do a nested-division chain even in an
         mword-free, iris-free file (`E mod 32 = 0 -> E/32 mod 4 = 0 -> … -> E =
         0` needs manual `Z_div_exact_2` + `Z.div_div` staging).
-- [x] **C** `WpCopyinDecode.v` (63 `cii_<off>` facts) + `ProofCopyin.v`
+- [x] **C** `CodeCopyin.v` (63 `cii_<off>` facts) + `ProofCopyin.v`
       (`Module CopyinProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT)
       (Memmove : MEMMOVE) : COPYIN`, **46.8 s isolated / 1.31 GB**, flat
       profile — biggest items are the three `Qed`s at 4.2 / 1.9 / 1.1 s) +
@@ -342,7 +342,7 @@ Two things specific to copyout:
         by `destruct k; …; vm_compute` **killed the coqc process with no error
         output** (the residual branch leaves a symbolic `k` under
         `vm_compute`) — write the twelve slot addresses at concrete indices.
-- [x] **D** `WpCopyoutDecode.v` (81 `coi_<off>` facts) + `ProofCopyout.v`
+- [x] **D** `CodeCopyout.v` (81 `coi_<off>` facts) + `ProofCopyout.v`
       (`Module CopyoutProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT)
       (WalkNoalloc : WALK_NOALLOC) (Memmove : MEMMOVE) : COPYOUT`, **54.6 s
       isolated / 1.49 GB**, flat profile — the two biggest sentences are the
@@ -412,8 +412,8 @@ decode lemmas deleted (net −37 proofs): the 25-word 96-byte-frame push/pop set
 (copyin and copyout are the tree's first two functions with one), plus
 `83e9 4601 6b05 8a2e 8b32 85da 85a6 89aa` and two the worklist had missed,
 `8baa` / `855e`.  **Four of the old homes were OFFSET-named, not word-named**
-(`WpWalkInstr.wdec_1c`/`wdec_18`, `WpProcMapstacksInstr.pmsdec_48`,
-`WpMappagesInstr.mdec_40`) — a word-keyed grep does not find those, so grep the
+(`CodeWalk.wdec_1c`/`wdec_18`, `CodeProcMapstacks.pmsdec_48`,
+`CodeMappages.mdec_40`) — a word-keyed grep does not find those, so grep the
 STATEMENT.  Every `*_<off>` instruction fact was mechanically diffed against
 HEAD across the 11 touched files (578 statements, 0 mismatches): only the
 decode lemma each is proved FROM changed.  (`wi_96`/`wi_98` and the +0x98

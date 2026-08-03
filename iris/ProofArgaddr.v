@@ -31,7 +31,7 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import FileInv.
-Require Import WpArgaddrDecode.
+Require Import CodeArgaddr.
 Require Import SpecArgraw.
 Require Import SpecArgaddr.
 From Kernel Require KernelInstrs.

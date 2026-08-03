@@ -29,7 +29,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* Decode templates (mirrors of WpMycpu / WpTimerinit / WpKvInstr).       *)
+(* Decode templates (mirrors of WpMycpu / WpTimerinit / CodeKernelvec).       *)
 (* ===================================================================== *)
 Local Ltac po_ast :=
   first [ reflexivity

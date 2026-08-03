@@ -54,7 +54,7 @@ Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import BufOwn BcacheInv BioInv.
-Require Import WpBpinDecode.
+Require Import CodeBpin.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBpin.
 From Kernel Require KernelSyms.

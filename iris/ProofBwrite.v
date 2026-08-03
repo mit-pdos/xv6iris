@@ -74,7 +74,7 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import SpecPanic.
 Require Import SpecHoldingsleep SpecVirtioDiskRw.
 Require Import SpecBwrite.
-Require Import WpBwriteDecode.
+Require Import CodeBwrite.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

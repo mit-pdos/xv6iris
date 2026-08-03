@@ -63,7 +63,7 @@ Require Import ByteBuf.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import WpFetchaddrDecode.
+Require Import CodeFetchaddr.
 Require Import SpecMyproc SpecCopyin.
 Require Import SpecFetchaddr.
 From Kernel Require KernelInstrs.

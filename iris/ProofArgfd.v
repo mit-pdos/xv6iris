@@ -12,7 +12,7 @@
      }
 
    Thirty-three instructions (KernelInstrs @ 0x80004a04; the listing is in
-   WpArgfdDecode.v).  What is new here relative to sys_close:
+   CodeArgfd.v).  What is new here relative to sys_close:
 
    * THREE arms joining at the epilogue (+0x46) -- each [return -1] tail being
      a [c.li a0,-1] plus a [c.j] back -- so [af_tail] is applied three times
@@ -54,7 +54,7 @@ Require Import UserPtTree.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecMyproc SpecArgint.
 Require Import SpecArgfd.
-Require Import WpArgfdDecode.
+Require Import CodeArgfd.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

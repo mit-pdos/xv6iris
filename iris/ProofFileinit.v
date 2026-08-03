@@ -5,7 +5,7 @@
 
    fileinit is a thin initlock wrapper, so it is an INSTANCE of the shape proved
    once in WpInitlockWrapper.v: all this file supplies is fileinit's thirteen
-   instructions (WpFileinitDecode.fii_code) and the three relocations -- a1 =
+   instructions (CodeFileinit.fii_code) and the three relocations -- a1 =
    &"ftable" (auipc 0x3 / addi +1468), a0 = &ftable (auipc 0x1e / addi +1212),
    and the jal displacement to initlock. *)
 From Stdlib Require Import ZArith.
@@ -19,7 +19,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelDataInv.
 Require Import SpecInitlock WpInitlockWrapper.
-Require Import WpFileinitDecode.
+Require Import CodeFileinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFileinit.

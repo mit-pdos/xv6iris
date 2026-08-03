@@ -33,7 +33,7 @@ Require Import ProcGeom CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMemset.
 Require Import SpecKalloc.
-Require Import WpWalkInstr.
+Require Import CodeWalk.
 Require Import WpMemsetPage.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

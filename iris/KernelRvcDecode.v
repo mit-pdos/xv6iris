@@ -228,7 +228,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* ra/s0/s1/s2/s3/s4 at 40/32/24/16/8/0(sp), c.addi4spn s0,sp,48 and       *)
 (* c.ret.  freerange, sched, sleep, acquiresleep, binit and iinit all use   *)
 (* this frame; before these lived here each of them either re-proved the    *)
-(* words privately or imported WpFreerangeDecode just to borrow them, which *)
+(* words privately or imported CodeFreerange just to borrow them, which *)
 (* put a whole function's decode file on three others' critical path.       *)
 (*                                                                          *)
 (* EVERY decode in this file is named by instruction BITS ([cdec_<word>]),  *)
@@ -236,7 +236,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* by one member's byte offset ([mdec_ccc] was fileinit's +0xccc, [podec_00] *)
 (* push_off's +0x00) -- names that meant nothing to any other caller and     *)
 (* that interleaved with the function-LOCAL [mdec_*]/[podec_*] families in   *)
-(* WpMemsetInstr / WpMappagesInstr / WpPushOffTop, so a reader could not     *)
+(* CodeMemset / CodeMappages / WpPushOffTop, so a reader could not     *)
 (* tell shared from local.  They have been renamed; use [cdec_<word>] for    *)
 (* anything new.  (The remaining [po_*]/[poexec_*] here are not decodes: two *)
 (* creg->reg conversions, two bv identities, and two execute facts that      *)
@@ -704,8 +704,8 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* ---- words that lived in a whole-function WP file and were borrowed from it.
    [cdec_e04a]/[cdec_6902] (c.sdsp/c.ldsp s2,0(sp) -- kalloc/kfree's fourth
-   saved-register slot) sat in WpKallocDecode.v and were imported by
-   WpSleeplockDecode.v; [cdec_8792]/[cdec_2781]/[cdec_079e] (the c.mv a5,tp /
+   saved-register slot) sat in CodeKalloc.v and were imported by
+   CodeSleeplock.v; [cdec_8792]/[cdec_2781]/[cdec_079e] (the c.mv a5,tp /
    sext.w a5 / c.slli a5,7 triple that materializes &cpus[cpuid]) sat in
    WpMycpu.v -- a file that holds mycpu's WEAKEST PRECONDITION -- and were
    imported by three decode files, which is exactly how [wp_mycpu] ended up on

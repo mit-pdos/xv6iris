@@ -616,7 +616,7 @@ correspondence lemma; hand out
        only outside half ever minted.  PAYOFF: kvminithart keeps the
        standard folded sie_cap_gpr house spec — pre carries
        strans_bit '0, post hands back strans_bit '1.
-   6b. WpKvminithartInstr.v: 17 instrs @ 0x80000f30 (2-slot frame,
+   6b. CodeKvminithart.v: 17 instrs @ 0x80000f30 (2-slot frame,
        sfence.vma 0x12000073, auipc/ld of kernel_pagetable, srli 12,
        li -1 / slli 63 / or (MAKE_SATP: 0x8000000000000000 | root>>12
        — mode 8, asid 0 since root < 2^56), csrw satp 0x18079073,

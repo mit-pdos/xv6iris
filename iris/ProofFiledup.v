@@ -66,7 +66,7 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
-Require Import FdSlots FileInv WpFiledupDecode.
+Require Import FdSlots FileInv CodeFiledup.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import IntrDefs.

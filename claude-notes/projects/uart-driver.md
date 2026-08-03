@@ -7,8 +7,8 @@ model itself is `claude-notes/design/device.md`.)
 
 | function | where | status |
 |---|---|---|
-| `uartwrite(char buf[], int n)` @ 0x800008dc, 52 instrs, 80-byte frame | SpecUartwrite / WpUartwriteDecode / ProofUartwrite / LinkUartwrite | proven + linked |
-| `uartintr(void)` @ 0x800009ce, 39 instrs, 32-byte frame | SpecUartintr / WpUartintrDecode / ProofUartintr / LinkUartintr | proven + linked (over an ASSUMED consoleintr) |
+| `uartwrite(char buf[], int n)` @ 0x800008dc, 52 instrs, 80-byte frame | SpecUartwrite / CodeUartwrite / ProofUartwrite / LinkUartwrite | proven + linked |
+| `uartintr(void)` @ 0x800009ce, 39 instrs, 32-byte frame | SpecUartintr / CodeUartintr / ProofUartintr / LinkUartintr | proven + linked (over an ASSUMED consoleintr) |
 | `uartgetc(void)` — **inlined, no symbol** | WpUartgetc | proven as a block lemma |
 
 All three rest on the definitional layer `UartTxInv.v`.
@@ -245,6 +245,6 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
 - The `uartputc_sync` token tension above.
 - Decode hygiene: four base words (`lui a5,0x10000`, `andi a5,a5,32`,
   `auipc a5,0xa`, `lbu a0,0(s2)`) moved into KernelBaseDecode.v for uartintr;
-  the private copies in WpUartinitDecode.v / WpUartPutcSync.v /
-  WpPrintkDecode.v are now redundant and the next decode sweep can retire
+  the private copies in CodeUartinit.v / WpUartPutcSync.v /
+  CodePrintk.v are now redundant and the next decode sweep can retire
   them.

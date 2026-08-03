@@ -50,7 +50,7 @@ Require Import PtBuild.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import WpGrowprocDecode.
+Require Import CodeGrowproc.
 Require Import SpecMyproc SpecUvmalloc SpecUvmdealloc SpecGrowproc.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

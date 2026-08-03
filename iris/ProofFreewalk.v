@@ -81,7 +81,7 @@ Require Import KptTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import WpFreewalkDecode.
+Require Import CodeFreewalk.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
 Require Import SpecKfree.

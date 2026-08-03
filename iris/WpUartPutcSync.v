@@ -7,7 +7,7 @@
 (*  wp_sb_uart_s_pt from WpUartKpt.v) under ONE plain [tlb_inv_pt root_ppn]. *)
 (*                                                                         *)
 (*  This file first assembles the per-instruction [instr] decode facts     *)
-(*  (mirroring WpKallocDecode.v) and two missing base leaves (LUI, ANDI),  *)
+(*  (mirroring CodeKalloc.v) and two missing base leaves (LUI, ANDI),  *)
 (*  then proves the device-core straight-line chunk (0x982 -> 0x99e) on    *)
 (*  the THRE-ready path.                                                    *)
 (* ===================================================================== *)

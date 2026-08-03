@@ -60,7 +60,7 @@ Require Import WpLock SleepLock.
 Require Import ArrCursor BcacheInv.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
 Require Import SpecInitlock SpecInitsleeplock.
-Require Import WpBinitDecode.
+Require Import CodeBinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecBinit.

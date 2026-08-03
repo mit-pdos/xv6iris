@@ -47,7 +47,7 @@ Require Import PtBuild.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpWalkInstr.
+Require Import CodeWalk.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import SpecWalk.

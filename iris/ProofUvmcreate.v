@@ -24,7 +24,7 @@ Require Import KallocInv.
 Require Import KMap.            (* mem_page_to_phys *)
 Require Import PtBuild KptPt KptTree KvmSpec.
 Require Import WpMemsetPage.    (* bytes_choose *)
-Require Import WpUvmcreateInstr.
+Require Import CodeUvmcreate.
 Require Import SpecKalloc SpecMemset SpecUvmcreate.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

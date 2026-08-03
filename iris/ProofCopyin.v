@@ -19,7 +19,7 @@
    and the two PAGE ACCESSORS [proc_pt_page_acc] / [proc_pt_page_acc_vmfault]
    borrow the one page the chunk is copied out of.
 
-   THE MACHINE (offsets into WpCopyinDecode.v's byte-verified listing):
+   THE MACHINE (offsets into CodeCopyin.v's byte-verified listing):
 
      +0x00 beqz a3,+0x90          len == 0: return 0 with NO frame pushed
      +0x02..+0x1a                 the 96-byte (12-slot) prologue
@@ -117,7 +117,7 @@ Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import WpCopyinDecode.
+Require Import CodeCopyin.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
 Require Import SpecWalkaddr SpecVmfault SpecMemmove.

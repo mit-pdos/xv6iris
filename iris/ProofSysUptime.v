@@ -44,7 +44,7 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import KernelRvcDecode WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpSysUptimeDecode.
+Require Import CodeSysUptime.
 Require Import TicksInv.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecSysUptime.

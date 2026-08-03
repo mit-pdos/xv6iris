@@ -112,8 +112,8 @@ word is caller-threaded pinned `zero_reg` pre/post.
 
 - [x] SleepLock.v, p_pid in ProcGeom.v, SpecSleep.v, the four Spec files;
       all in _CoqProject; tree rebuilt green.
-- [x] WpSleeplockDecode.v (shared templates reused from WpKallocDecode
-      kdc_* / WpFreerangeDecode fdc_*; fresh sldec_* templates.  Note:
+- [x] CodeSleeplock.v (shared templates reused from CodeKalloc
+      kdc_* / CodeFreerange fdc_*; fresh sldec_* templates.  Note:
       exec_execute_C_LW / exec_execute_C_SW are defined here — promote to
       WpMmodeLeafBase.v if another decode file needs them).
 - [x] ProofInitsleeplock.v + LinkInitsleeplock.v (functor over INITLOCK).

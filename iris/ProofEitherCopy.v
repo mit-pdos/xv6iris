@@ -69,7 +69,7 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import WpEitherCopyDecode.
+Require Import CodeEitherCopy.
 Require Import SpecMyproc SpecMemmove SpecCopyin SpecCopyout.
 Require Import SpecEitherCopyout SpecEitherCopyin.
 From Kernel Require KernelInstrs.

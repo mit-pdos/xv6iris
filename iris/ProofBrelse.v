@@ -76,7 +76,7 @@ Require Import HartTp WpNext.
 Require Import KernelText.
 Require Import InstrBytes.
 Require Import BufOwn BcacheInv BioInv.
-Require Import WpBrelseDecode.
+Require Import CodeBrelse.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBrelse.

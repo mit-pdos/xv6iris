@@ -1286,8 +1286,8 @@ Proof. unfold execute. cbn match. unfold execute_C_JR. apply exec_returnM. Qed.
 
 (* c.j : the unconditional compressed jump expands to a base JAL against x0.
    An execute fact, so it belongs here beside its siblings -- it previously sat
-   in WpKallocDecode.v (a DECODE file) with a second [Local Lemma] copy in
-   WpMappagesInstr.v, and three other proofs imported one of those two files to
+   in CodeKalloc.v (a DECODE file) with a second [Local Lemma] copy in
+   CodeMappages.v, and three other proofs imported one of those two files to
    reach it. *)
 Lemma exec_execute_C_J (imm : mword 11) s :
   exec (execute (C_J imm)) s
@@ -1325,8 +1325,8 @@ Proof. unfold execute. cbn match. unfold execute_C_SD. cbn zeta. apply exec_retu
 (* ---------------------------------------------------------------------- *)
 
 (* c.srai / c.addw : the two remaining creg-form compressed ALU expansions.
-   Each was proved privately in BOTH WpKvmmakeInstr.v and
-   WpProcMapstacksInstr.v; neither had a copy at this altitude. *)
+   Each was proved privately in BOTH CodeKvmmake.v and
+   CodeProcMapstacks.v; neither had a copy at this altitude. *)
 Lemma exec_execute_C_SRAI (shamt : mword 6) (rsd : cregidx) s :
   exec (execute (C_SRAI (shamt, rsd))) s
   = Some (ExecuteAs (SHIFTIOP (shamt, creg2reg_idx rsd, creg2reg_idx rsd, SRAI)), s).

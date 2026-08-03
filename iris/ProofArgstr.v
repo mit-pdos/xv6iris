@@ -43,7 +43,7 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import FdSlots FileInv ProcInv.
-Require Import WpArgstrDecode.
+Require Import CodeArgstr.
 Require Import SpecArgraw SpecFetchstr.
 Require Import SpecArgstr.
 From Kernel Require KernelInstrs.

@@ -48,7 +48,7 @@ Require Import VcGen.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import PipeInv.
-Require Import WpPipeallocDecode.
+Require Import CodePipealloc.
 Require Import WpLock.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.

@@ -23,7 +23,7 @@ Require Import ProcGeom.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpWakeup.
-Require Import WpSleeplockDecode.
+Require Import CodeSleeplock.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.

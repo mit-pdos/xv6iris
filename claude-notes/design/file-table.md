@@ -9,7 +9,7 @@ This file fixes the resource model those patterns are proved against.
 Rocq: geometry, the algebra and the predicates live in `FileInv.v`; the
 per-function specs are `SpecFile*.v` / `ProofFile*.v` / `LinkFile*.v` in the
 usual spec-module shape (`design/spec-modules.md`), with the decode layer in
-`WpFileallocDecode.v`.
+`CodeFilealloc.v`.
 
 The fractional sharing this design rests on is generic, so it lives in
 `RiscvPtsto.v`, not here: `mem_pointsto_agree` / `mem_pointsto_frac_split`,

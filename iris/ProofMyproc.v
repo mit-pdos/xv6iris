@@ -26,7 +26,7 @@ Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import KernelRvcDecode WpAuipc.
 Require Import WpMycpu ProcGeom.
-Require Import WpMyprocDecode.
+Require Import CodeMyproc.
 Require Import CpuOwn.
 Require Import IntrDefs.
 Require Import HartTp WpNext.

@@ -72,7 +72,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import WpSleepDecode.
+Require Import CodeSleep.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecSleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

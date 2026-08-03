@@ -256,11 +256,11 @@ offsets as indices and had to rederive them; the tables below give both.
       `proc_pt_own` moves, `proc_pt_data_irrel`); the three Spec files;
       `_CoqProject`.  Full tree green with the invariant change.
       (orchestrator)
-- [x] **A** `WpUvmunmapDecode.v` — 56 `uui_*` facts.
-- [x] **B** `WpUvmdeallocDecode.v` — 29 `udi_*` facts (+ a local
+- [x] **A** `CodeUvmunmap.v` — 56 `uui_*` facts.
+- [x] **B** `CodeUvmdealloc.v` — 29 `udi_*` facts (+ a local
       `udexec_C_SUB`: `c.sub` has no `exec_execute_C_*` in
       `WpMmodeLeafBase.v`, only in the user-side `UserExecFacts.v`).
-- [x] **C** `WpUvmallocDecode.v` — 74 `uai_*` facts.
+- [x] **C** `CodeUvmalloc.v` — 74 `uai_*` facts.
 - [x] **D** `ProofUvmunmap.v` (`Module UvmunmapProof (WalkNoalloc :
       WALK_NOALLOC) (Kfree : KFREE) : UVMUNMAP`, **24.6 s / 1.07 GB**
       isolated) + `LinkUvmunmap.v`.  `SpecUvmunmap.v` was NOT changed;
@@ -401,14 +401,14 @@ files' `*_cr[567]` creg bridges.  `ua_z_np0` was **dead** and was deleted;
 `cdec_*` in `KernelRvcDecode.v`, 4 `bdec_*` in `KernelBaseDecode.v`) and **41
 local copies deleted across 20 files** (net −24 proofs).  Compressed: `17fd`
 `6785` `77fd` `83a9` `84b2` `8556` `8a32` `8ab6` `95be` `a015` `b7d5` `bfc9`
-`bfe1`, plus `84ae`, which was **already** `cdec_84ae` — `WpMappagesInstr` and
-`WpUvmdeallocDecode` had each re-proved it anyway.  Base: `00006517` (four
+`bfe1`, plus `84ae`, which was **already** `cdec_84ae` — `CodeMappages` and
+`CodeUvmdealloc` had each re-proved it anyway.  Base: `00006517` (four
 copies), `00c79513`, `03459793`, `f51ff0ef`.  The four offset-named homes the
 last sweep warned about were found by keying the index on the **word inside
 the statement**, not on the lemma name — that is what turned up
-`WpSchedDecode.sddec_add_a1_a5` (= `95be`), `WpAcquireTop.aqdec_auipc` /
-`WpKvmmap.kvdec_auipc` / `WpProcMapstacksInstr.pmsdec_98` (= `00006517`) and
-`WpMappagesInstr.mdec_16`/`mdec_34`.  The nine words the worklist flagged
+`CodeSched.sddec_add_a1_a5` (= `95be`), `WpAcquireTop.aqdec_auipc` /
+`WpKvmmap.kvdec_auipc` / `CodeProcMapstacks.pmsdec_98` (= `00006517`) and
+`CodeMappages.mdec_16`/`mdec_34`.  The nine words the worklist flagged
 (`8f75` `97ae` `8ff5` `8f99` `4685` `995a` `e38d` `d57d` `d37d`) turned out to
 be **singletons** and stayed local.  A word-keyed index of the whole tree
 shows 108 duplicated words remaining, none involving these three functions —

@@ -13,7 +13,7 @@ every callee, but nothing yet DRIVES them.
 
 **In the tree (all in `_CoqProject`, full build green):**
 
-- **`WpMainDecode.v`** — the complete decode layer, 50/50 instructions
+- **`CodeMain.v`** — the complete decode layer, 50/50 instructions
   (`mni_00` … `mni_b0`) plus the 5 compressed and 30 base decode facts they
   consume. Nothing about main's decode is left to do.
 - **`StartedInv.v`** — the `started` invariant and its three accessors

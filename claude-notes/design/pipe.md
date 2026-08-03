@@ -208,7 +208,7 @@ values — the recipe in `durable-notes.md`.
 
 ## `pipealloc`
 
-`SpecPipealloc.v` (contract), `WpPipeallocDecode.v` (72 instruction facts),
+`SpecPipealloc.v` (contract), `CodePipealloc.v` (72 instruction facts),
 `ProofPipealloc.v` (the whole-function proof, a functor over `FILEALLOC`,
 `KALLOC`, `INITLOCK` and `FILECLOSE`). It is where the two halves of the model meet: the two
 *exclusive* `file_ref γf k 1 C` that filealloc hands back (which is what

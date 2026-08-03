@@ -245,9 +245,9 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
       outstanding.
 - [x] **S3** `ProcPtOwn.v` additions: `pte_flags10` + `uvm_perm_ok_of_leaf`
       (§2c), `uvmc_np` and `um_del_run_restore_sub` (§3d).
-- [x] **A** `WpFreewalkDecode.v` — 36 `fwi_*` facts.
-- [x] **B** `WpUvmfreeDecode.v` — 22 `ufi_*` facts.
-- [x] **C** `WpUvmcopyDecode.v` — 65 `uci_*` facts.
+- [x] **A** `CodeFreewalk.v` — 36 `fwi_*` facts.
+- [x] **B** `CodeUvmfree.v` — 22 `ufi_*` facts.
+- [x] **C** `CodeUvmcopy.v` — 65 `uci_*` facts.
 - [x] **D** `ProofFreewalk.v` (`Module FreewalkProof (Kfree : KFREE) :
       FREEWALK`, **15.9 s / 0.99 GB** isolated, flat profile — the three
       `Qed`s at 0.98/0.75/0.64 s are the top sentences) + `LinkFreewalk.v`.
@@ -398,7 +398,7 @@ numbers as BYTE OFFSETS: slot index `k = (frame - N) / 8`.
       37 % of text (was 75 / 26 %). `Print Assumptions` on all three linked
       contracts: only the five Sail reservation/platform axioms, `Values.mword`
       and `functional_extensionality_dep`.
-- [x] **I** `uvmclear`: `SpecUvmclear.v`, `WpUvmclearDecode.v` (17 `ucli_*`
+- [x] **I** `uvmclear`: `SpecUvmclear.v`, `CodeUvmclear.v` (17 `ucli_*`
       facts), `ProcPtOwn.v` §2e (12 lemmas, **no axioms at all** — pure bit and
       map arithmetic), `ProofUvmclear.v` (**8.3 s / 760 MB**, 503 lines, one
       `Lemma`, no join since the single path leaves nothing to rejoin) +

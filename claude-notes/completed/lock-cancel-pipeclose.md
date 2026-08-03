@@ -47,7 +47,7 @@ Verified facts worth not re-deriving:
 
 33 instructions at `0x80004440`, proven and linked (`ProofPipeclose.v`,
 `LinkPipeclose.v`); `tools/proof_coverage.py` counts it. The pieces:
-`WpPipecloseDecode.v` (all 33 instruction facts), `SpecPipeclose.v` (the
+`CodePipeclose.v` (all 33 instruction facts), `SpecPipeclose.v` (the
 contract), and — reusable — `WpSconfBtype.wp_beqz_x0_taken_s_sconf`,
 `PageFields`' backward leaves and `PipeInv.pipe_raw_page_own` /
 `pipe_bytes_page_own`.

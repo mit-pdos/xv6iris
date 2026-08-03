@@ -23,7 +23,7 @@
    page the memmove writes).
 
    THE LOOP SKELETON (offsets are [KernelSyms.copyout + off]; the decode
-   layer is WpCopyoutDecode.v, whose byte-verified listing is authoritative --
+   layer is CodeCopyout.v, whose byte-verified listing is authoritative --
    kernel.asm is stale by 14 bytes for this function):
 
      +0x50 and  s1,s4,s10        va0 := PGROUNDDOWN(dstva)     <- LOOP HEAD
@@ -102,7 +102,7 @@ Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import ByteCursor ByteBuf.
-Require Import WpCopyoutDecode.
+Require Import CodeCopyout.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
 Require Import SpecWalkaddr SpecVmfault SpecWalk SpecMemmove.

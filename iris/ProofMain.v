@@ -84,7 +84,7 @@ Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
 Require Import KMap.
 Require Import SpecMain.
-Require Import WpMainDecode.
+Require Import CodeMain.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

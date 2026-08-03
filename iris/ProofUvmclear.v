@@ -52,7 +52,7 @@ Require Import PtAdBits.
 Require Import CommonWalk PtTree Pt4kWalk PtBuild KptTree.
 Require Import UptTree UserPtTree.
 Require Import ProcPtOwn.
-Require Import WpUvmclearDecode.
+Require Import CodeUvmclear.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalk.
 Require Import SpecUvmclear.

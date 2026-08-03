@@ -7,14 +7,14 @@ machinery (see [`../design/tlb-translation.md`](../design/tlb-translation.md)).
 
 ## What is proved
 
-- **`uvmcreate()`** (`SpecUvmcreate` / `WpUvmcreateInstr` / `ProofUvmcreate` /
+- **`uvmcreate()`** (`SpecUvmcreate` / `CodeUvmcreate` / `ProofUvmcreate` /
   `LinkUvmcreate`): kalloc one page, memset it, return it.  The post hands the
   page over as `ptree_own 2 1 (pt_empty_node b)` — an all-zero Sv39 root, which
   is exactly what the caller's first `mappages` consumes — plus `page_valid` of
   the returned address so the caller can refute its own null test.  The body is
   the same shape as `ProofKvmmake`'s `wp_kmk_prologue_node` (kalloc + memset +
   `zero_page_to_node`) with the frame pop and the `beqz` fall-through added.
-- **`proc_pagetable(p)`** (`SpecProcPagetable` / `WpProcPagetableInstr` /
+- **`proc_pagetable(p)`** (`SpecProcPagetable` / `CodeProcPagetable` /
   `ProofProcPagetable` / `LinkProcPagetable`): `uvmcreate()`, then the
   TRAMPOLINE (R|X) and TRAPFRAME (R|W) `mappages` runs.  The post is
   `pt_rep0 t (ppt_map tfp)` — the deliverable, since **`ProcPt.ppt_bridge`**
@@ -88,7 +88,7 @@ pointer and maps it.
   budget/range fact is a top-level mword-free helper lemma
   (`ppt_nz1`/`ppt_nz2`/`ppt_env_recomb`/`ppt_nodes_sum`/`uvc_kdata_bound_arith`
   /`uvc_kda_arith`) applied as a closed fact.
-- The decode catalog `WpProcPagetableInstr.v` covers the **success path only**
+- The decode catalog `CodeProcPagetable.v` covers the **success path only**
   (+0x00..+0x58).  The two error tails (+0x5a `uvmfree`, +0x66
   `uvmunmap`/`uvmfree`) are never fetched, so they are deliberately absent — a
   `None`-mode proof would have to add them.

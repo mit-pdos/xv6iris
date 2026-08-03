@@ -12,7 +12,7 @@
      }
 
    @ KernelSyms.sys_close = 0x80004cb2, 24 instructions (see
-   WpSysCloseDecode.v for the listing).
+   CodeSysClose.v for the listing).
 
    THE POINT OF THIS SPEC.  sys_close is the first proof in which a
    [FileInv.file_ref] LEAVES the process: [proc_priv]'s descriptor [fd] gives

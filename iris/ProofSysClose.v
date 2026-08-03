@@ -10,7 +10,7 @@
      }
 
    Twenty-four instructions (KernelInstrs @ 0x80004cb2; the listing is in
-   WpSysCloseDecode.v).  Three things here are new relative to the earlier
+   CodeSysClose.v).  Three things here are new relative to the earlier
    syscall proofs, and they are what the file is about:
 
    * TWO STACK LOCALS, one of them a 4-byte [int] at the UPPER HALF of a
@@ -49,7 +49,7 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecMyproc SpecArgfd SpecFileclose.
 Require Import SpecSysClose.
-Require Import WpSysCloseDecode.
+Require Import CodeSysClose.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

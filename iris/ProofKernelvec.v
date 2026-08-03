@@ -49,7 +49,7 @@ Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import RegFile.
 Require Import WpMmodeLeafBase StackOwn.
-Require Import SmodeCore MstatusBits KernelText WpKvInstr.
+Require Import SmodeCore MstatusBits KernelText CodeKernelvec.
 Require Import VcGen VcGenS.
 Require Import KptShare.
 Require Import WpSmodePtLeaves WpSmodePtCtl.

@@ -5,7 +5,7 @@ contracts of myproc / argaddr / pipealloc / fdalloc / fileclose / copyout. It
 is not *linked*, and cannot be until `fileclose` has a proof — the one callee
 that lacks one; see "What is left" below.
 
-Rocq: `SpecSysPipe.v` (contract), `WpSysPipeDecode.v` (71 instruction facts),
+Rocq: `SpecSysPipe.v` (contract), `CodeSysPipe.v` (71 instruction facts),
 `ProofSysPipe.v` (the functor). Supporting specs written for it:
 `SpecArgaddr.v`, `SpecFdalloc.v`.
 

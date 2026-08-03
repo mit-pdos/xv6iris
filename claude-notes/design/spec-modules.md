@@ -7,9 +7,13 @@ amount of `-j` helps (the build is critical-path bound, not core bound; see
 
 Every whole-function proof under `iris/` is in this shape. Keep new ones in it.
 
-## The three files
+## The files
 
-For each kernel function `F` (`Spec<F>.v`, `Proof<F>.v`, `Link<F>.v`):
+For each kernel function `F`: `Code<F>.v`, `Spec<F>.v`, `Proof<F>.v`,
+`Link<F>.v`. `Code<F>.v` holds what the function's machine code IS — its decode
+templates and `instr` facts, no weakest precondition — and is described in
+[`code-organization.md`](code-organization.md); the other three are the
+decoupling shape, below.
 
 **`Spec<F>.v`** — the public interface, stated once, plus the symbol-address
 notation and any pure spec vocabulary:
@@ -178,7 +182,7 @@ instructions are this pattern, but it continues into `uartinit` and the
 `devsw[]` writes. The wrapper owns the epilogue and returns, so sharing with
 `consoleinit` would mean splitting prologue-through-jal into a separate piece —
 not what this shape is. It is proved standalone instead
-(`WpConsoleinitDecode` / `SpecConsoleinit` / `ProofConsoleinit` /
+(`CodeConsoleinit` / `SpecConsoleinit` / `ProofConsoleinit` /
 `LinkConsoleinit`, a functor over `INITLOCK` and `UARTINIT`), running the same
 script over CONCRETE addresses, so every pc step and relocation is a
 `vm_compute` rather than the wrapper's symbolic `pc_step`. The other nine
@@ -192,7 +196,7 @@ uartinit, pipealloc, virtio_disk_init) are unrelated.
   `F+0x1c` is 2-byte aligned, and what the two auipc/addi pairs and the jal
   resolve to (`… = name`, `… = lk`, `… = mword_of_int KernelSyms.initlock`).
 - **`WpInitlockWrapper.v`** — `InitlockWrapperProof (Initlock : INITLOCK)`.
-- A member `F` supplies only: its `Wp<F>Decode.v` (the shared `mdec_*`
+- A member `F` supplies only: its `Code<F>.v` (the shared `mdec_*`
   compressed templates plus the five base words carrying its own immediates)
   ending in an `<f>_code : kernel_text -∗ ilw_code …` bundle; a `Spec<F>.v` in
   the usual shape; and a `Proof<F>.v` that is one `iApply` — `Module ILW :=

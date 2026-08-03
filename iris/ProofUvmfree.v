@@ -86,7 +86,7 @@ Require Import ProcGeom CpuOwn.
 Require Import ByteCursor.
 Require Import ProcPtOwn.
 Require Import BarePt.
-Require Import WpUvmfreeDecode.
+Require Import CodeUvmfree.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecUvmunmap SpecFreewalk SpecUvmfree.
 Require Import KernelRvcDecode.

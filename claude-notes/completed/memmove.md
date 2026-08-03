@@ -1,6 +1,6 @@
 # memmove — the non-overlapping byte copy (COMPLETE)
 
-`memmove` is proved end to end: `SpecMemmove.v` (contract) → `WpMemmoveInstr.v`
+`memmove` is proved end to end: `SpecMemmove.v` (contract) → `CodeMemmove.v`
 (decodes + `instr` facts) → `ProofMemmove.v` (whole-function proof) →
 `LinkMemmove.v` (seals `MemmoveProof : MEMMOVE`). No admits, no axioms.
 
@@ -39,7 +39,7 @@ the pure fact at the one place it is needed:
   already false.
 
 So the descending arm closes by `iExFalso` **before it steps**. Its instructions
-are never fetched, and `WpMemmoveInstr.v` deliberately does not decode
+are never fetched, and `CodeMemmove.v` deliberately does not decode
 `memmove+0x3e..+0x5e` at all.
 
 The overlapping contract is deliberately out of scope: every xv6 kernel caller

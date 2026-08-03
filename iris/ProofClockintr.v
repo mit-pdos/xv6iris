@@ -56,7 +56,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import TimerCap WpSconfTimer.
 Require Import TicksInv.
 Require Import ProcGeom.
-Require Import WpClockintrDecode.
+Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

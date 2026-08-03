@@ -5,7 +5,7 @@ each).  The pair that lets one piece of kernel code serve a user buffer and a
 kernel buffer: a run-time flag picks between `copyout`/`copyin` through the
 current process's page table and a bare `memmove`.
 
-Files: `SpecEitherCopyout.v` / `SpecEitherCopyin.v`, `WpEitherCopyDecode.v`,
+Files: `SpecEitherCopyout.v` / `SpecEitherCopyin.v`, `CodeEitherCopy.v`,
 `ProofEitherCopy.v`, `LinkEitherCopyout.v` / `LinkEitherCopyin.v`.
 `Print Assumptions` on both: only the five Sail reservation/platform axioms
 (+ `functional_extensionality_dep`), the same set copyout and fetchaddr rest
@@ -54,7 +54,7 @@ only in which of a0/a1 is the flag (+0x10/+0x12, `84aa`/`8a2e` vs
 `8a2a`/`84ae`) and in the three `jal` targets; all 28 other words are
 identical.  That drove three structural choices, all of which paid off:
 
-- **one decode file for the family** (`WpEitherCopyDecode.v`, `eco_<off>` and
+- **one decode file for the family** (`CodeEitherCopy.v`, `eco_<off>` and
   `eci_<off>`), so the word layer is written once;
 - **one proof file with both functors** (`ProofEitherCopy.v`), so the pure
   helpers (`ec_push`/`ec_pop`/`ec_ld80`/`ec_zero_reg_moi`) are written once;
@@ -92,7 +92,7 @@ fetchaddr, fetchstr), `b7cd` (c.j -0x1e: copyout, pipewrite).
 
 With them, the **load-shape** lemma that turns `cdec_6928`'s cregidx AST into
 the literal-displacement form `wp_cld_s_sconf` wants: `cshape_6928`, retiring
-`ProofFetchaddr.fa_ld80` / `WpFetchstrDecode.fs_ld80` / this file's
+`ProofFetchaddr.fa_ld80` / `CodeFetchstr.fs_ld80` / this file's
 `ec_ld80`.  Deduplicating against what was already there turned up two more,
 both in `ProofVmfault.v`: `vf_ld80` was a verbatim copy of the existing
 `cshape_68a8` (the s1-based twin), and `vf_ld72` was already nothing but an

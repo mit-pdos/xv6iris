@@ -80,7 +80,7 @@ That is why `SpecCopyinstr.v` is by far the cheapest of the three to state.
 - **+0x78 is dead and is DISCHARGED, not decoded away.** `n = min(4096-off,
   rem)` with `off < 4096` and `rem ≥ 1` is never 0, so the `c.beqz` falls
   through; the four instructions at +0xa8 are the only ones
-  `WpCopyinstrDecode.v` omits.
+  `CodeCopyinstr.v` omits.
 - **Threading across the inner loop is stated against a FIXED map.** The
   inner loop's continuations say `∀ r ∉ {a1,a4,a5}, Mx !!! r = M0 !!! r` for
   an `M0` that is a LEMMA PARAMETER, not the current iteration's map —
@@ -139,7 +139,7 @@ fetchstr gets the block WHOLE and does its own `proc_priv_copy` inside.
                          gone, and the shared name is the one it now uses)
     WpMmodeLeafBase.v    the XORI generic-register logic WP
 
-    Spec/Wp<f>Decode/Proof/Link  for Copyinstr, Strlen, Fetchstr, Argstr
+    Spec/Code<f>/Proof/Link  for Copyinstr, Strlen, Fetchstr, Argstr
 
 ## Remaining work
 

@@ -294,7 +294,7 @@ Section WpSwtchVc.
 
   Notation SW := KernelSyms.swtch.
 
-  (* the three instr-builder templates, copied verbatim from WpMycpu/WpKallocDecode *)
+  (* the three instr-builder templates, copied verbatim from WpMycpu/CodeKalloc *)
   (* ------ the 28 instr facts of swtch's straight-line body ------ *)
   Lemma swi_00 : kernel_text -∗ instr (mword_of_int (SW + 0x00) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 1), Regidx (mword_of_int 10), 8)).
   Proof. mk_base (SW + 0x00)%Z (mword_of_int 0x00153023 : mword 32) (mword_of_int (SW + 0x00) : mword 64) (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 1), Regidx (mword_of_int 10), 8)) swb_00153023. Qed.

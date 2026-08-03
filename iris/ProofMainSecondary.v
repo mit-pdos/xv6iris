@@ -63,7 +63,7 @@ Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
 Require Import KMap.
 Require Import SpecMain SpecMainSecondary.
-Require Import WpMainDecode.
+Require Import CodeMain.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

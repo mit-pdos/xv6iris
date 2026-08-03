@@ -64,7 +64,7 @@ Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import ArrCursor.
-Require Import FdSlots FileInv WpFileallocDecode.
+Require Import FdSlots FileInv CodeFilealloc.
 Require Import WpLock.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.

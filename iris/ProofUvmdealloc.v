@@ -66,7 +66,7 @@ Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import ByteCursor.
 Require Import ProcPtOwn.
-Require Import WpUvmdeallocDecode.
+Require Import CodeUvmdealloc.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecUvmunmap.
 Require Import SpecUvmdealloc.

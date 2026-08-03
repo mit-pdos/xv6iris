@@ -54,7 +54,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import SpecInitlock.
 Require Import SpecUart.
-Require Import WpUartinitDecode.
+Require Import CodeUartinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecUartinit.

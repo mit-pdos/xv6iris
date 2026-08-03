@@ -284,14 +284,14 @@ Everything here is DONE (two passes; full build green,
       `bdec_0001d797` (2), `bdec_00005597` (2), `bdec_01048513` (2),
       `bdec_8b8fe0ef` (2).  The offset-named homes the word-keyed grep would
       have missed: `WpPopOff.ppdec_addiwm1`, `WpRelease.rldec_sw_zero`,
-      `WpSleeplockDecode.sldec_sw_{zero,a5}_locked`,
-      `ProofKilled.kldec_mv_s2_a5`, `WpWalkInstr.wdec_16` — five of the
+      `CodeSleeplock.sldec_sw_{zero,a5}_locked`,
+      `ProofKilled.kldec_mv_s2_a5`, `CodeWalk.wdec_16` — five of the
       seventeen words are only findable by statement.  Four files needed a new
       `Require` (`WpUartPutcSync` → KernelRvcDecode; `WpRelease`,
-      `WpSleeplockDecode`, `WpTrapinitDecode` → KernelBaseDecode); no cycle,
+      `CodeSleeplock`, `CodeTrapinit` → KernelBaseDecode); no cycle,
       both bases sit below every WP leaf.  Still out of the bio scope and
       worth a future sweep: the C_LD `0x6398` shape (3 copies:
-      WpFdallocDecode / WpFreeDescDecode / WpVirtioDiskRwDecode), `0x854e`
-      (5 copies), and `WpProcPagetableInstr` / `WpUvmcreateInstr`, which carry
+      CodeFdalloc / CodeFreeDesc / CodeVirtioDiskRw), `0x854e`
+      (5 copies), and `CodeProcPagetable` / `CodeUvmcreate`, which carry
       private copies of ~12 words KernelRvcDecode already owns plus of
       `WpMmodeLeafBase.exec_execute_C_{BEQZ,SRAI}`.

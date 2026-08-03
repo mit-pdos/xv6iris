@@ -1,6 +1,6 @@
 (* ProofAllocproc.v -- the whole-function WP for allocproc().
 
-   Fifty-five instructions @ 0x80001b28; see WpAllocprocDecode.v for the
+   Fifty-five instructions @ 0x80001b28; see CodeAllocproc.v for the
    listing and SpecAllocproc.v for the contract.  Three parts:
 
    * the SCAN (+0x1c .. +0x30), a bounded fuel induction over proc[] that
@@ -69,7 +69,7 @@ Require Import KvmSpec.
 Require Import SpecAcquire SpecRelease SpecAllocpid SpecKalloc SpecProcPagetable SpecMemset.
 Require Import SpecProcinit.
 Require Import SpecAllocproc.
-Require Import WpAllocprocDecode.
+Require Import CodeAllocproc.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

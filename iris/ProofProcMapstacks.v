@@ -30,7 +30,7 @@ Require Import ProcGeom.
 Require Import KstackArith.
 Require Import KallocInv.
 Require Import PtTree PtBuild KptPt KvmMap KvmSpec.
-Require Import WpProcMapstacksInstr.
+Require Import CodeProcMapstacks.
 Require Import SpecKalloc SpecKvmmap SpecProcMapstacks.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.

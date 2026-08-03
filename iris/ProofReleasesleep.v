@@ -51,7 +51,7 @@ Require Import VcGen.
 Require Import ProcGeom.
 Require Import WpWakeup.
 Require Import SleepLock.
-Require Import WpSleeplockDecode.
+Require Import CodeSleeplock.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.

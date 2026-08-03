@@ -20,7 +20,7 @@ Require Import HartTp WpNext IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpAuipc.
 Require Import CalleeSaved StackOwn.
 Require Import KernelRvcDecode.
-Require Import WpTrapinithartDecode.
+Require Import CodeTrapinithart.
 Require Import SpecTrapinithart.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

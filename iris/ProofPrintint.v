@@ -49,7 +49,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs HartTp WpNext WpSconfVc.
 Require Import ByteCursor PrintintArith.
-Require Import WpPrintintDecode.
+Require Import CodePrintint.
 Require Import SpecConsputc SpecPrintint.
 From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.

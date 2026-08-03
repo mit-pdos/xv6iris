@@ -86,7 +86,7 @@ Require Import UptTree UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPt ProcPtOwn.
-Require Import WpUvmcopyDecode.
+Require Import CodeUvmcopy.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
 Require Import SpecWalk SpecKalloc SpecMemmove SpecMappages SpecKfree SpecUvmunmap.

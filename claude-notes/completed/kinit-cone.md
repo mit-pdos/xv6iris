@@ -74,7 +74,7 @@ IN (`rewrite HRrela0 -Hlk` for cpu; `rewrite HRreltp -Ha0fcpu` for noff/int).
 `wp_freerange_sconf` proved (funext + model platform axioms only).  Also in the
 file: the strengthened `wp_kfree_sconf` post now RETURNS the three per-CPU cells
 (ProofKfree.v: `a_cpu ↦₈ 0`, `a_noff ↦₄ noff_ret`, `∃iv a_int ↦₄ iv`); the
-decode layer `WpFreerangeDecode.v` (`fri_00..fri_46`, obtained by
+decode layer `CodeFreerange.v` (`fri_00..fri_46`, obtained by
 `Eval vm_compute in decode_c_pure/ext_decode` probes); four new leaves
 (`wp_bltu_taken`/`wp_bgeu_fall`/`wp_bgeu_taken`/`wp_cand_s_sconf`).
 
@@ -110,7 +110,7 @@ Key facts that made it go:
 `wp_kinit_sconf` proved (funext + model platform axioms only).  Straight-line:
 2-slot c.addi frame (like initlock), `jal initlock` (wp_initlock_sconf), the
 newlock ghost, `jal freerange` (wp_freerange_sconf), epilogue.  Decode facts in
-`WpKinitDecode.v` (reuse the shared `mdec_*` from KernelRvcDecode for the common
+`CodeKinit.v` (reuse the shared `mdec_*` from KernelRvcDecode for the common
 compressed instrs; new fdc_ only for c.li/c.slli; fdb_ for the 8 auipc/addi/jal).
 
 Landed lessons:

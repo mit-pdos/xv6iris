@@ -25,7 +25,7 @@
    and [ProcPtOwn.proc_pt_acc_rep0] / [proc_pt_rebuild] / [proc_pt_page_acc]
    are the only table lemmas in the file.
 
-   THE MACHINE (offsets into WpCopyinstrDecode.v's byte-verified listing):
+   THE MACHINE (offsets into CodeCopyinstr.v's byte-verified listing):
 
      +0x00 beqz a3,+0xb0          max == 0: return -1 with NO frame
      +0x02..+0x16                 the 80-byte (10-slot) prologue
@@ -111,7 +111,7 @@ Require Import ByteCursor ByteBuf.
 Require Import PtreeType.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import WpCopyinstrDecode.
+Require Import CodeCopyinstr.
 Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalkaddr.

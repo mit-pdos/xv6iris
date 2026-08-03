@@ -40,7 +40,7 @@ Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs HartTp WpNext.
-Require Import WpConsputcDecode.
+Require Import CodeConsputc.
 Require Import SpecUartPutc SpecConsputc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

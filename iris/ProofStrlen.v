@@ -6,7 +6,7 @@
    Contract: SpecStrlen.v.  Eighteen instructions, a 2-slot frame, no callees,
    two arms joining at the epilogue (+0x20).
 
-   THE MACHINE (offsets into WpStrlenDecode.v's byte-verified listing):
+   THE MACHINE (offsets into CodeStrlen.v's byte-verified listing):
 
      +0x00..+0x06   the 2-slot prologue
      +0x08 lbu a5,0(a0)
@@ -68,7 +68,7 @@ Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import HartTp WpNext IntrDefs.
 Require Import ByteCursor ByteBuf.
-Require Import WpStrlenDecode.
+Require Import CodeStrlen.
 Require Import SpecStrlen.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

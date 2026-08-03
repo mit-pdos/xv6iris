@@ -59,7 +59,7 @@ Contents:
   store).
 - §8 the pure srli/slli/or/ori→`mappages_pte` bridges.
 
-### wp_walk (WpWalk.v; WpWalkInstr.v = 47-instr decode catalog wdec_*/wi_*)
+### wp_walk (WpWalk.v; CodeWalk.v = 47-instr decode catalog wdec_*/wi_*)
 
 Qed-sealed chunks: `wp_walk_epilogue` (+0x52..ret), `wp_walk_tail`,
 `wp_walk_alloc` (+0x72..+0x94; parameterized over cellA/old word/child level +
@@ -80,7 +80,7 @@ Carry-forward proof-engineering:
 - register facts across kalloc/alloc-chunk boundaries hop via the transport fact
   (`Htrans c` is_cs_idx-guarded), then peel the pre-call chain.
 
-### wp_mappages (WpMappages.v + WpMappagesInstr.v = 56-instr catalog mdec_*/mi_*)
+### wp_mappages (WpMappages.v + CodeMappages.v = 56-instr catalog mdec_*/mi_*)
 
 `mappages_sp_cancel`; Qed-sealed `wp_mappages_epilogue` (+0x9c..+0xb0: 9 cldsp
 restores + addi16sp + ret, both exits funnel here with a0 decided); a

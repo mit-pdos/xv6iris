@@ -23,7 +23,7 @@ Require Import PtTree.
 Require Import KptShare.
 Require Import TransPt.
 Require Import UserretDefs.
-Require Import WpKvminithart WpKvminithartInstr.
+Require Import WpKvminithart CodeKvminithart.
 Require Import SpecKvminithart.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.

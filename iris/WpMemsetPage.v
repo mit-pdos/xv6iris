@@ -1,7 +1,7 @@
 (* WpMemsetPage.v -- a PAGE-LEVEL S-mode WP for the kernel's [memset], tailored
    to zero/fill a whole 4096-byte page for kalloc/kfree.
 
-   [wp_memset_page] wraps [wp_memset_s_full_kt] (WpMemsetInstr.v): it DERIVES all
+   [wp_memset_page] wraps [wp_memset_s_full_kt] (CodeMemset.v): it DERIVES all
    of that lemma's ~30 per-byte side conditions (Sv39 canonicality, the identity
    translation, the gigapage svpn masks, the per-byte PMP TOR match, the pointer
    arithmetic) from the single fact that the page base [p] is RAM-resident and

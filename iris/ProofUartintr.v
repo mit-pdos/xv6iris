@@ -3,7 +3,7 @@
      void uartintr(void)
 
    The contract is SpecUartintr.v; the 39 instruction facts are
-   WpUartintrDecode.v ([uii2_<off>]).  Structure of the proof:
+   CodeUartintr.v ([uii2_<off>]).  Structure of the proof:
 
    - [ui_tail] is the epilogue at +0x6c (four restores, frame pop, ret).
    - [ui_rx] is the receive drain at +0x44: an iLöb, because the device may
@@ -60,7 +60,7 @@ Require Import SpecPanic.
 Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecAcquire SpecRelease SpecWakeup SpecConsoleintr.
-Require Import WpUartintrDecode.
+Require Import CodeUartintr.
 Require Import SpecUartintr.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

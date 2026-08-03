@@ -49,7 +49,7 @@ The protocol layer, in place and green:
   `hw_config`'s seventeen conjuncts by position.
 
 - **`virtio_disk_intr` is PROVEN and LINKED** (`SpecVirtioDiskIntr.v` /
-  `WpVirtioDiskIntrDecode.v` / `ProofVirtioDiskIntr.v` /
+  `CodeVirtioDiskIntr.v` / `ProofVirtioDiskIntr.v` /
   `LinkVirtioDiskIntr.v`, a functor over ACQUIRE / RELEASE / WAKEUP; the
   coverage report reads `proven`).  Things worth knowing before touching it:
   - The loop (+0x3e..+0x86) is an `iLöb` over `vt_loop` (§8), whose exit
@@ -285,7 +285,7 @@ pinned to predict which sector is touched.
 
 ## `virtio_disk_init`
 
-Proven and linked (`SpecVirtioDiskInit.v` / `WpVirtioDiskInitDecode.v` /
+Proven and linked (`SpecVirtioDiskInit.v` / `CodeVirtioDiskInit.v` /
 `ProofVirtioDiskInit.v` / `LinkVirtioDiskInit.v`). Design points to own before
 touching it:
 

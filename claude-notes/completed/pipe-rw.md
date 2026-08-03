@@ -131,7 +131,7 @@ Loop structure:
       Proof→Proof Require edge — + `SleepOfGen`; LinkSleep.v updated;
       LinkAcquiresleep/LinkSysPause unchanged and green.
 - [x] S4. SpecPipewrite.v / SpecPiperead.v (spec modules; both compile).
-- [x] S5. WpPipewriteDecode.v (95 facts) / WpPipereadDecode.v (90 facts), all
+- [x] S5. CodePipewrite.v (95 facts) / CodePiperead.v (90 facts), all
       185 encodings cross-checked against KernelInstrs.kernel_bytes.
 - [x] S6. ProofPipewrite.v (2726 lines, Qed-clean, no admits; 1m37s / 2.1 GB
       isolated; only Sail-model axioms per Print Assumptions) +

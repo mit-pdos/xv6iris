@@ -7,7 +7,7 @@
      bad: null whichever descriptors were installed, fileclose both, return -1
 
    Seventy-one instructions (KernelInstrs @ 0x80005338; the listing is in
-   WpSysPipeDecode.v).  Four things carry the proof.
+   CodeSysPipe.v).  Four things carry the proof.
 
    * THE FRAME IS THE STATE.  Like pipealloc, every branch after a call
      re-reads a stack local rather than a register: the [blt] at +0x3c tests
@@ -107,7 +107,7 @@ Require Import PipeInv.
 Require Import SpecPanic.
 Require Import SpecMyproc SpecArgaddr SpecPipealloc SpecFdalloc SpecFileclose SpecCopyout.
 Require Import SpecSysPipe.
-Require Import WpSysPipeDecode.
+Require Import CodeSysPipe.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.

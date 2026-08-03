@@ -67,7 +67,7 @@ Require Import KvmMap.
 Require Import KstackArith.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
 Require Import SpecInitlock.
-Require Import WpProcinitDecode.
+Require Import CodeProcinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecProcinit.

@@ -5,7 +5,7 @@
 
    trapinit is a thin initlock wrapper, so it is an INSTANCE of the shape
    proved once in WpInitlockWrapper.v: all this file supplies is trapinit's
-   thirteen instructions (WpTrapinitDecode.tri_code) and the three relocations
+   thirteen instructions (CodeTrapinit.tri_code) and the three relocations
    -- a1 = &"time" (auipc 0x5 / addi -450), a0 = &tickslock (auipc 0x16 /
    addi -666), and the jal displacement to initlock. *)
 From Stdlib Require Import ZArith.
@@ -19,7 +19,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelDataInv.
 Require Import SpecInitlock WpInitlockWrapper.
-Require Import WpTrapinitDecode.
+Require Import CodeTrapinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecTrapinit.

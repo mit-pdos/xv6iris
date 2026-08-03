@@ -78,7 +78,7 @@ standing for `l ++ bs` so the caller can print again.
 
 ## consputc (PROVEN)
 
-`SpecConsputc.v` / `WpConsputcDecode.v` / `ProofConsputc.v` / `LinkConsputc.v`.
+`SpecConsputc.v` / `CodeConsputc.v` / `ProofConsputc.v` / `LinkConsputc.v`.
 Seventeen instructions, a 2-slot frame, one BEQ, and either one or three calls to
 uartputc_sync.
 
@@ -130,7 +130,7 @@ rd,x0,rs`. Do not re-derive it.
 
 ### printint -- DONE
 
-`WpPrintintDecode.v` (50 instruction facts) / `PrintintArith.v` / `StackBytes.v`
+`CodePrintint.v` (50 instruction facts) / `PrintintArith.v` / `StackBytes.v`
 / `ProofPrintint.v` / `LinkPrintint.v`.  The four reusable pieces, and the traps
 each one cost:
 
@@ -193,7 +193,7 @@ reflexivity)`.  And a value bound out of an existential resource arrives as
 
 ### printk -- the shell (proven piece by piece, then assembled)
 
-`WpPrintkDecode.v` proves all **264** instruction facts (offsets 0x00..0x328)
+`CodePrintk.v` proves all **264** instruction facts (offsets 0x00..0x328)
 plus the 188 distinct decode words they rest on.  It was GENERATED from the
 image (`tools`-less, a throwaway script over the objdump listing) and checked
 by the kernel -- which is the only reason a 264-instruction decode layer is

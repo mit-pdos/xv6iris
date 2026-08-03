@@ -46,7 +46,7 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecAllocpid.
-Require Import WpAllocpidDecode.
+Require Import CodeAllocpid.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

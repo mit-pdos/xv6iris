@@ -11,7 +11,7 @@ Nothing is left to do.
 | file | contents | `coqc` |
 | --- | --- | --- |
 | `iris/SpecVirtioDiskRw.v` | `wp_virtio_disk_rw_sconf_body`, `Module Type VIRTIODISKRW`, `buf_own`, `K_virtio_disk_rw = 34` | — |
-| `iris/WpVirtioDiskRwDecode.v` | every `rwi_XXX` instruction fact, `VRW+0x000 .. +0x210` | ~40 s |
+| `iris/CodeVirtioDiskRw.v` | every `rwi_XXX` instruction fact, `VRW+0x000 .. +0x210` | ~40 s |
 | `iris/VirtioDiskRwDefs.v` | the FUNCTOR-FREE shared vocabulary (see below) | ~6 s |
 | `iris/ProofVirtioDiskRw.v` | P1, P2.1 (scan), P2.2a/b | ~21 s |
 | `iris/ProofVirtioDiskRwB.v` | P2.3 (set-up + sleep-retry iLöb + partial-free tail) | ~19 s |

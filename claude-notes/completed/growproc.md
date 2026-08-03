@@ -1,7 +1,7 @@
 # Project: growproc / sys_sbrk — and the `p->sz` ⇄ user-map coherence invariant
 
 `growproc` (proc.c, `0x80001c0a`, 98 B) is specified, proven and linked
-(`SpecGrowproc.v` / `WpGrowprocDecode.v` / `ProofGrowproc.v` /
+(`SpecGrowproc.v` / `CodeGrowproc.v` / `ProofGrowproc.v` /
 `LinkGrowproc.v`, over MYPROC + UVMALLOC + UVMDEALLOC; **24 s / 1.1 GB**
 isolated, axiom-clean).
 
@@ -178,7 +178,7 @@ Four words that would have become 2nd–6th copies moved into
 growproc's own and stayed local, with `gpshape_652c` (the load-shape
 restatement) beside them.
 
-**`WpProcPagetableInstr.v` was deliberately left alone**: it does not
+**`CodeProcPagetable.v` was deliberately left alone**: it does not
 `Require KernelRvcDecode` at all and privately re-proves `e04a`, `1000`,
 `84aa` and `892a`. Retiring one of the four would leave it inconsistent;
 the whole file is a sweep candidate, not this one word.
@@ -194,7 +194,7 @@ plus `functional_extensionality_dep`, and nothing else.
 ## sys_sbrk — the caller, and what the LAZY path proved about the invariant
 
 `sys_sbrk` (sysproc.c, `0x80002938`, 120 B) is specified, proven and linked
-(`SpecSysSbrk.v` / `WpSysSbrkDecode.v` / `ProofSysSbrk.v` / `LinkSysSbrk.v`,
+(`SpecSysSbrk.v` / `CodeSysSbrk.v` / `ProofSysSbrk.v` / `LinkSysSbrk.v`,
 over ARGINT + MYPROC + GROWPROC; axiom-clean).  This xv6 has the LAZY
 variant, so it is not just a growproc wrapper:
 

@@ -23,7 +23,7 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KallocInv WpKallocDecode.
+Require Import KallocInv CodeKalloc.
 Require Import WpLock.
 Require Import VcGen.
 Require Import WpSmodeIntr.

@@ -1647,7 +1647,7 @@ Qed.
    laws it subsumes. *)
 
 (* THE [c.andi] IMMEDIATE, IN THE FORM THE PROOF ACTUALLY MEETS.
-   [WpUvmclearDecode.ucli_12] carries the
+   [CodeUvmclear.ucli_12] carries the
    C.ANDI immediate as [sign_extend' 12 (mword_of_int 47 : mword 6)], and
    [WpSconfAlu.wp_andi_s_sconf] then sign-extends THAT to 64 -- so the leaf's
    [wval] premise is this DOUBLE extension.  [bv_is_wf] rejects the signed

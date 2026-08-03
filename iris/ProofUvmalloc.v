@@ -63,7 +63,7 @@ Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ByteCursor.
 Require Import ProcPt ProcPtOwn.
-Require Import WpUvmallocDecode.
+Require Import CodeUvmalloc.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
 Require Import SpecKalloc SpecMemsetPage SpecMappages SpecKfree SpecUvmdealloc.

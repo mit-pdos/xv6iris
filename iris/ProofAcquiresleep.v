@@ -90,7 +90,7 @@ Require Import SchedCtx.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import SleepLock.
-Require Import WpSleeplockDecode.
+Require Import CodeSleeplock.
 Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecMyproc SpecSleep.
 Require Import SpecAcquiresleep.

@@ -27,7 +27,7 @@ Require Import KallocInv.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys *)
 Require Import PtBuild KvmSpec.
-Require Import WpMappagesInstr.
+Require Import CodeMappages.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalk.
 Require Import SpecMappages.

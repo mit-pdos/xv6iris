@@ -249,16 +249,16 @@ All three carry `m !!! Regidx x4 = cid_word`.
       Require Export ProcGeom; axiom renamed wp_myproc_sconf_any; loop
       lemmas dropped the dead Rreg/γc/bsie/dq params; the ▷-slot change was
       fully mechanical — no later-strip needed anywhere in wakeup).
-- [x] S3: myproc PROVEN (WpMyprocDecode/ProofMyproc/LinkMyproc; no spec
+- [x] S3: myproc PROVEN (CodeMyproc/ProofMyproc/LinkMyproc; no spec
       friction; noff_push_pop_id exact with no bounds; load-address
       reconciliation = assoc/comm + one vm_compute pid_lock+48 = cpus).
-- [x] S4: sched PROVEN (WpSchedDecode/ProofSched/LinkSched; no spec
+- [x] S4: sched PROVEN (CodeSched/ProofSched/LinkSched; no spec
       friction — the p_sched round trip closed exactly as designed; the
       reconciliation core is `sched_reconcile{,2}` pulling `mycpu_a5
       cid_word` out front so the rest closes by vm_compute on constants;
       arity note: p_sched/cpu_cells/proc_held take only γs-side args,
       procs_inv/proc_lock_res/sched_vc take (γ root_ppn Φ γs)).
-- [x] S5: yield PROVEN (WpYieldDecode/ProofYield/LinkYield; no
+- [x] S5: yield PROVEN (CodeYield/ProofYield/LinkYield; no
       Admitted/Axiom).  `own_ctx` currently lives in SpecSched.v — move to
       SwtchCtx.v at the next SwtchCtx touch.
 - [x] S6: full clean build green (make -j16, zero Errors); durable lessons
@@ -266,7 +266,7 @@ All three carry `m !!! Regidx x4 = cid_word`.
       scheduler-chain protocol, ▷-slot lock invariant, cur_proc/cid_word,
       set-chain peel + named-assert callee_saved discipline).
 
-- [x] S7: sleep(chan, lk) PROVEN (SpecSleep/WpSleepDecode/ProofSleep/
+- [x] S7: sleep(chan, lk) PROVEN (SpecSleep/CodeSleep/ProofSleep/
       LinkSleep; no new axioms).  The condition lock (arbitrary γk/Rk)
       enters held — locked γk ∗ Rk ∗ lk->cpu ↦ mycpu_ret cid_word — and
       exits reacquired; noff runs 1→2→1 around the park (acquire(p->lock)

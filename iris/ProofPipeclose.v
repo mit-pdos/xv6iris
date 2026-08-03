@@ -66,7 +66,7 @@ Require Import IntrDefs.
 Require Import FdSlots.
 Require Import KallocInv PipeInv.
 Require Import SpecAcquire SpecRelease SpecWakeup SpecKfree.
-Require Import WpPipecloseDecode.
+Require Import CodePipeclose.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPipeclose.
 Import Defs.

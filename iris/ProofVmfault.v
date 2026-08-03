@@ -73,7 +73,7 @@ Require Import UserPtTree.
 Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPt ProcPtOwn.
-Require Import WpVmfaultDecode.
+Require Import CodeVmfault.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMyproc SpecIsmapped SpecKalloc SpecMemsetPage SpecMappages SpecKfree.
 Require Import SpecVmfault.

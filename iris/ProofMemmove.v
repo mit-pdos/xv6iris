@@ -24,7 +24,7 @@
    precondition owns the source and destination bytes SEPARATELY, and separation
    refutes exactly that ([mem_bytes_notin]), so the +0x3a fall-through arm closes
    by contradiction before it steps -- the descending loop's instructions are
-   never fetched and WpMemmoveInstr does not even decode them.
+   never fetched and CodeMemmove does not even decode them.
 
    EXPLICIT-CPUID: the whole function threads a generic [b : bool], exactly the
    shape of ProofPlicinit.v / ProofStrlen.v.  [mm_epilogue] and [mm_fwd] are
@@ -51,7 +51,7 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import HartTp WpNext IntrDefs.
-Require Import WpMemmoveInstr.
+Require Import CodeMemmove.
 Require Import ByteCursor.
 Require Import CalleeSaved.
 Require Import StackOwn.

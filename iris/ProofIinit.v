@@ -35,7 +35,7 @@ Require Import WpLock SleepLock.
 Require Import ArrCursor.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
 Require Import SpecInitlock SpecInitsleeplock.
-Require Import WpIinitDecode.
+Require Import CodeIinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecIinit.

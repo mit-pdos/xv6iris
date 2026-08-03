@@ -5,7 +5,7 @@
 
    printkinit is a thin initlock wrapper, so it is an INSTANCE of the shape
    proved once in WpInitlockWrapper.v: all this file supplies is printkinit's
-   thirteen instructions (WpPrintkinitDecode.pki_code), the three relocations
+   thirteen instructions (CodePrintkinit.pki_code), the three relocations
    -- a1 = &"pr" (auipc 0x6 / addi +1982), a0 = &pr (auipc 0x12 / addi -1402),
    and the jal displacement to initlock -- and the "pr" literal itself, read out
    of the kernel's data image. *)
@@ -20,7 +20,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelDataInv.
 Require Import SpecInitlock WpInitlockWrapper.
-Require Import WpPrintkinitDecode.
+Require Import CodePrintkinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPrintkinit.

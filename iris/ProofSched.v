@@ -26,7 +26,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpGprCsrwCommon.
 Require WpGprCsrwC.
-Require Import WpSchedDecode.
+Require Import CodeSched.
 Require Import SpecMyproc SpecHolding SpecSwtch SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

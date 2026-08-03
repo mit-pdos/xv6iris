@@ -53,7 +53,7 @@ Require Import ProcGeom.
 Require Import SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import WpSchedulerDecode.
+Require Import CodeScheduler.
 Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

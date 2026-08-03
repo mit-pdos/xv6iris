@@ -173,8 +173,8 @@ whole-function spec for a diverging function.
   R) is separately reusable.
 - **Decode**: `csrsi/csrci sstatus,2` decode with a 5-bit uimm slice whose
   `bv_is_wf` differs from `mword_of_int 2` — closed with the local
-  `decode_bridge_ms_bv` (now TRIPLICATED: WpVirtioDiskRwDecode,
-  WpVirtioDiskIntrDecode, WpSchedulerDecode → belongs in WpDecodeBridge.v).
+  `decode_bridge_ms_bv` (now TRIPLICATED: CodeVirtioDiskRw,
+  CodeVirtioDiskIntr, CodeScheduler → belongs in WpDecodeBridge.v).
   Dedup-sweep candidates noted in the decode agent's report: `0x4b85`(×3),
   `0x00011497`(×5), `0x00010717`(×2), `0x00016917`(×2), `0x4c9c`+LW-shape
   (×2), `0x855a`(×2), `0xe062`(×2), `0x10016073`(×2, one in ProofPushOff).
@@ -187,7 +187,7 @@ whole-function spec for a diverging function.
       ProcGeom.proc_addr_inj; ProofSwtch/ProofSched repaired; axiom-clean).
 - [x] W3: WpSmodeWfi.v (exec witnesses + wp_wfi_s_sconf; 5 axioms + funext).
 - [x] W4: the two level-0 SIE flip leaves (WpSconfCsr.v; additive only).
-- [x] W5: WpSchedulerDecode.v (56 instr facts, schi_<off>/schdec_<word>).
+- [x] W5: CodeScheduler.v (56 instr facts, schi_<off>/schdec_<word>).
 - [x] W6: SpecScheduler.v + proof_coverage.py diverging-spec shape
       (verified behavior-neutral on the existing tree).
 - [x] W7: ProofScheduler.v + LinkScheduler.v — PROVEN, no admits; axiom set
@@ -195,7 +195,7 @@ whole-function spec for a diverging function.
       lines, 62 s coqc.  Coverage: scheduler reads `proven` (proc.c 14/28).
 - [x] W8: full build green; `proof_coverage.py --check` green; committed.
 - [x] W9 (cleanup sweep): `0x4b85`(was ×3), `0x4c9c`+its LW exec-shape
-      (turned out ×3/×2 — WpAllocprocDecode held a third/second copy),
+      (turned out ×3/×2 — CodeAllocproc held a third/second copy),
       `0x855a`, `0xe062` → KernelRvcDecode (`cdec_*`, `cexec_lw24_s1_a5` —
       exec-shape naming follows that file's `cexec_*` precedent, since its
       `cshape_*` lemmas are pure AST equalities, not exec facts);

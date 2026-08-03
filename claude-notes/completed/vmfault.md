@@ -221,7 +221,7 @@ intermediate wand. Reusable facts worth knowing for item D:
   `rewrite ptree_own_S` rewrites the conclusion's too — scope the first one with
   `iEval (rewrite ptree_own_S) in "H"`.
 - The +0x96/+0x98 instruction facts (the alloc=0 arm, dead on the alloc=1 path)
-  live in `WpWalkInstr.v` with the rest of the `wi_*` catalog: `wi_96`
+  live in `CodeWalk.v` with the rest of the `wi_*` catalog: `wi_96`
   (`cdec_4501`, C_LI a0,0) and `wi_98` over the local `wdec_98`. The +0x98
   branch is `j -0x46` (70 bytes back to +0x52), i.e.
   `C_J (mword_of_int 2013 : mword 11)` — NOT `-0x92`, which is the plausible
@@ -366,7 +366,7 @@ kalloc/kfree find their `is_lock`/`kalloc_avail None`/`panic_wp` inside the
       ProofWalk's critical path (depends on SpecWalk, not ProofWalk).
       SpecWalk's `(8 <= K)` is exactly right (`wp_caddi16sp_push_s_sconf`'s
       premise is `k <= n` at k = 8) — no spec constant changed.
-- [x] **D** `WpIsmappedDecode.v` (13 `imi_<off>` instr facts; the 16-byte
+- [x] **D** `CodeIsmapped.v` (13 `imi_<off>` instr facts; the 16-byte
       frame reuses `cdec_1141/e406/e022/0800/60a2/6402/0141/8082`, so only
       four compressed words `imdc_4601/c119/6108/8905`, one base jal
       `imdb_jal_walk` (imm21 = 2095566 = 2^21 − 1586, verified against
@@ -418,7 +418,7 @@ kalloc/kfree find their `is_lock`/`kalloc_avail None`/`panic_wp` inside the
         `ProofMappages`; `pte_valid w0` in the mapped sub-arm comes from
         `pt_rep0`'s first component (`ptree_maps`'s 12th conjunct).
       - (The three files are in `_CoqProject` as of item G.)
-- [x] **E** WpVmfaultDecode.v — 58 `vfi_<off>` instr facts (0x00..0x82), 16
+- [x] **E** CodeVmfault.v — 58 `vfi_<off>` instr facts (0x00..0x82), 16
       local compressed decodes `vfdc_<word>`, 8 base decodes `vfdb_<word>`
       (every jal/branch immediate verified against KernelInstrs.v).
 - [x] **F** `ProofVmfault.v` (`Module VmfaultProof (Myproc : MYPROC)
@@ -486,8 +486,8 @@ kalloc/kfree find their `is_lock`/`kalloc_avail None`/`panic_wp` inside the
         All mappages premises are pre-`assert`ed and passed by name
         (optimization.md's inline-`ltac:` rule).
 - [x] **G** all eight new files are in `_CoqProject`
-      (ProofWalkNoalloc/LinkWalkNoalloc/WpIsmappedDecode/ProofIsmapped/
-      LinkIsmapped after LinkWalk.v; WpVmfaultDecode/ProofVmfault/LinkVmfault
+      (ProofWalkNoalloc/LinkWalkNoalloc/CodeIsmapped/ProofIsmapped/
+      LinkIsmapped after LinkWalk.v; CodeVmfault/ProofVmfault/LinkVmfault
       after SpecVmfault.v); full `make -f CoqMakefile -j16` green; coverage:
       ismapped 28B + vmfault 132B both **proven**, walk NOT double-counted,
       no manifest errors; committed.  `LinkWalkNoalloc.v` was KEPT (it is
@@ -496,7 +496,7 @@ kalloc/kfree find their `is_lock`/`kalloc_avail None`/`panic_wp` inside the
       / `pte_valid_bit0` / `candi1_imm` / `ptree_own_level0_ro` are in
       `PtBuild.v`, `wp_and_s_sconf` in `WpSconfAlu.v`, `cdec_c119` in
       `KernelRvcDecode.v`, and `wi_96`/`wi_98` (+ `wdec_98`) in
-      `WpWalkInstr.v`.
+      `CodeWalk.v`.
 
 ## Open questions / parked
 

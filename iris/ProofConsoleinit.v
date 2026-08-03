@@ -39,7 +39,7 @@ Require Import CalleeSaved StackOwn.
 Require Import KernelDataInv.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpUart.
-Require Import WpConsoleinitDecode.
+Require Import CodeConsoleinit.
 Require Import SpecInitlock SpecUartinit SpecConsoleinit.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.

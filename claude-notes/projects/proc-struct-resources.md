@@ -17,7 +17,7 @@ the evidence for every offset. This file is only the worklist.
       `is_kstack`.
 - [x] `sys_getpid` proven whole-function over `proc_priv`
       (`SpecSysGetpid.v` / `ProofSysGetpid.v` / `LinkSysGetpid.v`).
-- [x] `sys_close` proven whole-function (`WpSysCloseDecode.v` /
+- [x] `sys_close` proven whole-function (`CodeSysClose.v` /
       `SpecSysClose.v` / `ProofSysClose.v`), over the specs of `argfd`,
       `myproc` and `fileclose`. It is the first proof in which a `file_ref`
       LEAVES a process: `proc_priv_ofile` borrows the descriptor, the store
@@ -27,7 +27,7 @@ the evidence for every offset. This file is only the worklist.
       first, so no `LinkSysClose.v` exists yet and `proof_coverage.py` still
       reads `sys_close` as unproven. See "What sys_close needed" below.
 
-- [x] `procinit` proven and LINKED (`WpProcinitDecode.v` / `SpecProcinit.v` /
+- [x] `procinit` proven and LINKED (`CodeProcinit.v` / `SpecProcinit.v` /
       `ProofProcinit.v` / `LinkProcinit.v`, over `INITLOCK`; **47 s / 1.6 GB**,
       axiom-clean, `proof_coverage` reads it `proven`). This is the function
       that ROUTES the fd-slot supply — see
@@ -194,7 +194,7 @@ the evidence for every offset. This file is only the worklist.
       with all four slots used (no gap); `p` parks in s1 across acquire and the
       value in s2 across release. `panic_wp` is threaded because the reworked
       `acquire` takes it.
-- [x] **S3b — `sys_pause` PROVEN and LINKED** (`WpSysPauseDecode.v` /
+- [x] **S3b — `sys_pause` PROVEN and LINKED** (`CodeSysPause.v` /
       `ProofSysPause.v` / `LinkSysPause.v`, over ARGINT / ACQUIRE / RELEASE /
       MYPROC / KILLED / SLEEP; **42 s / 1.4 GB**, axiom-clean, `proof_coverage`
       reads it `proven`).  Fifty instructions, five joins, one iLöb loop.
@@ -254,7 +254,7 @@ the evidence for every offset. This file is only the worklist.
       arithmetic steps; only the `ring`-normalising last hop was missing.
 
 - [x] **S3c — `argaddr` PROVEN and LINKED** (`SpecArgaddr.v` /
-      `WpArgaddrDecode.v` / `ProofArgaddr.v` / `LinkArgaddr.v`, over ARGRAW;
+      `CodeArgaddr.v` / `ProofArgaddr.v` / `LinkArgaddr.v`, over ARGRAW;
       **7 s**, axiom-clean, `proof_coverage` reads it `proven`).  It is
       argint with ONE instruction changed — `c.sd a0,0(s1)` for `c.sw` —
       because the destination is a `uint64 *`, so the postcondition is
@@ -271,7 +271,7 @@ the evidence for every offset. This file is only the worklist.
       `cdec_e088` + its leaf-shape restatement `cexec_sd0_s1_a0`.
 
 - [x] **S3d — `fdalloc` PROVEN and LINKED** (`SpecFdalloc.v` /
-      `WpFdallocDecode.v` / `ProofFdalloc.v` / `LinkFdalloc.v`, over MYPROC;
+      `CodeFdalloc.v` / `ProofFdalloc.v` / `LinkFdalloc.v`, over MYPROC;
       **18 s / 0.9 GB**, axiom-clean, `proof_coverage` reads it `proven` — the
       first proven function in `sysfile.c`).  Thirty-two instructions: a
       32-byte ra/s0/s1 frame, one call, one counted loop, two returns joining
@@ -329,7 +329,7 @@ the evidence for every offset. This file is only the worklist.
         Nine words are fdalloc's own — the loop body and the install arm.
 
 - [x] **`growproc` PROVEN and LINKED** (`SpecGrowproc.v` /
-      `WpGrowprocDecode.v` / `ProofGrowproc.v` / `LinkGrowproc.v`, over
+      `CodeGrowproc.v` / `ProofGrowproc.v` / `LinkGrowproc.v`, over
       MYPROC + UVMALLOC + UVMDEALLOC; **24 s / 1.1 GB**, axiom-clean).  It is
       the function that WRITES `p->sz`, and it could not be specified until
       the block said how the size relates to the map: `proc_priv` gained
@@ -405,7 +405,7 @@ the evidence for every offset. This file is only the worklist.
       Fallout: `sys_pipe`'s two fdalloc call sites each settle their deficit
       from the `file_ref` they already hold, immediately after the call.
 
-- [x] **S4a — `argfd` proven** (`WpArgfdDecode.v` / `ProofArgfd.v`), over
+- [x] **S4a — `argfd` proven** (`CodeArgfd.v` / `ProofArgfd.v`), over
       `ARGINT` + `MYPROC`, 33 instructions. Like sys_close it is NOT linked:
       `ARGINT` has no implementation while `argraw` is parked (S3a), so there
       is no `LinkArgint.v` and hence no `LinkArgfd.v`. Three things worth
@@ -437,7 +437,7 @@ the evidence for every offset. This file is only the worklist.
       swallows the `proc_priv` the page is still inside, so the pair has to be
       one accessor.
 - [x] **S4b — `fetchaddr` PROVEN and LINKED** (`SpecFetchaddr.v` /
-      `WpFetchaddrDecode.v` / `ProofFetchaddr.v` / `LinkFetchaddr.v`, over
+      `CodeFetchaddr.v` / `ProofFetchaddr.v` / `LinkFetchaddr.v`, over
       MYPROC + COPYIN; **17 s isolated**, axiom-clean, `proof_coverage` reads
       it `proven`).  Twenty-six instructions, a 32-byte ra/s0/s1/s2 frame,
       three arms joining at the epilogue.  It is the first function that
@@ -487,7 +487,7 @@ the evidence for every offset. This file is only the worklist.
 
 - [x] **S6 — `allocproc` PROVEN and LINKED, counted-only**
       (`SpecAllocpid.v` / `LinkAllocpid.v` / `SpecAllocproc.v` /
-      `WpAllocprocDecode.v` / `ProofAllocproc.v` / `LinkAllocproc.v`, over
+      `CodeAllocproc.v` / `ProofAllocproc.v` / `LinkAllocproc.v`, over
       ACQUIRE / RELEASE / ALLOCPID / KALLOC / PROC_PAGETABLE / MEMSET;
       **38 s**, `proof_coverage` reads it `proven`).  Fifty-five instructions: a 32-byte
       ra/s0/s1/s2 frame, the proc[] scan, the allocation body, one shared
@@ -672,7 +672,7 @@ the evidence for every offset. This file is only the worklist.
          two `Module Type`s over a `*Core` functor: the failure arm records
          WHY it failed, so no caller has to carry a budget it does not have.
 
-- [x] **S8 — `allocpid` PROVEN and LINKED** (`WpAllocpidDecode.v` /
+- [x] **S8 — `allocpid` PROVEN and LINKED** (`CodeAllocpid.v` /
       `ProofAllocpid.v`; **11 s**), which makes **the whole allocproc cone
       axiom-free**.  Twenty-one instructions @
       0x800019d0, structurally `killed` with a store added: a 32-byte

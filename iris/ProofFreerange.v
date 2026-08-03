@@ -55,7 +55,7 @@ Require Import CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSconfVc.
 Require Import SpecKfree.
-Require Import WpFreerangeDecode.
+Require Import CodeFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.

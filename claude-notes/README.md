@@ -28,9 +28,10 @@ are working on that effort — the relevant `projects/` file.
   minstret invariant, the register file, memory points-to & dfrac, config
   bundles (`hw_config`/`mmode_config`/`smode_config`), fetch geometry, and the
   fast concrete-state decode bridge.
-- **[`code-organization.md`](design/code-organization.md)** — where WP leaf
-  lemmas live (`Wp<Mode><Family>.v`), import discipline, lemma-altitude rules,
-  and specific-vs-generic leaf lemmas.
+- **[`code-organization.md`](design/code-organization.md)** — where a function's
+  decode/`instr` facts live (`Code<F>.v`) and where WP leaf lemmas live
+  (`Wp<Mode><Family>.v`), import discipline, lemma-altitude rules, and
+  specific-vs-generic leaf lemmas.
 - **[`smode-and-vcgen.md`](design/smode-and-vcgen.md)** — the S-mode config
   convention (`_scfg` wrappers, SIE ghost), recovering a concrete register map
   from a VCgen block, and straight-line VCgen blocks.
@@ -96,7 +97,7 @@ are working on that effort — the relevant `projects/` file.
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
-  + kerneltrap): `WpMainDecode.v`, `StartedInv.v` (the `started` flag as a
+  + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a
   one-shot escrow with a PERSISTENT payload), `SpecMain.v` (deposit as a
   □-wand main applies at the `started = 1` store), `ProofMain.v` (six
   bare-`WP Loop` call-group lemmas; no `callee_saved` threading — main

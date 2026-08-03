@@ -42,7 +42,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs HartTp WpNext WpSconfVc.
 Require Import PrintintArith StackBytes.
-Require Import WpPrintkDecode.
+Require Import CodePrintk.
 Require Import PrintkFmt SpecConsputc SpecPrintint SpecPrintk.
 From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.

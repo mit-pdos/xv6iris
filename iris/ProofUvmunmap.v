@@ -79,7 +79,7 @@ Require Import ProcGeom CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import BarePt.
-Require Import WpUvmunmapDecode.
+Require Import CodeUvmunmap.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalk SpecKfree.
 Require Import SpecUvmunmap.

@@ -23,7 +23,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras ByteCursor.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore WpMemsetS.
-Require Import WpMemsetInstr WpMemsetPage.
+Require Import CodeMemset WpMemsetPage.
 Require Import CalleeSaved.
 Require Import StackOwn.
 Require Import SpecMemsetParts.
