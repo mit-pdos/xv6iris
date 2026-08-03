@@ -89,8 +89,6 @@ Proof.
   unfold kmem_lo. lia.
 Qed.
 
-Local Lemma ucl_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
 (* ===================================================================== *)
 (* THE WHOLE FUNCTION.                                                    *)
@@ -309,7 +307,7 @@ Section ProofUvmclear.
     assert (Hpp12 : add_vec_int (mword_of_int (UCL + 0x10) : mword 64) 2 = mword_of_int (UCL + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     (* ---- +0x12 c.andi a5,a5,-17 : a5 &= ~PTE_U ---- *)
-    iEval (rewrite ucl_cr7) in "Hi12".
+    iEval (rewrite creg_c7) in "Hi12".
     iApply (wp_candi_s_sconf Φ (mword_of_int (UCL + 0x12)) (mword_of_int 15 : mword 5) (mword_of_int 47 : mword 6)
               B1 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [-]").

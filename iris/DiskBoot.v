@@ -49,6 +49,7 @@ Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
 Require Import SpecVirtioDiskInit.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
+Require Import RiscvExtras.
 
 Local Open Scope Z_scope.
 

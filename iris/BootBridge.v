@@ -88,6 +88,7 @@ Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 From Kernel Require KernelSyms.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

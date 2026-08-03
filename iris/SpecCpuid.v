@@ -29,6 +29,7 @@ Require Import ProcGeom PlicHart IntrDefs HartTp WpNext.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import RiscvExtras.
 Import Defs.
 
 Notation CPUID := KernelSyms.cpuid.

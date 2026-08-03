@@ -34,6 +34,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import ByteCursor.
 Require Import StackOwn.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* [pa_add] composes into a single offset -- the byte-run analogue of
@@ -42,7 +43,7 @@ Lemma pa_add_add (p : mword 64) (i j : nat) :
   pa_add (pa_add p i) j = pa_add p (i + j).
 Proof.
   unfold pa_add, add_vec_int. apply bv_eq.
-  rewrite !bc_add_vec_unsigned !bc_moi_unsigned.
+  rewrite !add_vec64_unsigned !moi64_unsigned.
   rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
   f_equal. lia.
 Qed.
@@ -52,7 +53,7 @@ Qed.
 Lemma pa_add_0 (p : mword 64) : pa_add p 0 = p.
 Proof.
   unfold pa_add, add_vec_int. apply bv_eq.
-  rewrite bc_add_vec_unsigned bc_moi_unsigned.
+  rewrite add_vec64_unsigned moi64_unsigned.
   change (bv_wrap 64 (Z.of_nat 0)) with 0. rewrite Z.add_0_r.
   apply bv_wrap_small. apply bv_unsigned_in_range.
 Qed.
@@ -61,7 +62,7 @@ Lemma pa_add_S (p : mword 64) (i : nat) :
   add_vec (pa_add p i) (mword_of_int 1 : mword 64) = pa_add p (S i).
 Proof.
   unfold pa_add, add_vec_int. apply bv_eq.
-  rewrite !bc_add_vec_unsigned !bc_moi_unsigned.
+  rewrite !add_vec64_unsigned !moi64_unsigned.
   rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
   f_equal. lia.
 Qed.
@@ -173,7 +174,7 @@ Section StackBytes.
     (1 <= k)%nat -> pa_add (pa_stk sp k) 8 = pa_stk sp (k - 1).
   Proof.
     intro Hk. unfold pa_add, pa_stk, add_vec_int. apply bv_eq.
-    rewrite !bc_add_vec_unsigned !bc_moi_unsigned.
+    rewrite !add_vec64_unsigned !moi64_unsigned.
     rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
     f_equal. lia.
   Qed.

@@ -51,6 +51,7 @@ Require Import PlicPlan PlicHart DiskPtsto WpUart WpPlic SpecCpuid SpecPlicCompl
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvExtras.
 Import Defs.
 
 (* ---- the decodes used only by plic_complete ---- *)
@@ -79,10 +80,6 @@ Lemma pcdec_sw_s1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   = Some (C_SW (mword_of_int 1, Cregidx (mword_of_int 7), Cregidx (mword_of_int 1)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma pc_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-Lemma pc_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
 Lemma pc_imm4 : zero_extend' 12 (concat_vec (mword_of_int 1 : mword 5) ('b"00")) = (mword_of_int 4 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -90,7 +87,7 @@ Lemma pcexec_sw_s1 s :
   exec (execute (C_SW (mword_of_int 1, Cregidx (mword_of_int 7), Cregidx (mword_of_int 1)))) s
   = Some (ExecuteAs (STORE (mword_of_int 4, Regidx (mword_of_int 9), Regidx (mword_of_int 15), 4)), s).
 Proof.
-  rewrite exec_execute_C_SW. rewrite pc_cr7. rewrite pc_cr1. rewrite pc_imm4. reflexivity.
+  rewrite exec_execute_C_SW. rewrite creg_c7. rewrite creg_c1. rewrite pc_imm4. reflexivity.
 Qed.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -363,7 +360,7 @@ Section ProofPlicComplete.
       by (rgne; unfold N3; apply upd_eq).
     assert (HN4a5 : rget N4 a5_idx = ph_sthb cid_word).
     { rgne. unfold N4. rewrite upd_eq. unfold regval_into_reg.
-      rewrite HN3a5 HN3a4. unfold ph_sthb. apply ph_add_comm. }
+      rewrite HN3a5 HN3a4. unfold ph_sthb. apply add_vec64_comm. }
     (* ---- 0x1a: c.sw s1,4(a5) -- PLIC_SCLAIM(hart) = irq ---- *)
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv Φ (mword_of_int (PC + 0x1a)) true s1_idx a5_idx
               (mword_of_int 4 : mword 12) N4 (n - 4)%nat false

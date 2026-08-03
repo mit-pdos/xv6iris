@@ -52,6 +52,7 @@ Require Import WpLock.
 Require Import FdSlots FileInv.
 Require Import KallocInv PageFields ByteBuf.
 From Kernel Require KernelSyms.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -722,7 +723,7 @@ Section ProcInv.
     - rewrite big_sepL_cons /=.
       assert (Ha : pa_add c (8 * (o + 0))%nat = add_vec c (mword_of_int (8 * Z.of_nat o))).
       { unfold pa_add, add_vec_int. apply bv_eq.
-        rewrite !ProcGeom.pg_add_vec_unsigned !ProcGeom.pg_moi_unsigned.
+        rewrite !add_vec64_unsigned !moi64_unsigned.
         rewrite !bv_wrap_add_idemp_r. f_equal. lia. }
       rewrite Ha.
       replace (8 * Z.of_nat o + 8)%Z with (8 * Z.of_nat (S o))%Z by lia.
@@ -804,7 +805,7 @@ Section ProcInv.
     pa_add (p_context pa) 8 = add_vec pa (mword_of_int 104).
   Proof.
     unfold pa_add, add_vec_int, p_context, context_off. apply bv_eq.
-    rewrite !ProcGeom.pg_add_vec_unsigned !ProcGeom.pg_moi_unsigned.
+    rewrite !add_vec64_unsigned !moi64_unsigned.
     rewrite !bv_wrap_add_idemp_r !bv_wrap_add_idemp_l. f_equal. lia.
   Qed.
 

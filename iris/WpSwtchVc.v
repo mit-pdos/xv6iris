@@ -174,10 +174,6 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* creg / immediate reconciliations for the clean ExecuteAs expansions *)
 Lemma sw_cr0 : creg2reg_idx (Cregidx (mword_of_int 0)) = Regidx (mword_of_int 8).
 Proof. vm_compute. reflexivity. Qed.
-Lemma sw_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
-Lemma sw_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10).
-Proof. vm_compute. reflexivity. Qed.
 Lemma sw_cr3 : creg2reg_idx (Cregidx (mword_of_int 3)) = Regidx (mword_of_int 11).
 Proof. vm_compute. reflexivity. Qed.
 Lemma sw_imm16 : zero_extend' 12 (concat_vec (mword_of_int 2 : mword 5) ('b"000")) = (mword_of_int 16 : mword 12).
@@ -189,11 +185,11 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 Lemma swx_csd_s0 s :
   exec (execute (C_SD (mword_of_int 2, Cregidx (mword_of_int 2), Cregidx (mword_of_int 0)))) s
   = Some (ExecuteAs (STORE (mword_of_int 16, Regidx (mword_of_int 8), Regidx (mword_of_int 10), 8)), s).
-Proof. rewrite exec_execute_C_SD sw_cr0 sw_cr2 sw_imm16. reflexivity. Qed.
+Proof. rewrite exec_execute_C_SD sw_cr0 creg_c2 sw_imm16. reflexivity. Qed.
 Lemma swx_csd_s1 s :
   exec (execute (C_SD (mword_of_int 3, Cregidx (mword_of_int 2), Cregidx (mword_of_int 1)))) s
   = Some (ExecuteAs (STORE (mword_of_int 24, Regidx (mword_of_int 9), Regidx (mword_of_int 10), 8)), s).
-Proof. rewrite exec_execute_C_SD sw_cr1 sw_cr2 sw_imm24. reflexivity. Qed.
+Proof. rewrite exec_execute_C_SD creg_c1 creg_c2 sw_imm24. reflexivity. Qed.
 Lemma swx_cld_s0 s :
   exec (execute (C_LD (mword_of_int 2, Cregidx (mword_of_int 3), Cregidx (mword_of_int 0)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 16, Regidx (mword_of_int 11), Regidx (mword_of_int 8), false, 8)), s).
@@ -201,7 +197,7 @@ Proof. rewrite exec_execute_C_LD sw_cr3 sw_cr0 sw_imm16. reflexivity. Qed.
 Lemma swx_cld_s1 s :
   exec (execute (C_LD (mword_of_int 3, Cregidx (mword_of_int 3), Cregidx (mword_of_int 1)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 24, Regidx (mword_of_int 11), Regidx (mword_of_int 9), false, 8)), s).
-Proof. rewrite exec_execute_C_LD sw_cr3 sw_cr1 sw_imm24. reflexivity. Qed.
+Proof. rewrite exec_execute_C_LD sw_cr3 creg_c1 sw_imm24. reflexivity. Qed.
 
 
 (* ====================================================================== *)

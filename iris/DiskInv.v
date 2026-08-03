@@ -45,6 +45,7 @@ Require Import KptPt.
 Require Import KMap.
 Require Export BufOwn.
 From Kernel Require KernelSyms.
+Require Import RiscvExtras.
 
 Local Open Scope Z_scope.
 

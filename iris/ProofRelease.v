@@ -34,17 +34,6 @@ Require Import SpecRelease.
 Import Defs.
 
 
-Local Lemma addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  assert (add_vec_unsigned : forall a b : mword 64,
-            bv_unsigned (add_vec a b) = bv_wrap 64 (bv_unsigned a + bv_unsigned b)).
-  { intros a b. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite add_vec_unsigned.
-  change (bv_unsigned (zero_reg : mword 64)) with 0%Z. rewrite Z.add_0_l.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 Module ReleaseGenProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE_GEN.
 
@@ -220,7 +209,7 @@ Section ProofRelease.
     { rewrite Hs1h /R3 upd_ne; [| vm_compute; discriminate].
       rewrite /R2 upd_eq /R1 upd_ne; [| vm_compute; discriminate].
       rewrite /R0 upd_ne; [| vm_compute; discriminate].
-      apply addv_zero_l. }
+      apply add_vec_zero_l. }
     iPoseProof (rli_12 with "Htext") as "Hi12".
     assert (Hacpu : add_vec (mh !!! Regidx (mword_of_int 9 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka).

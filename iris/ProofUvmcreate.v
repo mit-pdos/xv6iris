@@ -27,6 +27,7 @@ Require Import WpMemsetPage.    (* bytes_choose *)
 Require Import CodeUvmcreate.
 Require Import SpecKalloc SpecMemset SpecUvmcreate.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -53,22 +54,6 @@ Qed.
 Lemma uvc_kda_arith (z : Z) : (0x80023558 <= z)%Z -> (text_end <= z)%Z.
 Proof. unfold text_end. lia. Qed.
 
-Lemma uvc_sp_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64) = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64) = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 Module UvmcreateProof (AK : KALLOC) (MS : MEMSET) : UVMCREATE.
 
@@ -203,7 +188,7 @@ Section ProofUvmcreate.
     assert (HE3sp : E3 !!! Regidx csp_rs1 = spr) by (rewrite /E3; rewrite upd_ne; [| reg_neq]; exact HE2sp).
     (* +0x22 addi sp,sp,32 -- the frame pop *)
     assert (Hwv : add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HE3sp. apply uvc_sp_cancel. }
+    { rewrite HE3sp. apply frame_cancel_32. }
     assert (Hpop : E3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HE3sp. reflexivity. }

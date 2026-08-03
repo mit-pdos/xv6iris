@@ -37,33 +37,13 @@ Require Import SpecArgaddr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
-(* the [c.sd]'s zero displacement *)
-Lemma aa_sd_off (X : mword 64) :
-  add_vec X (sign_extend' 64 (mword_of_int 0 : mword 12)) = X.
-Proof.
-  replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
-    with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
-  apply kv_addv_zero.
-Qed.
 
 (* argaddr's balanced 32-byte frame: entry [addi sp,-32] and exit
    [addi16sp sp,32] cancel. *)
-Lemma aa_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  apply bv_eq. rewrite !add_vec64_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 Module ArgaddrProof (Argraw : ARGRAW) : ARGADDR.
 
@@ -226,7 +206,7 @@ Section ProofArgaddr.
     iPoseProof (aai_10 with "Htext") as "Hi10".
     assert (Haddr10 : add_vec (rget MF (mword_of_int 9 : mword 5))
                         (sign_extend' 64 (mword_of_int 0 : mword 12)) = ip).
-    { rgne. rewrite HMFs1. apply aa_sd_off. }
+    { rgne. rewrite HMFs1. apply addv_sext0. }
     iApply (wp_csd_s_sconf Φ (mword_of_int (AA + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) MF (av - 4)%nat old b
               with "Hcg Hpc Hi10 [Hip] [-]").
@@ -286,7 +266,7 @@ Section ProofArgaddr.
     set (E5 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E4).
     assert (Hsp0up : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
-      by (rewrite /spd; apply aa_frame_cancel).
+      by (rewrite /spd; apply frame_cancel_32).
     assert (Hwv : add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
     { rewrite HE4csp. exact Hsp0up. }
     assert (Hpop : E4 !!! Regidx csp_rs1

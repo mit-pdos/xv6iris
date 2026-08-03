@@ -56,6 +56,7 @@ Require Import SchedCtx.
 Require Import CodeScheduler.
 Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -65,45 +66,16 @@ Local Strategy 1000 [pa_stk].
 (* Pure helpers: the mword address algebra + the two state facts.         *)
 (* ===================================================================== *)
 
-Lemma sc_addv_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Lemma sc_addvC (x y : mword 64) : add_vec x y = add_vec y x.
-Proof.
-  apply bv_eq. rewrite !sc_addv_unsigned. rewrite Z.add_comm. reflexivity.
-Qed.
 
-Lemma sc_addvA (x y z : mword 64) : add_vec (add_vec x y) z = add_vec x (add_vec y z).
-Proof.
-  apply bv_eq. rewrite !sc_addv_unsigned.
-  rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r Z.add_assoc. reflexivity.
-Qed.
 
-Lemma sc_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq. rewrite sc_addv_unsigned.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
-Lemma sc_addv_zero12_r (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof.
-  assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (zero_reg : mword 64))
-    by (apply bv_eq; vm_compute; reflexivity).
-  rewrite H0 sc_addvC. apply sc_addv_zero_l.
-Qed.
 
 (* the workhorse: pull the (symbolic) per-cpu shift term to the OUTSIDE,
    leaving a CLOSED constant equality. *)
 Lemma sc_swap (a sh b : mword 64) : add_vec (add_vec a sh) b = add_vec (add_vec a b) sh.
 Proof.
-  rewrite (sc_addvA a sh b) (sc_addvC sh b) (sc_addvA a b sh). reflexivity.
+  rewrite (po_addv_assoc a sh b) (add_vec64_comm sh b) (po_addv_assoc a b sh). reflexivity.
 Qed.
 
 Lemma sc_reconcile (K sh d MY : mword 64) :
@@ -112,7 +84,7 @@ Proof. intro H. rewrite (sc_swap K sh d). rewrite H. reflexivity. Qed.
 
 Lemma sc_reconcile2 (K sh d MY : mword 64) :
   add_vec MY d = K -> add_vec sh K = add_vec (add_vec MY sh) d.
-Proof. intro H. rewrite (sc_swap MY sh d). rewrite H. apply sc_addvC. Qed.
+Proof. intro H. rewrite (sc_swap MY sh d). rewrite H. apply add_vec64_comm. Qed.
 
 (* a saved-register frame slot address in terms of the pushed sp (-80). *)
 Lemma sc_frame_bridge (sp0 : mword 64) (j : nat) (uimm : mword 6) :
@@ -130,7 +102,7 @@ Proof.
   { apply bv_eq. rewrite H.
     unfold mword_of_int, Values.to_word, get_word. cbn.
     rewrite Z_to_bv_unsigned. reflexivity. }
-  unfold pa_stk, add_vec_int. rewrite sc_addvA. rewrite Heq. reflexivity.
+  unfold pa_stk, add_vec_int. rewrite po_addv_assoc. rewrite Heq. reflexivity.
 Qed.
 
 (* the two struct-proc field addresses in the 12-bit-displacement spelling. *)
@@ -894,7 +866,7 @@ Section ProofScheduler.
       assert (HT1a0 : T1 !!! Regidx Ra0 = add_vec zero_reg (proc_addr jj)).
       { rewrite /T1 upd_ne; [| vm_compute; discriminate]. rewrite /T0 upd_eq Hp1. reflexivity. }
       assert (Hlka : add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr jj).
-      { rewrite HT1a0 sc_addv_zero_l. apply sc_addv_zero12_r. }
+      { rewrite HT1a0 add_vec_zero_l. apply addv_sext0. }
       (* trap_csrs -> release's [trap_csrs_pay 0 ebx] + the loop's complement *)
       iAssert (trap_csrs_pay 0 ebx ∗ (if ebx then emp else trap_csrs))%I
         with "[Hcsrs]" as "[Hpay Hcsrs]".
@@ -1066,7 +1038,7 @@ Section ProofScheduler.
         by (rewrite /M1 upd_eq; reflexivity).
       assert (HM1a0 : M1 !!! Regidx Ra0 = proc_addr jj).
       { rewrite /M1 upd_ne; [| vm_compute; discriminate].
-        rewrite /M0 upd_eq Hp1. apply sc_addv_zero_l. }
+        rewrite /M0 upd_eq Hp1. apply add_vec_zero_l. }
       (* ================================================================ *)
       (* THE ONE OPEN SEAM (report, not a proof gap): [SpecAcquire] now    *)
       (* demands [panic_wp_any] (the hart-GENERIC form, propagated to 23   *)
@@ -1296,7 +1268,7 @@ Section ProofScheduler.
           rewrite /M4 upd_eq.
           rewrite (_ : M3 !!! Regidx Rs6 = a_cpu_ctx cid_word).
           2:{ rewrite /M3 upd_ne; [| vm_compute; discriminate]. exact HM2s6. }
-          apply sc_addv_zero_l. }
+          apply add_vec_zero_l. }
         assert (Hnewc : Mc !!! Regidx Ra1 = p_context (proc_addr jj)).
         { rewrite /Mc upd_ne; [| vm_compute; discriminate].
           rewrite /M4 upd_ne; [| vm_compute; discriminate].

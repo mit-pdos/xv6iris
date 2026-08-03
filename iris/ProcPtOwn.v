@@ -266,7 +266,7 @@ Lemma shl12_moi (z : Z) (n : Z) (s : mword n) :
 Proof.
   intro Hs. apply bv_eq.
   unfold shift_bits_left. rewrite Hs. rewrite ppo_shiftl12.
-  rewrite !bc_moi_unsigned. exact (z_shl12 z).
+  rewrite !moi64_unsigned. exact (z_shl12 z).
 Qed.
 
 (* [add rd,rs_count,rs_base] after a [slli rs_count,12]: a page COUNT
@@ -278,7 +278,7 @@ Lemma shl12_pages_add (va : mword 64) (n : nat) (k : Z) (s : mword k) :
   = add_vec va (mword_of_int (4096 * Z.of_nat n)).
 Proof.
   intro Hs. rewrite (shl12_moi (Z.of_nat n) k s Hs).
-  rewrite (Z.mul_comm (Z.of_nat n) 4096). apply add_vec_comm.
+  rewrite (Z.mul_comm (Z.of_nat n) 4096). apply add_vec64_comm.
 Qed.
 
 (* ===================================================================== *)
@@ -1041,7 +1041,7 @@ Lemma pgd_off (va : mword 64) :
   sub_vec va (and_vec va (mword_of_int (-4096)))
   = (mword_of_int (bv_unsigned va mod 4096) : mword 64).
 Proof.
-  apply bv_eq. rewrite bc_sub_vec_unsigned !bc_moi_unsigned pgd_unsigned.
+  apply bv_eq. rewrite sub_vec64_unsigned !moi64_unsigned pgd_unsigned.
   f_equal. ring.
 Qed.
 
@@ -1052,7 +1052,7 @@ Lemma pgd_room (va : mword 64) :
   = (mword_of_int (4096 - bv_unsigned va mod 4096) : mword 64).
 Proof.
   apply bv_eq.
-  rewrite bc_add_vec_unsigned bc_sub_vec_unsigned !bc_moi_unsigned.
+  rewrite add_vec64_unsigned sub_vec64_unsigned !moi64_unsigned.
   rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r.
   rewrite pgd_unsigned. f_equal. ring.
 Qed.

@@ -84,21 +84,12 @@ Proof. lia. Qed.
 
 (* --- mword algebra ---------------------------------------------------- *)
 
-Lemma fd_moi64_unsigned (z : Z) :
-  (0 <= z < 18446744073709551616)%Z -> bv_unsigned (mword_of_int z : mword 64) = z.
-Proof.
-  intro Hz.
-  unfold mword_of_int, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. apply bv_wrap_small.
-  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
-  lia.
-Qed.
 
 Lemma fd_uint_moi (x : mword 64) (z : Z) :
   (0 <= z < 18446744073709551616)%Z -> uint x = z -> x = mword_of_int z.
 Proof.
   intros Hz Hu. apply bv_eq. rewrite -(uint_unsigned x) Hu.
-  symmetry. exact (fd_moi64_unsigned z Hz).
+  symmetry. exact (moi64_small z Hz).
 Qed.
 
 (* the spec's [uint a0 = Z.of_nat i] pins a0 to a CONCRETE word *)

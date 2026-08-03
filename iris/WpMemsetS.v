@@ -39,6 +39,7 @@ Require Import SmodeCore.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -420,19 +421,7 @@ Section WpMemsetS.
   (* c.addi a5,a5,1 increments a5 by exactly one. *)
   Definition ms_incr1 : mword 64 := sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)).
 
-  Lemma add_vec_unsigned (x y : mword 64) :
-    bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-  Proof.
-    unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity.
-  Qed.
 
-  Lemma moi_unsigned (k : Z) : bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-  Proof.
-    unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-    rewrite Z_to_bv_unsigned. reflexivity.
-  Qed.
 
   Lemma ms_addr_pa_add (p : mword 64) (j : nat) : ms_addr p j = pa_add p j.
   Proof. unfold ms_addr, pa_add, add_vec_int. reflexivity. Qed.
@@ -446,7 +435,7 @@ Section WpMemsetS.
     add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j).
   Proof.
     rewrite ms_incr1_one. rewrite !ms_addr_pa_add. unfold pa_add, add_vec_int.
-    apply bv_eq. rewrite !add_vec_unsigned. rewrite !moi_unsigned.
+    apply bv_eq. rewrite !add_vec64_unsigned. rewrite !moi64_unsigned.
     rewrite Nat2Z.inj_succ.
     rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
     f_equal. lia.

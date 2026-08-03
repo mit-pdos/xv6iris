@@ -85,9 +85,6 @@ Local Ltac vgeom := unfold vt_geom; split; [zrange_vm|];
 Lemma vg_060 : vt_geom (mword_of_int 0x10001060). Proof. vgeom. Qed.
 Lemma vg_064 : vt_geom (mword_of_int 0x10001064). Proof. vgeom. Qed.
 
-Lemma vt_add_vec_0 (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
 (* the width-4 load's post value, collapsed to a plain sign-extension *)
 Lemma vt_ldval (w : mword 32) :
@@ -725,7 +722,7 @@ Section VtEpilogue.
       rewrite /E0 upd_ne; [| vm_compute; discriminate]. exact HMBcsp. }
     iApply (Release.wp_release_sconf Φ γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
               n eb pme C (av - 4)%nat
-              ltac:(rewrite HE2a0; apply vt_add_vec_0) ltac:(lia)
+              ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay [-]").
     { iExact "Hlk". }
     { iExact "Htok". }
@@ -1503,10 +1500,6 @@ Qed.
 
 (* ---- mword-level structural helpers ---- *)
 
-Lemma vt_addv_comm (a b : mword 64) : add_vec a b = add_vec b a.
-Proof.
-  apply bv_eq. rewrite !vq_add_vec_unsigned. rewrite Z.add_comm. reflexivity.
-Qed.
 
 Lemma vt_and_vec_unsigned (a b : mword 64) :
   bv_unsigned (and_vec a b) = Z.land (bv_unsigned a) (bv_unsigned b).
@@ -1521,7 +1514,7 @@ Lemma vt_addv_pa (p : mword 64) (X Y : mword 64) (k : nat) :
   add_vec X Y = (mword_of_int (Z.of_nat k) : mword 64) ->
   add_vec (add_vec X p) Y = (pa_add p k : SailStdpp.Values.mword 64).
 Proof.
-  intro H. rewrite (vt_addv_comm X p) po_addv_assoc H.
+  intro H. rewrite (add_vec64_comm X p) po_addv_assoc H.
   unfold pa_add, add_vec_int. reflexivity.
 Qed.
 

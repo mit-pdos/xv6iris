@@ -1,6 +1,6 @@
 (* WpAcquireTop.v -- decode/leaf lemmas for xv6's acquire() in S-mode: one
    [instr] lemma per instruction of acquire() (aqi_00 .. aqi_32) plus the
-   underlying decode/execute facts they build on (aqdec_*, aqexec_sd, aq_addv_zero_l, aq_sextw_round, ...).  These are consumed by
+   underlying decode/execute facts they build on (aqdec_*, aqexec_sd, add_vec_zero_l, aq_sextw_round, ...).  These are consumed by
    WpAcquireLock.wp_acquire_lock{_loop}, the CSL acquire spec that supersedes
    the plain-ownership top-level WP formerly proved in this file (see
    WpAcquireLock.v's header for the current top-level story).
@@ -145,15 +145,6 @@ Lemma aqexec_sd s :
   = Some (ExecuteAs (STORE (mword_of_int 16, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)), s).
 Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
-(* zero_reg is a left identity for add_vec (mirror of po_addv_assoc's proof) *)
-Lemma aq_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite bv_add_unsigned.
-  change (bv_unsigned zero_reg) with 0.
-  rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 Lemma aq_wrap_signed (n : N) (b : bv n) : bv_wrap n (bv_signed b) = bv_unsigned b.
 Proof.

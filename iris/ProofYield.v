@@ -60,20 +60,7 @@ Local Open Scope Z_scope.
 (* Pure helpers: address arithmetic + the two noff-cell value forms.      *)
 (* ===================================================================== *)
 
-Lemma yd_addv_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Lemma yd_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq. rewrite yd_addv_unsigned.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* acquire's noff output (push_off's +1 store over the entry value 0) is
    exactly [mword_of_int 1] (closed; needed for sched's cpu_cells). *)
@@ -256,7 +243,7 @@ Section YieldPostSched.
     (* ------------------------------------------------------------------ *)
     assert (Ha0_D1 : D1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
     { rewrite /D1 upd_ne; [| vm_compute; discriminate].
-      rewrite /D0 upd_eq Hs1_msch !yd_addv_zero_l. reflexivity. }
+      rewrite /D0 upd_eq Hs1_msch !add_vec_zero_l. reflexivity. }
     assert (HD1ra : D1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (YD + 0x1e) : mword 64) 4)
       by (rewrite /D1 upd_eq; reflexivity).
     assert (Hlka : add_vec (D1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr j).
@@ -633,7 +620,7 @@ Section ProofYield.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. rewrite /B0 upd_eq Ha0_mp. reflexivity. }
     assert (Hrec_state : add_vec (C0 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12))
                          = p_state (proc_addr j)).
-    { rewrite HC0s1 yd_addv_zero_l. unfold p_state, state_off.
+    { rewrite HC0s1 add_vec_zero_l. unfold p_state, state_off.
       assert (H24 : sign_extend' 64 (mword_of_int 24 : mword 12) = (mword_of_int 24 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H24. reflexivity. }
     assert (Hsv : trunc32 (C0 !!! Regidx (mword_of_int 15 : mword 5)) = RUNNABLE).

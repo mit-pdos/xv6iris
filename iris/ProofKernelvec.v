@@ -59,6 +59,7 @@ Require Import IntrDefs.
 Require WpGprCsrwCommon WpGprCsrwC.
 Require Import SpecKerneltrap SpecKernelvec.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -82,14 +83,6 @@ Ltac kv_skipt :=
 Ltac kv_skipl :=
   repeat (rewrite lookup_insert_ne; [ | first [ kv_regne | congruence ] ]).
 
-Lemma kv_addv_assoc (a b c : mword 64) :
-  add_vec (add_vec a b) c = add_vec a (add_vec b c).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite !bv_add_unsigned. unfold bv_wrap.
-  rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r Z.add_assoc. reflexivity.
-Qed.
 
 
 (* the -256/+256 immediate cancellation of the two c.addi16sp. *)
@@ -1345,7 +1338,7 @@ Section KernelvecCore.
     { clear - Hpres.
       assert (Hspval : add_vec (kv_sp1 m) (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6)))
                        = m !!! Regidx csp_rs1).
-      { unfold kv_sp1, regval_into_reg. rewrite kv_addv_assoc kv_cancel. apply kv_addv_zero. }
+      { unfold kv_sp1, regval_into_reg. rewrite po_addv_assoc kv_cancel. apply kv_addv_zero. }
       assert (Hin_sp : Regidx csp_rs1 ∈ kv_saved)
         by (apply (bool_decide_eq_true_1 (Regidx csp_rs1 ∈ kv_saved)); vm_compute; reflexivity).
       assert (Hin_1 : Regidx (mword_of_int 1 : mword 5) ∈ kv_saved)
@@ -1457,7 +1450,7 @@ Proof.
   assert (Hr : kv_sp1 m
                = add_vec (m !!! Regidx csp_rs1)
                          (sign_extend' 64 (caddi16sp_imm kv_imm1))) by reflexivity.
-  rewrite Hr kv_addv_assoc H. unfold pa_stk, add_vec_int. reflexivity.
+  rewrite Hr po_addv_assoc H. unfold pa_stk, add_vec_int. reflexivity.
 Qed.
 
 Lemma kv_slot_addr0 (m : regfile) :

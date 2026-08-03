@@ -924,7 +924,7 @@ Section ProofMappages.
       unfold mappages_pte. unfold ppn0.
       rewrite <- (run_ppn pa k ltac:(lia)).
       apply (mappages_pte_compute (add_vec pa (mword_of_int (4096 * Z.of_nat k))) perm (mword_of_int perm)).
-      - apply mappages_moi_small. lia.
+      - apply moi64_small. lia.
       - exact Hpr.
       - rewrite Hpaku.
         pose proof (aligned12_unsigned pa Hpaal) as Hpal0.
@@ -1182,7 +1182,7 @@ Section ProofMappages.
     rewrite uint_unsigned in Hvab. rewrite uint_unsigned in Hpab.
     assert (Hszu : bv_unsigned (mword_of_int (Z.of_nat npages * 4096) : mword 64)
                    = Z.of_nat npages * 4096)
-      by (apply mappages_moi_small; lia).
+      by (apply moi64_small; lia).
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { unfold spr, pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }

@@ -39,14 +39,9 @@ Proof.
 Qed.
 
 (* [mword_of_int] is [Z_to_bv], so its value is the wrapped literal.  (The same
-   identity is proved inside [WpMemsetS]'s Iris section as [moi_unsigned]; this
+   identity is proved inside [WpMemsetS]'s Iris section as [moi64_unsigned]; this
    file is deliberately Iris-free, so it carries its own copy rather than
    pulling a whole WP file in for one bitvector fact.) *)
-Lemma acur_moi_unsigned (k : Z) : bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof.
-  unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. reflexivity.
-Qed.
 
 (* the cursor's numeric value: in range for every index the loop visits,
    so the address arithmetic never wraps. *)
@@ -59,7 +54,7 @@ Proof.
   assert (Hmod64 : bv_modulus 64 = 2 ^ 64) by (unfold bv_modulus; f_equal).
   assert (Hile : (stride * Z.of_nat i <= stride * Z.of_nat n)%Z)
     by (apply Z.mul_le_mono_nonneg_l; [lia | apply inj_le; exact Hin]).
-  unfold acur. rewrite acur_moi_unsigned. apply bv_wrap_small.
+  unfold acur. rewrite moi64_unsigned. apply bv_wrap_small.
   rewrite Hmod64. split; [| lia].
   apply Z.add_nonneg_nonneg; [lia | apply Z.mul_nonneg_nonneg; lia].
 Qed.

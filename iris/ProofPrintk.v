@@ -276,7 +276,7 @@ Section ProofPrintk.
     assert (HW3s2 : W3 !!! Regidx s2_idx = m !!! Regidx a0_idx).
     { rewrite /W3 upd_eq. unfold regval_into_reg.
       rewrite /W2 upd_ne; [| reg_neq]. rewrite /W1 upd_ne; [| reg_neq].
-      apply pi_addv_zero_l. }
+      apply add_vec_zero_l. }
     assert (HW3s0 : W3 !!! Regidx s0_idx = add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)))
       by (rewrite /W3 upd_ne; [exact HW2s0 | reg_neq]).
     assert (HW3sp : W3 !!! Regidx csp_rs1 = spd) by (rewrite /W3 upd_ne; [exact HW2sp | reg_neq]).
@@ -1671,7 +1671,7 @@ Section ProofPrintk.
     iEval (rgne) in "Hcg".
     set (A2 := <[Regidx (mword_of_int 20 : mword 5) := regval_into_reg (add_vec zero_reg (A1 !!! Regidx (mword_of_int 9 : mword 5)))]> A1).
     assert (HA2s4 : A2 !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat (S p))).
-    { rewrite /A2 upd_eq. unfold regval_into_reg. rewrite HA1s1. apply pi_addv_zero_l. }
+    { rewrite /A2 upd_eq. unfold regval_into_reg. rewrite HA1s1. apply add_vec_zero_l. }
     assert (HA2s1 : A2 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S p)))
       by (rewrite /A2 upd_ne; [exact HA1s1 | reg_neq]).
     assert (HA2s2 : A2 !!! Regidx s2_idx = fmt) by (rewrite /A2 upd_ne; [exact HA1s2 | reg_neq]).
@@ -1840,7 +1840,7 @@ Section ProofPrintk.
       rewrite /P2 upd_ne; [| congruence].
       rewrite (callee_saved_lookup Hcs c Hc).
       rewrite /P1 upd_ne; [reflexivity | congruence].
-    - rewrite /P2 upd_eq. unfold regval_into_reg. rewrite Hmks4. apply pi_addv_zero_l.
+    - rewrite /P2 upd_eq. unfold regval_into_reg. rewrite Hmks4. apply add_vec_zero_l.
   Qed.
 
   (* ================================================================== *)
@@ -1900,7 +1900,7 @@ Section ProofPrintk.
   Proof.
     intro Hk. unfold pk_ap, pa_stk, add_vec_int.
     rewrite pa_stk_off2. f_equal.
-    apply bv_eq. rewrite !moi64_unsigned.
+    apply bv_eq. rewrite !moi64_mod.
     change (bv_wrap 64 ?x) with (x `mod` 18446744073709551616).
     destruct k as [|[|[|[|[|[|[|k]]]]]]]; try lia; vm_compute; reflexivity.
   Qed.
@@ -2130,7 +2130,7 @@ Section ProofPrintk.
     assert (HD4a1 : D4 !!! Regidx a1_idx = (mword_of_int 10 : mword 64)).
     { rewrite /D4 upd_eq. unfold regval_into_reg.
       rewrite /D3 upd_ne; [| reg_neq]. rewrite /D2 upd_ne; [| reg_neq].
-      rewrite /D1 upd_ne; [| reg_neq]. rewrite Hs6. apply pi_addv_zero_l. }
+      rewrite /D1 upd_ne; [| reg_neq]. rewrite Hs6. apply add_vec_zero_l. }
     assert (HD4a5 : D4 !!! Regidx a5_idx = pk_ap s0v k).
     { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_ne; [| reg_neq]. exact HD2a5. }
     assert (Hpe4 : add_vec_int (mword_of_int (PK + 0xe2) : mword 64) 2 = mword_of_int (PK + 0xe4)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2278,7 +2278,7 @@ Section ProofPrintk.
     { rewrite /S1 upd_eq. unfold regval_into_reg.
       rewrite /S0 upd_ne; [| reg_neq].
       rewrite (Hvk (mword_of_int 22 : mword 5) ltac:(mw_neq) ltac:(mw_neq)).
-      rewrite Hs6. apply pi_addv_zero_l. }
+      rewrite Hs6. apply add_vec_zero_l. }
     assert (HS1a5 : S1 !!! Regidx a5_idx = pk_ap s0v k).
     { rewrite /S1 upd_ne; [| reg_neq]. rewrite /S0 upd_ne; [| reg_neq]. exact Hva5. }
     assert (Hpac8 : add_vec_int (mword_of_int (PK + 0xc6) : mword 64) 2 = mword_of_int (PK + 0xc8)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2598,7 +2598,7 @@ Section ProofPrintk.
     { rewrite /S1 upd_eq. unfold regval_into_reg.
       rewrite /S0 upd_ne; [| reg_neq].
       rewrite (Hvk (mword_of_int 22 : mword 5) ltac:(mw_neq) ltac:(mw_neq)).
-      rewrite Hs6. apply pi_addv_zero_l. }
+      rewrite Hs6. apply add_vec_zero_l. }
     assert (HS1a5 : S1 !!! Regidx a5_idx = pk_ap s0v k).
     { rewrite /S1 upd_ne; [| reg_neq]. rewrite /S0 upd_ne; [| reg_neq]. exact Hva5. }
     assert (Hpa13c : add_vec_int (mword_of_int (PK + 0x13a) : mword 64) 2 = mword_of_int (PK + 0x13c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3230,7 +3230,7 @@ Section ProofPrintk.
     { rewrite /S1 upd_eq. unfold regval_into_reg.
       rewrite /S0 upd_ne; [| reg_neq].
       rewrite (Hvk (mword_of_int 22 : mword 5) ltac:(mw_neq) ltac:(mw_neq)).
-      rewrite Hs6. apply pi_addv_zero_l. }
+      rewrite Hs6. apply add_vec_zero_l. }
     assert (HS1a5 : S1 !!! Regidx a5_idx = pk_ap s0v k).
     { rewrite /S1 upd_ne; [| reg_neq]. rewrite /S0 upd_ne; [| reg_neq]. exact Hva5. }
     assert (Hpa122 : add_vec_int (mword_of_int (PK + 0x120) : mword 64) 2 = mword_of_int (PK + 0x122)) by (apply bv_eq; vm_compute; reflexivity).
@@ -4828,7 +4828,7 @@ Section ProofPrintk.
     (mword_of_int x : mword 64) = mword_of_int y -> x = y.
   Proof.
     intros Hx Hy H. apply (f_equal bv_unsigned) in H.
-    rewrite !moi64_unsigned in H.
+    rewrite !moi64_mod in H.
     assert (Hd : (x - y) `mod` 18446744073709551616 = 0).
     { rewrite Zminus_mod H Z.sub_diag. reflexivity. }
     apply Z.mod_divide in Hd; [| lia].
@@ -4867,7 +4867,7 @@ Section ProofPrintk.
     unfold zero_extend', Operators_mwords.zero_extend, Operators_mwords.extz_vec,
       SailStdpp.Values.to_word, to_word, get_word, MachineWord.MachineWord.zero_extend.
     rewrite bv_zero_extend_unsigned; [ | vm_compute; intro Hc; discriminate Hc ].
-    rewrite Z_to_bv_unsigned moi64_unsigned.
+    rewrite Z_to_bv_unsigned moi64_mod.
     unfold bv_wrap. change (bv_modulus 8) with 256.
     rewrite (Z.mod_small _ 256 (conj Hnn Hb)).
     rewrite Z.mod_small; [ reflexivity | ].
@@ -4920,7 +4920,7 @@ Section ProofPrintk.
       destruct (Z.eq_dec (uint x) 0) as [Hz | Hnz]; [ | lia ].
       exfalso.
       assert (Hxz : x = (zero_reg : mword 64)).
-      { apply bv_eq. rewrite <- !pi_uint_unsigned, Hz. vm_compute. reflexivity. }
+      { apply bv_eq. rewrite <- !uint_unsigned, Hz. vm_compute. reflexivity. }
       subst x.
       assert (eq_vec (zero_reg : mword 64) zero_reg = true)
         by (apply eq_vec_true_iff; reflexivity).
@@ -5048,7 +5048,7 @@ Section ProofPrintk.
     iEval (rgne) in "Hcg".
     set (D2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (D1 !!! Regidx a5_idx))]> D1).
     assert (HD2s1 : D2 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat (S i))).
-    { rewrite /D2 upd_eq. unfold regval_into_reg. rewrite HD1a5. apply pi_addv_zero_l. }
+    { rewrite /D2 upd_eq. unfold regval_into_reg. rewrite HD1a5. apply add_vec_zero_l. }
     assert (HD2a5 : D2 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i)))
       by (rewrite /D2 upd_ne; [exact HD1a5 | reg_neq]).
     assert (HD2s2 : D2 !!! Regidx s2_idx = fmt)
@@ -6261,10 +6261,10 @@ Section ProofPrintk.
       by (rewrite /D3 upd_ne; [exact HD2s5 | reg_neq]).
     assert (HD4a2 : D4 !!! Regidx (mword_of_int 12 : mword 5) = zero_extend' 64 (pk_byte c1)).
     { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_eq. unfold regval_into_reg.
-      rewrite HD2s5 pi_addv_zero_l Hn0 Hn1. reflexivity. }
+      rewrite HD2s5 add_vec_zero_l Hn0 Hn1. reflexivity. }
     assert (HD4a3 : D4 !!! Regidx (mword_of_int 13 : mword 5) = zero_extend' 64 (pk_byte c2)).
     { rewrite /D4 upd_eq. unfold regval_into_reg.
-      rewrite HD3s5 pi_addv_zero_l Hn0 Hn2. reflexivity. }
+      rewrite HD3s5 add_vec_zero_l Hn0 Hn2. reflexivity. }
     assert (HD4a4 : D4 !!! Regidx (mword_of_int 14 : mword 5) = pk_bit (Ascii.eqb c0 "l"%char)).
     { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_ne; [| reg_neq].
       rewrite /D2 upd_eq; reflexivity. }
@@ -6399,7 +6399,7 @@ Section ProofPrintk.
     { rewrite /D2 upd_ne; [| reg_neq]. rewrite /D1 upd_ne; [exact Ha3 | reg_neq]. }
     assert (HD4a2 : D4 !!! Regidx (mword_of_int 12 : mword 5) = zero_extend' 64 (pk_byte c1)).
     { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_eq. unfold regval_into_reg.
-      rewrite HD2a3 pi_addv_zero_l. reflexivity. }
+      rewrite HD2a3 add_vec_zero_l. reflexivity. }
     assert (HD4a3 : D4 !!! Regidx (mword_of_int 13 : mword 5) = zero_extend' 64 (pk_byte c2)).
     { rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_ne; [| reg_neq].
       rewrite HD2a3 Hn1 Hn2. reflexivity. }
@@ -6505,7 +6505,7 @@ Section ProofPrintk.
     set (J2 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg
                    (add_vec zero_reg (J1 !!! Regidx (mword_of_int 13 : mword 5)))]> J1).
     assert (HJ2a2 : J2 !!! Regidx (mword_of_int 12 : mword 5) = zero_extend' 64 (pk_byte c1)).
-    { rewrite /J2 upd_eq. unfold regval_into_reg. rewrite HJ1a3. apply pi_addv_zero_l. }
+    { rewrite /J2 upd_eq. unfold regval_into_reg. rewrite HJ1a3. apply add_vec_zero_l. }
     assert (HJ2a5 : J2 !!! Regidx a5_idx = pa_add fmt (S i))
       by (rewrite /J2 upd_ne; [exact HJ1a5 | reg_neq]).
     assert (Hpf0 : add_vec_int (mword_of_int (PK + 0xee) : mword 64) 2 = mword_of_int (PK + 0xf0)) by (apply bv_eq; vm_compute; reflexivity).

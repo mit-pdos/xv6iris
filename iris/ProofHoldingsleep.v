@@ -30,6 +30,7 @@ Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -52,13 +53,6 @@ Proof.
   rewrite bv_sub_unsigned. rewrite Z.sub_diag. reflexivity.
 Qed.
 
-(* compressed-register decode conversions. *)
-Lemma hcr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
-Lemma hcr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
-Lemma hcr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
 
 Module HoldingsleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC) : HOLDINGSLEEP.
@@ -256,14 +250,14 @@ Section ProofHoldingsleep.
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
     (* +0x18 c.lw a5,0(s1) : a5 := sext v *)
     iPoseProof (hsl_18 with "Htext") as "Hi18".
-    iEval (rewrite hcr1; rewrite hcr7) in "Hi18".
+    iEval (rewrite creg_c1; rewrite creg_c7) in "Hi18".
     assert (HAs1 : A !!! Regidx (mword_of_int 9 : mword 5) = slk).
     { rewrite (callee_saved_lookup HcsA (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact HM5s1. }
     assert (Haddr18 : add_vec (A !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
     { rewrite HAs1.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
-      apply wk_add_vec_0. }
+      apply addv_sext0. }
     iApply (wp_clw_s_sconf Φ (mword_of_int (HSL + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) A (av - 6)%nat v false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -355,7 +349,7 @@ Section ProofHoldingsleep.
     iEval (rewrite Hpc3c) in "Hpc".
     (* +0x3c c.lw s1,48(a0) : s1 := sext pidv (myproc()->pid) *)
     iPoseProof (hsl_3c with "Htext") as "Hi3c".
-    iEval (rewrite hcr2; rewrite hcr1) in "Hi3c".
+    iEval (rewrite creg_c2; rewrite creg_c1) in "Hi3c".
     assert (Haddr3c : add_vec (MP !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00")))) = p_pid p).
     { rewrite HMPa0. rewrite /p_pid.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
@@ -491,7 +485,7 @@ Section ProofHoldingsleep.
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20
               0%nat b p C (av - 6)%nat
-              ltac:(rewrite HD20a0; apply wk_add_vec_0)
+              ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR2] Hcnt Hpay [-]").
     { iExact "Hlk". }

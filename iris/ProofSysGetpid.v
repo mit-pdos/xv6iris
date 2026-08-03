@@ -52,9 +52,6 @@ Lemma sgdec_lw_a0_procpid s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs
   = Some (C_LW (mword_of_int 12, Cregidx (mword_of_int 2), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-(* Cregidx 2 = x10 = a0 (both the base and the destination of the [c.lw]). *)
-Lemma sg_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
 (* sys_getpid's balanced 16-byte frame: entry [addi sp,-16] and exit
    [addi sp,+16] cancel (identical to cpuid's / mycpu's). *)
@@ -231,7 +228,7 @@ Section ProofSysGetpid.
     iEval (rewrite Hpc0c) in "Hpc".
     (* ---- +0x0c: c.lw a0,48(a0) -- THE read: myproc()->pid ---- *)
     iDestruct (proc_priv_pid with "Hpriv") as "[Hpid Hpidback]".
-    iEval (rewrite sg_cr2) in "Hi0c".
+    iEval (rewrite creg_c2) in "Hi0c".
     assert (Haddr0c : add_vec (MF !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00")))) = p_pid p).
     { rewrite HMFa0. rewrite /p_pid.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)

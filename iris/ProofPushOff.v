@@ -46,17 +46,6 @@ Proof.
 Qed.
 
 
-Local Lemma addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  assert (add_vec_unsigned : forall a b : mword 64,
-            bv_unsigned (add_vec a b) = bv_wrap 64 (bv_unsigned a + bv_unsigned b)).
-  { intros a b. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite add_vec_unsigned.
-  change (bv_unsigned (zero_reg : mword 64)) with 0%Z. rewrite Z.add_0_l.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 Local Lemma po_up_cancel16 (X : mword 64) :
   pa_stk (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2 = X.
@@ -830,7 +819,7 @@ Section ProofPushOff.
       { rgne. rewrite /N8 upd_eq /N7 upd_eq.
         rewrite Hs1_6 /N5 upd_ne; [| vm_compute; discriminate].
         rewrite Hs1_4 /N3 upd_eq /N2 upd_eq.
-        rewrite addv_zero_l. reflexivity. }
+        rewrite add_vec_zero_l. reflexivity. }
       (* ---- 0x36: c.sw a5,124(a0) : store intena ---- *)
       assert (Hintaddr : N8 !!! Regidx (mword_of_int 10 : mword 5) = a0f).
       { rewrite /N8. rewrite upd_ne; [| vm_compute; discriminate].

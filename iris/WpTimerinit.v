@@ -62,6 +62,7 @@ From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -420,20 +421,11 @@ Definition ti_mcen1 (mcen0 : mword 32) : mword 64 :=
 Definition ti_interval : mword 64 := mword_of_int 1000000.
 Definition ti_deadline (mtime0 : mword 64) : mword 64 := add_vec mtime0 ti_interval.
 
-(* add_vec associativity + the -16/+16 cancellation (sp restore). *)
-Lemma ti_addv_assoc (a b c : mword 64) :
-  add_vec (add_vec a b) c = add_vec a (add_vec b c).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite !bv_add_unsigned.
-  unfold bv_wrap. rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r Z.add_assoc. reflexivity.
-Qed.
 
 Lemma ti_sp_restore (sp0 : mword 64) :
   add_vec (ti_sp1 sp0) (sign_extend' 64 i28) = sp0.
 Proof.
-  unfold ti_sp1. rewrite ti_addv_assoc.
+  unfold ti_sp1. rewrite po_addv_assoc.
   replace (add_vec (sign_extend' 64 i9) (sign_extend' 64 i28))
     with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
   exact (avi0 sp0).

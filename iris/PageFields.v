@@ -35,19 +35,13 @@ Require Import RiscvPtsto.
 Require Import InstrBytes.
 Require Import KallocInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
 (*  Address arithmetic  ([pa_add_add] lives in InstrBytes.v)           *)
 (* ------------------------------------------------------------------ *)
 
-(* [uint] and [bv_unsigned] agree (the Sail wrapper's N/Z round trip). *)
-Lemma uint_bv_unsigned (a : mword 64) : uint a = bv_unsigned a.
-Proof.
-  pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
-  rewrite Z2N.id; [ reflexivity | lia ].
-Qed.
 
 Lemma pa_add_unsigned (a : mword 64) (j : Z) :
   0 <= j ->
@@ -104,14 +98,14 @@ Proof.
   intros [Hal [Hlo Hhi]] Ho Hwpos Hw4096 Hwo.
   pose proof (bv_unsigned_in_range 64 p) as [Hnn _].
   unfold page_aligned, PGSIZE in Hal.
-  rewrite uint_bv_unsigned in Hal, Hhi.
+  rewrite uint_unsigned in Hal, Hhi.
   assert (Hhi' : bv_unsigned p < 2281701376) by (unfold kmem_hi in Hhi; exact Hhi).
   assert (Honn : 0 <= Z.of_nat o) by apply Nat2Z.is_nonneg.
   assert (Holt : Z.of_nat o < 4096) by (apply (Nat2Z.inj_lt o 4096) in Ho; exact Ho).
   destruct (page_off_arith (bv_unsigned p) (Z.of_nat o) w
               Hnn Hhi' Hal Honn Holt Hwpos Hw4096 Hwo) as [Hfit Hrem].
   unfold is_aligned_paddr. apply Z.eqb_eq.
-  rewrite uint_bv_unsigned.
+  rewrite uint_unsigned.
   change (pa_add p o) with (add_vec_int p (Z.of_nat o)).
   rewrite (pa_add_unsigned p (Z.of_nat o) Honn Hfit).
   exact Hrem.

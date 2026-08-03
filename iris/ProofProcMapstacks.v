@@ -897,10 +897,10 @@ Section ProofPMS.
       assert (Bsi : (0 <= 0x80012778 + 360 * Z.of_nat (S i) < 18446744073709551616)%Z).
       { split; [apply Z.add_nonneg_nonneg; [apply Z.leb_le; vm_compute; reflexivity | exact (proj1 Hsi)]
                | apply (Z.le_lt_trans _ (0x80012778 + 360 * 64)); [apply Z.add_le_mono_l; exact (proj2 Hsi) | apply Z.ltb_lt; vm_compute; reflexivity]]. }
-      rewrite (moi64_uns (0x80012778 + 360 * Z.of_nat i) Bi).
+      rewrite (moi64_small (0x80012778 + 360 * Z.of_nat i) Bi).
       change (bv_unsigned (mword_of_int 360 : mword 64)) with 360.
       replace (0x80012778 + 360 * Z.of_nat i + 360)%Z with (0x80012778 + 360 * Z.of_nat (S i))%Z by (rewrite Nat2Z.inj_succ; ring).
-      rewrite (moi64_uns (0x80012778 + 360 * Z.of_nat (S i)) Bsi).
+      rewrite (moi64_small (0x80012778 + 360 * Z.of_nat (S i)) Bsi).
       apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. exact Bsi. }
     assert (Hp7c : add_vec_int (mword_of_int (PM + 0x78) : mword 64) 4 = mword_of_int (PM + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp7c) in "Hpc".
@@ -980,7 +980,7 @@ Section ProofPMS.
               F1 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rgne; rgne; rewrite HF1s1 HF1s5; unfold neq_vec; apply negb_true_iff; apply eq_vec_false_iff;
                     intro Heq; apply (f_equal bv_unsigned) in Heq;
-                    rewrite (moi64_uns (0x80012778 + 360 * Z.of_nat (S i))
+                    rewrite (moi64_small (0x80012778 + 360 * Z.of_nat (S i))
                        ltac:(split; [apply Z.add_nonneg_nonneg; [apply Z.leb_le; vm_compute; reflexivity | apply Z.mul_nonneg_nonneg; lia]
                                     | apply (Z.le_lt_trans _ (0x80012778 + 360 * 64)); [apply Z.add_le_mono_l; apply Z.mul_le_mono_nonneg_l; lia | apply Z.ltb_lt; vm_compute; reflexivity]])) in Heq;
                     change (bv_unsigned (mword_of_int 0x80018178 : mword 64)) with 2147582328%Z in Heq;

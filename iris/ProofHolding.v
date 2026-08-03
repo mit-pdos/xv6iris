@@ -47,17 +47,6 @@ Require Import SpecHolding.
 Import Defs.
 
 
-Local Lemma addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  assert (add_vec_unsigned : forall a b : mword 64,
-            bv_unsigned (add_vec a b) = bv_wrap 64 (bv_unsigned a + bv_unsigned b)).
-  { intros a b. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite add_vec_unsigned.
-  change (bv_unsigned (zero_reg : mword 64)) with 0%Z. rewrite Z.add_0_l.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 
 Module HoldingProof (Mycpu : MYCPU) : HOLDING.
@@ -691,7 +680,7 @@ Section ProofHolding.
     (* the return value is 1: lk->cpu = mycpu, by the token's construction *)
     assert (Hmine' : eq_vec (add_vec zero_reg (mycpu_ret cid_word))
                        (C !!! Regidx (mword_of_int 10 : mword 5)) = true).
-    { rewrite addv_zero_l Ha0C. apply eq_vec_true_iff. reflexivity. }
+    { rewrite add_vec_zero_l Ha0C. apply eq_vec_true_iff. reflexivity. }
     assert (Ha0S6 : S6 !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64)).
     { rewrite /S6 upd_eq /S5 upd_eq.
       rewrite Hs1val. apply seqz_sub_eq. exact Hmine'. }

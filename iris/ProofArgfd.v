@@ -106,7 +106,7 @@ Proof. unfold pa_add, pa_stk. rewrite !avi_assoc. f_equal; lia. Qed.
    ~2^64, which is why ONE unsigned compare implements C's two tests. *)
 Lemma af_sext_uint (w : mword 32) :
   uint (sign_extend' 64 w : mword 64) = bv_wrap 64 (bv_signed w).
-Proof. rewrite uint_unsigned sext32_64_moi. apply stk_moi_unsigned. Qed.
+Proof. rewrite uint_unsigned sext32_64_moi. apply moi64_unsigned. Qed.
 
 (* The arithmetic, in mword-FREE form: under the bitvector zify hook [lia]
    fails whenever an [mword] is merely in CONTEXT, so the Z reasoning is

@@ -124,10 +124,6 @@ Set Printing Depth 40.
 (*  Pure arithmetic: the frame and the five local addresses.              *)
 (* ===================================================================== *)
 
-(* [add_vec x (sext 0)] is [x]: every [0(reg)] address in sys_pipe. *)
-Lemma sp_addv_sext0 (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
 (* +0x00 [c.addi16sp sp,-64] lands on the 8-slot frame base *)
 Lemma sp_push (X : mword 64) :
@@ -220,8 +216,6 @@ Qed.
 
 (* [c.add a5,a5,s1] computes [8*fd + 208 + p] while [ProcGeom.p_ofile] is
    spelled [p + (208 + 8*fd)] -- the one place the operand order matters. *)
-Lemma sp_add_comm (x y : mword 64) : add_vec x y = add_vec y x.
-Proof. apply bv_eq. rewrite !bv_add_unsigned. f_equal. lia. Qed.
 
 (* sys_pipe runs at [n = 0], so push_off's transient increment premise is
    this closed fact rather than a hypothesis threaded from the caller. *)
@@ -510,10 +504,10 @@ Section ProofSysPipe.
                 (add_vec (rget N2 Ra5) (rget N2 Rs1))]> N2) with N3.
     iEval (rewrite Hs8) in "Hpc".
     assert (HN3a5 : N3 !!! Regidx Ra5 = p_ofile p fd).
-    { rewrite /N3 upd_eq. rgne. rgne. rewrite HN2a5 HN2s1 sp_add_comm. reflexivity. }
+    { rewrite /N3 upd_eq. rgne. rgne. rewrite HN2a5 HN2s1 add_vec64_comm. reflexivity. }
     (* ---- +a+8: sd x0,0(a5) ---- *)
     assert (Hadd : add_vec (rget N3 Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
-                   = p_ofile p fd) by (rgne; rewrite HN3a5; apply sp_addv_sext0).
+                   = p_ofile p fd) by (rgne; rewrite HN3a5; apply addv_sext0).
     iEval (rewrite -Hadd) in "Hcell".
     iApply (wp_sd_zero_s_sconf Φ (mword_of_int zd) Ra5
               (mword_of_int 0 : mword 12) N3 nav old b

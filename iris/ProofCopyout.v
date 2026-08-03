@@ -767,7 +767,7 @@ Section ProofCopyout.
           { rewrite /U3. rewrite upd_ne; [| reg_neq].
             rewrite /U2. rewrite upd_ne; [| reg_neq].
             rewrite /U1. rewrite upd_ne; [exact HNs3 | reg_neq]. }
-          rewrite HU3s3. rewrite add_vec_comm.
+          rewrite HU3s3. rewrite add_vec64_comm.
           change (add_vec pa0 (mword_of_int (Z.of_nat off))) with (pa_add pa0 off).
           reflexivity. }
         assert (HU5a1 : U5 !!! Regidx Ra1 = pa_add src done).

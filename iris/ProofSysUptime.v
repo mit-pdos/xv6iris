@@ -107,13 +107,7 @@ Proof. rewrite su_uint_cast. rewrite trunc32_sext. reflexivity. Qed.
 Lemma su_eq_vec_refl {k} (x : mword k) : eq_vec x x = true.
 Proof. apply eq_vec_true_iff. reflexivity. Qed.
 
-Lemma su_add_vec_0 (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
-(* a0's compressed-register index. *)
-Lemma su_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
 Module SysUptimeProof (Acquire : ACQUIRE) (Release : RELEASE) : SYSUPTIME.
 
@@ -379,7 +373,7 @@ Section ProofSysUptime.
     iDestruct (ticks_res_intro t with "Hticks") as "HR".
     iApply (Release.wp_release_sconf Φ γl a_tickslock "time"%string ticks_res B5
               n eb p C (av - 4)%nat
-              ltac:(rewrite HB5a0; apply su_add_vec_0)
+              ltac:(rewrite HB5a0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay [-]").
     { iExact "Hlk". }
@@ -418,10 +412,10 @@ Section ProofSysUptime.
     iEval (rewrite Hpc30) in "Hpc".
     (* +0x30: c.srli a0,a0,0x20 *)
     iPoseProof (sui_30 with "Htext") as "Hi30".
-    iEval (rewrite su_cr2) in "Hi30".
+    iEval (rewrite creg_c2) in "Hi30".
     iApply (wp_csrli_s_sconf Φ (mword_of_int (SU + 0x30)) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               (mword_of_int 32 : mword 6) C0 (av - 4)%nat b
-              su_cr2 ltac:(vm_compute; discriminate) ltac:(rdok)
+              creg_c2 ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi30 [-]").
     iIntros (CID12 Hs12) "Hcg Hpc".
     set (C1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg

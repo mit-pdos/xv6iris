@@ -49,42 +49,13 @@ Require Import SpecAllocpid.
 Require Import CodeAllocpid.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
 Notation API := KernelSyms.allocpid.
 
-(* [c.mv rd,rs] is modelled as [add zero, rs]. *)
-Lemma apid_addv_zero_l (X : mword 64) : add_vec (zero_reg : mword 64) X = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite Hu.
-  assert (HZ : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite HZ Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
-Lemma apid_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !Hu. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the two auipc/addi relocations *)
 Lemma apid_lock_reloc1 :
@@ -102,14 +73,6 @@ Lemma apid_next_reloc :
           (sign_extend' 64 (mword_of_int 2062 : mword 12)) = alp_nextpid.
 Proof. rewrite /alp_nextpid. apply bv_eq; vm_compute; reflexivity. Qed.
 
-(* a zero displacement is the identity on the base *)
-Lemma apid_off0 (X : mword 64) :
-  add_vec X (sign_extend' 64 (mword_of_int 0 : mword 12)) = X.
-Proof.
-  replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64)
-    by (apply bv_eq; vm_compute; reflexivity).
-  apply kv_addv_zero.
-Qed.
 
 (* the numeric side conditions, mword-free (the zify-hook rule) *)
 Lemma apid_K4 (av : nat) : (14 <= av)%nat -> (4 <= av)%nat.
@@ -319,7 +282,7 @@ Section ProofAllocpid.
     (* +0x1e c.lw s1,0(a5) : pid = nextpid *)
     iPoseProof (apdi_1e with "Htext") as "Hi1e".
     assert (Hnaddr : add_vec (B2 !!! Regidx ai_a5) (sign_extend' 64 (mword_of_int 0 : mword 12)) = alp_nextpid)
-      by (rewrite HB2a5; apply apid_off0).
+      by (rewrite HB2a5; apply addv_sext0).
     iApply (wp_clw_s_sconf Φ (mword_of_int (API + 0x1e)) ai_s1 ai_a5
               (mword_of_int 0 : mword 12) B2 (av - 4)%nat (nv : mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -354,7 +317,7 @@ Section ProofAllocpid.
     (* +0x24 c.sw a4,0(a5) : nextpid = pid + 1 *)
     iPoseProof (apdi_24 with "Htext") as "Hi24".
     assert (Hnaddr2 : add_vec (B4 !!! Regidx ai_a5) (sign_extend' 64 (mword_of_int 0 : mword 12)) = alp_nextpid)
-      by (rewrite HB4a5; apply apid_off0).
+      by (rewrite HB4a5; apply addv_sext0).
     iApply (wp_csw_s_sconf Φ (mword_of_int (API + 0x24)) ai_a4 ai_a5
               (mword_of_int 0 : mword 12) B4 (av - 4)%nat (nv : mword 32) false
               with "Hcg Hpc Hi24 [Hnp] [-]").
@@ -411,7 +374,7 @@ Section ProofAllocpid.
     assert (HB7a0 : B7 !!! Regidx ai_a0 = alp_pid_lock)
       by (rewrite /B7 upd_ne; [exact HB6a0 | vm_compute; discriminate]).
     assert (Hlka : add_vec (B7 !!! Regidx ai_a0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = alp_pid_lock)
-      by (rewrite HB7a0; apply apid_off0).
+      by (rewrite HB7a0; apply addv_sext0).
     assert (HB7s1 : B7 !!! Regidx ai_s1 = sign_extend' 64 (nv : mword 32)).
     { rewrite /B7 upd_ne; [| vm_compute; discriminate].
       rewrite /B6 upd_ne; [| vm_compute; discriminate].
@@ -517,7 +480,7 @@ Section ProofAllocpid.
     assert (HE3csp : E3 !!! Regidx csp_rs1 = spd) by (rewrite /E3 upd_ne; [exact HE2csp | vm_compute; discriminate]).
     (* +0x3a c.addi16sp sp,32 *)
     assert (Hup : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
-      by (rewrite /spd /sp0; apply apid_frame_cancel).
+      by (rewrite /spd /sp0; apply frame_cancel_32).
     assert (Hwv : add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
       by (rewrite HE3csp; exact Hup).
     assert (Hpop : E3 !!! Regidx csp_rs1

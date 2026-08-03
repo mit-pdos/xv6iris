@@ -30,30 +30,11 @@ Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so th
                             ~90 existing references through ProcGeom keep working *)
 Require Import WpMycpu.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
-(* ===================================================================== *)
-(* Private helpers: [bv_unsigned] of the two address-forming operations.  *)
-(* [add_vec] on equal widths is [bv_add] (wrap mod 2^64); [mword_of_int]   *)
-(* is [Z_to_bv] (also mod 2^64).  Same shape as PtBuild's pb_* helpers.    *)
-(* ===================================================================== *)
-Local Lemma pg_add_vec_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Lemma pg_moi_unsigned (k : Z) :
-  bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof.
-  unfold mword_of_int, Values.to_word, get_word. cbn.
-  rewrite Z_to_bv_unsigned. reflexivity.
-Qed.
 
-Local Lemma pg_modulus64 : bv_modulus 64 = 18446744073709551616.
-Proof. vm_compute. reflexivity. Qed.
 
 (* [mword_of_int (uint w) = w] (mirror of StackOwn.stk_mword_of_int_uint,
    which lives in a later file not imported here). *)
@@ -67,12 +48,6 @@ Qed.
 
 (* add_vec associativity (mirror of KernelRvcDecode.po_addv_assoc, which lives
    in a later file not imported here). *)
-Local Lemma pg_addv_assoc (a b c : mword 64) :
-  add_vec (add_vec a b) c = add_vec a (add_vec b c).
-Proof.
-  apply bv_eq. rewrite !pg_add_vec_unsigned.
-  rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r Z.add_assoc. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* struct proc geometry.                                                  *)
@@ -159,12 +134,6 @@ Definition p_ofile (pa : mword 64) (fd : nat) : mword 64 :=
    stated over a symbolic value rather than a register), and the sum is
    [p_ofile] by definition.  Proving the shift once over a symbolic [z] is
    what keeps either proof from casing on the sixteen descriptors. *)
-Local Lemma pg_moi64_uns (z : Z) : 0 <= z < 18446744073709551616 ->
-  bv_unsigned (mword_of_int z : mword 64) = z.
-Proof.
-  intro Hz. rewrite pg_moi_unsigned. apply bv_wrap_small.
-  unfold bv_modulus. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. lia.
-Qed.
 
 Lemma ofile_slli3 (z : Z) : 0 <= z -> z * 8 < 18446744073709551616 ->
   shift_bits_left (mword_of_int z : mword 64)
@@ -180,9 +149,9 @@ Proof.
                 (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))))) with 3
     by (vm_compute; reflexivity).
   assert (Hzlt : z < 18446744073709551616) by nia.
-  rewrite (pg_moi64_uns z ltac:(lia)).
+  rewrite (moi64_small z ltac:(lia)).
   rewrite Z.shiftl_mul_pow2; [| lia]. change (2^3) with 8.
-  rewrite (pg_moi64_uns (z * 8) ltac:(nia)).
+  rewrite (moi64_small (z * 8) ltac:(nia)).
   apply bv_wrap_small. unfold bv_modulus.
   change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z.
   split; [apply Z.mul_nonneg_nonneg; lia | exact Hz].
@@ -223,7 +192,7 @@ Lemma p_ofile_succ (pa : mword 64) (fd : nat) :
   add_vec (p_ofile pa fd) (sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6)))
   = p_ofile pa (S fd).
 Proof.
-  unfold p_ofile. rewrite pg_addv_assoc.
+  unfold p_ofile. rewrite po_addv_assoc.
   assert (Hsx : sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6))
                 = (mword_of_int 8 : mword 64))
     by (apply bv_eq; vm_compute; reflexivity).
@@ -347,7 +316,7 @@ Qed.
 Lemma proc_addr_succ (k : nat) :
   add_vec (proc_addr k) (sign_extend' 64 (mword_of_int proc_size : mword 12)) = proc_addr (S k).
 Proof.
-  unfold proc_addr. rewrite pg_addv_assoc.
+  unfold proc_addr. rewrite po_addv_assoc.
   assert (Hsx : sign_extend' 64 (mword_of_int proc_size : mword 12) = (mword_of_int proc_size : mword 64))
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite Hsx. f_equal.
@@ -363,10 +332,10 @@ Lemma proc_addr_unsigned (i : nat) :
 Proof.
   intro Hi. unfold NPROC in Hi.
   unfold proc_addr, proc_base.
-  rewrite pg_add_vec_unsigned !pg_moi_unsigned.
+  rewrite add_vec64_unsigned !moi64_unsigned.
   rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r.
   apply bv_wrap_small.
-  unfold KernelSyms.proc, proc_size. rewrite pg_modulus64. lia.
+  unfold KernelSyms.proc, proc_size. rewrite bv_modulus64. lia.
 Qed.
 
 Lemma p_context_unsigned (i : nat) :
@@ -376,10 +345,10 @@ Lemma p_context_unsigned (i : nat) :
 Proof.
   intro Hi. assert (Hi' := Hi). unfold NPROC in Hi'.
   unfold p_context.
-  rewrite pg_add_vec_unsigned (proc_addr_unsigned i Hi) pg_moi_unsigned.
+  rewrite add_vec64_unsigned (proc_addr_unsigned i Hi) moi64_unsigned.
   rewrite bv_wrap_add_idemp_r.
   apply bv_wrap_small.
-  unfold KernelSyms.proc, proc_size, context_off. rewrite pg_modulus64. lia.
+  unfold KernelSyms.proc, proc_size, context_off. rewrite bv_modulus64. lia.
 Qed.
 
 (* proc addresses are injective on the array range. *)
@@ -447,7 +416,7 @@ Proof.
   intros Htp Hj Heq.
   apply (f_equal bv_unsigned) in Heq.
   unfold a_cpu_ctx in Heq.
-  rewrite pg_add_vec_unsigned (mycpu_ret_unsigned tp0 Htp) in Heq.
+  rewrite add_vec64_unsigned (mycpu_ret_unsigned tp0 Htp) in Heq.
   assert (H8 : bv_unsigned (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64) = 8)
     by (vm_compute; reflexivity).
   rewrite H8 in Heq.
@@ -455,7 +424,7 @@ Proof.
   destruct Htp as [Ht0 Ht8].
   assert (Hlhs : bv_wrap 64 (KernelSyms.cpus + 128 * uint tp0 + 8)
                  = KernelSyms.cpus + 128 * uint tp0 + 8).
-  { apply bv_wrap_small. unfold KernelSyms.cpus. rewrite pg_modulus64. lia. }
+  { apply bv_wrap_small. unfold KernelSyms.cpus. rewrite bv_modulus64. lia. }
   rewrite Hlhs in Heq.
   unfold KernelSyms.cpus, KernelSyms.proc, proc_size, context_off in Heq. lia.
 Qed.
@@ -500,15 +469,15 @@ Proof.
   assert (Hz : 0 <= Z.of_nat (fin_to_nat i) < 8).
   { split; [ apply Nat2Z.is_nonneg | ].
     change 8 with (Z.of_nat 8%nat). apply inj_lt. exact Hlt. }
-  rewrite uint_unsigned pg_moi_unsigned bv_wrap_small;
-    [ exact Hz | rewrite pg_modulus64; lia ].
+  rewrite uint_unsigned moi64_unsigned bv_wrap_small;
+    [ exact Hz | rewrite bv_modulus64; lia ].
 Qed.
 
 Lemma uint_cid_word_of (i : CPU) : uint (cid_word_of i) = Z.of_nat (fin_to_nat i).
 Proof.
   pose proof (fin_to_nat_lt i) as Hlt. unfold NCPU in Hlt.
-  unfold cid_word_of. rewrite uint_unsigned pg_moi_unsigned.
-  apply bv_wrap_small. rewrite pg_modulus64.
+  unfold cid_word_of. rewrite uint_unsigned moi64_unsigned.
+  apply bv_wrap_small. rewrite bv_modulus64.
   split; [ apply Nat2Z.is_nonneg | ].
   assert (Z.of_nat (fin_to_nat i) < Z.of_nat 8%nat) by (apply inj_lt; exact Hlt).
   lia.

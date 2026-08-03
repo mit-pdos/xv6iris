@@ -2415,14 +2415,7 @@ Qed.
 (* §8 mappages bridges: the pure facts wp_mappages' loop body needs.      *)
 (* ===================================================================== *)
 
-(* local unsigned-arithmetic helpers *)
-Local Lemma pb_add_vec_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof. exact (add_vec64_unsigned x y). Qed.
 
-Local Lemma pb_moi_unsigned (k : Z) :
-  bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof. exact (moi64_unsigned k). Qed.
 
 Local Lemma pb_add_vec_int27_wrap (a : mword 27) (j : Z) :
   0 <= j < 134217728 ->
@@ -2552,7 +2545,7 @@ Lemma pb_va_k_unsigned (va : mword 64) (k : nat) :
   = bv_unsigned va + 4096 * Z.of_nat k.
 Proof.
   intros Hb.
-  rewrite pb_add_vec_unsigned. rewrite pb_moi_unsigned.
+  rewrite add_vec64_unsigned. rewrite moi64_unsigned.
   rewrite bv_wrap_add_idemp_r.
   apply bv_wrap_small.
   unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616.
@@ -2602,7 +2595,7 @@ Lemma mappages_va_step (va : mword 64) (k : nat) (w : mword 64) :
   = add_vec va (mword_of_int (4096 * Z.of_nat (S k))).
 Proof.
   intros Hw. apply bv_eq.
-  rewrite !pb_add_vec_unsigned. rewrite !pb_moi_unsigned. rewrite Hw.
+  rewrite !add_vec64_unsigned. rewrite !moi64_unsigned. rewrite Hw.
   rewrite bv_wrap_add_idemp_l.
   replace (bv_unsigned va + bv_wrap 64 (4096 * Z.of_nat k) + 4096)
     with (bv_unsigned va + 4096 + bv_wrap 64 (4096 * Z.of_nat k)) by lia.
@@ -2619,7 +2612,7 @@ Lemma mappages_va_eq_iff (va : mword 64) (j k : nat) :
 Proof.
   intros Hj Hk. split; [| intros ->; reflexivity].
   intros Heq. apply (f_equal bv_unsigned) in Heq.
-  rewrite !pb_add_vec_unsigned in Heq. rewrite !pb_moi_unsigned in Heq.
+  rewrite !add_vec64_unsigned in Heq. rewrite !moi64_unsigned in Heq.
   rewrite !bv_wrap_add_idemp_r in Heq.
   apply pb_wrap64_add_inj in Heq; lia.
 Qed.
@@ -2859,7 +2852,7 @@ Lemma mappages_pa_of_va (va pa : mword 64) (k : nat) :
   = add_vec pa (mword_of_int (4096 * Z.of_nat k)).
 Proof.
   apply bv_eq.
-  rewrite !pb_add_vec_unsigned. rewrite !pb_moi_unsigned.
+  rewrite !add_vec64_unsigned. rewrite !moi64_unsigned.
   rewrite bv_wrap_add_idemp_l.
   replace (bv_unsigned va + bv_wrap 64 (4096 * Z.of_nat k)
            + bv_wrap 64 (bv_unsigned pa - bv_unsigned va))
@@ -2882,7 +2875,7 @@ Lemma mappages_s2_val (va a2v : mword 64) (npages : nat) :
 Proof.
   intros Ha2 Hn.
   apply bv_eq.
-  rewrite !pb_add_vec_unsigned. rewrite !pb_moi_unsigned.
+  rewrite !add_vec64_unsigned. rewrite !moi64_unsigned.
   rewrite Ha2.
   rewrite bv_wrap_add_idemp_l.
   replace (bv_wrap 64 (bv_signed (get_word (mword_of_int 2048 : mword 12))))
@@ -2909,7 +2902,7 @@ Lemma mappages_size_nonzero (npages : nat) :
   bv_unsigned (mword_of_int (Z.of_nat npages * 4096) : mword 64) <> 0.
 Proof.
   intros Hn Hb.
-  rewrite pb_moi_unsigned.
+  rewrite moi64_unsigned.
   rewrite bv_wrap_small; [lia |].
   unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616. lia.
 Qed.
@@ -2919,7 +2912,7 @@ Lemma mappages_va0 (va : mword 64) :
   add_vec va (mword_of_int (4096 * Z.of_nat 0)) = va.
 Proof.
   apply bv_eq.
-  rewrite pb_add_vec_unsigned. rewrite pb_moi_unsigned.
+  rewrite add_vec64_unsigned. rewrite moi64_unsigned.
   change (4096 * Z.of_nat 0) with 0.
   replace (bv_wrap 64 0) with 0 by (vm_compute; reflexivity).
   rewrite Z.add_0_r.
@@ -2927,14 +2920,6 @@ Proof.
 Qed.
 
 
-(* public: a small constant as a 64-bit word (register-value bridges) *)
-Lemma mappages_moi_small (z : Z) :
-  (0 <= z < 18446744073709551616)%Z ->
-  bv_unsigned (mword_of_int z : mword 64) = z.
-Proof.
-  intros Hz. rewrite pb_moi_unsigned. apply bv_wrap_small.
-  unfold bv_modulus. change (2 ^ Z.of_N 64) with 18446744073709551616. lia.
-Qed.
 
 (* ===================================================================== *)
 (* pt_nodes: the number of allocated TABLE PAGES in a ptree (kalloc     *)

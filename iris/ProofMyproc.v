@@ -41,25 +41,8 @@ Local Open Scope Z_scope.
 (* Pure address / value reconciliation lemmas.                            *)
 (* ===================================================================== *)
 
-Local Lemma mp_add_vec_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Local Lemma mp_addv_comm (a b : mword 64) : add_vec a b = add_vec b a.
-Proof.
-  apply bv_eq. rewrite !mp_add_vec_unsigned. rewrite Z.add_comm. reflexivity.
-Qed.
 
-Local Lemma mp_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq. rewrite mp_add_vec_unsigned.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz. rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the a4 pid_lock constant (auipc a4,0x11 at myproc+0x14 then addi a4,-1488) *)
 Definition mp_A4C : mword 64 :=
@@ -91,7 +74,7 @@ Proof.
   rewrite po_addv_assoc.
   assert (Hc : add_vec mp_A4C mp_L48 = mp_CPUSC)
     by (unfold mp_A4C, mp_L48, mp_CPUSC; apply bv_eq; vm_compute; reflexivity).
-  rewrite Hc. apply mp_addv_comm.
+  rewrite Hc. apply add_vec64_comm.
 Qed.
 
 (* the noff cell round trip: pop_off's [-1] store of push_off's [+1] store of
@@ -462,9 +445,9 @@ Section ProofMyproc.
     assert (Hs1MP2 : MP2 !!! Regidx (mword_of_int 9 : mword 5) = p).
     { destruct Hmp2 as (_ & _ & Hs1_2 & _). rewrite Hs1_2.
       rewrite /B9 upd_ne; [| vm_compute; discriminate].
-      rewrite /B8 upd_eq HB7a5. apply mp_addv_zero_l. }
+      rewrite /B8 upd_eq HB7a5. apply add_vec_zero_l. }
     assert (Ha0C1 : C1 !!! Regidx (mword_of_int 10 : mword 5) = p).
-    { rewrite /C1 upd_eq Hs1MP2. apply mp_addv_zero_l. }
+    { rewrite /C1 upd_eq Hs1MP2. apply add_vec_zero_l. }
     (* ---- 0x28/0x2a/0x2c: c.ldsp ra/s0/s1 (restore) ---- *)
     assert (HcspC1 : C1 !!! Regidx csp_rs1 = spd).
     { rewrite /C1 upd_ne; [| vm_compute; discriminate].

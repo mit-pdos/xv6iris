@@ -127,7 +127,7 @@ Proof.
   (* the end pointer, as a wrapped sum *)
   assert (Hend : bv_unsigned (add_vec (mword_of_int (Z.of_nat len) : mword 64) p_src)
                = ((Z.of_nat len + bv_unsigned p_src) mod 18446744073709551616)%Z).
-  { rewrite bc_add_vec_unsigned. rewrite bc_moi_unsigned.
+  { rewrite add_vec64_unsigned. rewrite moi64_unsigned.
     unfold bv_wrap. rewrite Hm. rewrite Zplus_mod_idemp_l. reflexivity. }
   rewrite Hend in Hin.
   destruct (mm_overlap_arith (bv_unsigned p_src) (bv_unsigned p_dst) (Z.of_nat len)
@@ -136,7 +136,7 @@ Proof.
   - apply Nat2Z.inj_lt. rewrite Z2Nat.id; [| apply Z.lt_le_incl; exact Hj0].
     exact Hj1.
   - apply bv_eq. unfold pa_add, add_vec_int.
-    rewrite bc_add_vec_unsigned. rewrite bc_moi_unsigned.
+    rewrite add_vec64_unsigned. rewrite moi64_unsigned.
     rewrite Z2Nat.id; [| apply Z.lt_le_incl; exact Hj0].
     unfold bv_wrap. rewrite Hm. rewrite Zplus_mod_idemp_r.
     assert (Heq : (bv_unsigned p_src + (bv_unsigned p_dst - bv_unsigned p_src))%Z
@@ -579,7 +579,7 @@ Section ProofMemmove.
     assert (Hlen64 : (Z.of_nat len < 2 ^ 64)%Z)
       by (apply (Z.lt_trans _ (2 ^ 32)); [ exact Hlen32 | vm_compute; reflexivity ]).
     assert (Hlenu : bv_unsigned (mword_of_int (Z.of_nat len) : mword 64) = Z.of_nat len).
-    { rewrite bc_moi_unsigned. apply bv_wrap_small.
+    { rewrite moi64_unsigned. apply bv_wrap_small.
       split; [ apply Nat2Z.is_nonneg |].
       apply (Z.lt_trans _ (2 ^ 32)); [ exact Hlen32 |].
       unfold bv_modulus. vm_compute. reflexivity. }
@@ -675,7 +675,7 @@ Section ProofMemmove.
     assert (HM4a5 : M4 !!! Regidx a5_idx
                     = add_vec (mword_of_int (Z.of_nat len) : mword 64) p_src).
     { unfold M4. rewrite upd_ne; [| vm_compute; discriminate].
-      unfold M3. rewrite upd_eq. unfold regval_into_reg. apply add_vec_comm. }
+      unfold M3. rewrite upd_eq. unfold regval_into_reg. apply add_vec64_comm. }
     (* ---- +0x18..+0x24: the copy loop ---- *)
     iApply (mm_loop Φ p_src p_dst len src_bytes dst_olds (n - 2) b pcur CID4 Hlen64
               len 0%nat M4 CID4 ltac:(intros _; reflexivity) ltac:(lia) ltac:(lia)
@@ -727,7 +727,7 @@ Section ProofMemmove.
     set (sp' := add_vec sp0 (sign_extend' 64 (sign_extend' 12 imm_entry))).
     set (m1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
     assert (Hlenu : bv_unsigned (mword_of_int (Z.of_nat len) : mword 64) = Z.of_nat len).
-    { rewrite bc_moi_unsigned. apply bv_wrap_small.
+    { rewrite moi64_unsigned. apply bv_wrap_small.
       split; [ apply Nat2Z.is_nonneg |].
       apply (Z.lt_trans _ (2 ^ 32)); [ exact Hlen32 |].
       unfold bv_modulus. vm_compute. reflexivity. }
@@ -941,7 +941,7 @@ Section ProofMemmove.
         iApply (wp_add_s_sconf Φ (mword_of_int (MM + 0x36)) a4_idx a1_idx a3_idx
                   (add_vec (mword_of_int (Z.of_nat (S len')) : mword 64) p_src) m4 (n - 2) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
-                  ltac:(rewrite Hm4a1' Hm4a3'; apply add_vec_comm)
+                  ltac:(rewrite Hm4a1' Hm4a3'; apply add_vec64_comm)
                   with "Hcg Hpc Hi36 [-]").
         iIntros (CID9 Hs9) "Hcg Hpc".
         assert (Hp3a : add_vec_int (mword_of_int (MM + 0x36) : mword 64) 4

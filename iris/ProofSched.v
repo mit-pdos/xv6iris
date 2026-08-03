@@ -29,6 +29,7 @@ Require WpGprCsrwC.
 Require Import CodeSched.
 Require Import SpecMyproc SpecHolding SpecSwtch SpecSched.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -37,31 +38,9 @@ Set Printing Depth 40.
 (* Pure helpers: address arithmetic + the SIE-bit fact.                   *)
 (* ===================================================================== *)
 
-Lemma sched_addv_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Lemma sched_addvC (x y : mword 64) : add_vec x y = add_vec y x.
-Proof.
-  apply bv_eq. rewrite !sched_addv_unsigned. rewrite Z.add_comm. reflexivity.
-Qed.
 
-Lemma sched_addvA (x y z : mword 64) : add_vec (add_vec x y) z = add_vec x (add_vec y z).
-Proof.
-  apply bv_eq. rewrite !sched_addv_unsigned.
-  rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r Z.add_assoc. reflexivity.
-Qed.
 
-Lemma sched_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq. rewrite sched_addv_unsigned.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the workhorse address reconciliation: pulling the (symbolic) shift term
    [sh] out front on both sides leaves a CLOSED constant equality. *)
@@ -69,10 +48,10 @@ Lemma sched_reconcile (sh a b c d : mword 64) :
   bv_unsigned (add_vec a b) = bv_unsigned (add_vec c d) ->
   add_vec (add_vec sh a) b = add_vec (add_vec sh c) d.
 Proof.
-  intro H. rewrite sched_addv_unsigned in H. rewrite (sched_addv_unsigned c d) in H.
+  intro H. rewrite add_vec64_unsigned in H. rewrite (add_vec64_unsigned c d) in H.
   apply bv_eq.
-  rewrite (sched_addv_unsigned (add_vec sh a) b) (sched_addv_unsigned sh a).
-  rewrite (sched_addv_unsigned (add_vec sh c) d) (sched_addv_unsigned sh c).
+  rewrite (add_vec64_unsigned (add_vec sh a) b) (add_vec64_unsigned sh a).
+  rewrite (add_vec64_unsigned (add_vec sh c) d) (add_vec64_unsigned sh c).
   rewrite !bv_wrap_add_idemp_l.
   rewrite <- !Z.add_assoc.
   rewrite <- (bv_wrap_add_idemp_r 64 (bv_unsigned sh) (bv_unsigned a + bv_unsigned b)).
@@ -86,9 +65,9 @@ Lemma sched_reconcile2 (sh a b c d : mword 64) :
   add_vec a (add_vec sh b) = add_vec (add_vec c sh) d.
 Proof.
   intro H.
-  rewrite (sched_addvC sh b). rewrite <- (sched_addvA a b sh).
-  rewrite (sched_addvC (add_vec a b) sh).
-  rewrite (sched_addvC c sh). rewrite (sched_addvA sh c d).
+  rewrite (add_vec64_comm sh b). rewrite <- (po_addv_assoc a b sh).
+  rewrite (add_vec64_comm (add_vec a b) sh).
+  rewrite (add_vec64_comm c sh). rewrite (po_addv_assoc sh c d).
   assert (Hab : add_vec a b = add_vec c d) by (apply bv_eq; exact H).
   rewrite Hab. reflexivity.
 Qed.
@@ -109,7 +88,7 @@ Proof.
   { apply bv_eq. rewrite H.
     unfold mword_of_int, Values.to_word, get_word. cbn.
     rewrite Z_to_bv_unsigned. reflexivity. }
-  unfold pa_stk, add_vec_int. rewrite sched_addvA. rewrite Heq. reflexivity.
+  unfold pa_stk, add_vec_int. rewrite po_addv_assoc. rewrite Heq. reflexivity.
 Qed.
 
 Lemma sched_sstatus_clear (ms : mword 64) :
@@ -318,8 +297,8 @@ Section SchedPostSwtch.
     { rgne. assert (HE3v : E3 !!! Regidx (mword_of_int 18 : mword 5)
                      = add_vec (add_vec (add_vec (mword_of_int (SD + 0x46) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20))) (sign_extend' 64 (mword_of_int 0x4e4 : mword 12))) (mycpu_a5 cid_word))
         by (rewrite /E3 upd_eq HE2s2 HshE; reflexivity).
-      rewrite HE3v. rewrite (sched_addvC _ (mycpu_a5 cid_word)).
-      unfold a_cpu_int, mycpu_ret. rewrite (sched_addvC _ (mycpu_a5 cid_word)).
+      rewrite HE3v. rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
+      unfold a_cpu_int, mycpu_ret. rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
       apply sched_reconcile. vm_compute. reflexivity. }
     iPoseProof (sdi_7a with "Htext") as "Hi7a".
     iApply (wp_sw_s_sconf Φ (mword_of_int (SD + 0x7a)) (mword_of_int 19 : mword 5) (mword_of_int 18 : mword 5)
@@ -443,7 +422,7 @@ Section SchedPostSwtch.
     assert (Hspd6 : pa_stk sp0 6 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpopsp : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0).
-    { rewrite -Hspd sched_addvA.
+    { rewrite -Hspd po_addv_assoc.
       assert (HAB : add_vec (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite HAB. apply kv_addv_zero. }
@@ -862,7 +841,7 @@ Section ProofSched.
         reflexivity. }
       rewrite HC5v.
       unfold a_cpu_noff, mycpu_ret.
-      rewrite (sched_addvC _ (mycpu_a5 cid_word)).
+      rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
       apply sched_reconcile. vm_compute. reflexivity. }
     iPoseProof (sdi_2a with "Htext") as "Hi2a".
     iApply (wp_lw_s_sconf Φ (mword_of_int (SD + 0x2a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
@@ -917,7 +896,7 @@ Section ProofSched.
         rewrite /C3 upd_ne; [| vm_compute; discriminate]. rewrite /C2 upd_ne; [| vm_compute; discriminate].
         rewrite /C1 upd_ne; [| vm_compute; discriminate]. rewrite /C0 upd_ne; [| vm_compute; discriminate].
         exact Hs1_mh. }
-      rewrite HC7s1 sched_addv_zero_l. unfold p_state, state_off.
+      rewrite HC7s1 add_vec_zero_l. unfold p_state, state_off.
       assert (H24 : sign_extend' 64 (mword_of_int 24 : mword 12) = (mword_of_int 24 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H24. reflexivity. }
     iPoseProof (sdi_34 with "Htext") as "Hi34".
@@ -1114,7 +1093,7 @@ Section ProofSched.
                                   (sign_extend' 64 (mword_of_int 0x4e4 : mword 12)))).
       { rewrite /D5 upd_eq HshD HD4s2. reflexivity. }
       rewrite HD5v. unfold a_cpu_int, mycpu_ret.
-      rewrite (sched_addvC _ (mycpu_a5 cid_word)).
+      rewrite (add_vec64_comm _ (mycpu_a5 cid_word)).
       apply sched_reconcile. vm_compute. reflexivity. }
     iPoseProof (sdi_54 with "Htext") as "Hi54".
     iApply (wp_lw_s_sconf Φ (mword_of_int (SD + 0x54)) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
@@ -1271,7 +1250,7 @@ Section ProofSched.
     assert (Hra_Mc : Mc !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SD + 0x6e) : mword 64) 4)
       by (rewrite /Mc upd_eq; reflexivity).
     assert (Holdc : Mc !!! Regidx (mword_of_int 10 : mword 5) = p_context (proc_addr j)).
-    { rewrite /Mc upd_ne; [| vm_compute; discriminate]. rewrite /D14 upd_eq HD13_x9 sched_addv_zero_l.
+    { rewrite /Mc upd_ne; [| vm_compute; discriminate]. rewrite /D14 upd_eq HD13_x9 add_vec_zero_l.
       unfold p_context, context_off.
       assert (H96 : sign_extend' 64 (mword_of_int 96 : mword 12) = (mword_of_int 96 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H96. reflexivity. }

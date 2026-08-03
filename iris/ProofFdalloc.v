@@ -79,6 +79,7 @@ Require Import SpecFdalloc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -137,14 +138,6 @@ Lemma fda_frees_none (fs : list (mword 64)) :
   fd_frees fs = [].
 Proof. intro Hall. by apply fda_frees_from_none. Qed.
 
-(* the two zero displacements: [c.ld a4,0(a5)] and [c.sd s1,0(a2)] *)
-Lemma fda_off0 (X : mword 64) :
-  add_vec X (sign_extend' 64 (mword_of_int 0 : mword 12)) = X.
-Proof.
-  replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
-    with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
-  apply kv_addv_zero.
-Qed.
 
 (* [c.addiw a0,a0,1] : fd++ on an [int] counter that never leaves [0,16] *)
 Lemma fda_addiw1 (fd : nat) : (fd < NOFILE)%nat ->
@@ -216,19 +209,6 @@ Qed.
 
 (* fdalloc's balanced 32-byte frame: the entry [addi sp,-32] and the exit
    [addi16sp sp,32] cancel. *)
-Lemma fda_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  apply bv_eq. rewrite !add_vec64_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the numeric premise myproc takes; [lia] cannot evaluate the power, so it is
    [vm_compute]d once here rather than inline at the call site. *)
@@ -362,7 +342,7 @@ Section ProofFdalloc.
       assert (Hs4 : pa_stk sp0 4
                     = add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
       { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-      rewrite Hs4. apply fda_frame_cancel. }
+      rewrite Hs4. apply frame_cancel_32. }
     assert (Hpop : T3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T3 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
@@ -750,7 +730,7 @@ Section ProofFdalloc.
       (* ---- +0x1a: c.ld a4,0(a5) -- a4 := p->ofile[fd] ---- *)
       iDestruct (proc_priv_ofile_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
       assert (Haddr : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
-                      = p_ofile p fd) by (rewrite HMa5; apply fda_off0).
+                      = p_ofile p fd) by (rewrite HMa5; apply addv_sext0).
       iApply (wp_cld_s_sconf Φ (mword_of_int (FDA + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
                 M (av - 4)%nat w b (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -856,7 +836,7 @@ Section ProofFdalloc.
           as "[Hslot Hpvback]".
         iDestruct (ofile_slot_null with "Hslot") as "[Hcell Hfdslot]".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
-                          = p_ofile p fd) by (rewrite HG3a2; apply fda_off0).
+                          = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
         iApply (wp_csd_s_sconf Φ (mword_of_int (FDA + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
                   G3 (av - 4)%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi3c [Hcell] [-]").

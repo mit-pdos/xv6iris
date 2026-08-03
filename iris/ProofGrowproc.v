@@ -754,7 +754,7 @@ Section ProofGrowproc.
       iApply (wp_add_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x1a))
                 Ra2 Rs1 Ra1 (add_vec (pv_sz V) nv) A2 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                ltac:(rgne; rgne; rewrite HA2s1 HA2a1; apply add_vec_comm)
+                ltac:(rgne; rgne; rewrite HA2s1 HA2a1; apply add_vec64_comm)
                 with "Hcg Hpc Hi1a [-]").
       iIntros (CID13 Hn13) "Hcg Hpc".
       set (B1 := <[Regidx Ra2 := regval_into_reg (add_vec (pv_sz V) nv)]> A2).
@@ -1259,7 +1259,7 @@ Section ProofGrowproc.
     iApply (wp_add_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x4c))
               Ra2 Rs1 Ra1 (add_vec (pv_sz V) nv) A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(rgne; rgne; rewrite HA2s1 HA2a1; apply add_vec_comm)
+              ltac:(rgne; rgne; rewrite HA2s1 HA2a1; apply add_vec64_comm)
               with "Hcg Hpc Hi4c [-]").
     iIntros (CID14 Hn14) "Hcg Hpc".
     set (E1 := <[Regidx Ra2 := regval_into_reg (add_vec (pv_sz V) nv)]> A2).

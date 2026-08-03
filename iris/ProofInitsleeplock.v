@@ -51,24 +51,8 @@ Local Ltac rgne :=
 (* Pure address / value reconciliation lemmas.                            *)
 (* ===================================================================== *)
 
-Local Lemma isl_add_vec_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Local Lemma isl_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq. rewrite isl_add_vec_unsigned.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz. rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
-Local Lemma isl_add_vec_sext0 (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
 Module InitsleeplockProof (Initlock : INITLOCK) : INITSLEEPLOCK.
 
@@ -328,9 +312,9 @@ Section ProofInitsleeplock.
     destruct Hilcs as (Hilsp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).
     assert (Hmilsp : mil !!! Regidx csp_rs1 = spd) by (rewrite Hilsp; exact HA7sp).
     assert (Hmils1 : mil !!! Regidx (mword_of_int 9 : mword 5) = slk)
-      by (rewrite Hils1 HA7s1; apply isl_addv_zero_l).
+      by (rewrite Hils1 HA7s1; apply add_vec_zero_l).
     assert (Hmils2 : mil !!! Regidx (mword_of_int 18 : mword 5) = name)
-      by (rewrite Hils2 HA7s2; apply isl_addv_zero_l).
+      by (rewrite Hils2 HA7s2; apply add_vec_zero_l).
     (* ===== the three struct stores ===== *)
     (* +0x1e sd s2,32(s1)  (lk->name := name) *)
     iApply (wp_sd_s_sconf Φ (mword_of_int (ISL + 0x1e)) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x20 : mword 12)
@@ -343,9 +327,9 @@ Section ProofInitsleeplock.
     (* +0x22 sw zero,0(s1)  (lk->locked := 0) *)
     iApply (wp_sw_zero_s_sconf Φ (mword_of_int (ISL + 0x22)) (mword_of_int 9 : mword 5) (mword_of_int 0x0 : mword 12)
               mil (av - 4)%nat vlocked b with "Hcg Hpc Hi22 [Hlocked] [-]").
-    { iEval (rgne; rewrite Hmils1 isl_add_vec_sext0). iExact "Hlocked". }
+    { iEval (rgne; rewrite Hmils1 addv_sext0). iExact "Hlocked". }
     iIntros (CID15 Hs15) "Hcg Hpc Hlocked".
-    iEval (rgne; rewrite Hmils1 isl_add_vec_sext0) in "Hlocked".
+    iEval (rgne; rewrite Hmils1 addv_sext0) in "Hlocked".
     assert (Hpc26 : add_vec_int (mword_of_int (ISL + 0x22) : mword 64) 4 = mword_of_int (ISL + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
     (* +0x26 sw zero,40(s1)  (lk->pid := 0) *)

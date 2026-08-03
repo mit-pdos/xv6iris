@@ -416,7 +416,7 @@ Section ProofPrintint.
     iEval (rgne) in "Hcg".
     set (D7 := <[Regidx a5_idx := regval_into_reg (add_vec zero_reg (D6 !!! Regidx a0_idx))]> D6).
     assert (HD7a5 : D7 !!! Regidx a5_idx = x).
-    { rewrite /D7 upd_eq. unfold regval_into_reg. rewrite HD6a0. apply pi_addv_zero_l. }
+    { rewrite /D7 upd_eq. unfold regval_into_reg. rewrite HD6a0. apply add_vec_zero_l. }
     assert (HD7a0 : D7 !!! Regidx a0_idx = x)
       by (rewrite /D7 upd_ne; [exact HD6a0 | reg_neq]).
     assert (HD7a1 : D7 !!! Regidx a1_idx = md !!! Regidx a1_idx).
@@ -471,7 +471,7 @@ Section ProofPrintint.
     { rewrite /D9 upd_ne; [| reg_neq]. rewrite /D8 upd_ne; [| reg_neq].
       rewrite /D7 upd_ne; [| reg_neq]. rewrite /D6 upd_ne; [| reg_neq].
       rewrite /D5 upd_ne; [| reg_neq]. rewrite /D4 upd_ne; [| reg_neq].
-      rewrite /D3 upd_eq. unfold regval_into_reg. rewrite HD2a2. apply pi_addv_zero_l. }
+      rewrite /D3 upd_eq. unfold regval_into_reg. rewrite HD2a2. apply add_vec_zero_l. }
     split.
     { rewrite /D9 upd_ne; [| reg_neq]. rewrite /D8 upd_ne; [| reg_neq].
       rewrite /D7 upd_ne; [| reg_neq]. rewrite /D6 upd_ne; [| reg_neq].
@@ -482,7 +482,7 @@ Section ProofPrintint.
       rewrite /D7 upd_ne; [| reg_neq]. rewrite /D6 upd_ne; [| reg_neq].
       rewrite /D5 upd_ne; [| reg_neq]. rewrite /D4 upd_ne; [| reg_neq].
       rewrite /D3 upd_ne; [| reg_neq]. rewrite /D2 upd_ne; [| reg_neq].
-      rewrite /D1 upd_eq. unfold regval_into_reg. rewrite Ha4. apply pi_addv_zero_l. }
+      rewrite /D1 upd_eq. unfold regval_into_reg. rewrite Ha4. apply add_vec_zero_l. }
     split.
     { rewrite /D9 upd_ne; [| reg_neq]. rewrite /D8 upd_ne; [| reg_neq]. exact HD7a5. }
     exact Hkeep.
@@ -868,7 +868,7 @@ Section ProofPrintint.
     iApply (wp_add_s_sconf Φ (mword_of_int (PI + 0x64)) s1_idx s2_idx a4_idx
               (pa_add buf (n - 1)) T1 (K - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(rgne; rgne; rewrite HT1s2 HT1a4 add_vec_comm add_vec_pa_add;
+              ltac:(rgne; rgne; rewrite HT1s2 HT1a4 add_vec64_comm add_vec_pa_add;
                     f_equal; rewrite (uint_moi_small (Z.of_nat (n-1)) ltac:(change (2^64) with 18446744073709551616; lia));
                     apply Nat2Z.id)
               with "Hcg Hpc Hi64 [-]").
@@ -920,7 +920,7 @@ Section ProofPrintint.
     assert (HT6a4 : T6 !!! Regidx a4_idx = mword_of_int (Z.of_nat (n - 1))).
     { rewrite /T6 upd_eq. unfold regval_into_reg. rewrite /T5 upd_eq. unfold regval_into_reg.
       rewrite HT4a4. apply slli32_srli32.
-      rewrite moi64_unsigned.
+      rewrite moi64_mod.
       rewrite (Z.mod_small (Z.of_nat (n-1)) 18446744073709551616 ltac:(lia)).
       change (2^32) with 4294967296. lia. }
     assert (HT6s2 : T6 !!! Regidx s2_idx = add_vec (add_vec buf (mword_of_int (-1) : mword 64)) (mword_of_int (Z.of_nat (n - 1)))).
@@ -1077,7 +1077,7 @@ Section ProofPrintint.
     iEval (rgne) in "Hcg".
     set (Q2 := <[Regidx a3_idx := regval_into_reg (add_vec zero_reg (Q1 !!! Regidx s2_idx))]> Q1).
     assert (HQ2a3 : Q2 !!! Regidx a3_idx = pa_add buf 0).
-    { rewrite /Q2 upd_eq. unfold regval_into_reg. rewrite HQ1s2 pi_addv_zero_l pa_add_0. reflexivity. }
+    { rewrite /Q2 upd_eq. unfold regval_into_reg. rewrite HQ1s2 add_vec_zero_l pa_add_0. reflexivity. }
     assert (Hp18 : add_vec_int (mword_of_int (PI + 0x16) : mword 64) 2 = mword_of_int (PI + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
     (* +0x18 c.li a4,0 : i := 0 *)

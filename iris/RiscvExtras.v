@@ -824,3 +824,31 @@ Qed.
 Definition mbump (b : bool) (x : mword 64) : mword 64 :=
   if b then add_vec_int x 1 else x.
 Global Opaque mbump.
+
+(* The 64-bit modulus as a literal.  [lia] cannot evaluate [bv_modulus 64],
+   so every proof that needs the bound rewrites with this first. *)
+Lemma bv_modulus64 : bv_modulus 64 = 18446744073709551616.
+Proof. vm_compute. reflexivity. Qed.
+
+(* [add_vec] is commutative -- which operand the encoder put in rs1 is not
+   something a proof should have to care about. *)
+Lemma add_vec64_comm (x y : mword 64) : add_vec x y = add_vec y x.
+Proof.
+  apply bv_eq. rewrite !add_vec64_unsigned. f_equal. lia.
+Qed.
+
+(* ...and the no-wrap corollary of [moi64_unsigned]. *)
+Lemma moi64_small (z : Z) :
+  (0 <= z < 18446744073709551616)%Z -> bv_unsigned (mword_of_int z : mword 64) = z.
+Proof. intro Hz. rewrite moi64_unsigned. apply bv_wrap_small. exact Hz. Qed.
+
+(* The same fact with the modulus spelled as a literal -- what a proof that
+   reasons in plain [Z] wants, since [lia] cannot evaluate [bv_modulus]. *)
+Lemma moi64_mod (z : Z) :
+  bv_unsigned (mword_of_int z : mword 64) = (z `mod` 18446744073709551616)%Z.
+Proof.
+  unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. unfold bv_wrap.
+  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+  reflexivity.
+Qed.

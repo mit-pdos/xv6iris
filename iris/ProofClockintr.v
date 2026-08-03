@@ -64,14 +64,7 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
-(* a0's compressed-register index (the c.beqz source). *)
-Lemma ci_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
-(* the zero displacement of the [c.lw]/[c.sw] on &ticks. *)
-Lemma ci_add_vec_0 (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
 Lemma ci_eq_vec_refl {k} (x : mword k) : eq_vec x x = true.
 Proof. apply eq_vec_true_iff. reflexivity. Qed.
@@ -441,7 +434,7 @@ Section ProofClockintr.
         by (rgne; rewrite Hmoa0; exact Hth).
       iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (CI + 0x0c)) (mword_of_int 14 : mword 8)
                 (Cregidx (mword_of_int 2)) a0_idx mo (av - 2)%nat false
-                ci_cr2 ltac:(vm_compute; discriminate) Hzero
+                creg_c2 ltac:(vm_compute; discriminate) Hzero
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi0c [-]").
       iNext. rewrite wp_next_off. iIntros "Hcg Hpc".
@@ -549,7 +542,7 @@ Section ProofClockintr.
         rewrite /a_ticks. apply bv_eq; vm_compute; reflexivity. }
       assert (Haddrt : add_vec (rget D1 a4_idx) (sign_extend' 64 (mword_of_int 0 : mword 12))
                        = a_ticks)
-        by (rgne; rewrite HD1a4; apply ci_add_vec_0).
+        by (rgne; rewrite HD1a4; apply addv_sext0).
       (* ---- +0x3c: c.lw a5,0(a4) -- read ticks, under the lock ---- *)
       iPoseProof (cii_3c with "Htext") as "Hi3c".
       iApply (wp_clw_s_sconf Φ (mword_of_int (CI + 0x3c)) a5_idx a4_idx
@@ -588,7 +581,7 @@ Section ProofClockintr.
         rewrite /D2 upd_ne; [| vm_compute; discriminate]. exact HD1a4. }
       assert (Haddrt3 : add_vec (rget D3 a4_idx) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = a_ticks)
-        by (rgne; rewrite HD3a4; apply ci_add_vec_0).
+        by (rgne; rewrite HD3a4; apply addv_sext0).
       iPoseProof (cii_40 with "Htext") as "Hi40".
       iApply (wp_csw_s_sconf Φ (mword_of_int (CI + 0x40)) a5_idx a4_idx
                 (mword_of_int 0 : mword 12) D3 (av - 2)%nat t false
@@ -716,7 +709,7 @@ Section ProofClockintr.
       iDestruct (ticks_res_intro _ with "Hticks") as "HR".
       iApply (Release.wp_release_sconf Φ γl a_tickslock "time"%string ticks_res E2
                 n eb p C (av - 2)%nat
-                ltac:(rewrite HE2a0; apply ci_add_vec_0)
+                ltac:(rewrite HE2a0; apply addv_sext0)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlkl] [Htok] [HR] Hcnt Hpay [-]").
       { iExact "Hlkl". }
@@ -794,7 +787,7 @@ Section ProofClockintr.
         by (rgne; rewrite Hmoa0; exact Hth).
       iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (CI + 0x0c)) (mword_of_int 14 : mword 8)
                 (Cregidx (mword_of_int 2)) a0_idx mo (av - 2)%nat false
-                ci_cr2 ltac:(vm_compute; discriminate) Hnzero
+                creg_c2 ltac:(vm_compute; discriminate) Hnzero
                 with "Hcg Hpc Hi0c [-]").
       rewrite wp_next_off. iIntros "Hcg Hpc".
       assert (Hpc0e : add_vec_int (mword_of_int (CI + 0x0c) : mword 64) 2 = mword_of_int (CI + 0x0e))

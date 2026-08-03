@@ -163,10 +163,6 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma bid_csd_imm72 :
   zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")) = (mword_of_int 72 : mword 12).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
-Lemma bid_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9).
-Proof. vm_compute. reflexivity. Qed.
-Lemma bid_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
 
 Section CodeBinit.
   Context `{!riscvGS Σ}.
@@ -287,7 +283,7 @@ Section CodeBinit.
      shape via the three bridges above. *)
   Lemma bii_54 : kernel_text -∗ instr (mword_of_int (BI + 0x54) : mword 64) true (STORE (mword_of_int 80 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 8)).
   Proof.
-    rewrite -bid_csd_imm80 -bid_cr1 -bid_cr7.
+    rewrite -bid_csd_imm80 -creg_c1 -creg_c7.
     mk_rvc (BI + 0x54)%Z (mword_of_int 0xe8bc : mword 16)
       (mword_of_int (BI + 0x54) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 1)), 8)) bidc_e8bc exec_execute_C_SD.
   Qed.
@@ -315,7 +311,7 @@ Section CodeBinit.
   (* c.sd s1,72(a5) : (head.next)->prev := b *)
   Lemma bii_68 : kernel_text -∗ instr (mword_of_int (BI + 0x68) : mword 64) true (STORE (mword_of_int 72 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), 8)).
   Proof.
-    rewrite -bid_csd_imm72 -bid_cr7 -bid_cr1.
+    rewrite -bid_csd_imm72 -creg_c7 -creg_c1.
     mk_rvc (BI + 0x68)%Z (mword_of_int 0xe7a4 : mword 16)
       (mword_of_int (BI + 0x68) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), 8)) bidc_e7a4 exec_execute_C_SD.
   Qed.

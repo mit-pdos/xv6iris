@@ -25,6 +25,7 @@ Require Import DevModel.
 Require Import KptPt.
 Require Import DevModel.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -101,12 +102,6 @@ Definition ph_a8 (base : mword 64) (imm : mword 12) : mword 64 :=
    same context address with the [lui] constant and the shifted hart id in
    opposite operand order ([add a5,a5,a0] vs [add a5,a5,a4]), so one of them
    lands on the mirror image of [ph_senb]/[ph_sthb]. *)
-Lemma ph_add_comm (x y : mword 64) : add_vec x y = add_vec y x.
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite !bv_add_unsigned. rewrite Z.add_comm. reflexivity.
-Qed.
 
 (* the geometry every S-mode PLIC access WP asks for: the address is inside the
    PLIC window, 4-aligned, canonical, on a [kpt_dev_vpn] page, and identity-

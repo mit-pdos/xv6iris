@@ -50,14 +50,6 @@ Proof.
   assert (Hhm : bv_half_modulus 64 = 2^63) by reflexivity. rewrite Hhm. lia.
 Qed.
 
-Lemma moi64_unsigned (z : Z) :
-  bv_unsigned (mword_of_int z : mword 64) = z `mod` 18446744073709551616.
-Proof.
-  unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. unfold bv_wrap.
-  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
 
 Lemma sub128_63 (x : mword (2*64)) :
   bv_unsigned (subrange_vec_dec x (64-1) 0) = bv_unsigned x `mod` 2^64.
@@ -119,7 +111,7 @@ Proof.
   intro Hi. apply bv_eq. rewrite mult_low_unsigned.
   rewrite (sint_moi_small (45 * Z.of_nat i) ltac:(split; [lia | change (2^63) with 9223372036854775808; lia])).
   rewrite (sint_moi_small 0x4fa4fa4fa4fa4fa5 ltac:(split; [lia | vm_compute; reflexivity])).
-  rewrite moi64_unsigned. change 18446744073709551616 with (2^64).
+  rewrite moi64_mod. change 18446744073709551616 with (2^64).
   (* 45*i*magic = i + (i*14)*2^64 ≡ i mod 2^64 *)
   assert (Hprod : (45 * Z.of_nat i * 5738987045154082725
                    = Z.of_nat i + (Z.of_nat i * 14) * 2 ^ 64)%Z)
@@ -128,12 +120,6 @@ Proof.
 Qed.
 
 
-Lemma moi64_uns (z : Z) : (0 <= z < 18446744073709551616)%Z -> bv_unsigned (mword_of_int z : mword 64) = z.
-Proof.
-  intro. unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. apply bv_wrap_small.
-  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity). lia.
-Qed.
 
 Lemma bvsigned_moi_small (z : Z) : (0 <= z < 2^63)%Z -> bv_signed (mword_of_int z : mword 64) = z.
 Proof. intro Hz. change (bv_signed ?x) with (sint x). apply sint_moi_small; exact Hz. Qed.
@@ -153,7 +139,7 @@ Proof.
   assert (Hdlt : 0 <= z / 8 < 18446744073709551616).
   { split; [apply Z.div_pos; lia|].
     apply Z.le_lt_trans with z; [apply Z.div_le_upper_bound; lia | lia]. }
-  rewrite (moi64_uns (z/8) ltac:(exact Hdlt)).
+  rewrite (moi64_small (z/8) ltac:(exact Hdlt)).
   apply bv_wrap_small. unfold bv_modulus.
   change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. exact Hdlt.
 Qed.
@@ -169,9 +155,9 @@ Proof.
                   (MachineWord.MachineWord.Z_idx (int_of_mword false (subrange_vec_dec (mword_of_int 13 : mword 6) 5 0))))) with 13
     by (vm_compute; reflexivity).
   assert (Hzlt : z < 18446744073709551616) by nia.
-  rewrite (moi64_uns z ltac:(lia)).
+  rewrite (moi64_small z ltac:(lia)).
   rewrite Z.shiftl_mul_pow2; [| lia]. change (2^13) with 8192.
-  rewrite (moi64_uns (z*8192) ltac:(lia)).
+  rewrite (moi64_small (z*8192) ltac:(lia)).
   apply bv_wrap_small. unfold bv_modulus.
   change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z.
   split; [apply Z.mul_nonneg_nonneg; lia | exact Hz].
@@ -186,8 +172,8 @@ Proof.
   intros Hy Hyx Hx. apply bv_eq.
   assert (Hxy : (0 <= x - y < 18446744073709551616)%Z) by lia.
   rewrite sub_vec64_unsigned.
-  rewrite (moi64_uns x ltac:(lia)). rewrite (moi64_uns y ltac:(lia)).
-  rewrite (moi64_uns (x - y) ltac:(exact Hxy)).
+  rewrite (moi64_small x ltac:(lia)). rewrite (moi64_small y ltac:(lia)).
+  rewrite (moi64_small (x - y) ltac:(exact Hxy)).
   apply bv_wrap_small. unfold bv_modulus.
   change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. exact Hxy.
 Qed.
@@ -206,7 +192,7 @@ Proof.
   rewrite <- !trunc32_subrange.
   rewrite !trunc32_mword_of_int.
   set (v := (8192 * (Z.of_nat i + 1))%Z) in *.
-  rewrite (moi64_uns v ltac:(lia)).
+  rewrite (moi64_small v ltac:(lia)).
   set (w := add_vec (mword_of_int (8192 * Z.of_nat i) : mword 32) (mword_of_int 8192 : mword 32)).
   assert (Hw : bv_unsigned w = v).
   { unfold w, v, add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',

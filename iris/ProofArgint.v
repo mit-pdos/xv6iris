@@ -59,23 +59,7 @@ Lemma aidec_sw_a0_ip s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) (
   = Some (C_SW (mword_of_int 0, Cregidx (mword_of_int 1), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma ai_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
-Lemma ai_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10 : mword 5).
-Proof. vm_compute. reflexivity. Qed.
 
-(* [c.mv rd,rs] is modelled as [add zero, rs]; this strips the zero. *)
-Lemma ai_addv_zero_l (X : mword 64) : add_vec (zero_reg : mword 64) X = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite Hu.
-  assert (HZ : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite HZ Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the [c.sw]'s zero displacement *)
 Lemma ai_sw_off (X : mword 64) :
@@ -88,24 +72,6 @@ Qed.
 
 (* argint's balanced 32-byte frame: entry [addi sp,-32] and exit
    [addi16sp sp,32] cancel. *)
-Lemma ai_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 Module ArgintProof (Argraw : ARGRAW) : ARGINT.
 
@@ -273,7 +239,7 @@ Section ProofArgint.
     assert (Hpc0c : add_vec_int (mword_of_int (AI + 0x0a) : mword 64) 2 = mword_of_int (AI + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
     assert (HA2s1 : A2 !!! Regidx (mword_of_int 9 : mword 5) = ip).
-    { rewrite /A2 upd_eq. rewrite ai_addv_zero_l.
+    { rewrite /A2 upd_eq. rewrite add_vec_zero_l.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. reflexivity. }
     (* +0x0c: jal ra,argraw *)
@@ -312,7 +278,7 @@ Section ProofArgint.
     { rewrite (callee_saved_lookup HcsMF (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
       rewrite /A3 upd_ne; [| vm_compute; discriminate]. exact HA2s1. }
     iPoseProof (ai_10 with "Htext") as "Hi10".
-    iEval (rewrite ai_cr1; rewrite ai_cr2) in "Hi10".
+    iEval (rewrite creg_c1; rewrite creg_c2) in "Hi10".
     assert (Haddr10 : add_vec (rget MF (mword_of_int 9 : mword 5))
                         (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = ip).
     { rgne. rewrite HMFs1. apply ai_sw_off. }

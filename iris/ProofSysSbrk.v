@@ -1145,7 +1145,7 @@ Section ProofSysSbrk.
                     = mword_of_int (KernelSyms.sys_sbrk + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp38) in "Hpc".
     assert (HL1a5 : L1 !!! Regidx Ra5 = add_vec (pv_sz V) (sbrk_arg v0)).
-    { rewrite /L1 upd_eq. rgne. rgne. rewrite HD4a5 HD4s1. apply add_vec_comm. }
+    { rewrite /L1 upd_eq. rgne. rgne. rewrite HD4a5 HD4s1. apply add_vec64_comm. }
     (* ---- +0x38 .. +0x3e: a4 := TRAPFRAME ---- *)
     iApply (wp_lui_s_sconf Φ (mword_of_int (KernelSyms.sys_sbrk + 0x38))
               Ra4 (mword_of_int 8192 : mword 20) (mword_of_int 33554432 : mword 64)

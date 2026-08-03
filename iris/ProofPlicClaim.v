@@ -63,10 +63,6 @@ Lemma pqdec_lw_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"
   = Some (C_LW (mword_of_int 1, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
-Lemma pq_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
-Lemma pq_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx (mword_of_int 10).
-Proof. vm_compute. reflexivity. Qed.
 Lemma pq_imm4 : zero_extend' 12 (concat_vec (mword_of_int 1 : mword 5) ('b"00")) = (mword_of_int 4 : mword 12).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
@@ -74,7 +70,7 @@ Lemma pqexec_lw_a0 s :
   exec (execute (C_LW (mword_of_int 1, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 4, Regidx (mword_of_int 15), Regidx (mword_of_int 10), false, 4)), s).
 Proof.
-  rewrite exec_execute_C_LW. rewrite pq_cr7. rewrite pq_cr2. rewrite pq_imm4. reflexivity.
+  rewrite exec_execute_C_LW. rewrite creg_c7. rewrite creg_c2. rewrite pq_imm4. reflexivity.
 Qed.
 
 (* the value a claim leaves in a0: [c.lw] sign-extends the 32-bit register, and

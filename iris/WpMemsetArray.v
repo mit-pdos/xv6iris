@@ -149,7 +149,7 @@ Section WpMemsetArray.
     assert (Hlen64 : Z.of_nat len < 2 ^ 64)
       by (apply (Z.lt_trans _ (2 ^ 32)); [ exact Hlen32 | vm_compute; reflexivity ]).
     assert (Hlenu : bv_unsigned (mword_of_int (Z.of_nat len) : mword 64) = Z.of_nat len).
-    { rewrite moi_unsigned. apply bv_wrap_small.
+    { rewrite moi64_unsigned. apply bv_wrap_small.
       unfold bv_modulus; simpl. split; [ lia | apply (Z.lt_trans _ (2 ^ 32)); [ lia | vm_compute; reflexivity ] ]. }
     iIntros "Hcg #Htext Hpc Hbuf0 Hcont".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)

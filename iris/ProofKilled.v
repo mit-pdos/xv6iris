@@ -63,18 +63,6 @@ Lemma kldec_jal_rel s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
 Proof. decode_bridge_ms. Qed.
 
 
-(* [c.mv rd,rs] is modelled as [add zero, rs]. *)
-Lemma kl_addv_zero_l (X : mword 64) : add_vec (zero_reg : mword 64) X = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite Hu.
-  assert (HZ : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite HZ Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the [c.lw]'s 40-byte displacement is p->killed's offset *)
 Lemma kl_killed_off (X : mword 64) :
@@ -82,25 +70,6 @@ Lemma kl_killed_off (X : mword 64) :
   = p_killed X.
 Proof. rewrite /p_killed. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 
-(* the balanced 32-byte frame *)
-Lemma kl_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !Hu. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
@@ -297,7 +266,7 @@ Section ProofKilled.
     assert (Hp0e : add_vec_int (mword_of_int (KL + 0x0c) : mword 64) 2 = mword_of_int (KL + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0e) in "Hpc".
     assert (HA2s1 : A2 !!! Regidx kl_s1 = proc_addr j).
-    { rewrite /A2 upd_eq kl_addv_zero_l.
+    { rewrite /A2 upd_eq add_vec_zero_l.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /M1 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     assert (HA2a0 : A2 !!! Regidx kl_a0 = proc_addr j).
@@ -372,7 +341,7 @@ Section ProofKilled.
     assert (Hp16 : add_vec_int (mword_of_int (KL + 0x14) : mword 64) 2 = mword_of_int (KL + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp16) in "Hpc".
     assert (HC2s2 : C2 !!! Regidx kl_s2 = sign_extend' 64 kl).
-    { rewrite /C2 upd_eq kl_addv_zero_l /C1 upd_eq. reflexivity. }
+    { rewrite /C2 upd_eq add_vec_zero_l /C1 upd_eq. reflexivity. }
     (* +0x16: c.mv a0,s1 *)
     iPoseProof (kli_16 with "Htext") as "Hi16".
     iApply (wp_cmv_s_sconf Φ (mword_of_int (KL + 0x16)) kl_a0 kl_s1 C2 (av - 4)%nat false
@@ -389,7 +358,7 @@ Section ProofKilled.
     { rewrite /C2 upd_ne; [| vm_compute; discriminate].
       rewrite /C1 upd_ne; [| vm_compute; discriminate]. exact Hmacq_s1. }
     assert (HC3a0 : C3 !!! Regidx kl_a0 = proc_addr j)
-      by (rewrite /C3 upd_eq kl_addv_zero_l; exact HC2s1).
+      by (rewrite /C3 upd_eq add_vec_zero_l; exact HC2s1).
     (* +0x18: jal ra,release *)
     iPoseProof (kli_18 with "Htext") as "Hi18".
     iApply (wp_jal_s_sconf Φ (mword_of_int (KL + 0x18)) kl_ra (mword_of_int 2091830 : mword 21)
@@ -506,7 +475,7 @@ Section ProofKilled.
     (* +0x26: c.addi16sp sp,32 -- the frame pop *)
     assert (HE4csp : E4 !!! Regidx csp_rs1 = spd) by (rewrite /E4 upd_ne; [exact HE3csp | vm_compute; discriminate]).
     assert (Hup : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
-      by (rewrite /spd /sp0; apply kl_frame_cancel).
+      by (rewrite /spd /sp0; apply frame_cancel_32).
     assert (Hwv : add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
       by (rewrite HE4csp; exact Hup).
     assert (Hpop : E4 !!! Regidx csp_rs1
@@ -553,7 +522,7 @@ Section ProofKilled.
       rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_ne; [| vm_compute; discriminate].
-      rewrite /E0 upd_eq kl_addv_zero_l. exact Hmrel_s2. }
+      rewrite /E0 upd_eq add_vec_zero_l. exact Hmrel_s2. }
     assert (HE5csp : E5 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
       by (rewrite /E5 upd_eq; exact Hwv).
     assert (HE5s0 : E5 !!! Regidx kl_s0 = m !!! Regidx kl_s0).

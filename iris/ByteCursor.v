@@ -34,24 +34,14 @@ Local Open Scope Z_scope.
 
 (* the three bitvector identities everything below runs on, restated off
    [RiscvExtras] (as [ArrCursor] does) so callers need only this file. *)
-Lemma bc_add_vec_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof. exact (add_vec64_unsigned x y). Qed.
 
 (* ...and its [sub_vec] counterpart, which the tree had under no name at all
    before this (it was inlined in [WpHolding] and [KstackArith] and proved
    twice more inside the two copy proofs). *)
-Lemma bc_sub_vec_unsigned (x y : mword 64) :
-  bv_unsigned (sub_vec x y) = bv_wrap 64 (bv_unsigned x - bv_unsigned y).
-Proof. exact (sub_vec64_unsigned x y). Qed.
 
-Lemma bc_moi_unsigned (k : Z) : bv_unsigned (mword_of_int k : mword 64) = bv_wrap 64 k.
-Proof. exact (moi64_unsigned k). Qed.
 
 (* [add_vec] is commutative -- the end pointer is [base + len] or [len + base]
    depending on which operand register the [add] put in rs1. *)
-Lemma add_vec_comm (x y : mword 64) : add_vec x y = add_vec y x.
-Proof. apply bv_eq. rewrite !bc_add_vec_unsigned. f_equal. ring. Qed.
 
 (* the cursor bump.  [o] is the increment as the INSTRUCTION spells it (a
    sign-extended immediate at the use site), passed as a premise so the caller
@@ -61,7 +51,7 @@ Lemma pa_add_step (p : mword 64) (j : nat) (o : mword 64) :
   add_vec (pa_add p j) o = pa_add p (S j).
 Proof.
   intros ->. unfold pa_add, add_vec_int. apply bv_eq.
-  rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite !add_vec64_unsigned, !moi64_unsigned.
   rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
   f_equal. lia.
 Qed.
@@ -73,7 +63,7 @@ Lemma pa_add_bump (p : mword 64) (d n : nat) :
   add_vec (pa_add p d) (mword_of_int (Z.of_nat n)) = pa_add p (d + n).
 Proof.
   unfold pa_add, add_vec_int. apply bv_eq.
-  rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite !add_vec64_unsigned, !moi64_unsigned.
   rewrite !bv_wrap_add_idemp_r, !bv_wrap_add_idemp_l. f_equal.
   rewrite Nat2Z.inj_add. ring.
 Qed.
@@ -82,7 +72,7 @@ Qed.
    when the count register is rs1 (copyin's [add a1,a1,a0] at +0x38). *)
 Lemma pa_add_comm (p : mword 64) (k : nat) :
   add_vec (mword_of_int (Z.of_nat k) : mword 64) p = pa_add p k.
-Proof. unfold pa_add, add_vec_int. apply add_vec_comm. Qed.
+Proof. unfold pa_add, add_vec_int. apply add_vec64_comm. Qed.
 
 (* ...and its dual: gcc bumps the pointer FIRST and then accesses [-1(reg)], so
    the access address is the cursor one below the bumped one. *)
@@ -91,7 +81,7 @@ Lemma pa_add_back1 (p : mword 64) (j : nat) (o : mword 64) :
   add_vec (pa_add p (S j)) o = pa_add p j.
 Proof.
   intros ->. unfold pa_add, add_vec_int. apply bv_eq.
-  rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite !add_vec64_unsigned, !moi64_unsigned.
   rewrite !bv_wrap_add_idemp_r. rewrite !bv_wrap_add_idemp_l.
   f_equal. lia.
 Qed.
@@ -129,7 +119,7 @@ Qed.
 Lemma pa_add_unsigned (p : mword 64) (k : nat) :
   bv_unsigned (pa_add p k : mword 64) = bv_wrap 64 (bv_unsigned p + Z.of_nat k).
 Proof.
-  unfold pa_add, add_vec_int. rewrite bc_add_vec_unsigned, bc_moi_unsigned.
+  unfold pa_add, add_vec_int. rewrite add_vec64_unsigned, moi64_unsigned.
   rewrite bv_wrap_add_idemp_r. reflexivity.
 Qed.
 
@@ -191,7 +181,7 @@ Lemma pa_add_diff (p : mword 64) (a b : nat) :
 Proof.
   intros Hle Ha. apply bv_eq.
   pose (Hu := pa_add_unsigned p).
-  rewrite bc_sub_vec_unsigned, !Hu, bc_moi_unsigned.
+  rewrite sub_vec64_unsigned, !Hu, moi64_unsigned.
   rewrite bv_wrap_sub_idemp_l, bv_wrap_sub_idemp_r.
   f_equal. rewrite (Nat2Z.inj_sub a b Hle). ring.
 Qed.
@@ -203,7 +193,7 @@ Lemma pa_add_delta (x p : mword 64) (i : nat) :
   add_vec (sub_vec x p) (pa_add p i) = pa_add x i.
 Proof.
   apply bv_eq.
-  rewrite bc_add_vec_unsigned, bc_sub_vec_unsigned, !pa_add_unsigned.
+  rewrite add_vec64_unsigned, sub_vec64_unsigned, !pa_add_unsigned.
   rewrite bv_wrap_add_idemp_l, bv_wrap_add_idemp_r.
   f_equal. ring.
 Qed.
@@ -226,9 +216,9 @@ Lemma pa_add_of_diff (q c v : mword 64) (off : nat) :
 Proof.
   intro Hoff.
   apply (f_equal bv_unsigned) in Hoff.
-  rewrite bc_sub_vec_unsigned, bc_moi_unsigned in Hoff.
+  rewrite sub_vec64_unsigned, moi64_unsigned in Hoff.
   apply bv_eq.
-  rewrite bc_sub_vec_unsigned, bc_add_vec_unsigned, pa_add_unsigned.
+  rewrite sub_vec64_unsigned, add_vec64_unsigned, pa_add_unsigned.
   rewrite bv_wrap_sub_idemp_l.
   replace (bv_unsigned q + bv_unsigned c - bv_unsigned v)%Z
     with (bv_unsigned q + (bv_unsigned c - bv_unsigned v))%Z by ring.
@@ -322,17 +312,12 @@ Qed.
 (*  that decrements it, and the [uint] a caller's premise mentions.        *)
 (* ===================================================================== *)
 
-Lemma bc_bvmod64 : bv_modulus 64 = 18446744073709551616.
-Proof. vm_compute; reflexivity. Qed.
 
 Lemma bc_wrap_small (z : Z) : 0 <= z -> z < 18446744073709551616 -> bv_wrap 64 z = z.
 Proof.
-  intros H0 H1. unfold bv_wrap. rewrite bc_bvmod64. apply Z.mod_small. split; assumption.
+  intros H0 H1. unfold bv_wrap. rewrite bv_modulus64. apply Z.mod_small. split; assumption.
 Qed.
 
-Lemma bc_moi_small (z : Z) : 0 <= z < 18446744073709551616 ->
-  bv_unsigned (mword_of_int z : mword 64) = z.
-Proof. intros [H0 H1]. rewrite bc_moi_unsigned. apply bc_wrap_small; assumption. Qed.
 
 Lemma bc_zero_reg_unsigned : bv_unsigned (zero_reg : mword 64) = 0.
 Proof. vm_compute; reflexivity. Qed.
@@ -341,7 +326,7 @@ Lemma bc_uint_moi_nat (k : nat) :
   (Z.of_nat k < 18446744073709551616)%Z ->
   uint (mword_of_int (Z.of_nat k) : mword 64) = Z.of_nat k.
 Proof.
-  intro Hk. rewrite uint_unsigned. apply bc_moi_small.
+  intro Hk. rewrite uint_unsigned. apply moi64_small.
   split; [apply Nat2Z.is_nonneg | exact Hk].
 Qed.
 
@@ -353,7 +338,7 @@ Lemma bc_add_moi (x : mword 64) (b k : Z) :
   bv_unsigned (add_vec x (mword_of_int k)) = b + k.
 Proof.
   intros Hx H0 Hk Hb.
-  rewrite bc_add_vec_unsigned, Hx, (bc_moi_small k ltac:(lia)).
+  rewrite add_vec64_unsigned, Hx, (moi64_small k ltac:(lia)).
   apply bc_wrap_small; lia.
 Qed.
 
@@ -368,8 +353,8 @@ Proof.
   destruct (Nat.eqb_spec k 0) as [-> | Hne].
   - apply eq_vec_true_iff. reflexivity.
   - apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
-    rewrite (bc_moi_small (Z.of_nat k) ltac:(lia)) in Hc.
-    rewrite (bc_moi_small 0 ltac:(lia)) in Hc. lia.
+    rewrite (moi64_small (Z.of_nat k) ltac:(lia)) in Hc.
+    rewrite (moi64_small 0 ltac:(lia)) in Hc. lia.
 Qed.
 
 (* the two one-sided readings of it that the branch arms want directly *)
@@ -410,11 +395,11 @@ Proof.
   intros Ha Hb.
   destruct (Nat.leb_spec b a) as [Hle | Hlt].
   - apply bc_geu.
-    rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
-    rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)). lia.
+    rewrite (moi64_small (Z.of_nat a) ltac:(lia)).
+    rewrite (moi64_small (Z.of_nat b) ltac:(lia)). lia.
   - apply bc_ltu.
-    rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
-    rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)). lia.
+    rewrite (moi64_small (Z.of_nat a) ltac:(lia)).
+    rewrite (moi64_small (Z.of_nat b) ltac:(lia)). lia.
 Qed.
 
 (* the decrement *)
@@ -424,10 +409,10 @@ Lemma bc_sub_nat (a b : nat) :
   = (mword_of_int (Z.of_nat (a - b)) : mword 64).
 Proof.
   intros Hle Ha. apply bv_eq.
-  rewrite bc_sub_vec_unsigned.
-  rewrite (bc_moi_small (Z.of_nat a) ltac:(lia)).
-  rewrite (bc_moi_small (Z.of_nat b) ltac:(lia)).
-  rewrite bc_moi_unsigned. f_equal.
+  rewrite sub_vec64_unsigned.
+  rewrite (moi64_small (Z.of_nat a) ltac:(lia)).
+  rewrite (moi64_small (Z.of_nat b) ltac:(lia)).
+  rewrite moi64_unsigned. f_equal.
   rewrite Nat2Z.inj_sub; [reflexivity | exact Hle].
 Qed.
 
@@ -441,7 +426,7 @@ Lemma bc_add_m1_nat (k : nat) (o : mword 64) :
   = (mword_of_int (Z.of_nat (k - 1)) : mword 64).
 Proof.
   intros -> Hk1 Hk. apply bv_eq.
-  rewrite bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite add_vec64_unsigned, !moi64_unsigned.
   rewrite bv_wrap_add_idemp_l, bv_wrap_add_idemp_r.
   f_equal. rewrite (Nat2Z.inj_sub k 1 Hk1).
   change (Z.of_nat 1) with 1%Z. ring.
@@ -541,5 +526,5 @@ Proof.
     by (vm_compute; reflexivity).
   rewrite bv_swrap_small;
     [| rewrite Hhm; split; [apply (Z.le_trans _ 0); [lia | exact Hk0] | exact Hk]].
-  rewrite bc_moi_unsigned. reflexivity.
+  rewrite moi64_unsigned. reflexivity.
 Qed.

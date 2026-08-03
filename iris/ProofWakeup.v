@@ -508,7 +508,7 @@ Section ProofWakeup.
             rewrite /Mr2a upd_ne; [| vm_compute; discriminate]. exact Hr2. }
           (* release premises, pre-established over the opaque loop map [Mr2c]. *)
           assert (Hlka2 : add_vec (Mr2c !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
-            by (rewrite HMr2c_a0; apply wk_add_vec_0).
+            by (rewrite HMr2c_a0; apply addv_sext0).
           (* release(&proc[k]->lock): cpu_own S lvl -> lvl (pay consumed).  Its
              exit index is the very [match] [b] is equal to, so the back edge
              lands on the loop invariant unchanged. *)
@@ -612,7 +612,7 @@ Section ProofWakeup.
         assert (Hdomacq : forall r : regidx, r ∈ dom (rf_to_gmap Macq)) by (intro r; apply rf_to_gmap_dom).
         (* ---- 0x46 c.lw a5,24(s1) : a5 := sext(state) ---- *)
         iPoseProof (wki_46 with "Htext") as "Hi46".
-        iEval (rewrite wk_cr1; rewrite wk_cr7) in "Hi46".
+        iEval (rewrite creg_c1; rewrite creg_c7) in "Hi46".
         assert (Hea46 : add_vec (rget (CID := CIDf) Macq (mword_of_int 9 : mword 5))
                           (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00"))))
                         = p_state (proc_addr k)).
@@ -708,7 +708,7 @@ Section ProofWakeup.
           iEval (rewrite Hpc4c) in "Hpc".
           (* ---- 0x4c c.ld a5,32(s1) : a5 := p->chan ---- *)
           iPoseProof (wki_4c with "Htext") as "Hi4c".
-          iEval (rewrite wk_cr1; rewrite wk_cr7) in "Hi4c".
+          iEval (rewrite creg_c1; rewrite creg_c7) in "Hi4c".
           assert (Hea4c : add_vec (rget (CID := CIDf) M48 (mword_of_int 9 : mword 5))
                             (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 5) ('b"000")))) = p_chan (proc_addr k)).
           { rewrite (rget_ne M48 (mword_of_int 9 : mword 5) ltac:(intro Hq; injection Hq as Hq2; vm_compute in Hq2; congruence)).

@@ -34,7 +34,7 @@
    [mword]-free top-level [Z] lemmas -- [ProcPtOwn.z_pgu_*] / [z_np_*] --
    because any goal mentioning [bv_unsigned] answers "Cannot find witness" to
    [lia] under this file's transitive [bitvector.tactics] import.  The two
-   [mword] bridges it needs are [ByteCursor.add_vec_comm] and
+   [mword] bridges it needs are [add_vec64_comm] and
    [ByteCursor.srli12_div4096]; the compressed [c.sub] leaf is
    [WpSconfAlu.wp_csub_wval_s_sconf] (the explicit-[wval] form; the
    encoding's own rd = rs1 shape is [wp_csub_s_sconf], a restatement of it).
@@ -723,7 +723,7 @@ Section ProofUvmdealloc.
     iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
     assert (Hsum5 : add_vec (A8 !!! Regidx Ra5) (A8 !!! Regidx Ra1)
                     = add_vec oldsz (mword_of_int 4095))
-      by (rewrite HA8a5 HA8a1; apply add_vec_comm).
+      by (rewrite HA8a5 HA8a1; apply add_vec64_comm).
     iEval (rewrite Hsum5) in "Hcg".
     set (A9 := <[Regidx Ra5 := regval_into_reg (add_vec oldsz (mword_of_int 4095))]> A8).
     change (<[Regidx Ra5 := regval_into_reg (add_vec oldsz (mword_of_int 4095))]> A8) with A9.

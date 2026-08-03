@@ -60,10 +60,6 @@ Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-(* [add_vec x (sext 0)] is [x]: every [0(reg)] address in pipealloc. *)
-Lemma addv_sext0 (x : mword 64) :
-  add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
 (* [fnode_nonzero] -- a file slot's address is never null, which is what
    kills pipealloc's two dead "*f0 == 0" arms -- is FileInv's, at the

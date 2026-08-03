@@ -75,7 +75,7 @@ Section ProofAcquire.
         (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg w]> M0) !!! Regidx (mword_of_int 9 : mword 5) = add_vec zero_reg lk).
     { intro w. rewrite upd_ne; [ exact HM0s1 | vm_compute; discriminate ]. }
     assert (HAlk2 : add_vec (add_vec zero_reg lk) (zeros' 64) = lk).
-    { rewrite aq_addv_zero_l.
+    { rewrite add_vec_zero_l.
       replace (zeros' 64 : mword 64) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
@@ -348,7 +348,7 @@ Section ProofAcquire.
       rewrite /B1 upd_ne; [| vm_compute; discriminate].
       rewrite Hcspp. exact HcspA3. }
     assert (Hlkb : add_vec (B2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lk0).
-    { rewrite HB2a0 !aq_addv_zero_l.
+    { rewrite HB2a0 !add_vec_zero_l.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
@@ -489,7 +489,7 @@ Section ProofAcquire.
     { rewrite Hs1o /B8 upd_ne; [| vm_compute; discriminate].
       exact HB3s1. }
     assert (Hpacpu : add_vec (Cm !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lk0).
-    { rewrite Hs1C aq_addv_zero_l. reflexivity. }
+    { rewrite Hs1C add_vec_zero_l. reflexivity. }
     iPoseProof (aqi_28 with "Htext") as "Hi28".
     (* [wp_csd_lkcpu_lockopen_s_sconf] (WpSconfLock.v) demands the dead-state
        refutation at ITS OWN ambient hart -- [h0 := cpu_id], resolved where

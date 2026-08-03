@@ -29,28 +29,15 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import ByteCursor.
 Require Import StackOwn.
+Require Import RiscvExtras.
+Require Import WpMmodeLeafBase.
 Local Open Scope Z_scope.
 
 (* [autocast] is the identity -- restated locally, as with the two above *)
 Lemma pi_autocast_id (m : Z) (x : mword m) : autocast x = x.
 Proof. apply autocast_refl. Qed.
 
-(* restated locally (as ByteCursor does) so this file needs no heavy import *)
-Lemma pi_uint_unsigned (a : mword 64) : uint a = bv_unsigned a.
-Proof.
-  pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
-  rewrite Z2N.id; [ reflexivity | lia ].
-Qed.
 
-Lemma moi64_unsigned (z : Z) :
-  bv_unsigned (mword_of_int z : mword 64) = z `mod` 18446744073709551616.
-Proof.
-  unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. unfold bv_wrap.
-  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
-  reflexivity.
-Qed.
 
 Lemma sint_moi_small (z : Z) : (0 <= z < 2^63)%Z ->
   sint (mword_of_int z : mword 64) = z.
@@ -58,7 +45,7 @@ Proof.
   intro Hz.
   change (sint ?x) with (bv_swrap 64 (bv_unsigned x)).
   assert (Hu : bv_unsigned (mword_of_int z : mword 64) = z).
-  { rewrite moi64_unsigned. apply Z.mod_small.
+  { rewrite moi64_mod. apply Z.mod_small.
     change 18446744073709551616 with (2^64) in *. lia. }
   rewrite Hu. apply bv_swrap_small.
   assert (Hhm : bv_half_modulus 64 = 2^63) by reflexivity. rewrite Hhm. lia.
@@ -99,7 +86,7 @@ Proof.
 Qed.
 
 Lemma tbt64 (N : Z) : uint (to_bits_truncate 64 N : mword 64) = N `mod` 2^64.
-Proof. rewrite pi_uint_unsigned. unfold to_bits_truncate. apply gsi64. Qed.
+Proof. rewrite uint_unsigned. unfold to_bits_truncate. apply gsi64. Qed.
 
 (* ---- small-value mword arithmetic ---- *)
 
@@ -109,7 +96,7 @@ Proof.
   apply bv_eq.
   unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
     SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. rewrite !moi64_unsigned.
+  rewrite bv_add_unsigned. rewrite !moi64_mod.
   unfold bv_wrap. change (bv_modulus 64) with 18446744073709551616.
   rewrite Zplus_mod_idemp_l, Zplus_mod_idemp_r. reflexivity.
 Qed.
@@ -143,7 +130,7 @@ Proof.
     change (bv_half_modulus (MachineWord.MachineWord.Z_idx 32)) with (2^31).
     unfold bv_wrap. change (bv_modulus (MachineWord.MachineWord.Z_idx 32)) with (2^32).
     rewrite (Z.mod_small (k + 2^31) (2^32) ltac:(zlit)). zlit. }
-  rewrite Hs. rewrite moi64_unsigned.
+  rewrite Hs. rewrite moi64_mod.
   unfold bv_wrap. change (bv_modulus _) with 18446744073709551616. reflexivity.
 Qed.
 
@@ -152,7 +139,7 @@ Lemma sextw_moi (k : Z) : 0 <= k < 2^31 ->
 Proof.
   intro Hk.
   assert (Hsub : subrange_vec_dec (mword_of_int k : mword 64) 31 0 = (mword_of_int k : mword 32)).
-  { apply bv_eq. rewrite sub64_31, moi64_unsigned.
+  { apply bv_eq. rewrite sub64_31, moi64_mod.
     unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
     rewrite Z_to_bv_unsigned. unfold bv_wrap.
     change (bv_modulus (MachineWord.MachineWord.Z_idx 32)) with 4294967296.
@@ -164,8 +151,8 @@ Qed.
 (* ---- the value the leaves write, as a literal ---- *)
 Lemma tbt_moi (N : Z) : to_bits_truncate 64 N = (mword_of_int N : mword 64).
 Proof.
-  apply bv_eq. rewrite <- (pi_uint_unsigned (to_bits_truncate 64 N)), <- (pi_uint_unsigned (mword_of_int N)).
-  rewrite tbt64, pi_uint_unsigned, moi64_unsigned.
+  apply bv_eq. rewrite <- (uint_unsigned (to_bits_truncate 64 N)), <- (uint_unsigned (mword_of_int N)).
+  rewrite tbt64, uint_unsigned, moi64_mod.
   change 18446744073709551616 with (2^64). reflexivity.
 Qed.
 
@@ -186,7 +173,7 @@ Proof.
   assert (Hr : shift_bits_right x (subrange_vec_dec (mword_of_int 60 : mword 6) (Z.sub log2_xlen 1) 0)
              = shiftr x 60)
     by (unfold shift_bits_right; f_equal; vm_compute; reflexivity).
-  rewrite Hr, pi_uint_unsigned.
+  rewrite Hr, uint_unsigned.
   unfold shiftr, SailStdpp.Values.with_word, get_word,
     MachineWord.MachineWord.logical_shift_right.
   rewrite bv_shiftr_unsigned.
@@ -235,7 +222,7 @@ Proof.
   assert (HxL : bv_unsigned (add_vec (pa_add p j) (mword_of_int (-1) : mword 64) : mword 64)
               = bv_wrap 64 (bv_unsigned p + Z.of_nat j + (-1))).
   { unfold pa_add, add_vec_int.
-    rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+    rewrite !add_vec64_unsigned, !moi64_unsigned.
     rewrite bv_wrap_add_idemp_r, bv_wrap_add_idemp_l.
     (* the remaining inner wrap sits in the MIDDLE of the sum; rotate it to the
        right so [bv_wrap_add_idemp_r] can absorb it *)
@@ -244,7 +231,7 @@ Proof.
     rewrite bv_wrap_add_idemp_r. f_equal. ring. }
   assert (HeL : bv_unsigned (add_vec p (mword_of_int (-1) : mword 64) : mword 64)
               = bv_wrap 64 (bv_unsigned p + (-1))).
-  { rewrite bc_add_vec_unsigned, bc_moi_unsigned. rewrite bv_wrap_add_idemp_r. reflexivity. }
+  { rewrite add_vec64_unsigned, moi64_unsigned. rewrite bv_wrap_add_idemp_r. reflexivity. }
   unfold neq_vec. f_equal.
   destruct (Nat.eqb_spec j 0) as [He | Hne].
   - apply eq_vec_true_iff. apply bv_eq. rewrite HxL, HeL, He.
@@ -263,13 +250,13 @@ Qed.
 
 Lemma uint_moi_small (k : Z) : 0 <= k < 2^64 -> uint (mword_of_int k : mword 64) = k.
 Proof.
-  intro Hk. rewrite pi_uint_unsigned, moi64_unsigned. apply Z.mod_small.
+  intro Hk. rewrite uint_unsigned, moi64_mod. apply Z.mod_small.
   change 18446744073709551616 with (2^64). exact Hk.
 Qed.
 
 Lemma moi_uint (r : mword 64) : mword_of_int (uint r) = r.
 Proof.
-  apply bv_eq. rewrite moi64_unsigned, pi_uint_unsigned. apply Z.mod_small.
+  apply bv_eq. rewrite moi64_mod, uint_unsigned. apply Z.mod_small.
   pose proof (bv_unsigned_in_range 64 r) as Hr.
   assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
   rewrite Hm in Hr. exact Hr.
@@ -282,28 +269,20 @@ Lemma add_vec_pa_add (D r : mword 64) :
   add_vec r D = pa_add D (Z.to_nat (uint r)).
 Proof.
   unfold pa_add, add_vec_int.
-  rewrite add_vec_comm. f_equal.
+  rewrite add_vec64_comm. f_equal.
   rewrite Z2Nat.id; [ symmetry; apply moi_uint | ].
-  rewrite pi_uint_unsigned. apply (bv_unsigned_in_range 64 r).
+  rewrite uint_unsigned. apply (bv_unsigned_in_range 64 r).
 Qed.
 
 (* [zero_reg] is a left identity for [add_vec] -- the value every [c.mv] writes.
    (The right-identity twin is [RiscvExtras.kv_addv_zero].) *)
-Lemma pi_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite bv_add_unsigned.
-  change (bv_unsigned zero_reg) with 0.
-  rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 Lemma pi_uint_nonneg (x : mword 64) : 0 <= uint x.
-Proof. rewrite pi_uint_unsigned. apply (bv_unsigned_in_range 64 x). Qed.
+Proof. rewrite uint_unsigned. apply (bv_unsigned_in_range 64 x). Qed.
 
 Lemma pi_uint_lt64 (x : mword 64) : uint x < 2^64.
 Proof.
-  rewrite pi_uint_unsigned.
+  rewrite uint_unsigned.
   pose proof (bv_unsigned_in_range 64 x) as Hr.
   assert (Hm : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
   rewrite Hm in Hr. change (2^64) with 18446744073709551616. exact (proj2 Hr).
@@ -340,7 +319,7 @@ Lemma sign_slot_addr (sp0 : mword 64) (n : nat) :
   = pa_add (pa_stk sp0 7) n.
 Proof.
   apply bv_eq. unfold pa_add, pa_stk, add_vec_int.
-  rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  rewrite !add_vec64_unsigned, !moi64_unsigned.
   rewrite !bv_wrap_add_idemp_l, !bv_wrap_add_idemp_r.
   rewrite wrap_add3, wrap_add3'.
   f_equal. ring.
@@ -354,7 +333,7 @@ Proof.
   apply bv_eq.
   unfold sub_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
     SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.sub.
-  rewrite bv_sub_unsigned. rewrite bc_add_vec_unsigned, bc_moi_unsigned.
+  rewrite bv_sub_unsigned. rewrite add_vec64_unsigned, moi64_unsigned.
   rewrite bv_wrap_sub_idemp_l.
   replace (bv_unsigned S + bv_wrap 64 k - bv_wrap 64 k) with (bv_unsigned S) by ring.
   apply bv_wrap_bv_unsigned.
@@ -371,7 +350,7 @@ Qed.
 Lemma addv_moi_moi (x : mword 64) (a b : Z) :
   add_vec (add_vec x (mword_of_int a)) (mword_of_int b) = add_vec x (mword_of_int (a + b)).
 Proof.
-  apply bv_eq. rewrite !bc_add_vec_unsigned, !bc_moi_unsigned.
+  apply bv_eq. rewrite !add_vec64_unsigned, !moi64_unsigned.
   rewrite bv_wrap_add_idemp_l, !bv_wrap_add_idemp_r.
   (* the surviving inner wrap sits in the middle of the sum: rotate it out *)
   rewrite wrap_add3'. f_equal. ring.

@@ -107,11 +107,9 @@ Definition fw_thr (mm m : regfile) : Prop :=
 Definition fw_cur (b : mword 44) (d : Z) : mword 64 :=
   add_vec (page_base b) (mword_of_int (8 * d)).
 
-Local Lemma fw_modulus64 : bv_modulus 64 = 18446744073709551616.
-Proof. vm_compute. reflexivity. Qed.
 
 Local Lemma fw_wrap64 (x : Z) : 0 <= x < 18446744073709551616 -> bv_wrap 64 x = x.
-Proof. intros H. apply bv_wrap_small. rewrite fw_modulus64. exact H. Qed.
+Proof. intros H. apply bv_wrap_small. rewrite bv_modulus64. exact H. Qed.
 
 (* the node-page arithmetic, over plain [Z] (any goal mentioning
    [bv_unsigned] defeats [lia] under this file's transitive

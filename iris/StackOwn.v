@@ -67,11 +67,6 @@ Proof.
   apply bv_wrap_bv_wrap. lia.
 Qed.
 
-Lemma stk_moi_unsigned (z : Z) : bv_unsigned (mword_of_int z : mword 64) = bv_wrap 64 z.
-Proof.
-  unfold mword_of_int, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-  rewrite Z_to_bv_unsigned. reflexivity.
-Qed.
 
 Lemma stk_mword_of_int_uint (w : mword 64) : mword_of_int (uint w) = w.
 Proof.
@@ -377,7 +372,7 @@ Proof.
     Operators_mwords.with_word', SailStdpp.Values.with_word, to_word, get_word,
     MachineWord.MachineWord.add in Hu.
   rewrite bv_add_unsigned in Hu.
-  rewrite (stk_moi_unsigned c) in Hu.
+  rewrite (moi64_unsigned c) in Hu.
   rewrite (bv_wrap_small 64 c) in Hu;
     [| unfold bv_modulus; change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z; lia].
   unfold bv_wrap, bv_modulus in Hu.

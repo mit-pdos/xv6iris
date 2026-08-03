@@ -38,6 +38,7 @@ Require ByteCursor.
 Require Import BufOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)

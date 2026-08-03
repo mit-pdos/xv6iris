@@ -74,17 +74,6 @@ Import Defs.
 Local Ltac peel n := do n (rewrite upd_ne; [| vm_compute; discriminate]).
 Local Ltac nz := vm_compute; discriminate.
 
-Local Lemma pcv_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  assert (add_vec_unsigned : forall a b : mword 64,
-            bv_unsigned (add_vec a b) = bv_wrap 64 (bv_unsigned a + bv_unsigned b)).
-  { intros a b. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite add_vec_unsigned.
-  change (bv_unsigned (zero_reg : mword 64)) with 0%Z. rewrite Z.add_0_l.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
 
 Module PipecloseProof (Acquire : ACQUIRE_GEN) (Wakeup : WAKEUP)
                       (Release : RELEASE_GEN) (ReleaseCancel : RELEASE_CANCEL)
@@ -259,11 +248,11 @@ Section ProofPipeclose.
     assert (Hs1A4 : A4 !!! Regidx (mword_of_int 9 : mword 5) = pi).
     { rewrite /A4 /A3; do 2 (rewrite upd_ne; [| nz]).
       rewrite /A2 upd_eq. unfold regval_into_reg.
-      rewrite /A1 /A0; do 2 (rewrite upd_ne; [| nz]). apply pcv_addv_zero_l. }
+      rewrite /A1 /A0; do 2 (rewrite upd_ne; [| nz]). apply add_vec_zero_l. }
     assert (Hs2A4 : A4 !!! Regidx (mword_of_int 18 : mword 5) = m !!! Regidx (mword_of_int 11 : mword 5)).
     { rewrite /A4; do 1 (rewrite upd_ne; [| nz]).
       rewrite /A3 upd_eq. unfold regval_into_reg.
-      rewrite /A2 /A1 /A0; do 3 (rewrite upd_ne; [| nz]). apply pcv_addv_zero_l. }
+      rewrite /A2 /A1 /A0; do 3 (rewrite upd_ne; [| nz]). apply add_vec_zero_l. }
     assert (HraA4 : A4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (PC + 0x10) : mword 64) 4)
       by (rewrite /A4; apply upd_eq).
     assert (HraA0 : A0 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1 : mword 5))
@@ -515,7 +504,7 @@ Section ProofPipeclose.
         iEval (rewrite Hpcrl) in "Hpc".
         assert (Ha0V2 : V2 !!! Regidx (mword_of_int 10 : mword 5) = pi).
         { rewrite /V2 upd_ne; [| nz]. rewrite /V1 upd_eq. unfold regval_into_reg.
-          rewrite Hs1M'. apply pcv_addv_zero_l. }
+          rewrite Hs1M'. apply add_vec_zero_l. }
         assert (HlkaV2 : add_vec (V2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pi).
         { rewrite Ha0V2.
           replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
@@ -659,7 +648,7 @@ Section ProofPipeclose.
       iEval (rewrite Hpcrl2) in "Hpc".
       assert (Ha0K2 : K2 !!! Regidx (mword_of_int 10 : mword 5) = pi).
       { rewrite /K2 upd_ne; [| nz]. rewrite /K1 upd_eq. unfold regval_into_reg.
-        rewrite Hs1J2. apply pcv_addv_zero_l. }
+        rewrite Hs1J2. apply add_vec_zero_l. }
       assert (HlkaK2 : add_vec (K2 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = pi).
       { rewrite Ha0K2.
         replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
@@ -714,7 +703,7 @@ Section ProofPipeclose.
       iEval (rewrite Hpckf) in "Hpc".
       assert (Ha0K4 : K4 !!! Regidx (mword_of_int 10 : mword 5) = pi).
       { rewrite /K4 upd_ne; [| nz]. rewrite /K3 upd_eq. unfold regval_into_reg.
-        rewrite Hs1mr. apply pcv_addv_zero_l. }
+        rewrite Hs1mr. apply add_vec_zero_l. }
       iDestruct (cpu_own_transport CIDrc CIDk2 n eb pme C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Kfree.wp_kfree_sconf Φ γkl γk klk kfl K4 on n eb pme C (av - 4)%nat b

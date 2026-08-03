@@ -130,6 +130,7 @@ Require Import WpMemsetPage.
 Require Import CodeVirtioDiskInit.
 Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.
 From Kernel Require KernelSyms.
+Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -259,38 +260,12 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
-Lemma vdi_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-         SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned.
-  change (bv_unsigned (zero_reg : mword 64)) with 0%Z.
-  rewrite Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the queue address the device ends up with IS the page the driver kalloc'd *)
 Lemma vdi_reassemble (a : Arch.pa) : (bv_unsigned a < 2 ^ 32)%Z ->
   set_hi (set_lo zero64 (lo32 a)) (Z_to_bv 32 0) = a.
 Proof. intro H. rewrite <- (vdi_hi32_small a H). apply set_lo_hi_id. Qed.
 
-(* the 4-slot frame push/pop cancel *)
-Lemma vdi_sp_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (add_vec_unsigned : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64) = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64) = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the [sext.w rd,rs] + [sw] pair commits exactly the low half of [rs] *)
 Lemma vdi_addiw_sw (x : mword 64) :
@@ -1836,7 +1811,7 @@ Section ProofVirtioDiskInit.
     pose (E4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg pav]> E3).
     assert (HE4a4 : E4 !!! Regidx (mword_of_int 14 : mword 5) = pav) by (peel; reflexivity).
     assert (HE4a5 : E4 !!! Regidx (mword_of_int 15 : mword 5) = pu)
-      by (peel; apply vdi_addv_zero_l).
+      by (peel; apply add_vec_zero_l).
     assert (Hp0e8 : add_vec_int (mword_of_int (VDI + 0x0e4) : mword 64) 4 = mword_of_int (VDI + 0x0e8)) by pcs.
     iEval (rewrite Hp0e8) in "Hpc".
     (* +0x0e8 beqz a4 -- NOT taken *)
@@ -2511,7 +2486,7 @@ Section ProofVirtioDiskInit.
     assert (Hwv : add_vec (P4 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))
                   = m !!! Regidx csp_rs1).
-    { rewrite HP4sp. rewrite /spr. apply vdi_sp_cancel. }
+    { rewrite HP4sp. rewrite /spr. apply frame_cancel_32. }
     assert (Hpop : P4 !!! Regidx csp_rs1 = pa_stk (add_vec (P4 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv. rewrite HP4sp. symmetry. exact Hsprstk. }

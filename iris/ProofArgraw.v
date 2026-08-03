@@ -179,25 +179,6 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma ar_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx ar_a5.
 Proof. vm_compute. reflexivity. Qed.
 
-(* argraw's balanced 32-byte frame (identical to argint's / sys_uptime's). *)
-Lemma ar_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !Hu. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 Module ArgrawProof (Myproc : MYPROC) : ARGRAW.
 
@@ -553,18 +534,6 @@ Section ProofArgraw.
   Qed.
 
 
-  (* [c.mv rd,rs] is modelled as [add zero, rs]. *)
-  Lemma ar_addv_zero_l (X : mword 64) : add_vec (zero_reg : mword 64) X = X.
-  Proof.
-    assert (Hu : forall x y : mword 64,
-              bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-    { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-        SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-      rewrite bv_add_unsigned. reflexivity. }
-    apply bv_eq. rewrite Hu.
-    assert (HZ : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-    rewrite HZ Z.add_0_l. apply bv_wrap_bv_unsigned.
-  Qed.
 
 
   (* ================================================================== *)
@@ -1539,7 +1508,7 @@ Section ProofArgraw.
     assert (Hp0c : add_vec_int (mword_of_int (AR + 0x0a) : mword 64) 2 = mword_of_int (AR + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0c) in "Hpc".
     assert (HA2s1 : A2 !!! Regidx ar_s1 = mword_of_int (Z.of_nat i)).
-    { rewrite /A2 upd_eq ar_addv_zero_l.
+    { rewrite /A2 upd_eq add_vec_zero_l.
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       rewrite /A0 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     (* +0x0c: jal ra,myproc *)

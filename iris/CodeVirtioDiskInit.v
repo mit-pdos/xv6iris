@@ -44,8 +44,6 @@ Lemma vdi_cr5 : creg2reg_idx (Cregidx (mword_of_int 5)) = Regidx (mword_of_int 1
 Proof. vm_compute. reflexivity. Qed.
 Lemma vdi_cr6 : creg2reg_idx (Cregidx (mword_of_int 6)) = Regidx (mword_of_int 14).
 Proof. vm_compute. reflexivity. Qed.
-Lemma vdi_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15).
-Proof. vm_compute. reflexivity. Qed.
 
 (* ===================================================================== *)
 (* Compressed decode facts unique to virtio_disk_init.                    *)
@@ -322,7 +320,7 @@ Proof. apply exec_execute_C_ANDI_leaf. vm_compute. reflexivity. Qed.
 Lemma vde_9781 s :
   exec (execute (C_SRAI (mword_of_int 32, Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (SHIFTIOP (mword_of_int 32 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 15), SRAI)), s).
-Proof. rewrite exec_execute_C_SRAI vdi_cr7. reflexivity. Qed.
+Proof. rewrite exec_execute_C_SRAI creg_c7. reflexivity. Qed.
 
 (* ===================================================================== *)
 (* Base (32-bit) decode facts unique to virtio_disk_init.  Negative addi   *)

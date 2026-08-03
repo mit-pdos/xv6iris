@@ -72,6 +72,7 @@ Require Import SpecAllocproc.
 Require Import CodeAllocproc.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -83,38 +84,7 @@ Notation AP := KernelSyms.allocproc.
 (* section, per the zify-hook rule: no [mword] in context when [lia] runs. *)
 (* ===================================================================== *)
 
-(* [c.mv rd,rs] is modelled as [add zero, rs]. *)
-Lemma ap_addv_zero_l (X : mword 64) : add_vec (zero_reg : mword 64) X = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite Hu.
-  assert (HZ : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite HZ Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
-(* the balanced 32-byte frame *)
-Lemma ap_frame_cancel (X : mword 64) :
-  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
-          (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  assert (Hu : forall x y : mword 64,
-            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
-  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-    rewrite bv_add_unsigned. reflexivity. }
-  apply bv_eq. rewrite !Hu. rewrite bv_wrap_add_idemp_l.
-  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)) : mword 64)
-             = 18446744073709551584) by (vm_compute; reflexivity).
-  assert (HB : bv_unsigned (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)) : mword 64)
-             = 32) by (vm_compute; reflexivity).
-  rewrite HA HB. rewrite <- Z.add_assoc.
-  replace (18446744073709551584 + 32) with (bv_modulus 64) by (vm_compute; reflexivity).
-  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
-Qed.
 
 (* the [struct proc] displacements, in the [sign_extend' 64 (mword 12)] shape
    a load/store leaf produces them.  [p_pid] / [p_pagetable] / [p_trapframe]
@@ -510,7 +480,7 @@ Section ProofAllocproc.
       (* +0x82 c.addi16sp sp,32 *)
       assert (HE4csp : E4 !!! Regidx csp_rs1 = spd) by (rewrite /E4 upd_ne; [exact HE3csp | vm_compute; discriminate]).
       assert (Hup : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
-        by (rewrite /spd /sp0; apply ap_frame_cancel).
+        by (rewrite /spd /sp0; apply frame_cancel_32).
       assert (Hwv : add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
         by (rewrite HE4csp; exact Hup).
       assert (Hpop : E4 !!! Regidx csp_rs1
@@ -557,7 +527,7 @@ Section ProofAllocproc.
         rewrite /E3 upd_ne; [| vm_compute; discriminate].
         rewrite /E2 upd_ne; [| vm_compute; discriminate].
         rewrite /E1 upd_ne; [| vm_compute; discriminate].
-        rewrite /E0 upd_eq. apply ap_addv_zero_l. }
+        rewrite /E0 upd_eq. apply add_vec_zero_l. }
       assert (HE5csp : E5 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
         by (rewrite /E5 upd_eq; exact Hwv).
       assert (HE5s0 : E5 !!! Regidx ap_s0 = m !!! Regidx ap_s0).
@@ -741,7 +711,7 @@ Section ProofAllocproc.
       assert (HL2ra : L2 !!! Regidx ap_ra = add_vec_int (mword_of_int (AP + 0x1e) : mword 64) 4) by (rewrite /L2 upd_eq; reflexivity).
       assert (HL2a0 : L2 !!! Regidx ap_a0 = proc_addr k).
       { rewrite /L2 upd_ne; [| vm_compute; discriminate].
-        rewrite /L1 upd_eq ap_addv_zero_l. exact Hks1. }
+        rewrite /L1 upd_eq add_vec_zero_l. exact Hks1. }
       assert (HL2s1 : L2 !!! Regidx ap_s1 = proc_addr k).
       { rewrite /L2 upd_ne; [| vm_compute; discriminate].
         rewrite /L1 upd_ne; [| vm_compute; discriminate]. exact Hks1. }
@@ -1042,7 +1012,7 @@ Section ProofAllocproc.
         assert (HF6ra : F6 !!! Regidx ap_ra = add_vec_int (mword_of_int (AP + 0x4e) : mword 64) 4) by (rewrite /F6 upd_eq; reflexivity).
         assert (HF6a0 : F6 !!! Regidx ap_a0 = proc_addr k).
         { rewrite /F6 upd_ne; [| vm_compute; discriminate].
-          rewrite /F5 upd_eq ap_addv_zero_l. exact HF4s1. }
+          rewrite /F5 upd_eq add_vec_zero_l. exact HF4s1. }
         assert (HF6s1 : F6 !!! Regidx ap_s1 = proc_addr k).
         { rewrite /F6 upd_ne; [| vm_compute; discriminate].
           rewrite /F5 upd_ne; [| vm_compute; discriminate]. exact HF4s1. }
@@ -1455,7 +1425,7 @@ Section ProofAllocproc.
         assert (HR2ra : R2 !!! Regidx ap_ra = add_vec_int (mword_of_int (AP + 0x28) : mword 64) 4) by (rewrite /R2 upd_eq; reflexivity).
         assert (HR2a0 : R2 !!! Regidx ap_a0 = proc_addr k).
         { rewrite /R2 upd_ne; [| vm_compute; discriminate].
-          rewrite /R1 upd_eq ap_addv_zero_l. exact HL3s1. }
+          rewrite /R1 upd_eq add_vec_zero_l. exact HL3s1. }
         assert (HR2s1 : R2 !!! Regidx ap_s1 = proc_addr k).
         { rewrite /R2 upd_ne; [| vm_compute; discriminate].
           rewrite /R1 upd_ne; [| vm_compute; discriminate]. exact HL3s1. }

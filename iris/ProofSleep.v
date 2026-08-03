@@ -75,6 +75,7 @@ Require Import SchedCtx.
 Require Import CodeSleep.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecSleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -82,26 +83,8 @@ Local Open Scope Z_scope.
 (* Pure helpers: address arithmetic + the noff-cell value forms.          *)
 (* ===================================================================== *)
 
-Lemma sl_addv_unsigned (x y : mword 64) :
-  bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned. reflexivity.
-Qed.
 
-Lemma sl_addv_zero_l (x : mword 64) : add_vec zero_reg x = x.
-Proof.
-  apply bv_eq. rewrite sl_addv_unsigned.
-  assert (Hz : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
-  rewrite Hz Z.add_0_l. apply bv_wrap_bv_unsigned.
-Qed.
 
-Lemma sl_addvA (x y z : mword 64) : add_vec (add_vec x y) z = add_vec x (add_vec y z).
-Proof.
-  apply bv_eq. rewrite !sl_addv_unsigned.
-  rewrite bv_wrap_add_idemp_l bv_wrap_add_idemp_r Z.add_assoc. reflexivity.
-Qed.
 
 (* a saved-register frame slot address in terms of the pushed sp (local copy
    of ProofSched.sched_frame_bridge, which lives in a proof file). *)
@@ -120,7 +103,7 @@ Proof.
   { apply bv_eq. rewrite H.
     unfold mword_of_int, Values.to_word, get_word. cbn.
     rewrite Z_to_bv_unsigned. reflexivity. }
-  unfold pa_stk, add_vec_int. rewrite sl_addvA. rewrite Heq. reflexivity.
+  unfold pa_stk, add_vec_int. rewrite po_addv_assoc. rewrite Heq. reflexivity.
 Qed.
 
 
@@ -288,7 +271,7 @@ Section SleepPostSched.
     (* ------------------------------------------------------------------ *)
     assert (Hrec_chan2 : add_vec (msch !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12))
                          = p_chan (proc_addr j)).
-    { rewrite Hs1_msch sl_addv_zero_l. unfold p_chan, chan_off.
+    { rewrite Hs1_msch add_vec_zero_l. unfold p_chan, chan_off.
       assert (H32 : sign_extend' 64 (mword_of_int 32 : mword 12) = (mword_of_int 32 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H32. reflexivity. }
     assert (Hrec_chan2g : add_vec (rget msch (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12))
@@ -336,7 +319,7 @@ Section SleepPostSched.
     (* [true].  Everything from here to the re-acquire's return is generic. *)
     (* ------------------------------------------------------------------ *)
     assert (Ha0_E1 : E1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
-    { rewrite /E1 upd_ne; [| vm_compute; discriminate]. rewrite /E0 upd_eq Hs1_msch !sl_addv_zero_l. reflexivity. }
+    { rewrite /E1 upd_ne; [| vm_compute; discriminate]. rewrite /E0 upd_eq Hs1_msch !add_vec_zero_l. reflexivity. }
     assert (HE1ra : E1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SL + 0x34) : mword 64) 4)
       by (rewrite /E1 upd_eq; reflexivity).
     assert (Hlka_r2 : add_vec (E1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr j).
@@ -391,7 +374,7 @@ Section SleepPostSched.
                     = mword_of_int KernelSyms.acquire) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcaq2) in "Hpc".
     assert (Ha0_F1 : F1 !!! Regidx (mword_of_int 10 : mword 5) = lk0).
-    { rewrite /F1 upd_ne; [| vm_compute; discriminate]. rewrite /F0 upd_eq Hs2_mrel2 !sl_addv_zero_l. reflexivity. }
+    { rewrite /F1 upd_ne; [| vm_compute; discriminate]. rewrite /F0 upd_eq Hs2_mrel2 !add_vec_zero_l. reflexivity. }
     assert (HF1ra : F1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SL + 0x3a) : mword 64) 4)
       by (rewrite /F1 upd_eq; reflexivity).
     (* reconcile lk-derived acquire addresses to the spec's lka forms. *)
@@ -504,7 +487,7 @@ Section SleepPostSched.
     assert (Hspd6 : pa_stk sp0 6 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpopsp : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0).
-    { rewrite -Hspd sl_addvA.
+    { rewrite -Hspd po_addv_assoc.
       assert (HAB : add_vec (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite HAB. apply kv_addv_zero. }
@@ -885,7 +868,7 @@ Section ProofSleep.
       rewrite (callee_saved_lookup Hcs_mp (mword_of_int 18) ltac:(vm_compute; reflexivity)).
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s2. }
     assert (Ha0_C1 : C1 !!! Regidx (mword_of_int 10 : mword 5) = lk0).
-    { rewrite /C1 upd_ne; [| vm_compute; discriminate]. rewrite /C0 upd_eq Hs2_macq !sl_addv_zero_l. reflexivity. }
+    { rewrite /C1 upd_ne; [| vm_compute; discriminate]. rewrite /C0 upd_eq Hs2_macq !add_vec_zero_l. reflexivity. }
     assert (HC1ra : C1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (SL + 0x1e) : mword 64) 4)
       by (rewrite /C1 upd_eq; reflexivity).
     assert (Hlka_r1 : add_vec (C1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
@@ -921,7 +904,7 @@ Section ProofSleep.
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s3. }
     assert (Hrec_chan : add_vec (mrel1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12))
                         = p_chan (proc_addr j)).
-    { rewrite Hs1_mrel1 sl_addv_zero_l. unfold p_chan, chan_off.
+    { rewrite Hs1_mrel1 add_vec_zero_l. unfold p_chan, chan_off.
       assert (H32 : sign_extend' 64 (mword_of_int 32 : mword 12) = (mword_of_int 32 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H32. reflexivity. }
     assert (Hrec_chang : add_vec (rget mrel1 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12))
@@ -935,7 +918,7 @@ Section ProofSleep.
     { iEval (rewrite Hrec_chang). iExact "Hchan". }
     rewrite wp_next_off.
     iIntros "Hcg Hpc Hchan".
-    iEval (rewrite Hrec_chang Hs3_mrel1g sl_addv_zero_l) in "Hchan".
+    iEval (rewrite Hrec_chang Hs3_mrel1g add_vec_zero_l) in "Hchan".
     assert (Hpc26 : add_vec_int (mword_of_int (SL + 0x22) : mword 64) 4 = mword_of_int (SL + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
     (* +0x26 c.li a5,2 *)
@@ -955,7 +938,7 @@ Section ProofSleep.
       by (rewrite /D0 upd_ne; [| vm_compute; discriminate]; exact Hs1_mrel1).
     assert (Hrec_state : add_vec (D0 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12))
                          = p_state (proc_addr j)).
-    { rewrite HD0s1 sl_addv_zero_l. unfold p_state, state_off.
+    { rewrite HD0s1 add_vec_zero_l. unfold p_state, state_off.
       assert (H24 : sign_extend' 64 (mword_of_int 24 : mword 12) = (mword_of_int 24 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H24. reflexivity. }
     assert (Hrec_stateg : add_vec (rget D0 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12))

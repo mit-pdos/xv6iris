@@ -28,6 +28,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
+Require Import RiscvExtras.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -93,18 +94,12 @@ Qed.
    whole InstrBytes/WP stack) -- see [uint_unsigned]/[uint_pa_add] in
    SmodePte.v / WpSmodeGpr.v for the upstream originals; this is the same
    one-line proof, kept local so this file's Require chain stays light. *)
-Local Lemma kalloc_uint_unsigned (a : mword 64) : uint a = bv_unsigned a.
-Proof.
-  pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
-  rewrite Z2N.id; [ reflexivity | lia ].
-Qed.
 
 Local Lemma kalloc_uint_pa_add (a : mword 64) (j : nat) :
   (uint a + Z.of_nat j < 18446744073709551616)%Z ->
   uint (pa_add a j) = uint a + Z.of_nat j.
 Proof.
-  intro Hlt. rewrite !kalloc_uint_unsigned in Hlt |- *.
+  intro Hlt. rewrite !uint_unsigned in Hlt |- *.
   unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
     Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
   unfold MachineWord.MachineWord.add.

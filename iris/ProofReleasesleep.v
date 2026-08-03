@@ -252,7 +252,7 @@ Section ProofReleasesleep.
     (* the two store addresses, in the leaves' [rget] spelling *)
     assert (Hslkaddr : add_vec (rget (CID := CIDacq) Macq (mword_of_int 9 : mword 5))
                          (sign_extend' 64 (mword_of_int 0 : mword 12)) = slk).
-    { rgne. rewrite HMacqs1. apply wk_add_vec_0. }
+    { rgne. rewrite HMacqs1. apply addv_sext0. }
     assert (Hpidaddr : add_vec (rget (CID := CIDacq) Macq (mword_of_int 9 : mword 5))
                          (sign_extend' 64 (mword_of_int 0x28 : mword 12)) = sl_pid slk).
     { rgne. rewrite HMacqs1. reflexivity. }
@@ -366,7 +366,7 @@ Section ProofReleasesleep.
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf Φ γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
               0%nat b pme C (av - 4)%nat
-              ltac:(rewrite HKrela0; apply wk_add_vec_0)
+              ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [] HtokL HRsl Hown Hpay [-]").
     { iExact "Hlockinv". }

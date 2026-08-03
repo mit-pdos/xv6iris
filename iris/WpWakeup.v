@@ -366,9 +366,6 @@ Section ProcInv.
 
   (* adding the (zero) offset [sext 0] is a noop: release's lock-word address is
      [add_vec lk0 (sext 0)], which must equal the lock's base [proc_addr k]. *)
-  Lemma wk_add_vec_0 (x : mword 64) :
-    add_vec x (sign_extend' 64 (mword_of_int 0 : mword 12)) = x.
-  Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 
   (* a state cell holding a value whose 64-bit sign-extension is 2 is SLEEPING;
      used in the wake path where the c.lw-loaded [sext st] compared equal to
@@ -382,11 +379,6 @@ Section ProcInv.
     rewrite trunc32_sext in Ht. rewrite Ht. apply bv_eq; vm_compute; reflexivity.
   Qed.
 
-  (* compressed-register decode: c.lw/c.ld/c.sw name x9 (s1) and x15 (a5). *)
-  Lemma wk_cr1 : creg2reg_idx (Cregidx (mword_of_int 1)) = Regidx (mword_of_int 9 : mword 5).
-  Proof. vm_compute. reflexivity. Qed.
-  Lemma wk_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx (mword_of_int 15 : mword 5).
-  Proof. vm_compute. reflexivity. Qed.
   (* [csp_rs1] (the c.*sp base encoding) is register x2 (sp). *)
 
   (* the noff word as rewritten by acquire's push_off (noff+1, truncated to 32)
