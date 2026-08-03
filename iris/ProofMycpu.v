@@ -8,7 +8,7 @@
    c.addi sp,16 feeds the frame back via [wp_caddi_sp_pop_s_sconf]
    (n - 2 -> n).  Leaf-by-leaf (the old den blocks contain the
    sp-moves, which the sconf VCgen guard forbids); the instruction
-   facts myi_XX are imported from WpMycpu.v.
+   facts myi_XX are imported from CodeMycpu.v.
 
    INTERRUPTS OFF.  The contract (SpecMycpu.v) is stated at [b = false]
    because the [tp] read happens MID-function: see the comment there.  Every
@@ -30,7 +30,7 @@ Require Import SmodeCore.
 Require Import HartTp WpNext IntrDefs.
 Require Import StackOwn CalleeSaved.
 Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpMycpu.
+Require Import CodeMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecMycpu.
 Require Import KernelRvcDecode.

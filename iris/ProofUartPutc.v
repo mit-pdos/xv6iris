@@ -1,6 +1,6 @@
 (* ProofUartPutc.v -- uartputc_sync over the SIE-agnostic sconf world.
 
-   The sconf mirror of [wp_uartputc_r] (WpUartPutcSyncFull.v): the panic-path
+   The sconf mirror of [wp_uartputc_r] (CodeUartPutcSync.v): the panic-path
    synchronous UART putc (panicking != 0 && panicked == 0), which does NO
    push_off/pop_off/locking, hence threads NO [intr_count].  The prologue/
    epilogue 4-slot frame (3 saves ra/s0/s1 + padding) is carved out of the
@@ -10,8 +10,8 @@
    two device leaves are the ProofUart accessor forms.
 
    All config-independent [instr] decode facts, the ppc_f* register maps and
-   the lsr_* device helpers are REUSED from the smode WpUartPutcSync /
-   WpUartPutcSyncFull files (persistent / pure facts, so the sconf port only
+   the lsr_* device helpers are REUSED from the smode CodeUartPutcSync /
+   CodeUartPutcSync files (persistent / pure facts, so the sconf port only
    re-does the resource threading); the frame cancellation is the shared
    [frame_cancel_32] (KernelRvcDecode.v).
 
@@ -48,7 +48,7 @@ Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl SpecUart.
-Require Import WpUartPutcSync WpUartPutcSyncFull.
+Require Import CodeUartPutcSync.
 Require Import WpSconfUartAccess.
 Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.

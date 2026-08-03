@@ -1,5 +1,5 @@
 (* ProofWakeupParts.v -- wakeup over the SIE-agnostic sconf world (kalloc cone,
-   stage 8).  Foundation for the sconf mirror of [wp_wakeup] (WpWakeup.v): a
+   stage 8).  Foundation for the sconf mirror of [wp_wakeup] (CodeWakeup.v): a
    loop over the proc[] table that, per proc, acquires the proc lock, wakes it
    if SLEEPING on the given chan, and releases -- threading the counting token
    [intr_count] net-zero across each acquire/release pair.
@@ -26,7 +26,7 @@ Require Import StackOwn.
 Require Import WpSmodeIntr.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpWakeup.
+Require Import CodeWakeup.
 Require Import SpecWakeupParts.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -41,7 +41,7 @@ Local Ltac rgne :=
       intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
 (* ======================================================================= *)
-(* myproc(), sconf-flavoured.  Like the smode [wp_myproc] (WpWakeup.v), the  *)
+(* myproc(), sconf-flavoured.  Like the smode [wp_myproc] (CodeWakeup.v), the  *)
 (* only fact wakeup needs is that a0 comes back a genuine proc[] entry and   *)
 (* the callee-saved registers are preserved.  myproc internally push_off/    *)
 (* pop_offs (net-zero) and manages its own stack frame from the capability's *)

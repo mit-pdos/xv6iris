@@ -1,6 +1,6 @@
 (* ProofInitlock.v -- initlock over the SIE-agnostic sconf world.
 
-   The sconf mirror of [wp_initlock_r] (WpInitlock.v): a straight-line
+   The sconf mirror of [wp_initlock_r] (CodeInitlock.v): a straight-line
    function with NO locking (no push_off/acquire), so it does NOT thread
    [intr_count] at all.  It owns the spinlock's three struct fields
    (locked : 4B @ +0, name : 8B @ +8, cpu : 8B @ +16) as raw memory and
@@ -11,7 +11,7 @@
    owned word (the lock is not yet an invariant) -- for that we use
    [wp_sw_zero_s_sconf] (WpSconfMem.v), the width-4 sibling of
    [wp_sd_zero_s_sconf].  The decode facts + [initlock_sp_
-   cancel] are reused from the smode file WpInitlock.v, exactly as
+   cancel] are reused from the smode file CodeInitlock.v, exactly as
    ProofKfree reuses WpKfree's [kfi_*]. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
@@ -27,7 +27,7 @@ Require Import SmodeCore.
 Require Import HartTp WpNext IntrDefs.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpInitlock WpLock.
+Require Import CodeInitlock WpLock.
 Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

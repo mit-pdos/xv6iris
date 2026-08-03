@@ -1,4 +1,4 @@
-(* WpMycpu.v -- whole-function WP for xv6's mycpu() in S-mode.
+(* CodeMycpu.v -- whole-function WP for xv6's mycpu() in S-mode.
    mycpu() @ 0x800018d6 returns a0 = &cpus[cpuid] (cpuid = tp register),
    using its own 16-byte stack frame (saves/restores ra,s0).  Built by
    composing the S-mode instruction lemmas (existing framework ones plus the
@@ -108,7 +108,7 @@ Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
    stack slots sit at sp+8 / sp+0. *)
 
 
-Section WpMycpu.
+Section CodeMycpu.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
@@ -180,10 +180,10 @@ Section WpMycpu.
   (*  a5 is clobbered, and ra/sp/s0 are restored (callee-saved).            *)
   (* =================================================================== *)
   (* the prologue's / epilogue's [instr] facts, from kernel_text via the
-     existing WpMycpu decode templates. *)
+     existing CodeMycpu decode templates. *)
 
 
   (* ------------------------------------------------------------------- *)
 
 
-End WpMycpu.
+End CodeMycpu.

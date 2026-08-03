@@ -30,6 +30,9 @@ Require Import WpEntryNew WpTimerinit WpStartNew.
 Require Import SpecEntry.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import CodeStart.
+Require Import CodeTimerinit.
+Require Import CodeEntry.
 Local Open Scope Z_scope.
 
 Module EntryProof : ENTRY.

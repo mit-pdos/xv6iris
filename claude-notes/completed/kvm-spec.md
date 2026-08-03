@@ -97,7 +97,7 @@ by aligned/nonzero premises (`mappages_align_probe`/`mappages_size_nonzero`),
 loop-state setup `s2 := last-page va` (`mappages_s2_val`), then the loop.
 `mappages_spec_holds : ⊢ mappages_spec`.
 
-### wp_kvmmap (WpKvmmap.v; panic_wp is a HYPOTHESIS, not a global axiom)
+### wp_kvmmap (CodeKvmmap.v; panic_wp is a HYPOTHESIS, not a global axiom)
 
 Thin wrapper: 2-slot frame, three c.mv swapping mappages's size/pa args (a2↔a3
 via a5), jal mappages (`wp_mappages_r` at swapped map P6, va/pa/vpn0/ppn0

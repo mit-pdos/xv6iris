@@ -520,7 +520,7 @@ Proof. decode_bridge_ms. Qed.
 
 (* --------------------------------------------------------------------- *)
 (* Words promoted when devintr became their second user (the private      *)
-(* copies in CodeVirtioDiskIntr / WpKvmmap were retired at the same time).*)
+(* copies in CodeVirtioDiskIntr / CodeKvmmap were retired at the same time).*)
 (* --------------------------------------------------------------------- *)
 
 (* beq a4,a5,+0x50 *)

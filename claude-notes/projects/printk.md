@@ -642,7 +642,7 @@ The assembly, in order (all four steps DONE):
 
 Blocked on uartputc_sync: only its `panicking != 0` path is proven
 (`ProofUartPutc.v`). The general path adds push_off/pop_off (both proven, and
-`WpPushOffTop.v`/`WpPopOff.v` are ready) and hence an `intr_count`, which would
+`CodePushOff.v`/`CodePopOff.v` are ready) and hence an `intr_count`, which would
 then have to be threaded through consputc, printint and printk. On top of that
 printk itself would take and release `pr.lock`, so its spec would grow an
 `is_lock` over whatever resource `pr.lock` protects (today: nothing -- see

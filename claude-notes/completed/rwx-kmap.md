@@ -644,7 +644,7 @@ correspondence lemma; hand out
    identity byte's own KP_rw claim + ram_svpn_static +
    kmap_at_agree pin class AND ppn (pa_of_id), so RAM bounds
    suffice.  The lemma carries the forward pointer: proc_lock_res/
-   procs_inv (WpWakeup) will gain a per-proc page_own (kstack_va i)
+   procs_inv (CodeWakeup) will gain a per-proc page_own (kstack_va i)
    conjunct; sp-migration consumes that.
    THIS PROJECT'S WORKLIST IS EXHAUSTED; the two cleanups once
    parked here are closed (see the header).  The durable recipes

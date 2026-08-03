@@ -13,7 +13,7 @@
    KernelBaseDecode.v; the rest are uartintr's own.
 
    NOTE for the next decode sweep: the private copies of the first four words
-   in CodeUartinit.v / WpUartPutcSync.v / CodePrintk.v are now
+   in CodeUartinit.v / CodeUartPutcSync.v / CodePrintk.v are now
    redundant with the KernelBaseDecode entries added here and can be retired.
 
    +0x44..+0x54 is uartgetc, which gcc INLINED (there is no such symbol in the

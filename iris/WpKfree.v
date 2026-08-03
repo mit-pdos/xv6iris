@@ -2,7 +2,7 @@
    against the allocator spec in KallocInv.v.
 
    kfree is a whole-function S-mode proof in the mould of [wp_release]
-   (WpRelease.v) and [wp_acquire_lock] (WpAcquireLock.v): it threads the S-mode
+   (CodeRelease.v) and [wp_acquire_lock] (WpAcquireLock.v): it threads the S-mode
    machine configuration (mstatus/pmp/pte/tlb) through every instruction and
    CALLS the sub-functions memset / acquire / release via [jal], discharging
    each callee's whole-function WP.  The novel content is the free-list PUSH,

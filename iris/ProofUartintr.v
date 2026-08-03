@@ -51,10 +51,10 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
-Require Import WpLock WpMycpu ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock CodeMycpu ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
-Require Import SpecUart WpUartPutcSync WpSconfUartAccess WpUartgetc.
+Require Import SpecUart CodeUartPutcSync WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
 Require Import SpecPanic.
 Require Import SchedCtx.

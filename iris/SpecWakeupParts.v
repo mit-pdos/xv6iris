@@ -18,7 +18,7 @@ Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import IntrDefs.
 Require Import IntrDefs.
-Require Import WpWakeup.
+Require Import CodeWakeup.
 From Kernel Require KernelSyms.
 
 Notation WK := KernelSyms.wakeup.

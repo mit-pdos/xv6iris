@@ -30,8 +30,8 @@ order; `make proofs` computes the order automatically from `_CoqProject`):
 | **`VcGen.v`** | The straight-line **VCgen**: deep-embedded symbolic values/heap, the computable symbolic executor `vc_step`/`vc_block`, and the single generic block WP **`wp_vc_block`** (one `vm_compute` + one `iApply` per block instead of one leaf-WP `iApply` per instruction). See the "straight-line VCgen" section below. |
 | **`VcGenDemo.v`** | The VCgen applied to a real kernel block: the 4-instruction timerinit prologue, re-derived as `wp_timerinit_prologue_vc` with ordinary `↦₈` pre/posts. |
 | **`VcGenS.v`** | The **S-mode** instantiation of the VCgen: the RVC-shape alphabet `vop_s` (c.addi / c.addi4spn / c.sdsp / c.ldsp), the executor `vc_block_s`, and **`wp_vc_block_s`** — the same one-`vm_compute`-per-block lifting over the S-mode leaf WPs (Supervisor config + `tlb_inv` threaded through). |
-| **`WpMycpuVc.v`** | `wp_mycpu` **re-proved with the VCgen**: mycpu's 4-instruction prologue and 3-instruction epilogue are each one `wp_vc_block_s`; only the 6 value-computing middle instructions and the `c.ret` keep per-instruction leaves. Statement identical to `WpMycpu.wp_mycpu`. |
-| **`WpPopOffVc.v`** | `wp_pop_off` **re-proved with the VCgen**, callee included: pop_off's prologue and (per bnez branch) epilogue are `wp_vc_block_s` applications — the epilogue's symbolic run is `vm_compute`d ONCE and reused in both branches — and the `jal mycpu` call composite is rebuilt on `wp_mycpu_vc`. Statement identical to `WpPopOff.wp_pop_off`; same 5 platform axioms. |
+| **`WpMycpuVc.v`** | `wp_mycpu` **re-proved with the VCgen**: mycpu's 4-instruction prologue and 3-instruction epilogue are each one `wp_vc_block_s`; only the 6 value-computing middle instructions and the `c.ret` keep per-instruction leaves. Statement identical to `CodeMycpu.wp_mycpu`. |
+| **`WpPopOffVc.v`** | `wp_pop_off` **re-proved with the VCgen**, callee included: pop_off's prologue and (per bnez branch) epilogue are `wp_vc_block_s` applications — the epilogue's symbolic run is `vm_compute`d ONCE and reused in both branches — and the `jal mycpu` call composite is rebuilt on `wp_mycpu_vc`. Statement identical to `CodePopOff.wp_pop_off`; same 5 platform axioms. |
 | `kernel-rocq/` | The dumped xv6 kernel image (`Kernel.KernelInstrs` / `KernelData` / `KernelSyms`), produced by `tools/dump_kernel.py`; a separate compiled dependency consumed by `KernelBoot.v`. |
 | `archive/` | The original ~35-file modular development this was consolidated from, plus dead-ends (the mock `RiscvIris*`, superseded `ADDwp*`/`WPAdd`, the abandoned `ChooseFree2`/`Step`). Kept for reference; not needed to build. |
 
@@ -373,7 +373,7 @@ An experiment in replacing hand-chained per-instruction WPs with a
 **Problem.** A straight-line block is verified today by one
 `iApply (wp_<op>_gpr …)` per instruction, manually re-threading
 `mmode_config` / `pmpcfg` / `pc_is` / `gpr_file` / points-to through every
-step (WpTimerinit / WpStartNew / WpPushOffTop are 20–35 such steps and
+step (WpTimerinit / WpStartNew / CodePushOff are 20–35 such steps and
 1–3 kloc each).  The plumbing is identical per instruction shape; only the
 data differ.
 

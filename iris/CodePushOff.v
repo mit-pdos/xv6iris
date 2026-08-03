@@ -1,6 +1,6 @@
-(* WpPushOffTop.v -- the top-level WP for xv6's push_off() in S-mode.
+(* CodePushOff.v -- the top-level WP for xv6's push_off() in S-mode.
    Composes: the prologue/epilogue stack ops, csrrci (interrupt disable,
-   WpPushOffCsr), the two mycpu() calls (WpMycpu), the per-cpu noff/intena
+   WpPushOffCsr), the two mycpu() calls (CodeMycpu), the per-cpu noff/intena
    4-byte accesses (WpPushOffMem), the beqz two-arm join, and the new
    arithmetic/branch instruction lemmas (WpPushOff).  Full functional
    postcondition: SIE cleared, noff incremented, intena = old SIE iff noff
@@ -29,7 +29,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* Decode templates (mirrors of WpMycpu / WpTimerinit / CodeKernelvec).       *)
+(* Decode templates (mirrors of CodeMycpu / WpTimerinit / CodeKernelvec).       *)
 (* ===================================================================== *)
 Local Ltac po_ast :=
   first [ reflexivity
@@ -157,7 +157,7 @@ Proof. apply exec_execute_C_ANDI_leaf; vm_compute; reflexivity. Qed.
 
 
 
-Section WpPushOffTop.
+Section CodePushOff.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{CID : CpuId}.
@@ -276,7 +276,7 @@ Section WpPushOffTop.
 
 
   (* The reusable jal->mycpu->return composites wp_call_mycpu /
-     wp_call_mycpu_scfg_cs now live in WpMycpu (beside wp_mycpu), so
+     wp_call_mycpu_scfg_cs now live in CodeMycpu (beside wp_mycpu), so
      holding/acquire reuse them without depending on push_off. *)
 
   (* ============ the suffix from 0x80000bd8 (PO+0x18) to c.ret ============ *)
@@ -288,4 +288,4 @@ Section WpPushOffTop.
 
 
 
-End WpPushOffTop.
+End CodePushOff.

@@ -1,4 +1,4 @@
-(* WpWakeup.v -- the per-process spinlock invariant of xv6's [struct proc],
+(* CodeWakeup.v -- the per-process spinlock invariant of xv6's [struct proc],
    the global [proc[NPROC]] lock invariant, and (later) a whole-function WP for
    wakeup().
 
@@ -269,7 +269,7 @@ End WkScfgLeaves.
    context obligation ([proc_ctx]) and their intro/elim/wakeup lemmas moved
    to SchedCtx.v (built on the sconf-γ swtch protocol), superseding the old
    smode-config / [contains_lock]-based versions that used to live here.
-   WpWakeup keeps only the decode/leaf/loop-arithmetic content below. *)
+   CodeWakeup keeps only the decode/leaf/loop-arithmetic content below. *)
 Section ProcInv.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
   Context `{CID : CpuId}.

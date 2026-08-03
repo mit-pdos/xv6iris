@@ -101,7 +101,7 @@ Lemma su_uint_cast_sext (t : mword 32) :
   shift_bits_right (shift_bits_left (sign_extend' 64 t) su_sh32) su_sh32 = zero_extend' 64 t.
 Proof. rewrite su_uint_cast. rewrite trunc32_sext. reflexivity. Qed.
 
-(* two one-liners copied self-contained (they live inside WpWakeup's section;
+(* two one-liners copied self-contained (they live inside CodeWakeup's section;
    requiring that file here would be a heavy edge for two trivialities). *)
 Lemma su_eq_vec_refl {k} (x : mword k) : eq_vec x x = true.
 Proof. apply eq_vec_true_iff. reflexivity. Qed.

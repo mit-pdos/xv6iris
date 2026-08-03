@@ -247,6 +247,6 @@ usual reason.  Reach for this shape for any other `static` helper gcc inlines.
 - The `uartputc_sync` token tension above.
 - Decode hygiene: four base words (`lui a5,0x10000`, `andi a5,a5,32`,
   `auipc a5,0xa`, `lbu a0,0(s2)`) moved into KernelBaseDecode.v for uartintr;
-  the private copies in CodeUartinit.v / WpUartPutcSync.v /
+  the private copies in CodeUartinit.v / CodeUartPutcSync.v /
   CodePrintk.v are now redundant and the next decode sweep can retire
   them.

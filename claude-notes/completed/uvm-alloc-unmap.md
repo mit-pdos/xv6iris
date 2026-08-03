@@ -406,8 +406,8 @@ local copies deleted across 20 files** (net −24 proofs).  Compressed: `17fd`
 copies), `00c79513`, `03459793`, `f51ff0ef`.  The four offset-named homes the
 last sweep warned about were found by keying the index on the **word inside
 the statement**, not on the lemma name — that is what turned up
-`CodeSched.sddec_add_a1_a5` (= `95be`), `WpAcquireTop.aqdec_auipc` /
-`WpKvmmap.kvdec_auipc` / `CodeProcMapstacks.pmsdec_98` (= `00006517`) and
+`CodeSched.sddec_add_a1_a5` (= `95be`), `CodeAcquire.aqdec_auipc` /
+`CodeKvmmap.kvdec_auipc` / `CodeProcMapstacks.pmsdec_98` (= `00006517`) and
 `CodeMappages.mdec_16`/`mdec_34`.  The nine words the worklist flagged
 (`8f75` `97ae` `8ff5` `8f99` `4685` `995a` `e38d` `d57d` `d37d`) turned out to
 be **singletons** and stayed local.  A word-keyed index of the whole tree

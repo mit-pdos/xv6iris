@@ -36,7 +36,7 @@ Local Open Scope Z_scope.
    [RiscvExtras] (as [ArrCursor] does) so callers need only this file. *)
 
 (* ...and its [sub_vec] counterpart, which the tree had under no name at all
-   before this (it was inlined in [WpHolding] and [KstackArith] and proved
+   before this (it was inlined in [CodeHolding] and [KstackArith] and proved
    twice more inside the two copy proofs). *)
 
 

@@ -61,7 +61,7 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpLock WpMycpu ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock CodeMycpu ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs.
 Require Import FdSlots.
 Require Import KallocInv PipeInv.

@@ -28,7 +28,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock KernelRvcDecode.
 Require Import SpecHolding.
 Require Import SpecPushOff.
-Require Import WpRelease.
+Require Import CodeRelease.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Import Defs.

@@ -2,9 +2,9 @@
    resource.
 
    Pure layout facts shared by the proc-lock invariant (SchedCtx.v), the
-   wakeup proof (WpWakeup.v) and the myproc/sched/yield whole-function specs.
+   wakeup proof (CodeWakeup.v) and the myproc/sched/yield whole-function specs.
    All per-CPU cell addresses are stated tp-indexed via [mycpu_ret tp0]
-   (WpMycpu.v), the same closed form the acquire/release/push_off/pop_off
+   (CodeMycpu.v), the same closed form the acquire/release/push_off/pop_off
    specs already use, so cells unify across call boundaries by name.
 
    Layout (kernel/proc.h, corroborated by the compiled image):
@@ -28,7 +28,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so the
                             ~90 existing references through ProcGeom keep working *)
-Require Import WpMycpu.
+Require Import CodeMycpu.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.

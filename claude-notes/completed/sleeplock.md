@@ -90,7 +90,7 @@ word is caller-threaded pinned `zero_reg` pre/post.
   MYPROC + the wp_sleep_sconf axiom); Releasesleep(ACQUIRE, RELEASE,
   WAKEUP); Holdingsleep(ACQUIRE, RELEASE, MYPROC).
 - Noff-cell forms across an acquire: the cell comes back as
-  `wk_noff_acq (mword_of_int 0)` etc. (WpWakeup.v) — rewrite computed forms
+  `wk_noff_acq (mword_of_int 0)` etc. (CodeWakeup.v) — rewrite computed forms
   to literals with `apply bv_eq; vm_compute; reflexivity` asserts.
 - acquire's `cpuold ≠ cpuv` premise: from `mycpu_ret_nonzero` + `tp_ok_cid`
   (ProcGeom.v) when tp = cid_word; releasesleep takes it as a premise.

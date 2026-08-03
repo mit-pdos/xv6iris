@@ -21,7 +21,7 @@
 
    The symbolic state, heap, and register denotation are shared with
    VcGen.v ([vstate] / [vheap_own] / [vregs_den] / [sval]).  See
-   WpMycpu.v / WpPopOff.v for this VCgen applied to mycpu() and
+   CodeMycpu.v / CodePopOff.v for this VCgen applied to mycpu() and
    pop_off(). *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.

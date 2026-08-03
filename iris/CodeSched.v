@@ -6,7 +6,7 @@
    freerange's/sleep's, and the a5-materialization triple (c.mv a5,tp / sext.w /
    c.slli a5,7) is mycpu's, so all of those come from the shared [cdec_*]
    templates in KernelRvcDecode.v -- this file no longer imports another
-   function's decode file (or WpMycpu, which holds a WP) to reach them.
+   function's decode file (or CodeMycpu, which holds a WP) to reach them.
    The remaining words -- the two panic-guard c.li's, the c.lw of
    p->state, the two c.add's onto pid_lock, c.mv s1,a0, c.beqz/c.bnez guards,
    c.andi, c.addi a5,8, the three per-CPU c.add's, the csrr, the two lw's, the

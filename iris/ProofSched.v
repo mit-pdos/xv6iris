@@ -17,7 +17,7 @@ Require Import InstrBytes KernelText.
 Require Import IntrDefs HartTp WpNext WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpLock.
-Require Import WpMycpu.
+Require Import CodeMycpu.
 Require Import WpAuipc.
 Require Import FdSlots.
 Require Import ProcGeom.

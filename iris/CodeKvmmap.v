@@ -1,4 +1,4 @@
-(* WpKvmmap.v -- the whole-function proof of kvmmap() (kernel/vm.c):
+(* CodeKvmmap.v -- the whole-function proof of kvmmap() (kernel/vm.c):
    a thin wrapper that swaps mappages's size/pa arguments, calls mappages,
    and panics on failure.  Spec of record: SpecKvmmap.v's [wp_kvmmap_sconf].
    The frame decodes are the shared 16-byte templates in KernelRvcDecode;

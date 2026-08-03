@@ -376,7 +376,7 @@ Two things specific to copyout:
         (`cbv [sign_extend' … MachineWord.sign_extend]` → `bv_sign_extend_unsigned`
         → `bv_swrap_small`).
       - **`sub_vec`'s unsigned law does not exist in the tree** (inlined twice,
-        in `WpHolding` and `KstackArith`); `pgd_unsigned` alone does not give
+        in `CodeHolding` and `KstackArith`); `pgd_unsigned` alone does not give
         the +0x82/+0x86/+0x32 chunk arithmetic.
       - **`bb_split`/`bb_join` are awkward at SYMBOLIC offsets** — the
         higher-order unification of `f (k+j)` against `?f j` is fragile.  What
@@ -429,7 +429,7 @@ their altitude, deduplicated against each other on the way:
   Also `sextw_moi`, `subrange_31_0_unsigned`, and the four 64-bit unsigned
   readings `moi64_unsigned` / `add_vec64_unsigned` / `sub_vec64_unsigned` /
   `and_vec64_unsigned` — which also retired the inlined `sub_vec` unfold chains
-  in `KstackArith.subvec_moi` and `WpHolding.seqz_sub_neq`.
+  in `KstackArith.subvec_moi` and `CodeHolding.seqz_sub_neq`.
 - `ByteBuf.bb_split3` / `bb_join3` are now PRIMARY (proved off a `Local
   bb_cut`), with `bb_split`/`bb_join` as their `c = 0` special cases — the
   2-way form was the abstraction mistake both proof agents independently

@@ -50,7 +50,7 @@ producers know it: sched's premise ties its cpu_own to its `j`; the scheduler
 just wrote c->proc = proc_addr j).  `p_sched_at_cpu` then takes `p =
 proc_addr j` and pins the existential j' = j via `proc_addr` injectivity.
 Blast radius: SwtchCtx, SpecSwtch, ProofSwtch, SchedCtx, SpecSched/ProofSched,
-ProofYield, ProofSleep, WpSwtchVc, WpWakeup — arity-mechanical everywhere
+ProofYield, ProofSleep, WpSwtchVc, CodeWakeup — arity-mechanical everywhere
 except the SchedCtx intro/elims (which gain/consume the new pure conjunct).
 
 ### 2. The interrupt-enable window and the eb accounting
@@ -159,7 +159,7 @@ whole-function spec for a diverging function.
 
 - **The payload-index refactor cost almost nothing**: ProofSwtch needed only
   the binder's arity (the pack/unpack sites already pass `p`); ProofSched one
-  call site; ProofYield/ProofSleep/WpWakeup compiled unchanged.
+  call site; ProofYield/ProofSleep/CodeWakeup compiled unchanged.
 - **The csrsi enable leaf's eb=false arm IS the pop_off restore leaf**:
   `intr_count γ 0 false ∗ intr_handler_avail γ` is definitionally
   `intr_count γ 1 true` (`intr_count_pack_S_on`), so that arm is a

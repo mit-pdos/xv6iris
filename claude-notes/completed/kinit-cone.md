@@ -44,7 +44,7 @@ allocations cannot fail. This layer is built and the sconf specs
   conclusion — spatial inputs kept). Any file that uses `kalloc_env`, `kmem_res`,
   or a kalloc/kfree spec needs `!kallocG Σ` in its section context.
 
-## initlock (WpInitlock.v)
+## initlock (CodeInitlock.v)
 
 Whole-function WP for the 11-instruction `initlock` (prologue / 3 field stores
 name·locked·cpu / epilogue).  Spec owns the spinlock's three struct fields as

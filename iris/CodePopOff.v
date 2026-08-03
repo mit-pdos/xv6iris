@@ -1,4 +1,4 @@
-(* WpPopOff.v -- whole-function WP for xv6's pop_off() in S-mode, plus the
+(* CodePopOff.v -- whole-function WP for xv6's pop_off() in S-mode, plus the
    leaves it needs that did not yet exist:
 
      pop_off @ 0x80000c3a (KernelInstrs.kernel_bytes):
@@ -371,7 +371,7 @@ Section WpPopOffTopSec.
 
 
   (* ------------------------------------------------------------------ *)
-  (* the call composite (jal + the whole mycpu): the WpPushOffTop proof,  *)
+  (* the call composite (jal + the whole mycpu): the CodePushOff proof,  *)
   (* verbatim, with wp_mycpu as the callee.                            *)
   (* ------------------------------------------------------------------ *)
 

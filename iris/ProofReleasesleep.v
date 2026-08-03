@@ -44,7 +44,7 @@ Require Import RegFile WpMmodeLeafBase SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
-Require Import WpLock WpMycpu.
+Require Import WpLock CodeMycpu.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import KernelRvcDecode.
 Require Import VcGen.

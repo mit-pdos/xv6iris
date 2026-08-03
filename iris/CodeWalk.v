@@ -112,7 +112,7 @@ Section WalkInstrs.
     (zero_extend' 12 (concat_vec (mword_of_int u : mword 6) ('b"000"))) (only parsing).
 
   (* the two ExecuteAs redirects not in WpMmodeLeafBase (Local copies,
-     as in WpUartPutcSync) *)
+     as in CodeUartPutcSync) *)
   Lemma wdec_1e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0x4a79 : mword 16)) s
     = Some (C_LI (mword_of_int 30, Regidx (mword_of_int 20)), s).

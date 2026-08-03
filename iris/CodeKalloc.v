@@ -6,8 +6,8 @@
 
    it proves a [kernel_text -* instr pc <is_rvc> <AST>] fact ([kai_<off>] /
    [kfi_<off>]) plus the per-instruction decode facts they consume.  Pure
-   mirror of WpMycpu.v (the [mk_base] / [mk_rvc ] / [mk_rvc ] templates)
-   the decode-fact style of WpPushOffTop / WpAcquireTop / WpRelease.
+   mirror of CodeMycpu.v (the [mk_base] / [mk_rvc ] / [mk_rvc ] templates)
+   the decode-fact style of CodePushOff / CodeAcquire / CodeRelease.
 
    Choice of [mk_rvc ] vs [mk_rvc ] for compressed instruction is purely by
    the pc's 4-alignment: pc = base+off with base 4-aligned, so
@@ -179,7 +179,7 @@ Section CodeKalloc.
   Context `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
-  (* The three [instr]-builder templates, copied verbatim from WpMycpu.   *)
+  (* The three [instr]-builder templates, copied verbatim from CodeMycpu.   *)
   (* ------------------------------------------------------------------- *)
   Notation KA := KernelSyms.kalloc.
   Notation KF := KernelSyms.kfree.

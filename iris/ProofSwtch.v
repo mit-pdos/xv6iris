@@ -53,6 +53,7 @@ Require Import SwtchCtx.
 Require Import WpSwtchVc.
 Require Import SpecSwtch.
 From Kernel Require KernelSyms.
+Require Import CodeSwtch.
 Local Open Scope Z_scope.
 Import Defs.
 

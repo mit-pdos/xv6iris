@@ -30,12 +30,12 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WpGpr ExecCommon WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
-(* exec_execute_csrr_sstatus: the exported copy lives in WpPopOff.v (the
+(* exec_execute_csrr_sstatus: the exported copy lives in CodePopOff.v (the
    WpSmodePtCtl one is Local); the csr-write reduction chain
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
    relocate all of them down when the csr leaves get a shared base. *)
 Require Import WpGprCsrrCommon WpGprCsrrB.
-Require Import WpPopOff WpPushOffCsr WpSieFlipBits.
+Require Import CodePopOff WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn.
 Require Import HartTp WpNext.

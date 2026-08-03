@@ -11,7 +11,7 @@
                                    refuted at the read, so the slow path is
                                    taken and holding() returns 1.
 
-   Both are built from WpHolding.v's decode/leaf lemmas (hi_00..hi_06,
+   Both are built from CodeHolding.v's decode/leaf lemmas (hi_00..hi_06,
    his_08..his_2a), with instruction +0x0 swapped for the invariant-mediated
    read. *)
 From Stdlib Require Import ZArith.
@@ -31,7 +31,7 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* seqz on a-b for EQUAL operands: result 1 (twin of WpHolding.seqz_sub_neq) *)
+(* seqz on a-b for EQUAL operands: result 1 (twin of CodeHolding.seqz_sub_neq) *)
 Lemma seqz_sub_eq (a b : mword 64) :
   eq_vec a b = true ->
   zero_extend' 64 (bool_to_bit (zopz0zI_u (sub_vec a b)
@@ -55,7 +55,7 @@ Section WpHoldingInv.
   (* ---- [smode_config] leaf wrappers for holding.  All config-preserving
      (holding never touches mstatus), so each just unbundles → raw leaf →
      rebundles.  The sstatus-reading leaves (cret/cbnez_fall/cbnez_taken_zca…)
-     reuse the wrappers exported by WpPopOff. ---- *)
+     reuse the wrappers exported by CodePopOff. ---- *)
 
 
 

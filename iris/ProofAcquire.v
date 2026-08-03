@@ -20,11 +20,11 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock WpMycpu CpuOwn WpAmo KernelRvcDecode.
+Require Import WpLock CodeMycpu CpuOwn WpAmo KernelRvcDecode.
 Require Import SpecMycpu SpecHolding.
 Require Import SpecPanic.
 Require Import SpecPushOff.
-Require Import WpAcquireTop.
+Require Import CodeAcquire.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecAcquire.
 Import Defs.

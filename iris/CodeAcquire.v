@@ -1,4 +1,4 @@
-(* WpAcquireTop.v -- decode/leaf lemmas for xv6's acquire() in S-mode: one
+(* CodeAcquire.v -- decode/leaf lemmas for xv6's acquire() in S-mode: one
    [instr] lemma per instruction of acquire() (aqi_00 .. aqi_32) plus the
    underlying decode/execute facts they build on (aqdec_*, aqexec_sd, add_vec_zero_l, aq_sextw_round, ...).  These are consumed by
    WpAcquireLock.wp_acquire_lock{_loop}, the CSL acquire spec that supersedes
@@ -51,8 +51,8 @@ Import Defs.
 Definition AQ : Z := KernelSyms.acquire.
 
 (* ===================================================================== *)
-(* Decode lemmas for the encodings not already covered by WpPushOffTop /  *)
-(* WpMycpu / WpHolding / WpAmo.                                           *)
+(* Decode lemmas for the encodings not already covered by CodePushOff /  *)
+(* CodeMycpu / CodeHolding / WpAmo.                                           *)
 (* ===================================================================== *)
 Local Ltac aq_ast :=
   first [ reflexivity
@@ -191,7 +191,7 @@ Qed.
 
 
 
-Section WpAcquireTop.
+Section CodeAcquire.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
@@ -296,4 +296,4 @@ Section WpAcquireTop.
   Proof. mk_base (AQ + 0x3c)%Z (mword_of_int 0xbe3ff0ef : mword 32)
     (mword_of_int (AQ + 0x3c) : mword 64) (JAL (mword_of_int 2096098 : mword 21, Regidx (mword_of_int 1))) aqdec_jal_panic. Qed.
 
-End WpAcquireTop.
+End CodeAcquire.

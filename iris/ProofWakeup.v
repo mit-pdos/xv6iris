@@ -1,6 +1,6 @@
 (* ProofWakeup.v -- the wakeup proc[]-table loop over the SIE-agnostic
    sconf world (kalloc cone, stage 8).  The sconf mirror of [wp_wakeup_loop]
-   (WpWakeup.v): a bounded fuel induction over the 64-entry proc[] table that,
+   (CodeWakeup.v): a bounded fuel induction over the 64-entry proc[] table that,
    per proc, acquires the proc lock, wakes it if SLEEPING on the given chan,
    and releases -- threading the counting token [intr_count] NET-ZERO across
    each acquire/release pair (acquire lvl->S lvl, release S lvl->lvl).
@@ -22,7 +22,7 @@
    hart binder.
 
    tp: [callee_saved] no longer preserves x4 and [tp_pin] makes any claim
-   about the map's tp slot vacuous, so WpWakeup's [wk_loop_regs] (which still
+   about the map's tp slot vacuous, so CodeWakeup's [wk_loop_regs] (which still
    carries one) is restated here as [wkl_regs] without it -- and with it go
    the loop's [rtp]/[a0f] parameters, whose only consumers were the tp
    premises of myproc/acquire/release. *)
@@ -45,7 +45,7 @@ Require Import RiscvExtras.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import SpecAcquire SpecRelease.
-Require Import WpWakeup SpecWakeupParts.
+Require Import CodeWakeup SpecWakeupParts.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -56,7 +56,7 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
-(* WpWakeup's [wk_loop_regs] minus the tp conjunct -- see the header. *)
+(* CodeWakeup's [wk_loop_regs] minus the tp conjunct -- see the header. *)
 Definition wkl_regs (M : regfile) (spF chan : mword 64)
     (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (k : nat) : Prop :=
   M !!! Regidx (mword_of_int 9)  = proc_addr k /\
@@ -849,7 +849,7 @@ Section ProofWakeup.
   (* ===================================================================== *)
   (* Whole-function WP for wakeup(chan) over sconf: prologue -> loop        *)
   (* (k=0, exiting to the epilogue) -> return.  Mirrors the smode wp_wakeup  *)
-  (* (WpWakeup.v).  The caller supplies deep-K custody (K>=18, so deep-10    *)
+  (* (CodeWakeup.v).  The caller supplies deep-K custody (K>=18, so deep-10    *)
   (* remains for the loop after the prologue's 8-slot frame carve) and       *)
   (* procs_inv.  proc_lock_res (SchedCtx.v) is threaded opaquely, ▷-slot     *)
   (* untouched.                                                             *)

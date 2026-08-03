@@ -1,4 +1,4 @@
-(* WpRelease.v -- whole-function WP for xv6's release() in S-mode, against
+(* CodeRelease.v -- whole-function WP for xv6's release() in S-mode, against
    the CSL lock invariant of WpLock.v: the caller supplies [is_lock γ lk R],
    the ownership token [locked γ] and the protected resource [R]; release()
    stores them back into the invariant when its [sw zero,0(s1)] clears the
@@ -33,7 +33,7 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelRvcDecode.
 Require Import KernelBaseDecode.
-Require Import WpLock WpPopOff.
+Require Import WpLock CodePopOff.
 (* subrange_full / mSIE_lower / sie_bit for the sstatus-SIE bridge; kept
    QUALIFIED so the WpGprCsrwC namespace doesn't shadow anything. *)
 From Kernel Require KernelInstrs.

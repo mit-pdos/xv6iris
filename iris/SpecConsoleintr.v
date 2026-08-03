@@ -40,7 +40,7 @@ Require Import SmodeCore.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
-Require Import WpMycpu.
+Require Import CodeMycpu.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import CalleeSaved.

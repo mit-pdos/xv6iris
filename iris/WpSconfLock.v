@@ -43,7 +43,7 @@ Require Import SmodeCorePt WpSmodePtLock WpAmo.
 Require Import MemAccessGen.
 Require Import UserBits.
 Require Import WpLock.
-Require Import WpMycpu ProcGeom.
+Require Import CodeMycpu ProcGeom.
 Require Import SRegime.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfMem.

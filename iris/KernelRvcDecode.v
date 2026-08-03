@@ -236,7 +236,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 (* by one member's byte offset ([mdec_ccc] was fileinit's +0xccc, [podec_00] *)
 (* push_off's +0x00) -- names that meant nothing to any other caller and     *)
 (* that interleaved with the function-LOCAL [mdec_*]/[podec_*] families in   *)
-(* CodeMemset / CodeMappages / WpPushOffTop, so a reader could not     *)
+(* CodeMemset / CodeMappages / CodePushOff, so a reader could not     *)
 (* tell shared from local.  They have been renamed; use [cdec_<word>] for    *)
 (* anything new.  (The remaining [po_*]/[poexec_*] here are not decodes: two *)
 (* creg->reg conversions, two bv identities, and two execute facts that      *)
@@ -707,7 +707,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
    saved-register slot) sat in CodeKalloc.v and were imported by
    CodeSleeplock.v; [cdec_8792]/[cdec_2781]/[cdec_079e] (the c.mv a5,tp /
    sext.w a5 / c.slli a5,7 triple that materializes &cpus[cpuid]) sat in
-   WpMycpu.v -- a file that holds mycpu's WEAKEST PRECONDITION -- and were
+   CodeMycpu.v -- a file that holds mycpu's WEAKEST PRECONDITION -- and were
    imported by three decode files, which is exactly how [wp_mycpu] ended up on
    their critical path. ---- *)
 
@@ -1981,7 +1981,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 
 (* --------------------------------------------------------------------- *)
 (* Words promoted when devintr became their second user (the private      *)
-(* copies in CodeSysSbrk / CodeMemmove / CodeGrowproc / WpWakeup /        *)
+(* copies in CodeSysSbrk / CodeMemmove / CodeGrowproc / CodeWakeup /        *)
 (* CodeScheduler were retired at the same time).                          *)
 (* --------------------------------------------------------------------- *)
 

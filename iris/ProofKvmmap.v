@@ -1,5 +1,5 @@
 (* ProofKvmmap.v -- kvmmap() over the SIE-agnostic sconf world.
-   Mirror of the smode wp_kvmmap_r (WpKvmmap.v): a thin 2-slot-frame wrapper
+   Mirror of the smode wp_kvmmap_r (CodeKvmmap.v): a thin 2-slot-frame wrapper
    that calls mappages() once (panicking on failure).  Threads the same sconf
    bundle + ptree_own + kalloc_env as mappages.
 
@@ -27,7 +27,7 @@ Require Import CalleeSaved StackOwn.
 Require Import KallocInv.
 Require Import PtreeType.
 Require Import Riscv.riscv_extras.
-Require Import WpKvmmap.
+Require Import CodeKvmmap.
 Require Import SpecMappages.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKvmmap.

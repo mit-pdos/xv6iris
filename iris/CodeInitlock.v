@@ -1,4 +1,4 @@
-(* WpInitlock.v -- whole-function S-mode WP for xv6's initlock().
+(* CodeInitlock.v -- whole-function S-mode WP for xv6's initlock().
 
      void initlock(struct spinlock *lk, char *name) {
        lk->name = name;   // c.sd  a1,8(a0)

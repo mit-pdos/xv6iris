@@ -24,7 +24,7 @@ Everything below is the settled design; the worklist is at the bottom.
 - `swtch` @ 0x80002398: decode facts + VCgen run in WpSwtchVc.v.
 - `struct cpu` (128 B, cpus[8] at 0x80012378): proc@0, context@8 (14×8),
   noff@120, intena@124.  Cell addresses are tp-indexed via `mycpu_ret tp0`
-  (WpMycpu.v), matching acquire/release/push_off/pop_off; new specs
+  (CodeMycpu.v), matching acquire/release/push_off/pop_off; new specs
   instantiate tp0 := `cid_word`.
 - `struct proc` (360 B, proc[64] at 0x80012778 — directly after cpus[]):
   lock@0 (locked word@0, cpu ptr@16), state@24, chan@32, context@96.
@@ -158,9 +158,9 @@ procs_inv := ⌜length γs = NPROC⌝ ∗ [∗ list] i ↦ γl ∈ γs,
 The `▷` ON THE SLOT is forced: the scheduler re-stores a parked context
 from the ▷VC its own swtch handed it; consumers feed the slot straight into
 wp_swtch_sconf's ▷ premise.  `proc_lock_res_intro/elim/wakeup` mirror the
-old WpWakeup shapes (wakeup carries the ▷-slot untouched SLEEPING→RUNNABLE).
+old CodeWakeup shapes (wakeup carries the ▷-slot untouched SLEEPING→RUNNABLE).
 
-WpWakeup.v keeps its decode/leaf/loop content but its ProcInv section is
+CodeWakeup.v keeps its decode/leaf/loop content but its ProcInv section is
 REPLACED by SchedCtx.v; SpecWakeup/ProofWakeup/LinkWakeup get
 the parameter rename (`proc_lock_res Rreg Φ γc bsie dq γk pa` →
 `proc_lock_res γ root_ppn Φ γs γk pa`, likewise procs_inv — the old
@@ -245,7 +245,7 @@ All three carry `m !!! Regidx x4 = cid_word`.
       swconf-across-iNext helper or make intr_count MaybeIntoLaterN-opaque.
       (b) consider a `wp_cret_s_zca_r_later_pt` wrapper (the raw leaf only
       exposes generic sr_inv; kpt_regime conversion worked but is noisy).
-- [x] S2c: wakeup stack reworked onto SchedCtx and green (WpWakeup slimmed +
+- [x] S2c: wakeup stack reworked onto SchedCtx and green (CodeWakeup slimmed +
       Require Export ProcGeom; axiom renamed wp_myproc_sconf_any; loop
       lemmas dropped the dead Rreg/γc/bsie/dq params; the ▷-slot change was
       fully mechanical — no later-strip needed anywhere in wakeup).

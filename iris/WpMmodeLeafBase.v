@@ -1000,7 +1000,7 @@ Proof.
   apply exec_returnm.
 Qed.
 
-(* --- relocated from WpKfree.v / WpHolding.v: pure register-generic execute
+(* --- relocated from WpKfree.v / CodeHolding.v: pure register-generic execute
    facts for SLTU / SUB / SLTIU, needed by the S-mode per-instruction leaf
    lemmas (kept here in the shared exec base to avoid import cycles). --- *)
 Definition gpr_sltu_val (rs2 rs1 : mword 5) (s : mstate) : mword 64 :=

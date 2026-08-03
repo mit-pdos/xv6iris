@@ -6,7 +6,7 @@
    acquire's, so its decodes reuse the shared [cdec_*] templates from
    KernelRvcDecode.v; the a5-materialization triple (c.mv a5,tp / c.addiw /
    c.slli a5,7) is byte-identical to mycpu's, reusing [cdec_8792]/[cdec_2781]/
-   [cdec_079e] from WpMycpu.v.  Only the two jal's, the auipc/addi pid_lock
+   [cdec_079e] from CodeMycpu.v.  Only the two jal's, the auipc/addi pid_lock
    materialization, the c.add and c.ld, and the two other c.mv's are myproc's
    own and get fresh templates here. *)
 From Stdlib Require Import ZArith.

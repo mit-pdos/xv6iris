@@ -1,4 +1,4 @@
-(* WpHolding.v -- decode/leaf lemmas for xv6's holding() in S-mode: one
+(* CodeHolding.v -- decode/leaf lemmas for xv6's holding() in S-mode: one
    [instr] lemma per instruction of holding() (hi_00/hi_02/hi_04/hi_06 for the
    fast-path prefix, his_08 .. his_2a for the full frame/mycpu()/compare
    sequence) plus the underlying decode/execute facts they build on
@@ -14,7 +14,7 @@
    holding() specs against [is_lock] that supersede the plain-ownership
    whole-function WP formerly proved in this file (see WpHoldingInv.v's
    header for the current top-level story). The composition follows
-   WpMycpu.v; the c.bnez fall-through leaf [wp_cbnez_fall_s] mirrors
+   CodeMycpu.v; the c.bnez fall-through leaf [wp_cbnez_fall_s] mirrors
    WpMemsetS.wp_cbeqz_fall_s_config with BNE. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
@@ -36,7 +36,7 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* Decode lemmas (podec-style; the tactics mirror WpPushOffTop's).        *)
+(* Decode lemmas (podec-style; the tactics mirror CodePushOff's).        *)
 (* ===================================================================== *)
 Local Ltac h_ast :=
   first [ reflexivity
@@ -72,7 +72,7 @@ Proof.
   intro H. rvc_oneshot s H.
 Qed.
 
-(* +0x6  0x8082  c.ret: reuse WpPushOffTop.cdec_8082 *)
+(* +0x6  0x8082  c.ret: reuse CodePushOff.cdec_8082 *)
 
 Lemma hexec_lw s :
   exec (execute (C_LW (mword_of_int 0, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
@@ -164,7 +164,7 @@ Proof.
   - apply bv_eq. vm_compute. reflexivity.
 Qed.
 
-Section WpHolding.
+Section CodeHolding.
   Context `{!riscvGS Σ}.
   Context `{CID : CpuId}.
 
@@ -262,4 +262,4 @@ Section WpHolding.
   Proof. mk_rvc (KernelSyms.holding + 0x2a)%Z (mword_of_int 0x8082 : mword 16)
     (mword_of_int (KernelSyms.holding + 0x2a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
-End WpHolding.
+End CodeHolding.

@@ -277,17 +277,17 @@ Everything here is DONE (two passes; full build green,
       across 22 consumer files (net −33 proofs), safety diff 0 statement
       mismatches.  To `KernelRvcDecode.v` — `cdec_40bc`/`cdec_c0bc` (3 copies
       each, plus their leaf-shape expansions as `cexec_40bc`/`cexec_c0bc`, 3
-      copies each), `cdec_37fd` (3, incl. `WpPopOff`), `cdec_4585` (3),
+      copies each), `cdec_37fd` (3, incl. `CodePopOff`), `cdec_4585` (3),
       `cdec_cb91` (3), `cdec_a021` (3), `cdec_c09c` (2), `cdec_893e` (2),
       `cdec_89ae` (2).  To `KernelBaseDecode.v` — `bdec_0001e497` (5),
       `bdec_0001e797` (3), `bdec_0001e717` (3), `bdec_0004a023` (3),
       `bdec_0001d797` (2), `bdec_00005597` (2), `bdec_01048513` (2),
       `bdec_8b8fe0ef` (2).  The offset-named homes the word-keyed grep would
-      have missed: `WpPopOff.ppdec_addiwm1`, `WpRelease.rldec_sw_zero`,
+      have missed: `CodePopOff.ppdec_addiwm1`, `CodeRelease.rldec_sw_zero`,
       `CodeSleeplock.sldec_sw_{zero,a5}_locked`,
       `ProofKilled.kldec_mv_s2_a5`, `CodeWalk.wdec_16` — five of the
       seventeen words are only findable by statement.  Four files needed a new
-      `Require` (`WpUartPutcSync` → KernelRvcDecode; `WpRelease`,
+      `Require` (`CodeUartPutcSync` → KernelRvcDecode; `CodeRelease`,
       `CodeSleeplock`, `CodeTrapinit` → KernelBaseDecode); no cycle,
       both bases sit below every WP leaf.  Still out of the bio scope and
       worth a future sweep: the C_LD `0x6398` shape (3 copies:

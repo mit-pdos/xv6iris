@@ -13,7 +13,7 @@ Require Import RegFile InstrBytes HartTp.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import WpMycpu.
+Require Import CodeMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
