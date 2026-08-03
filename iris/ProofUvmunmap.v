@@ -75,7 +75,7 @@ Require Import KptTree.
 Require Import PtBuild.
 Require Import TrampPt.
 Require Import UserPtTree.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import BarePt.

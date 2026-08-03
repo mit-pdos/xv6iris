@@ -49,7 +49,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import HartTp.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.

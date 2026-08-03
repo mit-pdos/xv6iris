@@ -17,7 +17,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import CpuOwn.
 Require Import SpecPanic.
 Require Import WpAuipc.

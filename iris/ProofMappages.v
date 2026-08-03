@@ -21,7 +21,7 @@ Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import VcGen WpSconfVc.
 Require Import KallocInv.
 Require Import CommonWalk PtTree.

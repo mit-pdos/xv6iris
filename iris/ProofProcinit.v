@@ -56,7 +56,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import HartTp WpNext CpuOwn.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ArrCursor.
 Require Import ProcGeom.

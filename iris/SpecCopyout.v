@@ -52,7 +52,7 @@ Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn.

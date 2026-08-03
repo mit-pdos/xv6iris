@@ -18,8 +18,8 @@ Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import KallocInv.
-Require Import IntrDefs HartTp WpNext.
-Require Import ProcGeom CpuOwn.
+Require Import IntrDefs WpNext.
+Require Import CpuOwn.
 Require Import SpecFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

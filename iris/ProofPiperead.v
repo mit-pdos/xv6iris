@@ -51,7 +51,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvExec RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvExec.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
@@ -61,14 +61,13 @@ Require Import ExecCommon WpGpr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
-Require Import SpecPanic.
 Require Import WpLock WpMycpu ProcGeom CpuOwn KernelRvcDecode.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
-Require Import SchedCtx SwtchCtx.
+Require Import SwtchCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyout SpecRelease.
 Require Import CodePiperead.
 Require Import SpecPiperead.

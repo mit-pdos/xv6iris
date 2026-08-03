@@ -53,7 +53,7 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
-Require Import CpuOwn SchedCtx FdSlots.
+Require Import CpuOwn FdSlots.
 Require Import DiskPtsto VirtioProto DiskInv.
 Require Import WpUart.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.

@@ -28,7 +28,6 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
-Require Import ProcGeom.
 Require Import WpSconfMem.
 Require Import VirtioModel DiskPtsto DiskInv.
 Require Import SpecFreeDesc.
@@ -404,7 +403,6 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
-Require Import ProcGeom.
 Require Import WpSconfMem.
 Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
 Require Import SpecFreeDesc.
@@ -594,11 +592,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes WpMmodeLeafBase ByteCursor.
+Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
-Require Import ProcGeom.
 Require Import WpSconfMem.
 Require Import WpSmodeHalf.
 Require Import VirtioModel DiskPtsto DiskInv.

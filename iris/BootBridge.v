@@ -76,7 +76,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec MinstretInv.
-Require Import RegFile HartTp WpNext InstrBytes WpGpr.
+Require Import RegFile HartTp InstrBytes WpGpr.
 Require Import KMap KptPt SmodePte.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.

@@ -52,15 +52,14 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import HartTp.
 Require Import FdSlots.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import WpLock.
 Require Import TicksInv.
 Require Import TimerCap.
 Require Import SchedCtx.
 Require Import SpecPanic.
-Require Import ProcGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

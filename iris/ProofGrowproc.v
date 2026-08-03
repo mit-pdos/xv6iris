@@ -43,7 +43,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import WpLock.
-Require Import ByteCursor.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import PtBuild.

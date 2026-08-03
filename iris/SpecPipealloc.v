@@ -64,10 +64,10 @@ Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import PipeInv.
 Require Import WpLock.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

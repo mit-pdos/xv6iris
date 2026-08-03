@@ -45,7 +45,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes WpMmodeLeafBase ByteCursor.
+Require Import InstrBytes WpMmodeLeafBase.
 Require Import WpGpr RegFile.
 Require Import KptPt.
 Require Import SmodeCore.

@@ -25,7 +25,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpWakeup.
 Require Import CodeSleeplock.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.

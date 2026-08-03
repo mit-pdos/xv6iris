@@ -29,13 +29,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Values.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import InstrBytes.
-Require Import WpDecode ExecCommon KernelText WpAuipc.
+Require Import ExecCommon KernelText WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import KernelBaseDecode.
 Require Import KernelRvcDecode.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import WpDecodeBridge.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.

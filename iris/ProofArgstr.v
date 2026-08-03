@@ -40,7 +40,6 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
-Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import FdSlots FileInv ProcInv.
 Require Import CodeArgstr.

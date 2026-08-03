@@ -13,7 +13,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes KernelText.
-Require Import WpDecode WpDecodeBridge WpRvcBridge.
+Require Import WpDecode WpDecodeBridge.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelSyms.
 Require Import KernelBaseDecode.

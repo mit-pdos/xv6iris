@@ -16,7 +16,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 (* for [MISA_C], which [close_dec] reads misa bits out of *)
 Require Import RiscvFetchExec.

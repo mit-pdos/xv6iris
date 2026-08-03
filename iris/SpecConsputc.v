@@ -48,7 +48,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs WpNext.
 From Kernel Require KernelSyms.
 
 Notation CPC := KernelSyms.consputc.

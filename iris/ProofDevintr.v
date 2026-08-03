@@ -50,18 +50,13 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
-Require Import SchedCtx.
-Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpSmodeIntr.
-Require Import DevModel DiskPtsto WpUart DiskInv.
-Require Import UartTxInv.
-Require Import TimerCap.
-Require Import PlicPlan.
+Require Import DevModel DiskPtsto WpUart.
 Require Import CodeDevintr.
 Require Import SpecPlicClaim SpecPlicComplete SpecUartintr SpecVirtioDiskIntr SpecClockintr.
 Require Import SpecDevintr.

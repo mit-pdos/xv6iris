@@ -37,7 +37,6 @@ Require Import InstrBytes.
 Require Import VcGen.
 Require Import MinstretInv.
 Require Import KptGhost.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import HartTp WpNext.
 Require Import IntrDefs.

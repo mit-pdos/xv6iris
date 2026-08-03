@@ -38,7 +38,6 @@ Require Import RiscvPtsto RiscvLang.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
-Require Import WpMycpu.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.

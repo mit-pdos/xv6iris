@@ -14,7 +14,7 @@ Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import WpSconfVc.
@@ -29,7 +29,7 @@ Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecMemset.
 Require Import SpecKalloc.

@@ -45,7 +45,7 @@ Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import VcGen VcGenS.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs HartTp.
 Require Import WpSmodePtCtl.
 Require Import StackOwn.
 Require Import CpuOwn.

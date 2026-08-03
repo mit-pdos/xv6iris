@@ -49,7 +49,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import ProcGeom.
-Require Import WpWakeup.
+Require Import ProcGeom.
 Require Import SleepLock.
 Require Import CodeSleeplock.
 Require Import SpecAcquire SpecRelease SpecWakeup.

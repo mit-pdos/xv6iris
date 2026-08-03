@@ -27,13 +27,13 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

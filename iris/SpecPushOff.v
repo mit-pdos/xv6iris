@@ -14,8 +14,8 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
-Require Import ProcGeom CpuOwn.
+Require Import WpNext.
+Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

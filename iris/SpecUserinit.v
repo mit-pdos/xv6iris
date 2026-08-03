@@ -51,9 +51,9 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpLock.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import FdSlots.
 Require Import SchedCtx.
 Require Import KallocInv KvmSpec.

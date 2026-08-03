@@ -45,7 +45,7 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpUart.
 From Kernel Require KernelSyms.

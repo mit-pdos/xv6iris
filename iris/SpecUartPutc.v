@@ -12,7 +12,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.

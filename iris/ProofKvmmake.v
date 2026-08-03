@@ -19,11 +19,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore RegFile WpMmodeLeafBase.
 Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpLock CpuOwn.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes KernelText.
-Require Import ProcGeom.
 Require Import KallocInv.
 Require Import ByteBuf.   (* bb_choose: a window of existentials is an existential function *)
 Require Import PtTree PtBuild KptPt KptExecMap KMap KptTree KvmMap KvmSpec.

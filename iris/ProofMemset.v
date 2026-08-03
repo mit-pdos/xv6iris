@@ -21,7 +21,6 @@ Require Import WpGpr WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import IntrDefs.
-Require Import IntrDefs.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpMemsetS.

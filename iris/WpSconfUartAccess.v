@@ -24,7 +24,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.

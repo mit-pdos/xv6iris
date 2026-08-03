@@ -61,7 +61,7 @@ Require Import InstrBytes KernelText.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs WpNext.
 Require Import ByteBuf.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

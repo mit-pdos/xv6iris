@@ -31,7 +31,7 @@ Require Import RegFile HartTp WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import TicksInv.

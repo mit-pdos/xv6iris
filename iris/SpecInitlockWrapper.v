@@ -21,7 +21,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import InstrBytes WpMmodeLeafBase WpAuipc.
 Require Import SmodeCore.
 Require Import CalleeSaved.

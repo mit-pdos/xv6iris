@@ -54,7 +54,7 @@ Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import SpecFilealloc SpecKalloc SpecInitlock SpecFileclose.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.

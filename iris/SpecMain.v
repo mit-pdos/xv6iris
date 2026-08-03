@@ -123,7 +123,7 @@ Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import HartTp.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
    the 65 claims are what the deposit wand carries to the secondaries *)
 Require Import KptGhost KptShare KptExecMap KvmMap.

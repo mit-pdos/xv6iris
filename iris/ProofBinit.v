@@ -55,7 +55,7 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpLock SleepLock.
 Require Import ArrCursor BcacheInv.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.

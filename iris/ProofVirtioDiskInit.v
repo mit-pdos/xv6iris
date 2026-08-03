@@ -119,7 +119,6 @@ Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCt
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
 Require Import KernelDataInv.
-Require Import ProcGeom.
 Require Import KallocInv KvmSpec.
 Require Import KptPt KMap.
 Require Import ByteBuf.

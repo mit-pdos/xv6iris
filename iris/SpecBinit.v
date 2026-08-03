@@ -34,7 +34,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile InstrBytes SmodeCore CalleeSaved KernelText KernelDataInv IntrDefs HartTp WpNext.
+Require Import RegFile InstrBytes SmodeCore CalleeSaved KernelText KernelDataInv IntrDefs WpNext.
 Require Import WpLock SleepLock.
 Require Import BcacheInv.
 From Kernel Require KernelSyms.

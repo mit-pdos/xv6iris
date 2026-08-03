@@ -63,7 +63,7 @@ Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import ByteCursor.
 Require Import ProcPtOwn.
 Require Import CodeUvmdealloc.

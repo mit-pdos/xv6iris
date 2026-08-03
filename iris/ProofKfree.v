@@ -29,7 +29,7 @@ Require Import VcGen.
 Require Import WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import CpuOwn.
 Require Import SpecMemsetPage SpecAcquire SpecRelease.
 Require Import WpKfree.

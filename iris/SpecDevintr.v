@@ -68,7 +68,6 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.

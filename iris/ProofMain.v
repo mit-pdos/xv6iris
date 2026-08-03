@@ -58,7 +58,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import RiscvFetchExec MinstretInv MemAccessGen.
 Require Import SmodeCore RegFile HartTp WpNext WpMmodeLeafBase InstrBytes.
-Require Import CalleeSaved StackOwn.
+Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr WpAuipc.

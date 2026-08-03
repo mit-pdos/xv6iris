@@ -39,7 +39,6 @@ Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
-Require Import ByteCursor.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import UserPtTree.

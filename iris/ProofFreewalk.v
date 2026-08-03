@@ -78,7 +78,7 @@ Require Import PageGeom.
 Require Import CommonWalk Pt4kWalk.
 Require Import PtTree PtBuild PtFree.
 Require Import KptTree.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import CodeFreewalk.

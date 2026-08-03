@@ -45,7 +45,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes SmodeCore CalleeSaved KernelText KernelDataInv IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpLock.
 Require Import ArrCursor.
 Require Import ProcGeom.

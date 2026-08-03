@@ -55,7 +55,7 @@ Require Import WpLock.
 Require Import SpecPanic.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart.

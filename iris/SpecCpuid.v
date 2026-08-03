@@ -25,7 +25,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
-Require Import ProcGeom PlicHart IntrDefs HartTp WpNext.
+Require Import ProcGeom PlicHart IntrDefs HartTp.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

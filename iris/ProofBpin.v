@@ -50,7 +50,7 @@ Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import BufOwn BcacheInv BioInv.

@@ -9,7 +9,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import DevModel RiscvLang RiscvPtsto.
-Require Import InstrBytes WpMmodeLeafBase.
+Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import KptPt.
 Require Import SmodeCore.

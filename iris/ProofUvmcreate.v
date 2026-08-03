@@ -19,7 +19,7 @@ Require Import SmodeCore RegFile InstrBytes WpMmodeLeafBase KernelText.
 Require Import IntrDefs HartTp WpNext WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import KallocInv.
 Require Import KMap.            (* mem_page_to_phys *)
 Require Import PtBuild KptPt KptTree KvmSpec.

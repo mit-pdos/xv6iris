@@ -21,12 +21,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 From Stdlib Require Import FunctionalExtensionality.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

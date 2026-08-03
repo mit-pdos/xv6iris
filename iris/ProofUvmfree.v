@@ -78,11 +78,11 @@ Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import PtreeType.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import ByteCursor.
 Require Import ProcPtOwn.
 Require Import BarePt.

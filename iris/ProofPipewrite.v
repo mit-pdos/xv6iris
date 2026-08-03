@@ -50,20 +50,18 @@ Require Import RiscvModelBytes.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import ByteCursor.
 Require Import StackOwn StackBytes CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock WpMycpu ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
-Require Import SpecPanic.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
-Require Import SchedCtx SwtchCtx.
+Require Import SwtchCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyin SpecRelease.
 Require Import CodePipewrite.
 Require Import SpecPipewrite.

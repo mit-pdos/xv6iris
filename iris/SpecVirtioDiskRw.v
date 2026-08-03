@@ -34,7 +34,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FdSlots.

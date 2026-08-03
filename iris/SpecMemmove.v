@@ -29,7 +29,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import KernelText.

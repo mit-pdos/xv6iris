@@ -29,7 +29,6 @@ Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import FileInv.
 Require Import CodeArgaddr.
 Require Import SpecArgraw.

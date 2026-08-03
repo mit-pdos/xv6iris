@@ -15,7 +15,7 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs WpNext.
 Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

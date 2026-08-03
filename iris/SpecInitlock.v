@@ -15,7 +15,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText.
 Require Import IntrDefs.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs WpNext.
 Require Import WpLock.
 Require Import RegFile.
 From Kernel Require KernelSyms.

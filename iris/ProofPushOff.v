@@ -20,7 +20,7 @@ Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr WpMycpu SpecMycpu WpPushOffTop WpPopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import WpPushOffBridges.
 Require Import SpecPushOff.
 Import Defs.

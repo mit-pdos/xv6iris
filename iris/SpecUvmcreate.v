@@ -17,7 +17,7 @@ Require Import WpLock.
 Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import KallocInv.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.

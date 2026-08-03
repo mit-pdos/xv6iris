@@ -58,9 +58,9 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpLock.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import PrintkFmt.
 Require Import SpecPanic.
 Require Import SpecPrintk.

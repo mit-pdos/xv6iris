@@ -59,7 +59,7 @@ Require Import KernelText KernelDataInv.
 Require Import WpLock.
 Require Import WpUart.
 Require Import IntrDefs.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
