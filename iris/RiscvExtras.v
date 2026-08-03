@@ -520,19 +520,24 @@ Qed.
 
 (* the low 39 bits of a RAM address are the address itself (as a bv 39):
    [uint a < 2^39], so the [subrange 38:0] extraction loses nothing. *)
+(* The low 39 bits of an address below 2^39 are the address.  Both the RAM
+   and the below-MAXVA callers below are this fact at a tighter bound. *)
+Lemma sub38_0_unsigned (a : mword 64) :
+  bv_unsigned a < 549755813888 ->
+  bv_unsigned (subrange_vec_dec a (Z.sub 39 1) 0) = bv_unsigned a.
+Proof.
+  intro Hlt.
+  rewrite (subrange_dec_unsigned_lo0 a (Z.sub 39 1) 549755813888
+             ltac:(lia) ltac:(vm_compute; reflexivity)).
+  apply Z.mod_small. split; [apply bv_unsigned_in_range | exact Hlt].
+Qed.
+
 Lemma ram_subrange_unsigned (a : mword 64) :
   addr_is_ram a ->
   bv_unsigned (subrange_vec_dec a (Z.sub 39 1) 0) = uint a.
 Proof.
   intros [Hlo Hhi]. rewrite uint_unsigned in Hlo, Hhi |- *. unfold ram_base, ram_size in *.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  rewrite bv_extract_0_unsigned.
-  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - 0 + 1)) with 39%N.
-  apply bv_wrap_small. pose proof (bv_unsigned_in_range 64 a).
-  change (bv_modulus 39) with 549755813888. lia.
+  apply sub38_0_unsigned. lia.
 Qed.
 
 (* the same two facts for any LOW address (below MAXVA = 2^38 -- walk's
@@ -542,16 +547,7 @@ Lemma lo_subrange_unsigned (a : mword 64) :
   bv_unsigned (subrange_vec_dec a (Z.sub 39 1) 0) = uint a.
 Proof.
   intros Hlt. rewrite uint_unsigned in Hlt |- *.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
-  rewrite bv_extract_0_unsigned.
-  change (MachineWord.MachineWord.Z_idx (Z.sub 39 1 - 0 + 1)) with 39%N.
-  apply bv_wrap_small.
-  change (bv_modulus 39) with 549755813888.
-  split; [exact (proj1 (bv_unsigned_in_range _ a)) |].
-  eapply Z.lt_trans; [exact Hlt | reflexivity].
+  apply sub38_0_unsigned. lia.
 Qed.
 
 (* Sv39 canonicality of any RAM address: since [uint a < 0x88000000 < 2^38],

@@ -29,15 +29,7 @@ Lemma uint_subrange11 (x : mword 64) :
   uint (subrange_vec_dec x 11 0) = (uint x) mod 4096.
 Proof.
   rewrite !(uint_unsigned_n _).
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  rewrite bv_extract_unsigned.
-  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
-  rewrite Z.shiftr_0_r.
-  unfold bv_wrap, bv_modulus.
-  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (11 - 0 + 1))) with 4096.
-  reflexivity.
+  exact (subrange_dec_unsigned_lo0 x 11 4096 ltac:(lia) ltac:(vm_compute; reflexivity)).
 Qed.
 
 (* a (possibly wrapping) 64-bit add acts modularly on the page offset *)
@@ -621,14 +613,8 @@ Lemma subrange16_concat16 (x y : mword 16) :
   subrange_vec_dec (concat_vec x y : mword 32) 15 0 = y.
 Proof.
   apply bv_eq.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  rewrite bv_extract_unsigned.
-  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
-  rewrite Z.shiftr_0_r.
-  unfold bv_wrap, bv_modulus.
-  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (15 - 0 + 1))) with 65536.
+  rewrite (subrange_dec_unsigned_lo0 (concat_vec x y : mword 32) 15 65536
+             ltac:(lia) ltac:(vm_compute; reflexivity)).
   rewrite concat16_16_unsigned.
   rewrite Z.add_comm, Z_mod_plus_full.
   apply Z.mod_small.
@@ -649,14 +635,8 @@ Lemma subrange16_zext32 (h : mword 16) :
   subrange_vec_dec (zero_extend' 32 h : mword 32) 15 0 = h.
 Proof.
   apply bv_eq.
-  unfold subrange_vec_dec. rewrite autocast_id.
-  unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-  unfold get_word, MachineWord.MachineWord.slice.
-  rewrite bv_extract_unsigned.
-  change (Z.of_N (MachineWord.MachineWord.Z_idx 0)) with 0.
-  rewrite Z.shiftr_0_r.
-  unfold bv_wrap, bv_modulus.
-  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx (15 - 0 + 1))) with 65536.
+  rewrite (subrange_dec_unsigned_lo0 (zero_extend' 32 h : mword 32) 15 65536
+             ltac:(lia) ltac:(vm_compute; reflexivity)).
   rewrite zext32_16_unsigned.
   apply Z.mod_small.
   pose proof (bv_unsigned_in_range _ h) as Hy. unfold bv_modulus in Hy.
