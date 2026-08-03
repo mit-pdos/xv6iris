@@ -841,8 +841,15 @@ Section BioInv.
       assert (Hml : map bnode (rev (seq 0 NBUF)) = blist 0 NBUF)
         by (rewrite /blist map_rev //).
       rewrite Hml. iFrame "Hlru Hslots". }
-    iModIntro. iExists bn. iFrame "Hsf". rewrite /bio_ctx. iFrame "Hlock".
-    rewrite big_sepL_sep. iFrame "Hsls Hescs".
+    (* Split STRUCTURALLY before framing.  A bare [iFrame "H"] against this
+       goal has to search [bio_ctx]'s big-op (NBUF sleeplocks + escrows) for
+       each named hypothesis: the two frames here were 25 s of the file's
+       46 s (measured 2026-08-03).  [iSplitR]/[iExact] name both sides, so
+       nothing is searched. *)
+    iModIntro. iExists bn. rewrite /bio_ctx.
+    iSplitR "Hsf"; [| iExact "Hsf"].
+    iSplitL "Hlock"; [iExact "Hlock" |].
+    rewrite big_sepL_sep. iSplitL "Hsls"; [iExact "Hsls" | iExact "Hescs"].
   Qed.
 
 End BioInv.

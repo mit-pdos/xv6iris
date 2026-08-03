@@ -79,7 +79,7 @@ Section TrapinithartBody.
     (* ============ +0x00 addi sp,sp,-16 : 2-slot frame push ============ *)
     iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int TIH) (mword_of_int 48 : mword 6) mm K 2 false HK Hpush
               with "Hcg Hpc Hi00 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
@@ -93,7 +93,7 @@ Section TrapinithartBody.
     iApply (wp_csdsp_s_sconf Φ (mword_of_int (TIH + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               W1 (K - 2)%nat v1 false with "Hcg Hpc Hi02 [Hc1] [-]").
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hc1". iEval (rewrite HspW1 Hb1) in "Hc1".
     iEval (rgne) in "Hc1".
     assert (HW1r1 : W1 !!! Regidx (mword_of_int 1 : mword 5) = mm !!! Regidx (mword_of_int 1))
@@ -105,7 +105,7 @@ Section TrapinithartBody.
     iApply (wp_csdsp_s_sconf Φ (mword_of_int (TIH + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat v2 false with "Hcg Hpc Hi04 [Hc2] [-]").
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hc2". iEval (rewrite HspW1 Hb2) in "Hc2".
     iEval (rgne) in "Hc2".
     assert (HW1r8 : W1 !!! Regidx (mword_of_int 8 : mword 5) = mm !!! Regidx (mword_of_int 8))
@@ -117,7 +117,7 @@ Section TrapinithartBody.
     iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (TIH + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> W1).
     assert (Hp08 : add_vec_int (mword_of_int (TIH + 0x06) : mword 64) 2 = mword_of_int (TIH + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
@@ -126,7 +126,7 @@ Section TrapinithartBody.
     iApply (wp_auipc_s_sconf Φ (mword_of_int (TIH + 0x08)) (mword_of_int 15 : mword 5) (mword_of_int 3 : mword 20)
               W2 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (A0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (mword_of_int (TIH + 0x08) : mword 64) (auipc_off (mword_of_int 3 : mword 20)))]> W2).
     assert (Hp0c : add_vec_int (mword_of_int (TIH + 0x08) : mword 64) 4 = mword_of_int (TIH + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -135,7 +135,7 @@ Section TrapinithartBody.
     iApply (wp_addi4_s_sconf Φ (mword_of_int (TIH + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xff2 : mword 12)
               A0 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (A1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0xff2 : mword 12)))]> A0).
@@ -148,7 +148,7 @@ Section TrapinithartBody.
               A1 (K - 2)%nat false tv0 (mword_of_int KernelSyms.kernelvec : mword 64)
               ltac:(vm_compute; lia) ltac:(rgne; exact Ha5) ltac:(vm_compute; discriminate)
               with "Hcg Hstv Hpc Hi10 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hstv Hpc".
     assert (Hp14 : add_vec_int (mword_of_int (TIH + 0x10) : mword 64) 4 = mword_of_int (TIH + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
@@ -162,7 +162,7 @@ Section TrapinithartBody.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [Hc1] [-]").
     { iEval (rewrite HA1sp Hb1). iExact "Hc1". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hc1". iEval (rewrite HA1sp Hb1) in "Hc1".
     set (L1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 1))]> A1).
     assert (HL1sp : L1 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /L1 upd_ne; [| reg_neq]; exact HA1sp).
@@ -174,7 +174,7 @@ Section TrapinithartBody.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [Hc2] [-]").
     { iEval (rewrite HL1sp Hb2). iExact "Hc2". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hc2". iEval (rewrite HL1sp Hb2) in "Hc2".
     set (L2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (mm !!! Regidx (mword_of_int 8))]> L1).
     assert (HL2sp : L2 !!! Regidx csp_rs1 = add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))) by (rewrite /L2 upd_ne; [| reg_neq]; exact HL1sp).
@@ -193,7 +193,7 @@ Section TrapinithartBody.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (TIH + 0x18)) (mword_of_int 16 : mword 6)
               L2 (K - 2)%nat 2 false Hpop with "Hcg Hpc Hi18 Hframe [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (Efin := <[Regidx csp_rs1 := regval_into_reg (add_vec (L2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> L2).
     assert (Hnk : ((K - 2) + 2)%nat = K) by lia.
@@ -205,7 +205,7 @@ Section TrapinithartBody.
     { rewrite /Efin upd_ne; [| reg_neq]. rewrite /L2 upd_ne; [| reg_neq]. rewrite /L1 upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf Φ (mword_of_int (TIH + 0x1a)) (mword_of_int 1 : mword 5) Efin K false
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi1a [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hpc". iEval (rewrite HEfin1) in "Hpc".
     iApply ("Hcont" $! Efin with "Hcg Hpc [%] Hstv").

@@ -216,7 +216,7 @@ Section YieldPostSched.
     iApply (wp_cmv_s_sconf Φ (mword_of_int (YD + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               msch (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (D0 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -231,7 +231,7 @@ Section YieldPostSched.
               D0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1e [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (D1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (YD + 0x1e) : mword 64) 4)]> D0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (YD + 0x1e) : mword 64) 4)]> D0) with D1.
@@ -606,7 +606,7 @@ Section ProofYield.
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) macq (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc Hi14 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (C0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6))))]> macq).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6))))]> macq) with C0.
@@ -636,7 +636,7 @@ Section ProofYield.
               (mword_of_int 24 : mword 12) C0 (av - 4)%nat st0 false
               with "Hcg Hpc Hi16 [Hstate] [-]").
     { iEval (rewrite Hrec_state_g). iExact "Hstate". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hstate".
     iEval (rewrite Hrec_state_g Hsv_g) in "Hstate".
     assert (Hpc18 : add_vec_int (mword_of_int (YD + 0x16) : mword 64) 2 = mword_of_int (YD + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -647,7 +647,7 @@ Section ProofYield.
               C0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (C1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (YD + 0x18) : mword 64) 4)]> C0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (YD + 0x18) : mword 64) 4)]> C0) with C1.

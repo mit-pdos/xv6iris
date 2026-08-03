@@ -448,7 +448,7 @@ Section ProofBunpin.
               macq (K - 4)%nat (cw : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc Hcell".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa) in "Hcell".
     set (D1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 (cw : mword 32))]> macq).
     assert (HD1a5 : D1 !!! Regidx Ra5 = sign_extend' 64 (cw : mword 32))
@@ -462,7 +462,7 @@ Section ProofBunpin.
     iApply (wp_caddiw_s_sconf Φ (mword_of_int (BU + 0x1a)) Ra5 (mword_of_int 63 : mword 6)
               D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D2 := <[Regidx Ra5 := regval_into_reg
                   (sign_extend' 64 (subrange_vec_dec
@@ -482,7 +482,7 @@ Section ProofBunpin.
     iApply (wp_csw_s_sconf Φ (mword_of_int (BU + 0x1c)) Ra5 Rs1 (mword_of_int 64 : mword 12)
               D2 (K - 4)%nat (cw : mword 32) false
               with "Hcg Hpc Hi1c Hcell [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc Hcell".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa2) in "Hcell".
     assert (Hstv : trunc32 (rget D2 Ra5) = decr32 (cw : mword 32)).
     { rewrite (rget_ne D2 Ra5 ltac:(vm_compute; discriminate)).
@@ -496,7 +496,7 @@ Section ProofBunpin.
     iApply (wp_auipc_s_sconf Φ (mword_of_int (BU + 0x1e)) Ra0 (mword_of_int 0x15 : mword 20)
               D2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (BU + 0x1e) : mword 64)
                      (auipc_off (mword_of_int 0x15 : mword 20)))]> D2).
@@ -506,7 +506,7 @@ Section ProofBunpin.
     iApply (wp_addi4_s_sconf Φ (mword_of_int (BU + 0x22)) Ra0 Ra0 (mword_of_int 0x47c : mword 12)
               D3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (D3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x47c : mword 12)))]> D3).
@@ -519,7 +519,7 @@ Section ProofBunpin.
     iApply (wp_jal_s_sconf Φ (mword_of_int (BU + 0x26)) Rra (mword_of_int 0x1fdf74 : mword 21)
               D4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi26 [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (BU + 0x26) : mword 64) 4)]> D4).
     assert (Htgtrel : add_vec (mword_of_int (BU + 0x26) : mword 64)

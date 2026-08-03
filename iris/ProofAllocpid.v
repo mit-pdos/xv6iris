@@ -255,7 +255,7 @@ Section ProofAllocpid.
     iApply (wp_auipc_s_sconf Φ (mword_of_int (API + 0x16)) ai_a5 (mword_of_int 9 : mword 20) macq0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B1 := <[Regidx ai_a5 := regval_into_reg
         (add_vec (mword_of_int (API + 0x16) : mword 64) (auipc_off (mword_of_int 9 : mword 20)))]> macq0).
@@ -267,7 +267,7 @@ Section ProofAllocpid.
     iApply (wp_addi4_s_sconf Φ (mword_of_int (API + 0x1a)) ai_a5 ai_a5 (mword_of_int 2062 : mword 12) B1 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B2 := <[Regidx ai_a5 := regval_into_reg
@@ -287,7 +287,7 @@ Section ProofAllocpid.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hnp] [-]").
     { iEval (rgne; rewrite Hnaddr). iExact "Hnp". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hnp". iEval (rgne; rewrite Hnaddr) in "Hnp".
     set (B3 := <[Regidx ai_s1 := regval_into_reg (sign_extend' 64 (nv : mword 32))]> B2).
     change (<[Regidx ai_s1 := regval_into_reg (sign_extend' 64 (nv : mword 32))]> B2) with B3.
@@ -299,7 +299,7 @@ Section ProofAllocpid.
     iApply (wp_addiw_s_sconf Φ (mword_of_int (API + 0x20)) ai_a4 ai_s1 (mword_of_int 1 : mword 12) B3 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B4 := <[Regidx ai_a4 := regval_into_reg
@@ -321,7 +321,7 @@ Section ProofAllocpid.
               (mword_of_int 0 : mword 12) B4 (av - 4)%nat (nv : mword 32) false
               with "Hcg Hpc Hi24 [Hnp] [-]").
     { iEval (rgne; rewrite Hnaddr2). iExact "Hnp". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hnp". iEval (rgne; rgne; rewrite Hnaddr2) in "Hnp".
     assert (Hp26 : add_vec_int (mword_of_int (API + 0x24) : mword 64) 2 = mword_of_int (API + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp26) in "Hpc".
@@ -333,7 +333,7 @@ Section ProofAllocpid.
     iApply (wp_auipc_s_sconf Φ (mword_of_int (API + 0x26)) ai_a0 (mword_of_int 0x11 : mword 20) B4 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B5 := <[Regidx ai_a0 := regval_into_reg
         (add_vec (mword_of_int (API + 0x26) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> B4).
@@ -345,7 +345,7 @@ Section ProofAllocpid.
     iApply (wp_addi4_s_sconf Φ (mword_of_int (API + 0x2a)) ai_a0 ai_a0 (mword_of_int 2386 : mword 12) B5 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B6 := <[Regidx ai_a0 := regval_into_reg
@@ -362,7 +362,7 @@ Section ProofAllocpid.
               B6 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2e [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B7 := <[Regidx ai_ra := regval_into_reg (add_vec_int (mword_of_int (API + 0x2e) : mword 64) 4)]> B6).
     change (<[Regidx ai_ra := regval_into_reg (add_vec_int (mword_of_int (API + 0x2e) : mword 64) 4)]> B6) with B7.

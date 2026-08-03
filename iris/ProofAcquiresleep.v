@@ -298,7 +298,7 @@ Section AslBodies.
     iApply (wp_cli_s_sconf Φ (mword_of_int (ASL + 0x28)) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64)
               M (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi28 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (E1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 1 : mword 64)]> M).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 1 : mword 64)]> M) with E1.
@@ -312,7 +312,7 @@ Section AslBodies.
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) E1 (av - 4)%nat (mword_of_int 0 : mword 32) false
               with "Hcg Hpc Hi2a [Hw] [-]").
     { iEval (rewrite Hlw0). iExact "Hw". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hw".
     iEval (rewrite Hlw0) in "Hw".
     assert (Hsv1 : trunc32 (rget E1 (mword_of_int 15 : mword 5)) = (mword_of_int 1 : mword 32)).
@@ -324,7 +324,7 @@ Section AslBodies.
     iApply (wp_jal_s_sconf Φ (mword_of_int (ASL + 0x2c)) (mword_of_int 1 : mword 5) (mword_of_int 2087436 : mword 21)
               E1 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2c [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (E2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (ASL + 0x2c) : mword 64) 4)]> E1).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (ASL + 0x2c) : mword 64) 4)]> E1) with E2.
@@ -336,7 +336,7 @@ Section AslBodies.
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros (ms_m mfm) "%Hms_m Hcg Hown Hpc %Hmp".
     destruct Hmp as (Hmp_cs & Hmp_a0).
     assert (Hpc30 : ret_pc (E2 !!! Regidx (mword_of_int 1 : mword 5))
@@ -354,7 +354,7 @@ Section AslBodies.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi30 [Hpid] [-]").
     { iEval (rewrite Hppid). iExact "Hpid". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hpid".
     iEval (rewrite Hppid) in "Hpid".
     set (E3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 pidv)]> mfm).
@@ -374,7 +374,7 @@ Section AslBodies.
               (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) E3 (av - 4)%nat (mword_of_int 0 : mword 32) false
               with "Hcg Hpc Hi32 [Hspid] [-]").
     { iEval (rewrite Hspidaddr). iExact "Hspid". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hspid".
     iEval (rewrite Hspidaddr) in "Hspid".
     assert (Hsvpid : trunc32 (rget E3 (mword_of_int 15 : mword 5)) = pidv).
@@ -390,7 +390,7 @@ Section AslBodies.
     iApply (wp_cmv_s_sconf Φ (mword_of_int (ASL + 0x34)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
               E3 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (E4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (E3 !!! Regidx (mword_of_int 18 : mword 5)))]> E3).
@@ -401,7 +401,7 @@ Section AslBodies.
     iApply (wp_jal_s_sconf Φ (mword_of_int (ASL + 0x36)) (mword_of_int 1 : mword 5) (mword_of_int 2084238 : mword 21)
               E4 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi36 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (E5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (ASL + 0x36) : mword 64) 4)]> E4).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (ASL + 0x36) : mword 64) 4)]> E4) with E5.
@@ -613,7 +613,7 @@ Section AslBodies.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [Hwp] [-]").
     { iEval (rewrite Hlw24). iExact "Hwp". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hwp".
     iEval (rewrite Hlw24) in "Hwp".
     set (La5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 vp)]> M).
@@ -631,7 +631,7 @@ Section AslBodies.
                 La5 (av - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HLa5_15 Hvp0; vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       assert (Hpp28 : add_vec_int (mword_of_int (ASL + 0x26) : mword 64) 2 = mword_of_int (ASL + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp28) in "Hpc".
@@ -651,7 +651,7 @@ Section AslBodies.
                 ltac:(rgne; rewrite HLa5_15; exact Hvph)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26 [Hr24 Hr16 Hr8 Hr0 Htok Hpid Hctx Hpark Hown Hpay IH Hexit Hheldw]").
-      iNext. rewrite wp_next_off. iIntros "Hcg Hpc".
+      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hbk : add_vec (mword_of_int (ASL + 0x26) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")))) = mword_of_int (ASL + 0x1c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbk) in "Hpc".
@@ -708,7 +708,7 @@ Section AslBodies.
     iApply (wp_cmv_s_sconf Φ (mword_of_int (ASL + 0x1c)) (mword_of_int 11 : mword 5) (mword_of_int 18 : mword 5)
               M (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (L0 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (M !!! Regidx (mword_of_int 18 : mword 5)))]> M).
@@ -719,7 +719,7 @@ Section AslBodies.
     iApply (wp_cmv_s_sconf Φ (mword_of_int (ASL + 0x1e)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               L0 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (L1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (L0 !!! Regidx (mword_of_int 9 : mword 5)))]> L0).
@@ -730,7 +730,7 @@ Section AslBodies.
     iApply (wp_jal_s_sconf Φ (mword_of_int (ASL + 0x20)) (mword_of_int 1 : mword 5) (mword_of_int 2088986 : mword 21)
               L1 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi20 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (L2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (ASL + 0x20) : mword 64) 4)]> L1).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (ASL + 0x20) : mword 64) 4)]> L1) with L2.
@@ -1019,7 +1019,7 @@ Section ProofAcquiresleep.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [Hw0] [-]").
     { iEval (rewrite Hlw18). iExact "Hw0". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hw0".
     iEval (rewrite Hlw18) in "Hw0".
     set (Me := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 v0)]> Macq).
@@ -1037,7 +1037,7 @@ Section ProofAcquiresleep.
                 ltac:(rgne; rewrite HMe15 Hv00; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1a").
-      iNext. rewrite wp_next_off. iIntros "Hcg Hpc".
+      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Htgt28 : add_vec (mword_of_int (ASL + 0x1a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 7 : mword 8) ('b"0")))) = mword_of_int (ASL + 0x28))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt28) in "Hpc".
@@ -1051,7 +1051,7 @@ Section ProofAcquiresleep.
                 Me (av - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HMe15; assert (Hx : neq_vec (sign_extend' 64 v0) zero_reg = true) by exact Hv0h; unfold neq_vec in Hx; apply negb_true_iff in Hx; exact Hx)
                 with "Hcg Hpc Hi1a [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       assert (Hpp1c : add_vec_int (mword_of_int (ASL + 0x1a) : mword 64) 2 = mword_of_int (ASL + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1c) in "Hpc".

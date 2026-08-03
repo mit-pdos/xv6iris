@@ -107,14 +107,14 @@ Section Proto.
               (add_vec (rget m Rzero) (cid_word_of cpu_id)) m n false Hnz Hok
               Hv0 with "Hcg Hpc Hi0").
     (* the whole cost of the refactor at an interrupts-off call site: *)
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     (* ---- add a5, a5, a5 : still on CID0, so [Hi4] (derived before the
        first step) is still about this hart. ---- *)
     iApply (wp_add_s_sconf Φ (add_vec_int pc 4) Ra5 Ra5 Ra5
               (add_vec (rget m1 Ra5) (rget m1 Ra5)) m1 n false Hnz Hok
               eq_refl with "Hcg Hpc Hi4").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iExact "Hcont".
   Qed.
 

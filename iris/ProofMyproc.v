@@ -281,7 +281,7 @@ Section ProofMyproc.
               MP1 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (HtpMP1 : rget MP1 (mword_of_int 4 : mword 5) = cid_word) by (exact (rget_tp MP1)).
     iEval (rewrite HtpMP1) in "Hcg".
@@ -294,7 +294,7 @@ Section ProofMyproc.
               B1 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -308,7 +308,7 @@ Section ProofMyproc.
               B2 (av - 4)%nat false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -326,7 +326,7 @@ Section ProofMyproc.
               B3 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B4 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (MP + 0x14) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> B3).
     change (<[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (mword_of_int (MP + 0x14) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> B3) with B4.
@@ -338,7 +338,7 @@ Section ProofMyproc.
               B4 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg (add_vec (B4 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0xa30 : mword 12)))]> B4).
@@ -356,7 +356,7 @@ Section ProofMyproc.
               B5 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
     set (B6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (B5 !!! Regidx (mword_of_int 15 : mword 5)) (B5 !!! Regidx (mword_of_int 14 : mword 5)))]> B5).
@@ -382,7 +382,7 @@ Section ProofMyproc.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hcur] [-]").
     { iEval (rewrite Hpa). iExact "Hcur". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hcur".
     iEval (rewrite Hpa) in "Hcur".
     iSpecialize ("Hown" with "Hcur").
@@ -396,7 +396,7 @@ Section ProofMyproc.
               B7 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (B8 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (B7 !!! Regidx (mword_of_int 15 : mword 5)))]> B7).
@@ -411,7 +411,7 @@ Section ProofMyproc.
               B8 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B9 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (MP + 0x22) : mword 64) 4)]> B8).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (MP + 0x22) : mword 64) 4)]> B8) with B9.

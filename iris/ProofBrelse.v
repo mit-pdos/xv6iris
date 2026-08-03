@@ -281,7 +281,7 @@ Section ProofBrelse.
     iApply (wp_auipc_s_sconf Φ (mword_of_int (BR + 0x60)) Ra0 (mword_of_int 21 : mword 20)
               M (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi60 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (T1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (BR + 0x60) : mword 64)
@@ -292,7 +292,7 @@ Section ProofBrelse.
     iApply (wp_addi4_s_sconf Φ (mword_of_int (BR + 0x64)) Ra0 Ra0 (mword_of_int 1266 : mword 12)
               T1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (T2 := <[Regidx Ra0 := regval_into_reg
@@ -307,7 +307,7 @@ Section ProofBrelse.
     iApply (wp_jal_s_sconf Φ (mword_of_int (BR + 0x68)) Rra (mword_of_int 2088938 : mword 21)
               T2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi68 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (T3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (BR + 0x68) : mword 64) 4)]> T2).
@@ -946,7 +946,7 @@ Section ProofBrelse.
                 mQ (K - 4)%nat (mword_of_int (Z.pos 1) : mword 32) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2c Hcell [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hcell".
       iEval (rewrite Hpa) in "Hcell".
       set (D1 := <[Regidx Ra5 := regval_into_reg
@@ -961,7 +961,7 @@ Section ProofBrelse.
       iApply (wp_caddiw_s_sconf Φ (mword_of_int (BR + 0x2e)) Ra5 (mword_of_int 63 : mword 6)
                 D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       iEval (rgpeel) in "Hcg".
       set (D2 := <[Regidx Ra5 := regval_into_reg
@@ -984,7 +984,7 @@ Section ProofBrelse.
       iApply (wp_csw_s_sconf Φ (mword_of_int (BR + 0x30)) Ra5 Rs1 (mword_of_int 64 : mword 12)
                 D2 (K - 4)%nat (mword_of_int (Z.pos 1) : mword 32) false
                 with "Hcg Hpc Hi30 Hcell [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hcell".
       iEval (rewrite Hpa2) in "Hcell".
       iEval (rgpeel) in "Hcell".
@@ -1022,7 +1022,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; exact Hbnez)
                 with "Hcg Hpc Hi32 [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       assert (Hpp34 : add_vec_int (mword_of_int (BR + 0x32) : mword 64) 2 = mword_of_int (BR + 0x34))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -1046,7 +1046,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [Hbn] [-]").
       { iEval (rgpeel; rewrite HD2s1). iExact "Hbn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hbn".
       iEval (rgpeel; rewrite HD2s1) in "Hbn".
       set (E1 := <[Regidx Ra4 := regval_into_reg (List.hd bhead (map bnode o2))]> D2).
@@ -1063,7 +1063,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 [Hbp] [-]").
       { iEval (rgpeel; rewrite HE1s1). iExact "Hbp". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hbp".
       iEval (rgpeel; rewrite HE1s1) in "Hbp".
       set (E2 := <[Regidx Ra5 := regval_into_reg (List.last (map bnode o1) bhead)]> E1).
@@ -1080,7 +1080,7 @@ Section ProofBrelse.
       iApply (wp_csd_s_sconf Φ (mword_of_int (BR + 0x38)) Ra5 Ra4 (mword_of_int 72 : mword 12)
                 E2 (K - 4)%nat (bnode k) false with "Hcg Hpc Hi38 [Hsp] [-]").
       { iEval (rgpeel; rewrite HE2a4). iExact "Hsp". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hsp".
       iEval (rgpeel) in "Hsp".
       iEval (rewrite HE2a4 HE2a5) in "Hsp".
@@ -1093,7 +1093,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3a [Hbn] [-]").
       { iEval (rgpeel; rewrite HE2s1). iExact "Hbn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hbn".
       iEval (rgpeel; rewrite HE2s1) in "Hbn".
       set (E3 := <[Regidx Ra4 := regval_into_reg (List.hd bhead (map bnode o2))]> E2).
@@ -1110,7 +1110,7 @@ Section ProofBrelse.
       iApply (wp_csd_s_sconf Φ (mword_of_int (BR + 0x3c)) Ra4 Ra5 (mword_of_int 80 : mword 12)
                 E3 (K - 4)%nat (bnode k) false with "Hcg Hpc Hi3c [Hpn] [-]").
       { iEval (rgpeel; rewrite HE3a5). iExact "Hpn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hpn".
       iEval (rgpeel) in "Hpn".
       iEval (rewrite HE3a5 HE3a4) in "Hpn".
@@ -1135,7 +1135,7 @@ Section ProofBrelse.
       iApply (wp_auipc_s_sconf Φ (mword_of_int (BR + 0x3e)) Ra5 (mword_of_int 29 : mword 20)
                 E3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       set (E4 := <[Regidx Ra5 := regval_into_reg
                     (add_vec (mword_of_int (BR + 0x3e) : mword 64)
@@ -1146,7 +1146,7 @@ Section ProofBrelse.
       iApply (wp_addi4_s_sconf Φ (mword_of_int (BR + 0x42)) Ra5 Ra5 (mword_of_int 1300 : mword 12)
                 E4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi42 [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       iEval (rgpeel) in "Hcg".
       set (E5 := <[Regidx Ra5 := regval_into_reg
@@ -1166,7 +1166,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi46 [Hhn] [-]").
       { iEval (rgpeel; rewrite HE5hn). iExact "Hhn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hhn".
       iEval (rgpeel; rewrite HE5hn) in "Hhn".
       set (E6 := <[Regidx Ra4 := regval_into_reg
@@ -1186,7 +1186,7 @@ Section ProofBrelse.
                 E6 (K - 4)%nat (List.hd bhead (map bnode o2)) false
                 with "Hcg Hpc Hi4a [Hbn] [-]").
       { iEval (rgpeel; rewrite HE6s1). iExact "Hbn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hbn".
       iEval (rgpeel) in "Hbn".
       iEval (rewrite HE6s1 HE6a4) in "Hbn".
@@ -1197,7 +1197,7 @@ Section ProofBrelse.
       iApply (wp_auipc_s_sconf Φ (mword_of_int (BR + 0x4c)) Ra4 (mword_of_int 29 : mword 20)
                 E6 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4c [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       set (E7 := <[Regidx Ra4 := regval_into_reg
                     (add_vec (mword_of_int (BR + 0x4c) : mword 64)
@@ -1208,7 +1208,7 @@ Section ProofBrelse.
       iApply (wp_addi4_s_sconf Φ (mword_of_int (BR + 0x50)) Ra4 Ra4 (mword_of_int 1902 : mword 12)
                 E7 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi50 [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       iEval (rgpeel) in "Hcg".
       set (E8 := <[Regidx Ra4 := regval_into_reg
@@ -1230,7 +1230,7 @@ Section ProofBrelse.
                 E8 (K - 4)%nat (List.last (map bnode o1) bhead) false
                 with "Hcg Hpc Hi54 [Hbp] [-]").
       { iEval (rgpeel; rewrite HE8s1). iExact "Hbp". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hbp".
       iEval (rgpeel) in "Hbp".
       iEval (rewrite HE8s1 HE8a4) in "Hbp".
@@ -1243,7 +1243,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi56 [Hhn] [-]").
       { iEval (rgpeel; rewrite HE8hn). iExact "Hhn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hhn".
       iEval (rgpeel; rewrite HE8hn) in "Hhn".
       set (E9 := <[Regidx Ra4 := regval_into_reg
@@ -1262,7 +1262,7 @@ Section ProofBrelse.
       iApply (wp_csd_s_sconf Φ (mword_of_int (BR + 0x5a)) Rs1 Ra4 (mword_of_int 72 : mword 12)
                 E9 (K - 4)%nat bhead false with "Hcg Hpc Hi5a [Hhp] [-]").
       { iEval (rgpeel; rewrite HE9a4). iExact "Hhp". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hhp".
       iEval (rgpeel) in "Hhp".
       iEval (rewrite HE9a4 HE9s1) in "Hhp".
@@ -1274,7 +1274,7 @@ Section ProofBrelse.
                 E9 (K - 4)%nat (List.hd bhead (map bnode o1 ++ map bnode o2)%list) false
                 with "Hcg Hpc Hi5c [Hhn] [-]").
       { iEval (rgpeel; rewrite HE9hn). iExact "Hhn". }
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hhn".
       iEval (rgpeel) in "Hhn".
       iEval (rewrite HE9hn HE9s1) in "Hhn".
@@ -1345,7 +1345,7 @@ Section ProofBrelse.
                 mQ (K - 4)%nat (mword_of_int (Z.pos (Pos.succ cnt')) : mword 32) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2c Hcell [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hcell".
       iEval (rewrite Hpa) in "Hcell".
       set (D1 := <[Regidx Ra5 := regval_into_reg
@@ -1361,7 +1361,7 @@ Section ProofBrelse.
       iApply (wp_caddiw_s_sconf Φ (mword_of_int (BR + 0x2e)) Ra5 (mword_of_int 63 : mword 6)
                 D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       iEval (rgpeel) in "Hcg".
       set (D2 := <[Regidx Ra5 := regval_into_reg
@@ -1386,7 +1386,7 @@ Section ProofBrelse.
       iApply (wp_csw_s_sconf Φ (mword_of_int (BR + 0x30)) Ra5 Rs1 (mword_of_int 64 : mword 12)
                 D2 (K - 4)%nat (mword_of_int (Z.pos (Pos.succ cnt')) : mword 32) false
                 with "Hcg Hpc Hi30 Hcell [-]").
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hcell".
       iEval (rewrite Hpa2) in "Hcell".
       iEval (rgpeel) in "Hcell".
@@ -1436,7 +1436,7 @@ Section ProofBrelse.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi32 [-]").
       iApply bi.later_intro.
-      rewrite wp_next_off.
+      iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
       assert (Htgt60 : add_vec (mword_of_int (BR + 0x32) : mword 64)
                          (sign_extend' 64 (sign_extend' 13

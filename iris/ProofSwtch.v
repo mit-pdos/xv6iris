@@ -70,6 +70,18 @@ Section ProofSwtch.
     rewrite /word_pointsto /mem_pointsto. apply _.
   Qed.
 
+  (* Field 1 of a context record is the saved sp.  Proved ONCE over an
+     ABSTRACT [m], with [cbn] RESTRICTED to the list combinators: at a
+     concrete register file (the [vregs_den rho swtch_regs1] this proof
+     reaches at the c.ret) a bare [cbn] normalises the whole VC denotation
+     instead, and the resulting proof term is re-checked at [Qed].  Measured
+     2026-08-03: inline, that one [assert] was 18.4 s of [cbn] + 23.4 s of
+     [reflexivity] and most of the file's 39.1 s [Qed] (98 s file); as this
+     lemma the file is 39 s. *)
+  Local Lemma callee_img_nth1 (m : regfile) (d : mword 64) :
+    nth 1 (callee_img m) d = m !!! Regidx csp_rs1.
+  Proof. unfold callee_img, ctx_regs, csp_rs1. cbn [map nth]. reflexivity. Qed.
+
   Lemma wp_swtch_sconf (Φ : mval -> iProp Σ)
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
@@ -200,9 +212,7 @@ Section ProofSwtch.
       rewrite -/(ctx_cells oldc (callee_img m0)).
       iFrame "Holdpart".
       iSplitL "Hstk".
-      { assert (Hn1 : nth 1 (callee_img m0) (mword_of_int 0) = m0 !!! Regidx csp_rs1)
-          by (unfold callee_img, ctx_regs, csp_rs1; cbn; reflexivity).
-        rewrite Hn1. iExact "Hstk". }
+      { rewrite (callee_img_nth1 m0 (mword_of_int 0)). iExact "Hstk". }
       iExact "Hwold". }
     (* ---- the trailing c.ret returns to new's saved return address ---- *)
     assert (Hm1 : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5)
@@ -234,7 +244,7 @@ Section ProofSwtch.
     (* the resumed file's sp (= new's saved sp = nth 1 new_vs) keys its stack. *)
     assert (Hcsp_t : vregs_den rho swtch_regs1 !!! Regidx csp_rs1
                      = nth 1 new_vs (mword_of_int 0)).
-    { rewrite <- Hcallee_new. unfold callee_img, ctx_regs, csp_rs1. cbn. reflexivity. }
+    { rewrite <- Hcallee_new. exact (eq_sym (callee_img_nth1 _ (mword_of_int 0))). }
     iDestruct (swi_ret with "Ht") as "Hret".
     iApply (wp_cret_s_zca_r_later strans_regime Φ
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)

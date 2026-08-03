@@ -1212,7 +1212,7 @@ Section ProofScheduler.
           iIntros "Hcell".
           assert (HM2s1rr : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
           iEval (rewrite HM2s1rr HM2s4r) in "Hcell".
-          iMod ("Hclose" with "Hcell") as "[$ $]". done. }
+          iMod ("Hclose" with "Hcell") as "[$ $]". iModIntro. iPureIntro. exact I. }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
         iIntros "Hcg Hpc [Hproc Hpark]".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
@@ -1359,7 +1359,7 @@ Section ProofScheduler.
           iModIntro. iExists (proc_addr jj).
           iSplitL "Hcell"; [ iEval (rewrite Hm's4r); iExact "Hcell" |].
           iIntros "Hcell". iEval (rewrite Hx076r Hm's4r) in "Hcell".
-          iMod ("Hclose" with "Hcell") as "[$ $]". done. }
+          iMod ("Hclose" with "Hcell") as "[$ $]". iModIntro. iPureIntro. exact I. }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
         iIntros "Hcg Hpc [Hproc Hpark]".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
@@ -1497,7 +1497,7 @@ Section ProofScheduler.
          [cpu_cells_pay true zero_reg]. *)
       iApply (wp_csrci_sstatus_x0_s_sconf Φ (mword_of_int (SC + 0x8a)) M (av - 10)%nat true
                 with "Hcg [] Hpc Hi8a [-]").
-      { iPureIntro. done. }
+      { iPureIntro. exact (conj eq_refl eq_refl). }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros (ms2) "%Hmsf2 Hcg Hcnt Hcsrs Hcells Hpc".
       assert (Ho8e : add_vec_int (mword_of_int (SC + 0x8a) : mword 64) 4 = mword_of_int (SC + 0x8e))

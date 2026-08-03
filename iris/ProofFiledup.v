@@ -328,7 +328,7 @@ Section ProofFiledup.
               macq (K - 4)%nat (mword_of_int (Z.pos cnt) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc Hcell".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa) in "Hcell".
     set (D1 := <[Regidx Ra5 := regval_into_reg
                   (sign_extend' 64 (mword_of_int (Z.pos cnt) : mword 32))]> macq).
@@ -344,7 +344,7 @@ Section ProofFiledup.
               Ra5 D1 (K - 4)%nat false ltac:(vm_compute; discriminate)
               ltac:(rgne; rewrite HD1a5; apply fref_word_spos; exact Hcnt)
               with "Hcg Hpc Hi1a [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpp1e : add_vec_int (mword_of_int (FD + 0x1a) : mword 64) 4 = mword_of_int (FD + 0x1e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1e) in "Hpc".
@@ -352,7 +352,7 @@ Section ProofFiledup.
     iApply (wp_caddiw_s_sconf Φ (mword_of_int (FD + 0x1e)) Ra5 (mword_of_int 1 : mword 6)
               D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D2 := <[Regidx Ra5 := regval_into_reg
                   (sign_extend' 64 (subrange_vec_dec
@@ -371,7 +371,7 @@ Section ProofFiledup.
     iApply (wp_csw_s_sconf Φ (mword_of_int (FD + 0x20)) Ra5 Rs1 (mword_of_int 4 : mword 12)
               D2 (K - 4)%nat (mword_of_int (Z.pos cnt) : mword 32) false
               with "Hcg Hpc Hi20 Hcell [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc Hcell".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hpa2) in "Hcell".
     (* the stored word IS the successor count -- the [c.addiw] arithmetic *)
     assert (Hstv : trunc32 (rget D2 Ra5) = (mword_of_int (Z.pos (Pos.succ cnt)) : mword 32)).
@@ -399,7 +399,7 @@ Section ProofFiledup.
     iApply (wp_auipc_s_sconf Φ (mword_of_int (FD + 0x22)) Ra0 (mword_of_int 0x1e : mword 20)
               D2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (FD + 0x22) : mword 64)
                      (auipc_off (mword_of_int 0x1e : mword 20)))]> D2).
@@ -409,7 +409,7 @@ Section ProofFiledup.
     iApply (wp_addi4_s_sconf Φ (mword_of_int (FD + 0x26)) Ra0 Ra0 (mword_of_int 0x428 : mword 12)
               D3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (D3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x428 : mword 12)))]> D3).
@@ -422,7 +422,7 @@ Section ProofFiledup.
     iApply (wp_jal_s_sconf Φ (mword_of_int (FD + 0x2a)) Rra (mword_of_int 0x1fcc50 : mword 21)
               D4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2a [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FD + 0x2a) : mword 64) 4)]> D4).
     assert (Htgtrel : add_vec (mword_of_int (FD + 0x2a) : mword 64)

@@ -248,7 +248,7 @@ Section ProofKilled.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [Hkilled] [-]").
     { iEval (rgne; rewrite Haddr). iExact "Hkilled". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hkilled". iEval (rgne; rewrite Haddr) in "Hkilled".
     set (C1 := <[Regidx kl_a5 := regval_into_reg (sign_extend' 64 kl)]> macq).
     change (<[Regidx kl_a5 := regval_into_reg (sign_extend' 64 kl)]> macq) with C1.
@@ -259,7 +259,7 @@ Section ProofKilled.
     iApply (wp_cmv_s_sconf Φ (mword_of_int (KL + 0x14)) kl_s2 kl_a5 C1 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (C2 := <[Regidx kl_s2 := regval_into_reg (add_vec zero_reg (C1 !!! Regidx kl_a5))]> C1).
@@ -273,7 +273,7 @@ Section ProofKilled.
     iApply (wp_cmv_s_sconf Φ (mword_of_int (KL + 0x16)) kl_a0 kl_s1 C2 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (C3 := <[Regidx kl_a0 := regval_into_reg (add_vec zero_reg (C2 !!! Regidx kl_s1))]> C2).
@@ -291,7 +291,7 @@ Section ProofKilled.
               C3 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (C4 := <[Regidx kl_ra := regval_into_reg (add_vec_int (mword_of_int (KL + 0x18) : mword 64) 4)]> C3).
     change (<[Regidx kl_ra := regval_into_reg (add_vec_int (mword_of_int (KL + 0x18) : mword 64) 4)]> C3) with C4.

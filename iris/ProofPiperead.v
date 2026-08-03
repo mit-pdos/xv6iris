@@ -985,7 +985,7 @@ Section ProofPiperead.
     iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x24)) Ra4 Rs1 (mword_of_int 536 : mword 12)
               M0 (av - 12)%nat nr0 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24 [Hnr] [-]").
     { rgall. iEval (rewrite Hnra0). iExact "Hnr". }
-    rewrite wp_next_off. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra0) in "Hnr".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra0) in "Hnr".
     set (W1 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 nr0)]> M0).
     change (<[Regidx Ra4 := regval_into_reg (sign_extend' 64 nr0)]> M0) with W1.
     assert (Hpc28 : add_vec_int (mword_of_int (PR + 0x24) : mword 64) 4 = mword_of_int (PR + 0x28))
@@ -998,7 +998,7 @@ Section ProofPiperead.
     iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x28)) Ra5 Rs1 (mword_of_int 540 : mword 12)
               W1 (av - 12)%nat nw0 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi28 [Hnw] [-]").
     { rgall. iEval (rewrite Hnwa1). iExact "Hnw". }
-    rewrite wp_next_off. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa1) in "Hnw".
+    iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa1) in "Hnw".
     set (W2 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 nw0)]> W1).
     change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 nw0)]> W1) with W2.
     assert (Hpc2c : add_vec_int (mword_of_int (PR + 0x28) : mword 64) 4 = mword_of_int (PR + 0x2c))
@@ -1007,7 +1007,7 @@ Section ProofPiperead.
     iPoseProof (pri_2c with "Htext") as "Hi2c".
     iApply (wp_addi4_s_sconf Φ (mword_of_int (PR + 0x2c)) Rs3 Rs1 (mword_of_int 536 : mword 12)
               W2 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+    iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (W0 := <[Regidx Rs3 := regval_into_reg
         (add_vec (W2 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 536 : mword 12)))]> W2).
     change (<[Regidx Rs3 := regval_into_reg
@@ -1144,7 +1144,7 @@ Section ProofPiperead.
       iApply (wp_cli_s_sconf Φ (mword_of_int (PR + 0x76)) Rs3 (mword_of_int 0 : mword 6)
                 (mword_of_int 0 : mword 64) M (av - 12)%nat false ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi76 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (G0 := <[Regidx Rs3 := regval_into_reg (mword_of_int 0 : mword 64)]> M).
       change (<[Regidx Rs3 := regval_into_reg (mword_of_int 0 : mword 64)]> M) with G0.
       assert (Hp78 : add_vec_int (mword_of_int (PR + 0x76) : mword 64) 2 = mword_of_int (PR + 0x78))
@@ -1155,7 +1155,7 @@ Section ProofPiperead.
       iPoseProof (pri_78 with "Htext") as "Hi78".
       iApply (wp_addi4_s_sconf Φ (mword_of_int (PR + 0x78)) Rs8 Rs0 (mword_of_int 4015 : mword 12)
                 G0 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi78 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       iEval (rewrite HG0s0) in "Hcg".
       set (G1 := <[Regidx Rs8 := regval_into_reg chaddr]> G0).
       change (<[Regidx Rs8 := regval_into_reg
@@ -1168,7 +1168,7 @@ Section ProofPiperead.
       iApply (wp_cli_s_sconf Φ (mword_of_int (PR + 0x7c)) Rs7 (mword_of_int 1 : mword 6)
                 (mword_of_int 1 : mword 64) G1 (av - 12)%nat false ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi7c [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (G2 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> G1).
       change (<[Regidx Rs7 := regval_into_reg (mword_of_int 1 : mword 64)]> G1) with G2.
       assert (Hp7e : add_vec_int (mword_of_int (PR + 0x7c) : mword 64) 2 = mword_of_int (PR + 0x7e))
@@ -1178,7 +1178,7 @@ Section ProofPiperead.
       iApply (wp_cli_s_sconf Φ (mword_of_int (PR + 0x7e)) Rs6 (mword_of_int 63 : mword 6)
                 (mword_of_int (-1) : mword 64) G2 (av - 12)%nat false ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi7e [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (G3 := <[Regidx Rs6 := regval_into_reg (mword_of_int (-1) : mword 64)]> G2).
       change (<[Regidx Rs6 := regval_into_reg (mword_of_int (-1) : mword 64)]> G2) with G3.
       assert (Hp80 : add_vec_int (mword_of_int (PR + 0x7e) : mword 64) 2 = mword_of_int (PR + 0x80))
@@ -1258,7 +1258,7 @@ Section ProofPiperead.
         iPoseProof (pri_c2 with "Htext") as "Hic2".
         iApply (wp_addi4_s_sconf Φ (mword_of_int (PR + 0xc2)) Ra0 Rs1 (mword_of_int 540 : mword 12)
                   M2 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic2 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (X1 := <[Regidx Ra0 := regval_into_reg
             (add_vec (M2 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 540 : mword 12)))]> M2).
         change (<[Regidx Ra0 := regval_into_reg
@@ -1271,7 +1271,7 @@ Section ProofPiperead.
         iApply (wp_jal_s_sconf Φ (mword_of_int (PR + 0xc6)) Rra (mword_of_int 2087158 : mword 21)
                   X1 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hic6 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (X2 := <[Regidx Rra := regval_into_reg
             (add_vec_int (mword_of_int (PR + 0xc6) : mword 64) 4)]> X1).
         change (<[Regidx Rra := regval_into_reg
@@ -1291,7 +1291,7 @@ Section ProofPiperead.
         iApply (Wakeup.wp_wakeup_sconf Φ X2 γs (mycpu_ret cid_word) pj 1%nat (av - 12)%nat true C false
                   HwK HwdomX Hlen Hwa0f Hwnz pr_lvl1
                   with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
-        rewrite wp_next_off. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
+        iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
         iEval (rewrite HX2ra) in "Hpc".
         assert (Hpca : ret_pc (add_vec_int (mword_of_int (PR + 0xc6) : mword 64) 4)
                        = (mword_of_int (PR + 0xca) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1308,7 +1308,7 @@ Section ProofPiperead.
         iPoseProof (pri_ca with "Htext") as "Hica".
         iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0xca)) Ra0 Rs1 Mw (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hica [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (X3 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mw !!! Regidx Rs1))]> Mw).
         change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mw !!! Regidx Rs1))]> Mw) with X3.
         assert (Hpcc : add_vec_int (mword_of_int (PR + 0xca) : mword 64) 2 = mword_of_int (PR + 0xcc))
@@ -1319,7 +1319,7 @@ Section ProofPiperead.
         iApply (wp_jal_s_sconf Φ (mword_of_int (PR + 0xcc)) Rra (mword_of_int 2082350 : mword 21)
                   X3 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hicc [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (X4 := <[Regidx Rra := regval_into_reg
             (add_vec_int (mword_of_int (PR + 0xcc) : mword 64) 4)]> X3).
         change (<[Regidx Rra := regval_into_reg
@@ -1436,7 +1436,7 @@ Section ProofPiperead.
         iApply (wp_bge_x0_taken_s_sconf Φ (mword_of_int (PR + 0x80)) (mword_of_int 66 : mword 13)
                   Rs5 G3 (av - 12)%nat false ltac:(nz) ltac:(rgall; exact Hblez)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi80 [-]").
-        iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjbz : add_vec (mword_of_int (PR + 0x80) : mword 64)
                          (sign_extend' 64 (mword_of_int 66 : mword 13)) = mword_of_int (PR + 0xc2))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1458,7 +1458,7 @@ Section ProofPiperead.
       iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (PR + 0x80)) (mword_of_int 66 : mword 13)
                 Rs5 G3 (av - 12)%nat false ltac:(nz) ltac:(rgall; exact Hblez)
                 with "Hcg Hpc Hi80 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hp84 : add_vec_int (mword_of_int (PR + 0x80) : mword 64) 4 = mword_of_int (PR + 0x84))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp84) in "Hpc".
@@ -1514,7 +1514,7 @@ Section ProofPiperead.
         iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x84)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                   M3 (av - 12)%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 [Hnr] [-]").
         { rgall. iEval (rewrite Hnra). iExact "Hnr". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra) in "Hnr".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra) in "Hnr".
         set (K1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 nr)]> M3).
         change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 nr)]> M3) with K1.
         assert (Hq88 : add_vec_int (mword_of_int (PR + 0x84) : mword 64) 4 = mword_of_int (PR + 0x88))
@@ -1528,7 +1528,7 @@ Section ProofPiperead.
         iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x88)) Ra4 Rs1 (mword_of_int 540 : mword 12)
                   K1 (av - 12)%nat nw false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi88 [Hnw] [-]").
         { rgall. iEval (rewrite Hnwa). iExact "Hnw". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa) in "Hnw".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa) in "Hnw".
         set (K2 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 nw)]> K1).
         change (<[Regidx Ra4 := regval_into_reg (sign_extend' 64 nw)]> K1) with K2.
         assert (Hq8c : add_vec_int (mword_of_int (PR + 0x88) : mword 64) 4 = mword_of_int (PR + 0x8c))
@@ -1549,7 +1549,7 @@ Section ProofPiperead.
                     Ra5 Ra4 K2 (av - 12)%nat false ltac:(nz) ltac:(nz)
                     ltac:(rgall; rewrite HK2a4 HK2a5; exact Hemp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi8c [-]").
-          iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           assert (Hjc2 : add_vec (mword_of_int (PR + 0x8c) : mword 64)
                            (sign_extend' 64 (mword_of_int 54 : mword 13)) = mword_of_int (PR + 0xc2))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -1577,7 +1577,7 @@ Section ProofPiperead.
         iApply (wp_beq_fall_s_sconf Φ (mword_of_int (PR + 0x8c)) (mword_of_int 54 : mword 13)
                   Ra5 Ra4 K2 (av - 12)%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite HK2a4 HK2a5; exact Hemp) with "Hcg Hpc Hi8c [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hq90 : add_vec_int (mword_of_int (PR + 0x8c) : mword 64) 4 = mword_of_int (PR + 0x90))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hq90) in "Hpc".
@@ -1596,7 +1596,7 @@ Section ProofPiperead.
         iApply (wp_andi_s_sconf Φ (mword_of_int (PR + 0x90)) Ra5 Ra5 (mword_of_int 511 : mword 12)
                   (mword_of_int (Z.of_nat idx) : mword 64) K2 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) Hwv with "Hcg Hpc Hi90 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (K3 := <[Regidx Ra5 := regval_into_reg (mword_of_int (Z.of_nat idx) : mword 64)]> K2).
         change (<[Regidx Ra5 := regval_into_reg (mword_of_int (Z.of_nat idx) : mword 64)]> K2) with K3.
         assert (Hq94 : add_vec_int (mword_of_int (PR + 0x90) : mword 64) 4 = mword_of_int (PR + 0x94))
@@ -1610,7 +1610,7 @@ Section ProofPiperead.
         iPoseProof (pri_94 with "Htext") as "Hi94".
         iApply (wp_cadd_s_sconf Φ (mword_of_int (PR + 0x94)) Ra5 Rs1 K3 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi94 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         iEval (rewrite HK3a5 HK3s1) in "Hcg".
         set (K4 := <[Regidx Ra5 := regval_into_reg
             (add_vec (mword_of_int (Z.of_nat idx) : mword 64) pi)]> K3).
@@ -1629,7 +1629,7 @@ Section ProofPiperead.
         iApply (wp_lbu_s_sconf Φ (mword_of_int (PR + 0x96)) Ra5 Ra5 (mword_of_int 24 : mword 12)
                   K4 (av - 12)%nat (db : mword 8) false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi96 [Hbyte] [-]").
         { rgall. iEval (rewrite HK4a5 pr_dataddr). iExact "Hbyte". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hbyte". rgall. iEval (rewrite HK4a5 pr_dataddr) in "Hbyte".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hbyte". rgall. iEval (rewrite HK4a5 pr_dataddr) in "Hbyte".
         iDestruct ("Hdback" with "Hbyte") as "Hdat".
         set (K5 := <[Regidx Ra5 := regval_into_reg (zero_extend' 64 (db : mword 8))]> K4).
         change (<[Regidx Ra5 := regval_into_reg (zero_extend' 64 (db : mword 8))]> K4) with K5.
@@ -1651,7 +1651,7 @@ Section ProofPiperead.
         iApply (wp_sb_s_sconf Φ (mword_of_int (PR + 0x9a)) Ra5 Rs0 (mword_of_int 4015 : mword 12)
                   K5 (av - 12)%nat chb false with "Hcg Hpc Hi9a [Hch] [-]").
         { rgall. iEval (rewrite HK5s0 Hchd). iExact "Hch". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hch". rgall. iEval (rewrite HK5s0 Hchd) in "Hch".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hch". rgall. iEval (rewrite HK5s0 Hchd) in "Hch".
         assert (Hq9e : add_vec_int (mword_of_int (PR + 0x9a) : mword 64) 4 = mword_of_int (PR + 0x9e))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hq9e) in "Hpc".
@@ -1659,7 +1659,7 @@ Section ProofPiperead.
         iPoseProof (pri_9e with "Htext") as "Hi9e".
         iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0x9e)) Ra3 Rs7 K5 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9e [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (K6 := <[Regidx Ra3 := regval_into_reg (add_vec zero_reg (K5 !!! Regidx Rs7))]> K5).
         change (<[Regidx Ra3 := regval_into_reg (add_vec zero_reg (K5 !!! Regidx Rs7))]> K5) with K6.
         assert (Hqa0 : add_vec_int (mword_of_int (PR + 0x9e) : mword 64) 2 = mword_of_int (PR + 0xa0))
@@ -1668,7 +1668,7 @@ Section ProofPiperead.
         iPoseProof (pri_a0 with "Htext") as "Hia0".
         iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0xa0)) Ra2 Rs8 K6 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia0 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (K7 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (K6 !!! Regidx Rs8))]> K6).
         change (<[Regidx Ra2 := regval_into_reg (add_vec zero_reg (K6 !!! Regidx Rs8))]> K6) with K7.
         assert (Hqa2 : add_vec_int (mword_of_int (PR + 0xa0) : mword 64) 2 = mword_of_int (PR + 0xa2))
@@ -1677,7 +1677,7 @@ Section ProofPiperead.
         iPoseProof (pri_a2 with "Htext") as "Hia2".
         iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0xa2)) Ra1 Rs2 K7 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia2 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (K8 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (K7 !!! Regidx Rs2))]> K7).
         change (<[Regidx Ra1 := regval_into_reg (add_vec zero_reg (K7 !!! Regidx Rs2))]> K7) with K8.
         assert (Hqa4 : add_vec_int (mword_of_int (PR + 0xa2) : mword 64) 2 = mword_of_int (PR + 0xa4))
@@ -1696,7 +1696,7 @@ Section ProofPiperead.
                   K8 (av - 12)%nat (page_base (ud_root P')) false ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hia4 [Hptc] [-]").
         { rgall. iEval (rewrite Hpta). iExact "Hptc". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hptc". rgall. iEval (rewrite Hpta) in "Hptc".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hptc". rgall. iEval (rewrite Hpta) in "Hptc".
         set (K9 := <[Regidx Ra0 := regval_into_reg (page_base (ud_root P'))]> K8).
         change (<[Regidx Ra0 := regval_into_reg (page_base (ud_root P'))]> K8) with K9.
         assert (Hqa8 : add_vec_int (mword_of_int (PR + 0xa4) : mword 64) 4 = mword_of_int (PR + 0xa8))
@@ -1707,7 +1707,7 @@ Section ProofPiperead.
         iApply (wp_jal_s_sconf Φ (mword_of_int (PR + 0xa8)) Rra (mword_of_int 2084838 : mword 21)
                   K9 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hia8 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (K10 := <[Regidx Rra := regval_into_reg
             (add_vec_int (mword_of_int (PR + 0xa8) : mword 64) 4)]> K9).
         change (<[Regidx Rra := regval_into_reg
@@ -1746,7 +1746,7 @@ Section ProofPiperead.
                   HK50 HK10a0 HK10a3 pr_len1_64 Hszb pr_lvl1
                   with "Hcg Hown Htext Hpc Hszc Hptc Hpt Henv [Hch] [-]").
         { rgall. iEval (rewrite HK10a2). iApply pr_buf1_intro. iExact "Hch". }
-        rewrite wp_next_off. iIntros (mrc P'') "Hcg Hown Hpc Hszc Hptc Hpt Hbuf %Hcsr %Hext2 %Hret". rgall.
+        iApply wp_next_off_intro. iIntros (mrc P'') "Hcg Hown Hpc Hszc Hptc Hpt Hbuf %Hcsr %Hext2 %Hret". rgall.
         iEval (rewrite HK10a2) in "Hbuf".
         iDestruct (pr_buf1_elim with "Hbuf") as "Hch".
         iEval (rewrite Hroot) in "Hptc".
@@ -1771,7 +1771,7 @@ Section ProofPiperead.
                     Rs6 Ra0 mrc (av - 12)%nat false ltac:(nz) ltac:(nz)
                     ltac:(rgall; rewrite Hr0 Hmrcs6; vm_compute; reflexivity)
                     with "Hcg Hpc Hiac [-]").
-          rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           assert (Hqb0 : add_vec_int (mword_of_int (PR + 0xac) : mword 64) 4 = mword_of_int (PR + 0xb0))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hqb0) in "Hpc".
@@ -1784,7 +1784,7 @@ Section ProofPiperead.
           iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0xb0)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                     mrc (av - 12)%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib0 [Hnr] [-]").
           { rgall. iEval (rewrite Hnra2). iExact "Hnr". }
-          rewrite wp_next_off. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra2) in "Hnr".
+          iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra2) in "Hnr".
           set (D1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 nr)]> mrc).
           change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 nr)]> mrc) with D1.
           assert (Hqb4 : add_vec_int (mword_of_int (PR + 0xb0) : mword 64) 4 = mword_of_int (PR + 0xb4))
@@ -1795,7 +1795,7 @@ Section ProofPiperead.
           iPoseProof (pri_b4 with "Htext") as "Hib4".
           iApply (wp_caddiw_s_sconf Φ (mword_of_int (PR + 0xb4)) Ra5 (mword_of_int 1 : mword 6)
                     D1 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib4 [-]").
-          rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           iEval (rewrite HD1a5) in "Hcg".
           set (D2 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 (subrange_vec_dec
               (add_vec (sign_extend' 64 nr)
@@ -1815,7 +1815,7 @@ Section ProofPiperead.
           iApply (wp_sw_s_sconf Φ (mword_of_int (PR + 0xb6)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                     D2 (av - 12)%nat nr false with "Hcg Hpc Hib6 [Hnr] [-]").
           { rgall. iEval (rewrite Hnra3). iExact "Hnr". }
-          rewrite wp_next_off. iIntros "Hcg Hpc Hnr". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall.
           assert (HD2a5 : D2 !!! Regidx Ra5 = sign_extend' 64 (subrange_vec_dec
               (add_vec (sign_extend' 64 nr)
                  (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0))
@@ -1830,7 +1830,7 @@ Section ProofPiperead.
           iPoseProof (pri_ba with "Htext") as "Hiba".
           iApply (wp_caddiw_s_sconf Φ (mword_of_int (PR + 0xba)) Rs3 (mword_of_int 1 : mword 6)
                     D2 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiba [-]").
-          rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           iEval (rewrite HD2s3) in "Hcg".
           assert (HSi : sign_extend' 64 (subrange_vec_dec
                     (add_vec (mword_of_int (Z.of_nat i) : mword 64)
@@ -1852,7 +1852,7 @@ Section ProofPiperead.
           iPoseProof (pri_bc with "Htext") as "Hibc".
           iApply (wp_caddi_s_sconf Φ (mword_of_int (PR + 0xbc)) Rs2 (mword_of_int 1 : mword 6)
                     D3 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hibc [-]").
-          rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           iEval (rewrite HD3s2) in "Hcg".
           set (D4 := <[Regidx Rs2 := regval_into_reg
               (add_vec cur (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> D3).
@@ -1890,7 +1890,7 @@ Section ProofPiperead.
                       Rs3 Rs5 D4 (av - 12)%nat false ltac:(nz) ltac:(nz)
                       ltac:(rgall; rewrite HD4s5 HD4s3 HZs; apply pr_moi_eqself)
                       with "Hcg Hpc Hibe [-]").
-            rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+            iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
             assert (Hqc2 : add_vec_int (mword_of_int (PR + 0xbe) : mword 64) 4 = mword_of_int (PR + 0xc2))
               by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite Hqc2) in "Hpc".
@@ -1918,7 +1918,7 @@ Section ProofPiperead.
                       ltac:(rgall; rewrite HD4s5 HD4s3; apply pr_moi_neq; lia)
                       ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hibe [-]").
-            iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+            iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
             assert (Hbk : add_vec (mword_of_int (PR + 0xbe) : mword 64)
                             (sign_extend' 64 (mword_of_int 8134 : mword 13)) = mword_of_int (PR + 0x84))
               by (apply bv_eq; vm_compute; reflexivity).
@@ -1948,7 +1948,7 @@ Section ProofPiperead.
                   Rs6 Ra0 mrc (av - 12)%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite Hrm1 Hmrcs6; apply eq_vec_true_iff; reflexivity)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiac [-]").
-        iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjea : add_vec (mword_of_int (PR + 0xac) : mword 64)
                          (sign_extend' 64 (mword_of_int 62 : mword 13)) = mword_of_int (PR + 0xea))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1967,7 +1967,7 @@ Section ProofPiperead.
           iApply (wp_bnez_x0_fall_s_sconf Φ (mword_of_int (PR + 0xea)) (mword_of_int 8152 : mword 13)
                     Rs3 mrc (av - 12)%nat false ltac:(nz)
                     ltac:(rgall; rewrite Hmrcs3 Hi0; exact pr_moi0_z) with "Hcg Hpc Hiea [-]").
-          rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           assert (Hqee : add_vec_int (mword_of_int (PR + 0xea) : mword 64) 4 = mword_of_int (PR + 0xee))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hqee) in "Hpc".
@@ -1975,7 +1975,7 @@ Section ProofPiperead.
           iPoseProof (pri_ee with "Htext") as "Hiee".
           iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0xee)) Rs3 Ra0 mrc (av - 12)%nat false
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiee [-]").
-          rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           set (E1 := <[Regidx Rs3 := regval_into_reg (add_vec zero_reg (mrc !!! Regidx Ra0))]> mrc).
           change (<[Regidx Rs3 := regval_into_reg (add_vec zero_reg (mrc !!! Regidx Ra0))]> mrc) with E1.
           assert (Hqf0 : add_vec_int (mword_of_int (PR + 0xee) : mword 64) 2 = mword_of_int (PR + 0xf0))
@@ -1988,7 +1988,7 @@ Section ProofPiperead.
           iApply (wp_cj_s_sconf Φ (mword_of_int (PR + 0xf0))
                     (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")))
                     E1 (av - 12)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hif0 [-]").
-          rewrite wp_next_off. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
           assert (Hjf0 : add_vec (mword_of_int (PR + 0xf0) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
                          = mword_of_int (PR + 0xc2)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2014,7 +2014,7 @@ Section ProofPiperead.
                   Rs3 mrc (av - 12)%nat false ltac:(nz)
                   ltac:(rgall; rewrite Hmrcs3; apply pr_moi_nz; lia)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiea [-]").
-        iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjeac : add_vec (mword_of_int (PR + 0xea) : mword 64)
                           (sign_extend' 64 (mword_of_int 8152 : mword 13)) = mword_of_int (PR + 0xc2))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -2095,7 +2095,7 @@ Section ProofPiperead.
       iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x34)) Ra5 Rs1 (mword_of_int 548 : mword 12)
                 M (av - 12)%nat wo1 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 [Hwo] [-]").
       { rgall. iEval (rewrite Hwoa). iExact "Hwo". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hwo". rgall. iEval (rewrite Hwoa) in "Hwo".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hwo". rgall. iEval (rewrite Hwoa) in "Hwo".
       set (L1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 wo1)]> M).
       change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 wo1)]> M) with L1.
       assert (Hw38 : add_vec_int (mword_of_int (PR + 0x34) : mword 64) 4 = mword_of_int (PR + 0x38))
@@ -2119,7 +2119,7 @@ Section ProofPiperead.
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rgall; rewrite HL1a5; exact Hwoz) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi38 [-]").
-        iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hj70 : add_vec (mword_of_int (PR + 0x38) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0"))))
                        = mword_of_int (PR + 0x70)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2138,7 +2138,7 @@ Section ProofPiperead.
         iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x70)) (mword_of_int 4 : mword 6) Rs6
                   L1 (av - 12)%nat y8 false with "Hcg Hpc Hi70 [Hc8] [-]").
         { rgall. iEval (rewrite HL1csp -Hb8). iExact "Hc8". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HL1csp -Hb8 HL1s6) in "Hc8".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HL1csp -Hb8 HL1s6) in "Hc8".
         assert (Hw72 : add_vec_int (mword_of_int (PR + 0x70) : mword 64) 2 = mword_of_int (PR + 0x72))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hw72) in "Hpc".
@@ -2146,7 +2146,7 @@ Section ProofPiperead.
         iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x72)) (mword_of_int 3 : mword 6) Rs7
                   L1 (av - 12)%nat y9 false with "Hcg Hpc Hi72 [Hc9] [-]").
         { rgall. iEval (rewrite HL1csp -Hb9). iExact "Hc9". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HL1csp -Hb9 HL1s7) in "Hc9".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HL1csp -Hb9 HL1s7) in "Hc9".
         assert (Hw74 : add_vec_int (mword_of_int (PR + 0x72) : mword 64) 2 = mword_of_int (PR + 0x74))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hw74) in "Hpc".
@@ -2154,7 +2154,7 @@ Section ProofPiperead.
         iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x74)) (mword_of_int 2 : mword 6) Rs8
                   L1 (av - 12)%nat y10 false with "Hcg Hpc Hi74 [Hc10] [-]").
         { rgall. iEval (rewrite HL1csp -Hb10). iExact "Hc10". }
-        rewrite wp_next_off. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HL1csp -Hb10 HL1s8) in "Hc10".
+        iApply wp_next_off_intro. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HL1csp -Hb10 HL1s8) in "Hc10".
         assert (Hw76 : add_vec_int (mword_of_int (PR + 0x74) : mword 64) 2 = mword_of_int (PR + 0x76))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hw76) in "Hpc".
@@ -2176,7 +2176,7 @@ Section ProofPiperead.
                 (Cregidx (mword_of_int 7)) Ra5 L1 (av - 12)%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgall; rewrite HL1a5; exact Hwoz) with "Hcg Hpc Hi38 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hw3a : add_vec_int (mword_of_int (PR + 0x38) : mword 64) 2 = mword_of_int (PR + 0x3a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hw3a) in "Hpc".
@@ -2184,7 +2184,7 @@ Section ProofPiperead.
       iPoseProof (pri_3a with "Htext") as "Hi3a".
       iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0x3a)) Ra0 Rs4 L1 (av - 12)%nat false
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi3a [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (L2 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L1 !!! Regidx Rs4))]> L1).
       change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L1 !!! Regidx Rs4))]> L1) with L2.
       assert (Hw3c : add_vec_int (mword_of_int (PR + 0x3a) : mword 64) 2 = mword_of_int (PR + 0x3c))
@@ -2195,7 +2195,7 @@ Section ProofPiperead.
       iApply (wp_jal_s_sconf Φ (mword_of_int (PR + 0x3c)) Rra (mword_of_int 2087792 : mword 21)
                 L2 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3c [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (L3 := <[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (PR + 0x3c) : mword 64) 4)]> L2).
       change (<[Regidx Rra := regval_into_reg
@@ -2218,7 +2218,7 @@ Section ProofPiperead.
       iApply (Killed.wp_killed_sconf Φ γs j γlp L3 (av - 12)%nat 1%nat true pj C false
                 HL3a0 Hj Hjl pr_lvl1 ltac:(lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic [-]").
-      rewrite wp_next_off. iIntros (mk kl) "[%Hkcs %Hka0] Hcg Hown Hpc". rgall.
+      iApply wp_next_off_intro. iIntros (mk kl) "[%Hkcs %Hka0] Hcg Hown Hpc". rgall.
       iEval (rewrite HL3ra) in "Hpc".
       assert (Hw40 : ret_pc (add_vec_int (mword_of_int (PR + 0x3c) : mword 64) 4)
                      = (mword_of_int (PR + 0x40) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2236,7 +2236,7 @@ Section ProofPiperead.
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rgall; rewrite Hka0; exact Hkz) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi40 [-]").
-        iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hj66 : add_vec (mword_of_int (PR + 0x40) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 19 : mword 8) ('b"0"))))
                        = mword_of_int (PR + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2245,7 +2245,7 @@ Section ProofPiperead.
         iPoseProof (pri_66 with "Htext") as "Hi66".
         iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0x66)) Ra0 Rs1 mk (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi66 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (N1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Rs1))]> mk).
         change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Rs1))]> mk) with N1.
         assert (Hw68 : add_vec_int (mword_of_int (PR + 0x66) : mword 64) 2 = mword_of_int (PR + 0x68))
@@ -2256,7 +2256,7 @@ Section ProofPiperead.
         iApply (wp_jal_s_sconf Φ (mword_of_int (PR + 0x68)) Rra (mword_of_int 2082450 : mword 21)
                   N1 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi68 [-]").
-        rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         set (N2 := <[Regidx Rra := regval_into_reg
             (add_vec_int (mword_of_int (PR + 0x68) : mword 64) 4)]> N1).
         change (<[Regidx Rra := regval_into_reg
@@ -2342,7 +2342,7 @@ Section ProofPiperead.
                 (Cregidx (mword_of_int 2)) Ra0 mk (av - 12)%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgall; rewrite Hka0; exact Hkz) with "Hcg Hpc Hi40 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hw42 : add_vec_int (mword_of_int (PR + 0x40) : mword 64) 2 = mword_of_int (PR + 0x42))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hw42) in "Hpc".
@@ -2350,7 +2350,7 @@ Section ProofPiperead.
       iPoseProof (pri_42 with "Htext") as "Hi42".
       iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0x42)) Ra1 Rs1 mk (av - 12)%nat false
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (L4 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Rs1))]> mk).
       change (<[Regidx Ra1 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Rs1))]> mk) with L4.
       assert (Hw44 : add_vec_int (mword_of_int (PR + 0x42) : mword 64) 2 = mword_of_int (PR + 0x44))
@@ -2359,7 +2359,7 @@ Section ProofPiperead.
       iPoseProof (pri_44 with "Htext") as "Hi44".
       iApply (wp_cmv_s_sconf Φ (mword_of_int (PR + 0x44)) Ra0 Rs3 L4 (av - 12)%nat false
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi44 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (L5 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L4 !!! Regidx Rs3))]> L4).
       change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L4 !!! Regidx Rs3))]> L4) with L5.
       assert (Hw46 : add_vec_int (mword_of_int (PR + 0x44) : mword 64) 2 = mword_of_int (PR + 0x46))
@@ -2370,7 +2370,7 @@ Section ProofPiperead.
       iApply (wp_jal_s_sconf Φ (mword_of_int (PR + 0x46)) Rra (mword_of_int 2087210 : mword 21)
                 L5 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi46 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (L6 := <[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (PR + 0x46) : mword 64) 4)]> L5).
       change (<[Regidx Rra := regval_into_reg
@@ -2420,7 +2420,7 @@ Section ProofPiperead.
       iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x4a)) Ra4 Rs1 (mword_of_int 536 : mword 12)
                 mfs (av - 12)%nat nr2 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a [Hnr] [-]").
       { rgall. iEval (rewrite Hnra4). iExact "Hnr". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra4) in "Hnr".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra4) in "Hnr".
       set (L7 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 nr2)]> mfs).
       change (<[Regidx Ra4 := regval_into_reg (sign_extend' 64 nr2)]> mfs) with L7.
       assert (Hw4e : add_vec_int (mword_of_int (PR + 0x4a) : mword 64) 4 = mword_of_int (PR + 0x4e))
@@ -2433,7 +2433,7 @@ Section ProofPiperead.
       iApply (wp_lw_s_sconf Φ (mword_of_int (PR + 0x4e)) Ra5 Rs1 (mword_of_int 540 : mword 12)
                 L7 (av - 12)%nat nw2 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4e [Hnw] [-]").
       { rgall. iEval (rewrite Hnwa4). iExact "Hnw". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa4) in "Hnw".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa4) in "Hnw".
       set (L8 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 nw2)]> L7).
       change (<[Regidx Ra5 := regval_into_reg (sign_extend' 64 nw2)]> L7) with L8.
       assert (Hw52 : add_vec_int (mword_of_int (PR + 0x4e) : mword 64) 4 = mword_of_int (PR + 0x52))
@@ -2472,7 +2472,7 @@ Section ProofPiperead.
            other instruction step here wants only the goal's later gone and
            uses [iApply bi.later_intro], which never walks the context (~0.06 s
            against [iNext]'s ~1.1 s — see optimization.md). *)
-        iNext. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hbk34 : add_vec (mword_of_int (PR + 0x52) : mword 64)
                           (sign_extend' 64 (mword_of_int 8162 : mword 13)) = mword_of_int (PR + 0x34))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -2484,7 +2484,7 @@ Section ProofPiperead.
       iApply (wp_beq_fall_s_sconf Φ (mword_of_int (PR + 0x52)) (mword_of_int 8162 : mword 13)
                 Ra5 Ra4 L8 (av - 12)%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HL8a4 HL8a5; exact Hstill) with "Hcg Hpc Hi52 [-]").
-      rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hw56 : add_vec_int (mword_of_int (PR + 0x52) : mword 64) 4 = mword_of_int (PR + 0x56))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hw56) in "Hpc".
@@ -2502,7 +2502,7 @@ Section ProofPiperead.
       iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x56)) (mword_of_int 4 : mword 6) Rs6
                 L8 (av - 12)%nat z8 false with "Hcg Hpc Hi56 [Hc8] [-]").
       { rgall. iEval (rewrite HL8csp -Hb8). iExact "Hc8". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HL8csp -Hb8 HL8s6) in "Hc8".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HL8csp -Hb8 HL8s6) in "Hc8".
       assert (Hw58 : add_vec_int (mword_of_int (PR + 0x56) : mword 64) 2 = mword_of_int (PR + 0x58))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hw58) in "Hpc".
@@ -2510,7 +2510,7 @@ Section ProofPiperead.
       iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x58)) (mword_of_int 3 : mword 6) Rs7
                 L8 (av - 12)%nat z9 false with "Hcg Hpc Hi58 [Hc9] [-]").
       { rgall. iEval (rewrite HL8csp -Hb9). iExact "Hc9". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HL8csp -Hb9 HL8s7) in "Hc9".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HL8csp -Hb9 HL8s7) in "Hc9".
       assert (Hw5a : add_vec_int (mword_of_int (PR + 0x58) : mword 64) 2 = mword_of_int (PR + 0x5a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hw5a) in "Hpc".
@@ -2518,7 +2518,7 @@ Section ProofPiperead.
       iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x5a)) (mword_of_int 2 : mword 6) Rs8
                 L8 (av - 12)%nat z10 false with "Hcg Hpc Hi5a [Hc10] [-]").
       { rgall. iEval (rewrite HL8csp -Hb10). iExact "Hc10". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HL8csp -Hb10 HL8s8) in "Hc10".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HL8csp -Hb10 HL8s8) in "Hc10".
       assert (Hw5c : add_vec_int (mword_of_int (PR + 0x5a) : mword 64) 2 = mword_of_int (PR + 0x5c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hw5c) in "Hpc".
@@ -2526,7 +2526,7 @@ Section ProofPiperead.
       iApply (wp_cj_s_sconf Φ (mword_of_int (PR + 0x5c))
                 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")))
                 L8 (av - 12)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5c [-]").
-      rewrite wp_next_off. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj76 : add_vec (mword_of_int (PR + 0x5c) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                      = mword_of_int (PR + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2555,7 +2555,7 @@ Section ProofPiperead.
                 Ra5 Ra4 W0 (av - 12)%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HW0a4 HW0a5; exact Hdisp) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi30 [-]").
-      iApply bi.later_intro. rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj5e : add_vec (mword_of_int (PR + 0x30) : mword 64)
                        (sign_extend' 64 (mword_of_int 46 : mword 13)) = mword_of_int (PR + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -2566,7 +2566,7 @@ Section ProofPiperead.
       iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x5e)) (mword_of_int 4 : mword 6) Rs6
                 W0 (av - 12)%nat z8 false with "Hcg Hpc Hi5e [Hc8] [-]").
       { rgall. iEval (rewrite HW0csp -Hb8). iExact "Hc8". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HW0csp -Hb8 HW0s6) in "Hc8".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HW0csp -Hb8 HW0s6) in "Hc8".
       assert (Hd60 : add_vec_int (mword_of_int (PR + 0x5e) : mword 64) 2 = mword_of_int (PR + 0x60))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hd60) in "Hpc".
@@ -2574,7 +2574,7 @@ Section ProofPiperead.
       iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x60)) (mword_of_int 3 : mword 6) Rs7
                 W0 (av - 12)%nat z9 false with "Hcg Hpc Hi60 [Hc9] [-]").
       { rgall. iEval (rewrite HW0csp -Hb9). iExact "Hc9". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HW0csp -Hb9 HW0s7) in "Hc9".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HW0csp -Hb9 HW0s7) in "Hc9".
       assert (Hd62 : add_vec_int (mword_of_int (PR + 0x60) : mword 64) 2 = mword_of_int (PR + 0x62))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hd62) in "Hpc".
@@ -2582,7 +2582,7 @@ Section ProofPiperead.
       iApply (wp_csdsp_s_sconf Φ (mword_of_int (PR + 0x62)) (mword_of_int 2 : mword 6) Rs8
                 W0 (av - 12)%nat z10 false with "Hcg Hpc Hi62 [Hc10] [-]").
       { rgall. iEval (rewrite HW0csp -Hb10). iExact "Hc10". }
-      rewrite wp_next_off. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HW0csp -Hb10 HW0s8) in "Hc10".
+      iApply wp_next_off_intro. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HW0csp -Hb10 HW0s8) in "Hc10".
       assert (Hd64 : add_vec_int (mword_of_int (PR + 0x62) : mword 64) 2 = mword_of_int (PR + 0x64))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hd64) in "Hpc".
@@ -2590,7 +2590,7 @@ Section ProofPiperead.
       iApply (wp_cj_s_sconf Φ (mword_of_int (PR + 0x64))
                 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")))
                 W0 (av - 12)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64 [-]").
-      rewrite wp_next_off. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj76b : add_vec (mword_of_int (PR + 0x64) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0"))))
                       = mword_of_int (PR + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2603,7 +2603,7 @@ Section ProofPiperead.
     iApply (wp_bne_fall_s_sconf Φ (mword_of_int (PR + 0x30)) (mword_of_int 46 : mword 13)
               Ra5 Ra4 W0 (av - 12)%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HW0a4 HW0a5; exact Hdisp) with "Hcg Hpc Hi30 [-]").
-    rewrite wp_next_off. iIntros "Hcg Hpc". rgall.
+    iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hd34 : add_vec_int (mword_of_int (PR + 0x30) : mword 64) 4 = mword_of_int (PR + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hd34) in "Hpc".

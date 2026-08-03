@@ -274,7 +274,7 @@ Section ProofSysUptime.
               MA (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B0 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (SU + 0x16) : mword 64) (auipc_off (mword_of_int 0x7 : mword 20)))]> MA).
@@ -291,7 +291,7 @@ Section ProofSysUptime.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [Hticks] [-]").
     { iEval (rewrite Haddrt). iExact "Hticks". }
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hticks".
     iEval (rewrite Haddrt) in "Hticks".
     set (B1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (t : mword 32))]> B0).
@@ -304,7 +304,7 @@ Section ProofSysUptime.
               B1 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (B1 !!! Regidx (mword_of_int 15 : mword 5)))]> B1).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (B1 !!! Regidx (mword_of_int 15 : mword 5)))]> B1) with B2.
@@ -319,7 +319,7 @@ Section ProofSysUptime.
               B2 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (mword_of_int (SU + 0x20) : mword 64) (auipc_off (mword_of_int 0x15 : mword 20)))]> B2).
@@ -333,7 +333,7 @@ Section ProofSysUptime.
               B3 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
         (add_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x6e4 : mword 12)))]> B3).
@@ -347,7 +347,7 @@ Section ProofSysUptime.
               B4 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi28 [-]").
-    rewrite wp_next_off.
+    iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (SU + 0x28) : mword 64) 4)]> B4).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (SU + 0x28) : mword 64) 4)]> B4) with B5.
