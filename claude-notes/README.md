@@ -41,6 +41,12 @@ are working on that effort — the relevant `projects/` file.
 - **[`multi-cpu.md`](design/multi-cpu.md)** — the ambient-hart multi-CPU model.
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy
   (`RiscvAdequacy.v`).
+- **[`crash.md`](design/crash.md)** — power, crashes, and generations: the
+  ghost power thread (PowerOff bumps the generation, PowerOn resets +
+  forks the new generation's threads), generation-indexed loop
+  expressions with corpse arms, the fixed/era `riscvGS` split, the
+  crash-spanning iProp disk invariant (`crash_inv`), and the decision
+  record of the rejected designs.
 - **[`device.md`](design/device.md)** — the memory-mapped device model (16550
   UART + PLIC + virtio-mmio disk), `DevModel.v`/`VirtioModel.v`/`WpUart.v`/
   `WpVirtio.v`, the device ghosts, the bus-master/DMA-lease story, and the
@@ -78,6 +84,15 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`crash.md`](projects/crash.md)** — the crash/power-cycling layer.
+  The mechanism PROTOTYPE is done and axiom-free (`iris/CrashProto.v`:
+  generations, corpse arms, the power thread forking each boot, the
+  generational state_interp, the crash-spanning invariant, adequacy —
+  all on a miniature language). Remaining: the real-tree port, six
+  milestones (fixed/era split → language + GenId sweep → death
+  machinery → `wp_power_loop` + minimal adequacy → durable disk layer →
+  the ∀-era boot composition). Design in
+  [`design/crash.md`](design/crash.md).
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, `killed`, `sys_getpid`, `sys_close`,
