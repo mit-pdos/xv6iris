@@ -108,12 +108,6 @@ are working on that effort — the relevant `projects/` file.
   later-stripping fence leaf, G5's three sweeps), the callee-by-callee
   resource inventory, the assemblies main performs, and what remains:
   the whole-system adequacy composition.
-- **[`explicit-cpuid-porting-guide.md`](projects/explicit-cpuid-porting-guide.md)** —
-  the mechanical per-file recipe for that sweep (read it before porting a file).
-- **[`explicit-cpuid.md`](projects/explicit-cpuid.md)** — removing the ambient
-  `CpuId` so a step's continuation is about the hart execution RESUMES on:
-  `wp_next`, the SIE-arm index `b`, tp pinned to the hart (`HartTp.v`), and the
-  two-stage plan. Prototype compiling on branch `explicit-cpuid`.
 - **[`sched-hart-generic.md`](projects/sched-hart-generic.md)** — G5 part
   2: the parked-proc resumption contract (`p_sched`) quantifies the
   RESUMING hart inside the payload (`∀ h, ⟨resources at h⟩ -∗ WP (LoopE
@@ -172,6 +166,25 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`explicit-cpuid.md`](completed/explicit-cpuid.md)** — the ambient `CpuId`
+  removed from every WP statement, so a step's continuation is about the hart
+  execution RESUMES on rather than the one it started on. `wp_next` and its two
+  escape hatches (interrupts off; no current proc), the SIE-arm index `b`, tp
+  pinned to the hart (`HartTp.v`), the canonical per-hart SIE ghost, `cpu_own`
+  riding the enabled arm, and `scheds_inv` — the parked-scheduler record made
+  GLOBAL, which is what let it stop being carried across migrations. Keeps the
+  scoreboard of SIX contracts that were stated falsely and compiled anyway (and
+  what each got wrong), the 25 surprises, and the retrospective on why this
+  should have been six expand/contract cycles rather than one big-bang branch.
+  **STAGE 2 REMAINS and is future work**: making the migration real in the
+  engines (`intr_handler_spec`'s continuation, `WpIntrInv`'s `iLöb`) is gated
+  on `kerneltrap` actually being proved — see the file's last section, and the
+  explicit obligation `wp_next`'s second hatch places on it.
+- **[`explicit-cpuid-porting-guide.md`](completed/explicit-cpuid-porting-guide.md)** —
+  the mechanical per-file recipe for that sweep. Still worth reading before any
+  interface sweep of this kind: most of it is about failure modes that COMPILE
+  (a vacuous contract, a wrong-hart read, a dropped conjunct, a non-terminating
+  `iSpecialize` one leaf after the mistake).
 - **[`kpt-share.md`](completed/kpt-share.md)** — G5 part 1: the kernel page
   table SHARED across harts, so `kvminithart` has ONE hart-generic contract
   (consumes only the persistent `kpt_inv root` + the `↦₈□` root cell; the

@@ -261,133 +261,7 @@ field rewrites and its refcnt update are ALL `rewrite wp_next_off`, and
 neither induction needed `wp_next_shift`. Look for that collapse before
 planning any hart-generic scaffolding.
 
-## STATUS (2026-08-02, superseded above): 631 of 641 files green
-
-Every cone is ported and linked except one. What is DONE, and no longer worth
-re-reading the play-by-play for: the foundation (`HartTp`, `WpNext`,
-`IntrDefs`, `CalleeSaved`, hart-free `instr`/`kernel_text`, the engines,
-`RiscvAdequacy`'s per-hart SIE mint), all 122 `Spec*`, all 169 `Wp*`, all but
-five `Proof*`, and all but five `Link*` — including `LinkMain`, so the whole
-boot chain links end to end against its callees' proofs.
-
-WHAT REMAINS is ten files with ONE cause between them: `ProofSleep`,
-`ProofYield`, `ProofBread`, `ProofBwrite`, `ProofAcquiresleep` and their
-`Link*` closure, all blocked because `sched_vc` cannot cross an
-interrupts-enabled step. **The mechanism that fixes it is designed AND
-PROTOTYPED — `iris/ProtoSchedsInv.v` states it and closes every obligation
-with no `Admitted`.** Read "THE LEVEL-0/ENABLED-BASE CONE" below for why, and
-its subsection "THE ANSWER, PROTOTYPED" for what to build; the remaining work
-is wiring that mechanism into `SchedCtx`/`SwtchCtx` and re-porting five
-proofs, not design.
-
-The refactor's whole purpose was to make a class of silent falsehood visible,
-and the score is that it found **six** contracts that were stated falsely and
-compiled anyway:
-
-| contract | what it claimed | why false |
-|---|---|---|
-| `cpuid` / `mycpu` | the returned id is the ENTRY hart's | the tp read is mid-body |
-| `kvminithart` | works at any SIE state | carries `tlb ↦ᵣ` / `strans_bit` / satp cells, all hart-indexed |
-| `clockintr` | interrupt-generic | calls `cpuid()` unbracketed; `tick_keeper` is hart-indexed |
-| `allocproc` | one exit SIE index | returns holding p->lock on one arm and not the other — the shared form is REFUTABLE |
-| `sleep` / `sched` | one index for resource and crossing | a `swtch` moves the hart with interrupts OFF |
-| `wp_csrci_sstatus_x0_s_sconf` | usable at all | asks for a ghost eighth the SIE arm already owns |
-
-Not one of them failed to compile. Every one was found by a consumer agent
-that refused to force a proof and diagnosed instead — which is the single
-most valuable behaviour to keep asking for.
-
-
-### DEFERRED: the central fix for the conversion blowup
-
-**Measured, diagnosed, and deliberately not done yet** — a local patch is in
-place instead (`Local Strategy opaque [rget].` in `ProofVirtioDiskInit.v` plus
-the `rgne` sweep it forces).
-
-THE BUG. One `wp_cand_s_sconf` application took **400 s of a 421 s prefix**
-(0.06 s before the refactor). Conversion unfolds the transparent register tower
-through `rget → tp_pin → rf_upd` over a 24-link `pose`-chain. Making ANY ONE of
-the three opaque collapses it to **0.08 s**. Depth is necessary: the same lemma
-two links deep is 0.035 s.
-
-RULED OUT by direct measurement — the inline `ltac:`, the statement's `let`,
-the value being map-derived, a closed-literal `wval`, operands passed as
-separate premises, `and_vec`, the symbolic `cid_word_of`, and `gpr_file`'s
-32-way `rf_to_gmap` fold. **A `Strategy` LEVEL does nothing (level 1000 = 390 s);
-only true opacity works.**
-
-WHY IT IS LATENT EVERYWHERE: the trigger is `tp_pin`'s extra transparent layer
-over a deep tower. There are 7 `let wval := … rget …` statements in
-`WpSconfAlu.v` alone and ~25 more across `WpSconfLock` / `WpVirtioDev` /
-`WpPlic` / `WpSmodeHalf` / `SpecUart`. Any of them can hit this at sufficient
-depth.
-
-**…but "latent everywhere" is narrower than it reads, and the difference is
-actionable.** `ProofVirtioDiskIntr.v` is the LARGER file (2989 lines vs 2400)
-in the same cone and needed no opacity at all — measured, 38 s clean. The
-reason is structural: it is decomposed into `Qed`-sealed chunks that each state
-their register effect as a frame condition over an ABSTRACT output map, so no
-`pose`-chain exceeds ~6 links, while the Init file's 400 s sentence sits over a
-24-link chain. **The trigger is register-chain DEPTH, and a decomposed
-whole-function proof is immune to it.** So the central fix buys much less than
-the "7 + ~25 sites" count suggests — and decomposing a proof is a better answer
-than opacifying a definition tree-wide, because it is local and it improves the
-proof anyway.
-
-THE CENTRAL FIX, when someone wants it: either a global
-`Strategy opaque [tp_pin]` in `HartTp.v`, or seal `gpr_file (tp_pin m)` behind
-a named opaque wrapper in `IntrDefs.v`. Either makes the failure mode
-impossible tree-wide. THE COST is a mechanical sweep: every site that today
-closes `rget M k` against `M !!! Regidx k` silently BY CONVERSION needs an
-explicit `rgne`. Note also that opacifying all three of `rget`/`tp_pin`/`rf_upd`
-additionally broke a `reg_neq` ("No primitive equality found") — prefer the
-minimal opacity that works.
-
-NOT worth chasing: `ProofPrintk` is +12 s / +13 %, a FLAT per-step tax from
-`wp_next`'s binder (349 `iIntros` = +3.0 s, 91 `iSpecialize` = +1.4 s, +3.3 s
-of `Qed`); `tp_pin`/`rget` contribute 0.95 s there. `Strategy`/opacity buys
-nothing on that file (measured 102 s vs 100 s). Recovering it would mean
-changing the `wp_next` shape — a spec decision, not a tuning knob.
-
-### Known spec fixes still owed
-
-- `SpecMemsetParts`'s loop premises need `Regidx ra5 <> Regidx Rtp` (its other
-  operands are excluded from sp/ra1/ra4 but not tp, so `rd_ok` cannot be
-  derived). Real bug, blocks `ProofMemset.wp_memset_loop_sconf`.
-- ~~`VcGenS`'s symbolic executor still lacks the tp guards that `WpSconfVc` got
-  locally.~~ **DONE.** `VcGenS.is_tp` / `is_tp_false` now live in `VcGenS.v`,
-  and `vc_step_s` rejects EVERY opcode whose variable register operand
-  (source or destination) is tp — `VScaddi`/`VScaddi4spn`/`VScldsp`/`VScaddiw`
-  on `rd`, `VScsdsp` on `rs2`, `VSclw`/`VSld` on `rd`+`rs1`,
-  `VScsw`/`VSsd` on `rs1`+`rs2`; `VScaddi16sp` is sp-only and needs none.
-  `WpSconfVc` was simplified onto it: its local `rd_tp_bad`/`is_tp` are gone,
-  replaced by `rd_sp_bad` (the sp half, which is genuinely this tier's — the
-  sie capability is keyed on sp) plus `rd_ok_of_guards`, which composes the
-  two halves back into `IntrDefs.rd_ok`. The two store shapes `VScsdsp`/`VSsd`
-  keep an explicit `is_tp` because `vc_step_sp_s` implements them itself (the
-  frame ledger) instead of delegating. Tightening only REJECTS more programs:
-  every consumer (`ProofKernelvec`, `WpPopOff`, `WpUartPutcSyncFull`, and the
-  13 `Proof*` users of `wp_vc_block_s_sconf`) still runs its block.
-- Same class, still owed — a leaf contract that reads a register at a VARIABLE
-  index through the raw map instead of `rget`, at the PINNED (`sie_cap_gpr`)
-  altitude. `SpecUart` was one (fixed: its three `_body` definitions now spell
-  the base as `rget m rs1` and the store byte as `rget m rs2`, which is what
-  unblocked `ProofUart.v`). A tree-wide sweep finds 11 more declarations / 18
-  sites, all in files that are not yet ported (no `.vo`), so all latent:
-  `ProofBrelse.wp_csdsp_au_s_sconf` (rs2), `ProofVirtioDiskInit`
-  (`wp_vdi_sw`/`_sw_reset`/`_flip`/`_lw`, 7 sites), `ProofVirtioDiskIntr`
-  (`wp_vt_lw_dev`/`wp_vt_sw_dev`/`wp_vt_lhu_used_idx`/`wp_vt_lw_used_elem`,
-  5 sites), `SpecMemsetParts.wp_memset_loop_sconf_body` (the bullet above),
-  and `WpUartgetc.wp_uartgetc_inline` (rs_lsr/rs_rhr). Everything else that
-  greps is either the raw-`gpr_file` M-mode / pre-sconf `WpSmodePt*` tier
-  (where the raw read is correct by construction), a map-to-map agreement
-  fact, `HartTp.rget` itself, or `IntrDefs.sie_cap_gpr_x0` (guarded by
-  `uint i = 0`).
-- `kvminithart` / `trapinithart` / `plicinithart` / `plic_claim` are boot- or
-  trap-context only and should be stated at `b = false` rather than
-  `b`-generic; that is what blocks four of their proofs.
-
-## THE LEVEL-0/ENABLED-BASE CONE: what actually has to cross (2026-08-02)
+## HOW THE LAST BLOCKER WAS FOUND AND ANSWERED (the reasoning, kept)
 
 The deferred question at the bottom of this file — *"what else has to cross the
 migration"* — **came due during the consumer sweep, not at Stage 2**, and three
@@ -991,7 +865,20 @@ splits the work:
   IH at the resuming hart. Only the engine files change — every leaf statement
   and consumer proof from Stage 1 is already the right shape.
 
-## Stage-2 finding: the engine needs canonical per-hart ghost names
+## STAGE 2 — THE ONE THING THAT REMAINS, and it is a separate project
+
+Everything above is done. What is NOT done is making the migration REAL: the
+statements now all say a step's continuation is at the hart execution resumes
+on, but the ENGINES still resume on the same hart, because
+`IntrDefs.intr_handler_spec` is an assumed axiom and
+`WpIntrInv.wp_exec_step_intr`'s `iLöb` is taken at a fixed hart. Stage 2 is
+gated on `kerneltrap` actually being proved, and it inherits one explicit
+obligation this refactor created deliberately: **`wp_next`'s second escape
+hatch means kerneltrap must satisfy "no current proc ⇒ the trap returns on the
+same hart"** — true of the C (`kerneltrap` yields only when `myproc() != 0`),
+and now a premise rather than an accident.
+
+### Stage-2 finding: the engine needs canonical per-hart ghost names
 
 `wp_exec_step_intr` (WpIntrInv.v:224) is an `iLöb` that, on the interrupt arm,
 applies `intr_handler_spec` and re-enters the IH. Making that arm resume on a
