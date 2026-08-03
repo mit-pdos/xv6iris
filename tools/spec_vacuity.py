@@ -1,4 +1,4 @@
-import re, glob
+import re, glob, os, sys
 # VACUITY CHECK.  In bi_scope a [forall] extends MAXIMALLY, so an unparenthesised
 # forall inside the WAND CHAIN swallows the trailing [WP …] and the contract
 # degenerates to something trivially provable.  Compiling does NOT catch it, and
@@ -22,7 +22,12 @@ def scan(body):
                 return body[i:i+58].split('\n')[0]
         i += 1
     return None
-bad = []; files = sorted(glob.glob('Spec*.v') + glob.glob('Wp*.v'))
+# a _body Definition can live in any per-function file; Code*.v joined the set
+# when the decode/instr layer was renamed out of Wp*.v.
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'iris'))
+bad = []; files = sorted(glob.glob('Spec*.v') + glob.glob('Wp*.v') + glob.glob('Code*.v'))
+if not files:
+    sys.exit("spec_vacuity: found no files to scan -- refusing to report CLEAN")
 for f in files:
     src = open(f, errors='ignore').read()
     for m in re.finditer(r'^Definition\s+(\w*_body)\b', src, re.M):
@@ -36,3 +41,4 @@ if bad:
     for f,b,l in bad: print(f"  {f:28s} {b:34s} {l}")
 else:
     print("\nCLEAN -- no unparenthesised forall inside any wand chain")
+sys.exit(1 if bad else 0)

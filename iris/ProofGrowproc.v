@@ -144,20 +144,6 @@ Section ProofGrowproc.
   Notation Ra3 := (mword_of_int 13 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
-  (* the frame's push and pop, as the two instructions spell them *)
-  Lemma gp_push (X : mword 64) :
-    add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk X 4.
-  Proof.
-    unfold pa_stk, add_vec_int. apply f_equal.
-    apply bv_eq; vm_compute; reflexivity.
-  Qed.
-
-  Lemma gp_pop (X : mword 64) :
-    add_vec (pa_stk X 4) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-  Proof.
-    rewrite <- gp_push. apply frame_cancel.
-    apply bv_eq; vm_compute; reflexivity.
-  Qed.
 
   (* =================================================================== *)
   (*  §2  The epilogue at +0x3c, entered by all five exits.               *)
@@ -277,7 +263,7 @@ Section ProofGrowproc.
     (* ---- +0x44: c.addi16sp sp,32 (frame pop) ---- *)
     assert (Hwv : add_vec (T4 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
-      by (rewrite HT4sp; apply gp_pop).
+      by (rewrite HT4sp; apply stk_pop_32).
     assert (Hpop : T4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
@@ -453,14 +439,14 @@ Section ProofGrowproc.
     iPoseProof (gpi_16 with "Htext") as "Hi16".
     (* ---- +0x00: c.addi sp,-32 (frame push) ---- *)
     iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m av 4 b
-              ltac:(lia) (gp_push (m !!! Regidx csp_rs1))
+              ltac:(lia) (stk_push_32 (m !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hn1) "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.growproc + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
-      by (rewrite /M1 upd_eq; apply gp_push).
+      by (rewrite /M1 upd_eq; apply stk_push_32).
     iDestruct (stack_own_4_elim with "Hframe") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     (* ---- +0x02 .. +0x08: save ra / s0 / s1 / s2 ---- *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)

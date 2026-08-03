@@ -749,6 +749,7 @@ Qed.
    [exec_execute_ZICOND_RTYPE_gpr] (ZicondGpr.v) is already total and
    premise-free, so the totality form is a corollary. *)
 Require Import ZicondGpr.
+Require Import WpMmodeLeafBase.
 
 Lemma exec_execute_ZICOND_RTYPE_total (i2 i1 ird : mword 5)
     (op : zicondop) (s : mstate) :
@@ -815,10 +816,6 @@ Lemma exec_execute_C_MUL (rsdc rsc2 : cregidx) (s : mstate) :
                               creg2reg_idx rsdc, mop)), s).
 Proof. eexists. apply exec_returnm. Qed.
 
-Lemma exec_execute_C_JALR (rs1 : regidx) (s : mstate) :
-  exec (execute (C_JALR rs1)) s
-    = Some (ExecuteAs (JALR (zeros' 12, rs1, ra)), s).
-Proof. apply exec_returnm. Qed.
 
 Lemma exec_execute_C_EBREAK_U (s : mstate) :
   exec (execute (C_EBREAK tt)) s = Some (ExecuteAs (EBREAK tt), s).

@@ -116,22 +116,6 @@ Qed.
 (* 2. exec layer: [csrw stimecmp, rs1] at Supervisor.                     *)
 (* ===================================================================== *)
 
-Lemma exec_hartSupports_Sstc s : exec (hartSupports Ext_Sstc) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Sstc) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). apply exec_returnM.
-Qed.
-
-Lemma exec_currentlyEnabled_Sstc s : exec (currentlyEnabled Ext_Sstc) s = Some (true, s).
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_Sstc) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  apply exec_hartSupports_Sstc.
-Qed.
 
 Lemma exec_is_stimecmp_accessible_S s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->

@@ -346,3 +346,33 @@ Definition imm_ld : mword 12 := subrange_vec_dec w_ld 31 20.
 Definition i_ld : mword 5 :=
   autocast (subrange_vec_dec (subrange_vec_dec w_ld 11 7) (regidx_bit_width - 1) 0).
 
+(* ---------------------------------------------------------------------- *)
+(* currentlyEnabled Ext_Zicfilp = false in Supervisor with menvcfg.LPE = 0. *)
+(* Lives here rather than in ExecCommon.v because it walks the recursive    *)
+(* budget via [exec_rec_cE_Zicsr_any], which is defined in this file.       *)
+(* ---------------------------------------------------------------------- *)
+
+
+Lemma exec_cE_zicfilp_false_S s :
+  register_lookup cur_privilege (sregs s) = Supervisor ->
+  bool_bit_backwards (_get_MEnvcfg_LPE (register_lookup menvcfg s.(sregs))) = false ->
+  exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s).
+Proof.
+  intros Hpriv Hlpe.
+  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp) 0) with true by reflexivity.
+  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _
+            (exec_rec_cE_Zicsr_any (currentlyEnabled_measure Ext_Zicfilp - 1) _ s
+               ltac:(vm_compute; reflexivity))).
+  cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+  match goal with |- context[_rec_get_xLPE Supervisor _ ?acc] => destruct acc end.
+  cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
+  replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
+  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn match.
+  rewrite Hlpe. apply exec_returnM.
+Qed.

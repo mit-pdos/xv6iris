@@ -91,20 +91,6 @@ Section ProofSysSbrk.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
-  Lemma ss_push (X : mword 64) :
-    add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk X 6.
-  Proof.
-    unfold pa_stk, add_vec_int. apply f_equal.
-    apply bv_eq; vm_compute; reflexivity.
-  Qed.
-
-  Lemma ss_pop (X : mword 64) :
-    add_vec (pa_stk X 6) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
-  Proof.
-    rewrite <- ss_push. apply frame_cancel.
-    apply bv_eq; vm_compute; reflexivity.
-  Qed.
-
   (* the two [int] locals, as offsets from the frame pointer [s0 = sp0] *)
   Lemma ss_addr_n (X : mword 64) :
     add_vec X (sign_extend' 64 (mword_of_int 0xfd8 : mword 12)) = pa_stk X 5.
@@ -113,13 +99,6 @@ Section ProofSysSbrk.
     apply bv_eq; vm_compute; reflexivity.
   Qed.
 
-  (* [c.addi4spn s0,sp,48] puts the frame pointer back at the caller's sp *)
-  Lemma ss_fp (X : mword 64) :
-    add_vec (pa_stk X 6) (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))) = X.
-  Proof.
-    rewrite <- ss_push. apply frame_cancel.
-    apply bv_eq; vm_compute; reflexivity.
-  Qed.
 
   Lemma ss_addr_t (X : mword 64) :
     add_vec X (sign_extend' 64 (mword_of_int 0xfdc : mword 12)) = pa_add (pa_stk X 5) 4.
@@ -246,7 +225,7 @@ Section ProofSysSbrk.
     (* ---- +0x6c: c.addi16sp sp,48 (frame pop) ---- *)
     assert (Hwv : add_vec (T3 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0)
-      by (rewrite HT3sp; apply ss_pop).
+      by (rewrite HT3sp; apply stk_pop_48).
     assert (Hpop : T3 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T3 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
@@ -571,14 +550,14 @@ Section ProofSysSbrk.
     iPoseProof (ssi_76 with "Htext") as "Hi76".
     (* ---- +0x00: c.addi16sp sp,-48 (frame push) ---- *)
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 61 : mword 6) m av 6 b
-              ltac:(lia) (ss_push (m !!! Regidx csp_rs1))
+              ltac:(lia) (stk_push_48 (m !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CIDs1 Hq1) "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_sbrk + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 6)
-      by (rewrite /M1 upd_eq; apply ss_push).
+      by (rewrite /M1 upd_eq; apply stk_push_48).
     (* six slots: 1-3 take ra/s0/s1, 5 holds the two [int] locals, 4 and 6
        are never touched *)
     assert (H46 : (4 <= 6)%nat) by lia.
@@ -652,7 +631,7 @@ Section ProofSysSbrk.
                     = mword_of_int (KernelSyms.sys_sbrk + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     assert (HM2s0 : M2 !!! Regidx Rs0 = sp0)
-      by (rewrite /M2 upd_eq HM1sp; apply ss_fp).
+      by (rewrite /M2 upd_eq HM1sp; apply stk_fp_48).
     assert (HM2sp : M2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* the two [int] locals: the two halves of slot 5 *)

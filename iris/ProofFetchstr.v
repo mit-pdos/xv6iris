@@ -69,23 +69,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-(* ===================================================================== *)
-(*  Pure arithmetic: the 48-byte frame, and the numeric premises.         *)
-(* ===================================================================== *)
-
-Lemma fs_push (X : mword 64) :
-  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk X 6.
-Proof.
-  unfold pa_stk, add_vec_int. apply f_equal.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma fs_pop (X : mword 64) :
-  add_vec (pa_stk X 6) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
-Proof.
-  rewrite <- fs_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 (* [max < 2^31] is what the caller supplies; copyinstr wants [< 2^64] and
    strlen [< 2^31] of the ANSWER.  [lia] cannot evaluate the powers. *)
@@ -271,7 +254,7 @@ Section ProofFetchstr.
     (* ---- +0x38: c.addi16sp sp,48 (the frame pop) ---- *)
     assert (Hwv : add_vec (T5 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0)
-      by (rewrite HT5sp; apply fs_pop).
+      by (rewrite HT5sp; apply stk_pop_48).
     assert (Hpop : T5 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T5 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
@@ -417,7 +400,7 @@ Section ProofFetchstr.
     iPoseProof (fsi_3e with "Htext") as "Hi3e".
     (* ---- +0x00: c.addi16sp sp,-48 (frame push) ---- *)
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 61 : mword 6) m av 6 b
-              ltac:(lia) (fs_push (m !!! Regidx csp_rs1))
+              ltac:(lia) (stk_push_48 (m !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hk1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -427,7 +410,7 @@ Section ProofFetchstr.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 6)
-      by (rewrite /M1 upd_eq; apply fs_push).
+      by (rewrite /M1 upd_eq; apply stk_push_48).
     iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(C1 & C2 & C3 & C4 & C5 & C6 & _)".
     iDestruct "C1" as (u1) "Hs1".

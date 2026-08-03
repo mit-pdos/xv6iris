@@ -125,22 +125,9 @@ Set Printing Depth 40.
 (* ===================================================================== *)
 
 
-(* +0x00 [c.addi16sp sp,-64] lands on the 8-slot frame base *)
-Lemma sp_push (X : mword 64) :
-  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) = pa_stk X 8.
-Proof.
-  unfold pa_stk, add_vec_int. apply f_equal.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 (* ...and +0x08 [c.addi4spn s0,sp,64] takes it straight back: s0 IS the
    entry sp, which is what every [imm(s0)] local address is relative to. *)
-Lemma sp_s0_entry (X : mword 64) :
-  add_vec (pa_stk X 8) (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))) = X.
-Proof.
-  rewrite <- sp_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 (* the five [imm(s0)] locals, in slot terms *)
 Lemma sp_addr_fdarray (X : mword 64) :          (* -40 : uint64 fdarray *)
@@ -181,13 +168,6 @@ Lemma sp_addr_fd0_base (X : mword 64) :
   pa_add (pa_stk X 8) 4 = add_vec_int (pa_stk X 8) 4.
 Proof. reflexivity. Qed.
 
-(* the frame pop at +0xde *)
-Lemma sp_pop (X : mword 64) :
-  add_vec (pa_stk X 8) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
-Proof.
-  rewrite <- sp_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 (* the three [c.sdsp]/[c.ldsp] displacements off the pushed sp *)
 Lemma sp_frm1 (X : mword 64) :          (* 56(sp) : saved ra *)
@@ -781,7 +761,7 @@ Section ProofSysPipe.
     (* ---- +0xde: c.addi16sp sp,64 -- the frame trade back ---- *)
     assert (Hwv : add_vec (T4 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)
-      by (rewrite HT4sp; apply sp_pop).
+      by (rewrite HT4sp; apply stk_pop_64).
     assert (Hpop : T4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8)
@@ -904,7 +884,7 @@ Section ProofSysPipe.
     iPoseProof (spi_28 with "Htext") as "Hi28".
     (* ===== PROLOGUE: 8-slot frame, ra/s0/s1 saves, s0 := entry sp ===== *)
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 60 : mword 6) m av 8 b
-              Hav8 (sp_push sp0) with "Hcg Hpc Hi00 [-]").
+              Hav8 (stk_push_64 sp0) with "Hcg Hpc Hi00 [-]").
     iIntros (CID18 Hcr18) "Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
@@ -913,7 +893,7 @@ Section ProofSysPipe.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> m) with R1.
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 8)
-      by (rewrite /R1 upd_eq; apply sp_push).
+      by (rewrite /R1 upd_eq; apply stk_push_64).
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (SP + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
@@ -979,7 +959,7 @@ Section ProofSysPipe.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     assert (HR2s0 : R2 !!! Regidx Rs0 = sp0).
-    { rewrite /R2 upd_eq HR1sp. apply sp_s0_entry. }
+    { rewrite /R2 upd_eq HR1sp. apply stk_fp_64. }
     assert (HR2sp : R2 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /R2 upd_ne; [exact HR1sp | vm_compute; discriminate]).
     (* the residual "everything else is untouched" fact, extended at each step *)

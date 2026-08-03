@@ -36,6 +36,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import ExecCommon.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -85,22 +86,6 @@ Qed.
 (* ---- clones of the Sstc gate reductions (primed: the unprimed originals
    live in WpGprCsrwCommon.v, which is DOWNSTREAM of this file) ---- *)
 
-Lemma exec_hartSupports_Sstc' s : exec (hartSupports Ext_Sstc) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Sstc) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). apply exec_returnM.
-Qed.
-
-Lemma exec_currentlyEnabled_Sstc' s : exec (currentlyEnabled Ext_Sstc) s = Some (true, s).
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_Sstc) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  apply exec_hartSupports_Sstc'.
-Qed.
 
 (* ---- should_inc_mcycle is total (mirror of exec_should_inc_minstret_Some) ---- *)
 
@@ -190,7 +175,7 @@ Proof.
   (* head = (write mip MTIP) >> (Sstc && menvcfg.STCE gate) *)
   erewrite exec_bind_Some.
   2:{ erewrite exec_bind0_Some. 2:{ apply exec_write_reg. }
-      erewrite exec_and_boolM_Some. 2:{ apply exec_currentlyEnabled_Sstc'. }
+      erewrite exec_and_boolM_Some. 2:{ apply exec_currentlyEnabled_Sstc. }
       cbn match.
       erewrite exec_bind_Some. 2:{ apply (exec_read_reg menvcfg _). }
       cbn beta. apply exec_returnM. }

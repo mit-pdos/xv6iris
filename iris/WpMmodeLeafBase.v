@@ -2167,3 +2167,13 @@ End ExecLoadGchk.
 (* WpUserClassify.v; RTYPE/RTYPEW/MUL are proved here (the shared base), so *)
 (* the orchestrator can wire them into the rd=0 RVC HINT arm.               *)
 (* ====================================================================== *)
+
+(* ---------------------------------------------------------------------- *)
+(* JALR/C.JALR expansions shared by the S-mode control leaves and the      *)
+(* user-mode execution facts.                                             *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma exec_execute_C_JALR (rs1 : regidx) (s : mstate) :
+  exec (execute (C_JALR rs1)) s
+    = Some (ExecuteAs (JALR (zeros' 12, rs1, ra)), s).
+Proof. apply exec_returnm. Qed.

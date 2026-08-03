@@ -110,9 +110,6 @@ Definition uvai_jalr_t0 : instruction := JALR (zeros' 12, ureg 5, ra).
 
 (* the C_JALR execute expansion (the compressed forms userret needed all live
    in WpMmodeLeafBase; this one did not). *)
-Lemma exec_execute_C_JALR (rs1 : regidx) s :
-  exec (execute (C_JALR rs1)) s = Some (ExecuteAs (JALR (zeros' 12, rs1, ra)), s).
-Proof. unfold execute. cbn match. unfold execute_C_JALR. apply exec_returnM. Qed.
 
 (* ===================================================================== *)
 (* 3. Decode facts.                                                       *)

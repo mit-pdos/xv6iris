@@ -84,20 +84,6 @@ Set Printing Depth 40.
 (*  Pure arithmetic, shared by both functions.                            *)
 (* ===================================================================== *)
 
-(* the 48-byte frame: push and pop are BOTH [c.addi16sp] here *)
-Lemma ec_push (X : mword 64) :
-  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk X 6.
-Proof.
-  unfold pa_stk, add_vec_int. apply f_equal.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma ec_pop (X : mword 64) :
-  add_vec (pa_stk X 6) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
-Proof.
-  rewrite <- ec_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 (* the kernel arm returns the FLAG register, which the [c.beqz] proved zero *)
 Lemma ec_zero_reg_moi : (zero_reg : mword 64) = (mword_of_int 0 : mword 64).
@@ -278,7 +264,7 @@ Section EitherCopyEpilogue.
     (* ---- +0x36: c.addi16sp sp,48 (frame pop) ---- *)
     assert (Hwv : add_vec (T6 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0)
-      by (rewrite HT6sp; apply ec_pop).
+      by (rewrite HT6sp; apply stk_pop_48).
     assert (Hpop : T6 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T6 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
@@ -452,7 +438,7 @@ Section ProofEitherCopyout.
     iPoseProof (eco_48 with "Htext") as "Hi48".
     (* ---- +0x00: c.addi16sp sp,-48 (frame push) ---- *)
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 61 : mword 6) m av 6 b
-              ltac:(lia) (ec_push sp0) with "Hcg Hpc Hi00 [-]").
+              ltac:(lia) (stk_push_48 sp0) with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
@@ -461,7 +447,7 @@ Section ProofEitherCopyout.
               (add_vec (m !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 6)
-      by (rewrite /R1 upd_eq; apply ec_push).
+      by (rewrite /R1 upd_eq; apply stk_push_48).
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (ECO + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
@@ -1136,7 +1122,7 @@ Section ProofEitherCopyin.
     iPoseProof (eci_48 with "Htext") as "Hi48".
     (* ---- +0x00: c.addi16sp sp,-48 (frame push) ---- *)
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 61 : mword 6) m av 6 b
-              ltac:(lia) (ec_push sp0) with "Hcg Hpc Hi00 [-]").
+              ltac:(lia) (stk_push_48 sp0) with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
@@ -1145,7 +1131,7 @@ Section ProofEitherCopyin.
               (add_vec (m !!! Regidx csp_rs1)
                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 6)
-      by (rewrite /R1 upd_eq; apply ec_push).
+      by (rewrite /R1 upd_eq; apply stk_push_48).
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (ECI + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".

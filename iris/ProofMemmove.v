@@ -59,6 +59,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import SpecMemmove.
+Require Import KernelRvcDecode.
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -150,18 +151,6 @@ Section ProofMemmove.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{CID : CpuId}.
 
-  (* the epilogue's [c.addi sp,16] undoes the prologue's 2-slot push. *)
-  Local Lemma pa_stk2_up (X : mword 64) :
-    add_vec (pa_stk X 2) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-  Proof.
-    unfold pa_stk, add_vec_int. rewrite pa_stk_off2.
-    assert (Hz : bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat 2)) : mword 64)
-                             + uint (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)) = 0%Z)
-      by (vm_compute; reflexivity).
-    rewrite Hz.
-    change (add_vec X (mword_of_int 0)) with (add_vec_int X 0).
-    apply avi0.
-  Qed.
 
   (* [callee_saved] from agreement on the twelve registers the function never
      touches, plus the two frame registers it saves and restores. *)
@@ -268,7 +257,7 @@ Section ProofMemmove.
     { unfold M5. rewrite upd_ne; [ exact HspM4 | vm_compute; discriminate ]. }
     assert (Hup : add_vec (M5 !!! Regidx csp_rs1)
                     (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
-    { rewrite HspM5. apply pa_stk2_up. }
+    { rewrite HspM5. apply stk_pop_16. }
     assert (Hpop : M5 !!! Regidx csp_rs1
                    = pa_stk (add_vec (M5 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).

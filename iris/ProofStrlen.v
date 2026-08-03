@@ -126,12 +126,6 @@ Section ProofStrlen.
     add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) = pa_stk X 2.
   Proof. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. Qed.
 
-  Local Lemma sl_pop (X : mword 64) :
-    add_vec (pa_stk X 2) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
-  Proof.
-    rewrite <- sl_push. apply frame_cancel. apply bv_eq; vm_compute; reflexivity.
-  Qed.
-
   (* +0x0e [addi a5,a0,1] : the FIRST cursor, one past the base *)
   Local Lemma sl_bump1 (p : mword 64) :
     add_vec p (sign_extend' 64 (mword_of_int 1 : mword 12)) = pa_add p 1.
@@ -225,7 +219,7 @@ Section ProofStrlen.
     (* ---- +0x24: c.addi sp,16 (the frame pop) ---- *)
     assert (Hwv : add_vec (T2 !!! Regidx csp_rs1)
                     (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0)
-      by (rewrite HT2sp; apply sl_pop).
+      by (rewrite HT2sp; apply stk_pop_16).
     assert (Hpop : T2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T2 !!! Regidx csp_rs1)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)

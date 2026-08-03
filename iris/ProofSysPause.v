@@ -126,6 +126,7 @@ Require Import SpecArgint SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSlee
 Require Import SpecSysPause.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import KernelRvcDecode.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -166,25 +167,7 @@ Lemma sp_off3 (X : mword 64) :
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk X 5.
 Proof. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 
-(* [c.addi4spn s0,sp,64]: s0 is the ENTRY sp *)
-Lemma sp_s0_is_sp0 (X : mword 64) :
-  add_vec (pa_stk X 8) (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))) = X.
-Proof.
-  unfold pa_stk, add_vec_int. rewrite add_vec_off2.
-  rewrite -{2}(kv_addv_zero X). f_equal; try (apply bv_eq; vm_compute; reflexivity).
-Qed.
 
-(* the frame push / pop *)
-Lemma sp_push (X : mword 64) :
-  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) = pa_stk X 8.
-Proof. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. Qed.
-
-Lemma sp_pop (X : mword 64) :
-  add_vec (pa_stk X 8) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
-Proof.
-  unfold pa_stk, add_vec_int. rewrite add_vec_off2.
-  rewrite -{2}(kv_addv_zero X). f_equal; try (apply bv_eq; vm_compute; reflexivity).
-Qed.
 
 (* release's / sleep's "the pointer I passed is the lock" premise *)
 Lemma sp_add_vec_0 (x : mword 64) :
@@ -535,7 +518,7 @@ Section SpBodies.
       done. }
     assert (Hwv : add_vec (E2 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)
-      by (rewrite HE2sp; apply sp_pop).
+      by (rewrite HE2sp; apply stk_pop_64).
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6)))) 8)
@@ -1711,7 +1694,7 @@ Section ProofSysPause.
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))
-                    = pa_stk (m !!! Regidx csp_rs1) 8) by apply sp_push.
+                    = pa_stk (m !!! Regidx csp_rs1) 8) by apply stk_push_64.
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 60 : mword 6) m av 8 true
               ltac:(lia) Hpush with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
@@ -1784,7 +1767,7 @@ Section ProofSysPause.
                     = mword_of_int (SP + 0x08)) by pcstep.
     iEval (rewrite Hpc08) in "Hpc".
     assert (HR2s0 : R2 !!! Regidx (mword_of_int 8 : mword 5) = sp0)
-      by (rewrite /R2 upd_eq HspR1; apply sp_s0_is_sp0).
+      by (rewrite /R2 upd_eq HspR1; apply stk_fp_64).
     assert (HR2sp : R2 !!! Regidx csp_rs1 = pa_stk sp0 8)
       by (rewrite /R2 upd_ne; [exact HspR1 | reg_neq]).
     (* +0x08 addi a1,s0,-52 : a1 := &n *)

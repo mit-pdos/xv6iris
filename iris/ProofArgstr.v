@@ -51,21 +51,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-(* the PUSH is a plain [c.addi sp,-32] ... *)
-Lemma as_push (X : mword 64) :
-  add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk X 4.
-Proof.
-  unfold pa_stk, add_vec_int. apply f_equal.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
-(* ... but the POP is a [c.addi16sp sp,32]. *)
-Lemma as_pop (X : mword 64) :
-  add_vec (pa_stk X 4) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
-Proof.
-  rewrite <- as_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 Module ArgstrProof (Argraw : ARGRAW) (Fetchstr : FETCHSTR) : ARGSTR.
 
@@ -123,7 +109,7 @@ Section ProofArgstr.
     iPoseProof (asi_26 with "Htext") as "Hi26".
     (* ---- +0x00: c.addi sp,-32 (frame push) ---- *)
     iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m av 4 b
-              ltac:(lia) (as_push (m !!! Regidx csp_rs1))
+              ltac:(lia) (stk_push_32 (m !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hk1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -133,7 +119,7 @@ Section ProofArgstr.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
-      by (rewrite /M1 upd_eq; apply as_push).
+      by (rewrite /M1 upd_eq; apply stk_push_32).
     iDestruct (stack_own_4_elim with "Hframe") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     (* ---- +0x02 .. +0x08: save ra / s0 / s1 / s2 ---- *)
     assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1)
@@ -479,7 +465,7 @@ Section ProofArgstr.
     (* ---- +0x24: c.addi16sp sp,32 (the frame pop) ---- *)
     assert (Hwv : add_vec (T4 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0)
-      by (rewrite HT4sp; apply as_pop).
+      by (rewrite HT4sp; apply stk_pop_32).
     assert (Hpop : T4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)

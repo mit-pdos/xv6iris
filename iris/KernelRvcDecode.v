@@ -17,6 +17,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvExec.
 Require Import WpRvcBridge.
 Require Import WpMmodeLeafBase.
+Require Import StackOwn.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -892,6 +893,63 @@ Qed.
 
 (* -16/+16, the standard 16-byte frame ([c.addi sp,-16] / [c.addi sp,16];
    48 is -16 in a 6-bit field). *)
+(* ---------------------------------------------------------------------- *)
+(* The same two facts spelled through [StackOwn.pa_stk] -- the form a proof  *)
+(* that tracks its frame as stack SLOTS wants, rather than as a raw          *)
+(* [add_vec].  [pa_stk X k] is [X] minus 8k bytes, so the prologue's push is *)
+(* [add_vec X <imm> = pa_stk X k] and the epilogue's pop is its inverse;     *)
+(* [stk_fp_*] is the [addi s0,sp,<frame>] that lands back at the ENTRY sp.   *)
+(* Twenty-five byte-identical copies of these once lived under twenty-five   *)
+(* different names, in fourteen function proofs.  Instantiate; do not        *)
+(* re-derive.                                                               *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma stk_push (X v : mword 64) (k : nat) :
+  v = mword_of_int (- (8 * Z.of_nat k)) -> add_vec X v = StackOwn.pa_stk X k.
+Proof. intros ->. reflexivity. Qed.
+
+Lemma stk_pop (X v : mword 64) (k : nat) :
+  add_vec (mword_of_int (- (8 * Z.of_nat k)) : mword 64) v = mword_of_int 0 ->
+  add_vec (StackOwn.pa_stk X k) v = X.
+Proof. apply frame_cancel. Qed.
+
+(* -16 / +16, both a plain [c.addi sp]. *)
+Lemma stk_pop_16 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 2) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* -32 ([c.addi sp,-32]) / +32 ([c.addi16sp sp,32]). *)
+Lemma stk_push_32 (X : mword 64) :
+  add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = StackOwn.pa_stk X 4.
+Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
+Lemma stk_pop_32 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 4) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* -48 / +48, both [c.addi16sp] (61 is -3 in a 6-bit field, scaled by 16). *)
+Lemma stk_push_48 (X : mword 64) :
+  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = StackOwn.pa_stk X 6.
+Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
+Lemma stk_pop_48 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 6) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* -64 / +64 (60 is -4 in a 6-bit field, scaled by 16). *)
+Lemma stk_push_64 (X : mword 64) :
+  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) = StackOwn.pa_stk X 8.
+Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
+Lemma stk_pop_64 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 8) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* [addi s0,sp,<frame>] -- the frame-pointer set-up, back at the entry sp. *)
+Lemma stk_fp_48 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 6) (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+Lemma stk_fp_64 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 8) (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
 Lemma frame_cancel_16 (X : mword 64) :
   add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
           (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.

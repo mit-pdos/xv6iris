@@ -152,37 +152,6 @@ Lemma exec_check_CSR_result_read (csr : mword 12) s :
   exec (check_CSR_result csr Machine CSRRead) s = Some (CSR_Check_OK tt, s).
 Proof. apply (exec_check_CSR_result_read_p Machine csr s). Qed.
 
-(* currentlyEnabled Ext_U. *)
-Lemma exec_hartSupports_U s : exec (hartSupports Ext_U) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_U) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). apply exec_returnM.
-Qed.
-
-Lemma exec_currentlyEnabled_U s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (currentlyEnabled Ext_U) s = Some (true, s).
-Proof.
-  intro HU. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_U) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_U s)). cbn match.
-  match goal with |- context[Defs.and_boolM ?l _] =>
-    assert (Hu : exec l s = Some (true, s)) by
-      (rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s));
-       rewrite (exec_returnM _ s); rewrite HU; reflexivity);
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hu)
-  end. cbn match.
-  match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k ?acc] =>
-    destruct acc; cbn [_rec_currentlyEnabled]; unfold Defs.assert_exp';
-    replace (Z.geb k 0) with true by reflexivity; cbn match;
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)); cbn match
-  end.
-  apply exec_hartSupports_Zicsr.
-Qed.
 
 (* Each CSR read value, and misa's U/S bits, are untouched by [set_reg _ nextPC _],
    so they carry into the execute state (set_reg σ nextPC (pc+4)) unchanged. *)

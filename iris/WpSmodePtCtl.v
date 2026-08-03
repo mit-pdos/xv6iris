@@ -49,93 +49,6 @@ Proof.
   apply exec_returnm.
 Qed.
 
-(* ---- Local helpers copied from WpSmodeJalr.v ---- *)
-Local Lemma exec_cE_zicfilp_false_S s :
-    register_lookup cur_privilege (sregs s) = Supervisor ->
-    bool_bit_backwards (_get_MEnvcfg_LPE (register_lookup menvcfg s.(sregs))) = false ->
-    exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s).
-  Proof.
-    intros Hpriv Hlpe.
-    unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp) 0) with true by reflexivity.
-    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _
-              (exec_rec_cE_Zicsr_any (currentlyEnabled_measure Ext_Zicfilp - 1) _ s
-                 ltac:(vm_compute; reflexivity))).
-    cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zicfilp s)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
-    match goal with |- context[_rec_get_xLPE Supervisor _ ?acc] => destruct acc end.
-    cbn [_rec_get_xLPE]. unfold Defs.assert_exp'.
-    replace (Z.geb (currentlyEnabled_measure Ext_Zicfilp - 1) 0) with true by (vm_compute; reflexivity).
-    cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). cbn match.
-    rewrite Hlpe. apply exec_returnM.
-  Qed.
-
-(* helper: exec_jump_to_zca *)
-Local Lemma exec_jump_to_zca (target : mword 64) s :
-    eq_vec (access_vec_dec target 0) ('b"0") = true ->
-    exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-    exec (jump_to target) s = Some (RETIRE_SUCCESS, set_reg s nextPC target).
-  Proof.
-    intros Halign Hzca.
-    unfold jump_to. rewrite exec_catch_early_return.
-    change (ext_control_check_pc target) with (@None unit). cbv iota beta.
-    rewrite (execR_bind_Some _ _ _ false s).
-    2:{ unfold Defs.bind0.
-        erewrite execR_bind_Some.
-        2:{ erewrite execR_bind_Some.
-            2:{ apply execR_returnR_fwd. }
-            rewrite execR_liftR. unfold assert_exp. rewrite Halign. cbn match.
-            rewrite exec_returnm. reflexivity. }
-        unfold and_boolM.
-        rewrite (execR_bind_Some _ _ _ (bit_to_bool (access_vec_dec target 1)) s).
-        2:{ apply execR_returnR_fwd. }
-        destruct (bit_to_bool (access_vec_dec target 1)).
-        - cbv iota beta.
-          rewrite (execR_bind_Some _ _ _ true s).
-          2:{ rewrite execR_liftR. rewrite Hzca. reflexivity. }
-          cbv iota beta. apply execR_returnR_fwd.
-        - cbv iota beta. apply execR_returnR_fwd. }
-    cbv iota beta.
-    unfold Defs.bind0.
-    rewrite (execR_bind_Some _ _ _ tt (set_reg s nextPC target)).
-    2:{ rewrite execR_liftR. rewrite exec_set_next_pc. reflexivity. }
-    rewrite (execR_returnR_fwd RETIRE_SUCCESS (set_reg s nextPC target)).
-    reflexivity.
-  Qed.
-
-(* helper: exec_execute_JALR_ret_zca *)
-Local Lemma exec_execute_JALR_ret_zca (imm : mword 12) (rs1 rdz : mword 5) s :
-    uint rs1 <> 0 -> uint rdz = 0 ->
-    exec (currentlyEnabled Ext_Zicfilp) s = Some (false, s) ->
-    exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
-    eq_vec (access_vec_dec (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0")) 0) ('b"0") = true ->
-    exec (execute_JALR imm (Regidx rs1) (Regidx rdz)) s
-    = Some (RETIRE_SUCCESS,
-            set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))).
-  Proof.
-    intros Hrs1 Hrdz Hzic Hzca Halign.
-    unfold execute_JALR.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (Defs.bind0 (update_elp_state (Regidx rs1)) (get_next_pc tt)) s
-                   = Some (register_lookup nextPC s.(sregs), s))).
-    2:{ rewrite (exec_bind0_Some _ _ _ _ _
-                  (_ : exec (update_elp_state (Regidx rs1)) s = Some (tt, s))).
-        2:{ unfold update_elp_state. rewrite (exec_bind_Some _ _ _ _ _ Hzic). cbn match. apply exec_returnm. }
-        unfold get_next_pc. exact (exec_read_reg nextPC s). }
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)).
-    replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_jump_to_zca _ s Halign Hzca)).
-    cbn match.
-    rewrite (exec_bind0_Some _ _ _ _ _
-              (exec_wX_bits_gpr rdz (register_lookup nextPC s.(sregs))
-                  (set_reg s nextPC (update_vec_dec (add_vec (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) (sign_extend' 64 imm)) 0 ('b"0"))))).
-    rewrite Hrdz. cbn match. apply exec_returnm.
-  Qed.
-
 
 (* ---- Local helpers copied from WpSmodeCsr.v ---- *)
 
@@ -231,13 +144,7 @@ Section WpSmodePtCtl.
   (* ---- from WpSmodeFence.v ---- *)
 
 
-
-
-
   (* ---- from WpSmodeJal.v ---- *)
-
-
-
 
 
   Lemma wp_jal_gpr_s_zca_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
@@ -354,7 +261,6 @@ Section WpSmodePtCtl.
   Qed.
 
   (* ---- from WpSmodeJalr.v ---- *)
-
 
 
   Lemma wp_cret_s_zca_r_later (R : s_regime) (Φ : mval -> iProp Σ)
@@ -507,15 +413,7 @@ Section WpSmodePtCtl.
   Qed.
 
 
-
   (* ---- from WpSmodeCsr.v ---- *)
-
-
-
-
-
-
-
 
 
   (* ---- from WpSmodeSret.v ---- *)

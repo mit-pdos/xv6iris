@@ -8,40 +8,6 @@ Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec ExecCommon.
 Local Open Scope Z_scope.
 
 
-(* currentlyEnabled Ext_U, mirroring exec_currentlyEnabled_M (ExecCommon). *)
-Lemma exec_hartSupports_U s : exec (hartSupports Ext_U) s = Some (true, s).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_U) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). apply exec_returnM.
-Qed.
-
-Lemma exec_currentlyEnabled_U s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (currentlyEnabled Ext_U) s = Some (true, s).
-Proof.
-  intro HU. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_U) 0) with true by reflexivity.
-  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_U s)). cbn match.
-  (* inner: and_boolM (read misa; misa.U=1) (cE Zicsr) *)
-  match goal with |- context[Defs.and_boolM ?l _] =>
-    assert (Hu : exec l s = Some (true, s)) by
-      (rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s));
-       rewrite (exec_returnM _ s); rewrite HU; reflexivity);
-    rewrite (exec_and_boolM_Some _ _ _ _ _ Hu)
-  end. cbn match.
-  (* inner cE Zicsr is the _rec form with a decremented limit; reduce inline *)
-  match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k ?acc] =>
-    destruct acc; cbn [_rec_currentlyEnabled]; unfold Defs.assert_exp';
-    replace (Z.geb k 0) with true by reflexivity; cbn match;
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)); cbn match
-  end.
-  apply exec_hartSupports_Zicsr.
-Qed.
-
 (* ====================================================================== *)
 (* exec_execute_MRET — ROADMAP (not yet completed; helpers above verified).*)
 (* The full reduction was validated through `currentlyEnabled Ext_U`; two   *)

@@ -61,30 +61,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-(* ===================================================================== *)
-(*  Pure arithmetic: the 48-byte frame and the [int fd] local.            *)
-(* ===================================================================== *)
-
-Lemma af_push (X : mword 64) :
-  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk X 6.
-Proof.
-  unfold pa_stk, add_vec_int. apply f_equal.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma af_s0_entry (X : mword 64) :
-  add_vec (pa_stk X 6) (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))) = X.
-Proof.
-  rewrite <- af_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma af_pop (X : mword 64) :
-  add_vec (pa_stk X 6) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = X.
-Proof.
-  rewrite <- af_push. apply frame_cancel.
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
 
 (* [addi a1,s0,-36] : &fd, the UPPER WORD of frame slot 5 *)
 Lemma af_addr_fd (X : mword 64) :
@@ -291,7 +267,7 @@ Section ProofArgfd.
     (* ---- +0x4e: c.addi16sp sp,48 (frame pop) ---- *)
     assert (Hwv : add_vec (T4 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0)
-      by (rewrite HT4sp; apply af_pop).
+      by (rewrite HT4sp; apply stk_pop_48).
     assert (Hpop : T4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (T4 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6)
@@ -439,14 +415,14 @@ Section ProofArgfd.
     iPoseProof (afi_58 with "Htext") as "Hi58".
     (* ---- +0x00: c.addi16sp sp,-48 (frame push) ---- *)
     iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 61 : mword 6) m av 6 b
-              ltac:(lia) (af_push (m !!! Regidx csp_rs1))
+              ltac:(lia) (stk_push_48 (m !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hk1) "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.argfd + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 6)
-      by (rewrite /M1 upd_eq; apply af_push).
+      by (rewrite /M1 upd_eq; apply stk_push_48).
     (* the six frame slots *)
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
@@ -536,7 +512,7 @@ Section ProofArgfd.
                     = mword_of_int (KernelSyms.argfd + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     assert (HM2s0 : M2 !!! Regidx (mword_of_int 8 : mword 5) = sp0).
-    { rewrite /M2 upd_eq HM1sp. apply af_s0_entry. }
+    { rewrite /M2 upd_eq HM1sp. apply stk_fp_48. }
     (* ---- +0x0c: c.mv s2,a1 -- s2 := pfd ---- *)
     iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x0c))
               (mword_of_int 18 : mword 5) (mword_of_int 11 : mword 5) M2 (av - 6)%nat b
