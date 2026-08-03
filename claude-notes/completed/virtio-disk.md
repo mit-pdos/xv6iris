@@ -324,8 +324,11 @@ touching it:
   20+-link `pose` chains; the sweep sealed only `rget`, which cannot help while
   `rf_upd` is transparent. Sealing all three plus switching the 115
   `rewrite wp_next_off` sites to `iApply wp_next_off_intro` restored it. If
-  this file ever goes slow again, that is the first thing to check — and the
-  general rule is in [`optimization.md`](../optimization.md).
+  this file ever goes slow again, that is the first thing to check. It is also
+  the ONLY proof this bites — ten of the next-most-expensive were A/B'd with
+  the same seal and every one came out inside noise (and `ProofCopyout` does
+  not compile with it), so do not generalise the seal into a sweep; see
+  [`optimization.md`](../optimization.md).
 - The queue obligation at the QUEUE_READY / DRIVER_OK writes is
   `virtio_queue_ok` with `S = ∅` and `ai = 0`: the rings are freshly zeroed and
   nothing is published yet, so `v_seen = ai = 0` and there is no slot to prove
