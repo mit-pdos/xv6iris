@@ -46,6 +46,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - TLB invariant must allow for page table to be updated by another core, so TLB has stale A/D bits
 - ownership of cpu struct goes into interrupt-handling invariant when interrupts are enabled (but expose stable cur_proc)
 - big refactors get mired in complexity on the first pass: kpt-rwx refactor, explicit-cpuid refactor, user-mode execution, cleaning up first version of instruction leaf specs
+- crash handling: ghost "power" thread turns on/off power repeatedly, bumping generation counter and forking off HART "threads" when powering up a new gen
 
 Big things that still need to be done/explored:
 
