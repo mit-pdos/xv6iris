@@ -546,6 +546,7 @@ CodePiperead.v
 SpecPipeclose.v
 SpecPipewrite.v
 SpecPiperead.v
+ProofPiperead.v
 LinkPipewrite.v
 LinkPiperead.v
 ProofPipeclose.v
