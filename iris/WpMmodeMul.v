@@ -15,7 +15,7 @@ Local Open Scope Z_scope.
 (* Structurally identical to the generic ADD (WpGpr.v): reads rs1/rs2,     *)
 (* writes rd; only the written value differs (the M-extension product      *)
 (* [mult_to_bits_half] instead of [add_vec]).  Reuses [mulop_mul] (the      *)
-(* funct3=000 signed/signed/Low op) from WpEntry.v.                         *)
+(* funct3=000 signed/signed/Low op).                                       *)
 (* ====================================================================== *)
 
 (* The value MUL writes to rd, expressed over the file-generic reads. *)

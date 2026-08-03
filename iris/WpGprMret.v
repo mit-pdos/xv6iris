@@ -8,7 +8,7 @@ Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec ExecCommon.
 Local Open Scope Z_scope.
 
 
-(* currentlyEnabled Ext_U, mirroring exec_currentlyEnabled_M (WpEntry). *)
+(* currentlyEnabled Ext_U, mirroring exec_currentlyEnabled_M (ExecCommon). *)
 Lemma exec_hartSupports_U s : exec (hartSupports Ext_U) s = Some (true, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).

@@ -6,7 +6,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec WpGpr.
 Local Open Scope Z_scope.
 
-(* [exec_if_false_g] (from WpEntry) drives the [write_CSR] CSR-dispatch walks
+(* [exec_if_false_g] (ExecCommon) drives the [write_CSR] CSR-dispatch walks
    below at the goal head — see its comment / the README "Build-perf note". *)
 
 (* ====================================================================== *)

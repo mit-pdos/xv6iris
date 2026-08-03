@@ -51,7 +51,7 @@ Section WpMemsetS.
      in (its own 0x1141 in the low half, the next halfword 0xe406 in the high). *)
   (* C.ADDI's 6-bit signed immediate (== -16) and destination register (== sp),
      extracted exactly as the model's decoder does (mirror of [imm_caddi] /
-     [rsd_caddi] in WpEntry). *)
+     [rsd_caddi] in CodeEntry). *)
 
 
   (* ---- decode: 0x1141 decodes to [C_ADDI (imm_memset0, rsd_memset0)] ---- *)

@@ -772,12 +772,12 @@ Section HneClosed.
 End HneClosed.
 
 (* ====================================================================== *)
-(* Pure fetch reductions moved here from WpEntry.v (F_RVC 4-aligned and     *)
+(* Pure fetch reductions (F_RVC 4-aligned and                                *)
 (* the width-2 read stack for the non-4-aligned F_RVC path), so downstream  *)
-(* memory-resource fetch lemmas can reach them without importing WpEntry.   *)
+(* memory-resource fetch lemmas can reach them without a WP-family import.  *)
 (* ====================================================================== *)
 
-(* ---- moved from WpEntry.v: FetchRVC / exec_fetch_RVC_4 ---- *)
+(* ---- FetchRVC / exec_fetch_RVC_4 ---- *)
 Section FetchRVC.
   Context (pc : mword 64) (region : PMA_Region) (w : mword 32) (s : mstate).
   Let addr := fetch_pa pc.
@@ -837,7 +837,7 @@ Section FetchRVC.
 
 End FetchRVC.
 
-(* ---- moved from WpEntry.v: Zca enablement chain ---- *)
+(* ---- the Zca enablement chain ---- *)
 Lemma exec_hartSupports_Zca s : exec (hartSupports Ext_Zca) s = Some (true, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
@@ -972,7 +972,7 @@ Definition priv_mSU (p : Privilege) : bool :=
   | VirtualSupervisor | VirtualUser => false
   end.
 
-(* ---- moved from WpEntry.v: width-2 mem-read stack + exec_fetch_bytes_2 ---- *)
+(* ---- the width-2 mem-read stack + exec_fetch_bytes_2 ---- *)
 Lemma autocast_mword_id_16 (w : bv 16) :
   autocast (T := mword) (m := 8 * 2) (n := 2 * 8) w = w.
 Proof.
@@ -1165,7 +1165,7 @@ Section FetchBytes2.
   Qed.
 End FetchBytes2.
 
-(* ---- moved from WpEntry.v: FetchRVC2 / exec_fetch_RVC_2 ---- *)
+(* ---- FetchRVC2 / exec_fetch_RVC_2 ---- *)
 Section FetchRVC2.
   Context (pc : mword 64) (region : PMA_Region) (w : mword 16) (s : mstate).
   Let addr := fetch_pa pc.
@@ -1233,7 +1233,7 @@ Section FetchRVC2.
 End FetchRVC2.
 
 
-(* ---- moved from WpEntry.v: 2-aligned 32-bit fetch (2+2 read) ---- *)
+(* ---- the 2-aligned 32-bit fetch (2+2 read) ---- *)
 (* ---------------------------------------------------------------------- *)
 (* 2-aligned 32-bit fetch: reads 2 bytes (ilo) at pc, isRVC=false, then 2  *)
 (* more (ihi) at pc+2, returns F_Base (concat ihi ilo).  The 2-aligned     *)
@@ -1350,7 +1350,7 @@ End FetchFBase2.
 
 
 
-(* ---- moved from WpEntry.v: F_RVC run_hart_active reduction ---- *)
+(* ---- the F_RVC run_hart_active reduction ---- *)
 (* ---------------------------------------------------------------------- *)
 (* run_hart_active reduction for the F_RVC (compressed) branch.            *)
 (* Mirror of exec_hart_active_progress; nextPC := pc+2, decode via         *)

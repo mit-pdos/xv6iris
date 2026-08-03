@@ -98,7 +98,7 @@ Definition st_h62 : mword 16 := mword_of_int 0x823e.
 
 (* ===================================================================== *)
 (* Decode lemmas for the encodings not already decoded by WpTimerinit /  *)
-(* WpEntry / WpGprMretWp.  RVC: the WpEntry clause walkers + per-clause   *)
+(* CodeEntry / WpGprMretWp.  RVC: CodeEntry's clause walkers + per-clause *)
 (* closes (WpTimerinit recipe); 32-bit: [decode_any] one-shot.            *)
 (* ===================================================================== *)
 

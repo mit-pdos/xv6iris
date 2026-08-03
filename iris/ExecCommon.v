@@ -8,9 +8,7 @@
    anything needing a bare executor fact can reach it without importing a WP
    family file.  Facts that are keyed only by the model, not by a privilege
    mode or an instruction family, belong here.
-
-   (Originally split verbatim out of WpEntry.v so the leaves need not depend
-   on that slow file; WpEntry.v re-imports this one.) *)
+ *)
 From Stdlib Require Import ZArith.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -269,3 +267,31 @@ Qed.
 (* JAL with rd = x0 (zreg): the jump retires with NO link write, so the only
    state change is nextPC := target.  Instantiate the rd-generic [exec_execute_JAL]
    at rd := zreg and discharge the wX obligation with the x0-no-op fact. *)
+
+(* ---------------------------------------------------------------------- *)
+(* The M extension's enable tower.  Keyed by the model and by nothing else *)
+(* -- no privilege mode, no instruction family -- so it belongs here and   *)
+(* not in the file of whichever function first needed a [mul].             *)
+(* ---------------------------------------------------------------------- *)
+
+(* hartSupports Ext_M = true (const arm). *)
+Lemma exec_hartSupports_M s : exec (hartSupports Ext_M) s = Some (true, s).
+Proof.
+  unfold hartSupports. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
+  replace (Z.geb (hartSupports_measure Ext_M) 0) with true by reflexivity.
+  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). apply exec_returnM.
+Qed.
+
+Lemma exec_currentlyEnabled_M s :
+  eq_vec (_get_Misa_M (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (currentlyEnabled Ext_M) s = Some (true, s).
+Proof.
+  intro HM. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
+  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
+  replace (Z.geb (currentlyEnabled_measure Ext_M) 0) with true by reflexivity.
+  cbn match. rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM eq_refl s)). cbn match.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_M s)). cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg misa s)). cbn match.
+  rewrite HM. apply exec_returnM.
+Qed.

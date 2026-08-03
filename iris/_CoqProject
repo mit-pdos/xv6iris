@@ -35,7 +35,6 @@ WpDecode.v
 WpDecodeBridge.v
 WpRvcBridge.v
 ExecCommon.v
-WpEntry.v
 WpGpr.v
 WpMmodeMul.v
 WpGprCsrrCommon.v

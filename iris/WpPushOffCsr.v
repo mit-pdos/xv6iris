@@ -11,12 +11,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import WpEntry.
+
 Require Import WpGpr.
 Require Import SmodeCore.
 Require Import WpGprCsrwCommon WpGprCsrwA.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import ExecCommon.
 Local Open Scope Z_scope.
 Import Defs.
 

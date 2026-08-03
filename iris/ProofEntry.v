@@ -24,7 +24,7 @@ From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto WpEntry.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpEntryNew WpTimerinit WpStartNew.
 Require Import SpecEntry.

@@ -15,7 +15,7 @@
    All decoded-field / word Definitions (imm_auipc, i_auipc, imm_ld, i_ld,
    imm_clui, rd_clui, csr_csrr, i_rd_csrr, imm_caddi, rsd_caddi, i_mul_*,
    rsd_cadd, rs2_cadd, imm_jal, i_jal, mulop_mul) are REUSED from WpDecode.v /
-   WpEntry.v -- not redefined here.
+  .v -- not redefined here.
 
    The chain applies, in order:
      wp_auipc_gpr → wp_ld_gpr → wp_clui_gpr → wp_csrr_mhartid_gpr
@@ -32,7 +32,7 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvFetchExec WpDecode WpEntry WpGpr.
+Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvFetchExec WpDecode WpGpr.
 Require Import WpAuipc WpMmodeMul WpMmodeJal.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeLoad.
