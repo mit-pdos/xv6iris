@@ -175,6 +175,12 @@ Record gstate := GState {
   gregs : CPU -> regstate;
   gmem  : gmap Arch.pa (bv 8);
   gdev  : dev_state;
+  (* the power/crash layer (claude-notes/design/crash.md): the current
+     GENERATION and the POWER bit.  INERT until the power thread lands:
+     every arm below PRESERVES both fields and none reads them, so the
+     semantics is still generation- and power-blind. *)
+  ggen : nat;
+  gpow : bool;
 }.
 
 (* pointwise update of a single hart's register file *)
@@ -346,22 +352,22 @@ Definition prim_step
   (exists gen cpu, e = LoopE gen cpu /\ e' = LoopE gen cpu /\ κ = [] /\ efs = [] /\
     exists (tick : bool) (u : unit) (s' : mstate),
       run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
-      g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev))
+      g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev) g.(ggen) g.(gpow))
   \/
   (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
     exists d',
       uart_step g.(gdev) d' /\
-      g' = GState g.(gregs) g.(gmem) d')
+      g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow))
   \/
   (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
     exists d' m',
       disk_step g.(gdev) g.(gmem) d' m' /\
-      g' = GState g.(gregs) m' d')
+      g' = GState g.(gregs) m' d' g.(ggen) g.(gpow))
   \/
   (exists gen, e = PlicLoopE gen /\ e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
     exists gr',
       plic_step g.(gdev) g.(gregs) gr' /\
-      g' = GState gr' g.(gmem) g.(gdev)).
+      g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow)).
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
 Proof.

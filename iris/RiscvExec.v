@@ -176,7 +176,7 @@ Section WPExec.
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (LoopE gen_id cpu_id),
-             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev)), [].
+             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev) g.(ggen) g.(gpow)), [].
       left.
       exists gen_id, cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
       exists false, tt, σ'. split; [exact Hrunf|done]. }
