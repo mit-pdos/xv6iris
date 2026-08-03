@@ -148,7 +148,7 @@ Lemma pw_addiw_lit (v : mword 32) (co : mword 12) (c : Z) :
 Proof.
   intro Hco. apply bv_eq.
   rewrite subrange_31_0_unsigned.
-  rewrite bc_add_vec_unsigned Hco.
+  rewrite add_vec64_unsigned Hco.
   rewrite pw_add32_unsigned moi32_unsigned !pw_wrap32 pw_wrap64.
   apply pw_z_addlow. apply pw_sext_low32.
 Qed.
@@ -168,7 +168,7 @@ Proof.
                  (add_vec (mword_of_int i : mword 64)
                     (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0 : mword 32)
               = (mword_of_int (i + 1) : mword 32)).
-  { apply bv_eq. rewrite subrange_31_0_unsigned bc_add_vec_unsigned bc_moi_unsigned.
+  { apply bv_eq. rewrite subrange_31_0_unsigned add_vec64_unsigned moi64_unsigned.
     assert (H1c : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)) : mword 64) = 1%Z)
       by (vm_compute; reflexivity).
     rewrite H1c moi32_unsigned !pw_wrap32 !pw_wrap64.
@@ -177,7 +177,7 @@ Proof.
     reflexivity. }
   rewrite E. apply bv_eq.
   rewrite (sext64_moi32_unsigned (i + 1) ltac:(rgall; rewrite H231; lia)).
-  rewrite bc_moi_unsigned pw_wrap64. symmetry. apply Z.mod_small. lia.
+  rewrite moi64_unsigned pw_wrap64. symmetry. apply Z.mod_small. lia.
 Qed.
 
 (* ---- the %PIPESIZE index ---- *)
@@ -220,7 +220,7 @@ Proof.
   intros HA Ho.
   transitivity (add_vec_int p (Z.of_nat (pipe_data_off + idx)%nat)); [| reflexivity ].
   apply bv_eq. unfold add_vec_int.
-  rewrite !bc_add_vec_unsigned bc_moi_unsigned HA Ho.
+  rewrite !add_vec64_unsigned moi64_unsigned HA Ho.
   rewrite !bv_wrap_add_idemp_l !bv_wrap_add_idemp_r.
   f_equal. unfold pipe_data_off. rewrite Nat2Z.inj_add.
   replace (Z.of_nat 24%nat) with 24%Z by (vm_compute; reflexivity).
@@ -234,7 +234,7 @@ Proof.
   intro Hz.
   assert (Hhm : bv_half_modulus 64 = (2 ^ 63)%Z) by reflexivity.
   change (sint ?x) with (bv_swrap 64 (bv_unsigned x)).
-  rewrite bc_moi_unsigned bv_swrap_wrap.
+  rewrite moi64_unsigned bv_swrap_wrap.
   apply bv_swrap_small. rewrite Hhm. lia.
 Qed.
 
