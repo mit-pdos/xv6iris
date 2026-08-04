@@ -1325,26 +1325,116 @@ forgets. Two shapes, and the choice is a design decision, not a proof problem:
 (1) is the smaller statement change and the honest one — the facts really are
 invariants of kernel M-mode, not incidental. (2) is the smaller *file* change.
 
+### M6c (2a) — `boot_bridge` takes HALF of `c->proc` (LANDED)
+
+Forced by the control flow, not by taste: `SpecMain` wants all EIGHT harts'
+`cpu_proc_half`, and hart 0 cannot get them from the other harts' bridges —
+each bridge runs inside *that* hart's own WP, long after the client's single
+`={⊤}=∗` has ended. So `boot_bridge` now takes `cpu_proc_half cpu_id p0` and
+returns no spare half; the client's carve splits every `cpus[h].proc` cell and
+routes one half into hart `h`'s bridge, the other eight into main's boot
+supply. The proof lost exactly the two lines that split
+(`cpu_own_init_boot` always wanted the half). BootBridge's and SpecMain's
+comments now describe the working arrangement, and BootBridge's mis-filing of
+`stvec` as ".bss, from the memory image" is corrected (it is a Sail register —
+slice 2e's finding).
+
+### M6c (2b) — `mstatus_kernel_facts`: THE PLAN, and the reconnaissance (NOT
+### YET IMPLEMENTED)
+
+The decided shape (coordinator's call, option (1) of the blocker above): ONE
+shared predicate, put inside `mmode_config`'s existential, so
+`wp_entry_boot`'s post binder carries it and `boot_bridge`'s ten facts follow.
+**Everything below was verified by reading the tree; it is what makes the job
+small, and it was the main design risk.**
+
+1. **The predicate.** `mstatus_kernel_facts ms` := `IntrDefs.sconf_ms_facts`'s
+   ten conjuncts **plus** `_get_Mstatus_SIE ms = 'b"0"`. Home: a NEW tiny
+   `iris/MstatusFacts.v` with MINIMAL imports (Stdlib + `bitvector.definitions`
+   + Sail + the model), **not** `MstatusBits.v` — MstatusBits requires
+   `bitvector.tactics`, and `InstrBytes` must require the new file, which would
+   push the zify hook into the bottom of the tree (durable-notes: the hook
+   arrives transitively and `lia` then fails on any goal mentioning
+   `bv_unsigned`). `sconf_ms_facts` keeps its verbatim statement (it is inside
+   `sconf`; changing it changes `sconf`) and IntrDefs gains the one-way bridge
+   `mstatus_kernel_facts ms -> sconf_ms_facts ms` — the wrapper recipe, zero
+   consumer churn. The MPP conjunct is `have_nom_val (_get_Mstatus_MPP ms) =
+   true`, i.e. MPP ≠ `'b"10"`; state it in the low file as the bit
+   disequality and derive the boolean form in IntrDefs (`have_nom_val` lives in
+   `WpGprCsrwCommon`, which is NOT below InstrBytes).
+2. **`InstrBytes.mmode_config` gains `⌜mstatus_kernel_facts mstatus0⌝`** inside
+   its existential, and `mmode_config_unbundle` / `mmode_config_rebuild` gain
+   it. MIE/MPRV/SXL stay where they are (harmless overlap; keeping them keeps
+   every existing destructuring pattern compiling).
+3. **THE REBUILD SITES ARE SIX, AND FIVE ARE IN ONE FILE.** `grep
+   mmode_config_rebuild` = `BootConfig.v:326` (at the reset mstatus
+   `0xA00000000` → one `vm_compute`), and `WpStartNew.v:855, 987, 1151` (plus
+   the three `mmode_config_unbundle`s at 849/970/1134/1282 that now hand the
+   fact out). **`WpGprCsrwC` only MENTIONS it in a comment** — there is no
+   bundled `csrw mstatus` WP at all, only `wp_csrw_mstatus_raw`, which takes
+   the cells unbundled with `ms0` explicit. And `wp_instr_config` likewise
+   takes the unbundled cells + `ms0`, while the bundled `wp_instr` hands
+   `mmode_config` back UNCHANGED. So **no leaf outside WpStartNew needs a new
+   premise** — the widening does not ripple.
+4. **Two preservation lemmas, and the per-field machinery ALREADY EXISTS.**
+   Needed: `mstatus_kernel_facts ms -> mstatus_kernel_facts (st_ms1 ms)`
+   (WpStartNew's two rebuilds at `st_ms1 ms0`) and
+   `mstatus_kernel_facts x -> mstatus_kernel_facts (cms5 x)` (the MRET
+   composite, `WpGprMretWp`). `st_ms1 ms = mstatus_legalized ms (st_va5_40 ms)`
+   with `st_va5_40 ms = or_vec (and_vec ms st_mask_and) st_mask_or`, and
+   **`WpSieFlipBits.v` already proves all ELEVEN
+   `mstatus_legalized_<FIELD>'` field lemmas** (SIE, MPRV, SXL, MXR, TSR, TVM,
+   XS, FS, VS, SD, MPP) over the `q<F>_u<G>` update-disjointness family — they
+   are top-level `Local Lemma`s, hence reachable by qualified name. **BUT
+   WpSieFlipBits requires IntrDefs and WpGprCsrwC, so WpStartNew cannot see
+   them.** The right move (one home per fact, and it is the same subject as
+   the `trap_ms_*` / `sret_ms5_*` families already there) is to **move the
+   `q<F>_u<G>` family and the eleven `mstatus_legalized_*'` lemmas DOWN into
+   `MstatusBits.v`** and have WpSieFlipBits use them from there. What is then
+   still owed is the mask step, `_get_Mstatus_X (st_va5_40 ms) =
+   _get_Mstatus_X ms` for every field except MPP — MstatusBits' own `tb1`/`tb2`
+   testbit tactics are exactly the tool.
+5. **Then the post threading.** `WpStartNew.wp_start`'s continuation gains
+   `(HoKF : mstatus_kernel_facts ms0)` beside HoIE/HoPRV/HoSXL (its own comment
+   already calls `ms0` "the (hidden) entry mstatus value"), `SpecEntry`'s
+   likewise, ProofEntry passes it through (one extra `$!` argument). Keep
+   HoIE/HoPRV/HoSXL under their old names — subsumption with the old names
+   restated, so nothing downstream churns.
+6. **`boot_bridge` need not change.** Its five pure premises stay; the CHAIN
+   discharges them from `HoKF` via a new `boot_csrs_from_kf` beside
+   `boot_csrs_reset` (which stays, as the reset-state instance).
+
+Sanity anchors for whoever implements this: the hostile-`ms0` table above is
+the regression test in prose (at `ms0 = 2^63 + 0xA00000000 + SIE + MXR + TVM +
+TSR + FS + VS + XS`, seven facts fail), and `mstatus_kernel_facts` must hold of
+`boot_w64 0xA00000000` by `vm_compute` — check that FIRST, before touching
+`mmode_config`, because if it does not the whole plan is wrong.
+
+Budget note: this is a bottom-of-tree edit (InstrBytes), so every iteration is
+a full `-k` rebuild (~13 min); the WpStartNew work is the only real proof
+content.
+
 ### What is left of M6c after this
 
-- the mstatus reshape above (prerequisite for ANY composition);
+- **`mstatus_kernel_facts` (M6c (2b) above) — the prerequisite for ANY
+  composition.** Nothing else on this list is blocked by it, but the chain is.
 - then `boot_entry_run` — apply `Entry.wp_entry_boot` with `boot_entry_pre`'s
-  output and §1's geometry (all its premises now exist), and `boot_bridge` on
-  its post;
-- then the two main arms, which additionally need the SHARED allocation
-  lemma. **One thing that shape settles**: `SpecMain` demands
-  `[∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg` — all EIGHT harts' spare
-  halves — and hart 0 cannot get them from the other harts' `boot_bridge`s
-  (each hart's bridge runs inside that hart's own WP, long after the client's
-  single `={⊤}=∗` has ended). So the SHARED carve must split each
-  `cpus[h].proc` cell itself, give one half to hart `h`'s bundle and collect
-  the other eight into the boot supply — which means `boot_bridge` should take
-  `cpu_proc_half cpu_id p0` rather than the full cell and stop returning a
-  spare. That is a small, forced interface change to BootBridge, and its
-  header comment ("each hart's boot bridge hands its spare half out here, and
-  the eight of them are exactly what main's `scheds_alloc` consumes") is the
-  arrangement that does not work.
-- the `.bss` cut chain and the client ghosts (items 1, 4, 6, 7 below).
+  output and §1's geometry (every premise now exists), and `boot_bridge` on its
+  post. NOTE for the application: `wp_entry_boot`'s `sp0` is the let-bound
+  `m_jal m v_stack0 mhartid_in !!! Regidx csp_rs1`, so the premises appear at
+  THAT term — `rewrite (sp0_val (boot_regfile rs) (fin_to_nat cpu_id) _)` in
+  the goal to reach §1's `mword_of_int (sp_of n)` form.
+- then the two main arms. The per-hart/shared split, as designed: the per-hart
+  lemma takes the SHARED persistents (`started_inv (main_deposit …)`,
+  `dev_inv`, `crash_inv`, `panic_wp_any`, the allocated ghost families) plus
+  this hart's residue plus — for the `fin_to_nat c = 0` arm only — the whole
+  boot supply, and the arm is selected by
+  `destruct (decide (fin_to_nat cpu_id = 0))`; the companion shared-allocation
+  lemma produces all of that ONCE from `power_boot_res`'s shared residue, and
+  M6d is then `allocation once + the chain eight times`. `started_inv` must be
+  allocated there, not per hart, at `P := SpecMainSecondary.main_deposit`.
+- the `.bss` cut chain and the client ghosts (items 1, 6, 7 below). The cut
+  chain must also split each `cpus[h].proc` cell (M6c (2a)).
 
 ## M6c (NEXT, fresh budget) — the per-hart boot chain
 
