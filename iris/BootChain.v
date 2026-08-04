@@ -59,6 +59,8 @@ Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv DevModel.
 Require Import WpUart DiskPtsto SpecPanic.
 Require Import WpLock KallocInv FileInv FdSlots.
+Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
+Require Import LinkMain.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
@@ -205,6 +207,12 @@ Qed.
 (* the secondary arm's stack budget is inside the one the bridge hands out *)
 Lemma K_main_secondary_le : (K_main_secondary <= K_main)%nat.
 Proof. unfold K_main_secondary, K_main. lia. Qed.
+
+(* ...and at the BOOT hart: the id word IS [zero_reg], which is what makes
+   main's [beqz a0] take the boot path. *)
+Lemma cid_word_of_zero (n : nat) :
+  (n = 0)%nat -> (mword_of_int (Z.of_nat n) : mword 64) = zero_reg.
+Proof. intros ->. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* the boot menvcfg has the Zicfilp landing-pad enable clear *)
 Lemma menvcfg_boot_lpe : _get_MEnvcfg_LPE (boot_w64 0) = ('b"0").
@@ -531,3 +539,90 @@ Section BootSecondary.
   Qed.
 
 End BootSecondary.
+
+(* ====================================================================== *)
+(* §5  THE BOOT HART'S WHOLE CHAIN.                                        *)
+(*                                                                        *)
+(* [boot_hart_primary]: for the hart with [fin_to_nat c = 0], §3 composed   *)
+(* with [Main.wp_main_boot_sconf] -- the same shape as §4, but this arm      *)
+(* consumes the WHOLE BOOT SUPPLY (the carved .bss bundles, the eight       *)
+(* [cpu_proc_half]s, the park receipts, the device tokens, the two global    *)
+(* one-shots, the free-page run), so the supply is what the statement is    *)
+(* mostly made of.                                                        *)
+(*                                                                        *)
+(* THE DEPOSIT WAND IS DISCHARGED HERE, not taken.  [SpecMain]'s boot arm    *)
+(* asks for [□ (∀ γpr γs γk pd pav pu root pas, <nine facts> -∗ P)] and this *)
+(* chain instantiates [P := SpecMainSecondary.main_deposit γd γv Φ] -- whose *)
+(* body IS those nine facts under an existential over exactly those eight    *)
+(* names.  So the wand is [iIntros] + [iExists] + [iFrame], and THAT is what *)
+(* ties the two arms together: the boot hart deposits precisely what a       *)
+(* secondary hart's [started_inv] withdrawal (§4) consumes.                 *)
+(* ====================================================================== *)
+
+Section BootPrimary.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma boot_hart_primary (Φ : mval -> iProp Σ) (rs : regstate)
+      (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
+      (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg) :
+    reset_regs cpu_id rs ->
+    (* the BOOT hart: this is what makes main's [beqz a0] take the boot path *)
+    (fin_to_nat cpu_id = 0)%nat ->
+    (* kinit's free-page run, and enough pages for kvmmake + the 64 kstacks
+       + the disk's 3 *)
+    prun (mword_of_int 0x88000000 : mword 64)
+      (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv) ps ->
+    (K_kvmmake + 64 + 3 < length ps)%nat ->
+    (* the disk's protocol is in its not-live arm at boot *)
+    virtio_live c0 = false ->
+    kernel_text -∗
+    kernel_data -∗
+    boot_hart_res rs iv dq -∗
+    panic_wp_any -∗
+    started_inv (main_deposit γd γv Φ) -∗
+    (* --- the boot supply --- *)
+    main_locks_raw -∗
+    main_globals_raw -∗
+    ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
+    ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    dev_inv γd γv -∗
+    uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
+    uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
+    disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
+    ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) -∗
+    disk_done_lb γv 0%nat -∗
+    kpt_unset -∗
+    kmap_auth kmap_M0 -∗
+    ([∗ list] p ∈ ps, page_own p) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hreset Hz Hprun Hlen Hlive.
+    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark
+             #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
+    iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
+    iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
+    iApply (Main.wp_main_boot_sconf Φ mf K_main zero_reg ps
+              (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
+                 (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
+              (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
+              (register_lookup tlb rs) (main_deposit γd γv Φ)
+              (cid_word_of_zero _ Hz) (le_n K_main) eq_refl eq_refl Hprun Hlen
+              Hlive eq_refl
+              with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
+                    Hprocs Hpark Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
+                    Hraw Hkpt Hkmap Hpages").
+    (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
+       nine conjuncts at exactly its eight existential witnesses, so the wand
+       is intro + exists + frame and nothing else. *)
+    iModIntro.
+    iIntros (γpr γs γk pd pav pu root pas)
+      "Hpr Hpi Hsi Hdl Hgeom Hkpti Hroot Htramp Hkst".
+    rewrite /main_deposit.
+    iExists γpr, γk, γs, pd, pav, pu, root, pas.
+    iFrame "Hpr Hpi Hsi Hdl Hgeom Hkpti Hroot Htramp Hkst".
+  Qed.
+
+End BootPrimary.

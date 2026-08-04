@@ -1679,24 +1679,63 @@ Two interface decisions worth keeping:
   `wire_inv` (from all eight harts' pins), `started_inv` at that payload, and
   the boot arm's supply.
 
+### M6c (6) — `boot_hart_primary`: the boot hart, and BOTH ARMS CLOSED (LANDED)
+
+`BootChain.v` §5: §3 composed with `Main.wp_main_boot_sconf`. Same shape as §4,
+but this arm consumes the WHOLE BOOT SUPPLY, so the supply is what the
+statement is mostly made of: `main_locks_raw`, `main_globals_raw`, the eight
+`cpu_proc_half`s, the `park_full` receipts, `dev_inv` + the boot hart's five
+device tokens, the two disk ghosts, `kpt_unset`, `kmap_auth kmap_M0`, and the
+free-page run. Premises beyond §4's: `prun` at the two literal addresses,
+`K_kvmmake + 64 + 3 < length ps`, `virtio_live c0 = false`.
+
+**THE DEPOSIT WAND IS DISCHARGED, NOT TAKEN — and that is what ties the arms
+together.** `SpecMain`'s boot arm asks for
+`□ (∀ γpr γs γk pd pav pu root pas, <nine facts> -∗ P)`, and at
+`P := main_deposit γd γv Φ` the wand's conclusion IS those nine facts under an
+existential over exactly those eight names, in the same order. So the proof is
+`iModIntro`, `iIntros`, `iExists γpr, γk, γs, pd, pav, pu, root, pas`, `iFrame`
+— nine lines — and it says exactly the right thing: **the boot hart deposits
+precisely what a secondary hart's `started_inv` withdrawal (§4) consumes.**
+(NB the wand binds `γpr γs γk` while `main_deposit` binds `γpr γk γs`, so the
+`iExists` order is not the `iIntros` order.)
+
+`Print Assumptions`: 5 `rv64d.*` + funext + printk-general + kerneltrap +
+**userinit** — the recorded boot-arm footprint exactly, no consoleintr.
+
+**NO DISPATCHER LEMMA, deliberately.** A `boot_hart` that picks the arm with
+`destruct (decide (fin_to_nat cpu_id = 0))` would have to take the boot supply
+for every hart (wrong) or take it under an `if decide … then … else True`
+(awkward). The dispatch belongs to M6d, which holds the supply for hart 0 only:
+it destructs the decision itself and calls §5 or §4. `cid_word_of_zero` and
+`cid_word_of_nz` are the two sides of that decision, already in §1.
+
 ### What is left of M6c after this
 
 - **(DONE — M6c (2b).)** `mstatus_kernel_facts`.
 - **(DONE — M6c (3).)** `boot_entry_bridge`, modulo the `mie`/`mideleg` pins
   above.
 - **(DONE — M6c (4).)** `boot_hart_secondary` — the secondary arm, closed.
-- **NEXT: the BOOT arm** (`fin_to_nat c = 0`), which is where the whole boot
-  supply is consumed: §3's continuation plus `main_locks_raw`,
-  `main_globals_raw`, the eight `cpu_proc_half`s, the `park_full` receipts,
-  `dev_inv` + the boot hart's device tokens, the two disk ghosts, `kpt_unset`,
-  `kmap_auth kmap_M0`, the page run, and `wp_main_boot_sconf`'s □-wand at
-  `P := main_deposit` (whose body IS `main_deposit`'s existential — so the wand
-  is `iIntros` + `iExists` + `iFrame`, with `γs` the one the caller quantifies).
-  The arm is selected by `destruct (decide (fin_to_nat cpu_id = 0))`, and
-  `SpecMain`'s `cid_word = zero_reg` premise then follows exactly as
-  `cid_word_of_nz` gives its negation.
-- then the shared-allocation companion, the `.bss` cut chain and the client
-  ghosts (items 1, 6, 7 below). The per-hart/shared split, as designed: the per-hart
+- **(DONE — M6c (6).)** the BOOT arm. **BOTH ARMS ARE NOW CLOSED**, so what
+  remains of the per-hart chain is nothing: M6c's lemma exists, twice, at
+  `boot_hart_res` + the shared persistents.
+- **NEXT, and it is all CLIENT-side (M6d's three pieces):**
+  1. **The shared-allocation companion.** From `power_boot_res`'s shared
+     residue, ONCE: the client ghost families
+     (`lockG`/`kallocG`/`fileG`/`sieG`/`fdslotG`/`uartGhostG`/`diskGhostG` +
+     `fd_slots`, which has no memory footprint), `dev_inv γd γv`,
+     `wire_inv` (out of ALL EIGHT harts' `sig_seip`/`sig_meip` — which is why
+     `boot_hart_res` excludes them and the client must call `boot_entry_pre`
+     per hart inside its own `={⊤}=∗`), `crash_inv`, `panic_wp_any`, and
+     `started_inv (main_deposit γd γv Φ)` — the payload is settled, see
+     M6c (4)/(6).
+  2. **The `.bss` cut chain** — the ~28 `boot_ran_split`s in address order (the
+     layout table above is that order), producing every bundle
+     `main_locks_raw` / `main_globals_raw` / `boot_hart_res` asks for, and
+     splitting each `cpus[h].proc` cell in half (M6c (2a)).
+  3. **The dispatch**: `destruct (decide (fin_to_nat c = 0))` per hart, §5 for
+     hart 0 (with the supply) and §4 for the other seven.
+  With those three, M6d is `allocation once + the chain eight times`. The per-hart/shared split, as designed: the per-hart
   lemma takes the SHARED persistents (`started_inv (main_deposit …)`,
   `dev_inv`, `crash_inv`, `panic_wp_any`, the allocated ghost families) plus
   this hart's residue plus — for the `fin_to_nat c = 0` arm only — the whole
