@@ -49,7 +49,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - crash handling: ghost "power" thread turns on/off power repeatedly, bumping generation counter and forking off HART "threads" when powering up a new gen
 - user-mode proof: kernel either has a proven WP for user process, or a generic safety-only WP valid for all user code
 - explicit power on / power off forced instantiating WPs for HART entry, which caught pma_matches_all unsatisfiability
-- use [sail_model_init; init_model; init_boot_requirements] to initialize HART on power-on
+- use Sail's reset spec (init_model) to initialize HART on power-on
 - tangentially found bug corresponding to usertests partial_write
 
 Big things that still need to be done/explored:
