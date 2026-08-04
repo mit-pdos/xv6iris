@@ -30,6 +30,7 @@ DiskPtsto.v
 VirtioProto.v
 RiscvExtras.v
 PowerBoot.v
+ColdBoot.v
 AlignBits.v
 RiscvTryStep.v
 RiscvFetchExec.v

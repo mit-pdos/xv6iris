@@ -1591,7 +1591,7 @@ guarantees that the model forgets. The options were, and (1) was taken:
 **TAKEN: (1), both pins**, together with the one-time re-read that closes the
 class — the register-by-register account in M6c (5) below.
 
-### M6c (5) — THE RESET-REGISTER AUDIT, and the class closed
+### M6c (5) — THE RESET REGISTERS: the audit is a THEOREM (`ColdBoot.v`)
 
 The `mie`/`mideleg` pins of M6c (3) are IN (`RiscvLang.reset_regs` +
 `PowerBoot.boot_regs`, one `register_set` each; `boot_regs_reset`'s `reg_peel`
@@ -1603,59 +1603,86 @@ consumer that destructures it positionally is exactly what breaks when a
 sixteenth pin is added — `boot_entry_pre` is the one place that still does
 (it wants twelve of them at once).
 
-**THE DEFINITIVE ACCOUNT.** The reference is the model's COLD-boot path,
-`sail_model_init` followed by `reset` — not `reset` alone (see the caveat
-below). `reset` is `hart_state := ACTIVE; reset_sys; reset_vmem; reset_elp;
-ext_reset`, and `reset_sys` is the interesting one: it writes `cur_privilege`,
-clears ONLY mstatus.MIE (bit 3) and mstatus.MPRV (bit 17), calls
-`reset_tvecs` / `reset_misa` / `reset_pmp` / `reset_stateen`, sets
-`PC := nextPC := pc_reset_address`, and zeroes `mcause` / the vector CSRs.
+**THE FIFTEEN VALUES ARE NO LONGER AUDITED — THEY ARE PROVEN.** This entry used
+to carry a fifteen-row table naming, for each conjunct of `reset_regs`, the line
+of the Sail model that writes it. `iris/ColdBoot.v` replaces the table with
+`reset_regs_cold_boot`: it RUNS the model's own cold-boot chain with
+`RiscvExec.exec` and proves `reset_regs` of the register file the run produces.
+Read that file's header for the full account; what matters for future work:
 
-| `reset_regs` conjunct | justified by | kind |
-| --- | --- | --- |
-| `PC = 0x80000000` | `reset_sys`: `PC := pc_reset_address`; the model's own default is 0 (`sail_model_init`), and `set_pc_reset_address` is the board hook | **PLATFORM** (virt's reset vector) |
-| `nextPC = 0x80000000` | `reset_sys` writes nextPC from the SAME `pc_reset_address` — which is exactly why the M6c-pre pin was addable | **PLATFORM**, same source |
-| `cur_privilege = Machine` | `reset_sys`, first line | MODEL |
-| `hart_state = HART_ACTIVE` | `reset`, first line (and `sail_model_init`'s last) | MODEL |
-| `mhartid = <hart index>` | `sail_model_init` writes 0; nothing writes per-hart | **PLATFORM** (per-hart id) |
-| `mstatus = 0xA00000000` | `sail_model_init` writes `zeros` with SXL = UXL = 2, which IS 0xA00000000 (bits 35:34 and 33:32); `reset_sys` then clears MIE/MPRV (already 0) | MODEL, **cold only** |
-| `misa = 0x800000000014112D` | `sail_model_init` (MXL) + `reset_misa` (each extension bit from `hartSupports`) | MODEL + config |
-| `mseccfg = 0` | `sail_model_init` `legalize_mseccfg(0,0)`; `reset_sys` clears bits 8/9/10 | MODEL |
-| `menvcfg = 0` | `sail_model_init` `legalize_menvcfg(0,0)`; `reset` does not touch it | MODEL, **cold only** |
-| `htif_tohost_base = None` | `sail_model_init` | MODEL, **cold only** |
-| `elp = NO_LP_EXPECTED` | `reset_elp` | MODEL |
-| `pma_regions = pma_boot` | `sail_model_init` writes a THREE-region table; `pma_boot` is ONE all-permitting region | **IDEALIZATION** (M6b-pre (1)) |
-| `pmpcfg_n = pmpcfg_boot` | `reset_pmp` clears A and L in all 64 entries; `pmpcfg_boot` is all-zero BYTES, so it also claims R/W/X = 0 | MODEL + a harmless over-claim: `RiscvFetchExec.pmp_all_off` asks only for A = OFF and L = false, so nothing uses the extra |
-| `mie = 0` | neither `sail_model_init` nor `reset` writes `mie` | **PLATFORM** (new, M6c (5)) |
-| `mideleg = 0` | neither writes `mideleg` | **PLATFORM** (new, M6c (5)) |
+- **A transcription rots, and this one had — THE ONE OPEN ITEM.** The misa pin
+  says `0x800000000014112D` (`RiscvFetchExec.MISA_C`, S/C/U/M/A/I/D/F); the
+  model's own `reset_misa` writes one bit per `hartSupports` answer and the
+  built-in config also answers yes to **B** and **V**, so the model's cold boot
+  leaves `0x800000000034112F` (`ColdBoot.cold_boot_misa` proves it). **The
+  correction was tried and REVERTED, and the measurement is the useful part:**
+  with the two bits set, the whole kernel side is unaffected — a full `-k` build
+  recompiled every `Code*.v`/`Wp*`/`Proof*` file green, so the decode bridge's
+  ~1400 `misa = MISA_C` premises and every word's decode are robust to the value
+  — but `DecodeSetU.goodbP_encdec_u` FAILS: with misa.B / misa.V on, the
+  Zba/Zbb-only/Zbs and vector families reach decoder leaves, so `decodable_u`
+  (the *complete* U-mode decode image, 54 constructors) is no longer complete and
+  `decode_total_u_set` is false as stated. Fixing it means extending
+  `decodable_u` and then `UserTotalU`'s dispatch (2k lines) and
+  `UserMemClassify` (7k lines) with those families — a U-mode decode-image
+  project, not a one-line edit. So misa is carried as the SECOND explicit
+  `register_set` patch in `reset_regs_cold_boot`, next to the PMA idealization:
+  the divergence is a named line in a compiled theorem that breaks if the model
+  moves again. **Corollary for the U-mode tier: its completeness theorem rests on
+  a misa the model would not produce, and that is now the tracked reason to touch
+  it.**
+- **THE RESIDUE, and it is all of it.** (i) `pma_regions = pma_boot` is an
+  IDEALIZATION: `sail_model_init` writes a THREE-region table and `pma_boot` is
+  ONE all-permitting region, so it is the single conjunct
+  `reset_regs_cold_boot` takes as an explicit `register_set` patch — visible in
+  the statement. (ii) `mie`, `mideleg` and pmpcfg's R/W/X bits are written by no
+  line of the chain: they come out of the model's initial register file
+  (`init_regstate`, whose fields are `inhabitant` = zero), so they stay PLATFORM
+  assumptions that the theorem shows to agree with the model's power-on state.
+  (iii) the reset vector (`set_pc_reset_address 0x80000000`) and the per-hart
+  `mhartid` are the BOARD's two configuration writes, made explicitly by
+  `ColdBoot.boot_init` — the model writes 0 for both. (iv) the loaded image is
+  the loader's, modelled by `boot_byte`.
+- **`cancel_reservation` IS AN AXIOM OF THE MODEL, so `reset()` cannot be
+  interpreted.** `reset_sys` calls it, and an opaque element of the monad is not
+  a constructor application, so `run`/`exec` — structural fixpoints on the
+  program — are stuck on it: no interpretation of `reset` exists, and destructing
+  one loses everything. THE TECHNIQUE that makes the theorem possible anyway is
+  worth reusing for any other model function with a platform hook in the middle:
+  copy the model's definition with the hook lifted to a **parameter**
+  (`ColdBoot.reset_sys_at`) and prove `reset_sys tt = reset_sys_at
+  (cancel_reservation tt)` by **`reflexivity`** — the kernel then checks the
+  copy's fidelity, and the elision is provably the only difference. Instantiate
+  the parameter with the state no-op the model documents. (The alternative, an
+  `exec_cancel_reservation` axiom as in `UserMemAccess.v`, would add an eleventh
+  name to the system theorem's footprint and is deliberately not taken.)
+- **DO NOT RUN MODEL CODE OVER AN OPEN REGISTER FILE.** `regstate`'s fields are
+  FUNCTIONS and `register_set` wraps each in a fresh
+  `fun r' => if r' =? r then v else …`, so over a *variable* base the ~300 writes
+  of the cold-boot chain become a closure tower whose readback explodes:
+  `vm_compute` ran >8 min at 4.6 GB and `lazy` reached 19 GB, while the same run
+  from `init_regstate` is **under a second**. This is why `ColdBoot` justifies
+  the VALUES from a closed run and does not (cannot, by computation) also justify
+  `boot_shape`'s *shape* — an `∃ rs0, run boot_init (MState rs0 …) …` clause in
+  `boot_shape`, which would justify both at once, is not dischargeable by
+  computation at either end.
+- **AND DO NOT LEAVE THE CHAIN IN A `Qed`.** `vm_compute; reflexivity` is
+  rechecked by the kernel's LAZY conversion, which on this chain is >3.8 GB for
+  ONE equation and reached 25 GB for the fifteen conjuncts in one `Qed`. The fix
+  (now durable-notes' rule) is `vm_cast_no_check` plus computing the state ONCE
+  into a `Definition` tied to the model by a single VM-cast lemma
+  (`ColdBoot.cold_state` / `cold_boot_exec`); with it the whole file is
+  **13.6 s / 0.9 GB**, and every register fact is a shallow conversion.
 
-**No reverse-direction (soundness-relevant) finding**: every conjunct is either
-established by the cold-boot path or is an explicitly-labelled platform value /
-idealization, and the ONE place `reset_regs` claims more than the model
-(`pmpcfg`'s R/W/X) is provably unused. Nothing in the list is contradicted by
-the model.
-
-**THE DURABLE CAVEAT, and it is the reason to keep this table.** `reset()`
-ALONE does not justify `reset_regs`: SIX conjuncts (`mstatus`, `menvcfg`,
-`htif_tohost_base`, `mhartid`, `pma_regions`, and `pmpcfg`'s R/W/X) come from
-`sail_model_init`, which runs ONCE at power-up. `reset_sys` clears only MIE and
-MPRV of mstatus, so a WARM reset preserves SIE / MXR / TSR / FS / VS / SD / TVM
-— i.e. `BootConfig.mstatus_reset_kernel_facts`, the anchor of the whole
-`mstatus_kernel_facts` arrangement, would be FALSE after one. **So
-`reset_regs` is a COLD-boot description and must not be reused if a warm-reset
-transition is ever added to the language** (it would need its own, much weaker,
-fact set, and the boot chain would not compose over it).
-
-**WHY THE CLASS IS NOW CLOSED.** `boot_regs` writes the pinned registers over
-the PREVIOUS era's `regstate` and leaves everything else alone, which is
-*weaker* than a real power cycle (which clears everything) — so the model is
-conservative for every unpinned register, a missing pin can only ever show up
-as an unprovable premise (never as an unsound step), and adding one is always
-available at the cost of a platform justification recorded in the table above.
-The three gaps found so far (`nextPC`, `mie`, `mideleg`) are all of that shape.
-Registers still unpinned and deliberately so, with why nothing needs them:
-`satp` (writing 0 selects Bare whatever the old value was), `mepc` /
-`mcounteren` / `stimecmp` / `medeleg` (start() overwrites each, and the
+**WHY THE CLASS IS CLOSED.** `boot_regs` writes the pinned registers over the
+PREVIOUS era's `regstate` and leaves everything else alone, which is *weaker*
+than a real power cycle — so the model is conservative for every unpinned
+register, a missing pin can only ever show up as an unprovable premise (never as
+an unsound step), and adding one costs one `register_set` plus a line in
+`ColdBoot`'s theorem. The three gaps found that way (`nextPC`, `mie`, `mideleg`)
+are all of that shape. Registers still unpinned and deliberately so, with why
+nothing needs them: `satp` (writing 0 selects Bare whatever the old value was),
+`mepc` / `mcounteren` / `stimecmp` / `medeleg` (start() overwrites each, and the
 contract quantifies over the entry value), `mip` / `mcycle` / `mtime` /
 `minstret` (the invariants over them are value-agnostic —
 `MinstretInv.clock_inv_alloc`), `sig_seip` / `sig_meip` (ditto,
@@ -1663,6 +1690,17 @@ contract quantifies over the entry value), `mip` / `mcycle` / `mtime` /
 (`reset_TLB` empties it and the bridge is generic in the vector anyway),
 `stvec` / `sepc` / `scause` / `stval` (owned at an arbitrary value; main's
 `trap_csrs` is existential).
+
+**THE DURABLE CAVEAT.** `reset_regs` is a **COLD**-boot description.
+`reset()` alone does not justify it: six conjuncts (`mstatus`, `menvcfg`,
+`htif_tohost_base`, `mhartid`, `pma_regions`, and pmpcfg's R/W/X) get their
+values from `sail_model_init`, which runs once at power-up, and `reset_sys`
+clears only mstatus's MIE and MPRV — so a WARM reset preserves
+SIE / MXR / TSR / FS / VS / SD / TVM and `BootConfig.mstatus_reset_kernel_facts`,
+the anchor of the whole `mstatus_kernel_facts` arrangement, would be FALSE after
+one. If a warm-reset transition is ever added to the language it needs its own,
+much weaker, fact set, `ColdBoot`'s lemmas must not be reused for it, and the
+boot chain would not compose over it.
 
 ### THE EXPECTED AXIOM FOOTPRINT (definitive, for M6d)
 
@@ -2070,3 +2108,12 @@ yet.
 - Decide the torn-write knob (see the design note's recorded modeling
   choices) when the log's crash proof is designed — request-atomic is the
   current recorded choice.
+- **Correct `MISA_C` to the model's real cold-boot value `0x800000000034112F`**
+  (M6c (5) above has the full measurement). It is a one-line change plus the
+  matching literals in `RiscvLang.reset_regs` / `PowerBoot.boot_regs` /
+  `BootConfig.hw_config_intro`, and then the deletion of
+  `ColdBoot.cold_regs_boot`'s misa patch; the WORK is in the U-mode tier, whose
+  `DecodeSetU.decodable_u` (the complete 32-bit decode image) has to grow the
+  Zba/Zbb-only/Zbs and vector families, with `UserTotalU`'s dispatch and
+  `UserMemClassify` following. Not a crash-layer item, but this is where the
+  reason for it is recorded.

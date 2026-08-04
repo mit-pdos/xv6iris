@@ -47,16 +47,34 @@ per-milestone record):
   - The gating makes the alternation total: no stutter arm, never stuck.
 - `boot_shape` (RiscvLang.v, pure): the kernel image reloaded and .bss
   zeroed over an ALL-PRESENT RAM (the loader/firmware, modeled here as
-  `boot_byte` over the ELF's own byte maps), the twelve per-hart reset
-  registers of `reset_regs` (PC = 0x80000000, M-mode, mhartid = the hart
-  index, the M-mode config registers, all-OFF PMP), the devices reset
-  (`virtio_reset` keeps `v_disk`; UART/PLIC at their power-on states) —
-  and the rest of the registers arbitrary, because that is what a boot
-  proof quantifies over. `boot_facts` is the same fact set minus the two
-  equalities that relate the new machine to the dead one: it is what the
-  power thread hands the boot client. The canonical machine that has the
-  shape, and the witness that PowerOn can always step, are `boot_gstate`
-  / `boot_shape_boot_gstate` in PowerBoot.v.
+  `boot_byte` over the ELF's own byte maps), the fifteen per-hart reset
+  registers of `reset_regs` (PC = nextPC = 0x80000000, M-mode, mhartid =
+  the hart index, the M-mode config registers, all-OFF PMP, mie/mideleg
+  clear), the devices reset (`virtio_reset` keeps `v_disk`; UART/PLIC at
+  their power-on states) — and the rest of the registers arbitrary,
+  because that is what a boot proof quantifies over. `boot_facts` is the
+  same fact set minus the two equalities that relate the new machine to
+  the dead one: it is what the power thread hands the boot client. The
+  canonical machine that has the shape, and the witness that PowerOn can
+  always step, are `boot_gstate` / `boot_shape_boot_gstate` in
+  PowerBoot.v.
+  - **`reset_regs`' VALUES ARE PROVEN, not transcribed.**
+    `ColdBoot.reset_regs_cold_boot` runs the Sail model's own cold-boot
+    chain (`sail_model_init`; the board's reset vector and hart id;
+    `init_model`; `init_boot_requirements`) with `RiscvExec.exec` and
+    proves `reset_regs` of the register file it produces, so a model
+    regeneration that changes a reset value breaks the build. Two
+    conjuncts are explicit `register_set` patches in that statement and
+    they are the whole residue: `pma_regions` (the one-region
+    idealization) and `misa` (a KNOWN divergence — the model's config
+    also enables B and V, so its cold boot leaves `0x800000000034112F`;
+    correcting `MISA_C` leaves the whole kernel side green but falsifies
+    `DecodeSetU.decode_total_u_set`, so it is a U-mode decode-image
+    project — projects/crash.md M6c (5)).
+    The chain's one uninterpretable step — `cancel_reservation`, an
+    `Axiom` of the model — is lifted to a parameter whose elision is
+    itself checked by `reflexivity`. `reset_regs` is a COLD-boot
+    description; a warm-reset arm would need its own, weaker, fact set.
 - The corpse arm is a SELF-LOOP, not a retire-to-value: reaching a value
   would force `Φ dead_val` through every leaf lemma in the tree; the
   self-loop keeps the dead branch Φ-generic. Deliberate consequence:

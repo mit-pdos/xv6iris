@@ -469,11 +469,21 @@ Definition pmpcfg_boot
   SailStdpp.Values.vector_init 64 (SailStdpp.Values.mword_of_int 0).
 
 (* THE PER-HART RESET REGISTERS.  Every value here is either the model's own
-   reset ([sail_model_int]/[reset]) or the platform's configuration; the
+   reset ([sail_model_init]/[reset]) or the platform's configuration; the
    PREDICATES the boot proof needs of them ([pmp_all_off pmpcfg_boot],
    [pma_allows_all pma_boot], the MISA bit facts, mstatus's MIE/MPRV/SXL,
    menvcfg's LPE) are all consequences, proved where those predicates live
-   (they are above this file). *)
+   (they are above this file).
+   NO VALUE BELOW IS TAKEN ON TRUST.  [ColdBoot.reset_regs_cold_boot] runs the
+   Sail model's OWN cold-boot chain ([sail_model_init]; the board's reset vector
+   and hart id; [init_model]; [init_boot_requirements]) with [RiscvExec.exec]
+   and proves this predicate of the register file it produces -- so the
+   justification of each value is a compiled theorem, not a table, and a model
+   regeneration that changes one breaks the build.  Exactly TWO conjuncts are
+   explicit [register_set] patches in that theorem, and they are the whole
+   residue: [pma_regions] (the one-region idealization) and [misa] (a tracked
+   divergence, see below).  Read ColdBoot.v's header for those, for the one
+   platform hook the interpreter cannot step, and for the COLD-vs-warm caveat. *)
 Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* the pc a hart comes out of reset at.  [KernelSyms._entry] is 0x80000000
      but KernelSyms is above this file, so the literal is spelled here and
@@ -496,7 +506,13 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* SXL = UXL = 2 (64-bit), MIE = MPRV = 0 -- the model's own
      [sail_model_init], and [BootBridge.mstatus_reset] *)
   /\ register_lookup mstatus rs = boot_w64 0xA00000000
-  (* = [RiscvFetchExec.MISA_C]: S, C, U, M and A present *)
+  (* = [RiscvFetchExec.MISA_C]: MXL = 2 with A/C/D/F/I/M/S/U set.  THE ONE
+     VALUE HERE THAT THE MODEL DOES NOT PRODUCE: [reset_misa] writes one bit
+     per [hartSupports] answer and the built-in config also answers yes to B
+     and V, so the model's cold boot leaves 0x800000000034112F.  The divergence
+     is tracked, proved ([ColdBoot.cold_boot_misa]) and carried as an explicit
+     patch in [ColdBoot.reset_regs_cold_boot]; correcting it is a U-mode
+     decode-image project, for the reason spelled out at [MISA_C]. *)
   /\ register_lookup misa rs = boot_w64 0x800000000014112D
   /\ register_lookup mseccfg rs = boot_w64 0
   /\ register_lookup menvcfg rs = boot_w64 0
@@ -515,8 +531,9 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
      model's own cold-boot path leaves them at the [regstate]'s initial value
      ([sail_model_init] writes neither, and [reset] does not either), so this
      is a PLATFORM assumption exactly like [pc_reset_address] and [mhartid]
-     below -- see the register-by-register account in
-     claude-notes/projects/crash.md (M6c (5)). *)
+     above -- one the model's own initial register file happens to agree with,
+     which is what makes [ColdBoot.reset_regs_cold_boot] able to close these
+     two conjuncts along with the rest. *)
   /\ register_lookup mie rs = boot_w64 0
   /\ register_lookup mideleg rs = boot_w64 0.
 

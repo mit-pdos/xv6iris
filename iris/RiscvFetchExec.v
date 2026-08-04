@@ -168,7 +168,21 @@ Qed.
 
 (* Concrete reference config values for the decode bridge (WpDecodeBridge).
    [MISA_C] is the platform misa (S/C/U/M/A/I/D/F set, MXL=2); read-only, never
-   written by the kernel.  [MENVCFG_S] is the S-mode menvcfg AFTER the two M-mode
+   written by the kernel.
+   KNOWN DIVERGENCE FROM THE MODEL, tracked and deliberately NOT fixed here: the
+   Sail model's own cold boot leaves 0x800000000034112F -- B and V set as well,
+   because [reset_misa] writes one bit per [hartSupports] answer and the built-in
+   config answers yes to both.  [ColdBoot.cold_boot_misa] PROVES the model's
+   value and [ColdBoot.reset_regs_cold_boot] carries the divergence as an
+   explicit patch, so it cannot rot further.  Setting the two bits costs the
+   kernel side nothing (measured: every [Code*.v] word decodes identically) but
+   it BREAKS [DecodeSetU.decode_total_u_set]: with misa.B / misa.V on, the
+   Zba/Zbb-only/Zbs and vector families reach decoder leaves and [decodable_u] is
+   no longer the whole image -- so the correction is a U-mode decode-image
+   project (extend [decodable_u] plus UserTotalU's dispatch and
+   UserMemClassify), not a one-line edit.  See claude-notes/projects/crash.md
+   M6c (5).
+   [MENVCFG_S] is the S-mode menvcfg AFTER the two M-mode
    boot writes ([start.c]: [menvcfg |= MENVCFG_ADUE] then, in [timerinit],
    [menvcfg |= MENVCFG_STCE]) legalize from the all-zero reset -- i.e. the ADUE
    bit (61) and the STCE bit (63) set, 0xA000000000000000.  The kernel never
