@@ -85,14 +85,20 @@ are working on that effort — the relevant `projects/` file.
 ### `projects/` — ongoing worklists & plans (one per effort)
 
 - **[`crash.md`](projects/crash.md)** — the crash/power-cycling layer.
-  The mechanism PROTOTYPE is done and axiom-free (`iris/CrashProto.v`:
-  generations, corpse arms, the power thread forking each boot, the
-  generational state_interp, the crash-spanning invariant, adequacy —
-  all on a miniature language). Remaining: the real-tree port, six
-  milestones (fixed/era split → language + GenId sweep → death
-  machinery → `wp_power_loop` + minimal adequacy → durable disk layer →
-  the ∀-era boot composition). Design in
-  [`design/crash.md`](design/crash.md).
+  **DONE through M6: the SYSTEM THEOREM is proven.**
+  `SystemAdequacy.xv6_power_adequacy` — a machine that starts powered off at
+  generation 0 never gets stuck: every configuration reachable from
+  `[PowerLoopE]` under any interleaving of power cycles, hart steps and device
+  steps is reducible, with no hypothesis about the software and none about the
+  machine beyond "off at generation 0" (`boot_shape` supplies the rest per
+  era). Its footprint is the 5 `rv64d.*` platform axioms + funext + the four
+  sanctioned assumed kernel contracts (printk-general, kerneltrap, userinit,
+  panic). All six milestones landed: fixed/era split → language + GenId sweep
+  → death machinery → `wp_power_loop` + minimal adequacy → durable disk layer
+  → the ∀-era boot composition (`BootCarve`/`BootCarveMain` → `BootChain` →
+  `BootShared` → `SystemAdequacy`). Remaining is future work only: the FS
+  instantiation of `P_fs`/`Pc` (the theorem passes `True` today) and the
+  torn-write knob. Design in [`design/crash.md`](design/crash.md).
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, `killed`, `sys_getpid`, `sys_close`,

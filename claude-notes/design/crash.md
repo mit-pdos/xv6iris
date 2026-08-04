@@ -7,7 +7,19 @@ memory, registers and all device state except the disk image, and reboot at
 GENERATION with fresh ghost names, and one crash-spanning invariant owns the
 disk's persistent contents as an arbitrary iProp. Existing crash-free WPs
 are untouched by construction — crash reasoning never appears in any leaf,
-engine, or whole-function statement. Worklist:
+engine, or whole-function statement.
+
+**STATUS: COMPLETE through M6.** The layer is built and CLOSED: the system
+theorem `SystemAdequacy.xv6_power_adequacy` says that a machine starting
+powered off at generation 0 is never stuck under any interleaving of power
+cycles, hart steps and device steps, over the real kernel image and all eight
+harts. Its hypotheses are exactly `ggen = 0` and `gpow = false`; its axiom
+footprint is the 5 `rv64d.*` platform axioms + `functional_extensionality_dep`
++ the four sanctioned assumed kernel contracts (printk-general, kerneltrap,
+userinit, panic). What is left is future work rather than layer work: the crash
+predicate `Pc` is instantiated at `True` and the FS layer's `P_fs` is what will
+give it content, and the torn-write knob is still open. Worklist (with the
+per-milestone record):
 [`../projects/crash.md`](../projects/crash.md).
 
 ## The semantics (RiscvLang.v)

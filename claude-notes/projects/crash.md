@@ -3,6 +3,61 @@
 Design: [`../design/crash.md`](../design/crash.md) — read it first; it
 carries the full architecture and the decision record.
 
+## THE PROJECT IS DONE THROUGH M6 (2026-08-04)
+
+**`SystemAdequacy.xv6_power_adequacy` is the system theorem, and it is
+proven.**
+
+```
+Theorem xv6_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ,
+    !fileG Σ, !fdslotGpreS Σ} (g : gstate)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :
+  forall t2 g2 e2,
+    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
+    e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2.
+```
+
+Read it as: **power the board on and off forever, schedule the eight harts and
+the three devices however you like, and the machine is never stuck.** The only
+hypotheses about the machine are "off at generation 0" — everything a boot
+needs (RAM total and holding the loaded kernel image, the per-hart reset
+registers, the reset devices) is established per ERA by the power thread's own
+PowerOn transition through `RiscvLang.boot_shape`. There is no Iris judgment,
+no ghost state and no assumption about the software in the statement.
+`xv6_power_adequacy_xv6Σ` is the same at the concrete `xv6Σ`, so even the
+functor-list side conditions are discharged.
+
+**THE EXACT FOOTPRINT** (`Print Assumptions xv6_power_adequacy`), ten axioms:
+
+| axiom | kind |
+| --- | --- |
+| `rv64d.load_reservation`, `rv64d.match_reservation`, `rv64d.valid_reservation`, `rv64d.cancel_reservation`, `rv64d.plat_term_write` | the 5 model PLATFORM axioms |
+| `FunctionalExtensionality.functional_extensionality_dep` | sanctioned stdlib (the exec/run determinism machinery) |
+| `LinkPrintkGen.PrintkGen.wp_printk_gen_sconf` | assumed kernel contract (printk-general) |
+| `LinkKerneltrap.Kerneltrap.kerneltrap_returns` | assumed kernel contract (kerneltrap) |
+| `LinkUserinit.Userinit.wp_userinit_sconf` | assumed kernel contract (userinit) |
+| `LinkPanic.Panic.panic_wp_holds` | assumed kernel contract (panic) — **NEW at M6c (7)**; see the footprint section below |
+
+No `wp_consoleintr_sconf`: the boot chain reaches consoleintr only through the
+assumed `kerneltrap`, so it is not in the cone.
+
+**THE COMPOSITION, in one line each** (every file in `_CoqProject`):
+`BootCarve` + `BootCarveMain` (the image-carving library) → `BootConfig` (the
+register set and the config bundles) → `BootChain` (one hart's whole life,
+twice: `boot_hart_primary` / `boot_hart_secondary`) → `BootShared`
+(`boot_shared_alloc`: the shared allocation + the `.bss` cursor walk, ONCE per
+era) → `SystemAdequacy` (`xv6_boot_era` = allocation once + the chain eight
+times + the three device loops; then `riscv_power_adequacy`).
+
+**WHAT IS LEFT IS FUTURE WORK, NOT LAYER WORK.** The crash predicate `Pc` is
+instantiated at `True`, so the theorem's content is "never stuck" and the
+durability slot is open; giving it content is the FS layer's `P_fs` job (see
+"Future work" at the bottom). The torn-write knob is likewise still open.
+
+The per-milestone record below is kept in full: its reconnaissance, its
+gotchas and its decision record are what made each stage small, and the
+`.bss` layout table and the reset-register audit are reference material.
+
 ## Status (2026-08-03)
 
 **Milestone 0 — the mechanism prototype — is DONE and AXIOM-FREE:
@@ -153,7 +208,7 @@ template for milestones 1–4.
    Coq does not have).
    **Remaining: M5** (durable disk) and **M6** (boot composition).
 
-## M5 (durable disk) — steps 1-4 LANDED, step 5 remains
+## M5 (durable disk) — LANDED (steps 1-4 here, step 5 as M5b below)
 
 The disk-image ghost must survive power cycles; anything linear parked
 in an ERA invariant is stranded at a crash (invariants are never
@@ -662,7 +717,7 @@ Still open from the M6a bridge list: `pmp_all_off pmpcfg_boot`, and the
 `KernelSyms._entry = 0x80000000` / `MISA_C = <the pinned misa>` bridges
 (the latter is `reflexivity` and is used inside `hw_config_intro`).
 
-## M6b (IN PROGRESS) — the boot-image carving library
+## M6b (LANDED) — the boot-image carving library
 
 From `power_boot_res`'s raw memory conjunct plus the raw kmap fragments plus
 the pure `boot_facts g'`, produce the bundles SpecEntry/SpecMain's
@@ -1627,9 +1682,24 @@ and whole cones are marked "baseline 5 + funext". So the per-commit check is:
 - **`riscv_power_adequacy` after M6d** will therefore be: the 5 + funext + that
   same kernel-level set. That is the expected footprint, not a regression.
 
-Measured so far: `boot_entry_pre` closed; `boot_entry_bridge` = 5 + funext;
+**AMENDED AT M6c (7) — the sanctioned set is FOUR, not three.** This list was
+written before anyone asked where `panic_wp` comes from at the top of the tree,
+and the answer is that it never came from anywhere: it was a HYPOTHESIS carried
+by every caller, which works until the caller is the system theorem. So
+M6c (7) added `iris/LinkPanic.v` with `Axiom panic_wp_holds`, the same shape as
+the other three, and the definitive footprint of `xv6_power_adequacy` is the 5
++ funext + **printk-general, kerneltrap, userinit and panic** (no consoleintr).
+The table at the top of this file is the measured list. The general lesson is
+worth keeping: *a contract that every caller "just takes" is not discharged, it
+is deferred, and the deferral becomes visible only at the closed theorem* —
+`tools/proof_coverage.py`'s `MANIFEST_ASSUMED` was right about panic all along
+and the axiom list was not.
+
+Measured: `boot_entry_pre` closed; `boot_entry_bridge` = 5 + funext;
 `boot_hart_secondary` = 5 + funext + printk-general + kerneltrap (no userinit,
-no consoleintr — the secondary arm reaches neither).
+no consoleintr — the secondary arm reaches neither); `boot_shared_alloc` = 5 +
+panic; `xv6_power_adequacy` = 5 + funext + printk-general + kerneltrap +
+userinit + panic.
 
 ### One footprint note for M6d
 
@@ -1710,7 +1780,108 @@ for every hart (wrong) or take it under an `if decide … then … else True`
 it destructs the decision itself and calls §5 or §4. `cid_word_of_zero` and
 `cid_word_of_nz` are the two sides of that decision, already in §1.
 
-### What is left of M6c after this
+### M6c (7) — `boot_shared_alloc`: THE SHARED BOOT CONTEXT (LANDED)
+
+`BootShared.v` (new) is the companion lemma: ONE `={⊤}=∗` from
+`RiscvAdequacy.power_boot_res` to everything the chain takes — the shared
+persistents, eight `boot_hart_res` bundles, and the boot hart's whole supply.
+Five things are worth keeping.
+
+1. **THE `.bss` CHAIN IS A CURSOR, NOT ~30 PROOFS.** §1's `bss_cut g lo a b hi`
+   takes the window `[a,b)` out of `[lo,hi)` and keeps `[b,hi)`, DROPPING the
+   skipped prefix — every gap in the layout table above (tx_chan/tx_busy,
+   ticks, sb, log, `cons`'s 128-byte buffer, every record's padding) is claimed
+   by nobody and `boot_raw_ran` is affine. So each bundle is ONE line, and the
+   walk CHECKS ITSELF: a wrong boundary makes the NEXT cut fail to unify with
+   the tail rather than leaving an unprovable residue at the end. This is the
+   abstraction the recorded "~28 `boot_ran_split`s" item wanted.
+2. **THE PER-HART `.bss` IS TWO STRIDE FAMILIES, NOT EIGHT COPIES** — stack0's
+   eight 4096-byte slices and `cpus[]`'s eight 128-byte records, each through
+   BootCarve §11 with the per-element carve written once. The bridge that makes
+   this possible is `big_sepL_cpu_of_nat` (off `fin_to_nat <$> fin_enum n =
+   seq 0 n`): a family is indexed by `seq 0 NCPU`, every consumer wants
+   `[∗ list] c ∈ enum CPU`. §2's four `a_cpu_*_of_z` / `a_cpu_*_cid` equations
+   are the only per-hart arithmetic, eight `vm_compute`s each.
+3. **PANIC'S CONTRACT HAD NOWHERE LEFT TO COME FROM.** `SpecPanic.panic_wp` had
+   always been carried as a HYPOTHESIS by its callers, which works until the
+   caller is the system theorem. panic is already a deliberately-assumed
+   contract (`proof_coverage.py`'s `MANIFEST_ASSUMED`), so `iris/LinkPanic.v`
+   supplies it the way LinkKerneltrap / LinkUserinit / LinkPrintkGen /
+   LinkConsoleintr do: one `Axiom panic_wp_holds` at the ambient hart, with the
+   hart-generic `panic_wp_any` derived. **The recorded footprint expectation
+   below was written before this was noticed and is now amended: it is the 5 +
+   funext + FOUR sanctioned kernel contracts.** The eventual proof
+   (uartputc_sync + a Löb spin loop) replaces that one file. NB the `∀ h : CPU`
+   must be introduced with `bi.forall_intro` at the META level — `iIntros`
+   refuses `(∀ h : CPU, panic_wp)%I` outright, which is the INTRO half of the
+   durable notes' `iSpecialize` trap.
+4. **THREE THINGS ARE FORCED TO HAPPEN IN THIS ONE FUPD**, and all three are
+   control flow: `WireInv.wire_inv_alloc` wants all eight harts' PLIC pins at
+   once and must run before any WP (so `boot_entry_pre` is called per hart
+   INSIDE the fupd and the sixteen pins are kept — the recorded reason
+   `boot_hart_res` excludes them); each `cpus[h].proc` cell is split in half
+   here (M6c (2a)); and `started_inv` is allocated once at
+   `SpecMainSecondary.main_deposit γd γv Φ`, with `Φ` a parameter the system
+   level instantiates at `fun _ => True`.
+5. **`fdslotG` IS THE ONE CLIENT CLASS THAT CARRIES A GHOST NAME**, so it is
+   allocated here and appears under the postcondition's existential
+   (`∃ _ : fdslotG Σ, …`, the `fd_slots_alloc` idiom); the other seven
+   (`lockG`/`kallocG`/`fileG`/`sieG`/`uartGhostG`/`diskGhostG` + the pre-class)
+   are capacity only and live in Σ. `fd_slots_auth` is minted and DROPPED: its
+   only consumer is `FileInv.ftable_res`, and nothing in main's cone allocates
+   the ftable lock yet — that is owed by whoever composes the file layer's
+   boot, not here.
+
+Four small additions went to their proper homes rather than into the client:
+`BootCarve.boot_ran_cell4_bss` / `_cell2_bss` (the PINNED-value twins — the
+`started`, `c->noff` and `d_used_idx` cells all need the value, which the
+existential cells cannot give) plus the width-generic `nth_byte_zero`;
+`BootCarveMain`'s four `struct disk` field bridges beside `disk_lock_of_z`, and
+`bhead_of_z`; `VirtioModel`'s four reset-device facts (what `boot_facts`'
+`dvirtio = virtio_reset v0` is read off through); and `WpUart.uart_out_auth_lb`
+(SpecMain asks for `uart_out_lb γd l0` and the authority is on its way into
+`dev_inv_body`, so there was no other source).
+
+Two traps: a nat literal as large as the page count (32732) elaborates as
+`Init.Nat.of_num_uint` and `lia` cannot see through it — go through `Nat.ltb`
+plus one `vm_compute`; and `rewrite !big_sepL_sep` splits a per-element body
+that is ITSELF a conjunction, which is why the two per-hart ghost bundles
+(`hart_strans` / `hart_sie`) are NAMED definitions rather than inline pairs.
+
+`Print Assumptions boot_shared_alloc`: the 5 `rv64d.*` + `panic_wp_holds`. No
+funext — the chain is not composed here.
+
+### M6d — THE SYSTEM THEOREM (LANDED)
+
+`SystemAdequacy.v` (new): `xv6_boot_era` is `boot_shared_alloc` + the chain
+eight times + the three device-loop WPs, and `xv6_power_adequacy` is that
+instantiated into `riscv_power_adequacy`. The statement, the footprint and the
+composition are at the top of this file.
+
+Three things about the assembly:
+
+- **THE DISPATCH IS `enum CPU`'s HEAD, NOT A `decide`.** `enum CPU` IS
+  `0%fin :: FS <$> enum (fin 7)` by conversion, so `big_sepL_cpu_peel` /
+  `_glue` separate the boot hart from the seven secondaries with NO case
+  analysis on a hart variable anywhere — and every element of the tail is
+  syntactically an `FS`, which discharges the secondary arm's
+  `fin_to_nat c ≠ 0` premise by `cbn; lia`. This is why BootChain §5
+  deliberately shipped no dispatcher lemma.
+- **SPELL THE TWO DIRECTIONS OF A `⊣⊢` PEEL SEPARATELY.** `iApply` /
+  `iDestruct` on a bi-entailment picks a direction of its own accord, and the
+  list you get back is neither side of the goal's; the failure then reads as an
+  unapplicable `big_sepL_impl` several lines later, quoting a `FS <$> …` list.
+  `bi.equiv_entails_1_1` / `_1_2` off one `⊣⊢` helper is the fix.
+- **THE ERA INSTANCE GOES IN THE STATEMENT, NOT IN THE PROOF.** `xv6_boot_era`
+  is stated in a Section over `Context {!riscvGS Σ}`, and the obligation is
+  discharged by `exact (@xv6_boot_era Σ (RiscvGS Σ F HE) … gen g' Hbf)`:
+  `riscv_fixedGS (RiscvGS Σ F HE)` ι-reduces to `F` and `riscv_eraGS` to `HE`,
+  so both `power_boot_res` and the WPs are convertible with no `set`-bound
+  instance to apply lemmas at. This is the crash.md M0 gotcha used in the
+  direction that works, and it is much cheaper than threading `@`-instances
+  through a long proof.
+
+### What is left of M6c after this — NOTHING (all items DONE)
 
 - **(DONE — M6c (2b).)** `mstatus_kernel_facts`.
 - **(DONE — M6c (3).)** `boot_entry_bridge`, modulo the `mie`/`mideleg` pins
@@ -1719,7 +1890,10 @@ it destructs the decision itself and calls §5 or §4. `cid_word_of_zero` and
 - **(DONE — M6c (6).)** the BOOT arm. **BOTH ARMS ARE NOW CLOSED**, so what
   remains of the per-hart chain is nothing: M6c's lemma exists, twice, at
   `boot_hart_res` + the shared persistents.
-- **NEXT, and it is all CLIENT-side (M6d's three pieces):**
+- **(DONE — M6c (7) and M6d.)** All three client-side pieces below landed: the
+  shared-allocation companion (`BootShared.boot_shared_alloc`), the `.bss` cut
+  chain (as a CURSOR, see M6c (7)) and the per-hart dispatch (as `enum CPU`'s
+  head, see M6d). Kept for the design record:
   1. **The shared-allocation companion.** From `power_boot_res`'s shared
      residue, ONCE: the client ghost families
      (`lockG`/`kallocG`/`fileG`/`sieG`/`fdslotG`/`uartGhostG`/`diskGhostG` +
@@ -1730,7 +1904,8 @@ it destructs the decision itself and calls §5 or §4. `cid_word_of_zero` and
      `started_inv (main_deposit γd γv Φ)` — the payload is settled, see
      M6c (4)/(6).
   2. **The `.bss` cut chain** — the ~28 `boot_ran_split`s in address order (the
-     layout table above is that order), producing every bundle
+     layout table above is that order; it landed as ONE cursor lemma walked
+     ~30 times, M6c (7)), producing every bundle
      `main_locks_raw` / `main_globals_raw` / `boot_hart_res` asks for, and
      splitting each `cpus[h].proc` cell in half (M6c (2a)).
   3. **The dispatch**: `destruct (decide (fin_to_nat c = 0))` per hart, §5 for
@@ -1747,7 +1922,10 @@ it destructs the decision itself and calls §5 or §4. `cid_word_of_zero` and
 - the `.bss` cut chain and the client ghosts (items 1, 6, 7 below). The cut
   chain must also split each `cpus[h].proc` cell (M6c (2a)).
 
-## M6c (NEXT, fresh budget) — the per-hart boot chain
+## M6c (LANDED) — the per-hart boot chain: the RECONNAISSANCE
+
+(Kept because the gap list below is what made each of M6c's seven stages small;
+every item in it is marked DONE with the stage that closed it.)
 
 The one lemma M6b exists to make possible, stated per hart:
 
@@ -1876,9 +2054,19 @@ its half via `BootBridge.boot_bridge`.
 
 ## Future work (after the milestones)
 
+**This is all that is left of the crash project.** The layer itself is closed
+(see the top of this file); each item below needs a layer that does not exist
+yet.
+
 - FS instantiation of `P_fs` (log recovery; recovery-aware boot proved
   from any `P_fs`-image rather than the pristine mkfs image) once the
-  log/FS layers exist.
+  log/FS layers exist. This is where `xv6_power_adequacy`'s `Pc := True`
+  becomes a real durability property: the theorem is already stated over an
+  arbitrary `Pc` (`riscv_power_adequacy` takes it plus `⊢ Pc`), so the FS
+  instantiation replaces two arguments and nothing else.
+- `fd_slots_auth` has no consumer at boot yet (`FileInv.ftable_res` wants it and
+  nothing in main's cone allocates the ftable lock), so `BootShared` mints and
+  DROPS it. Whoever composes the file layer's boot picks it up there.
 - Decide the torn-write knob (see the design note's recorded modeling
   choices) when the log's crash proof is designed — request-atomic is the
   current recorded choice.
