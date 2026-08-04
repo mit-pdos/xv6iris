@@ -186,14 +186,31 @@ Definition boot_gprs : gset register :=
   list_to_set ((fun i : Z => (R_bitvector_64 (gpr_of_Z i) : register))
                  <$> seqZ 1 31).
 
-(* THE DOCUMENTED MINIMUM.  Three groups, and every one of them is forced:
+(* THE DOCUMENTED MINIMUM, and it is EXACTLY the register footprint of the
+   three specs the per-hart boot chain composes -- [SpecEntry.wp_entry_boot],
+   [BootBridge.boot_bridge] and [SpecMain.wp_main_boot_sconf] (whose
+   [SpecMainSecondary] twin asks for a strict subset).  Adequacy allocates the
+   era's register ghost map with domain exactly [D]
+   ([RiscvAdequacy.reg_init_map_dom]), so a register OUTSIDE this set has no
+   cell in that era at all and can never be handed to anyone: the set has to
+   be complete, not merely sufficient.  Five groups, and every one is forced:
    - what [reset_regs] pins (so a boot proof can READ the reset values off
      the machine the power thread hands it), plus [nextPC]: [pc_is] owns PC
      AND nextPC, and [reset_regs] deliberately does not pin the latter;
    - what [SpecEntry.wp_entry_boot] quantifies over and then WRITES
      (pmpaddr_n, mepc, satp, medeleg, mideleg, mie, mcounteren, stimecmp);
    - the [MinstretInv] cells the per-era invariants are allocated over, and
-     the wire pins the device client already asks for. *)
+     the wire pins the device client already asks for;
+   - the FOUR S-mode trap registers past the M-mode contract: [tlb]
+     ([SpecMain.main_hart_raw], [KptShare.tlb_res_pt]) and [IntrDefs.
+     trap_csrs]' [sepc] / [scause] / [stval], all of them [boot_bridge]
+     inputs as well;
+   - [stvec], which is NOT a .bss cell (it is a Sail register): the Bare arm
+     of [IntrDefs.strans_inv] holds it, so every hart's [sie_cap_gpr] -- and
+     hence both main arms -- needs it, and [trapinithart] is what seals it
+     into [intr_inv].
+   The audit table (which spec forces which register, and how it is owned) is
+   in claude-notes/projects/crash.md's M6b section. *)
 Definition boot_D (_ : CPU) : gset register :=
   {[ (PC : register); (nextPC : register);
      (cur_privilege : register); (hart_state : register);
@@ -206,7 +223,9 @@ Definition boot_D (_ : CPU) : gset register :=
      (stimecmp : register);
      (minstret : register); (minstret_increment : register);
      (mcycle : register); (mtime : register); (mip : register);
-     (sig_seip : register); (sig_meip : register) ]} ∪ boot_gprs.
+     (sig_seip : register); (sig_meip : register);
+     (tlb : register); (stvec : register);
+     (sepc : register); (scause : register); (stval : register) ]} ∪ boot_gprs.
 
 (* ====================================================================== *)
 (* §3  The bundles, from the reset cells.                                  *)
