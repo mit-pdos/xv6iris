@@ -2108,12 +2108,113 @@ yet.
 - Decide the torn-write knob (see the design note's recorded modeling
   choices) when the log's crash proof is designed — request-atomic is the
   current recorded choice.
-- **Correct `MISA_C` to the model's real cold-boot value `0x800000000034112F`**
-  (M6c (5) above has the full measurement). It is a one-line change plus the
-  matching literals in `RiscvLang.reset_regs` / `PowerBoot.boot_regs` /
-  `BootConfig.hw_config_intro`, and then the deletion of
-  `ColdBoot.cold_regs_boot`'s misa patch; the WORK is in the U-mode tier, whose
-  `DecodeSetU.decodable_u` (the complete 32-bit decode image) has to grow the
-  Zba/Zbb-only/Zbs and vector families, with `UserTotalU`'s dispatch and
-  `UserMemClassify` following. Not a crash-layer item, but this is where the
-  reason for it is recorded.
+- **The misa divergence: regen the model config with B and V OFF** (M6c (5) above
+  has the full measurement). `hartSupports` answers yes to B and V, so
+  `reset_misa` produces `0x800000000034112F` while the tree pins
+  `RiscvFetchExec.MISA_C = 0x800000000014112D`. The approved fix is the config
+  side, not the constant: in `model-xv6iris/sail-config-rv64d.json` set
+  `extensions.B.supported := false` (line ~495) and
+  `extensions.V.support_level := "Disabled"` (line ~442-454 — V is gated on a
+  `support_level` string, NOT a `supported` bool; `hartSupports Ext_V` reads
+  `vector_support_ge vector_support_level Full`, and `vlen_exp`/`elen_exp` may be
+  left as they are per that file's own comment). Then regen with
+  `tools/regen_sail_model.sh` / `make model-gen` (root README, "Regenerating the
+  Sail model"; needs sail 0.20.1 + `sail_coq_backend` + a `sail-riscv`
+  checkout). EXPECT `rv64d.v` to move; `kernel-rocq/` must NOT — it comes from
+  the xv6 ELF. The config header comment currently advertises exactly ONE
+  deliberate deviation from upstream (the SIG flag); this makes it three, so
+  update that comment in the same commit. Then `ColdBoot`'s misa patch retires
+  and misa joins the run-derived facts. Watch, in either
+  direction, `exec_currentlyEnabled_*`, the decode-bridge lemmas, and the U-mode
+  totality dispatch: correcting the CONSTANT instead (measured) leaves the whole
+  kernel side green but falsifies `DecodeSetU.decode_total_u_set`, because with
+  misa.B / misa.V on the Zba/Zbb-only/Zbs and vector families reach decoder
+  leaves and `decodable_u` stops being the complete image. Verify
+  `Print Assumptions` on `xv6_power_adequacy` (ten axioms) AND on the U-mode
+  completeness theorem.
+
+### PMA TABLE RETIREMENT (and with it, the config assert) — three steps, in order
+
+The end state: the boot anchor is the model's own `init_model ""`, config validity
+is a discharged obligation, and the `pma_regions` patch is gone. It has to be
+done in this order, because step 3 is only *satisfiable* after steps 1–2.
+
+1. **`pma_boot` becomes the model's real three-region table** — ROM
+   0x1000/IOMemory, the MMIO band 0x2000000 + 0x10000000/IOMemory, RAM
+   0x80000000 + 0x8000000/MainMemory — and it is **NOT hand-transcribed**:
+   anchor it with an evaluation lemma tying it to the `write_reg pma_regions [...]`
+   literal at the end of `sail_model_init` (rv64d.v ~line 43318). Extract **just
+   that write's value**; do NOT run `sail_model_init` itself (its register inits
+   are the ISA-UNSPECIFIED part, and it is the source of the 19 GB open-base
+   blow-up recorded below). The table is platform state that `reset()`
+   deliberately does not touch, so it stays a pre-reset pin — but "proven from
+   the model" rather than transcribed, exactly like `ColdBoot`'s other values.
+2. **Restate `pma_allows_all`'s obligations per ADDRESS CLASS** and re-anchor its
+   consumers: kernel RAM accesses match the MainMemory region; UART / PLIC /
+   virtio accesses match the IOMemory band with the attributes those device
+   towers need. Note honestly that `pma_allows_all` as it stands quantifies over
+   ALL addresses, which the real three-region table CANNOT satisfy — so the
+   predicate's address side is what has to be restated, not just the table.
+3. **THEN switch the boot anchor from `reset` back to `init_model ""`.** The
+   config validation is wanted back once it is satisfiable: `config_is_valid` at
+   the real table should compute to `true`, provable as a `vm_cast_no_check`
+   lemma (the positive twin of `ColdBoot.config_is_valid_pma_boot`), the assert
+   then discharges, and the anchor becomes exactly the model's own startup
+   sequence. **Why it cannot be done first:** `config_is_valid` is FALSE at
+   `pma_boot` — `check_mem_layout` wants the CLINT inside a configured IOMemory
+   region and `pma_boot` is one all-permitting *MainMemory* region — so anchoring
+   on `init_model` today would leave the PowerOn arm with NO successors: an
+   unprovable reducibility witness, and a vacuous system theorem if it were ever
+   admitted. `config_is_valid` reads exactly ONE register (`pma_regions`, in
+   `check_mem_layout` and `within_configured_pma_memory`); everything else in its
+   twelve checks is pure configuration, which is why the fix is entirely about
+   the table.
+
+### THE PATCH CHAIN, AND WHY IT IS STILL `sail_model_init`-ANCHORED
+
+The intended next shape — `boot_facts`' register clause as "the ARCHITECTURAL
+reset (`reset()` alone, per the privileged spec) of arbitrary power-on garbage,
+plus a named platform patch chain" — is **blocked on an evaluation wall**, and
+the measurement is the durable part:
+
+- The reset program itself is short and a probe that FORCES NOTHING is cheap:
+  `exec ArchReset.arch_reset` over an OPEN `regstate`, checked only for
+  `is_Some`, is **1.2 s / 650 MB**.
+- But **forcing any single register field of the result explodes**: `PC`,
+  `nextPC`, `cur_privilege`, `hart_state` and `elp` each hit a 100 s timeout at
+  ~4 GB. A field of `regstate` is a FUNCTION and `register_set` wraps it in a
+  fresh `fun r' => if r' =? r then v else <old> r'`, so over an open base
+  applying a field to the ~100-write tower is what blows up — and every
+  consumer-facing fact is exactly such an application. `is_Some` is cheap
+  because it applies no field at all; that is the trap to remember when
+  measuring.
+- `native_compute` is not an escape: the build passes `-native-compiler no`.
+- So the ∃-garbage anchoring needs **symbolic peeling** of the write tower
+  (`exec_bind0_Some` / `exec_write_reg` / `irrelevant_register_set` /
+  `register_lookup_set`, keeping the tower FOLDED and never forcing a field) —
+  ~100 steps plus the RMW reads inside `reset_misa` / `reset_pmp` / the vtype
+  chain. That is its own task, not a side effect of another one.
+- Until it is done, `ColdBoot` stays anchored on the model's full cold boot at
+  the CLOSED `init_regstate`, where everything computes in 13.6 s; the price is
+  the one recorded above — the values are justified, the *shape*
+  (`boot_shape`/`PowerBoot.boot_regs` writing pinned values over the dying
+  generation) is not.
+- The kernel-checked-copy technique this needs is already in the tree
+  (`ColdBoot.reset_sys_at` + `reset_sys_at_split`, and the module-local
+  `Import SailStdpp.Base` / `Import Defs` ORDER trap: `Base` re-exports
+  Prompt_monad's `read_reg`, so `Defs` must be imported LAST or nothing unifies
+  with `M`).
+
+### PMPCFG PATCH RETIREMENT
+
+`reset_regs`' `pmpcfg_n = pmpcfg_boot` over-claims: the architecture gives only
+A = OFF and L = 0 per entry, which is all `RiscvFetchExec.pmp_all_off` consumes.
+Retiring the pin means deriving `pmp_all_off` from the run — and `reset_pmp` is a
+`foreach_ZM_up 0 63` per-entry RMW, so with `i : Z` unrestricted that is a 64-way
+symbolic index resolution over a `vec_update_dec` tower plus two generic
+bitvector facts (`_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF`,
+`pmpLocked (_update_Pmpcfg_ent_L y 0) = false`) — none of it `vm_compute`-able.
+Consumer side is small: `BootChain.boot_hart_res`'s `pmpcfg_n ↦ᵣ pmpcfg_boot`
+becomes `↦ᵣ register_lookup pmpcfg_n rs`, since `SpecEntry.wp_entry_boot` /
+`WpEntryNew` already take `pmp_all_off pmpcfg0` at a quantified value.
+

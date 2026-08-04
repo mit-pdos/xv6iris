@@ -68,9 +68,13 @@ per-milestone record):
     they are the whole residue: `pma_regions` (the one-region
     idealization) and `misa` (a KNOWN divergence — the model's config
     also enables B and V, so its cold boot leaves `0x800000000034112F`;
-    correcting `MISA_C` leaves the whole kernel side green but falsifies
-    `DecodeSetU.decode_total_u_set`, so it is a U-mode decode-image
-    project — projects/crash.md M6c (5)).
+    the fix is on the config side — projects/crash.md's future-work list).
+    Both patches, and the anchoring question behind them (`reset()` alone,
+    per the ISA, versus the model's whole cold boot), are recorded as
+    ordered follow-up tasks there: PMA table retirement re-enables
+    `init_model`'s config assert, and the ∃-garbage anchoring waits on
+    symbolic peeling, because forcing any register field of the reset's
+    result over an open register file does not compute.
     The chain's one uninterpretable step — `cancel_reservation`, an
     `Axiom` of the model — is lifted to a parameter whose elision is
     itself checked by `reflexivity`. `reset_regs` is a COLD-boot
