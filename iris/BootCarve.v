@@ -814,6 +814,64 @@ Section BootCarve.
     rewrite EA. iExact "Hb".
   Qed.
 
+  (* The PINNED twin of [boot_ran_cell8]: a .bss doubleword whose value the
+     loader fixed.  [boot_ran_run_bss] discharges the image side, so the
+     caller's whole obligation is "this CLOSED value's bytes are zero" --
+     eight [vm_compute]s, and [nth_byte_zero8] pays them once for the only
+     value any consumer uses.  What wants it: [ProcInv.proc_dormant_nofd]'s
+     two zeroed address-space cells and its sixteen null [ofile] slots, and
+     [SpecMain.main_globals_raw]'s [kmem+24 ↦₈ 0]. *)
+  Lemma boot_ran_cell8_bss (g : gstate) (A : Z) (w : mword 64) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> img_end <= A -> A + 8 <= ram_hi -> A mod 8 = 0 ->
+    (forall j, (j < 8)%nat -> nth_byte w j = DevModel.byte0) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 8) -∗ (pa_of_z A) ↦₈ w.
+  Proof.
+    intros Hmem Hlo Hbss Hhi Hal Hz. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 8 = A + Z.of_nat 8%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 8%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 8) A (A + Z.of_nat 8%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_bss (m := 64%N) g A 8%nat w Hmem Hlo Hbss Hhi' Hz
+                 with "Hcl H") as "Hbs".
+    assert (Hal8 : is_aligned_paddr (Physaddr (pa_of_z A)) 8 = true).
+    { apply aligned8_of_mod. rewrite (boot_uint_pa A Hram). exact Hal. }
+    iApply (word_pointsto_intro _ _ _ Hal8 with "Hbs").
+  Qed.
+
+  (* the one value every pinned .bss doubleword in the tree holds. *)
+  Lemma nth_byte_zero8 (j : nat) :
+    (j < 8)%nat -> nth_byte (zero_reg : mword 64) j = DevModel.byte0.
+  Proof.
+    intro Hj.
+    destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+      try (apply bv_eq; vm_compute; reflexivity).
+    exfalso. lia.
+  Qed.
+
+  (* A run of [n] bytes as an existentially-valued LIST with its length -- the
+     shape a byte-ARRAY bundle takes, as opposed to a typed cell:
+     [ProcInv.pname_cells] over [pv_name V] (16 bytes) and
+     [SpecMain.main_globals_raw]'s [disk_free[8]]. *)
+  Lemma boot_ran_bytes_list (g : gstate) (A : Z) (n : nat) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + Z.of_nat n <= ram_hi ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + Z.of_nat n)
+    -∗ (∃ bs : list (bv 8), ⌜length bs = n⌝ ∗
+          [∗ list] i ↦ b ∈ bs, (pa_add (pa_of_z A) i) ↦ₘ b).
+  Proof.
+    intros Hmem Hlo Hhi. iIntros "#Hcl H".
+    iDestruct (boot_ran_mem_run g A n Hmem Hlo Hhi with "Hcl H") as "Hbs".
+    iExists ((fun i : nat => boot_byte (A + Z.of_nat i)) <$> seq 0 n).
+    iSplitR; [iPureIntro; rewrite length_fmap length_seq; reflexivity |].
+    rewrite big_sepL_fmap.
+    iApply (big_sepL_mono with "Hbs"). iIntros (i x Hx) "Hb".
+    apply lookup_seq in Hx. destruct Hx as [-> _]. iExact "Hb".
+  Qed.
+
   (* ================================================================== *)
   (* §11  INDEX FAMILIES: N copies of one shape, out of ONE range.       *)
   (*                                                                    *)

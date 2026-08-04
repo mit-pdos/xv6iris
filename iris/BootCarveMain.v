@@ -823,6 +823,369 @@ Section BootCarveMain.
     iExact "H11".
   Qed.
 
+  (* ================================================================== *)
+  (* [proc_raw] / [proc_pub]: ONE process slot, and then the family.      *)
+  (*                                                                    *)
+  (* Four RUNS inside a [struct proc] have no cell wrapper of their own,  *)
+  (* so they get one each here: the 14-word saved context, the sixteen    *)
+  (* null [ofile] slots, the 16-byte name array, and (through            *)
+  (* [BootCarve.boot_ran_cell8_bss]) the four PINNED zeros.  Each is      *)
+  (* stated GENERICALLY in the record's base and the field's offset, and  *)
+  (* then restated in the consumer's own vocabulary -- the restatement is *)
+  (* one [iApply], because [p_ofile] / [p_name] / [ctx_cells] ARE those    *)
+  (* address forms by definition.                                        *)
+  (* ================================================================== *)
+
+  (* the saved-context save area: [n] doublewords from [C + off]. *)
+  Lemma boot_ctx_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= C + off -> C + off + 8 * Z.of_nat n <= ram_hi ->
+    (C + off) mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g (C + off) (C + off + 8 * Z.of_nat n)
+    -∗ (∃ vs : list (mword 64), ⌜length vs = n⌝ ∗ ctx_cells_at (pa_of_z C) off vs).
+  Proof.
+    intro Hmem. revert off. induction n as [|k IH]; intros off Hlo Hhi Hal.
+    - iIntros "_ _". iExists []. iSplitR; [done |]. cbn [ctx_cells_at]. done.
+    - iIntros "#Hcl H".
+      (* ALL the arithmetic first: once an [mword] witness is in context the
+         zify hook makes [lia] answer "Cannot find witness" (durable-notes). *)
+      assert (Hd1 : C + off <= C + off + 8) by lia.
+      assert (Hd2 : C + off + 8 <= C + off + 8 * Z.of_nat (S k)) by lia.
+      assert (Eo : C + (off + 8) = C + off + 8) by lia.
+      assert (Ehi : C + off + 8 * Z.of_nat (S k)
+                    = C + (off + 8) + 8 * Z.of_nat k) by lia.
+      assert (Elo : C + off + 8 = C + (off + 8)) by lia.
+      assert (Hchi : C + off + 8 <= ram_hi) by lia.
+      assert (Hilo : text_end <= C + (off + 8)) by lia.
+      assert (Hihi : C + (off + 8) + 8 * Z.of_nat k <= ram_hi) by lia.
+      assert (Hial : (C + (off + 8)) mod 8 = 0)
+        by (rewrite Eo; exact (z_mod_addo 8 (C + off) 8 Hal eq_refl)).
+      iDestruct (boot_ran_split g (C + off) (C + off + 8)
+                   (C + off + 8 * Z.of_nat (S k)) Hd1 Hd2 with "H") as "[Hc H]".
+      iDestruct (boot_ran_cell8 g (C + off) Hmem Hlo Hchi Hal with "Hcl Hc")
+        as (v) "Hc".
+      iDestruct (boot_ran_eq g _ _ (C + (off + 8))
+                   (C + (off + 8) + 8 * Z.of_nat k) Elo Ehi with "H") as "H".
+      iDestruct (IH (off + 8) Hilo Hihi Hial with "Hcl H") as (vs) "[%Hlen Hvs]".
+      iExists (v :: vs). iSplitR; [iPureIntro; cbn [length]; by rewrite Hlen |].
+      cbn [ctx_cells_at]. iSplitL "Hc"; [rewrite off_of_z; iExact "Hc" | iExact "Hvs"].
+  Qed.
+
+  Lemma boot_own_ctx (g : gstate) (C : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= C -> C + 112 <= ram_hi -> C mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g C (C + 112) -∗ own_ctx (pa_of_z C).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    iDestruct (boot_ran_eq g C (C + 112) (C + 0) (C + 0 + 8 * Z.of_nat 14%nat)
+                 ltac:(lia) ltac:(lia) with "H") as "H".
+    iDestruct (boot_ctx_cells g C 14%nat 0 Hmem ltac:(lia) ltac:(lia)
+                 ltac:(rewrite Z.add_0_r; exact Hal) with "Hcl H") as (vs) "[%Hlen Hvs]".
+    rewrite /own_ctx /ctx_cells. iExists vs. iSplitR; [done |]. iExact "Hvs".
+  Qed.
+
+  (* a run of [n] PINNED-zero doublewords from [C + off] -- the sixteen null
+     [p->ofile] slots (and, at n = 1, any single zeroed pointer cell). *)
+  Lemma boot_zero_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= C + off -> img_end <= C + off ->
+    C + off + 8 * Z.of_nat n <= ram_hi -> (C + off) mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g (C + off) (C + off + 8 * Z.of_nat n)
+    -∗ ([∗ list] fd ↦ v ∈ replicate n (zero_reg : mword 64),
+          add_vec (pa_of_z C) (mword_of_int (off + 8 * Z.of_nat fd)) ↦₈ v).
+  Proof.
+    intro Hmem. revert off. induction n as [|k IH]; intros off Hlo Hbss Hhi Hal.
+    - iIntros "_ _". done.
+    - iIntros "#Hcl H".
+      assert (Hd1 : C + off <= C + off + 8) by lia.
+      assert (Hd2 : C + off + 8 <= C + off + 8 * Z.of_nat (S k)) by lia.
+      assert (Eo : C + (off + 8) = C + off + 8) by lia.
+      assert (Ehi : C + off + 8 * Z.of_nat (S k)
+                    = C + (off + 8) + 8 * Z.of_nat k) by lia.
+      assert (Elo : C + off + 8 = C + (off + 8)) by lia.
+      assert (Hchi : C + off + 8 <= ram_hi) by lia.
+      assert (Hilo : text_end <= C + (off + 8)) by lia.
+      assert (Hibss : img_end <= C + (off + 8)) by lia.
+      assert (Hihi : C + (off + 8) + 8 * Z.of_nat k <= ram_hi) by lia.
+      assert (Hial : (C + (off + 8)) mod 8 = 0)
+        by (rewrite Eo; exact (z_mod_addo 8 (C + off) 8 Hal eq_refl)).
+      assert (Ehd : off + 8 * Z.of_nat 0%nat = off) by lia.
+      iDestruct (boot_ran_split g (C + off) (C + off + 8)
+                   (C + off + 8 * Z.of_nat (S k)) Hd1 Hd2 with "H") as "[Hc H]".
+      iDestruct (boot_ran_cell8_bss g (C + off) (zero_reg : mword 64) Hmem Hlo Hbss
+                   Hchi Hal nth_byte_zero8 with "Hcl Hc") as "Hc".
+      iDestruct (boot_ran_eq g _ _ (C + (off + 8))
+                   (C + (off + 8) + 8 * Z.of_nat k) Elo Ehi with "H") as "H".
+      iDestruct (IH (off + 8) Hilo Hibss Hihi Hial with "Hcl H") as "Hrest".
+      cbn [replicate]. iSplitL "Hc".
+      + rewrite Ehd off_of_z. iExact "Hc".
+      + iApply (big_sepL_mono with "Hrest"). iIntros (fd v _) "Hv".
+        rewrite (_ : off + 8 * Z.of_nat (S fd) = off + 8 + 8 * Z.of_nat fd); [| lia].
+        iExact "Hv".
+  Qed.
+
+  (* a byte ARRAY inside the record, contents existential: [p->name[16]]. *)
+  Lemma boot_name_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= C + off -> C + off + Z.of_nat n <= ram_hi ->
+    kmap_static_claims -∗ boot_raw_ran g (C + off) (C + off + Z.of_nat n)
+    -∗ (∃ bs : list (bv 8), ⌜length bs = n⌝ ∗
+          [∗ list] i ↦ b ∈ bs,
+            add_vec (pa_of_z C) (mword_of_int (off + Z.of_nat i)) ↦ₘ b).
+  Proof.
+    intros Hmem Hlo Hhi. iIntros "#Hcl H".
+    iDestruct (boot_ran_bytes_list g (C + off) n Hmem Hlo Hhi with "Hcl H")
+      as (bs) "[%Hlen Hbs]".
+    iExists bs. iSplitR; [done |].
+    iApply (big_sepL_mono with "Hbs"). iIntros (i b _) "Hb".
+    rewrite off_of_z (_ : C + (off + Z.of_nat i) = C + off + Z.of_nat i); [| lia].
+    iEval (rewrite pa_add_of_z) in "Hb". iExact "Hb".
+  Qed.
+
+  (* ---- the three runs, in the consumer's own vocabulary ---- *)
+
+  Lemma boot_ofile_cells (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    img_end <= A -> A + 336 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗
+    boot_raw_ran g (A + 208) (A + 208 + 8 * Z.of_nat NOFILE)
+    -∗ ofile_cells (pa_of_z A) (replicate NOFILE (zero_reg : mword 64)).
+  Proof.
+    intros Hmem Hbss Hhi Hal.
+    assert (Hlo : text_end <= A)
+      by exact (z_lo_trans text_end img_end A ltac:(vm_compute; discriminate) Hbss).
+    rewrite /ofile_cells.
+    iApply (boot_zero_cells g A NOFILE 208 Hmem ltac:(lia) ltac:(lia)
+              ltac:(unfold NOFILE; lia) (z_mod_addo 8 A 208 Hal eq_refl)).
+  Qed.
+
+  Lemma boot_proc_name (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 360 <= ram_hi ->
+    kmap_static_claims -∗
+    boot_raw_ran g (A + 344) (A + 344 + Z.of_nat PNAMELEN)
+    -∗ (∃ bs : list (bv 8), ⌜length bs = PNAMELEN⌝ ∗
+          pname_cells (pa_of_z A) (DfracOwn 1) bs).
+  Proof.
+    intros Hmem Hlo Hhi. rewrite /pname_cells.
+    iApply (boot_name_cells g A PNAMELEN 344 Hmem ltac:(lia)
+              ltac:(unfold PNAMELEN; lia)).
+  Qed.
+
+  (* ---- ONE process slot: everything the image owes about [proc[i]] ----
+     [proc_raw]'s three own cells plus [proc_dormant_nofd], AND the two
+     PUBLIC conjuncts [main_globals_raw] lists separately ([p_chan] and
+     [proc_pub]) -- one lemma, because [p_pid ↦₄{1/2}] appears in BOTH halves
+     (inside [proc_dormant_nofd] and inside [proc_pub]) and the image can only
+     hand out the cell ONCE: it is carved in full at +48 and SPLIT.
+     The four PINNED zeros ([sz] at +72, [pagetable] at +80, [trapframe] at
+     +88, [cwd] at +336) come from [boot_ran_cell8_bss]; the [pv_sz] bound
+     [uint (pv_sz V) <= uvm_maxsz] is then free.  [p_parent] (+56) is claimed
+     by no bundle and is dropped with the padding. *)
+  Local Definition proc_slot_raw (a : Arch.pa) : iProp Σ :=
+    (proc_raw a ∗ (∃ ch : SailStdpp.Values.mword 64, p_chan a ↦₈ ch) ∗
+     proc_pub a)%I.
+
+  Lemma boot_proc_slot (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    img_end <= A -> A + 360 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 360)
+    -∗ proc_slot_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hbss Hhi Hal. iIntros "#Hcl H".
+    assert (Hlo : text_end <= A)
+      by exact (z_lo_trans text_end img_end A ltac:(vm_compute; discriminate) Hbss).
+    assert (Hal4 : A mod 4 = 0) by exact (z_mod8_mod4 A Hal).
+    (* the field-address bridges, and every alignment fact, BEFORE any cell is
+       destructed: once an [mword] witness is in context the zify hook makes
+       [lia] fail (durable-notes). *)
+    assert (E48 : (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64)
+                  = mword_of_int 48) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E72 : (sign_extend' 64 (mword_of_int 72 : mword 12) : mword 64)
+                  = mword_of_int 72) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E80 : (sign_extend' 64 (mword_of_int 80 : mword 12) : mword 64)
+                  = mword_of_int 80) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E88 : (sign_extend' 64 (mword_of_int 88 : mword 12) : mword 64)
+                  = mword_of_int 88) by (apply bv_eq; vm_compute; reflexivity).
+    assert (M24 : (A + 24) mod 4 = 0) by exact (z_mod_addo 4 A 24 Hal4 eq_refl).
+    assert (M32 : (A + 32) mod 8 = 0) by exact (z_mod_addo 8 A 32 Hal eq_refl).
+    assert (M40 : (A + 40) mod 4 = 0) by exact (z_mod_addo 4 A 40 Hal4 eq_refl).
+    assert (M44 : (A + 44) mod 4 = 0) by exact (z_mod_addo 4 A 44 Hal4 eq_refl).
+    assert (M48 : (A + 48) mod 4 = 0) by exact (z_mod_addo 4 A 48 Hal4 eq_refl).
+    assert (M64 : (A + 64) mod 8 = 0) by exact (z_mod_addo 8 A 64 Hal eq_refl).
+    assert (M72 : (A + 72) mod 8 = 0) by exact (z_mod_addo 8 A 72 Hal eq_refl).
+    assert (M80 : (A + 80) mod 8 = 0) by exact (z_mod_addo 8 A 80 Hal eq_refl).
+    assert (M88 : (A + 88) mod 8 = 0) by exact (z_mod_addo 8 A 88 Hal eq_refl).
+    assert (M96 : (A + 96) mod 8 = 0) by exact (z_mod_addo 8 A 96 Hal eq_refl).
+    assert (M336 : (A + 336) mod 8 = 0) by exact (z_mod_addo 8 A 336 Hal eq_refl).
+    (* the fourteen windows, in address order.  A window is re-anchored by an
+       EMPTY split, so every cut's [lo] is literally the [A + off] its cell
+       lemma asks for. *)
+    iDestruct (boot_ran_split g A (A + 24) (A + 360) ltac:(lia) ltac:(lia)
+                 with "H") as "[Hlk H]".
+    iDestruct (boot_ran_split g (A + 24) (A + 24 + 4) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hst H]".
+    iDestruct (boot_ran_split g (A + 24 + 4) (A + 32) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 32) (A + 32 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hch H]".
+    iDestruct (boot_ran_split g (A + 32 + 8) (A + 40) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 40) (A + 40 + 4) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hkl H]".
+    iDestruct (boot_ran_split g (A + 40 + 4) (A + 44) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 44) (A + 44 + 4) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hxs H]".
+    iDestruct (boot_ran_split g (A + 44 + 4) (A + 48) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 48) (A + 48 + 4) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hpid H]".
+    iDestruct (boot_ran_split g (A + 48 + 4) (A + 64) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 64) (A + 64 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hks H]".
+    iDestruct (boot_ran_split g (A + 64 + 8) (A + 72) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 72) (A + 72 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hsz H]".
+    iDestruct (boot_ran_split g (A + 72 + 8) (A + 80) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 80) (A + 80 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hpg H]".
+    iDestruct (boot_ran_split g (A + 80 + 8) (A + 88) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 88) (A + 88 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Htf H]".
+    iDestruct (boot_ran_split g (A + 88 + 8) (A + 96) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 96) (A + 96 + 112) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hctx H]".
+    iDestruct (boot_ran_split g (A + 96 + 112) (A + 208) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 208) (A + 208 + 8 * Z.of_nat NOFILE) (A + 360)
+                 ltac:(lia) ltac:(unfold NOFILE; lia) with "H") as "[Hof H]".
+    iDestruct (boot_ran_split g (A + 208 + 8 * Z.of_nat NOFILE) (A + 336) (A + 360)
+                 ltac:(unfold NOFILE; lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 336) (A + 336 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hcwd H]".
+    iDestruct (boot_ran_split g (A + 336 + 8) (A + 344) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 344) (A + 344 + Z.of_nat PNAMELEN) (A + 360)
+                 ltac:(lia) ltac:(unfold PNAMELEN; lia) with "H") as "[Hnm _]".
+    (* the cells *)
+    iDestruct (boot_lk_raw g A Hmem Hlo ltac:(lia) Hal with "Hcl Hlk") as "Hlk".
+    iDestruct (boot_ran_cell4 g (A + 24) Hmem ltac:(lia) ltac:(lia) M24
+                 with "Hcl Hst") as (vst) "Hst".
+    iDestruct (boot_ran_cell8 g (A + 32) Hmem ltac:(lia) ltac:(lia) M32
+                 with "Hcl Hch") as (vch) "Hch".
+    iDestruct (boot_ran_cell4 g (A + 40) Hmem ltac:(lia) ltac:(lia) M40
+                 with "Hcl Hkl") as (vkl) "Hkl".
+    iDestruct (boot_ran_cell4 g (A + 44) Hmem ltac:(lia) ltac:(lia) M44
+                 with "Hcl Hxs") as (vxs) "Hxs".
+    iDestruct (boot_ran_cell4 g (A + 48) Hmem ltac:(lia) ltac:(lia) M48
+                 with "Hcl Hpid") as (vpid) "Hpid".
+    iDestruct (boot_ran_cell8 g (A + 64) Hmem ltac:(lia) ltac:(lia) M64
+                 with "Hcl Hks") as (vks) "Hks".
+    iDestruct (boot_ran_cell8_bss g (A + 72) (zero_reg : mword 64) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M72 nth_byte_zero8
+                 with "Hcl Hsz") as "Hsz".
+    iDestruct (boot_ran_cell8_bss g (A + 80) (zero_reg : mword 64) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M80 nth_byte_zero8
+                 with "Hcl Hpg") as "Hpg".
+    iDestruct (boot_ran_cell8_bss g (A + 88) (zero_reg : mword 64) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M88 nth_byte_zero8
+                 with "Hcl Htf") as "Htf".
+    iDestruct (boot_ran_cell8_bss g (A + 336) (zero_reg : mword 64) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M336 nth_byte_zero8
+                 with "Hcl Hcwd") as "Hcwd".
+    iDestruct (boot_own_ctx g (A + 96) Hmem ltac:(lia) ltac:(lia) M96
+                 with "Hcl Hctx") as "Hctx".
+    iDestruct (boot_ofile_cells g A Hmem Hbss ltac:(lia) Hal with "Hcl Hof")
+      as "Hof".
+    iDestruct (boot_proc_name g A Hmem Hlo ltac:(lia) with "Hcl Hnm")
+      as (bs) "[%Hbs Hnm]".
+    (* the pid cell is owned by BOTH halves at a half each *)
+    iAssert ((pa_of_z (A + 48)) ↦₄{DfracOwn (1/2)} vpid ∗
+             (pa_of_z (A + 48)) ↦₄{DfracOwn (1/2)} vpid)%I with "[Hpid]"
+      as "[Hpid1 Hpid2]".
+    { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hpid". }
+    rewrite /proc_slot_raw /proc_raw /proc_pub /proc_dormant_nofd /proc_fields
+            /p_state /p_chan /p_killed /p_xstate /p_pid /p_kstack /p_sz
+            /p_pagetable /p_trapframe /p_context /p_cwd
+            E48 E72 E80 E88 !off_of_z.
+    iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hctx Hpg Htf".
+    { iExists vst, vks.
+      iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hst"; [iExact "Hst" |].
+      iSplitL "Hks"; [iExact "Hks" |].
+      iExists (MkPPriv (zero_reg : mword 64)
+                 (UPTD (mword_of_int 0 : mword 44) (mword_of_int 0 : mword 44) ∅ ∅)
+                 [] (replicate NOFILE (zero_reg : mword 64))
+                 (zero_reg : mword 64) bs), vpid.
+      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+      iSplitR; [iPureIntro; split_and!;
+                [reflexivity | reflexivity | vm_compute; discriminate] |].
+      iSplitL "Hpid1"; [iExact "Hpid1" |].
+      iSplitL "Hsz Hcwd Hnm".
+      { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].
+        iSplitR; [iPureIntro; exact Hbs |]. iExact "Hnm". }
+      iSplitL "Hof"; [iExact "Hof" |]. iSplitL "Hctx"; [iExact "Hctx" |].
+      iSplitL "Hpg"; [iExact "Hpg" |]. iExact "Htf". }
+    iSplitL "Hch"; [iExists vch; iExact "Hch" |].
+    iExists vkl, vxs, vpid.
+    iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
+    iExact "Hpid2".
+  Qed.
+
+  (* ...and the 64 slots, out of the one [proc[]] range: ONE family, whose
+     per-element carve gives both of [main_globals_raw]'s proc big-ops. *)
+  Lemma boot_procs_raw (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g KernelSyms.proc
+                   (KernelSyms.proc + proc_size * Z.of_nat NPROC)
+    -∗ ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
+       ([∗ list] i ∈ seq 0 NPROC,
+          (∃ ch : SailStdpp.Values.mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+          proc_pub (proc_addr i)).
+  Proof.
+    intro Hmem. iIntros "#Hcl H".
+    iDestruct (boot_stride_family_seq g proc_slot_raw
+                 KernelSyms.proc proc_size NPROC
+                 ltac:(unfold proc_size; lia)
+                 ltac:(intros i A Hi HA _ _;
+                       destruct (z_stride_side KernelSyms.proc proc_size NPROC 360
+                                   img_end ram_hi i A Hi HA
+                                   ltac:(unfold proc_size; lia)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; reflexivity)
+                                   ltac:(vm_compute; reflexivity))
+                         as (Q1 & Q2 & Q3);
+                       assert (T1 : A <= A + 360) by lia;
+                       assert (T2 : A + 360 <= A + proc_size)
+                         by (unfold proc_size; lia);
+                       iIntros "#Hcl H";
+                       iDestruct (boot_ran_split g A (A + 360) (A + proc_size)
+                                    T1 T2 with "H") as "[H _]";
+                       iApply (boot_proc_slot g A Hmem Q1 Q2 Q3 with "Hcl H"))
+                 with "Hcl H") as "H".
+    rewrite /proc_slot_raw big_sepL_sep. iDestruct "H" as "[H1 H2]".
+    iSplitL "H1".
+    - iApply (big_sepL_mono with "H1"). iIntros (n i _) "Hi".
+      rewrite (proc_addr_of_z i). iExact "Hi".
+    - iApply (big_sepL_mono with "H2"). iIntros (n i _) "Hi".
+      rewrite (proc_addr_of_z i). iExact "Hi".
+  Qed.
+
   (* one page, out of its own 4096-byte range: [BootCarve.boot_ran_mem_run]
      hands out the bytes already indexed by [pa_add], and [page_own] is that
      run with the contents forgotten. *)

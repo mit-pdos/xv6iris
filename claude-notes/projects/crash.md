@@ -674,10 +674,10 @@ and holds everything stated in a callee's vocabulary (kinit's page run today;
 slice 2's structured conjuncts next). Keeping BootCarve low is what keeps its
 `lia` usable — the higher file is under `bitvector.tactics`' zify hook.
 
-**STATE: slices 1a, 1b, 1b', 2a, 2b, 2c and 3 are LANDED. M6b IS NOT
-COMPLETE**: what remains is `proc_raw`/`proc_pub` (slice 2d) and the `boot_D`
-audit (slice 2e); every other structured conjunct now has its own lemma in
-BootCarveMain.v. **Everything `SpecEntry`'s precondition needs is
+**STATE: slices 1a, 1b, 1b', 2a, 2b, 2c, 2d and 3 are LANDED. M6b IS NOT
+COMPLETE**: what remains is the `boot_D` audit (slice 2e).  Every bundle
+`SpecEntry`'s AND `SpecMain`'s precondition names is now produced from the boot
+image by a named lemma in BootCarveMain.v. **Everything `SpecEntry`'s precondition needs is
 done**; `SpecMain`'s still needs those bundles, and two of its conjuncts turn
 out not to be carves at all (slice 2b's `fd_slots` finding). The M6c hand-off — the per-hart
 chain, what exists for it and the six things that do NOT — is its own section
@@ -931,20 +931,7 @@ chain of cuts rather than a proof:
 
 **WHAT REMAINS OF M6b, exactly:**
 
-1. **`proc_raw` / `proc_pub`, the big one.** `proc_raw` is `lk_raw` +
-   `p_state ↦₄` + `p_kstack ↦₈` + `ProcInv.proc_dormant_nofd`, and that last
-   one is itself `proc_fields` + `ofile_cells` + `own_ctx (p_context pa)` +
-   the PINNED `p_pagetable ↦₈ 0` / `p_trapframe ↦₈ 0` + a pure constraint on
-   the field record (`pv_ofile = replicate NOFILE 0`, `pv_cwd = 0`,
-   `uint (pv_sz) ≤ uvm_maxsz`) — so the zeros come from `boot_ran_run_bss`
-   and the `pv_sz` bound is free at 0. **Two traps to expect:**
-   `p_pid pa ↦₄{DfracOwn (1/2)}` appears in BOTH `proc_raw` (through
-   `proc_dormant_nofd`) and `proc_pub`, so the carve must produce the FULL
-   cell and SPLIT it — check whether a `word4_pointsto_frac_split` exists
-   (`word_pointsto_frac_split` does, for `↦₈`); and both families are 64
-   copies at stride `proc_size = 360`, i.e. one `boot_stride_family_seq`
-   each, never 64 instances.
-2. **`fd_slots` IS NOT A CARVE AT ALL, and this is a finding for M6c rather
+**`fd_slots` IS NOT A CARVE AT ALL, and this is a finding for M6c rather
    than for BootCarve.** `FdSlots.fd_slots n` is `own fdslot_name (◯ n)` — a
    GHOST fragment, with no memory footprint whatever; it is minted at boot by
    `fd_slots_alloc`. So `main_globals_raw`'s
@@ -1015,6 +1002,47 @@ new proof idea in any of them, and that is the point of §10/§11.**
    `z_lo_trans _ _ _ ltac:(…) H` leaves the first two arguments open, the
    `vm_compute` does nothing and `discriminate` reports *"No primitive
    equality found"*. Give such a helper its arguments EXPLICITLY.
+
+### Slice 2d — `proc_raw` / `proc_pub` (LANDED)
+
+`boot_proc_slot` produces `proc_slot_raw` = `proc_raw pa ∗ (∃ ch, p_chan pa ↦₈
+ch) ∗ proc_pub pa` — all THREE of `main_globals_raw`'s per-process conjuncts —
+out of one slot's 360 bytes, and `boot_procs_raw` is that at the 64-slot
+family, split back into the two big-ops main's statement lists.
+
+**One lemma for all three conjuncts is FORCED, not tidiness:**
+`p_pid pa ↦₄{DfracOwn (1/2)}` sits in BOTH `proc_dormant_nofd` and
+`proc_pub`, and the image can hand the cell out only ONCE — so the carve takes
+the full cell at +48 and splits it with `word4_pointsto_frac_split` +
+`Qp.div_2`. Any decomposition that produced `proc_raw` and `proc_pub`
+independently would need the cell twice.
+
+The `struct proc` map, as carved (360 bytes, offsets):
+`lock` 0–24 (`boot_lk_raw`) · `state ↦₄` 24 · `chan ↦₈` 32 · `killed ↦₄` 40 ·
+`xstate ↦₄` 44 · **`pid ↦₄` 48, split ½/½** · `parent` 56 (**claimed by no
+bundle** — dropped with the padding) · `kstack ↦₈` 64 · `sz ↦₈ 0` 72 ·
+`pagetable ↦₈ 0` 80 · `trapframe ↦₈ 0` 88 · `context` 96–208 (`own_ctx`) ·
+`ofile[16] ↦₈ 0` 208–336 · `cwd ↦₈ 0` 336 · `name[16]` 344–360.
+
+- **FOUR cells are PINNED zeros, and `sz` is one of them.**
+  `proc_dormant_nofd` requires `uint (pv_sz V) ≤ uvm_maxsz`, which is free at
+  `pv_sz = 0` and unprovable for an existential word — so `p_sz` must be
+  carved as a .bss zero, exactly like `pagetable`/`trapframe`/`cwd`. That is
+  what `BootCarve.boot_ran_cell8_bss` (§10's PINNED twin of `boot_ran_cell8`)
+  and `nth_byte_zero8` are for; `pv_upt` and `pv_tf` are mentioned by nothing
+  in the bundle, so `V` names an arbitrary `UPTD … ∅ ∅` and `[]`.
+- **Three runs inside the record had no wrapper**, and each is one induction
+  over the offset, stated generically in `(C, off, n)` and then restated in
+  the consumer's vocabulary by a single `iApply` (`p_ofile` / `p_name` /
+  `ctx_cells_at` ARE those address forms by definition): `boot_ctx_cells` →
+  `boot_own_ctx` (14 words), `boot_zero_cells` → `boot_ofile_cells` (16 null
+  slots), `boot_name_cells` → `boot_proc_name` (16 bytes, existential, via
+  §10's new `boot_ran_bytes_list`).
+- **HOIST EVERY ARITHMETIC FACT ABOVE THE FIRST CELL DESTRUCT.** The moment an
+  `mword` witness is in context the zify hook makes `lia` answer *"Cannot
+  find witness"* — which is how the two run inductions failed first. Do all
+  the splits (they introduce no witness) and all the `assert`s first, then the
+  cell conversions with NAMED premises.
 
 ### Slice 3 — the kinit page run (LANDED)
 
