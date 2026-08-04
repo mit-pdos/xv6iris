@@ -60,6 +60,11 @@ Local Open Scope Z_scope.
 Fixpoint zrun (lo : Z) (n : nat) : list Z :=
   match n with O => [] | S k => lo :: zrun (lo + 1) k end.
 
+(* the same at an arbitrary STRIDE: the base addresses of [n] consecutive
+   fixed-size records.  §11's index-family carve inducts on this. *)
+Fixpoint zstride (base stride : Z) (n : nat) : list Z :=
+  match n with O => [] | S k => base :: zstride (base + stride) stride k end.
+
 (* the two bits of plain-[Z] arithmetic the carve needs, packaged as closed
    facts (durable-notes: [lia] is unusable once an [mword] is in context). *)
 Lemma z_mod8_sub (u d : Z) : u mod 8 = 0 -> (u - 8 * d) mod 8 = 0.
@@ -409,6 +414,15 @@ Section BootCarve.
     pa_add (pa_of_z A) j = pa_of_z (A + Z.of_nat j).
   Proof. unfold pa_of_z. apply pa_add_mword. Qed.
 
+  (* a struct FIELD offset from a [pa_of_z] base, in [pa_of_z]'s spelling.
+     Every field address in the tree is [add_vec base (mword_of_int off)] --
+     directly, or through a [sign_extend']-ed 12-bit literal, which is the
+     same CLOSED term and reduces by one [vm_compute] -- so this is the one
+     bridge a structured-bundle carve needs. *)
+  Lemma off_of_z (A o : Z) :
+    add_vec (pa_of_z A) (mword_of_int o : mword 64) = pa_of_z (A + o).
+  Proof. unfold pa_of_z. apply (avi_mword A o). Qed.
+
   (* THE [↦ₘ] RUN: [boot_ran_bytes]' bytes, re-indexed by [pa_add] and each
      upgraded through its static claim.  [boot_ran_own] is the same step over
      the MAP (which is what a lookup-driven bundle like [kernel_data] wants);
@@ -510,14 +524,18 @@ Section BootCarve.
   (* §8  Words: a range's 8 bytes as a doubleword.                        *)
   (* ================================================================== *)
 
-  Local Lemma aligned8_of_mod (a : mword 64) :
-    uint a mod 8 = 0 -> is_aligned_paddr (Physaddr a) 8 = true.
+  Local Lemma aligned_of_mod (a : mword 64) (W : Z) :
+    0 < W -> uint a mod W = 0 -> is_aligned_paddr (Physaddr a) W = true.
   Proof.
-    intro Hm. unfold is_aligned_paddr. apply Z.eqb_eq.
+    intros HW Hm. unfold is_aligned_paddr. apply Z.eqb_eq.
     pose proof (bv_unsigned_in_range _ a) as [Hnn _].
     rewrite uint_unsigned in Hm |- *.
     rewrite Z.rem_mod_nonneg; [exact Hm | exact Hnn | lia].
   Qed.
+
+  Local Lemma aligned8_of_mod (a : mword 64) :
+    uint a mod 8 = 0 -> is_aligned_paddr (Physaddr a) 8 = true.
+  Proof. intro Hm. apply (aligned_of_mod a 8); [lia | exact Hm]. Qed.
 
   (* An 8-byte, 8-ALIGNED range of the image is a doubleword of ARBITRARY
      contents at the physical tier -- which is all a stack slot (or any
@@ -705,6 +723,170 @@ Section BootCarve.
     rewrite (nth_byte_assemble_len m bs j ltac:(rewrite Hlen; exact Hm)
                ltac:(rewrite Hlen; exact Hj)).
     subst bs. exact (bs_lookup A W j Hj).
+  Qed.
+
+  (* ---- the three typed cells, and a bare byte, spelled out ----
+     Each is §10's existential run plus the width's own intro lemma, so a
+     consumer that wants a CELL rather than a run never re-does the assembly.
+     These are what a structured bundle ([lk_raw], [sl_raw], [blink_raw],
+     [disk_slot_raw], every field of a [struct proc]) is built out of. *)
+
+  Lemma boot_ran_cell8 (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 8 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 8)
+    -∗ (∃ w : bv 64, (pa_of_z A) ↦₈ w).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 8 = A + Z.of_nat 8%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 8%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 8) A (A + Z.of_nat 8%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_ex (m := 64%N) g A 8%nat Hmem Hlo Hhi'
+                 ltac:(cbn; lia) with "Hcl H") as (w) "Hbs".
+    assert (Hal8 : is_aligned_paddr (Physaddr (pa_of_z A)) 8 = true).
+    { apply aligned8_of_mod. rewrite (boot_uint_pa A Hram). exact Hal. }
+    iExists w. iApply (word_pointsto_intro _ _ _ Hal8 with "Hbs").
+  Qed.
+
+  Lemma boot_ran_cell4 (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 4 <= ram_hi -> A mod 4 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 4)
+    -∗ (∃ w : bv 32, (pa_of_z A) ↦₄ w).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 4 = A + Z.of_nat 4%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 4%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 4) A (A + Z.of_nat 4%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_ex (m := 32%N) g A 4%nat Hmem Hlo Hhi'
+                 ltac:(cbn; lia) with "Hcl H") as (w) "Hbs".
+    assert (Hal4 : is_aligned_paddr (Physaddr (pa_of_z A)) 4 = true).
+    { apply (aligned_of_mod _ 4); [lia |].
+      rewrite (boot_uint_pa A Hram). exact Hal. }
+    iExists w. iApply (word4_pointsto_intro _ _ _ Hal4 with "Hbs").
+  Qed.
+
+  Lemma boot_ran_cell2 (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 2 <= ram_hi -> A mod 2 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 2)
+    -∗ (∃ w : bv 16, (pa_of_z A) ↦₂ w).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 2 = A + Z.of_nat 2%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 2%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 2) A (A + Z.of_nat 2%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_ex (m := 16%N) g A 2%nat Hmem Hlo Hhi'
+                 ltac:(cbn; lia) with "Hcl H") as (w) "Hbs".
+    assert (Hal2 : is_aligned_paddr (Physaddr (pa_of_z A)) 2 = true).
+    { apply (aligned_of_mod _ 2); [lia |].
+      rewrite (boot_uint_pa A Hram). exact Hal. }
+    iExists w. iApply (word2_pointsto_intro _ _ _ Hal2 with "Hbs").
+  Qed.
+
+  (* a single byte (the [disk_slot_raw] status bytes, [disk_free[8]]) *)
+  Lemma boot_ran_byte (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 1 <= ram_hi ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 1)
+    -∗ (pa_of_z A) ↦ₘ boot_byte A.
+  Proof.
+    intros Hmem Hlo Hhi. iIntros "#Hcl H".
+    assert (E : A + 1 = A + Z.of_nat 1%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 1%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 1) A (A + Z.of_nat 1%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_mem_run g A 1%nat Hmem Hlo Hhi' with "Hcl H") as "Hbs".
+    change (seq 0 1%nat) with [0%nat].
+    iDestruct "Hbs" as "[Hb _]".
+    rewrite pa_add_of_z.
+    assert (EA : A + Z.of_nat 0%nat = A) by (cbn; lia).
+    rewrite EA. iExact "Hb".
+  Qed.
+
+  (* ================================================================== *)
+  (* §11  INDEX FAMILIES: N copies of one shape, out of ONE range.       *)
+  (*                                                                    *)
+  (* Every per-index .bss family main is handed is N copies of a fixed   *)
+  (* shape at stride-spaced addresses -- the 64 [proc_raw]s / [proc_pub]s *)
+  (* (stride 360), the NBUF buffer sleeplocks and link pairs, the NINODE *)
+  (* inode sleeplocks, the 8 disk slots.  So the carve is given ONCE,    *)
+  (* parameterised by the per-element one: never N instances.            *)
+  (* NB [ArrCursor.acur base stride i] IS [pa_of_z (base + stride * i)]  *)
+  (* BY DEFINITION, so a family whose addresses are spelled with [acur]  *)
+  (* (bcache's [bnode], iinit's [inode_lock]) needs no bridge at all,    *)
+  (* and [ProcGeom.proc_addr] is that same term up to one [add_vec]      *)
+  (* normalisation ([SpecProcinit.proc_addr_acur]).                      *)
+  (* ================================================================== *)
+
+  Lemma zstride_fmap (base stride : Z) (n : nat) :
+    zstride base stride n
+    = (fun i : nat => base + stride * Z.of_nat i) <$> seq 0 n.
+  Proof.
+    revert base. induction n as [|k IH]; intro base; [reflexivity |].
+    cbn [zstride seq fmap list_fmap]. f_equal; [lia |].
+    rewrite (IH (base + stride)) -fmap_S_seq -list_fmap_compose.
+    apply list_fmap_ext. intros i x _. cbn.
+    rewrite Nat2Z.inj_succ Z.mul_succ_r. lia.
+  Qed.
+
+  Lemma boot_stride_family (g : gstate) (Φ : Arch.pa -> iProp Σ)
+      (base stride : Z) (N : nat) :
+    0 <= stride ->
+    (forall A : Z, base <= A -> A + stride <= base + stride * Z.of_nat N ->
+       kmap_static_claims -∗ boot_raw_ran g A (A + stride) -∗ Φ (pa_of_z A)) ->
+    kmap_static_claims -∗ boot_raw_ran g base (base + stride * Z.of_nat N)
+    -∗ ([∗ list] A ∈ zstride base stride N, Φ (pa_of_z A)).
+  Proof.
+    intro Hst. revert base. induction N as [|k IH]; intros base Hone.
+    - iIntros "_ _". done.
+    - assert (Hk0 : 0 <= Z.of_nat k) by apply Nat2Z.is_nonneg.
+      assert (Hmul : 0 <= stride * Z.of_nat k)
+        by (apply Z.mul_nonneg_nonneg; [exact Hst | exact Hk0]).
+      assert (Hd1 : base <= base + stride) by lia.
+      assert (Hsucc : base + stride * Z.of_nat (S k)
+                      = base + stride + stride * Z.of_nat k)
+        by (rewrite Nat2Z.inj_succ Z.mul_succ_r; lia).
+      assert (Hd2 : base + stride <= base + stride * Z.of_nat (S k))
+        by (rewrite Hsucc; lia).
+      iIntros "#Hcl H".
+      iDestruct (boot_ran_split g base (base + stride)
+                   (base + stride * Z.of_nat (S k)) Hd1 Hd2 with "H")
+        as "[Hh Ht]".
+      change (zstride base stride (S k))
+        with (base :: zstride (base + stride) stride k).
+      iSplitL "Hh".
+      + iApply (Hone base ltac:(lia) ltac:(rewrite Hsucc; lia) with "Hcl Hh").
+      + iDestruct (boot_ran_eq g _ _ (base + stride)
+                     (base + stride + stride * Z.of_nat k) eq_refl Hsucc
+                     with "Ht") as "Ht".
+        iApply (IH (base + stride) with "Hcl Ht").
+        intros A HA1 HA2. iApply (Hone A ltac:(lia) ltac:(rewrite Hsucc; lia)).
+  Qed.
+
+  (* ...and the same in the [seq 0 N]-indexed spelling every conjunct of
+     [SpecMain.main_globals_raw] is literally written in. *)
+  Lemma boot_stride_family_seq (g : gstate) (Φ : Arch.pa -> iProp Σ)
+      (base stride : Z) (N : nat) :
+    0 <= stride ->
+    (forall A : Z, base <= A -> A + stride <= base + stride * Z.of_nat N ->
+       kmap_static_claims -∗ boot_raw_ran g A (A + stride) -∗ Φ (pa_of_z A)) ->
+    kmap_static_claims -∗ boot_raw_ran g base (base + stride * Z.of_nat N)
+    -∗ ([∗ list] i ∈ seq 0 N, Φ (pa_of_z (base + stride * Z.of_nat i))).
+  Proof.
+    intros Hst Hone. iIntros "#Hcl H".
+    iDestruct (boot_stride_family g Φ base stride N Hst Hone with "Hcl H") as "H".
+    rewrite zstride_fmap big_sepL_fmap. iExact "H".
   Qed.
 
   Lemma boot_stack_own_phys (g : gstate) (sp : mword 64) (n : nat) :

@@ -37,7 +37,19 @@ Require Import KernelText.
 Require Import BootCarve.
 Require Import PageGeom KallocInv.
 Require Import SpecFreerange.
+Require Import WpLock SpecProcinit.
 Local Open Scope Z_scope.
+
+(* --- the alignment arithmetic the structured carves need, over plain [Z] --- *)
+Lemma z_mod8_addo (A o : Z) :
+  A mod 8 = 0 -> o mod 8 = 0 -> (A + o) mod 8 = 0.
+Proof. intros H1 H2. rewrite Zplus_mod H1 H2. reflexivity. Qed.
+
+Lemma z_mod8_mod4 (A : Z) : A mod 8 = 0 -> A mod 4 = 0.
+Proof.
+  intro H. apply Z.mod_divide in H; [| lia]. apply Z.mod_divide; [lia |].
+  apply (Z.divide_trans 4 8); [exists 2; reflexivity | exact H].
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 0. The page arithmetic, over plain [Z].                                 *)
@@ -222,7 +234,55 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Section BootCarveMain.
-  Context `{!riscvGS Σ}.
+  Context `{!riscvGS Σ, !lockG Σ}.
+
+  (* ------------------------------------------------------------------ *)
+  (* The LOCK TRIPLE, out of a [struct spinlock]'s own 24 bytes.         *)
+  (*                                                                    *)
+  (* [SpecProcinit.lk_raw] is the shape EVERY uninitialised lock in the  *)
+  (* kernel is handed over at -- [main_locks_raw]'s eleven, the 64 proc  *)
+  (* locks inside [proc_raw], and the inner spinlock of every sleeplock  *)
+  (* -- so it is carved once here.  The footprint is [lock ↦₄] at +0,    *)
+  (* [name ↦₈] at +8 and [cpu ↦₈] at +16; +4..+8 is padding and is       *)
+  (* dropped.  Both field addresses go through [BootCarve.off_of_z]      *)
+  (* after their [sign_extend']-ed 12-bit literal offsets reduce by      *)
+  (* [vm_compute].                                                      *)
+  (* ------------------------------------------------------------------ *)
+  Lemma boot_lk_raw (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 24 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 24) -∗ lk_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (E8 : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
+                 = mword_of_int 8) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E16 : (sign_extend' 64 (mword_of_int 0x10 : mword 12) : mword 64)
+                  = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hal8 : (A + 8) mod 8 = 0)
+      by (apply z_mod8_addo; [exact Hal | reflexivity]).
+    assert (Hal16 : (A + 16) mod 8 = 0)
+      by (apply z_mod8_addo; [exact Hal | reflexivity]).
+    (* three field ranges out of the record's 24 bytes *)
+    iDestruct (boot_ran_split g A (A + 8) (A + 24) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H2]".
+    iDestruct (boot_ran_split g A (A + 4) (A + 8) ltac:(lia) ltac:(lia)
+                 with "H0") as "[H0 _]".
+    iDestruct (boot_ran_split g (A + 8) (A + 16) (A + 24) ltac:(lia) ltac:(lia)
+                 with "H2") as "[H1 H2]".
+    iDestruct (boot_ran_cell4 g A Hmem Hlo ltac:(lia)
+                 (z_mod8_mod4 A Hal) with "Hcl H0") as (vlock) "H0".
+    iDestruct (boot_ran_eq g (A + 8) (A + 16) (A + 8) (A + 8 + 8)
+                 eq_refl ltac:(lia) with "H1") as "H1".
+    iDestruct (boot_ran_cell8 g (A + 8) Hmem ltac:(lia) ltac:(lia) Hal8
+                 with "Hcl H1") as (vname) "H1".
+    iDestruct (boot_ran_eq g (A + 16) (A + 24) (A + 16) (A + 16 + 8)
+                 eq_refl ltac:(lia) with "H2") as "H2".
+    iDestruct (boot_ran_cell8 g (A + 16) Hmem ltac:(lia) ltac:(lia) Hal16
+                 with "Hcl H2") as (vcpu) "H2".
+    rewrite /lk_raw /lock_name_field /lk_cpu E8 E16 !off_of_z.
+    iExists vlock, vname, vcpu. iFrame "H0 H1 H2".
+  Qed.
 
   (* one page, out of its own 4096-byte range: [BootCarve.boot_ran_mem_run]
      hands out the bytes already indexed by [pa_add], and [page_own] is that

@@ -674,11 +674,16 @@ and holds everything stated in a callee's vocabulary (kinit's page run today;
 slice 2's structured conjuncts next). Keeping BootCarve low is what keeps its
 `lia` usable — the higher file is under `bitvector.tactics`' zify hook.
 
-**STATE: slices 1a, 1b, 1b', 2a and 3 are LANDED. What remains of M6b is
-slice 2's STRUCTURED conjuncts** (the per-index `.bss` bundles of
-`main_locks_raw` / `main_globals_raw`), in BootCarveMain.v — see slice 2
-below. Everything SpecEntry needs is done; SpecMain still needs those
-bundles.
+**STATE: slices 1a, 1b, 1b', 2a, 2b-machinery and 3 are LANDED. M6b IS NOT
+COMPLETE**: what remains is slice 2b's four structured shapes
+(`sl_raw`/`blink_raw`/`disk_slot_raw` — each `boot_lk_raw`'s pattern at its own
+offsets — and `proc_raw`/`proc_pub`, the big one) plus `main_locks_raw`'s
+eleven-lock assembly, all in BootCarveMain.v; see slice 2b below, which says
+exactly what each owes. **Everything `SpecEntry`'s precondition needs is
+done**; `SpecMain`'s still needs those bundles, and two of its conjuncts turn
+out not to be carves at all (slice 2b item 3). The M6c hand-off — the per-hart
+chain, what exists for it and the six things that do NOT — is its own section
+below.
 
 ### Slice 1a — the three-way split, LIFTED (LANDED)
 
@@ -898,16 +903,73 @@ So a cell is now three lines: `boot_ran_split` down to its own `[A, A+W)`,
 one of the three above, then the width's `*_pointsto_intro` with
 `aligned8_of_mod`-style alignment (a `vm_compute` on the symbol address).
 
-**WHAT REMAINS is the STRUCTURED conjuncts, and that is where the work is** —
-`proc_raw`/`proc_pub` × 64, `fd_slots`, the NBUF `sl_raw`/`blink_raw`, the
-NINODE sleeplocks, `disk_slot_raw` × 8, and `main_locks_raw`'s eleven
-`lk_raw`s. Each needs its own file's vocabulary (SpecProcinit / ProcGeom /
-FdSlots / BcacheInv / DiskInv), so they go in **`BootCarveMain.v`** beside
-slice 3, not in BootCarve. Two things to expect there: the per-index bundles
-are `[∗ list] i ∈ seq 0 N, …` over a stride, so they want one induction over
-the index (the shape §9/§3 already use) rather than N cuts written out; and
-that file is under the zify hook (see slice 3), so all their address
-arithmetic must be plain-`Z` helpers from the start.
+### Slice 2b — the structured conjuncts: MACHINERY + the lock triple LANDED
+
+The two general moves are in, and with them a structured bundle is a short
+chain of cuts rather than a proof:
+
+- **BootCarve §10's four CELL wrappers** — `boot_ran_cell8` / `_cell4` /
+  `_cell2` / `boot_ran_byte`: §10's existential run plus the width's own
+  intro lemma, so nothing downstream re-does the assembly. `aligned_of_mod`
+  is the width-generic alignment step (`aligned8_of_mod` is now its
+  instance), and `off_of_z` is **the one address bridge a structured carve
+  needs**: every struct field address in the tree is
+  `add_vec base (mword_of_int off)`, directly or through a `sign_extend'`-ed
+  12-bit literal which is the same CLOSED term and reduces by one
+  `vm_compute`.
+- **BootCarve §11's INDEX-FAMILY carve** — `boot_stride_family` (+
+  `_seq`, in the `[∗ list] i ∈ seq 0 N` spelling every conjunct is literally
+  written in): give the per-element carve ONCE and get the big-op, out of one
+  range, for any `N` and stride. `zstride` is its address list. **The
+  addresses need no bridge at all**: `ArrCursor.acur base stride i` IS
+  `pa_of_z (base + stride * i)` BY DEFINITION, which is how bcache's `bnode`
+  and iinit's `inode_lock` are spelled, and `ProcGeom.proc_addr` is the same
+  term up to one `add_vec` normalisation (`SpecProcinit.proc_addr_acur`).
+- **`BootCarveMain.boot_lk_raw`** — the worked pattern, and the one every
+  other lock reuses: `lk_raw` out of a `struct spinlock`'s own 24 bytes
+  (`↦₄` at +0, `↦₈` at +8, `↦₈` at +16; +4..+8 is padding and is dropped).
+  It serves `main_locks_raw`'s eleven, the 64 proc locks inside `proc_raw`,
+  and every sleeplock's inner spinlock.
+
+**WHAT REMAINS OF M6b, exactly:**
+
+1. **The other three small shapes**, each `boot_lk_raw`'s pattern at its own
+   offsets: `SleepLock.sl_raw` (6 cells), `BcacheInv.blink_raw` (2), and
+   `DiskInv.disk_slot_raw` (`ops_own i` + a byte + a word).
+2. **`proc_raw` / `proc_pub`, the big one.** `proc_raw` is `lk_raw` +
+   `p_state ↦₄` + `p_kstack ↦₈` + `ProcInv.proc_dormant_nofd`, and that last
+   one is itself `proc_fields` + `ofile_cells` + `own_ctx (p_context pa)` +
+   the PINNED `p_pagetable ↦₈ 0` / `p_trapframe ↦₈ 0` + a pure constraint on
+   the field record (`pv_ofile = replicate NOFILE 0`, `pv_cwd = 0`,
+   `uint (pv_sz) ≤ uvm_maxsz`) — so the zeros come from `boot_ran_run_bss`
+   and the `pv_sz` bound is free at 0. **Two traps to expect:**
+   `p_pid pa ↦₄{DfracOwn (1/2)}` appears in BOTH `proc_raw` (through
+   `proc_dormant_nofd`) and `proc_pub`, so the carve must produce the FULL
+   cell and SPLIT it — check whether a `word4_pointsto_frac_split` exists
+   (`word_pointsto_frac_split` does, for `↦₈`); and both families are 64
+   copies at stride `proc_size = 360`, i.e. one `boot_stride_family_seq`
+   each, never 64 instances.
+3. **`fd_slots` IS NOT A CARVE AT ALL, and this is a finding for M6c rather
+   than for BootCarve.** `FdSlots.fd_slots n` is `own fdslot_name (◯ n)` — a
+   GHOST fragment, with no memory footprint whatever; it is minted at boot by
+   `fd_slots_alloc`. So `main_globals_raw`'s
+   `fd_slots (NPROC * (NOFILE + FDSPARE))` must be allocated by the boot
+   CLIENT inside its `={⊤}=∗`, not produced here. The same holds for every
+   client-side class main's statement binds (`lockG`, `kallocG`, `fileG`,
+   `sieG`, `fdslotG`, `uartGhostG`, `diskGhostG`): `power_boot_res` provides
+   only the ERA ghosts, so the client's Σ must carry those functors and the
+   client allocates them.
+4. **`main_locks_raw`'s assembly**: eleven `boot_lk_raw`s at UNRELATED symbol
+   addresses, so this one is inherently eleven applications — but the cuts
+   have to be taken in ADDRESS ORDER out of the one `.bss` range, so sort the
+   eleven symbols first (`cons`, `tx_lock`, `pr`, `kmem`, `pid_lock`,
+   `wait_lock`, `tickslock`, `bcache`, `itable`, `ftable`, `disk_lock`) and
+   check by `vm_compute` that they do not overlap.
+
+`BootCarveMain.v` is under the zify hook (see slice 3), so write every new
+arithmetic step there as a plain-`Z` helper from the start. Note the
+`boot_lk_raw`-style goals are all about a `Z` variable `A` and plain `lia`
+works on them — the hook only bites goals mentioning `uint`/`bv_unsigned`.
 
 ### Slice 3 — the kinit page run (LANDED)
 
@@ -962,6 +1024,78 @@ about the constants themselves (`0 ≤ kmem_lo`, `ram_hi + 4096 < 2^64`,
 `kmem_hi = ram_hi`) need no `lia` at all — `discriminate` / `reflexivity`, per
 M6b-pre (1). Any new lemma here should be written that way from the start
 rather than after a failure.
+
+## M6c (NEXT, fresh budget) — the per-hart boot chain
+
+The one lemma M6b exists to make possible, stated per hart:
+
+```
+power_boot_res HE gen boot_D nproc g'  (hart c's share)  ⊢  WP (LoopE gen c)
+```
+
+i.e. carve → `hw_config`/`mmode_config` → `wp_entry_boot` →
+`BootBridge.boot_bridge` → `wp_main_boot_sconf` (hart 0) or
+`wp_main_secondary` (the rest), the arm chosen by `fin_to_nat c` — which is
+sound because `boot_facts` pins `mhartid = c` (M6a) and SpecMain's boot arm is
+gated on `cid_word = zero_reg`.
+
+**What the chain needs and ALREADY EXISTS** (all axiom-free and linked):
+
+- the carve: `BootCarve` §1–§11 + `BootCarveMain` (slices 1a/1b/1b'/2a/3 and
+  2b's machinery) — `kernel_text_intro`, `kernel_data_intro`,
+  `kernel_data_phys_word` (the `entry_ld_ea` word),
+  `boot_stack_own_phys` (per-hart, at that hart's sp),
+  `boot_kinit_run`, the cell/family combinators.
+- the config bundles: `BootConfig.hw_config_intro` / `mmode_config_intro`
+  from the `reset_regs`-pinned cells, `pma_allows_all_pma_boot`,
+  `pmp_all_off pmpcfg_boot`, and `boot_D` as the register set to ask for.
+- the M-mode contract: `SpecEntry.wp_entry_boot` (`LinkEntry`), whose
+  remaining premises are all discharged from the above plus `4 <= n`.
+- the seam: `BootBridge.boot_bridge`, and `stack_own_phys_to_stack` for the
+  physical→VA stack tier.
+- main itself: `SpecMain` (boot arm) and `SpecMainSecondary`, both proven.
+
+**What it needs that does NOT yet exist — noticed while building M6b, and
+each one is a real gap, not a formality:**
+
+1. **`boot_D` IS INCOMPLETE.** `SpecMain.main_hart_raw` wants
+   `tlb ↦ᵣ tlbvec0` and `IntrDefs.trap_csrs` (= `sepc`, `scause`, `stval`),
+   and NONE of those four registers is in `boot_D`. Adequacy only ever hands
+   out `D c`, so the client cannot obtain them: `boot_D` must gain them.
+   Since that set is the documented MINIMUM, **audit the whole of main's and
+   `wp_entry_boot`'s register footprint against it** (start from
+   `main_hart_raw`, `sie_cap_gpr`, and whatever `trapinithart` consumes)
+   rather than adding these four and stopping.
+2. **The client-side ghosts.** `power_boot_res` provides only ERA ghosts, so
+   `fd_slots`, and the names behind every class main's statement binds
+   (`lockG`/`kallocG`/`fileG`/`sieG`/`fdslotG`/`uartGhostG`/`diskGhostG`),
+   are the client's to allocate inside its `={⊤}=∗` — with the matching
+   functors in Σ. `fd_slots` in particular has NO memory footprint (slice 2b,
+   item 3).
+3. **The sp₀ arithmetic.** `wp_entry_boot`'s stack premises and
+   `boot_stack_own_phys`'s range are about `uint sp0` where
+   `sp0 = m_jal m v_stack0 mhartid_in !!! csp_rs1` = `stack0 + 4096*(c+1)`.
+   Nothing in the tree yet computes that: the client needs
+   `uint sp0 = 0x8000a250 + 4096 * (fin_to_nat c + 1)` (from `v_stack0` =
+   the `entry_ld_ea` word = `&stack0` and `mhartid = c`), which is what makes
+   the per-hart stack range, BootBridge's
+   `text_end + 8*boot_stack_slots K <= uint sp0` / `uint sp0 <= ram_base +
+   ram_size`, and the two `ti_ea_*` PMP-region bounds all dischargeable.
+   Note `stack0 = 0x8000a250` is 16-aligned but NOT page-aligned, and the
+   eight per-hart slices are `[stack0 + 4096*h, stack0 + 4096*(h+1))`.
+4. **`KernelSyms._entry = 0x80000000`** — M6a's bridge list still owes it;
+   `reset_regs` pins PC to the literal and `SpecEntry`'s entry pc is
+   `mword_of_int KernelSyms._entry`, so it is `reflexivity`, but nothing
+   states it.
+5. **`started_inv P` and the deposit wand.** main's precondition takes both,
+   so the client must allocate `StartedInv.started_inv` and CHOOSE `P`. That
+   choice is the boot composition's actual content and is
+   `main-boot.md`'s outstanding item; the secondary arm's concrete package is
+   `SpecMainSecondary.main_deposit`.
+6. **The disjointness bookkeeping.** The carve's cuts must be taken in
+   ADDRESS ORDER out of one `.bss` range, so the client needs the symbol
+   addresses sorted and their non-overlap by `vm_compute` — cheap, but it is
+   the client's job and there is no helper for it.
 
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item), now over the
