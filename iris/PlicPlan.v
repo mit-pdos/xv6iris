@@ -39,6 +39,16 @@ Definition plic_senable_ok (w : bv 32) : Prop :=
 Definition plic_ok (p : plic_state) : Prop :=
   forall h : nat, plic_senable_ok (p_enable p h).
 
+(* The reset PLIC satisfies the plan: every S-context enable word is zero, and
+   zero enables nothing (so a fortiori nothing outside the real sources).
+   This is what lets a boot client allocate [plic_inv] over the machine a
+   PowerOn hands it (claude-notes/design/crash.md). *)
+Lemma plic_ok_plic0 : plic_ok plic0_state.
+Proof.
+  intro h. unfold plic_senable_ok. cbn [p_enable plic0_state].
+  vm_compute. reflexivity.
+Qed.
+
 (* A hart that overwrites its OWN enable word with a permitted value keeps the
    plan, whatever the other harts' words are -- this is the whole point of
    stating the plan per hart. *)

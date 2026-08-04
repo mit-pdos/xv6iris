@@ -406,11 +406,116 @@ speak about disk content. That mint is `DiskPtsto.disk_bytes_mint` at
 the empty auth, and it has to be threaded into both adequacy theorems'
 client bundles together with the FS's abstract state.
 
+## M6a (boot_shape pins the reset machine) — LANDED
+
+`boot_shape` used to say only "same generation, power on, memory is
+RAM-shaped, disk reset". It now pins everything a boot proof has to READ
+off a fresh machine, and nothing more:
+
+- **`reset_regs c rs`** (RiscvLang.v) pins twelve register VALUES per
+  hart: PC = 0x80000000, `cur_privilege = Machine`, `hart_state =
+  HART_ACTIVE tt`, `mhartid = c` (the hart index — this is what ties
+  `_entry`'s per-hart stack carve and SpecMain's arm choice to the CPU
+  the thread runs on), `mstatus = 0xA00000000` (SXL=UXL=2, MIE=MPRV=0 —
+  the model's own `sail_model_init`, = `BootBridge.mstatus_reset`),
+  `misa = 0x800000000014112D` (= `RiscvFetchExec.MISA_C`), `mseccfg = 0`,
+  `menvcfg = 0` (so `_get_MEnvcfg_LPE = 0`), `htif_tohost_base = None`,
+  `elp = landing_pad_bits_backwards NO_LP_EXPECTED` (the model's
+  `reset_elp`), `pma_regions = pma_boot`, `pmpcfg_n = pmpcfg_boot`.
+  Everything `SpecEntry.wp_entry_boot` ∀-quantifies —
+  mepc/satp/medeleg/mideleg/mie/mcounteren/stimecmp/pmpaddr_n and the
+  GPRs — is deliberately NOT pinned: `boot_shape` stays as weak as the
+  hardware. Values, not predicates: the properties the boot proof needs
+  (`pmp_all_off`, `pma_allows_all`, the MISA bits, mstatus's
+  MIE/MPRV/SXL, menvcfg's LPE) live above RiscvLang and are M6's bridges.
+- **Memory** is now pinned exactly: `(∀ a, ram_lo ≤ a < ram_hi →
+  gmem !! mword_of_int a = Some (boot_byte a))` — RAM is TOTAL (what lets
+  a client carve main's memory precondition) and holds the LOADED IMAGE
+  (what lets it read the kernel text back out) — plus the old "nothing
+  outside RAM". `boot_byte a := default byte0 (boot_image !! a)` with
+  `boot_image` the ELF's loadable bytes FILTERED to `[ram_lo, img_end)`.
+  The filter is the trick that makes ".bss is zero-filled" SYMBOLIC: at
+  or above `img_end` the lookup is `None` by `map_lookup_filter_None`, so
+  no proof ever walks either 20k-entry literal map.
+- **The image is nameable in the language**: RiscvLang.v now does
+  `From Kernel Require KernelInstrs KernelData`. Measured cost: ~0.03 s
+  per importing file (the .vo's are 3 MB/1.4 MB but load lazily), and
+  zero instance risk — both are stdpp-only generated literals, no Sail,
+  no iris. This is what makes the image a fact of the SEMANTICS rather
+  than an assumption bolted onto a client.
+- **Devices**: `duart = uart0_state`, `dplic = plic0_state` (+
+  `PlicPlan.plic_ok_plic0`, so a boot client can allocate `plic_inv`),
+  `dvirtio = virtio_reset <the old disk>` (unchanged — the image
+  survives).
+- **`boot_facts g'`** is the client-facing half (everything except the
+  two bookkeeping equalities relating the new machine to the dead one),
+  and it is what `Hboot` takes in `wp_power_loop` and in
+  `riscv_power_adequacy` — replacing the old three premises
+  (Hram/gpow/∃virtio), which it subsumes.
+- **`iris/PowerBoot.v`** (new) holds the canonical reset machine
+  `boot_gstate` (reset regs written over the dead machine's, `boot_mem`,
+  reset devices) and `boot_shape_boot_gstate`, which is now
+  `wp_power_loop`'s PowerOn reducibility witness — the ONE place that
+  knows how to construct a reset machine.
+
+Gotchas (all paid for here):
+
+- **`Qed` never came back** on the "nothing outside RAM" direction when
+  it went through `elem_of_list_to_map_2` on the 134M-entry
+  `list_to_map` (the reverse direction puts the list into the proof
+  term). Fix: CUT THE DOMAIN with a `base.filter` on the map instead of
+  arguing about the list's keys, and the fact becomes one
+  `map_lookup_filter_Some`. The forward direction
+  (`elem_of_list_to_map`) is cheap and stays.
+- **Never `split_and!; try reflexivity` across `boot_shape`'s
+  conjuncts.** On the memory clause `reflexivity` tries to unify a lookup
+  in that same giant map with `Some _` and computes the list. One tactic
+  per conjunct.
+- **`injection` on an `Arch.pa * bv 8` pair equation does not come
+  back** (the pa width is an unreduced `if 64 =? 32 …`);
+  `apply (f_equal fst)` + `cbn` is instant.
+- `mword`, `mword_of_int`, `vec`, `vector_init` live in
+  **SailStdpp.Values**, not Operators_mwords, and RiscvLang must spell
+  them QUALIFIED (importing Values would make `Countable_mword`
+  canonical and retype `gmem`). `uint` is in Operators_mwords.
+- PowerBoot.v is iris-free, so it uses vanilla `rewrite a, b` with
+  COMMAS (ssreflect's space-separated form is not available there).
+
+**TWO THINGS M6 MUST FIX FIRST — both discovered here, neither
+fudgeable:**
+
+1. **`RiscvFetchExec.pma_allows_all` is not satisfiable as stated.** It
+   demands `∀ (a : mword 64) (n : Z), ∃ r, matching_pma_region regions
+   (Physaddr a) n = Some r ∧ <permissive>` — over ALL widths `n`,
+   including ones that wrap the 64-bit space, and `range_subset` (rv64d
+   6273) fails exactly on the wrap (it compares `a_begin ≤u a_end`
+   relative to the region base). So no table can satisfy it, and every
+   spec taking it as a premise is today vacuously satisfied. `boot_shape`
+   pins `pma_boot` — ONE all-permitting region over the whole space,
+   which is the honest platform model and satisfies the predicate for
+   every non-wrapping access. M6 must restrict `pma_allows_all` to the
+   widths the model itself allows (`1 ≤ n ≤ 4096`, `uint a + n ≤ 2^64`;
+   the Sail source's own precondition comment says as much) and thread
+   the bound at its use sites, after which `pma_allows_all pma_boot`
+   becomes provable.
+2. **`hw_config` has no construction site anywhere in the tree** — it is
+   only ever consumed, so nothing has yet had to produce
+   `misa ↦ᵣ□ …`/`mseccfg`/`pma_regions`/`htif_tohost_base`/`elp`. With
+   `reset_regs` pinned, M6 can finally build it from the reset cells:
+   `RiscvPtsto.reg_pointsto_persist` per cell (template:
+   `TimerCap.v:95`), then the pure facts by `vm_compute`. The bridges it
+   needs, none of which landed here: `KernelSyms._entry = 0x80000000`,
+   `MISA_C = <the pinned misa>` (reflexivity), `pmp_all_off
+   pmpcfg_boot`, `pma_allows_all pma_boot` (blocked on 1),
+   mstatus's MIE/MPRV/SXL from `0xA00000000`, `_get_MEnvcfg_LPE 0 = 0`.
+
 **M6** — the boot composition as the ∀-era entailment instantiating
-`power_boot_res` (absorbs main-boot's outstanding item); tighten
-`boot_shape` with the device-reset facts (uart/plic reset, so the
-device corollary can run under power) and the harts' reset registers
-(SpecEntry.v's coming-out-of-reset state, so `wp_entry_boot` composes).
+`power_boot_res` (absorbs main-boot's outstanding item), now over the
+pinned `boot_facts`: carve the image out of the RAM-total memory
+(`kernel_text` from `boot_byte` on `[ram_lo, img_end)`, the bss zeros
+above it), build `hw_config`/`mmode_config` per hart from the reset
+cells, run `wp_entry_boot` on every forked hart, and hand each `main`
+its half via `BootBridge.boot_bridge`.
 3. **Death machinery**: `wp_dead`, the base rules' four-way case split
    (`> gen` dead / live / off-refuted-by-registry / `< gen`
    refuted-by-birth-bound), birth lb + era registration folded into the

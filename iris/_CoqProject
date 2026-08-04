@@ -27,6 +27,7 @@ VirtioQueue.v
 DiskPtsto.v
 VirtioProto.v
 RiscvExtras.v
+PowerBoot.v
 AlignBits.v
 RiscvTryStep.v
 RiscvFetchExec.v

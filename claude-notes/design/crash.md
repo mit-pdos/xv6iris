@@ -33,11 +33,18 @@ engine, or whole-function statement. Worklist:
     threads (`LoopE ggen c` for each hart + the three device loops) via
     `prim_step`'s `efs`. First boot and every reboot are this same arm.
   - The gating makes the alternation total: no stutter arm, never stuck.
-- `boot_shape` (PowerModel.v, pure): kernel image reloaded + bss zeroed
-  (the loader/firmware, modeled here), registers at reset (SpecEntry.v's
-  coming-out-of-reset assumptions: PC = 0x80000000, M-mode, all-OFF PMP),
-  devices reset (`virtio_reset` keeps `v_disk`), rest of RAM/regs
-  arbitrary.
+- `boot_shape` (RiscvLang.v, pure): the kernel image reloaded and .bss
+  zeroed over an ALL-PRESENT RAM (the loader/firmware, modeled here as
+  `boot_byte` over the ELF's own byte maps), the twelve per-hart reset
+  registers of `reset_regs` (PC = 0x80000000, M-mode, mhartid = the hart
+  index, the M-mode config registers, all-OFF PMP), the devices reset
+  (`virtio_reset` keeps `v_disk`; UART/PLIC at their power-on states) —
+  and the rest of the registers arbitrary, because that is what a boot
+  proof quantifies over. `boot_facts` is the same fact set minus the two
+  equalities that relate the new machine to the dead one: it is what the
+  power thread hands the boot client. The canonical machine that has the
+  shape, and the witness that PowerOn can always step, are `boot_gstate`
+  / `boot_shape_boot_gstate` in PowerBoot.v.
 - The corpse arm is a SELF-LOOP, not a retire-to-value: reaching a value
   would force `Φ dead_val` through every leaf lemma in the tree; the
   self-loop keeps the dead branch Φ-generic. Deliberate consequence:

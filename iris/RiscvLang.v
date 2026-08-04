@@ -19,6 +19,13 @@ From iris.program_logic Require Import language.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Export DevModel.
+(* The LOADED KERNEL IMAGE, as the loader/firmware leaves it at a boot
+   (claude-notes/design/crash.md): [boot_shape] below pins RAM to it, so the
+   image has to be nameable HERE, in the language.  Both files are
+   auto-generated per-byte [gmap Z (bv 8)] literals over stdpp only -- no
+   Sail, no iris -- so importing them costs ~0.03 s per file and pulls in
+   nothing that could shift a typeclass instance. *)
+From Kernel Require KernelInstrs KernelData.
 (* NB: deliberately NO `Set Default Proof Using "Type"` — some merged sections   *)
 (* use bare `Proof.` and rely on Coq's default (generalize over the section      *)
 (* Hypotheses actually used), as in their original (Set-free) files.             *)
@@ -377,20 +384,149 @@ Inductive mexpr :=
   | PlicLoopE (gen : nat)
   | PowerLoopE.
 
+(* ---------------------------------------------------------------------- *)
+(* THE RESET MACHINE (claude-notes/design/crash.md): what the loader and    *)
+(* the hardware leave behind at a PowerOn.  Everything a boot proof needs   *)
+(* to READ off the fresh machine is pinned here, and nothing else is: every *)
+(* register [SpecEntry.wp_entry_boot] quantifies over (mepc/satp/medeleg/   *)
+(* mideleg/mie/mcounteren/stimecmp/pmpaddr_n) is deliberately left          *)
+(* arbitrary, so this predicate stays as weak as the hardware.              *)
+(* ---------------------------------------------------------------------- *)
+
+(* RAM as the platform wires it.  [RiscvPtsto.addr_is_ram] is exactly
+   [ram_lo <= uint a < ram_hi] (its [ram_base]/[ram_size] live ABOVE this
+   file, so the constants are spelled here; keep the two in sync). *)
+Definition ram_lo : Z := 0x80000000.
+Definition ram_hi : Z := 0x88000000.
+
+(* THE LOADED IMAGE.  The ELF's loadable bytes -- text ([kernel_bytes]) and
+   data ([kernel_data]) -- RESTRICTED to the file image [ram_lo, img_end).
+   The restriction is what makes ".bss is zero-filled" a SYMBOLIC fact: at
+   or above [img_end] the filter yields [None], so [boot_byte] is [byte0]
+   with no lookup into either 20k-entry literal.  [img_end] is the single
+   PT_LOAD's vaddr + filesz, and [.bss] runs from there up to
+   [KernelData.kernelMemEnd]. *)
+Definition img_end : Z := 0x8000a220.
+
+Definition boot_image : gmap Z (bv 8) :=
+  base.filter (fun ab : Z * bv 8 => (ab.1 < img_end)%Z)
+    (KernelInstrs.kernel_bytes ∪ KernelData.kernel_data).
+
+(* the byte the loader leaves at [a]: the image's where it has one, zero
+   everywhere else in RAM (.bss and the free pages) *)
+Definition boot_byte (a : Z) : bv 8 := default byte0 (boot_image !! a).
+
+(* a 64-bit reset value, spelled once (the model's [mword_of_int] is not
+   imported unqualified here -- see the header note) *)
+Definition boot_w64 (z : Z) : SailStdpp.Values.mword 64 :=
+  SailStdpp.Values.mword_of_int z.
+
+(* THE PLATFORM'S PMA TABLE, idealized as ONE all-permitting region over the
+   whole address space.  This is the honest reading of the assumption the
+   whole M-mode tower already makes ([RiscvFetchExec.pma_allows_all], which
+   every fetch/memory lemma takes as a premise): the platform's physical
+   memory attributes permit what the kernel does.  Pinning a table here is
+   what will let the M6 client DISCHARGE that premise instead of assuming
+   it.  (Note for M6: [pma_allows_all] as currently stated quantifies over
+   ALL widths [n : Z], including ones that wrap the 64-bit address space, so
+   it is not satisfiable by ANY table -- [range_subset] fails on the wrap.
+   It has to be restricted to the widths the model itself allows
+   ([1 <= n <= 4096], no wraparound) before this table can serve; see the
+   M6a entry in claude-notes/projects/crash.md.) *)
+Definition pma_boot_attrs : PMA := {|
+  PMA_mem_type := MainMemory;
+  PMA_cacheable := true;
+  PMA_coherent := true;
+  PMA_executable := true;
+  PMA_readable := true;
+  PMA_writable := true;
+  PMA_read_idempotent := true;
+  PMA_write_idempotent := true;
+  PMA_misaligned_exceptions := {|
+    PMAMisalignedExceptions_load_store := None;
+    PMAMisalignedExceptions_vector := None;
+    PMAMisalignedExceptions_amo := AccessFault |};
+  PMA_atomic_support := AMOSwap;
+  PMA_reservability := RsrvNonEventual;
+  PMA_supports_cbo_zero := true;
+  PMA_supports_pte_read := true;
+  PMA_supports_pte_write := true |}.
+
+Definition pma_boot : list PMA_Region := [ {|
+  PMA_Region_base := boot_w64 0;
+  PMA_Region_size := boot_w64 0xFFFFFFFFFFFFFFFF;
+  PMA_Region_attributes := pma_boot_attrs;
+  PMA_Region_include_in_device_tree := false |} ].
+
+(* pmpcfg with every entry OFF and unlocked -- what the model's [reset_pmp]
+   establishes (it clears A and L in all 64 entries) and what
+   [RiscvFetchExec.pmp_all_off] asks for.  All-zero bytes: A = bits[4:3] = 0
+   decodes to OFF and L = bit 7 is clear, and the out-of-range default of
+   [vec_access_dec] is the [Inhabited] zero as well, so the property holds
+   at EVERY index. *)
+Definition pmpcfg_boot
+    : SailStdpp.Values.vec (SailStdpp.Values.mword 8) 64 :=
+  SailStdpp.Values.vector_init 64 (SailStdpp.Values.mword_of_int 0).
+
+(* THE PER-HART RESET REGISTERS.  Every value here is either the model's own
+   reset ([sail_model_int]/[reset]) or the platform's configuration; the
+   PREDICATES the boot proof needs of them ([pmp_all_off pmpcfg_boot],
+   [pma_allows_all pma_boot], the MISA bit facts, mstatus's MIE/MPRV/SXL,
+   menvcfg's LPE) are all consequences, proved where those predicates live
+   (they are above this file). *)
+Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
+  (* the pc a hart comes out of reset at.  [KernelSyms._entry] is 0x80000000
+     but KernelSyms is above this file, so the literal is spelled here and
+     the M6 bridge equates the two. *)
+  register_lookup PC rs = boot_w64 0x80000000
+  /\ register_lookup cur_privilege rs = Machine
+  /\ register_lookup hart_state rs = HART_ACTIVE tt
+  (* mhartid IS the hart index: this is what makes [_entry]'s per-hart stack
+     carve and SpecMain's arm choice (cid_word = zero_reg for hart 0) line up
+     with the CPU the thread runs on. *)
+  /\ register_lookup mhartid rs = boot_w64 (Z.of_nat (fin_to_nat c))
+  (* SXL = UXL = 2 (64-bit), MIE = MPRV = 0 -- the model's own
+     [sail_model_init], and [BootBridge.mstatus_reset] *)
+  /\ register_lookup mstatus rs = boot_w64 0xA00000000
+  (* = [RiscvFetchExec.MISA_C]: S, C, U, M and A present *)
+  /\ register_lookup misa rs = boot_w64 0x800000000014112D
+  /\ register_lookup mseccfg rs = boot_w64 0
+  /\ register_lookup menvcfg rs = boot_w64 0
+  /\ register_lookup htif_tohost_base rs = None
+  (* the model's [reset_elp]: no landing pad expected *)
+  /\ register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED
+  /\ register_lookup pma_regions rs = pma_boot
+  /\ register_lookup pmpcfg_n rs = pmpcfg_boot.
+
+(* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
+   replaces: this is the fact set the power thread hands the boot client
+   ([RiscvAdequacy.power_boot_res]'s [Hboot] premise). *)
+Definition boot_facts (g' : gstate) : Prop :=
+  g'.(gpow) = true
+  (* nothing outside RAM exists ... *)
+  /\ (forall a b, g'.(gmem) !! a = Some b ->
+        (ram_lo <= SailStdpp.Operators_mwords.uint a < ram_hi)%Z)
+  (* ... and ALL of RAM does, holding the loaded image (zero off it).  The
+     totality is what lets a client carve main's memory precondition, and the
+     content is what lets it read the kernel text back out. *)
+  /\ (forall a : Z, (ram_lo <= a < ram_hi)%Z ->
+        g'.(gmem) !! (SailStdpp.Values.mword_of_int a : Arch.pa)
+        = Some (boot_byte a))
+  /\ (forall c : CPU, reset_regs c (g'.(gregs) c))
+  (* the devices are reset: FIFOs empty, no interrupt enabled or pending,
+     the disk's queue not live (its IMAGE survives -- see [boot_shape]) *)
+  /\ g'.(gdev).(duart) = uart0_state
+  /\ g'.(gdev).(dplic) = plic0_state
+  /\ (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0).
+
 (* the machine state a PowerOn hands over (claude-notes/design/crash.md):
-   same generation (PowerOff already bumped it), power up, a RAM-shaped
-   memory, and the disk device RESET -- [virtio_reset] keeps [v_disk], the
-   ONE crash-surviving component.  Deliberately MINIMAL so far: the
-   UART/PLIC reset facts and the harts' reset registers join when their
-   consumers (the device corollary, the M6 boot composition) land;
-   tightening this predicate later only shrinks the PowerOn arm (the one
-   proof it touches is [wp_power_loop]'s reducibility witness). *)
+   same generation (PowerOff already bumped it), the reset machine above,
+   and the disk device reset FROM THIS MACHINE's disk -- [virtio_reset]
+   keeps [v_disk], the ONE crash-surviving component. *)
 Definition boot_shape (g g' : gstate) : Prop :=
-  g'.(ggen) = g.(ggen) /\ g'.(gpow) = true /\
-  (forall a b, g'.(gmem) !! a = Some b ->
-     (0x80000000 <= SailStdpp.Operators_mwords.uint a
-        < 0x80000000 + 0x8000000)%Z) /\
-  g'.(gdev).(dvirtio) = virtio_reset g.(gdev).(dvirtio).
+  g'.(ggen) = g.(ggen)
+  /\ g'.(gdev).(dvirtio) = virtio_reset g.(gdev).(dvirtio)
+  /\ boot_facts g'.
 
 (* what a PowerOn forks: the new generation's whole thread complement *)
 Definition power_fork (gen : nat) : list mexpr :=

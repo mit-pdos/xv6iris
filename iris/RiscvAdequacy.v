@@ -62,6 +62,7 @@ Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans
 Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
 Require Import PlicPlan DiskPtsto VirtioProto WpUart.
+Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)
@@ -763,10 +764,13 @@ Section power.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc : nat)
       (Φ : mval -> iProp Σ)
+      (* the boot client is handed the WHOLE fact set a reset machine has
+         ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
+         per-hart reset registers, the reset devices, power on) -- everything
+         [boot_shape] says except the two bookkeeping equalities that relate
+         the new machine to the dead one. *)
       (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
-         (forall a b, g'.(gmem) !! a = Some b -> addr_is_ram a) ->
-         g'.(gpow) = true ->
-         (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0) ->
+         boot_facts g' ->
          ⊢ power_boot_res HE gen D nproc g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
@@ -819,16 +823,13 @@ Section power.
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
       iSplitR.
       { iPureIntro.
-        exists [], PowerLoopE,
-          (GState g.(gregs) ∅
-             (DevState g.(gdev).(duart) g.(gdev).(dplic)
-                (virtio_reset g.(gdev).(dvirtio)))
-             g.(ggen) true),
-          (power_fork g.(ggen)).
+        (* SOMEWHERE TO GO: the canonical reset machine (PowerBoot.v) has the
+           shape [boot_shape] demands -- reset registers, all of RAM holding
+           the loaded image, reset devices, the disk image preserved. *)
+        exists [], PowerLoopE, (boot_gstate g), (power_fork g.(ggen)).
         do 4 right. split_and!; auto.
         right. split_and!; auto.
-        rewrite /boot_shape /=. split_and!; auto.
-        intros a b Hl. rewrite lookup_empty in Hl. discriminate Hl. }
+        apply boot_shape_boot_gstate. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct Hstep as
         [ (gen2 & cpu2 & Hc & _)
@@ -837,7 +838,8 @@ Section power.
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | congruence | ].
       iIntros "_".
-      destruct Hbs as (Hgen2 & Hpow2 & Hram2 & Hvirt2).
+      destruct Hbs as (Hgen2 & Hvirt2 & Hbf).
+      pose proof (proj1 Hbf) as Hpow2.
       (* fresh era: registers, memory, devices, and the per-era kernel
          ghosts, all at brand-new names *)
       iMod (reg_alloc_cpus g2.(gregs) D (enum CPU) (NoDup_enum CPU))
@@ -877,10 +879,9 @@ Section power.
       iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hbornlb".
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
-      iMod (Hboot HE g.(ggen) g2 Hram2 Hpow2 with
+      iMod (Hboot HE g.(ggen) g2 Hbf with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
-      { rewrite Hvirt2. eauto. }
       { rewrite /power_boot_res.
         iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF".
         iFrame "Helems".
@@ -939,11 +940,13 @@ Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        one. *)
     (Pc : iProp Σ) (HPc : ⊢ Pc)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (* the client boots ANY era over ANY machine of the reset shape; what it
+       is told about that machine is [RiscvLang.boot_facts] (RAM total and
+       holding the loaded kernel image, the per-hart reset registers, the
+       reset devices, power on) *)
     (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
                     (g' : gstate),
-       (forall a b, g'.(gmem) !! a = Some b -> addr_is_ram a) ->
-       g'.(gpow) = true ->
-       (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0) ->
+       boot_facts g' ->
        ⊢ power_boot_res HE gen D nproc g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
