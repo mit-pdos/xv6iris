@@ -613,6 +613,100 @@ Section BootCarve.
   (* [stack_own_phys_to_stack] on top of this.)                          *)
   (* ================================================================== *)
 
+  (* ================================================================== *)
+  (* §10  TYPED CELLS: a range as the byte run a cell's intro lemma wants. *)
+  (*                                                                    *)
+  (* Every typed global [SpecMain.main_locks_raw] / [main_globals_raw]   *)
+  (* names is W consecutive OWNED bytes at a kernel-symbol address, and  *)
+  (* [RiscvPtsto]'s three intro lemmas ([word_pointsto_intro] /          *)
+  (* [word4_pointsto_intro] / [word2_pointsto_intro]) all take exactly   *)
+  (* the same thing: an alignment fact plus                             *)
+  (* [[∗ list] j ∈ seq 0 W, pa_add a j ↦ₘ nth_byte w j].  So this        *)
+  (* section produces THAT, width-generically, in the two flavours the   *)
+  (* image offers -- contents-EXISTENTIAL (which is what almost every    *)
+  (* conjunct wants, since a caller cannot honestly claim a value for a  *)
+  (* static it has never written) and PINNED (the .bss cells, whose      *)
+  (* value the loader fixes at zero).  One lemma each, no per-width      *)
+  (* copies and no per-cell copies.                                     *)
+  (* ================================================================== *)
+
+  (* ".bss is zero-filled", SYMBOLICALLY: at or above [img_end] the image
+     filter yields [None], so no proof ever walks either 20k-entry literal. *)
+  Lemma boot_byte_bss (a : Z) : img_end <= a -> boot_byte a = DevModel.byte0.
+  Proof.
+    intro Ha.
+    assert (Hn : boot_image !! a = None).
+    { unfold boot_image. apply map_lookup_filter_None. right.
+      intros x _ Hp. cbn in Hp. lia. }
+    unfold boot_byte. rewrite Hn. reflexivity.
+  Qed.
+
+  Local Lemma bs_lookup (A : Z) (W j : nat) :
+    (j < W)%nat ->
+    ((fun i : nat => boot_byte (A + Z.of_nat i)) <$> seq 0 W) !!! j
+    = boot_byte (A + Z.of_nat j).
+  Proof.
+    intro Hj. rewrite list_lookup_total_alt list_lookup_fmap.
+    rewrite (lookup_seq_lt 0 W j Hj). reflexivity.
+  Qed.
+
+  (* the run at a PINNED value: [boot_ran_mem_run] with the image's bytes
+     identified with the value's, which is the caller's one obligation. *)
+  Lemma boot_ran_run_at {m : N} (g : gstate) (A : Z) (W : nat) (w : bv m) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + Z.of_nat W <= ram_hi ->
+    (forall j, (j < W)%nat -> nth_byte w j = boot_byte (A + Z.of_nat j)) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + Z.of_nat W)
+    -∗ ([∗ list] j ∈ seq 0 W, (pa_add (pa_of_z A) j) ↦ₘ nth_byte w j).
+  Proof.
+    intros Hmem Hlo Hhi Hbytes. iIntros "#Hcl H".
+    iDestruct (boot_ran_mem_run g A W Hmem Hlo Hhi with "Hcl H") as "Hbs".
+    iApply (big_sepL_mono with "Hbs"). iIntros (kk j Hk) "Hb".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    rewrite (Hbytes (0 + kk)%nat Hlt). iExact "Hb".
+  Qed.
+
+  (* ...and the .bss corollary: above [img_end] the obligation is discharged
+     by [boot_byte_bss], so the caller owes only "this value's bytes are
+     zero" -- eight (or two) [vm_compute]s on a CLOSED value. *)
+  Lemma boot_ran_run_bss {m : N} (g : gstate) (A : Z) (W : nat) (w : bv m) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> img_end <= A -> A + Z.of_nat W <= ram_hi ->
+    (forall j, (j < W)%nat -> nth_byte w j = DevModel.byte0) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + Z.of_nat W)
+    -∗ ([∗ list] j ∈ seq 0 W, (pa_add (pa_of_z A) j) ↦ₘ nth_byte w j).
+  Proof.
+    intros Hmem Hlo Hbss Hhi Hz.
+    iApply (boot_ran_run_at g A W w Hmem Hlo Hhi).
+    intros j Hj. rewrite (Hz j Hj). symmetry. apply boot_byte_bss. lia.
+  Qed.
+
+  (* the run at an EXISTENTIAL value: the little-endian assembly of whatever
+     the loader left.  [m] is any width wide enough for the [W] bytes, so this
+     ONE lemma serves [↦₈] (W=8), [↦₄] (W=4), [↦₂] (W=2) and any byte array. *)
+  Lemma boot_ran_run_ex {m : N} (g : gstate) (A : Z) (W : nat) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + Z.of_nat W <= ram_hi ->
+    (8 * Z.of_nat W <= Z.of_N m) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + Z.of_nat W)
+    -∗ (∃ w : bv m,
+          [∗ list] j ∈ seq 0 W, (pa_add (pa_of_z A) j) ↦ₘ nth_byte w j).
+  Proof.
+    intros Hmem Hlo Hhi Hm. iIntros "#Hcl H".
+    set (bs := (fun i : nat => boot_byte (A + Z.of_nat i)) <$> seq 0 W).
+    assert (Hlen : length bs = W)
+      by (subst bs; rewrite length_fmap length_seq; reflexivity).
+    iExists (Z_to_bv m (assemble_bytes bs) : bv m).
+    iApply (boot_ran_run_at g A W _ Hmem Hlo Hhi with "Hcl H").
+    intros j Hj.
+    rewrite (nth_byte_assemble_len m bs j ltac:(rewrite Hlen; exact Hm)
+               ltac:(rewrite Hlen; exact Hj)).
+    subst bs. exact (bs_lookup A W j Hj).
+  Qed.
+
   Lemma boot_stack_own_phys (g : gstate) (sp : mword 64) (n : nat) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->

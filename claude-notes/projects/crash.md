@@ -858,24 +858,45 @@ equation; and `assert … by (unfold … in *; cbn in *; lia)` in a goal whose
 proofmode context holds `kernel_data` walks the 18000-entry big_sepM. Name
 the hypothesis you meant (`unfold img_end in Hhi`), never `in *`.
 
-### Slice 2 — typed cells (NOT STARTED)
+### Slice 2 — typed cells: THE CELL LAYER IS LANDED, the structured
+### conjuncts remain
 
-The 4/8-byte cells at kernel-symbol addresses that `main_locks_raw` /
-`main_globals_raw` demand, out of consecutive `↦ₘ` bytes with their image
-values (bss = 0 symbolically, via `boot_byte`'s filter being `None` at or
-above `img_end`; data = the dump's words). **Start from slice 1b''s range
-layer**: each cell is `boot_ran_split` down to its own `[A, A+W)` and then
-`boot_ran_own` + a width-W join — `boot_ran_word`'s `↦ₘ`/existential twins
-(`↦₈`/`↦₄`/`↦₂`, all contents-existential) plus a `boot_byte_bss`
-("`img_end ≤ a → boot_byte a = byte0`", one `map_lookup_filter_None`) for
-the two that are PINNED (`kmem+24 ↦₈ 0` and `d_used_idx ↦₂ wrap16 0`). The
-addresses and widths are uniform, so that combinator family beats forty
-bespoke lemmas. What is NOT uniform, and is where the real work is, is the
-STRUCTURED conjuncts — `proc_raw`/`proc_pub` × 64, `fd_slots`, the NBUF
-`sl_raw`/`blink_raw`, the NINODE sleeplocks, `disk_slot_raw` × 8 — each of
-which needs its own file's vocabulary (ProcGeom / FdSlots / BcacheInv /
-DiskInv). Those cannot live in BootCarve (it stays below the WP tower on
-purpose): they want a file above SpecMain, which is also where slice 3 goes.
+**BootCarve §10 is the whole width-generic core, and it came out as three
+lemmas rather than a family, because `RiscvPtsto`'s three intro lemmas
+(`word_pointsto_intro` / `word4_pointsto_intro` / `word2_pointsto_intro`)
+all take EXACTLY the same thing** — an alignment fact plus
+`[∗ list] j ∈ seq 0 W, pa_add a j ↦ₘ nth_byte w j`. So §10 produces that run,
+width-generically (`{m : N}`, any `W` with `8*W ≤ m`), in the two flavours the
+image offers, and there are no per-width and no per-cell copies:
+
+- `boot_ran_run_ex` — contents-EXISTENTIAL: the little-endian assembly of
+  whatever the loader left. This is what almost every conjunct wants (a
+  caller cannot honestly claim a value for a static it has never written), and
+  it serves `↦₈` (W=8), `↦₄` (W=4), `↦₂` (W=2) and byte arrays like
+  `disk_free[8]` from the one statement.
+- `boot_ran_run_at` — a PINNED value, with "the image's bytes ARE this value's"
+  as the caller's one obligation.
+- `boot_ran_run_bss` — the .bss corollary of it: above `img_end` that
+  obligation is discharged by `boot_byte_bss` ("`img_end ≤ a → boot_byte a =
+  byte0`", one `map_lookup_filter_None`, no walk of either 20k-entry literal),
+  so the caller owes only "this CLOSED value's bytes are zero" — W
+  `vm_compute`s. This is what the two pinned conjuncts (`kmem+24 ↦₈ 0` and
+  `d_used_idx ↦₂ wrap16 0`) need.
+
+So a cell is now three lines: `boot_ran_split` down to its own `[A, A+W)`,
+one of the three above, then the width's `*_pointsto_intro` with
+`aligned8_of_mod`-style alignment (a `vm_compute` on the symbol address).
+
+**WHAT REMAINS is the STRUCTURED conjuncts, and that is where the work is** —
+`proc_raw`/`proc_pub` × 64, `fd_slots`, the NBUF `sl_raw`/`blink_raw`, the
+NINODE sleeplocks, `disk_slot_raw` × 8, and `main_locks_raw`'s eleven
+`lk_raw`s. Each needs its own file's vocabulary (SpecProcinit / ProcGeom /
+FdSlots / BcacheInv / DiskInv), so they go in **`BootCarveMain.v`** beside
+slice 3, not in BootCarve. Two things to expect there: the per-index bundles
+are `[∗ list] i ∈ seq 0 N, …` over a stride, so they want one induction over
+the index (the shape §9/§3 already use) rather than N cuts written out; and
+that file is under the zify hook (see slice 3), so all their address
+arithmetic must be plain-`Z` helpers from the start.
 
 ### Slice 3 — the kinit page run (LANDED)
 
