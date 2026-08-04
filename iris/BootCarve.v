@@ -841,14 +841,72 @@ Section BootCarve.
     iApply (word_pointsto_intro _ _ _ Hal8 with "Hbs").
   Qed.
 
+  (* ...and the same at the two NARROWER widths, for the .bss cells that are
+     not doublewords: [SpecMain.main_globals_raw]'s [d_used_idx ↦₂ wrap16 0],
+     [StartedInv]'s [started ↦₄ 0] and [IntrDefs.cpu_cells]' [c->noff ↦₄ 0].
+     Same three lines as [boot_ran_cell8_bss] at the width's own alignment and
+     intro lemma; the [_bss] flavour is what pins the VALUE, which is what
+     those three consumers need and the existential [boot_ran_cell4] /
+     [boot_ran_cell2] cannot give. *)
+  Lemma boot_ran_cell4_bss (g : gstate) (A : Z) (w : mword 32) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> img_end <= A -> A + 4 <= ram_hi -> A mod 4 = 0 ->
+    (forall j, (j < 4)%nat -> nth_byte w j = DevModel.byte0) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 4) -∗ (pa_of_z A) ↦₄ w.
+  Proof.
+    intros Hmem Hlo Hbss Hhi Hal Hz. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 4 = A + Z.of_nat 4%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 4%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 4) A (A + Z.of_nat 4%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_bss (m := 32%N) g A 4%nat w Hmem Hlo Hbss Hhi' Hz
+                 with "Hcl H") as "Hbs".
+    assert (Hal4 : is_aligned_paddr (Physaddr (pa_of_z A)) 4 = true).
+    { apply (aligned_of_mod _ 4); [lia |].
+      rewrite (boot_uint_pa A Hram). exact Hal. }
+    iApply (word4_pointsto_intro _ _ _ Hal4 with "Hbs").
+  Qed.
+
+  Lemma boot_ran_cell2_bss (g : gstate) (A : Z) (w : mword 16) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> img_end <= A -> A + 2 <= ram_hi -> A mod 2 = 0 ->
+    (forall j, (j < 2)%nat -> nth_byte w j = DevModel.byte0) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 2) -∗ (pa_of_z A) ↦₂ w.
+  Proof.
+    intros Hmem Hlo Hbss Hhi Hal Hz. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 2 = A + Z.of_nat 2%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 2%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 2) A (A + Z.of_nat 2%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_bss (m := 16%N) g A 2%nat w Hmem Hlo Hbss Hhi' Hz
+                 with "Hcl H") as "Hbs".
+    assert (Hal2 : is_aligned_paddr (Physaddr (pa_of_z A)) 2 = true).
+    { apply (aligned_of_mod _ 2); [lia |].
+      rewrite (boot_uint_pa A Hram). exact Hal. }
+    iApply (word2_pointsto_intro _ _ _ Hal2 with "Hbs").
+  Qed.
+
+  (* the byte-obligation of all three [_bss] cells, at ANY width and any
+     zero-valued word: [nth_byte] is a [bv_extract], so a value whose
+     [bv_unsigned] is 0 has every byte zero and no per-width destruct is
+     needed. *)
+  Lemma nth_byte_zero {m : N} (w : bv m) (j : nat) :
+    bv_unsigned w = 0 -> nth_byte w j = DevModel.byte0.
+  Proof.
+    intro Hw. apply bv_eq. rewrite /nth_byte bv_extract_unsigned Hw.
+    rewrite Z.shiftr_0_l. reflexivity.
+  Qed.
+
   (* the one value every pinned .bss doubleword in the tree holds. *)
   Lemma nth_byte_zero8 (j : nat) :
     (j < 8)%nat -> nth_byte (zero_reg : mword 64) j = DevModel.byte0.
   Proof.
-    intro Hj.
-    destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
-      try (apply bv_eq; vm_compute; reflexivity).
-    exfalso. lia.
+    intro Hj. apply (nth_byte_zero (zero_reg : mword 64) j).
+    vm_compute. reflexivity.
   Qed.
 
   (* A run of [n] bytes as an existentially-valued LIST with its length -- the

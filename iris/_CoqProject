@@ -686,6 +686,7 @@ LinkSysSbrk.v
 SpecUserinit.v
 LinkUserinit.v
 StartedInv.v
+LinkPanic.v
 CodeMain.v
 SpecMain.v
 ProofMain.v
@@ -698,3 +699,4 @@ ProtoCpuid.v
 ProtoSchedsInv.v
 CrashProto.v
 BootChain.v
+BootShared.v

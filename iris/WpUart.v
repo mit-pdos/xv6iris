@@ -388,6 +388,18 @@ Section DevLoops.
   Proof. rewrite /uart_sent. apply _. Qed.
   Global Instance uart_sent_timeless γ l : Timeless (uart_sent γ l).
   Proof. rewrite /uart_sent. apply _. Qed.
+  (* the transmitted-prefix authority yields its own lower bound, exactly as
+     [uart_ghosts_alloc] peels the accepted-trace one off [uart_sent_auth].
+     A boot client needs it because [SpecMain]'s precondition asks for
+     [uart_out_lb γ l0] beside the transmitter token, and the authority is on
+     its way into [dev_inv_body] -- there is no other source. *)
+  Lemma uart_out_auth_lb (γ : uart_names) (u : uart_state) :
+    uart_out_auth γ u ⊢ uart_out_auth γ u ∗ uart_out_lb γ (u_out u).
+  Proof.
+    rewrite /uart_out_auth /uart_out_lb {1}mono_list_auth_lb_op own_op.
+    iIntros "[$ $]".
+  Qed.
+
   Global Instance uart_out_lb_persistent γ l : Persistent (uart_out_lb γ l).
   Proof. rewrite /uart_out_lb. apply _. Qed.
   Global Instance uart_out_lb_timeless γ l : Timeless (uart_out_lb γ l).

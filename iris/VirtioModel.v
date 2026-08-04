@@ -271,6 +271,24 @@ Definition virtio_cfg0 : virtio_cfg :=
 Definition virtio_reset (v : virtio_state) : virtio_state :=
   VirtioState virtio_cfg0 zero32 zero16 zero16 (v_disk v).
 
+(* WHAT A RESET DEVICE SATISFIES.  These are the four facts a boot client owes
+   [VirtioProto.disk_ghosts_alloc] and [WpUart.dev_inv_alloc] about the device
+   it allocates the protocol invariant over, and they hold of ANY reset device
+   -- the disk image is the only field [virtio_reset] keeps, and none of the
+   four mentions it.  (The [boot_facts] of a power-on say exactly
+   [dvirtio = virtio_reset v0] for some [v0], so this is what the crash-layer
+   boot client reads them off.) *)
+Lemma virtio_reset_not_live (v : virtio_state) :
+  virtio_live (v_cfg (virtio_reset v)) = false.
+Proof. reflexivity. Qed.
+
+Lemma virtio_reset_seen (v : virtio_state) : v_seen (virtio_reset v) = zero16.
+Proof. reflexivity. Qed.
+
+Lemma virtio_reset_used_idx (v : virtio_state) :
+  v_used_idx (virtio_reset v) = zero16.
+Proof. reflexivity. Qed.
+
 Definition virtio_write (v : virtio_state) (off : Z) (w : bv 32)
   : option virtio_state :=
   let c := v_cfg v in
@@ -1207,6 +1225,11 @@ Proof.
 Qed.
 
 Lemma virtio_isr_ok0 : virtio_isr_ok virtio0_state.
+Proof. by vm_compute. Qed.
+
+(* ...and of a RESET device, whose ISR [virtio_reset] zeroes: the fourth of the
+   reset facts above (stated here because [virtio_isr_ok] is defined here). *)
+Lemma virtio_isr_ok_reset (v : virtio_state) : virtio_isr_ok (virtio_reset v).
 Proof. by vm_compute. Qed.
 
 (* a completion ORs in bit 0, which keeps the invariant *)

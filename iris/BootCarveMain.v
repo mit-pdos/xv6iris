@@ -242,6 +242,49 @@ Proof.
   unfold disk_lock. rewrite E. apply off_of_z.
 Qed.
 
+(* ...and its four siblings, the [struct disk] fields [main_globals_raw] names:
+   the three queue pointers at +0/+8/+16, the [free[8]] byte array at +24 and
+   [DiskInv]'s [used_idx] at +32.  Same one-[vm_compute] reduction of the
+   sign-extended 12-bit literal, except [d_used_idx] which is spelled with
+   [pa_add] and reduces by [avi_mword] instead. *)
+Lemma disk_desc_of_z : disk_desc = pa_of_z KernelSyms.disk.
+Proof. reflexivity. Qed.
+
+Lemma disk_avail_of_z : disk_avail = pa_of_z (KernelSyms.disk + 8).
+Proof.
+  assert (E : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
+              = mword_of_int 8) by (apply bv_eq; vm_compute; reflexivity).
+  unfold disk_avail. rewrite E. apply off_of_z.
+Qed.
+
+Lemma disk_used_of_z : disk_used = pa_of_z (KernelSyms.disk + 16).
+Proof.
+  assert (E : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
+              = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+  unfold disk_used. rewrite E. apply off_of_z.
+Qed.
+
+Lemma disk_free_of_z : disk_free = pa_of_z (KernelSyms.disk + 24).
+Proof.
+  assert (E : (sign_extend' 64 (mword_of_int 24 : mword 12) : mword 64)
+              = mword_of_int 24) by (apply bv_eq; vm_compute; reflexivity).
+  unfold disk_free. rewrite E. apply off_of_z.
+Qed.
+
+Lemma d_used_idx_of_z : d_used_idx = pa_of_z (KernelSyms.disk + 32).
+Proof.
+  unfold d_used_idx, DiskInv.disk_base, pa_add.
+  rewrite (_ : Z.of_nat 32%nat = 32); [| reflexivity].
+  unfold pa_of_z. apply avi_mword.
+Qed.
+
+(* the bcache's LIST SENTINEL: [bhead] IS [bnode NBUF], i.e. the family's
+   address one past the last buffer, so no extra lemma is needed for it -- this
+   is [bnode_of_z] at [NBUF], named because the client's cut chain takes the
+   sentinel's link pair out of its own window. *)
+Lemma bhead_of_z : bhead = pa_of_z (buf_base + buf_stride * Z.of_nat NBUF).
+Proof. exact (bnode_of_z NBUF). Qed.
+
 (* the eleven [struct spinlock] windows [main_locks_raw] enumerates, IN
    ADDRESS ORDER and pairwise disjoint -- which is what lets a client cut all
    eleven out of the one .bss range with [boot_ran_split] alone.  Every step

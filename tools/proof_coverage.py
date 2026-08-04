@@ -112,7 +112,8 @@ MANIFEST_PROVEN = {
 # Functions whose contract is *stated* but deliberately assumed (an Axiom, or a
 # hypothesis threaded through callers' specs) rather than proven.
 MANIFEST_ASSUMED = {
-    "panic": ("SpecPanic.v", "panic_wp", "assumed as a hypothesis carried by callers"),
+    "panic": ("SpecPanic.v", "panic_wp",
+              "carried as a hypothesis by every caller; the Axiom is LinkPanic.v"),
     "kerneltrap": ("SpecKerneltrap.v", "wp_kerneltrap_returns_body",
                    "only 'it returns' is assumed; the Axiom is LinkKerneltrap.v"),
     "consoleintr": ("SpecConsoleintr.v", "wp_consoleintr_sconf_body",
