@@ -664,10 +664,21 @@ Still open from the M6a bridge list: `pmp_all_off pmpcfg_boot`, and the
 
 ## M6b (IN PROGRESS) — the boot-image carving library
 
-`iris/BootCarve.v`: from `power_boot_res`'s raw memory conjunct plus the
-raw kmap fragments plus the pure `boot_facts g'`, produce the bundles
-SpecEntry/SpecMain's preconditions mention, so the eventual boot
-composition is pure assembly.
+From `power_boot_res`'s raw memory conjunct plus the raw kmap fragments plus
+the pure `boot_facts g'`, produce the bundles SpecEntry/SpecMain's
+preconditions mention, so the eventual boot composition is pure assembly.
+**TWO FILES**, and the split is load-bearing: `iris/BootCarve.v` stays BELOW
+the WP tower (raw memory, the rwx split, the range layer, words, the physical
+stack, the typed-cell runs), while `iris/BootCarveMain.v` sits above SpecMain
+and holds everything stated in a callee's vocabulary (kinit's page run today;
+slice 2's structured conjuncts next). Keeping BootCarve low is what keeps its
+`lia` usable — the higher file is under `bitvector.tactics`' zify hook.
+
+**STATE: slices 1a, 1b, 1b', 2a and 3 are LANDED. What remains of M6b is
+slice 2's STRUCTURED conjuncts** (the per-index `.bss` bundles of
+`main_locks_raw` / `main_globals_raw`), in BootCarveMain.v — see slice 2
+below. Everything SpecEntry needs is done; SpecMain still needs those
+bundles.
 
 ### Slice 1a — the three-way split, LIFTED (LANDED)
 
