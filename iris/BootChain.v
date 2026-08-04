@@ -264,7 +264,7 @@ Section BootChain.
       sig_meip ↦ᵣ register_lookup sig_meip rs.
   Proof.
     intros (Hpc0 & Hnpc0 & Hpv0 & Hhs0 & Hmh0 & Hms0 & Hmisa0 & Hsec0 & Hmenv0 &
-            Hhtif0 & Help0 & Hpma0 & Hpmpc0).
+            Hhtif0 & Help0 & Hpma0 & Hpmpc0 & _ & _).
     iIntros "#Hcl #Hcert Hregs".
     iDestruct (boot_reg_split rs with "Hregs") as
       "(HPC & HnPC & Hpriv & Hhs & Hmh & Hms & Hmisa & Hsec & Hmenv & Hhtif & Help &
@@ -379,21 +379,15 @@ Section BootRun.
 
   Lemma boot_entry_bridge (Φ : mval -> iProp Σ) (rs : regstate)
       (iv : mword 32) (dq : dfrac) :
+    (* [reset_regs] alone: the mie / mideleg facts [boot_bridge] needs ("no
+       non-delegated interrupt is enabled") are now PINS of the reset machine
+       rather than premises here, read off by name with
+       [reset_regs_{mie,mideleg}].  They are necessary: at a nonzero entry
+       [mie] the bridge's premise is FALSE, since start()'s `csrs sie` does not
+       clear an M-mode enable it finds set while [legalize_mideleg] forces the
+       matching delegation bit to 0.  satp needs nothing -- writing 0 selects
+       Bare whatever the old value was. *)
     reset_regs cpu_id rs ->
-    (* THE TWO CSR PINS THE RESET MACHINE DOES NOT YET GIVE.  [boot_bridge]'s
-       "no non-delegated interrupt is enabled" premise
-       ([and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = 0]) is
-       FALSE at an arbitrary entry [mie] -- an M-mode enable bit such as MEIE
-       survives start()'s `csrs sie` write while [mideleg]'s legalizer forces
-       the matching delegation bit to 0.  [RiscvLang.reset_regs] pins thirteen
-       registers and mie/mideleg are not among them, so these two are premises
-       here rather than consequences.  Reality supplies them (a reset hart has
-       every interrupt disabled and delegates nothing), which makes this the
-       same shape of finding as the [nextPC] pin of M6c-pre -- see
-       claude-notes/projects/crash.md, M6c (3).  (satp needs no pin: writing 0
-       selects Bare whatever the old value was.) *)
-    register_lookup mie rs = boot_w64 0 ->
-    register_lookup mideleg rs = boot_w64 0 ->
     (* the image, PERSISTENT and shared by every hart, so it is not part of
        the per-hart bundle *)
     kernel_text -∗
@@ -408,7 +402,9 @@ Section BootRun.
        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hreset Hmie0 Hmdl0.
+    intros Hreset.
+    pose proof (reset_regs_mie _ _ Hreset) as Hmie0.
+    pose proof (reset_regs_mideleg _ _ Hreset) as Hmdl0.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
@@ -512,9 +508,6 @@ Section BootSecondary.
   Lemma boot_hart_secondary (Φ : mval -> iProp Σ) (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
     reset_regs cpu_id rs ->
-    (* the two pins the reset machine does not yet give -- see §3 *)
-    register_lookup mie rs = boot_w64 0 ->
-    register_lookup mideleg rs = boot_w64 0 ->
     (* a SECONDARY hart: this is what makes main's [beqz a0] fall through *)
     (fin_to_nat cpu_id <> 0)%nat ->
     kernel_text -∗
@@ -524,11 +517,10 @@ Section BootSecondary.
     started_inv (main_deposit γd γv Φ) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hreset Hmie0 Hmdl0 Hnz.
+    intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
-    iApply (boot_entry_bridge Φ rs iv dq Hreset Hmie0 Hmdl0
-              with "Htext Hres").
+    iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf Φ mf K_main zero_reg γd γv
               (register_lookup tlb rs)

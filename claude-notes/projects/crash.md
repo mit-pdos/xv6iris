@@ -1494,8 +1494,10 @@ Four things worth knowing before touching it:
   statement and ignores it.
 
 ### THE SECOND SPEC GAP: the reset machine does not pin `mie` / `mideleg`
+### (SETTLED — the pins are in; see M6c (5) below for the audit)
 
-**A DESIGN CALL, recorded rather than taken.** `boot_entry_bridge` takes
+**As FOUND (kept for the reasoning; the fix is M6c (5)).**
+`boot_entry_bridge` took
 `register_lookup mie rs = boot_w64 0` and `register_lookup mideleg rs =
 boot_w64 0` as PREMISES, and nothing in the tree can discharge them:
 
@@ -1513,7 +1515,7 @@ boot_w64 0` as PREMISES, and nothing in the tree can discharge them:
   genuinely arbitrary and the contract quantifies over them.)
 
 This is the same SHAPE as the `nextPC` finding of M6c-pre — a fact reality
-guarantees that the model forgets — and the options are:
+guarantees that the model forgets. The options were, and (1) was taken:
 
 1. **Extend `reset_regs` + `PowerBoot.boot_regs` with the two pins** (the
    nextPC precedent). One `register_set` each; `boot_regs_reset`'s `reg_peel`
@@ -1531,10 +1533,103 @@ guarantees that the model forgets — and the options are:
    owe them — which only postpones (1), since the client's only source of
    register facts is `boot_facts`.
 
-Recommendation: (1), both pins, together with a re-read of the Sail `reset()`
-to see whether any OTHER register it clears is missing from `reset_regs` —
-this is the second time the list has come up short, so the audit is worth
-doing once rather than one register at a time.
+**TAKEN: (1), both pins**, together with the one-time re-read that closes the
+class — the register-by-register account in M6c (5) below.
+
+### M6c (5) — THE RESET-REGISTER AUDIT, and the class closed
+
+The `mie`/`mideleg` pins of M6c (3) are IN (`RiscvLang.reset_regs` +
+`PowerBoot.boot_regs`, one `register_set` each; `boot_regs_reset`'s `reg_peel`
+loop absorbed them with no proof change), and `boot_entry_bridge` /
+`boot_hart_secondary` read them off `reset_regs` by name
+(`reset_regs_mie` / `reset_regs_mideleg`) instead of taking premises. **Ask by
+name, never positionally**: `reset_regs` is a fifteen-way conjunction and a
+consumer that destructures it positionally is exactly what breaks when a
+sixteenth pin is added — `boot_entry_pre` is the one place that still does
+(it wants twelve of them at once).
+
+**THE DEFINITIVE ACCOUNT.** The reference is the model's COLD-boot path,
+`sail_model_init` followed by `reset` — not `reset` alone (see the caveat
+below). `reset` is `hart_state := ACTIVE; reset_sys; reset_vmem; reset_elp;
+ext_reset`, and `reset_sys` is the interesting one: it writes `cur_privilege`,
+clears ONLY mstatus.MIE (bit 3) and mstatus.MPRV (bit 17), calls
+`reset_tvecs` / `reset_misa` / `reset_pmp` / `reset_stateen`, sets
+`PC := nextPC := pc_reset_address`, and zeroes `mcause` / the vector CSRs.
+
+| `reset_regs` conjunct | justified by | kind |
+| --- | --- | --- |
+| `PC = 0x80000000` | `reset_sys`: `PC := pc_reset_address`; the model's own default is 0 (`sail_model_init`), and `set_pc_reset_address` is the board hook | **PLATFORM** (virt's reset vector) |
+| `nextPC = 0x80000000` | `reset_sys` writes nextPC from the SAME `pc_reset_address` — which is exactly why the M6c-pre pin was addable | **PLATFORM**, same source |
+| `cur_privilege = Machine` | `reset_sys`, first line | MODEL |
+| `hart_state = HART_ACTIVE` | `reset`, first line (and `sail_model_init`'s last) | MODEL |
+| `mhartid = <hart index>` | `sail_model_init` writes 0; nothing writes per-hart | **PLATFORM** (per-hart id) |
+| `mstatus = 0xA00000000` | `sail_model_init` writes `zeros` with SXL = UXL = 2, which IS 0xA00000000 (bits 35:34 and 33:32); `reset_sys` then clears MIE/MPRV (already 0) | MODEL, **cold only** |
+| `misa = 0x800000000014112D` | `sail_model_init` (MXL) + `reset_misa` (each extension bit from `hartSupports`) | MODEL + config |
+| `mseccfg = 0` | `sail_model_init` `legalize_mseccfg(0,0)`; `reset_sys` clears bits 8/9/10 | MODEL |
+| `menvcfg = 0` | `sail_model_init` `legalize_menvcfg(0,0)`; `reset` does not touch it | MODEL, **cold only** |
+| `htif_tohost_base = None` | `sail_model_init` | MODEL, **cold only** |
+| `elp = NO_LP_EXPECTED` | `reset_elp` | MODEL |
+| `pma_regions = pma_boot` | `sail_model_init` writes a THREE-region table; `pma_boot` is ONE all-permitting region | **IDEALIZATION** (M6b-pre (1)) |
+| `pmpcfg_n = pmpcfg_boot` | `reset_pmp` clears A and L in all 64 entries; `pmpcfg_boot` is all-zero BYTES, so it also claims R/W/X = 0 | MODEL + a harmless over-claim: `RiscvFetchExec.pmp_all_off` asks only for A = OFF and L = false, so nothing uses the extra |
+| `mie = 0` | neither `sail_model_init` nor `reset` writes `mie` | **PLATFORM** (new, M6c (5)) |
+| `mideleg = 0` | neither writes `mideleg` | **PLATFORM** (new, M6c (5)) |
+
+**No reverse-direction (soundness-relevant) finding**: every conjunct is either
+established by the cold-boot path or is an explicitly-labelled platform value /
+idealization, and the ONE place `reset_regs` claims more than the model
+(`pmpcfg`'s R/W/X) is provably unused. Nothing in the list is contradicted by
+the model.
+
+**THE DURABLE CAVEAT, and it is the reason to keep this table.** `reset()`
+ALONE does not justify `reset_regs`: SIX conjuncts (`mstatus`, `menvcfg`,
+`htif_tohost_base`, `mhartid`, `pma_regions`, and `pmpcfg`'s R/W/X) come from
+`sail_model_init`, which runs ONCE at power-up. `reset_sys` clears only MIE and
+MPRV of mstatus, so a WARM reset preserves SIE / MXR / TSR / FS / VS / SD / TVM
+— i.e. `BootConfig.mstatus_reset_kernel_facts`, the anchor of the whole
+`mstatus_kernel_facts` arrangement, would be FALSE after one. **So
+`reset_regs` is a COLD-boot description and must not be reused if a warm-reset
+transition is ever added to the language** (it would need its own, much weaker,
+fact set, and the boot chain would not compose over it).
+
+**WHY THE CLASS IS NOW CLOSED.** `boot_regs` writes the pinned registers over
+the PREVIOUS era's `regstate` and leaves everything else alone, which is
+*weaker* than a real power cycle (which clears everything) — so the model is
+conservative for every unpinned register, a missing pin can only ever show up
+as an unprovable premise (never as an unsound step), and adding one is always
+available at the cost of a platform justification recorded in the table above.
+The three gaps found so far (`nextPC`, `mie`, `mideleg`) are all of that shape.
+Registers still unpinned and deliberately so, with why nothing needs them:
+`satp` (writing 0 selects Bare whatever the old value was), `mepc` /
+`mcounteren` / `stimecmp` / `medeleg` (start() overwrites each, and the
+contract quantifies over the entry value), `mip` / `mcycle` / `mtime` /
+`minstret` (the invariants over them are value-agnostic —
+`MinstretInv.clock_inv_alloc`), `sig_seip` / `sig_meip` (ditto,
+`WireInv.wire_inv_alloc`; and `sail_model_init` does zero them), `tlb`
+(`reset_TLB` empties it and the bridge is generic in the vector anyway),
+`stvec` / `sepc` / `scause` / `stval` (owned at an arbitrary value; main's
+`trap_csrs` is existential).
+
+### THE EXPECTED AXIOM FOOTPRINT (definitive, for M6d)
+
+`functional_extensionality_dep` is **SANCTIONED** — the axiom budget is the 5
+model platform axioms PLUS funext (the exec/run determinism machinery uses it),
+and whole cones are marked "baseline 5 + funext". So the per-commit check is:
+
+- `riscv_power_adequacy` / `riscv_device_adequacy` **today**: exactly the 5
+  `rv64d.*` axioms (`load_reservation`, `match_reservation`,
+  `valid_reservation`, `cancel_reservation`, `plat_term_write`). They do not
+  reach funext yet; keep checking for exactly 5 until the chain is composed in.
+- **any chain lemma**: the 5 + `functional_extensionality_dep` + the sanctioned
+  kernel-level assumptions it inherits — `wp_printk_gen_sconf` (printk-general)
+  and `kerneltrap_returns` (kerneltrap) on both arms, `wp_userinit_sconf`
+  (userinit) on the BOOT arm only, `wp_consoleintr_sconf` (consoleintr) if
+  reached. Anything else is a regression.
+- **`riscv_power_adequacy` after M6d** will therefore be: the 5 + funext + that
+  same kernel-level set. That is the expected footprint, not a regression.
+
+Measured so far: `boot_entry_pre` closed; `boot_entry_bridge` = 5 + funext;
+`boot_hart_secondary` = 5 + funext + printk-general + kerneltrap (no userinit,
+no consoleintr — the secondary arm reaches neither).
 
 ### One footprint note for M6d
 

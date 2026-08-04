@@ -30,7 +30,13 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 
 Definition boot_regs (c : CPU) (rs : regstate) : regstate :=
-  register_set PC (boot_w64 0x80000000)
+  (* mie / mideleg first (order is irrelevant -- the peel loop finds each
+     writer): every interrupt disabled and nothing delegated, the platform's
+     power-on values.  See [reset_regs]' comment and the register-by-register
+     account in claude-notes/projects/crash.md (M6c (5)). *)
+  register_set mie (boot_w64 0)
+  (register_set mideleg (boot_w64 0)
+  (register_set PC (boot_w64 0x80000000)
    (register_set nextPC (boot_w64 0x80000000)
     (register_set cur_privilege Machine
     (register_set hart_state (HART_ACTIVE tt)
@@ -42,7 +48,7 @@ Definition boot_regs (c : CPU) (rs : regstate) : regstate :=
           (register_set htif_tohost_base None
            (register_set elp (landing_pad_bits_backwards NO_LP_EXPECTED)
             (register_set pma_regions pma_boot
-             (register_set pmpcfg_n pmpcfg_boot rs)))))))))))).
+             (register_set pmpcfg_n pmpcfg_boot rs)))))))))))))).
 
 (* peel [register_set]s off a lookup until the one that wrote the register:
    the mismatch side conditions are register disequalities, one [vm_compute]

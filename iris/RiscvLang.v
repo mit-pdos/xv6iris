@@ -504,7 +504,33 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* the model's [reset_elp]: no landing pad expected *)
   /\ register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED
   /\ register_lookup pma_regions rs = pma_boot
-  /\ register_lookup pmpcfg_n rs = pmpcfg_boot.
+  /\ register_lookup pmpcfg_n rs = pmpcfg_boot
+  (* mie AND mideleg CLEAR: every interrupt disabled, nothing delegated.  Like
+     the [nextPC] pin above these are necessary-and-not-obvious, and for the
+     same reason -- the S-mode side's [IntrDefs.sconf] requires that every
+     enabled interrupt be delegated, and start()'s [csrs sie] does not clear
+     an M-mode enable it finds already set while [legalize_mideleg] forces the
+     matching delegation bit to 0.  So at a nonzero entry [mie] the boot
+     chain's bridge is not provable at all (M6c (3)).  Justification: the
+     model's own cold-boot path leaves them at the [regstate]'s initial value
+     ([sail_model_init] writes neither, and [reset] does not either), so this
+     is a PLATFORM assumption exactly like [pc_reset_address] and [mhartid]
+     below -- see the register-by-register account in
+     claude-notes/projects/crash.md (M6c (5)). *)
+  /\ register_lookup mie rs = boot_w64 0
+  /\ register_lookup mideleg rs = boot_w64 0.
+
+(* NAMED PROJECTIONS of the two pins above.  [reset_regs] is a fifteen-way
+   conjunction and positional destructuring of it in a consumer is exactly the
+   brittleness that adding a conjunct exposes, so anything that wants ONE fact
+   asks by name. *)
+Lemma reset_regs_mie (c : CPU) (rs : regstate) :
+  reset_regs c rs -> register_lookup mie rs = boot_w64 0.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
+
+Lemma reset_regs_mideleg (c : CPU) (rs : regstate) :
+  reset_regs c rs -> register_lookup mideleg rs = boot_w64 0.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client
