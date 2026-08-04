@@ -267,23 +267,144 @@ Proof-engineering gotchas this milestone paid for:
   got reduced by `/=` is unpredictable, and `exact` is conversion-robust
   while ssreflect's `rewrite` is not.
 
-**REMAINING (M5b): `crash_inv` and the write permits.**
-`inv crashN (∃ …, disk_bytes-frags ∗ P_fs …)` with `P_fs` an iProp over
-fixed-layer ghosts; allocated once in `riscv_power_adequacy`'s fixed
-allocation (client supplies the initial `P_fs`); both power arms never
-open it. The initial MINT of the client's `disk_bytes` over the mkfs
-image lands here too (deferred from M5a: adequacy allocates the auth
-empty and `power_boot_res` says nothing about the disk yet) — it is
-`DiskPtsto.disk_bytes_mint` at the empty auth. The vslot WRITE PERMIT
-(the `vs_data` precedent): the enqueuer deposits an iProp wand
-alongside the OUT slot; `virtio_proto_step` consumes it to re-establish
-`P_fs` after updating the auth. **Watch:** `virtio_proto`'s live arm
-still parks `disk_bytes` fragments (`slot_pend_res`/`slot_done_res`) of
-the now-DURABLE map inside the per-era `disk_inv`, so a crash strands
-the fragments of every in-flight block — sound, but those bytes can
-never be re-claimed. Either the permit design must hand them back at
-the crash boundary, or `P_fs` must be stated over the not-in-flight
-range only. Decide this WITH the permits, not after.
+## M5b (crash_inv + the write-permit hook) — LANDED
+
+The mechanism is in place and instantiating it is FS work. What landed:
+
+- **The crash predicate is a fixed-layer FIELD**: `riscvFixedGS` gained
+  `riscv_crash_pred : iProp Σ` (a plain iProp field is legal — only the
+  ERA record has to be Σ-free, because it is a `ghost_map` VALUE). That
+  one decision is what keeps `P_fs` out of every `dev_inv`-adjacent
+  signature: no statement between RiscvPtsto and the disk thread names
+  it, so device.md's "a `dev_inv_body`-adjacent parameter ripples
+  through every device file" warning never fires.
+- `crashN := nroot .@ "crash"`, `crash_inv := inv crashN
+  riscv_crash_pred` (persistent), both in RiscvPtsto.v.
+- **The permit** `disk_write_permit := (▷ riscv_crash_pred ==∗ ▷
+  riscv_crash_pred)`, with `disk_write_permit_trivial : ⊢
+  disk_write_permit`. Deliberately a BARE later-to-later BASIC update:
+  the interesting part is the closure, not the type — the log's
+  commit-flip wand will curry its own abstract-state ghosts and the
+  block it is about into the permit at enqueue time. A basic update goes
+  through at whatever mask `wp_disk_loop` holds with `crashN` and
+  `diskN` both open, which is why no mask annotation is needed; and a
+  SERIALIZED writer (xv6's log, one commit at a time under the log lock)
+  needs nothing conditional.
+- **The consumption instant** (the part that had to be got right):
+  `virtio_proto_step` hands a `disk_write_permit` back to its caller, and
+  `wp_disk_loop` — which now takes `crash_inv` persistently — opens
+  `crashN` in the DMA-completion arm ONLY, spends the permit on the
+  `▷`-body and closes. That is the only opening of `crashN` in the tree,
+  and the seam is FINAL: when the log lands, only where the permit COMES
+  FROM changes.
+- **The enqueue-side deposit is NOT there, and `slot_pend_res` is the
+  wrong home for it — see the blocker below.** Today
+  `virtio_proto_step` MINTS the identity permit. No driver spec changed.
+- **Adequacy**: both theorems take `(Pc : iProp Σ)` and `(HPc : ⊢ Pc)`,
+  allocate `inv_alloc crashN ⊤ Pc` (the body ι-reduces to
+  `riscv_crash_pred` once the constructor field is filled with `Pc`),
+  and hand `crash_inv` out — in the single-generation client bundle and
+  in `power_boot_res`, so every boot gets the SAME invariant, which is
+  what makes a durability property span power cycles. The device
+  corollary passes `Pc := True` and `bi.True_intro _`.
+
+**THE BLOCKER, and it is a design decision, not a proof difficulty: an
+iProp CANNOT be deposited in `slot_pend_res`.** The plan was to put
+`disk_write_permit` in the OUT arm of `slot_pend_res` (the `vs_data`
+precedent: an exclusive resource taken across a sleep must be recorded
+where the invariant keys on the request). That was tried and reverted:
+
+- `disk_inv_body` (which contains `virtio_proto`, which contains
+  `slot_pend_res`) MUST be `Timeless`. Every site that opens it — eight
+  today, `iInv … as ">…"` — does so from INSIDE an MMIO atomic-update
+  accessor (`wp_store_s_sconf_au` and friends), where there is no step
+  left to absorb a `▷`, so a non-timeless body cannot be used there at
+  all and the fix is not "add an `iNext`" anywhere.
+- A permit is a wand over an ARBITRARY `riscv_crash_pred`, so it is never
+  timeless, and there is no way to smuggle an iProp through a timeless
+  invariant: saved propositions are not timeless either
+  (`own γ (to_agree (Next P))` over a non-discrete OFE). Only pure data
+  and discrete ghost state can live in `disk_inv`.
+
+So the enqueuer→completion channel needs a home of its own. Two designs,
+both viable, to decide WITH the log:
+  (a) **A second, non-timeless era invariant for the permits**, with a
+      timeless ghost SKELETON: body `∃ S : gset nat, permit_auth S ∗
+      [∗ set] p ∈ S, permit_at p`. Both halves work under a `▷`:
+      `▷(A ∗ B)` splits, the timeless `▷A` strips, the auth update
+      happens outside the later, and a permit is ADDED under the later
+      (`▷B ∗ permit ⊢ ▷(B ∗ permit)`), which is all the enqueuer needs —
+      it never has to USE a permit. The device thread CAN use one,
+      because `wp_disk_step`'s callback has its own `▷` between the two
+      legs: open the permit invariant in the FIRST (⊤→∅) leg and the
+      existing `iNext` strips it. Cost: one namespace, a per-position
+      permit key (positions are already `dn_slot`-keyed), and threading
+      the new invariant through the publish leaf and `wp_disk_loop`.
+  (b) **Make `P_fs` closed under in-flight writes** — the shape real WAL
+      crash proofs have ("the disk is the last committed state, or a
+      committed state plus a partial log") — and discharge the completion
+      from the invariant's OWN content plus the pure fact that this write
+      is one of the pending ones. Then nothing is deposited per slot at
+      all; the commit-flip write is the only one that needs a
+      distinguished permit. Needs "which writes are pending" to be
+      expressible where the wand is stated.
+(a) is the mechanical one; (b) is how the FS proof will most likely want
+to be organized, and it may make (a) unnecessary. Neither is blocked by
+anything that landed here.
+
+Gotchas:
+
+- `iInv` works on a FOLDED invariant definition (`crash_inv`), same as
+  the existing `disk_inv`/`uart_inv` — no `rewrite /crash_inv` needed.
+- The permit must be applied to the `▷`-body: `iInv` on a non-timeless
+  body hands out `▷ riscv_crash_pred` and wants it back, which is
+  exactly the permit's type. Do NOT strip the later (the crash predicate
+  is arbitrary, so it is not timeless).
+- Hand the permit back from `virtio_proto_step` unconditionally rather
+  than as `if vs_is_out sl`: the caller does not know the direction (the
+  completing slot is chosen inside the lemma), and for a read the
+  identity permit is honest — no disk byte moved.
+- `crashN` (`nroot .@ "crash"`) is disjoint from `devN`-derived
+  namespaces, so opening it inside the already-open `diskN` is one
+  `solve_ndisj`; and a BASIC update (`==∗`) is mask-agnostic, which is
+  exactly why the permit needs no mask annotation.
+
+**THE STRANDED-FRAGMENT QUESTION (resolved as a recorded decision for
+the FS work, not by code).** `virtio_proto`'s live arm parks `disk_bytes`
+fragments of the now-DURABLE map inside the per-era `disk_inv`
+(`slot_pend_res` for in-flight requests, `slot_done_res` for completed
+ones not yet reclaimed). A power cycle abandons that invariant, so those
+fragments become unreachable while the durable AUTH still remembers their
+keys: the affected offsets can never be re-minted (minting requires
+`dmap !! o = None`) and never re-claimed. Sound — nothing false is
+provable, the image itself is intact — but the keys are lost. The FS
+instantiation must pick one:
+  (a) **Keep durable fragments out of slots**: redesign `dn_img` so a
+      slot deposits a COPY rather than the exclusive entry — a
+      fractional/persistent-agreement entry (`ghost_map_elem` at a
+      fraction, or a separate agreement map keyed by offset) so the
+      enqueuer keeps a claim that survives the era. Costs a rework of
+      `disk_bytes_update`'s exclusivity argument at the completion.
+  (b) **Accept per-crash key loss** and have recovery mint FRESH blocks:
+      `P_fs` is then stated over the offsets the FS still holds, and boot
+      re-mints the in-flight window from the auth (which needs an
+      auth-side "forget these keys" update — `ghost_map_delete` on the
+      stranded range, performed by the power arm, which is the only
+      holder of the auth at that instant).
+Note (b) is the cheaper one and it fits the power arm's existing access
+to the auth; (a) is the one that keeps the crash proof local to the log.
+**The decision belongs with the log's crash proof** — it is exactly the
+question "what does recovery know about a request that was in flight when
+the power died?", and the answer depends on the WAL discipline, not on
+this layer.
+
+Still future work (unchanged): the FS instantiation of `P_fs` (log
+recovery, recovery-aware boot), and the initial `disk_bytes` MINT for
+clients over the mkfs image — adequacy allocates the durable map EMPTY
+and `power_boot_res` says nothing about the disk, so `Pc` cannot yet
+speak about disk content. That mint is `DiskPtsto.disk_bytes_mint` at
+the empty auth, and it has to be threaded into both adequacy theorems'
+client bundles together with the FS's abstract state.
 
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item); tighten

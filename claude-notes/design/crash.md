@@ -110,20 +110,45 @@ engine, or whole-function statement. Worklist:
   resource. The era-level `virtio_proto` keeps the queue/slot/claim
   protocol — which SHOULD die at a crash: in-flight requests vanish with
   the device reset, and sleepers holding receipts are dead anyway.
-- `crash_inv := inv crashN (∃ …, disk_bytes γdur … ∗ P_fs …)` with `P_fs`
-  an ARBITRARY iProp over fixed-layer ghosts (abstract FS state,
-  commit-history mono-lists, persistent durability receipts). Allocated
-  once, in adequacy; spans power cycles because neither power arm touches
-  `v_disk` — the power proofs FRAME the durable conjunct and never open
-  the invariant.
+- `crash_inv := inv crashN riscv_crash_pred`, where `riscv_crash_pred` is
+  a FIELD of `riscvFixedGS` of type `iProp Σ` — the client fixes it at
+  adequacy (the `Pc` parameter). Intended instance: "the durable image
+  satisfies `P_fs`", over `disk_bytes` fragments plus whatever abstract FS
+  state, commit-history mono-lists and persistent durability receipts the
+  FS keeps. Carrying it as a FIELD rather than a parameter is what keeps
+  `P_fs` out of every `dev_inv`-adjacent signature — nothing between
+  RiscvPtsto and the disk thread names it. Allocated once, in adequacy,
+  and handed to every boot (`power_boot_res`), so all generations share
+  it; it spans power cycles because neither power arm touches `v_disk` —
+  the power proofs FRAME the durable conjunct and never open the
+  invariant.
+  - **A sleeper's `disk_bytes` fragments are still era-parked**, and that
+    is a known open decision, not an oversight: a slot's fragments sit in
+    the per-era `disk_inv`, so a crash strands them while the durable auth
+    still remembers their keys (sound, but those offsets can never be
+    re-minted or re-claimed). The two candidate fixes — fractional/
+    agreement image entries so a slot holds a COPY, or auth-side key
+    forgetting in the power arm plus recovery re-minting — are recorded in
+    `../projects/crash.md`; the choice belongs with the log's crash proof.
 - `v_disk` changes in exactly ONE place (the device thread's DMA
   completion of an OUT slot, `vslot_post`), so that step carries the only
-  crash obligation in the whole kernel: the enqueuer (`virtio_disk_rw`'s
-  caller) deposits a WRITE PERMIT in the `vslot` — an iProp wand over
-  fixed ghosts, per the recorded vs_data rule ("an invariant that takes an
-  exclusive fragment across a sleep must record it") — and `wp_disk_loop`
-  consumes it, opening `crash_inv` and `disk_inv` together (disjoint
-  namespaces) to re-establish `P_fs`. Disk reads cost nothing. In-era
+  crash obligation in the whole kernel: `wp_disk_loop` opens `crash_inv`
+  and `disk_inv` together (disjoint namespaces) at that instant and spends
+  a WRITE PERMIT — `disk_write_permit := (▷ riscv_crash_pred ==∗ ▷
+  riscv_crash_pred)`, handed to it by `virtio_proto_step` — to
+  re-establish `P_fs`. A BASIC update suffices, with no mask annotation:
+  a serialized writer (xv6's log) needs nothing conditional. Disk reads
+  cost nothing (the identity permit).
+  - **Where the permit comes FROM is still open.** The intended source is
+    the enqueuer (`virtio_disk_rw`'s caller), per the recorded vs_data
+    rule, but the `vslot` cannot hold it: `disk_inv_body` must be
+    `Timeless` (the MMIO accessors open it with no step left to absorb a
+    `▷`), and no iProp can pass through a timeless invariant. The two
+    candidate channels — a second, non-timeless era invariant with a
+    timeless ghost skeleton, or a `P_fs` closed under in-flight writes so
+    that no per-slot deposit is needed — are written up in
+    `../projects/crash.md` (M5b). Until one lands, the completion mints
+    the identity permit, so nothing in the kernel yet owes anything. In-era
   kernel code has NO crash conditions anywhere — no wpc, no per-function
   crash specs; the write-ahead-log discipline lands entirely on the
   enqueue permit.

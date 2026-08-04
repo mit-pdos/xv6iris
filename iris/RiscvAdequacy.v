@@ -329,13 +329,28 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        [false]).  A hart client passes [NPROC]; the device-only corollary
        below passes 0. *)
     (nproc : nat)
+    (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
+       durability property, sealed into [crash_inv] here and handed back in
+       the bundle below.  It is an ARBITRARY iProp over fixed-layer ghosts
+       (the intended instance is "the durable image satisfies P_fs", over
+       [disk_bytes] fragments and whatever abstract-state ghosts the FS
+       keeps); nothing between here and the disk thread's DMA completion --
+       the only place it is opened -- ever names it. *)
+    (Pc : iProp Σ)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* the SINGLE-GENERATION form (crash.md): the machine is already booted
        and running generation 0 -- the power thread is not in this pool, so
        power stays on and the generation never moves.  The full power
        adequacy (pool = [PowerLoop]) supersedes this at milestone M6. *)
     (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
-    (Hgid : gen_id = 0%nat) :
+    (Hgid : gen_id = 0%nat)
+    (* the crash predicate must hold BEFORE anything runs -- mkfs's
+       obligation.  Stated as an entailment from nothing because the
+       fixed-layer ghosts it could speak about are allocated inside this
+       proof; minting the client's initial [disk_bytes] over the pristine
+       image (so that [Pc] can be about the disk at all) lands with the FS
+       instantiation. *)
+    (HPc : ⊢ Pc) :
   (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
@@ -380,6 +395,10 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 false) ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio)) ∗
+       (* the crash-spanning invariant, allocated over [Pc] below: the client
+          threads it to [wp_disk_loop] (the one consumer) and, once the FS
+          instantiates [Pc], opens it around its own commit points *)
+       crash_inv ∗
        (* the generation certificates (crash.md): birth + started + the
           era registration, i.e. [gen_cert] -- what a client needs to
           allocate [minstret_inv] *)
@@ -441,13 +460,16 @@ Proof.
      [disk_bytes] over the mkfs image is [DiskPtsto.disk_bytes_mint] against
      this auth, and lands with the crash invariant. *)
   iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
+  (* the crash-spanning invariant, over the client's [Pc].  Allocated at the
+     FIXED layer, so it outlives every era; both power arms leave it closed. *)
+  iMod (inv_alloc crashN ⊤ Pc with "[]") as "#Hcinv"; [ iNext; iApply HPc |].
   assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
     by apply lookup_empty.
   iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ γdisk)
+                  _ γdisk Pc)
                E0).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
@@ -520,6 +542,7 @@ Proof.
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|].
     iSplitL "HvF"; [iExact "HvF"|].
+    iSplitR; [iExact "Hcinv"|].
     rewrite /gen_cert Hgid.
     assert (Hsc : start_count g = 1%nat)
       by (rewrite /start_count Hpow Hgen0; done).
@@ -617,11 +640,16 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId} (g
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
+  (* a device-only machine has no durability property to keep: [Pc := True],
+     whose invariant is allocated and then never opened by anything but the
+     completion arm's (identity) permit. *)
   apply (riscv_system_adequacy Σ [] g
-           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0 Hram
-           Hpow Hgen0 Hgid).
+           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
+           (True : iProp Σ) Hram
+           Hpow Hgen0 Hgid (bi.True_intro _)).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf & #Hcert)".
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
+            #Hcinv & #Hcert)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt
      and the (unfrozen) DLAB half -- are what a boot chain would thread through
@@ -661,7 +689,7 @@ Proof.
   iSplitL.
   { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
   iSplitL.
-  { iApply (wp_disk_loop γv _ Himg with "Hcert Hvinv Hpinv"). }
+  { iApply (wp_disk_loop γv _ Himg with "Hcert Hcinv Hvinv Hpinv"). }
   iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.
 
@@ -726,6 +754,11 @@ Section power.
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
      ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
+     (* the crash-spanning invariant: FIXED-layer, so every boot gets the
+        SAME one -- which is the whole point (the durability property is what
+        survives the power cycle).  The boot client threads it to
+        [wp_disk_loop]. *)
+     crash_inv ∗
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc : nat)
@@ -740,8 +773,9 @@ Section power.
             WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
             WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
             WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
-    ⊢ WP (PowerLoopE : expr riscv_lang) {{ Φ }}.
+    crash_inv -∗ WP (PowerLoopE : expr riscv_lang) {{ Φ }}.
   Proof.
+    iIntros "#Hcinv".
     iLöb as "IH".
     iApply wp_lift_step; first done.
     iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
@@ -850,6 +884,7 @@ Section power.
       { rewrite /power_boot_res.
         iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF".
         iFrame "Helems".
+        iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
         iSplitR; [|iExact "HRelem"].
         assert (Hsg : (g.(ggen) + 1)%nat = S g.(ggen)) by lia.
@@ -897,6 +932,12 @@ End power.
    and device steps is reducible. *)
 Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
     (D : CPU -> gset register) (nproc : nat) (g : gstate)
+    (* the crash predicate (see [riscv_system_adequacy]): allocated ONCE, into
+       the fixed layer, so the SAME [crash_inv] is handed to every boot --
+       which is what makes a durability property span power cycles.  Taken
+       before [Hboot] so the [crash_inv] inside [power_boot_res] is this
+       one. *)
+    (Pc : iProp Σ) (HPc : ⊢ Pc)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
                     (g' : gstate),
@@ -927,8 +968,9 @@ Proof.
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hsauth _]".
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
+  iMod (inv_alloc crashN ⊤ Pc with "[]") as "#Hcinv"; [ iNext; iApply HPc |].
   set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-              _ γdisk).
+              _ γdisk Pc).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -951,7 +993,8 @@ Proof.
     rewrite Hpow. done. }
   iSplitL.
   { cbn. iSplitL; [|done].
-    iApply (@wp_power_loop Σ F _ D nproc (fun _ => True%I) (Hboot F)). }
+    iApply (@wp_power_loop Σ F _ D nproc (fun _ => True%I) (Hboot F)
+              with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
   iPureIntro. intros e He. exact (Hns e eq_refl He).

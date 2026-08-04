@@ -2,7 +2,8 @@
 From Stdlib Require Import Eqdep_dec ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat.
+From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat
+     invariants.
 From iris.algebra Require Import csum excl agree.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
@@ -234,6 +235,13 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      fragments there must carry the same [ghost_mapG] instance. *)
   riscvF_diskGS :: diskImgG Σ;
   riscv_disk_name : gname;
+  (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
+     durability invariant over the disk image -- an ARBITRARY iProp, sealed
+     into [crash_inv] below.  A plain iProp field is legal here (only the ERA
+     record has to be Σ-free, because it is a [ghost_map] VALUE), and it is
+     what keeps [P_fs] out of every [dev_inv]-adjacent signature: no proof
+     between here and the device thread ever names it. *)
+  riscv_crash_pred : iProp Σ;
 }.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
@@ -316,6 +324,46 @@ Definition era_registered `{!riscvFixedGS Σ} (gen : nat) (E : riscvEraGS) : iPr
    premise and case on the current [(ggen, gpow)] against it. *)
 Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
   (gen_born gen_id ∗ gen_started gen_id ∗ era_registered gen_id riscv_eraGS)%I.
+
+(* ---------------------------------------------------------------------- *)
+(* THE CRASH-SPANNING INVARIANT (claude-notes/design/crash.md).             *)
+(*                                                                          *)
+(* [crash_inv] is allocated ONCE, in adequacy, over the fixed layer's        *)
+(* [riscv_crash_pred], and it spans power cycles for free: neither power arm *)
+(* opens it (both FRAME [disk_dur_interp], and [virtio_reset] keeps          *)
+(* [v_disk]), so the client's durability property holds at every reachable   *)
+(* state INCLUDING the instant after a power loss.  It is opened in exactly  *)
+(* one place in the whole tree -- the disk thread's DMA completion, the one  *)
+(* step that moves [v_disk] ([WpUart.wp_disk_loop]).                         *)
+(* ---------------------------------------------------------------------- *)
+
+Definition crashN : namespace := nroot .@ "crash".
+
+Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ := inv crashN riscv_crash_pred.
+
+Global Instance crash_inv_persistent `{!riscvFixedGS Σ} : Persistent crash_inv.
+Proof. rewrite /crash_inv. apply _. Qed.
+
+(* THE WRITE PERMIT: what an enqueuer deposits in an OUT slot
+   ([VirtioProto.slot_pend_res]) and what the DMA completion spends to
+   re-establish the crash predicate AT THE INSTANT the on-disk image changes.
+   Deliberately a BARE later-to-later basic update: the interesting content is
+   the CLOSURE, not the type -- the future log's commit-flip wand curries its
+   own abstract-state ghosts (and the block it is about) into the permit at
+   enqueue time, and the completion instant is precisely when the on-disk
+   state changes, so that is when the wand must run.  A SERIALIZED writer --
+   which xv6's log is, one commit at a time under the log lock -- needs
+   nothing conditional here: no "if the disk still looks like X" guard, no
+   mask annotation (a basic update goes through at whatever mask
+   [wp_disk_loop] holds while [crashN] and [diskN] are both open). *)
+Definition disk_write_permit `{!riscvFixedGS Σ} : iProp Σ :=
+  (▷ riscv_crash_pred ==∗ ▷ riscv_crash_pred)%I.
+
+(* Until the log lands, every enqueuer deposits THIS: a write that promises
+   nothing about durability is exactly a write whose permit is the identity.
+   The hook is what will change without touching the driver's specs. *)
+Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} : ⊢ disk_write_permit.
+Proof. rewrite /disk_write_permit. iIntros "HP". by iModIntro. Qed.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks

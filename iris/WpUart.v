@@ -850,11 +850,16 @@ Section DevLoops.
        over with the fragments [virtio_proto] holds.  [disk_ghosts_alloc]
        exports this equation. *)
     dn_img γd = riscv_disk_name ->
-    gen_cert -∗ disk_inv γd -∗ plic_inv -∗
+    (* [crash_inv] is taken PERSISTENTLY and opened in exactly one arm: the
+       DMA completion, where the durable image changes and the write permit
+       deposited at enqueue re-establishes the crash predicate
+       (claude-notes/design/crash.md).  [crashN] is disjoint from [diskN] and
+       [plicN], so the two openings compose. *)
+    gen_cert -∗ crash_inv -∗ disk_inv γd -∗ plic_inv -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Himg.
-    iIntros "#Hcert #Hvinv #Hpinv".
+    iIntros "#Hcert #Hcinv #Hvinv #Hpinv".
     iLöb as "IH".
     iApply (wp_disk_step with "Hcert").
     (* the fourth component is the DURABLE image auth ([wp_disk_step] hands it
@@ -883,7 +888,14 @@ Section DevLoops.
          by [Himg]. *)
       iEval (rewrite -Himg Hv) in "Hdur".
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
-              with "Hmem Hdur Hlease") as "(Hmem' & Hdur' & Hlease')".
+              with "Hmem Hdur Hlease") as "(Hmem' & Hdur' & Hperm & Hlease')".
+      (* THE COMMIT INSTANT: the image has just changed, so the crash
+         predicate is re-established here, by the permit the enqueuer
+         deposited in the OUT slot (the identity, for a read or until the log
+         lands).  This is the only opening of [crashN] in the tree. *)
+      iInv "Hcinv" as "HP" "Hcclose".
+      iMod ("Hperm" with "HP") as "HP".
+      iMod ("Hcclose" with "HP") as "_".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }

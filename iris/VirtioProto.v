@@ -1129,7 +1129,22 @@ Section VirtioProto.
      is [vs_data sl] -- the content the publisher asserted when it published,
      and the content the device will copy into the buffer.  Pinning it here is
      what lets the woken publisher identify the fragments it gets back with
-     the [disk_block] it handed in. *)
+     the [disk_block] it handed in.
+
+     NO CRASH WRITE PERMIT LIVES HERE, AND IT CANNOT (claude-notes/design/
+     crash.md, and the M5b entry in projects/crash.md).  The natural home for
+     the enqueuer's obligation is this record -- it is the [vs_data]
+     precedent, an exclusive resource recorded where the invariant keys on the
+     request -- but [disk_inv_body] MUST BE [Timeless]: every driver site that
+     opens it (eight of them today) does so inside an MMIO atomic-update
+     accessor, where there is no step
+     left to absorb a [▷], so a non-timeless body cannot be used at all.  A
+     permit is an iProp (a wand over an arbitrary [riscv_crash_pred]) and is
+     therefore never timeless, and there is no way to smuggle an iProp through
+     a timeless invariant -- saved propositions are not timeless either
+     ([own γ (to_agree (Next P))] over a non-discrete OFE).  So the permit
+     needs a channel of its own; until it exists, [virtio_proto_step] mints
+     the identity permit at the completion. *)
   Definition slot_pend_res (γ : disk_names) (sl : vslot) : iProp Σ :=
     (∃ bs : list (bv 8),
        ⌜length bs = vs_len sl⌝ ∗
@@ -1518,7 +1533,18 @@ Section VirtioProto.
      ([RiscvPtsto.disk_dur_interp], handed over by [RiscvExec.wp_disk_step])
      is updated.  It travels as an explicit premise+return rather than inside
      [virtio_proto]: the invariant this lemma runs under is per-ERA and a
-     crash must not strand the image (claude-notes/design/crash.md). *)
+     crash must not strand the image (claude-notes/design/crash.md).
+
+     It also HANDS BACK a crash WRITE PERMIT
+     ([RiscvPtsto.disk_write_permit]), so that the caller can spend it on
+     [riscv_crash_pred] at this very instant: the step where the durable image
+     changes is the step where the client's durability property has to be
+     re-established.  The permit is UNCONDITIONAL (the caller does not know,
+     and does not want to know, the completed request's direction) and today
+     it is MINTED here as the identity -- nothing deposits one, because a
+     [vslot] cannot hold an iProp (see [slot_pend_res]).  This return is the
+     interface that will not change when the log lands; only the permit's
+     source will. *)
   Lemma virtio_proto_step (γ : disk_names) (v : virtio_state)
       (m : gmap Arch.pa (bv 8)) (mv : vmem) (v' : virtio_state)
       (w : gmap Arch.pa (bv 8)) :
@@ -1527,7 +1553,7 @@ Section VirtioProto.
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
       gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
-      virtio_proto γ v'.
+      disk_write_permit ∗ virtio_proto γ v'.
   Proof.
     iIntros (Hview Hstep) "Hm Hauth Hp".
     iDestruct "Hauth" as (dmap) "[Hauth %Hdv]".
@@ -1571,6 +1597,13 @@ Section VirtioProto.
     iDestruct (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl with "Hpend")
       as "[Hslres Hpend]".
     iDestruct "Hslres" as (bs) "(%Hbslen & %Hbspin & Hbs)".
+    (* THE PERMIT for the write this step performs.  Minted here as the
+       IDENTITY, because nothing deposits one yet: the enqueue-side channel
+       needs a non-timeless home (see [slot_pend_res]).  The RETURN is the
+       interface that matters and it is final -- when the log lands, only the
+       source of this permit changes, not [wp_disk_loop] and not the
+       [wp_disk_step] seam. *)
+    iAssert disk_write_permit as "Hperm"; [ iApply disk_write_permit_trivial |].
     iAssert (|==> ∃ (dmap' : gmap Z (bv 8)) (bs' : list (bv 8)),
                ghost_map_auth (dn_img γ) 1 dmap' ∗
                disk_bytes γ (vs_sector_off sl) bs' ∗
@@ -1658,7 +1691,7 @@ Section VirtioProto.
             apply elem_of_union_r, pa_range_intro. exact Hj.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild *)
-    iModIntro. iFrame "Hm".
+    iModIntro. iFrame "Hm Hperm".
     iSplitL "Hauth".
     { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
     rewrite /virtio_proto vslot_post_cfg Hlive.
