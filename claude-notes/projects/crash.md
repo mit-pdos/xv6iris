@@ -2274,13 +2274,16 @@ End state: shrink the patch from `mseccfg = 0` to `PMM = disabled at
 power-on` (stating the tower's premise field-wise), with MLPE and the seed
 bits derived from the reset run.
 
-**USER-APPROVED (2026-08-04): disable pointer masking in the config** —
-`Smmpm` per the user's directive, and `Smnpm`/`Ssnpm` with it (recommended
-scope: xv6 runs S/U mode, where the same read path consults
-`menvcfg.PMM`/`senvcfg.PMM`, `smode_config` carries the same premise, and
-`menvcfg = 0` is another whole-register pin with the same story). Run this
-AFTER the PMA table retirement lands (regen + same files). The finding that
-shapes what the flip buys, verified against the generated model:
+**CONFIG FLIP RESCINDED (2026-08-04): pointer masking stays enabled.** The
+user first approved disabling `Smmpm`, then withdrew it on learning the
+finding below: the flip does not remove the PMM initial-value pin (the
+read path is ungated), so it buys reclassification only, not a smaller
+proof — "if we still have to initialize the PMM field in mseccfg, then no
+need to disable Smmpm." So: no config change; the `PMM = disabled at
+power-on` pin stays a named platform assumption in the patch chain
+(shrunk field-wise per the decomposition above). The finding, verified
+against the generated model and kept because it documents why a future
+flip would NOT help:
 
 - The read path `transform_effective_address → get_pmlen →
   is_pmm_applicable → get_pmm` NEVER consults
@@ -2291,15 +2294,11 @@ shapes what the flip buys, verified against the generated model:
   write path, never the read path. So the flip does NOT remove the proof's
   dependence on the initial field value; under reset-only boot the premise
   remains.
-- What the flip DOES buy: the priv spec makes unimplemented-extension
-  fields read-only zero, so with Smmpm off the `PMM = 0` pin stops being a
-  platform choice and becomes an architecturally mandated fact the model
-  merely can't establish through `reset()` (it stores `mseccfg` as raw
-  bits). Reclassify the pin as a documented model-representation artifact —
-  same epistemic class as the `cancel_reservation` hook. Possibly worth an
-  upstream report (`is_pmm_applicable` arguably should gate on the
+- All the flip would buy is reclassification: the priv spec makes
+  unimplemented-extension fields read-only zero, so with Smmpm off the pin
+  would become an architecturally mandated fact the model merely can't
+  establish through `reset()`. The user judged that not worth a config
+  change while the pin itself must stay either way. Possibly still worth
+  an upstream report (`is_pmm_applicable` arguably should gate on the
   extension).
-- B/V lesson applies: evaluate `config_is_valid` after the flip (the
-  pointer-masking family may have dependents; the `supported_pmlen_7/16`
-  subfields ride along).
 
