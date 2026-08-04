@@ -789,43 +789,127 @@ invalidates `RiscvLang.vo` (RiscvLang names the image) and therefore the
 WHOLE iris tree — a dumper edit costs one full ~15 min rebuild, not a
 single-file check.
 
-### Slice 1b — what still remains
+### Slice 1b' — `kernel_data` + the physical cuts (LANDED); the RANGE layer
 
-- **`kernel_data_intro`.** `KernelDataInv.kernel_data` is `↦ₘ□`
-  (PERSISTED), while the data half arrives OWNED, and main needs the .bss
-  cells owned. So `supra_text` needs a SECOND cut, at `img_end`: below it →
-  persist into `kernel_data`; at or above it → stays owned for slice 2's
-  typed cells. The two are disjoint because `kernel_data`'s upper bound IS
-  `img_end` (see above) and every `main_globals_raw` cell is .bss. The
-  `< img_end` range fact is already generated.
-- **The PHYSICAL cuts**: the `stack0` pages (`stack_own_phys` per hart) and
-  the `entry_ld_ea` word, as raw `↦ₚ`, taken out of `supra_text` before the
-  `↦ₘ` upgrade — a key-set deletion on that filtered map plus the per-byte
-  presence from `boot_facts`.
+**The whole rest of the carve is spelled in ONE vocabulary, and that is the
+result worth knowing before touching this file.** Every piece still to be
+taken out of the `text_end`-and-above half is an address RANGE —
+`[text_end, img_end)` for the initialized globals, a hart's 4096-byte
+`stack0` slice, the .bss cells, `[s1entry, PHYSTOP)` for kinit's run — so
+BootCarve §6 defines `boot_raw_ran g lo hi` (the raw bytes whose `uint` lies
+in `[lo, hi)`) with exactly two primitives on it, and every later bundle is
+a chain of them:
+
+- `boot_ran_split` — cut at any `mid`. `ran_bytes_union` (`map_filter_filter`
+  + `map_filter_ext`, two `lia`s) and `ran_bytes_disj` are its pure halves.
+- `boot_ran_bytes` — **the one induction in the file**, over the range's
+  LENGTH: `boot_raw_ran g lo (lo + n)` ⊢ the run of its `n` raw bytes at
+  `pa_of_z (lo + i)` with values `boot_byte (lo + i)` (`zrun` is that address
+  list, with `zrun_fmap` giving the `seq`-indexed spelling a `pa_add`
+  consumer wants). Its base case DROPS the empty filter rather than proving
+  it empty (affine), and its step is `boot_ran_split` at `lo + 1` plus
+  `ran_bytes_one`.
+- **`ran_bytes_one` is the load-bearing fact and the reason `pa_of_z_uint`
+  had to be added to PowerBoot.v**: a one-byte range is a SINGLETON map. A
+  filter *by address* says nothing about which KEYS survive until you know
+  that a key whose `uint` is `a` can only be `pa_of_z a` — i.e. that
+  `pa_of_z` is a left inverse of `uint`, which needs no range premise
+  (`Z_to_bv_bv_unsigned`).
+- `boot_data_ran` bridges §2's half into the vocabulary: with "nothing
+  outside RAM", `supra_text g` IS `ran_bytes g text_end ram_hi`.
+
+On top of it, slice 1b's two remaining bundles:
+
+- **`kernel_data_intro`** (§7). The second cut of the data half goes at
+  `img_end` because `KernelDataInv.kernel_data` is `↦ₘ□` (PERSISTED) while
+  the half arrives owned and main needs the .bss cells owned: below `img_end`
+  the bytes go `boot_ran_own` (§4's per-byte `phys_ident_mem` step, over the
+  range) → `boot_ran_persist` → the bundle; at or above it they stay OWNED
+  for slices 2 and 3. `kernel_data`'s keys are a SUBSET of the range (the
+  rest is padding, dropped), so the bundle is read out by lookup exactly as
+  `kernel_text_intro` does. `boot_byte_data` is the value bridge: above
+  `text_end` the text map is exhausted (`kernel_bytes`' keys stop at
+  0x80006120), so the union takes the data side.
+- **The physical cuts.** Both turned out NOT to need a cut of their own:
+  - `boot_ran_word` (§8) — an 8-byte 8-ALIGNED range is a doubleword of
+    ARBITRARY contents at the physical tier, and `boot_stack_own_phys` (§9)
+    is its induction: `[uint sp - 8n, uint sp)` ⊢ `stack_own_phys sp n`.
+    **Nothing in it mentions `stack0`** — a per-hart carve is the same lemma
+    at that hart's sp, and the client picks the range. It peels the DEEPEST
+    slot each step (`stack_own_phys_app sp k 1`), which keeps `sp` FIXED
+    through the induction and needs only `uint_pa_stk` at the peeled index.
+  - `kernel_data_phys_word` (§8) — the `entry_ld_ea` word is INSIDE
+    `[text_end, img_end)`, so it comes off `kernel_data` (`↦ₘ□`) by
+    `KMap.mem_ident_phys`, at `DfracDiscarded`, which is exactly why
+    `SpecEntry` takes that word at an arbitrary `dq`. Stated generically over
+    `(A, w)`: BootCarve deliberately stays BELOW the M-mode tower, so the
+    `entry_ld_ea`/`&stack0` instantiation (8 `vm_compute` lookups in one
+    process, so one slow + seven cached) belongs with the client.
+
+`StackOwn.v` gained `z_stk_sub` / `uint_pa_stk`, moved down from
+`BootBridge.v` (one home per fact — they belong beside `pa_stk`, and both
+consumers are boot-path).
+
+**TWO HANGS, both `in *` inside a proofmode goal, both worth avoiding by
+reflex:** `injection` on `Some (bv 8) = Some (bv 8)` does not come back (the
+`Arch.pa * bv 8` note in M6a, one level down) — go through
+`map_lookup_filter_Some_2` / `map_lookup_filter_None` and never produce the
+equation; and `assert … by (unfold … in *; cbn in *; lia)` in a goal whose
+proofmode context holds `kernel_data` walks the 18000-entry big_sepM. Name
+the hypothesis you meant (`unfold img_end in Hhi`), never `in *`.
 
 ### Slice 2 — typed cells (NOT STARTED)
 
 The 4/8-byte cells at kernel-symbol addresses that `main_locks_raw` /
 `main_globals_raw` demand, out of consecutive `↦ₘ` bytes with their image
 values (bss = 0 symbolically, via `boot_byte`'s filter being `None` at or
-above `img_end`; data = the dump's words). Follow InstrBytes'
-`word_pointsto_join4` / `word_pointsto_join8` and `kernel_data_window`'s
-style; the addresses and widths are uniform, so a small combinator family
-("W consecutive `↦ₘ` bytes at a symbol address, with the image's value")
-beats forty bespoke lemmas. NB `main_globals_raw`'s conjuncts are mostly
-CONTENTS-EXISTENTIAL, which makes them strictly easier than the two that
-are not (`kmem+24 ↦₈ 0` and `d_used_idx ↦₂ wrap16 0`) — those two need the
-bss-is-zero clause.
+above `img_end`; data = the dump's words). **Start from slice 1b''s range
+layer**: each cell is `boot_ran_split` down to its own `[A, A+W)` and then
+`boot_ran_own` + a width-W join — `boot_ran_word`'s `↦ₘ`/existential twins
+(`↦₈`/`↦₄`/`↦₂`, all contents-existential) plus a `boot_byte_bss`
+("`img_end ≤ a → boot_byte a = byte0`", one `map_lookup_filter_None`) for
+the two that are PINNED (`kmem+24 ↦₈ 0` and `d_used_idx ↦₂ wrap16 0`). The
+addresses and widths are uniform, so that combinator family beats forty
+bespoke lemmas. What is NOT uniform, and is where the real work is, is the
+STRUCTURED conjuncts — `proc_raw`/`proc_pub` × 64, `fd_slots`, the NBUF
+`sl_raw`/`blink_raw`, the NINODE sleeplocks, `disk_slot_raw` × 8 — each of
+which needs its own file's vocabulary (ProcGeom / FdSlots / BcacheInv /
+DiskInv). Those cannot live in BootCarve (it stays below the WP tower on
+purpose): they want a file above SpecMain, which is also where slice 3 goes.
 
 ### Slice 3 — the kinit page run (NOT STARTED)
 
 `[s1entry, PHYSTOP)` → `[∗ list] p ∈ ps, page_own p` + `prun phystop
 s1entry ps` (KallocInv's shapes), peeled SYMBOLICALLY — never enumerate
-(durable-notes' large-map rules). Open question to settle from
+(durable-notes' large-map rules). Settled from
 `SpecMain.wp_main_boot_sconf_body`'s actual precondition rather than from
 the design: it asks for `(K_kvmmake + 64 + 3 < length ps)` and nothing
 else about the 64 kstack pages, i.e. **the kstacks come out of the same
 `ps` budget** and do NOT need a separate bundle.
+
+What slice 1b' settles about it:
+
+- **It cannot live in BootCarve.** `page_own` is `KallocInv`'s and `prun` /
+  `PGSIZEv` / `negPGSIZEv` are `SpecFreerange`'s, both far above; the home is
+  a NEW file above SpecMain (which already imports both), shared with slice
+  2's structured conjuncts.
+- The per-page step is `boot_ran_own` on a `[p, p+4096)` range plus
+  `zrun_fmap` + `big_sepL_impl` to index it by `pa_add p j` — symbolic, one
+  `big_sepL` of 4096, no enumeration; then ONE induction over the page count,
+  exactly like §9's stack induction.
+- **Spell the page list the way `prun` recurses** (`p :: pg_run (s1 + 4096) k`
+  with `p = s1 - 4096`), so `prun` is a structural induction with no list
+  surgery. The two mword facts it needs are cheap:
+  `add_vec s1 negPGSIZEv` IS `pa_stk s1 512` (so `uint_pa_stk` gives its
+  `uint`, and `pa_of_z_uint` its `pa_of_z` spelling), and
+  `add_vec s1 PGSIZEv` IS `pa_add s1 4096` (`PageGeom.kalloc_uint_pa_add`,
+  reachable by qualified name though `Local`).
+- The concrete run, for the record: `s1entry = 0x80025000`
+  (`PGROUNDUP(0x80023558) + 4096`), so the pages are
+  `0x80024000 + 4096*i` for `i < 32732` — the last is `0x87fff000` and
+  `PHYSTOP = 0x88000000`. `page_valid` holds of all of them
+  (`kmem_lo = 0x80023558 ≤ 0x80024000`); note the first page is `s1entry -
+  4096`, NOT `s1entry`.
 
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item), now over the

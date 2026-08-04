@@ -85,6 +85,18 @@ Proof.
   rewrite uint_unsigned, moi64_mod. apply Z.mod_small. lia.
 Qed.
 
+(* the OTHER direction of the round trip, and it needs no range premise at
+   all: [Z_to_bv] is a left inverse of [bv_unsigned] at every width, so every
+   [Arch.pa] IS the [pa_of_z] of its own unsigned value.  This is what pins a
+   range filter's DOMAIN -- a key whose [uint] is [a] can only be
+   [pa_of_z a] -- which is what turns "the bytes whose address lies in
+   [lo, hi)" into an enumerable run (BootCarve's §6). *)
+Lemma pa_of_z_uint (p : Arch.pa) : pa_of_z (uint p) = p.
+Proof.
+  unfold pa_of_z, SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite uint_unsigned. apply Z_to_bv_bv_unsigned.
+Qed.
+
 Lemma pa_of_z_inj (a a' : Z) :
   ram_lo <= a < ram_hi -> ram_lo <= a' < ram_hi -> pa_of_z a = pa_of_z a' -> a = a'.
 Proof.

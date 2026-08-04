@@ -88,6 +88,45 @@ Proof.
   apply avi_assoc.
 Qed.
 
+(* the unsigned value of an address [8*k] bytes below [sp], when the
+   subtraction does not underflow.  Stated with [sp : mword 64] (never
+   [Arch.pa], whose width is an unreduced [if] -- durable-notes), like
+   [SmodePte.uint_pa_add], whose proof shape this mirrors.  Both consumers
+   are boot-path: BootBridge's physical->VA stack conversion and BootCarve's
+   carve of a hart's stack out of the raw boot image. *)
+Lemma z_stk_sub (u d : Z) :
+  0 <= d -> d <= u -> u < 18446744073709551616 ->
+  bv_wrap 64 (u + bv_wrap 64 (- d)) = u - d.
+Proof.
+  intros Hd Hdu Hu. unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  rewrite Z.add_mod_idemp_r; [| lia].
+  apply Z.mod_small. lia.
+Qed.
+
+Lemma uint_pa_stk (a : mword 64) (k : nat) :
+  (8 * Z.of_nat k <= uint a)%Z ->
+  uint (pa_stk a k) = (uint a - 8 * Z.of_nat k)%Z.
+Proof.
+  intro Hle. rewrite !uint_unsigned in Hle |- *.
+  unfold pa_stk, add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (Hj : bv_unsigned (mword_of_int (- (8 * Z.of_nat k)) : mword 64)
+               = bv_wrap 64 (- (8 * Z.of_nat k))).
+  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+    rewrite Z_to_bv_unsigned. reflexivity. }
+  rewrite Hj.
+  match goal with |- context [bv_wrap ?W _] => change (bv_wrap W) with (bv_wrap 64) end.
+  pose proof (bv_unsigned_in_range _ a) as [Hlo Hhi].
+  assert (Hhi' : (bv_unsigned a < 18446744073709551616)%Z).
+  { revert Hhi. unfold bv_modulus.
+    assert (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616)
+      as -> by (vm_compute; reflexivity). lia. }
+  apply z_stk_sub; [ lia | exact Hle | exact Hhi' ].
+Qed.
+
 Section stack_own.
   Context `{!riscvGS Σ}.
 
