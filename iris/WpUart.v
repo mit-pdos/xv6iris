@@ -774,12 +774,12 @@ Section DevLoops.
   (*  touches both halves.                                               *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_uart_loop γ Φ :
-    uart_inv γ -∗ plic_inv -∗
+    gen_cert -∗ uart_inv γ -∗ plic_inv -∗
     WP (UartLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#Huinv #Hpinv".
+    iIntros "#Hcert #Huinv #Hpinv".
     iLöb as "IH".
-    iApply wp_uart_step.
+    iApply (wp_uart_step with "Hcert").
     iIntros (gr m d) "(Hgr & Hmem & Hdev)".
     (* No invariant is opened until the arm is known: each arm then opens
        exactly the one half of the fabric it moves. *)
@@ -845,12 +845,12 @@ Section DevLoops.
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_disk_loop γd Φ :
-    disk_inv γd -∗ plic_inv -∗
+    gen_cert -∗ disk_inv γd -∗ plic_inv -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#Hvinv #Hpinv".
+    iIntros "#Hcert #Hvinv #Hpinv".
     iLöb as "IH".
-    iApply wp_disk_step.
+    iApply (wp_disk_step with "Hcert").
     iIntros (gr m d) "(Hgr & Hmem & Hdev)".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' m' Hstep).
@@ -916,12 +916,12 @@ Section DevLoops.
   (*  is the PLIC's.                                                       *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_plic_loop Φ :
-    plic_inv -∗ wire_inv -∗
+    gen_cert -∗ plic_inv -∗ wire_inv -∗
     WP (PlicLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#Hpinv #Hwinv".
+    iIntros "#Hcert #Hpinv #Hwinv".
     iLöb as "IH".
-    iApply wp_plic_step.
+    iApply (wp_plic_step with "Hcert").
     iIntros (gr m d) "(Hgr & Hmem & Hdev)".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (gr' Hstep).

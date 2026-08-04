@@ -98,6 +98,8 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_parkGS :: ghost_varG Σ bool;
   (* the generation counter (crash/power layer) *)
   riscv_pre_genGS :: mono_natG Σ;
+  (* the generation REGISTRY (crash/power layer): gen -> era record *)
+  riscv_pre_registryGS :: ghost_mapG Σ nat riscvEraGS;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -113,7 +115,8 @@ Definition riscvΣ : gFunctors :=
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
      GFunctor kptR;
      ghost_varΣ bool;
-     mono_natΣ ].
+     mono_natΣ;
+     ghost_mapΣ nat riscvEraGS ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -318,7 +321,13 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        [false]).  A hart client passes [NPROC]; the device-only corollary
        below passes 0. *)
     (nproc : nat)
-    (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a) :
+    (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
+    (* the SINGLE-GENERATION form (crash.md): the machine is already booted
+       and running generation 0 -- the power thread is not in this pool, so
+       power stays on and the generation never moves.  The full power
+       adequacy (pool = [PowerLoop]) supersedes this at milestone M6. *)
+    (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
+    (Hgid : gen_id = 0%nat) :
   (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
@@ -362,7 +371,11 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
           own p->lock until its first dispatch (SchedCtx.proc_slots). *)
        ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 false) ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
-       virtio_frag (g.(gdev).(dvirtio))
+       virtio_frag (g.(gdev).(dvirtio)) ∗
+       (* the generation certificates (crash.md): birth + started + the
+          era registration, i.e. [gen_cert] -- what a client needs to
+          allocate [minstret_inv] *)
+       gen_cert
        ={⊤}=∗
        ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
        WP (UartLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
@@ -411,9 +424,17 @@ Proof.
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
   (* EVERY proc slot's park receipt, minted at [false] *)
   iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
-  iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth _]".
-  set (HR := RiscvGS Σ (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen)
-               (RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark)).
+  iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth #Hbornlb]".
+  iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hstartauth #Hstartlb]".
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark).
+  iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
+  assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
+    by apply lookup_empty.
+  iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
+  iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
+  set (HR := RiscvGS Σ
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg)
+               E0).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
@@ -483,22 +504,36 @@ Proof.
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "HuF"; [iExact "HuF"|].
-    iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }
+    iSplitL "HpF"; [iExact "HpF"|].
+    iSplitL "HvF"; [iExact "HvF"|].
+    rewrite /gen_cert Hgid.
+    assert (Hsc : start_count g = 1%nat)
+      by (rewrite /start_count Hpow Hgen0; done).
+    iSplitR; [iEval (rewrite -Hgen0); iExact "Hbornlb"|].
+    iSplitR; [|iExact "HRelem"].
+    iEval (rewrite Hsc) in "Hstartlb". iExact "Hstartlb". }
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
-       (gregs_interp g'.(gregs) ∗ gen_heap_interp g'.(gmem) ∗
-        dev_interp g'.(gdev) ∗ gen_auth g'.(ggen))%I),
+       (@power_interp Σ (@riscv_fixedGS Σ HR) g')%I),
     (replicate (length (cpu_pool cs)) (fun _ : mval => True%I)),
     (fun _ : mval => True%I),
-    (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ HR)).
+    (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ HR))).
   cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA HvA Hgenauth".
-  { (* the initial state interpretation *)
-    iSplitL "Hauths".
-    { rewrite /gregs_interp. iApply big_sepL_enum_to_set. iExact "Hauths". }
-    iFrame "Hh". iSplitR "Hgenauth"; last iExact "Hgenauth".
-    iSplitL "HuA"; [iExact "HuA"|].
+  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth".
+  { (* the initial state interpretation: generation 0, power on, the one
+       registered era *)
+    rewrite /power_interp. iFrame "Hgenauth Hstartauth".
+    iExists {[ 0%nat := E0 ]}. iFrame "HRauth".
+    iSplitR.
+    { iPureIntro. rewrite dom_singleton_L /start_count Hpow Hgen0 /=.
+      set_solver. }
+    rewrite Hpow. iExists E0.
+    iSplitR.
+    { iPureIntro. rewrite Hgen0. by rewrite lookup_singleton. }
+    rewrite /era_interp. iSplitL "Hauths".
+    { rewrite /gregs_interp_at. iApply big_sepL_enum_to_set. iExact "Hauths". }
+    iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
     iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
   iSplitL "Hwps Hwpu Hwpd Hwpp".
   { (* the WPs of the initial threads: the harts, then the three devices *)
@@ -556,16 +591,20 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId} (g
     (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
        PLIC plan): the interrupt-status register holds only defined bits.  A
        reset device does. *)
-    (Hvisr : virtio_isr_ok g.(gdev).(dvirtio)) :
+    (Hvisr : virtio_isr_ok g.(gdev).(dvirtio))
+    (* the single-generation form: generation 0, power on (see the theorem) *)
+    (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
+    (Hgid : gen_id = 0%nat) :
   forall t2 g2 e2,
     rtc erased_step (cpu_pool [], g) (t2, g2) ->
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
   apply (riscv_system_adequacy Σ [] g
-           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0 Hram).
+           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0 Hram
+           Hpow Hgen0 Hgid).
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf)".
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf & #Hcert)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt
      and the (unfrozen) DLAB half -- are what a boot chain would thread through
@@ -603,8 +642,8 @@ Proof.
   iDestruct (dev_inv_disk with "Hinv") as "#Hvinv".
   iModIntro. iSplitR; [done|].
   iSplitL.
-  { iApply (wp_uart_loop γ with "Huinv Hpinv"). }
+  { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
   iSplitL.
-  { iApply (wp_disk_loop γv with "Hvinv Hpinv"). }
-  iApply (wp_plic_loop with "Hpinv Hwinv").
+  { iApply (wp_disk_loop γv with "Hcert Hvinv Hpinv"). }
+  iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.

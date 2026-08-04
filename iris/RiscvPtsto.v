@@ -94,39 +94,6 @@ Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
    exactly it: the pre-split field names are preserved verbatim as
    definitions below the class, so no statement anywhere changes. *)
 
-Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
-  riscvF_invGS :: invGS Σ;
-  riscvF_regGS :: ghost_mapG Σ register (sigT type_of_register);
-  (* the device fabric (DevModel.v): one [ghost_var] per device, in the
-     standard halves pattern -- [state_interp] holds one half (the "auth"),
-     the other half (the "frag") floats freely and is typically stored in an
-     invariant shared between the driver's hart and the device thread. *)
-  riscvF_uartGS :: ghost_varG Σ uart_state;
-  riscvF_plicGS :: ghost_varG Σ plic_state;
-  riscvF_virtioGS :: ghost_varG Σ virtio_state;
-  (* pinned to the SAIL key instances (Decidable_eq_mword/Countable_mword),
-     because every use site (KMap/KptPt/adequacy) imports Sail and elaborates
-     [gmap (mword 27)] with them; without pinning, this field would take
-     stdpp's bv_eq_dec/bv_countable (RiscvPtsto does not import the Sail
-     instance modules) and the ghost_mapG key-instance args would not unify. *)
-  riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
-                    (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
-  riscvF_kptGS :: inG Σ kptR;
-  riscvF_parkGS :: ghost_varG Σ bool;
-  (* the byte memory's PRE-class: the era layer stores only the two heap
-     GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
-     the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
-     the generation registry -- claude-notes/projects/crash.md); the
-     full [gen_heapGS] is reconstructed below as [riscv_memGS]. *)
-  riscvF_memGpreS :: gen_heapGpreS Arch.pa (bv 8) Σ;
-  (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
-     COUNTER, a mono-nat mirroring [gstate.(ggen)].  FIXED-layer -- it is
-     the one ghost that spans power cycles; [gen_dead] below is the
-     persistent death certificate the corpse arms run on. *)
-  riscvF_genGS :: mono_natG Σ;
-  riscv_gen_name : gname;
-}.
-
 Record riscvEraGS := RiscvEraGS {
   (* one register-map ghost name PER hart.  A [ghost_map] element on
      [cpu_reg_name c] owns a register of hart [c].  The function is total (every
@@ -210,6 +177,50 @@ Record riscvEraGS := RiscvEraGS {
   era_park_name : nat -> gname;
 }.
 
+Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
+  riscvF_invGS :: invGS Σ;
+  riscvF_regGS :: ghost_mapG Σ register (sigT type_of_register);
+  (* the device fabric (DevModel.v): one [ghost_var] per device, in the
+     standard halves pattern -- [state_interp] holds one half (the "auth"),
+     the other half (the "frag") floats freely and is typically stored in an
+     invariant shared between the driver's hart and the device thread. *)
+  riscvF_uartGS :: ghost_varG Σ uart_state;
+  riscvF_plicGS :: ghost_varG Σ plic_state;
+  riscvF_virtioGS :: ghost_varG Σ virtio_state;
+  (* pinned to the SAIL key instances (Decidable_eq_mword/Countable_mword),
+     because every use site (KMap/KptPt/adequacy) imports Sail and elaborates
+     [gmap (mword 27)] with them; without pinning, this field would take
+     stdpp's bv_eq_dec/bv_countable (RiscvPtsto does not import the Sail
+     instance modules) and the ghost_mapG key-instance args would not unify. *)
+  riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
+                    (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
+  riscvF_kptGS :: inG Σ kptR;
+  riscvF_parkGS :: ghost_varG Σ bool;
+  (* the byte memory's PRE-class: the era layer stores only the two heap
+     GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
+     the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
+     the generation registry -- claude-notes/projects/crash.md); the
+     full [gen_heapGS] is reconstructed below as [riscv_memGS]. *)
+  riscvF_memGpreS :: gen_heapGpreS Arch.pa (bv 8) Σ;
+  (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
+     COUNTER, a mono-nat mirroring [gstate.(ggen)].  FIXED-layer -- it is
+     the one ghost that spans power cycles; [gen_dead] below is the
+     persistent death certificate the corpse arms run on. *)
+  riscvF_genGS :: mono_natG Σ;
+  riscv_gen_name : gname;
+  (* the STARTED-GENERATIONS counter (value [ggen + (if gpow then 1 else 0)],
+     monotone under both power arms because PowerOff bumps [ggen]): a
+     thread's persistent [gen_started] certificate is what refutes the
+     current-generation-but-powered-off state in the base rules. *)
+  riscv_start_name : gname;
+  (* the GENERATION REGISTRY: gen ↦ its era record (Σ-free data, see
+     [riscvEraGS] above).  A live thread's [minstret_inv] carries the
+     persistent element [gen_id ↪□ riscv_eraGS], which is what ties its
+     ambient era to the one [state_interp]'s existential holds. *)
+  riscvF_registryGS :: ghost_mapG Σ nat riscvEraGS;
+  riscv_registry_name : gname;
+}.
+
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_fixedGS :: riscvFixedGS Σ;
   riscv_eraGS : riscvEraGS;
@@ -232,8 +243,10 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
 Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
+Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.pa (bv 8) Σ :=
+  GenHeapGS _ _ _ (era_heap_name E) (era_meta_name E).
 Global Instance riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ :=
-  GenHeapGS _ _ _ (era_heap_name riscv_eraGS) (era_meta_name riscv_eraGS).
+  era_memGS_of riscv_eraGS.
 Definition cpu_reg_name `{!riscvGS Σ} : CPU -> gname := era_reg_name riscv_eraGS.
 Definition uart_name `{!riscvGS Σ} : gname := era_uart_name riscv_eraGS.
 Definition plic_name `{!riscvGS Σ} : gname := era_plic_name riscv_eraGS.
@@ -250,12 +263,33 @@ Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
    resource bundle's birth certificate (it will ride in that era's
    [minstret_inv]); [gen_dead gen] is the stable death certificate --
    PowerOff bumps [ggen], so a generation once passed is dead forever. *)
-Definition gen_auth `{!riscvGS Σ} (n : nat) : iProp Σ :=
+Definition gen_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
   mono_nat_auth_own riscv_gen_name 1 n.
-Definition gen_born `{!riscvGS Σ} (gen : nat) : iProp Σ :=
+Definition gen_born `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_gen_name gen.
-Definition gen_dead `{!riscvGS Σ} (gen : nat) : iProp Σ :=
+Definition gen_dead `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_gen_name (S gen).
+
+(* the started-generations counter's faces.  [start_count] is the pure
+   value [state_interp] pins; [gen_started gen] says generation [gen]'s
+   PowerOn has happened. *)
+Definition start_count (g : gstate) : nat :=
+  (g.(ggen) + (if g.(gpow) then 1 else 0))%nat.
+Definition start_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
+  mono_nat_auth_own riscv_start_name 1 n.
+Definition gen_started `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
+  mono_nat_lb_own riscv_start_name (S gen).
+
+(* the registry element: generation [gen] runs era [E].  Persistent. *)
+Definition era_registered `{!riscvFixedGS Σ} (gen : nat) (E : riscvEraGS) : iProp Σ :=
+  gen ↪[riscv_registry_name]□ E.
+
+(* THE CERTIFICATE BUNDLE a generation-[gen_id] thread carries (inside
+   [minstret_inv], so no statement anywhere names it): born + started +
+   its era's registration.  The base rules take it as one persistent
+   premise and case on the current [(ggen, gpow)] against it. *)
+Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
+  (gen_born gen_id ∗ gen_started gen_id ∗ era_registered gen_id riscv_eraGS)%I.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks
@@ -889,7 +923,7 @@ Definition reg_agree (m : gmap register (sigT type_of_register))
   forall r dv, m !! r = Some dv -> dv = existT r (register_lookup r rs).
 
 (* the register bridge for a GIVEN hart's ghost name [γ]. *)
-Definition reg_interp_at `{!riscvGS Σ} (γ : gname) (rs : regstate) : iProp Σ :=
+Definition reg_interp_at `{!riscvFixedGS Σ} (γ : gname) (rs : regstate) : iProp Σ :=
   (∃ m, ghost_map_auth γ 1 m ∗ ⌜reg_agree m rs⌝)%I.
 
 (* the bridge for the AMBIENT hart -- what the WPs manipulate.  Original arity
@@ -965,14 +999,43 @@ Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
   ([∗ set] cpu ∈ (fin_to_set CPU : gset CPU), reg_interp_at (cpu_reg_name cpu) (gr cpu))%I.
 
 (* ---------------------------------------------------------------------- *)
-(* 3. irisGS instance: state_interp = (per-hart register bridges) * memory. *)
+(* 3. irisGS instance (claude-notes/design/crash.md).  [state_interp] is    *)
+(*    defined over the FIXED layer ALONE and holds the CURRENT era          *)
+(*    existentially: [wp] is sealed over the whole [irisGS] record, so     *)
+(*    threads of different generations share a WP connective only if the   *)
+(*    instance never mentions the era.  The ambient era of a thread's      *)
+(*    [riscvGS] reappears at the base rules, where the registry element    *)
+(*    in its [gen_cert] ties it to the existential.                        *)
 (* ---------------------------------------------------------------------- *)
 
-Global Program Instance riscv_irisGS `{!riscvGS Σ} : irisGS riscv_lang Σ := {
-  iris_invGS := riscv_invGS;
-  state_interp g _ _ _ :=
-    (gregs_interp g.(gregs) ∗ gen_heap_interp g.(gmem) ∗ dev_interp g.(gdev) ∗
-     gen_auth g.(ggen))%I;
+(* the state_interp conjuncts of an ARBITRARY era.  The ambient forms
+   ([gregs_interp]/[gen_heap_interp (hG := riscv_memGS)]/[dev_interp]) are
+   these at [riscv_eraGS], definitionally. *)
+Definition gregs_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (gr : CPU -> regstate) : iProp Σ :=
+  ([∗ set] cpu ∈ (fin_to_set CPU : gset CPU),
+     reg_interp_at (era_reg_name E cpu) (gr cpu))%I.
+Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
+    (d : dev_state) : iProp Σ :=
+  (ghost_var (era_uart_name E) (1/2) d.(duart) ∗
+   ghost_var (era_plic_name E) (1/2) d.(dplic) ∗
+   ghost_var (era_virtio_name E) (1/2) d.(dvirtio))%I.
+Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp Σ :=
+  (gregs_interp_at E g.(gregs) ∗
+   gen_heap_interp (hG := era_memGS_of E) g.(gmem) ∗
+   dev_interp_at E g.(gdev))%I.
+
+Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
+  (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗
+   (∃ R : gmap nat riscvEraGS,
+      ghost_map_auth riscv_registry_name 1 R ∗
+      ⌜dom R = set_seq 0 (start_count g)⌝ ∗
+      (if g.(gpow) then (∃ E, ⌜R !! g.(ggen) = Some E⌝ ∗ era_interp E g)%I
+       else True%I)))%I.
+
+Global Program Instance riscv_irisGS `{!riscvFixedGS Σ} : irisGS riscv_lang Σ := {
+  iris_invGS := riscvF_invGS;
+  state_interp g _ _ _ := power_interp g;
   fork_post _ := True%I;
   num_laters_per_step _ := 0%nat;
 }.

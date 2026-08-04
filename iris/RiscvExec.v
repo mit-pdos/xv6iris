@@ -1,6 +1,6 @@
 (* RiscvExec.v -- the run/exec interpreters, determinism bridge, wp_exec_step. *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap.
+From iris.base_logic.lib Require Import gen_heap ghost_map mono_nat.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -146,27 +146,129 @@ Qed.
 (* 3. The reusable WP rule for deterministic ops.                          *)
 (* ---------------------------------------------------------------------- *)
 
+(* the generation of a generation-indexed thread expression (the power
+   thread has none) *)
+Definition thread_gen (e : mexpr) : option nat :=
+  match e with
+  | LoopE gen _ => Some gen
+  | UartLoopE gen => Some gen
+  | DiskLoopE gen => Some gen
+  | PlicLoopE gen => Some gen
+  | PowerLoopE => None
+  end.
+
+Section WPDead.
+  Context `{!riscvFixedGS Σ}.
+
+  (* THE CORPSE RULE (claude-notes/design/crash.md): a dead generation's
+     thread self-loops forever, from the death certificate ALONE -- no era
+     resources, any postcondition.  This is what the base rules tail into
+     when they discover their generation has passed, and it is the whole
+     reason abandoning a generation's resources is sound. *)
+  Lemma wp_dead (e : mexpr) (gen : nat) (Φ : mval -> iProp Σ) :
+    thread_gen e = Some gen ->
+    gen_dead gen ⊢ WP (e : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hg.
+    iIntros "#Hdead". iLöb as "IH".
+    iApply wp_lift_step; first by destruct e.
+    iIntros (g ns κ κs nt) "(Hgauth & Hsi)".
+    iDestruct (mono_nat_lb_own_valid with "Hgauth Hdead") as %[_ Hge].
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+    assert (Hnl : ~ thread_live g gen).
+    { intros [_ Heq]. lia. }
+    iSplitR.
+    { iPureIntro. destruct e; simplify_eq/=.
+      - exists [], (LoopE gen cpu), g, [].
+        left. exists gen, cpu. split_and!; auto.
+      - exists [], (UartLoopE gen), g, [].
+        right; left. exists gen. split_and!; auto.
+      - exists [], (DiskLoopE gen), g, [].
+        right; right; left. exists gen. split_and!; auto.
+      - exists [], (PlicLoopE gen), g, [].
+        right; right; right; left. exists gen. split_and!; auto. }
+    iIntros (e2 g2 efs Hstep) "!>".
+    (* only the corpse arm is enabled *)
+    assert (e2 = e /\ g2 = g /\ efs = []) as (-> & -> & ->).
+    { destruct e; simplify_eq/=;
+        destruct Hstep as
+          [ (gen2 & cpu2 & Heq & -> & _ & -> & [ (Hlive & _) | (_ & ->) ])
+          | [ (gen2 & Heq & -> & _ & -> & [ (Hlive & _) | (_ & ->) ])
+          | [ (gen2 & Heq & -> & _ & -> & [ (Hlive & _) | (_ & ->) ])
+          | [ (gen2 & Heq & -> & _ & -> & [ (Hlive & _) | (_ & ->) ])
+          | (Heq & _) ] ] ] ];
+        simplify_eq/=; try done;
+        exfalso; apply Hnl; exact Hlive. }
+    iIntros "_". iMod "Hback" as "_". iModIntro.
+    iFrame "Hgauth Hsi". iSplitL; [|done].
+    iApply "IH".
+  Qed.
+End WPDead.
+
 Section WPExec.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* The single per-hart framing point: [wp_lift_step] hands us the GLOBAL
-     [state_interp] (all harts' register bridges + shared memory); we focus the
-     ambient hart [cpu_id]'s bridge via [gregs_interp_acc], run one step against
-     that hart's [mstate] view, and restore the global bridge afterwards.  Every
-     leaf WP is written in terms of the single-hart [mstate_interp] and never
-     sees [gregs]. *)
+  (* The single per-hart framing point, now FOUR-WAY (crash.md): the rule
+     takes the thread's [gen_cert] and cases on the current [(ggen, gpow)].
+     LIVE (power on, generation current): the registry element ties the
+     ambient era to [state_interp]'s existential and the pre-crash proof
+     runs unchanged -- the caller's callback still sees exactly
+     [mstate_interp].  DEAD (generation passed): tail into [wp_dead].
+     Current-but-off: refuted by the STARTED certificate (the started
+     count would have to be both [gen_id] and [> gen_id]).  Unborn:
+     refuted by the birth certificate. *)
   Lemma wp_exec_step Φ :
+    gen_cert -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ σ' σ'', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
                  ⌜exec (riscv_step true)  σ = Some (tt, σ'')⌝ ∗
           ▷ (∀ tick : bool, |={∅,⊤}=> mstate_interp (if tick then σ'' else σ') ∗
-                            WP (Loop : expr riscv_lang) {{ Φ }}))
-    ⊢ WP (Loop : expr riscv_lang) {{ Φ }}.
+                            WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "H".
+    iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
+    { (* DEAD -- the birth bound rules out the unborn side *)
+      assert (Hlt : gen_id < g.(ggen)) by lia.
+      iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hlb".
+      iDestruct (mono_nat_lb_own_le (n := g.(ggen)) (S gen_id) with "Hlb")
+        as "#Hdead"; [lia|].
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro. exists [], (LoopE gen_id cpu_id), g, [].
+        left. exists gen_id, cpu_id. split_and!; auto.
+        right. split; [|done]. intros [_ Hgg]. lia. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct Hstep as
+        [ (gen2 & cpu2 & Hcpu2 & -> & _ & -> &
+            [ ([_ Hgg] & _) | (_ & ->) ])
+        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | (Hc & _) ] ] ] ];
+        [ injection Hcpu2 as <- <-; exfalso; lia
+        | injection Hcpu2 as <- <-
+        | discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc ].
+      iIntros "_". iMod "Hback" as "_". iModIntro.
+      iFrame "Hgauth Hsauth".
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL; [|done].
+      iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
+    destruct (g.(gpow)) eqn:Hpw; last first.
+    { (* CURRENT BUT POWERED OFF: impossible -- generation [gen_id]'s
+         PowerOn has happened ([gen_started]), but the started count reads
+         [ggen + 0 = gen_id]. *)
+      exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia. }
+    (* LIVE.  Tie the ambient era to the existential via the registry. *)
+    iDestruct "Hera" as (E) "(%HRE & Hera)".
+    iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
+    assert (E = riscv_eraGS) as ->.
+    { rewrite Heq in HRE. congruence. }
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev)) with "[Hri Hmem Hdev]")
       as (σ' σ'') "(%Hexecf & %Hexect & Hk)".
@@ -176,22 +278,33 @@ Section WPExec.
     iModIntro. iSplitR.
     { iPureIntro.
       exists [], (LoopE gen_id cpu_id),
-             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev) g.(ggen) g.(gpow)), [].
+             (GState (<[cpu_id := σ'.(sregs)]> g.(gregs)) σ'.(mem) σ'.(mdev)
+                g.(ggen) g.(gpow)), [].
       left.
-      exists gen_id, cpu_id. split; [done|]. split; [done|]. split; [done|]. split; [done|].
-      exists false, tt, σ'. split; [exact Hrunf|done]. }
+      exists gen_id, cpu_id. split_and!; auto.
+      left. split; [split; congruence|].
+      exists false, tt, σ'. split; [exact Hrunf|]. rewrite Hpw. done. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(gen2 & cpu2 & Hcpu2 & -> & _ & -> & tick2 & u2 & σ2' & Hrun2 & ->)
-                      |[(gen2 & Hcontra & _) | [(gen2 & Hcontra & _) | (gen2 & Hcontra & _)]]];
-      [| discriminate Hcontra | discriminate Hcontra | discriminate Hcontra ].
-    injection Hcpu2 as <- <-.
+    destruct Hstep as
+      [ (gen2 & cpu2 & Hcpu2 & -> & _ & -> &
+          [ (Hlive & tick2 & u2 & σ2' & Hrun2 & ->) | (Hnl & ->) ])
+      | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | (Hc & _) ] ] ] ];
+      [ injection Hcpu2 as <- <-
+      | injection Hcpu2 as <- <-; exfalso; apply Hnl; split; congruence
+      | discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc ].
     iSpecialize ("Hk" $! tick2).
     destruct tick2;
       [ destruct (Huniqt _ _ Hrun2) as [_ ->]
       | destruct (Huniqf _ _ Hrun2) as [_ ->] ];
       iMod "Hk" as "[(Hri' & Hmem' & Hdev') HWP]";
       iDestruct ("Hclose" with "Hri'") as "Hgr'";
-      iIntros "_ !>"; rewrite /state_interp /=; iFrame "Hgr' Hmem' Hdev' Hgen HWP".
+      iIntros "_ !>"; rewrite /state_interp /power_interp /=;
+      iFrame "Hgauth Hsauth HWP";
+      iExists R; iFrame "HRauth";
+      (iSplitR; [iPureIntro; exact Hdom|]);
+      rewrite Hpw; iExists riscv_eraGS;
+      (iSplitR; [iPureIntro; exact HRE|]);
+      iFrame "Hgr' Hmem' Hdev'".
   Qed.
 
 End WPExec.
@@ -200,111 +313,240 @@ Section WPDev.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
 
-  (* The device-thread analogues of [wp_exec_step]: one step of each of the
-     THREE device execution contexts.  Every device relation is total (each
-     has either a premise-free arm or an explicit [Idle] stutter -- RiscvLang
-     §3c), so the user only ever proves PRESERVATION: for EVERY transition
-     that device admits, re-establish the register bridges, the byte memory
-     and the device interpretation.
+  (* The device-thread analogues, same four-way split.  Their callbacks
+     still hand over the same full interp triple as before. *)
 
-     All three hand over the SAME full interp triple
-     ([gregs_interp]/[gen_heap_interp]/[dev_interp]) that the old single
-     [wp_dev_step] handed, even where a given relation cannot touch one of
-     them: uniformity across the three rules is worth more here than shaving
-     an unused conjunct off two of them.  What differs is the SHAPE of the
-     post-state each rule asks for, which is exactly that relation's
-     footprint. *)
+  Local Lemma dev_step_prelude (g : gstate)
+      (Hbge : gen_id <= g.(ggen)) (Hsge : S gen_id <= start_count g) :
+    g.(ggen) = gen_id -> g.(gpow) = true \/ gen_id < g.(ggen).
+  Proof.
+    intros Heq. destruct (g.(gpow)) eqn:Hpw; [by left|].
+    exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia.
+  Qed.
 
-  (* the UART: [duart]/[dplic] only -- registers and memory come back
-     unchanged *)
   Lemma wp_uart_step Φ :
+    gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
        ▷ (∀ d', ⌜uart_step d d'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d' ∗
-            WP (UartLoop : expr riscv_lang) {{ Φ }}))
-    ⊢ WP (UartLoop : expr riscv_lang) {{ Φ }}.
+            WP (UartLoop : expr riscv_lang) {{ Φ }})) -∗
+    WP (UartLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "H".
+    iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
+    { assert (Hlt : gen_id < g.(ggen)) by lia.
+      iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hlb".
+      iDestruct (mono_nat_lb_own_le (n := g.(ggen)) (S gen_id) with "Hlb")
+        as "#Hdead"; [lia|].
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro. exists [], (UartLoopE gen_id), g, [].
+        right; left. exists gen_id. split_and!; auto.
+        right. split; [|done]. intros [_ Hgg]. lia. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct Hstep as
+        [ (gen2 & cpu2 & Hc & _)
+        | [ (gen2 & Hu & -> & _ & -> & [ ([_ Hgg] & _) | (_ & ->) ])
+        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | (Hc & _) ] ] ] ];
+        [ discriminate Hc
+        | injection Hu as <-; exfalso; lia
+        | injection Hu as <-
+        | discriminate Hc | discriminate Hc | discriminate Hc ].
+      iIntros "_". iMod "Hback" as "_". iModIntro.
+      iFrame "Hgauth Hsauth".
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL; [|done].
+      iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
+    destruct (g.(gpow)) eqn:Hpw; last first.
+    { exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia. }
+    iDestruct "Hera" as (E) "(%HRE & Hera)".
+    iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
+    assert (E = riscv_eraGS) as ->.
+    { rewrite Heq in HRE. congruence. }
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right; left. eexists.
-      split; [reflexivity|]. split; [reflexivity|].
-      split; [reflexivity|]. split; [reflexivity|].
-      eexists. split; [apply UartStepIdle | reflexivity]. }
+    { iPureIntro. exists [], (UartLoopE gen_id),
+        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow)), [].
+      right; left. exists gen_id. split_and!; auto.
+      left. split; [split; congruence|].
+      eexists. split; [apply UartStepIdle|]. rewrite Hpw. done. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(gen2 & cpu2 & Hcontra & _)
-                      |[(gen2 & Hue & -> & _ & -> & d' & Hdstep & ->)
-                       |[(gen2 & Hcontra & _) | (gen2 & Hcontra & _)]]];
-      [ discriminate Hcontra | | discriminate Hcontra | discriminate Hcontra ].
-    injection Hue as <-.
+    destruct Hstep as
+      [ (gen2 & cpu2 & Hc & _)
+      | [ (gen2 & Hu & -> & _ & -> & [ (Hlive & d' & Hdstep & ->) | (Hnl & ->) ])
+      | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | (Hc & _) ] ] ] ];
+      [ discriminate Hc
+      | injection Hu as <-
+      | injection Hu as <-; exfalso; apply Hnl; split; congruence
+      | discriminate Hc | discriminate Hc | discriminate Hc ].
     iMod ("Hk" $! d' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' Hgen HWP".
+    iIntros "_ !>". rewrite /state_interp /power_interp /=.
+    iFrame "Hgauth Hsauth HWP".
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
   Qed.
 
-  (* the disk: [dvirtio]/[dplic] AND the byte memory.  The BYTE MEMORY is
-     handed over rather than framed, because the disk is a bus master:
-     [DiskStepDma] returns a memory that differs from the one it was given
-     (RiscvLang §3c).  A client therefore has to own every byte the DMA
-     writes -- which is exactly what the disk invariant's DMA lease
-     (WpVirtio.v / VirtioProto.v) is for. *)
   Lemma wp_disk_step Φ :
+    gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
        ▷ (∀ d' m', ⌜disk_step d m d' m'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
-            WP (DiskLoop : expr riscv_lang) {{ Φ }}))
-    ⊢ WP (DiskLoop : expr riscv_lang) {{ Φ }}.
+            WP (DiskLoop : expr riscv_lang) {{ Φ }})) -∗
+    WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "H".
+    iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
+    { assert (Hlt : gen_id < g.(ggen)) by lia.
+      iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hlb".
+      iDestruct (mono_nat_lb_own_le (n := g.(ggen)) (S gen_id) with "Hlb")
+        as "#Hdead"; [lia|].
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro. exists [], (DiskLoopE gen_id), g, [].
+        right; right; left. exists gen_id. split_and!; auto.
+        right. split; [|done]. intros [_ Hgg]. lia. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct Hstep as
+        [ (gen2 & cpu2 & Hc & _)
+        | [ (gen2 & Hc & _)
+        | [ (gen2 & Hu & -> & _ & -> & [ ([_ Hgg] & _) | (_ & ->) ])
+        | [ (gen2 & Hc & _) | (Hc & _) ] ] ] ];
+        [ discriminate Hc | discriminate Hc
+        | injection Hu as <-; exfalso; lia
+        | injection Hu as <-
+        | discriminate Hc | discriminate Hc ].
+      iIntros "_". iMod "Hback" as "_". iModIntro.
+      iFrame "Hgauth Hsauth".
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL; [|done].
+      iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
+    destruct (g.(gpow)) eqn:Hpw; last first.
+    { exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia. }
+    iDestruct "Hera" as (E) "(%HRE & Hera)".
+    iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
+    assert (E = riscv_eraGS) as ->.
+    { rewrite Heq in HRE. congruence. }
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right; right; left. eexists.
-      split; [reflexivity|]. split; [reflexivity|].
-      split; [reflexivity|]. split; [reflexivity|].
-      do 2 eexists. split; [apply DiskStepIdle | reflexivity]. }
+    { iPureIntro. exists [], (DiskLoopE gen_id),
+        (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow)), [].
+      right; right; left. exists gen_id. split_and!; auto.
+      left. split; [split; congruence|].
+      do 2 eexists. split; [apply DiskStepIdle|]. rewrite Hpw. done. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(gen2 & cpu2 & Hcontra & _)
-                      |[(gen2 & Hcontra & _)
-                       |[(gen2 & Hde & -> & _ & -> & d' & m' & Hdstep & ->)
-                        |(gen2 & Hcontra & _)]]];
-      [ discriminate Hcontra | discriminate Hcontra | | discriminate Hcontra ].
-    injection Hde as <-.
+    destruct Hstep as
+      [ (gen2 & cpu2 & Hc & _)
+      | [ (gen2 & Hc & _)
+      | [ (gen2 & Hu & -> & _ & -> & [ (Hlive & d' & m' & Hdstep & ->) | (Hnl & ->) ])
+      | [ (gen2 & Hc & _) | (Hc & _) ] ] ] ];
+      [ discriminate Hc | discriminate Hc
+      | injection Hu as <-
+      | injection Hu as <-; exfalso; apply Hnl; split; congruence
+      | discriminate Hc | discriminate Hc ].
     iMod ("Hk" $! d' m' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' Hgen HWP".
+    iIntros "_ !>". rewrite /state_interp /power_interp /=.
+    iFrame "Hgauth Hsauth HWP".
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
   Qed.
 
-  (* the wire: reads [dplic], writes ONE hart's registers.  Memory and the
-     device state come back unchanged; the register bridge does not (the wire
-     step writes a hart's [sig_seip] register, which needs its ghost-map
-     fragment unless the written value is unchanged). *)
   Lemma wp_plic_step Φ :
+    gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
        ▷ (∀ gr', ⌜plic_step d gr gr'⌝ ={∅,⊤}=∗
             gregs_interp gr' ∗ gen_heap_interp m ∗ dev_interp d ∗
-            WP (PlicLoop : expr riscv_lang) {{ Φ }}))
-    ⊢ WP (PlicLoop : expr riscv_lang) {{ Φ }}.
+            WP (PlicLoop : expr riscv_lang) {{ Φ }})) -∗
+    WP (PlicLoop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "H".
+    iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
+    iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
+    iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    destruct (decide (g.(ggen) = gen_id)) as [Heq|Hne]; last first.
+    { assert (Hlt : gen_id < g.(ggen)) by lia.
+      iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hlb".
+      iDestruct (mono_nat_lb_own_le (n := g.(ggen)) (S gen_id) with "Hlb")
+        as "#Hdead"; [lia|].
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro. exists [], (PlicLoopE gen_id), g, [].
+        right; right; right; left. exists gen_id. split_and!; auto.
+        right. split; [|done]. intros [_ Hgg]. lia. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct Hstep as
+        [ (gen2 & cpu2 & Hc & _)
+        | [ (gen2 & Hc & _)
+        | [ (gen2 & Hc & _)
+        | [ (gen2 & Hu & -> & _ & -> & [ ([_ Hgg] & _) | (_ & ->) ])
+        | (Hc & _) ] ] ] ];
+        [ discriminate Hc | discriminate Hc | discriminate Hc
+        | injection Hu as <-; exfalso; lia
+        | injection Hu as <-
+        | discriminate Hc ].
+      iIntros "_". iMod "Hback" as "_". iModIntro.
+      iFrame "Hgauth Hsauth".
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL; [|done].
+      iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
+    destruct (g.(gpow)) eqn:Hpw; last first.
+    { exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia. }
+    iDestruct "Hera" as (E) "(%HRE & Hera)".
+    iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
+    assert (E = riscv_eraGS) as ->.
+    { rewrite Heq in HRE. congruence. }
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
-    { iPureIntro. do 4 eexists. right; right; right. eexists.
-      split; [reflexivity|]. split; [reflexivity|].
-      split; [reflexivity|]. split; [reflexivity|].
-      eexists. split; [apply (PlicStepWire _ _ 0%fin) | reflexivity]. }
+    { iPureIntro. exists [], (PlicLoopE gen_id),
+        (GState (<[0%fin := register_set sig_seip
+                    (bool_to_bit (dev_seip g.(gdev) (fin_to_nat (0%fin : CPU))))
+                    (g.(gregs) 0%fin)]> g.(gregs)) g.(gmem) g.(gdev)
+           g.(ggen) g.(gpow)), [].
+      right; right; right; left. exists gen_id. split_and!; auto.
+      left. split; [split; congruence|].
+      eexists. split; [apply (PlicStepWire _ _ 0%fin)|]. rewrite Hpw. done. }
     iIntros (e2 g2 efs Hstep) "!>".
-    destruct Hstep as [(gen2 & cpu2 & Hcontra & _)
-                      |[(gen2 & Hcontra & _)
-                       |[(gen2 & Hcontra & _)
-                        |(gen2 & Hpe & -> & _ & -> & gr' & Hdstep & ->)]]];
-      [ discriminate Hcontra | discriminate Hcontra | discriminate Hcontra | ].
-    injection Hpe as <-.
+    destruct Hstep as
+      [ (gen2 & cpu2 & Hc & _)
+      | [ (gen2 & Hc & _)
+      | [ (gen2 & Hc & _)
+      | [ (gen2 & Hu & -> & _ & -> & [ (Hlive & gr' & Hdstep & ->) | (Hnl & ->) ])
+      | (Hc & _) ] ] ] ];
+      [ discriminate Hc | discriminate Hc | discriminate Hc
+      | injection Hu as <-
+      | injection Hu as <-; exfalso; apply Hnl; split; congruence
+      | discriminate Hc ].
     iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' Hgen HWP".
+    iIntros "_ !>". rewrite /state_interp /power_interp /=.
+    iFrame "Hgauth Hsauth HWP".
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
   Qed.
 
 End WPDev.

@@ -8,7 +8,7 @@
 (*      which ssreflect -- pulled in by iris -- forbids).           *)
 (* ============================================================== *)
 
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap finite bitvector.definitions.
 From iris.program_logic Require Import language.
 (* NOTE: SailStdpp.Base/Values/TypeCasts are imported LATER (before the         *)
 (* ExecClose section), NOT here: they make the model's [mword] Countable        *)
@@ -335,7 +335,35 @@ Inductive mexpr :=
   | LoopE (gen : nat) (cpu : CPU)
   | UartLoopE (gen : nat)
   | DiskLoopE (gen : nat)
-  | PlicLoopE (gen : nat).
+  | PlicLoopE (gen : nat)
+  | PowerLoopE.
+
+(* the machine state a PowerOn hands over (claude-notes/design/crash.md):
+   same generation (PowerOff already bumped it), power up, a RAM-shaped
+   memory, and the disk device RESET -- [virtio_reset] keeps [v_disk], the
+   ONE crash-surviving component.  Deliberately MINIMAL so far: the
+   UART/PLIC reset facts and the harts' reset registers join when their
+   consumers (the device corollary, the M6 boot composition) land;
+   tightening this predicate later only shrinks the PowerOn arm (the one
+   proof it touches is [wp_power_loop]'s reducibility witness). *)
+Definition boot_shape (g g' : gstate) : Prop :=
+  g'.(ggen) = g.(ggen) /\ g'.(gpow) = true /\
+  (forall a b, g'.(gmem) !! a = Some b ->
+     (0x80000000 <= SailStdpp.Operators_mwords.uint a
+        < 0x80000000 + 0x8000000)%Z) /\
+  g'.(gdev).(dvirtio) = virtio_reset g.(gdev).(dvirtio).
+
+(* what a PowerOn forks: the new generation's whole thread complement *)
+Definition power_fork (gen : nat) : list mexpr :=
+  (LoopE gen <$> enum CPU) ++ [UartLoopE gen; DiskLoopE gen; PlicLoopE gen].
+
+(* a generation-indexed thread is LIVE iff the power is on and its
+   generation is current; its real arms are gated on exactly that, and the
+   CORPSE arm -- a pure self-loop -- is the complement.  A dead
+   generation's thread can only take the corpse step, which needs no
+   resources (RiscvExec.wp_dead). *)
+Definition thread_live (g : gstate) (gen : nat) : Prop :=
+  g.(gpow) = true /\ g.(ggen) = gen.
 Definition mval := Empty_set.
 Definition mobs := Empty_set.
 Definition of_val (v : mval) : mexpr := match v with end.
@@ -345,29 +373,47 @@ Notation Loop := (LoopE gen_id cpu_id).
 Notation UartLoop := (UartLoopE gen_id).
 Notation DiskLoop := (DiskLoopE gen_id).
 Notation PlicLoop := (PlicLoopE gen_id).
+Notation PowerLoop := PowerLoopE.
 
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
     (e' : mexpr) (g' : gstate) (efs : list mexpr) : Prop :=
   (exists gen cpu, e = LoopE gen cpu /\ e' = LoopE gen cpu /\ κ = [] /\ efs = [] /\
-    exists (tick : bool) (u : unit) (s' : mstate),
-      run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
-      g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev) g.(ggen) g.(gpow))
+    ((thread_live g gen /\
+      exists (tick : bool) (u : unit) (s' : mstate),
+        run (riscv_step tick) (MState (g.(gregs) cpu) g.(gmem) g.(gdev)) u s' /\
+        g' = GState (<[cpu := s'.(sregs)]> g.(gregs)) s'.(mem) s'.(mdev) g.(ggen) g.(gpow))
+     \/ (~ thread_live g gen /\ g' = g)))
   \/
   (exists gen, e = UartLoopE gen /\ e' = UartLoopE gen /\ κ = [] /\ efs = [] /\
-    exists d',
-      uart_step g.(gdev) d' /\
-      g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow))
+    ((thread_live g gen /\
+      exists d',
+        uart_step g.(gdev) d' /\
+        g' = GState g.(gregs) g.(gmem) d' g.(ggen) g.(gpow))
+     \/ (~ thread_live g gen /\ g' = g)))
   \/
   (exists gen, e = DiskLoopE gen /\ e' = DiskLoopE gen /\ κ = [] /\ efs = [] /\
-    exists d' m',
-      disk_step g.(gdev) g.(gmem) d' m' /\
-      g' = GState g.(gregs) m' d' g.(ggen) g.(gpow))
+    ((thread_live g gen /\
+      exists d' m',
+        disk_step g.(gdev) g.(gmem) d' m' /\
+        g' = GState g.(gregs) m' d' g.(ggen) g.(gpow))
+     \/ (~ thread_live g gen /\ g' = g)))
   \/
   (exists gen, e = PlicLoopE gen /\ e' = PlicLoopE gen /\ κ = [] /\ efs = [] /\
-    exists gr',
-      plic_step g.(gdev) g.(gregs) gr' /\
-      g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow)).
+    ((thread_live g gen /\
+      exists gr',
+        plic_step g.(gdev) g.(gregs) gr' /\
+        g' = GState gr' g.(gmem) g.(gdev) g.(ggen) g.(gpow))
+     \/ (~ thread_live g gen /\ g' = g)))
+  \/
+  (e = PowerLoopE /\ e' = PowerLoopE /\ κ = [] /\
+    ((g.(gpow) = true /\ efs = [] /\
+       (* PowerOff: kill the running generation INSTANTLY -- the bump is
+          what makes [ggen > gen] the one stable death certificate *)
+       g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false)
+     \/
+     (g.(gpow) = false /\ efs = power_fork g.(ggen) /\
+       boot_shape g g'))).
 
 Lemma riscv_lang_mixin : LanguageMixin of_val to_val prim_step.
 Proof.
@@ -375,7 +421,8 @@ Proof.
   - intros [].
   - intros e v Hv. discriminate Hv.
   - intros e s κ e' s' efs
-      [(gen & cpu & -> & _) | [(gen & -> & _) | [(gen & -> & _) | (gen & -> & _)]]];
+      [(gen & cpu & -> & _) | [(gen & -> & _) | [(gen & -> & _)
+       | [(gen & -> & _) | (-> & _)]]]];
       reflexivity.
 Qed.
 

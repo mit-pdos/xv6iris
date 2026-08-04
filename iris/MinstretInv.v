@@ -310,11 +310,12 @@ Section MinstretInv.
   (* [minstret_inv] BUNDLES the clock invariant, so the (many) existing
      callers keep threading a single persistent proposition. *)
   Definition minstret_inv : iProp Σ :=
-    (inv minstretN minstret_inv_body ∗ clock_inv ∗ gen_born gen_id)%I.
-  (* [gen_born] (RiscvPtsto.v, the crash/power layer): every WP in the tree
+    (inv minstretN minstret_inv_body ∗ clock_inv ∗ gen_cert)%I.
+  (* [gen_cert] (RiscvPtsto.v, the crash/power layer): every WP in the tree
      threads [minstret_inv], so riding the BIRTH CERTIFICATE here is what
-     hands the stage-2e base rules their [gen_id ≤ ggen σ] bound with zero
-     statement churn -- the same move that folded [clock_inv] in. *)
+     hands the base rules their generation certificates (birth bound +
+     started bound + the era registration) with zero statement churn --
+     the same move that folded [clock_inv] in. *)
 
   Global Instance minstret_inv_persistent : Persistent minstret_inv.
   Proof. apply _. Qed.
@@ -336,14 +337,14 @@ Section MinstretInv.
   (* ---------------------------------------------------------------------- *)
 
   Lemma wp_exec_step_clock Φ :
-    clock_inv -∗
+    gen_cert -∗ clock_inv -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ σ', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
           ▷ (|={∅,⊤}=> mstate_interp σ' ∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#Hcinv H".
-    iApply wp_exec_step.
+    iIntros "#Hcert #Hcinv H".
+    iApply (wp_exec_step with "Hcert").
     iIntros (σ) "Hsi".
     iMod ("H" $! σ with "Hsi") as (σ') "[%Hexec Hk]".
     destruct (exec_tick_clock σ') as (c' & t' & p' & Htick).
@@ -404,8 +405,8 @@ Section MinstretInv.
                WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "#(Hinv & Hcinv & Hborn) H".
-    iApply (wp_exec_step_clock Φ with "Hcinv").
+    iIntros "#(Hinv & Hcinv & Hcert) H".
+    iApply (wp_exec_step_clock Φ with "Hcert Hcinv").
     iIntros (σ) "Hsi".
     (* open the minstret invariant ([={E, E∖↑minstretN}]); the caller's fupd
        supplies [={E∖↑minstretN, Ei}], and a [fupd_mask_intro] bridges [Ei→∅] to
