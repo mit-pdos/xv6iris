@@ -662,24 +662,123 @@ Still open from the M6a bridge list: `pmp_all_off pmpcfg_boot`, and the
 `KernelSyms._entry = 0x80000000` / `MISA_C = <the pinned misa>` bridges
 (the latter is `reflexivity` and is used inside `hw_config_intro`).
 
-## M6b (NOT STARTED) — the boot-image carving library
+## M6b (IN PROGRESS) — the boot-image carving library
 
-`iris/BootCarve.v`: from `power_boot_res`'s raw mem conjunct plus
-`boot_facts`, produce the bundles SpecEntry/SpecMain's preconditions
-mention. Three slices, each landable green on its own:
-(a) the three-way split — sub-`text_end` bytes → `kernel_text` (lift the
-    `Htext` ↦ₓ□ persist block out of `riscv_system_adequacy`'s proof into
-    a reusable lemma instead of duplicating it, together with the
-    `kmap_static_claims` persist step), `[text_end, img_end)` →
-    `kernel_data` + owned ↦ₘ, and the PHYSICAL cuts (stack0 pages for
-    `stack_own_phys`, the `entry_ld_ea` word) taken out BEFORE the ↦ₘ
-    upgrade;
-(b) typed 4/8-byte cells at kernel-symbol addresses with their image
-    values (bss = 0, data = the dump's words), following InstrBytes'
-    `word_pointsto_join4` and `kernel_data_window`;
-(c) the kinit page run `[s1entry, PHYSTOP)` → `[∗ list] p ∈ ps, page_own p`
-    + `prun`, peeled SYMBOLICALLY (durable-notes large-map rules).
-Nothing wires into adequacy until M6c/M6d.
+`iris/BootCarve.v`: from `power_boot_res`'s raw memory conjunct plus the
+raw kmap fragments plus the pure `boot_facts g'`, produce the bundles
+SpecEntry/SpecMain's preconditions mention, so the eventual boot
+composition is pure assembly.
+
+### Slice 1a — the three-way split, LIFTED (LANDED)
+
+The four steps were inlined in `riscv_system_adequacy`'s proof; they are
+now `BootCarve.v` lemmas and that proof APPLIES them, so there is one
+copy and the crash-layer boot client (same raw inputs at a fresh era)
+reuses it:
+
+- `kmap_static_claims_intro` — the persisted static-claims bundle out of
+  the raw kmap fragments. **This goes FIRST**, and the order is forced by
+  the resources rather than by taste: the claims come from the kmap
+  fragments, which do not overlap the memory map at all, and BOTH memory
+  halves need the whole bundle to do their identity upgrade. (So the
+  question "can the physical cut precede the claims persist?" does not
+  arise — the persist depends on nothing in the memory map.)
+- `boot_bytes_split` — the raw byte map cut at `text_end`
+  (`sub_text g` / `supra_text g`).
+- `boot_text_persist` — the sub-`text_end` half: raw `pointsto` + the RAM
+  fact → `↦ₚ`, the static claim → `↦ₓ`, then `text_pointsto_persist` →
+  the immutable `↦ₓ□` image.
+- `boot_data_own` — the `text_end`-and-above half → the OWNED `↦ₘ` image.
+
+Plus, in BootConfig.v beside the other reset facts, the last item of
+M6a's bridge list: **`pmp_all_off pmpcfg_boot`**. `pmpcfg_boot` is
+`vector_init 64 0` and `pmp_all_off` quantifies over a `Z` index with NO
+range premise, so the OUT-OF-RANGE reads are what the proof turns on:
+`vec_access_dec` falls back on the `Inhabited` default, which for
+`mword 8` is the same zero byte the vector is filled with (below the
+range that fallback is taken by `access_list_inc`'s own guard, above it
+by `nth` running off the list). `pmpcfg_boot_entry` is the reusable "every
+index reads zero" fact; the two predicates then follow by `vm_compute`.
+
+**TWO TRAPS, both paid for here and both worth knowing before touching
+this file:**
+
+- **Never write a `gmap Arch.pa (bv 8)` BINDER in this file** — index
+  everything by the `gstate` instead (`boot_raw_bytes g`,
+  `boot_text_raw g`, `boot_data_raw g`). BootCarve must `Require Import
+  KptPt`/`KMap` (for the mword-27 claim instances that §1 needs), and
+  those make `Instances.Countable_mword` canonical for `Arch.pa`; a
+  binder written here is then a DIFFERENT type from `RiscvLang`'s `gmem`
+  field. The two print identically and the CALLER fails with *"has type
+  `@gmap Arch.pa (bv_eq_dec …) …` while it is expected to have type
+  `@gmap Arch.pa (@Instances.Decidable_eq_mword …) …`"*. Writing the
+  binder as `(mm : _)` does NOT help (the `_` elaborates at the canonical
+  instance from the body's `big_sepM`); naming the state does, and it is
+  what every caller has anyway. Trying to fix it by dropping the Values
+  imports just moves the failure to §1.
+- **Apply every lifted lemma at the EXPLICIT instance** inside adequacy:
+  `iMod (@boot_text_persist Σ HR g Hram with …)`. The `set`-bound era
+  record is not a typeclass instance, so a bare `iMod` fails with
+  *"iSpecialize: cannot instantiate … `↪[kmap_name]` … with …
+  `↪[γk]`"* — the same M0 gotcha, now hit from the other side.
+- `rewrite <- (map_filter_union_complement P mm)` does not work when `mm`
+  is a local VARIABLE ("cannot instantiate ?b because mm is not in its
+  scope" — the replacement mentions `mm`). Go forward instead: `pose
+  proof` the equation and `iAssert` the union form, closing it with
+  `rewrite Heq`. And a `¬` written inside that `iAssert` parses in
+  `bi_scope` as bi-negation, so the complement filter needs its own
+  named definition (`co_sub_text`).
+
+### Slice 1b — what slice 1 still owes (NOT STARTED)
+
+- **The PHYSICAL cuts, taken out before the `↦ₘ` upgrade**: the `stack0`
+  pages (for `stack_own_phys` per hart) and the `entry_ld_ea` word, as raw
+  `↦ₚ`. Both live above `text_end`, so they come out of `supra_text`;
+  the shape needed is a key-set deletion on that filtered map plus the
+  per-byte presence from `boot_facts`' RAM-total clause.
+- **The NAMED bundles `kernel_text` / `kernel_data`**, and this is a REAL
+  WALL, not a proof difficulty: `kernel_text` is a `big_sepM` over the
+  whole 23340-entry `KernelInstrs.kernel_bytes`, so producing it from the
+  sub-`text_end` half needs
+  `∀ a b, kernel_bytes !! a = Some b → ram_lo <= a < text_end`
+  (and the same for `KernelData.kernel_data` above `text_end`). That is a
+  fact about a `list_to_map` of 23k entries, and the direction needed is
+  the one durable-notes records as fatal — `elem_of_list_to_map_2` puts
+  the list into the proof term and the `Qed` does not come back (M6a paid
+  for this once already). The M6a fix ("cut the domain with a filter")
+  does not apply, because `kernel_text`'s definition is fixed.
+  The honest options, to decide before slice 1b:
+  (i) have **`tools/dump_elf.py` emit the range fact** alongside the map
+      (it already prints the range in the file header comment:
+      `0x80000000 .. 0x80006120`), as a `map_Forall` lemma proved by one
+      `vm_compute` on a `bool_decide` — no list in the proof term; or
+  (ii) restate `kernel_text` over a domain-FILTERED image, which changes
+      a definition every WP proof in the tree consumes.
+  (i) is much the cheaper and keeps `kernel_text` untouched.
+
+### Slice 2 — typed cells (NOT STARTED)
+
+The 4/8-byte cells at kernel-symbol addresses that `main_locks_raw` /
+`main_globals_raw` demand, out of consecutive `↦ₘ` bytes with their image
+values (bss = 0 symbolically, via `boot_byte`'s filter being `None` at or
+above `img_end`; data = the dump's words). Follow InstrBytes'
+`word_pointsto_join4` / `word_pointsto_join8` and `kernel_data_window`'s
+style; the addresses and widths are uniform, so a small combinator family
+("W consecutive `↦ₘ` bytes at a symbol address, with the image's value")
+beats forty bespoke lemmas. NB `main_globals_raw`'s conjuncts are mostly
+CONTENTS-EXISTENTIAL, which makes them strictly easier than the two that
+are not (`kmem+24 ↦₈ 0` and `d_used_idx ↦₂ wrap16 0`) — those two need the
+bss-is-zero clause.
+
+### Slice 3 — the kinit page run (NOT STARTED)
+
+`[s1entry, PHYSTOP)` → `[∗ list] p ∈ ps, page_own p` + `prun phystop
+s1entry ps` (KallocInv's shapes), peeled SYMBOLICALLY — never enumerate
+(durable-notes' large-map rules). Open question to settle from
+`SpecMain.wp_main_boot_sconf_body`'s actual precondition rather than from
+the design: it asks for `(K_kvmmake + 64 + 3 < length ps)` and nothing
+else about the 64 kstack pages, i.e. **the kstacks come out of the same
+`ps` budget** and do NOT need a separate bundle.
 
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item), now over the

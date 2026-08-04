@@ -58,6 +58,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
 Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
+Require Import BootCarve.  (* the boot-image carving library: the claims-bundle
+                              persist and the rwx three-way split at [text_end],
+                              lifted out of this proof so there is ONE copy *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans arm bit *)
 Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
@@ -472,59 +475,17 @@ Proof.
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
                   _ γdisk Pc)
                E0).
-  (* persist the ~49k static fragments into the claims bundle
-     (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
-  iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".
-  { rewrite /kmap_static_claims. iApply big_sepM_bupd.
-    iApply (big_sepM_mono with "Hkfrags").
-    iIntros (vpn e Hlk) "Hfrag".
-    iMod (ghost_map_elem_persist with "Hfrag") as "Hf".
-    iModIntro. rewrite /kmap_at. destruct e as [ppn pc]. iExact "Hf". }
+  (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
+     layer's boot client has the same raw inputs at a fresh era and reuses
+     them).  The claims bundle FIRST -- it comes from the kmap fragments,
+     which do not overlap the memory map, and both memory halves need it. *)
+  (* the [set]-bound era record is NOT a typeclass instance, so every lifted
+     lemma is applied at the EXPLICIT instance [HR] (crash.md's M0 gotcha). *)
+  iMod (@kmap_static_claims_intro Σ HR with "Hkfrags") as "#Hkbundle".
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
-  (* rwx-kmap init split at etext: split the raw heap fragments into the
-     sub-[text_end] half (upgraded to [↦ₓ] via [Hram] and PERSISTED to
-     [↦ₓ□]) and the rest (upgraded to owned [↦ₘ]). *)
-  iEval (rewrite <- (map_filter_union_complement
-                       (fun p : Arch.pa * bv 8 => uint p.1 < text_end)
-                       g.(gmem))) in "Hbytes".
-  iDestruct (big_sepM_union with "Hbytes") as "[Htext Hdata]";
-    [apply map_disjoint_filter_complement |].
-  iAssert (|==> [∗ map] a ↦ b
-                  ∈ filter (fun p : Arch.pa * bv 8 => uint p.1 < text_end)
-                      g.(gmem),
-             a ↦ₓ□ b)%I with "[Htext]" as ">Htext".
-  { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htext").
-    iIntros "!>" (a b Ha) "Hb".
-    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hlt]. cbn in Hlt.
-    pose proof (Hram a b Ha) as [Hlo _].
-    assert (Htext : addr_is_text a) by (split; [exact Hlo | exact Hlt]).
-    assert (Hcanon : (uint a < 274877906944)%Z)
-      by (unfold addr_is_text, text_end in Htext; lia).
-    (* identity assembly: raw ↦ₚ + the static claim (off the bundle) -> ↦ₓ,
-       then persist to the immutable image ↦ₓ□ (uniform-claims PHYSICAL TIER). *)
-    iApply text_pointsto_persist.
-    iApply (phys_ident_text a (DfracOwn 1) b (text_svpn_class a Htext) Htext Hcanon
-              with "Hkbundle [Hb]").
-    rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_text_ram a Htext). }
-  iAssert ([∗ map] a ↦ b
-             ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
-                 g.(gmem),
-             a ↦ₘ b)%I with "[Hdata]" as "Hdata".
-  { assert (Hfeq : filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1) g.(gmem)
-                 = filter (fun p : Arch.pa * bv 8 => ¬ (uint p.1 < text_end)) g.(gmem)).
-    { apply (proj1 (map_filter_ext _ _ g.(gmem))). intros i x _. cbn. split; lia. }
-    rewrite Hfeq.
-    iApply (big_sepM_impl with "Hdata").
-    iIntros "!>" (a b Ha) "Hb".
-    apply map_lookup_filter_Some in Ha. destruct Ha as [Ha Hge]. cbn in Hge.
-    pose proof (Hram a b Ha) as [_ Hhi].
-    assert (Hkd : addr_is_kdata a) by (split; [lia | exact Hhi]).
-    assert (Hcanon : (uint a < 274877906944)%Z)
-      by (unfold addr_is_kdata, ram_base, ram_size, text_end in Hkd; lia).
-    (* identity assembly: raw ↦ₚ + the static claim -> owned ↦ₘ image. *)
-    iApply (phys_ident_mem a (DfracOwn 1) b (kdata_svpn_class a Hkd) (addr_is_kdata_ram a Hkd) Hcanon
-              with "Hkbundle [Hb]").
-    rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd). }
+  iDestruct (@boot_bytes_split Σ HR g with "Hbytes") as "[Htext Hdata]".
+  iMod (@boot_text_persist Σ HR g Hram with "Hkbundle Htext") as "Htext".
+  iDestruct (@boot_data_own Σ HR g Hram with "Hkbundle Hdata") as "Hdata".
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
   iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark HuF HpF HvF]")
