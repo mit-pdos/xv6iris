@@ -423,7 +423,9 @@ Lemma umode_mem_read_fetch_4 (pa : mword 64) (iw : mword 32) (σ' : mstate) :
     = Some (Ok iw, σ').
 Proof.
   intros Hbytes Hram0 Hram3 Halp HA Hord HX Hcovp Lpriv Lhtif Hall.
-  destruct (Hall pa 4) as (region & Hpmam & Hexec & _).
+  destruct (Hall pa 4
+             (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl)))
+    as (region & Hpmam & Hexec & _).
   pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
   pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -458,7 +460,9 @@ Lemma umode_mem_read_fetch_2 (pa : mword 64) (ih : mword 16) (σ' : mstate) :
     = Some (Ok ih, σ').
 Proof.
   intros Hbytes Hram0 Hram1 Halp HA Hord HX Hcovp Lpriv Lhtif Hall.
-  destruct (Hall pa 2) as (region & Hpmam & Hexec & _).
+  destruct (Hall pa 2
+             (pma_access_ram _ _ Hram0 (pma_width_ok 2 eq_refl eq_refl)))
+    as (region & Hpmam & Hexec & _).
   pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
   pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)

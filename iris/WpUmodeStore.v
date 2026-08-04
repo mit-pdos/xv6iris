@@ -276,7 +276,8 @@ Section UmodeStoreMem.
                   = Some (Ok true,
                           MState sig2.(sregs) (write_bytes sig2.(mem) pa 8 v) sig2.(mdev))).
     { destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-                 : pma_allows_all (register_lookup pma_regions sig2.(sregs))) pa 8)
+                 : pma_allows_all (register_lookup pma_regions sig2.(sregs))) pa 8
+                (pma_access_ram _ _ Hram0' (pma_width_ok 8 eq_refl eq_refl)))
         as (region & Hpmam & _ & _ & Hwrb).
       pose proof (addr_is_ram_not_in_clint _ Hram0') as Hnc_c.
       pose proof (addr_is_ram_not_in_sig _ Hram0') as Hnc_s.

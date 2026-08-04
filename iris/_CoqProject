@@ -586,6 +586,7 @@ SpecPrintint.v
 SpecPrintk.v
 CodePrintint.v
 PrintintArith.v
+BootConfig.v
 StackBytes.v
 ProofPrintint.v
 LinkPrintint.v

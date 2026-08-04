@@ -608,10 +608,11 @@ Still open from the M6a bridge list: `pmp_all_off pmpcfg_boot` (needs a
 is `vector_init 64 (mword_of_int 0)`, and the out-of-range default is the
 `Inhabited` zero, so the property does hold at every index).
 
-## M6b-pre (2) `hw_config` / `mmode_config` / `boot_D` — NEXT (recipe settled)
+## M6b-pre (2) `hw_config` / `mmode_config` / `boot_D` — LANDED
 
 `iris/BootConfig.v` (new) is the home: the first CONSTRUCTION site either
-bundle will have had. What goes in it:
+bundle has ever had. All four results are `Closed under the global
+context`. What it holds:
 
 - `pma_allows_all_pma_boot` — **the payoff of (1)**: the M6a-pinned table
   (one region, base 0, size 2^64-1, all-permitting) satisfies the repaired
@@ -636,7 +637,30 @@ bundle will have had. What goes in it:
   are these by pure conversion, per M2's note). `reg_pointsto_persist` on
   the five frozen cells (misa, mseccfg, pma_regions, htif_tohost_base,
   elp; template `TimerCap.v:95`) is the only ghost step; every pure
-  conjunct is `vm_compute` on a pinned value.
+  conjunct is `vm_compute` on a pinned value. `mmode_config_intro` is
+  `InstrBytes.mmode_config_rebuild` at the pinned mstatus `0xA00000000`,
+  whose three MIE/MPRV/SXL facts are `vm_compute`.
+
+**THE IMPORT-HEADER TRAP, and it cost real time.** A file whose header
+is `From stdpp Require Import gmap finite list_numbers
+bitvector.definitions` + `SailStdpp.ConcurrencyInterface*` +
+`SailStdpp.TypeCasts` (i.e. RiscvFetchExec's own header) cannot STATE an
+iris entailment at all: even `Lemma t : hw_config -∗ hw_config` fails with
+*"The term hw_config has type upred.uPred (iprop.iProp_solution.iResUR
+?Σ) while it is expected to have type bi_car ?PROP0"* — the `bi_car`
+canonical structure never resolves and `Σ` stays an evar, on a section
+that has `Context `{!riscvGS Σ}` right there. It is the same family as
+durable-notes' `SailStdpp.Values` instance leak, and the diagnosis is
+misleading: the error points at the lemma, not at the header. **Copy the
+header of an existing file that states the bundle you are building**
+(InstrBytes.v, for `hw_config`/`mmode_config`) and add only what you need
+on top; do not assemble one from the low-level files' headers. The pure
+half of the same file compiled fine throughout, which is what makes this
+look like a lemma bug.
+
+Still open from the M6a bridge list: `pmp_all_off pmpcfg_boot`, and the
+`KernelSyms._entry = 0x80000000` / `MISA_C = <the pinned misa>` bridges
+(the latter is `reflexivity` and is used inside `hw_config_intro`).
 
 ## M6b (NOT STARTED) — the boot-image carving library
 
