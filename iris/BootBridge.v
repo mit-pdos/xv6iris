@@ -44,9 +44,17 @@
        kvminithart, so they travel BESIDE the bridge, straight into main's
        precondition.  Everything this file DOES thread is per-hart, which is
        what makes the bridge runnable on every hart at once;
-     - the cpus[0] struct cells ([a_cpu_noff] / [a_cpu_int] /
-       [a_cpu_proc] / the 14 context words behind [cpu_ctx_free]) and the
-       [stvec] cell: .bss, from the memory image.
+     - the cpus[cid] struct cells ([a_cpu_noff] / [a_cpu_int] / HALF of
+       [a_cpu_proc] / the 14 context words behind [cpu_ctx_free]): .bss, from
+       the memory image.  Only HALF of [c->proc], because the other half
+       belongs to the global parked-scheduler invariant
+       ([SchedCtx.scheds_inv]) that main allocates out of ALL EIGHT harts'
+       spare halves -- and the SPLIT CANNOT HAPPEN HERE: every hart's bridge
+       runs inside that hart's own weakest precondition, long after the boot
+       client's single [={⊤}=∗] has ended, so hart 0 could never collect the
+       other seven.  The client's carve splits each cell and routes one half
+       here, the other into main's boot supply.  ([stvec] is NOT .bss --
+       it is a Sail register, and comes from the per-hart register set.)
 
    [pc_is] is NOT threaded: SpecEntry's post hands back [pc_is pcMain]
    with [pcMain := mword_of_int KernelSyms.main], which is literally the
@@ -443,19 +451,22 @@ Section BootBridge.
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     a_cpu_noff cid_word ↦₄ nv -∗
     a_cpu_int cid_word ↦₄ iv -∗
-    a_cpu_proc cid_word ↦₈ p0 -∗
+    (* HALF of [cpus[cid].proc], not the whole cell.  [IntrDefs.cpu_cells]
+       keeps only half; the other half belongs to the global parked-scheduler
+       invariant [SchedCtx.scheds_inv], which main allocates once γs exists
+       ([SchedCtx.scheds_alloc]) out of ALL EIGHT harts' spare halves.  A
+       bridge cannot be where that split happens: each hart's bridge runs
+       inside that hart's OWN weakest precondition, long after the boot
+       client's single [={⊤}=∗] has ended, so hart 0 could never collect the
+       other seven.  The client's carve therefore splits every
+       [cpus[h].proc] cell itself, hands one half to hart [h] here and puts
+       the other eight in main's boot supply. *)
+    cpu_proc_half cpu_id p0 -∗
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
       sie_cap_gpr mf K false p0 ∗
       cpu_own 0 false p0 cpu_ctx_free false ∗
-      (* THE SPARE HALF of [cpus[cid].proc].  [IntrDefs.cpu_cells] keeps only
-         half of that cell now; the other half belongs to the global parked-
-         scheduler invariant [SchedCtx.scheds_inv], which main allocates once
-         γs exists ([SchedCtx.scheds_alloc]).  So each hart's boot bridge
-         hands its spare half out here, and the eight of them are exactly
-         what main's [scheds_alloc] consumes. *)
-      cpu_proc_half cpu_id p0 ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
@@ -511,7 +522,6 @@ Section BootBridge.
                  (st_mdl1 mideleg0) MENVCFG_S Hmsf Hmiez eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
-    rewrite cpu_proc_halve. iDestruct "Hproc" as "[Hproc Hprocs]".
     iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
                  with "Hnoff Hint He2 Hproc Hctx") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY
@@ -524,7 +534,7 @@ Section BootBridge.
     iExists (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in).
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
-    iFrame "Hcpu Hprocs Hg4a".
+    iFrame "Hcpu Hg4a".
     rewrite /main_hart_raw /trap_csrs. iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
   Qed.
 
