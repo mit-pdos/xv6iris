@@ -64,17 +64,18 @@ per-milestone record):
     `init_model`; `init_boot_requirements`) with `RiscvExec.exec` and
     proves `reset_regs` of the register file it produces, so a model
     regeneration that changes a reset value breaks the build. Two
-    conjuncts are explicit `register_set` patches in that statement and
-    they are the whole residue: `pma_regions` (the one-region
-    idealization) and `misa` (a KNOWN divergence — the model's config
-    also enables B and V, so its cold boot leaves `0x800000000034112F`;
-    the fix is on the config side — projects/crash.md's future-work list).
-    Both patches, and the anchoring question behind them (`reset()` alone,
-    per the ISA, versus the model's whole cold boot), are recorded as
-    ordered follow-up tasks there: PMA table retirement re-enables
-    `init_model`'s config assert, and the ∃-garbage anchoring waits on
-    symbolic peeling, because forcing any register field of the reset's
-    result over an open register file does not compute.
+    conjunct is an explicit `register_set` patch in that statement and it
+    is the whole residue: `pma_regions`, the one-region idealization.
+    (misa used to be a second patch — the model's config enabled B and V,
+    so its cold boot left `0x800000000034112F`. Fixed at the config, not
+    the constant: B and V are disabled in the model config, `reset_misa`
+    now produces `MISA_C`, and misa is run-derived.) The remaining patch,
+    and the anchoring question behind it (`reset()` alone, per the ISA,
+    versus the model's whole cold boot), are ordered follow-up tasks in
+    projects/crash.md: PMA table retirement re-enables `init_model`'s
+    config assert, and the ∃-garbage anchoring waits on symbolic peeling,
+    because forcing any register field of the reset's result over an open
+    register file does not compute.
     The chain's one uninterpretable step — `cancel_reservation`, an
     `Axiom` of the model — is lifted to a parameter whose elision is
     itself checked by `reflexivity`. `reset_regs` is a COLD-boot

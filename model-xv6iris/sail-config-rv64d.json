@@ -4,13 +4,49 @@
 //
 // This is sail-riscv's own config/config.json.in, fully resolved for the
 // rv64d_v256_e64 build (the @CMAKE@ placeholders substituted) with exactly
-// ONE change from upstream's default: `platform.simple_interrupt_generator
-// .supported` is flipped to `false` (search for "xv6iris" below). Everything
-// else is unmodified sail-riscv default config. To refresh this file after a
-// sail-riscv upstream bump, regenerate the default
+// THREE changes from upstream's default (each marked "xv6iris" inline):
+//   1. `platform.simple_interrupt_generator.supported` := false  (see below)
+//   2. `extensions.B.supported`                        := false  (see below)
+//   3. `extensions.V.support_level`                    := "Disabled", together
+//      with the fourteen V-DEPENDENT extensions upstream leaves on
+//      (Zvabd Zvbb Zvbc Zvfbfmin Zvfbfwma Zvfh Zvfhmin Zvkg Zvkned Zvknha
+//      Zvknhb Zvksed Zvksh Zvkt) -- see "Why disable B and V" below: the
+//      model's OWN `config_is_valid` rejects the config otherwise, since each
+//      of those requires Zve*, and Zve* comes from V's support_level.
+// Everything else is unmodified sail-riscv default config. To refresh this
+// file after a sail-riscv upstream bump, regenerate the default
 // build/config/rv64d_v256_e64.json via cmake (see the root README) and
-// re-apply that one flag flip -- diff against the new file to catch any
+// re-apply those three edits -- diff against the new file to catch any
 // other upstream default changes.
+//
+// Why disable B and V: the proofs are about the xv6 kernel, which is compiled
+// rv64gc -- it contains no bit-manipulation and no vector instructions, and
+// xv6's own `start()` never writes misa. Leaving them enabled made the model
+// claim a machine the proofs are not about, in two visible ways:
+//   - `reset_misa` sets one misa bit per `hartSupports` answer, so the model's
+//     architectural reset produced misa = 0x800000000034112F while the tree's
+//     platform constant `RiscvFetchExec.MISA_C` is 0x800000000014112D. That
+//     mismatch had to be carried as an explicit patch in
+//     `RiscvLang.boot_patch`; with B and V off, `reset_misa` produces MISA_C
+//     itself and the patch is gone (see iris/ColdBoot.v).
+//   - `DecodeSetU.decodable_u` claims to be the COMPLETE 32-bit decode image
+//     reachable in U-mode. With misa.B / misa.V set, the Zba/Zbb-only/Zbs and
+//     vector families reach decoder leaves and that claim is false. Disabling
+//     the extensions is the honest fix; growing the set would be verifying a
+//     machine the kernel does not run on.
+// None of these flags changes the module set sail is invoked with (Zba/Zbb/
+// Zbc/Zbs/B_types/V_core/V_types are still compiled); they change what
+// `hartSupports` answers, which is what every extension gate consults.
+//
+// AND MIND THE DEPENDENCY CASCADE: disabling V alone makes the model's own
+// `config_is_valid` return FALSE (`check_vext_config` and
+// `check_misc_extension_dependencies` both fail, on Zvfhmin / Zvfh / Zvbb /
+// Zvfbfmin / Zvfbfwma / ... "requires Zve32f/Zve32x"), and a config the model
+// rejects would make `init_model`'s assert unprovable. After ANY extension
+// flip, re-check validity -- iris/ColdBoot.v evaluates the model's cold boot
+// through that assert, so a bad config shows up there as a build failure.
+// Upstream already ships Zba/Zbb/Zbs disabled while B is enabled, so B has no
+// dependents here; V is the one with a family.
 //
 // Why disable SIG: the Sail model's built-in "Simple Interrupt Generator"
 // test device (see sail-riscv/doc/SimpleInterruptGenerator.md) claims MMIO
@@ -451,7 +487,8 @@
       // For e.g. Zve32x and Zve32f require `elen_exp` >= 5,
       // Zve64x, Zve64f, and Zve64d require `elen_exp` >= 6,
       // and V requires `elen_exp` >= 6 and `vlen_exp` >= 7.
-      "support_level": "Full",
+      // xv6iris: DISABLED (upstream default: "Full") -- see the header
+      "support_level": "Disabled",
       // `vlen_exp` and `elen_exp` should be between 3 and 16,
       // inclusive.  If `support_level` is `"Disabled"`, then these
       // should be left as 3 (or any other legal value).
@@ -493,7 +530,8 @@
       }
     },
     "B": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- see the header
+      "supported": false
     },
     "S": {
       "supported": true
@@ -680,49 +718,63 @@
       "supported": false
     },
     "Zvabd": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvfbfmin": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvfbfwma": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvfh": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvfhmin": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvbb": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvbc": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvkb": {
       "supported": false
     },
     "Zvkg": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvkned": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvknha": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvknhb": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvksed": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvksh": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Zvkt": {
-      "supported": true
+      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      "supported": false
     },
     "Ssccptr": {
       "supported": true

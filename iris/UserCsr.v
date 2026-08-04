@@ -203,10 +203,12 @@ Proof.
   apply exec_rec_cE_Zaamo_1. exact Hmisa.
 Qed.
 
-(* Zve32x: hart-SUPPORTED here, but the gate reads mstatus.VS -- the
-   VS = Off pin turns it false (parallel to the FS pin for F). *)
+(* Zve32x: NOT hart-supported.  It comes from V's [support_level], which
+   model-xv6iris/sail-config-rv64d.json sets to "Disabled" (the kernel is
+   rv64gc -- see that file's header), so the vector gates are off at the
+   HART-support level and never reach the mstatus.VS check below. *)
 Lemma exec_hartSupports_Zve32x (s : mstate) :
-  exec (hartSupports Ext_Zve32x) s = Some (true, s).
+  exec (hartSupports Ext_Zve32x) s = Some (false, s).
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
   cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
@@ -215,7 +217,7 @@ Proof.
   cbn beta.
   match goal with
   | |- exec (returnM ?v) _ = _ =>
-      replace v with true by (vm_compute; reflexivity)
+      replace v with false by (vm_compute; reflexivity)
   end.
   apply exec_returnM.
 Qed.
@@ -242,20 +244,17 @@ Lemma exec_currentlyEnabled_Zve32x_off (s : mstate) (ms_v : mword 64) :
   eq_vec (_get_Mstatus_VS ms_v) ('b"00") = true ->
   exec (currentlyEnabled Ext_Zve32x) s = Some (false, s).
 Proof.
-  intros Hms Hvs.
+  (* THE mstatus.VS PREMISES ARE NO LONGER NEEDED, and the statement keeps them
+     anyway so no caller churns (the wrapper recipe): with V disabled in the
+     model's config, [hartSupports Ext_Zve32x] is already false and
+     [and_boolM] short-circuits before the VS read. *)
+  intros _ _.
   unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
   cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
   change (Z.geb (currentlyEnabled_measure Ext_Zve32x) 0) with true. cbn match.
   erewrite exec_bind_Some. 2:{ apply exec_returnM. }
   cbn beta. cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_hartSupports_Zve32x s)).
-  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_rec_cE_Zvl32b_0 s _)).
-  erewrite exec_and_boolM_Some.
-  2:{ rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
-      rewrite Hms. apply exec_returnM. }
-  assert (Hneq : neq_vec (_get_Mstatus_VS ms_v) ('b"00") = false).
-  { unfold neq_vec. rewrite Hvs. reflexivity. }
-  rewrite Hneq.
   reflexivity.
 Qed.
 

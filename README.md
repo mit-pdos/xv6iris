@@ -63,7 +63,26 @@ with `sail_coq_backend`, and a `sail-riscv` checkout), run
 `tools/regen_sail_model.sh` — or `make model-gen`, which prints instructions if
 `sail` is missing. The model is generated from this repo's own config,
 `model-xv6iris/sail-config-rv64d.json`; the comment at the top of that file
-documents the one deliberate deviation from the upstream default.
+documents the deliberate deviations from the upstream default.
+
+On this machine the toolchain is already installed, but **not in the switch the
+proofs build in**: `sail` 0.20.1 + `sail_coq_backend` live in the DEFAULT opam
+switch (`/root/.opam/default/bin/sail`), while `coqc` must stay the project
+switch's (`/shared/xv6rocq`), and the `sail-riscv` checkout is
+`/shared/xv6rocq/sail-riscv` (already cmake-configured, its `CMakeCache.txt`
+`SAIL_BIN` pointing at that same binary). So APPEND the sail switch to `PATH`
+rather than prepending it — the default switch also has a `coqc`, and the
+regen script compile-checks the result:
+
+```
+export OPAMSWITCH=/shared/xv6rocq && eval $(opam env)
+PATH="$PATH:/root/.opam/default/bin" tools/regen_sail_model.sh /shared/xv6rocq/sail-riscv
+```
+
+A regen takes ~10 min and peaks around 7 GB. **Before changing the config, regen
+with it UNCHANGED and check `git diff model-xv6iris/` is empty**: that is the
+only way to tell a config effect from upstream drift in the checkout, and the
+script installs into `model-xv6iris/` on success, so `git` is the comparison.
 
 ## Documentation
 

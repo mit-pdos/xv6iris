@@ -5,9 +5,9 @@
 (* [reset_regs] pins fifteen register values per hart, and until this file   *)
 (* existed each of them was justified by a table in the notes that said      *)
 (* which line of the Sail model wrote it.  A table is a transcription: it     *)
-(* rots silently when the model is regenerated, and it did -- the misa pin    *)
-(* claimed 0x800000000014112D while the model's own [reset_misa] over the      *)
-(* built-in config produces 0x800000000034112F (B and V are supported too).   *)
+(* rots silently when the model is regenerated, and it HAD: the misa pin      *)
+(* claimed 0x800000000014112D while the model's own [reset_misa] produced      *)
+(* 0x800000000034112F, because the config still enabled B and V (§3).          *)
 (* So the justification is a THEOREM here instead: [reset_regs_cold_boot]     *)
 (* RUNS the model's cold-boot chain with [RiscvExec.exec] and proves          *)
 (* [reset_regs] of the register file it produces.  Every value is therefore    *)
@@ -40,20 +40,24 @@
 (* [reset] and [init_model].  The hook is then instantiated with a state        *)
 (* no-op, which is what the model documents it to be.                          *)
 (*                                                                            *)
-(* THE FIRST THING IT FOUND: misa.  The pin said 0x800000000014112D            *)
-(* ([RiscvFetchExec.MISA_C], S/C/U/M/A/I/D/F); the model's own [reset_misa]      *)
-(* writes one bit per [hartSupports] answer and the built-in config answers yes  *)
-(* to B and V as well, so the real cold-boot value is 0x800000000034112F         *)
-(* ([cold_boot_misa] below).  The correction is NOT made here, and the reason is *)
-(* worth knowing: it costs the kernel side nothing (measured -- every [Code*.v]  *)
-(* word decodes identically at either value) but it BREAKS                       *)
-(* [DecodeSetU.decode_total_u_set], because with misa.B / misa.V on the          *)
-(* Zba/Zbb-only/Zbs and vector families reach decoder leaves and [decodable_u]   *)
-(* stops being the whole decode image -- i.e. it is a U-mode decode-image        *)
-(* project (extend [decodable_u], UserTotalU's dispatch, UserMemClassify).  So   *)
-(* misa is the SECOND explicit patch in [reset_regs_cold_boot], next to the PMA  *)
-(* idealization: the divergence is now a named line in a compiled theorem that   *)
-(* breaks if the model moves again, instead of a stale literal nobody rechecks.  *)
+(* THE FIRST THING IT FOUND: misa -- AND IT IS NOW FIXED AT THE SOURCE.  The     *)
+(* pin said 0x800000000014112D ([RiscvFetchExec.MISA_C]); [reset_misa] writes    *)
+(* one bit per [hartSupports] answer, and the config used to answer yes to B      *)
+(* and V as well, so the model's own cold boot produced 0x800000000034112F.       *)
+(* Two ways to close a gap like that, and the CHEAP one was wrong: correcting     *)
+(* [MISA_C] to the model's value leaves the whole kernel side green (measured --  *)
+(* every [Code*.v] word decodes identically) but FALSIFIES                        *)
+(* [DecodeSetU.decode_total_u_set], because with misa.B / misa.V set the          *)
+(* Zba/Zbb-only/Zbs and vector families reach decoder leaves and [decodable_u]    *)
+(* stops being the complete U-mode decode image.  So the fix went to the CONFIG   *)
+(* instead: B and V are disabled in model-xv6iris/sail-config-rv64d.json, which   *)
+(* is honest -- the kernel is compiled rv64gc and contains no B or V instruction, *)
+(* and verifying a machine with extensions the software never uses is work spent   *)
+(* on the wrong machine.  [reset_misa] now produces MISA_C itself, the patch is    *)
+(* gone, and [cold_boot_misa] below is the compiled tie between that config file   *)
+(* and the constant.  THE LESSON: when a model fact and a tree constant           *)
+(* disagree, ask which of the two is describing the machine you mean to verify     *)
+(* before assuming the constant is the thing to move.                             *)
 (*                                                                            *)
 (* WHAT THE RUN DOES *NOT* ESTABLISH -- the rest of the residue, and it is       *)
 (* short:                                                                       *)
@@ -262,22 +266,26 @@ Proof. reflexivity. Qed.
 (* ---------------------------------------------------------------------- *)
 (* 3. THE THEOREM: [reset_regs] is what the model's cold boot produces.     *)
 (*                                                                         *)
-(*    The TWO [register_set]s are the whole residue -- the PMA idealization  *)
-(*    and misa's tracked divergence (both in the header) -- and every other  *)
-(*    conjunct is closed by computing the model's own code.                  *)
+(*    ONE [register_set] is left -- the PMA idealization (see the header) -- *)
+(*    and every other conjunct, misa included, is closed by computing the    *)
+(*    model's own code.                                                     *)
 (* ---------------------------------------------------------------------- *)
 
-(* the model's real misa, pinned so a further drift is a build failure *)
+(* MISA IS RUN-DERIVED NOW, and this lemma is what says so: [reset_misa] sets
+   one bit per [hartSupports] answer, and with B and V disabled in
+   model-xv6iris/sail-config-rv64d.json those answers produce exactly the
+   platform constant the whole decode bridge is stated over.  Keep it: it is
+   the tie between the config file and [MISA_C], so a config or model move
+   that changes the answer breaks the build here rather than silently making
+   [MISA_C] a fiction again. *)
 Lemma cold_boot_misa (hid : mword 64) :
-  register_lookup misa (cold_regs hid) = boot_w64 0x800000000034112F.
+  register_lookup misa (cold_regs hid) = boot_w64 0x800000000014112D.
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Definition cold_regs_boot (c : CPU) : regstate :=
-  (* PATCH 2: misa, the tracked divergence -- [RiscvFetchExec.MISA_C] *)
-  register_set misa (boot_w64 0x800000000014112D)
-    (* PATCH 1: the PMA table, idealized to one all-permitting region *)
-    (register_set pma_regions pma_boot
-       (cold_regs (boot_w64 (Z.of_nat (fin_to_nat c))))).
+  (* THE ONE PATCH: the PMA table, idealized to one all-permitting region *)
+  register_set pma_regions pma_boot
+    (cold_regs (boot_w64 (Z.of_nat (fin_to_nat c)))).
 
 Theorem reset_regs_cold_boot (c : CPU) : reset_regs c (cold_regs_boot c).
 Proof.

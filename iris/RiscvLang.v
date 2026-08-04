@@ -479,11 +479,11 @@ Definition pmpcfg_boot
    and hart id; [init_model]; [init_boot_requirements]) with [RiscvExec.exec]
    and proves this predicate of the register file it produces -- so the
    justification of each value is a compiled theorem, not a table, and a model
-   regeneration that changes one breaks the build.  Exactly TWO conjuncts are
-   explicit [register_set] patches in that theorem, and they are the whole
-   residue: [pma_regions] (the one-region idealization) and [misa] (a tracked
-   divergence, see below).  Read ColdBoot.v's header for those, for the one
-   platform hook the interpreter cannot step, and for the COLD-vs-warm caveat. *)
+   regeneration that changes one breaks the build.  Exactly ONE conjunct is an
+   explicit [register_set] patch in that theorem, and it is the whole residue:
+   [pma_regions], the one-region idealization.  Read ColdBoot.v's header for
+   that, for the one platform hook the interpreter cannot step, and for the
+   COLD-vs-warm caveat. *)
 Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* the pc a hart comes out of reset at.  [KernelSyms._entry] is 0x80000000
      but KernelSyms is above this file, so the literal is spelled here and
@@ -506,13 +506,10 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* SXL = UXL = 2 (64-bit), MIE = MPRV = 0 -- the model's own
      [sail_model_init], and [BootBridge.mstatus_reset] *)
   /\ register_lookup mstatus rs = boot_w64 0xA00000000
-  (* = [RiscvFetchExec.MISA_C]: MXL = 2 with A/C/D/F/I/M/S/U set.  THE ONE
-     VALUE HERE THAT THE MODEL DOES NOT PRODUCE: [reset_misa] writes one bit
-     per [hartSupports] answer and the built-in config also answers yes to B
-     and V, so the model's cold boot leaves 0x800000000034112F.  The divergence
-     is tracked, proved ([ColdBoot.cold_boot_misa]) and carried as an explicit
-     patch in [ColdBoot.reset_regs_cold_boot]; correcting it is a U-mode
-     decode-image project, for the reason spelled out at [MISA_C]. *)
+  (* = [RiscvFetchExec.MISA_C]: MXL = 2 with A/C/D/F/I/M/S/U set -- exactly the
+     bits [reset_misa] writes from [hartSupports], now that B and V are
+     disabled in the model's config ([ColdBoot.cold_boot_misa] proves the tie).
+     Run-derived, not assumed. *)
   /\ register_lookup misa rs = boot_w64 0x800000000014112D
   /\ register_lookup mseccfg rs = boot_w64 0
   /\ register_lookup menvcfg rs = boot_w64 0

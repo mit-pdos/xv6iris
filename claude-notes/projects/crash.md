@@ -1702,6 +1702,58 @@ one. If a warm-reset transition is ever added to the language it needs its own,
 much weaker, fact set, `ColdBoot`'s lemmas must not be reused for it, and the
 boot chain would not compose over it.
 
+### THE misa DIVERGENCE, CLOSED — at the config, not the constant
+
+`reset_misa` writes one misa bit per `hartSupports` answer, and the config
+answered yes to B and V, so the model's cold boot produced
+`0x800000000034112F` while the tree's platform constant
+`RiscvFetchExec.MISA_C` is `0x800000000014112D`. **Fixed on the CONFIG side**:
+`extensions.B.supported := false` and `extensions.V.support_level :=
+"Disabled"` in `model-xv6iris/sail-config-rv64d.json`, regenerated. `reset_misa`
+now produces MISA_C itself, `ColdBoot`'s misa patch is GONE (one patch left —
+the PMA idealization), and `ColdBoot.cold_boot_misa` is the compiled tie between
+the config file and the constant.
+
+**WHY THE CONFIG AND NOT THE CONSTANT — the measurement that decided it.**
+Correcting `MISA_C` to the model's value was tried on a full build first: the
+whole kernel side stays green (every `Code*.v`/`Wp*`/`Proof*`/`Link*` file
+recompiled, so the decode bridge's ~1400 `misa = MISA_C` premises are robust to
+the value) but `DecodeSetU.goodbP_encdec_u` FAILS — with misa.B / misa.V set the
+Zba/Zbb-only/Zbs and vector families reach decoder leaves and `decodable_u`
+stops being the complete U-mode decode image. The general lesson: **when a model
+fact and a tree constant disagree, ask which of the two describes the machine
+you mean to verify before assuming the constant is what moves.** xv6 is compiled
+rv64gc and contains no B or V instruction, so the config was the wrong thing,
+not the constant.
+
+**THE DEPENDENCY CASCADE, and it is the trap for any future extension flip.**
+Disabling V alone makes the model's OWN `config_is_valid` return **false**:
+`check_vext_config` and `check_misc_extension_dependencies` fail on the fourteen
+V-dependent extensions upstream leaves enabled (Zvabd Zvbb Zvbc Zvfbfmin
+Zvfbfwma Zvfh Zvfhmin Zvkg Zvkned Zvknha Zvknhb Zvksed Zvksh Zvkt — each
+"requires Zve32f/Zve32x", and Zve* comes from V's `support_level`). All fourteen
+had to be disabled too. B has no dependents (upstream already ships Zba/Zbb/Zbs
+off while B is on). **The failure surfaces in `ColdBoot`**, whose cold-boot
+evaluation runs through `init_model`'s `assert (config_is_valid tt)` — a
+rejected config shows up as `lazymatch` finding no `Some` there, not as anything
+mentioning the config. So after ANY extension flip, evaluate `config_is_valid`
+before believing the regen.
+
+**FALLOUT, and it was two lines of proof.**  `UserCsr.exec_hartSupports_Zve32x`
+flips `true` -> `false`; `exec_currentlyEnabled_Zve32x_off` keeps its statement
+VERBATIM (including the two mstatus.VS premises, now unused and introduced as
+`intros _ _`) because `and_boolM` short-circuits on the false hart-support
+answer, so no caller churns. Nothing else in the tree moved:
+`Print Assumptions xv6_power_adequacy` is still the same ten axioms, and
+`DecodeSetU.decode_total_u_set` is **closed under the global context**.
+
+**PROTOCOL FOR A MODEL REGEN, worth reusing.**  Regen ONCE with the config
+UNCHANGED first and check `git diff model-xv6iris/` is empty — that is the only
+way to keep upstream drift in the checkout from masquerading as config fallout.
+At `sail-riscv` eb31a74 the baseline was byte-identical, so the 29-line
+`rv64d.v` diff is entirely attributable to the flags. Toolchain locations are
+recorded in the root README's "Regenerating the Sail model".
+
 ### THE EXPECTED AXIOM FOOTPRINT (definitive, for M6d)
 
 `functional_extensionality_dep` is **SANCTIONED** — the axiom budget is the 5
@@ -2108,30 +2160,7 @@ yet.
 - Decide the torn-write knob (see the design note's recorded modeling
   choices) when the log's crash proof is designed — request-atomic is the
   current recorded choice.
-- **The misa divergence: regen the model config with B and V OFF** (M6c (5) above
-  has the full measurement). `hartSupports` answers yes to B and V, so
-  `reset_misa` produces `0x800000000034112F` while the tree pins
-  `RiscvFetchExec.MISA_C = 0x800000000014112D`. The approved fix is the config
-  side, not the constant: in `model-xv6iris/sail-config-rv64d.json` set
-  `extensions.B.supported := false` (line ~495) and
-  `extensions.V.support_level := "Disabled"` (line ~442-454 — V is gated on a
-  `support_level` string, NOT a `supported` bool; `hartSupports Ext_V` reads
-  `vector_support_ge vector_support_level Full`, and `vlen_exp`/`elen_exp` may be
-  left as they are per that file's own comment). Then regen with
-  `tools/regen_sail_model.sh` / `make model-gen` (root README, "Regenerating the
-  Sail model"; needs sail 0.20.1 + `sail_coq_backend` + a `sail-riscv`
-  checkout). EXPECT `rv64d.v` to move; `kernel-rocq/` must NOT — it comes from
-  the xv6 ELF. The config header comment currently advertises exactly ONE
-  deliberate deviation from upstream (the SIG flag); this makes it three, so
-  update that comment in the same commit. Then `ColdBoot`'s misa patch retires
-  and misa joins the run-derived facts. Watch, in either
-  direction, `exec_currentlyEnabled_*`, the decode-bridge lemmas, and the U-mode
-  totality dispatch: correcting the CONSTANT instead (measured) leaves the whole
-  kernel side green but falsifies `DecodeSetU.decode_total_u_set`, because with
-  misa.B / misa.V on the Zba/Zbb-only/Zbs and vector families reach decoder
-  leaves and `decodable_u` stops being the complete image. Verify
-  `Print Assumptions` on `xv6_power_adequacy` (ten axioms) AND on the U-mode
-  completeness theorem.
+- ~~The misa divergence~~ — **DONE** (see "THE misa DIVERGENCE, CLOSED" below).
 
 ### PMA TABLE RETIREMENT (and with it, the config assert) — three steps, in order
 

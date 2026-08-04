@@ -5889,7 +5889,7 @@ Definition flen := Z.mul (8) (8).
 Definition undefined_vector_support '(tt : unit) : M (vector_support) :=
    (internal_pick ([Disabled; Integer; Float_single; Float_double; Full]))  : M (vector_support).
 
-Definition vector_support_level : vector_support := Full.
+Definition vector_support_level : vector_support := Disabled.
 #[export] Hint Unfold vector_support_level : sail.
 Definition vlen_exp := 8.
 #[export] Hint Unfold vlen_exp : sail.
@@ -10018,7 +10018,7 @@ exact (
              (_limit_reduces_bool _acc ltac:(assumption)))
           : M (bool)))
        : M (bool)
-   | Ext_B => returnM (true)
+   | Ext_B => returnM (false)
    | Ext_V => returnM ((andb ((Z.geb (8) (7))) ((vector_support_ge (vector_support_level) (Full)))))
    | Ext_S => returnM (true)
    | Ext_U => returnM (true)
@@ -10124,21 +10124,21 @@ exact (
       returnM ((andb ((Z.geb (6) (6))) ((vector_support_ge (vector_support_level) (Float_single)))))
    | Ext_Zve64x =>
       returnM ((andb ((Z.geb (6) (6))) ((vector_support_ge (vector_support_level) (Integer)))))
-   | Ext_Zvabd => returnM ((andb ((sys_enable_experimental_extensions (tt))) ((true  : bool))))
-   | Ext_Zvfbfmin => returnM (true)
-   | Ext_Zvfbfwma => returnM (true)
-   | Ext_Zvfh => returnM (true)
-   | Ext_Zvfhmin => returnM (true)
-   | Ext_Zvbb => returnM (true)
-   | Ext_Zvbc => returnM (true)
+   | Ext_Zvabd => returnM ((andb ((sys_enable_experimental_extensions (tt))) ((false  : bool))))
+   | Ext_Zvfbfmin => returnM (false)
+   | Ext_Zvfbfwma => returnM (false)
+   | Ext_Zvfh => returnM (false)
+   | Ext_Zvfhmin => returnM (false)
+   | Ext_Zvbb => returnM (false)
+   | Ext_Zvbc => returnM (false)
    | Ext_Zvkb => returnM (false)
-   | Ext_Zvkg => returnM (true)
-   | Ext_Zvkned => returnM (true)
-   | Ext_Zvknha => returnM (true)
-   | Ext_Zvknhb => returnM (true)
-   | Ext_Zvksed => returnM (true)
-   | Ext_Zvksh => returnM (true)
-   | Ext_Zvkt => returnM (true)
+   | Ext_Zvkg => returnM (false)
+   | Ext_Zvkned => returnM (false)
+   | Ext_Zvknha => returnM (false)
+   | Ext_Zvknhb => returnM (false)
+   | Ext_Zvksed => returnM (false)
+   | Ext_Zvksh => returnM (false)
+   | Ext_Zvkt => returnM (false)
    | Ext_Zvkn =>
       (and_boolM
          ((_rec_hartSupports (Ext_Zvkned) ((Z.sub (_reclimit) (1)))
@@ -42124,7 +42124,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32f)) >>= fun (w__11 : bool) => returnM (((not (w__11))  : bool)))) >>= fun (w__12 : bool) =>
    let valid : bool :=
      if w__12 then
@@ -42134,7 +42134,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((or_boolM
           ((hartSupports (Ext_Zve32f)) >>= fun (w__13 : bool) => returnM (((not (w__13))  : bool)))
           (returnM (((not ((true  : bool)))  : bool))))
@@ -42148,7 +42148,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__16 : bool) => returnM (((not (w__16))  : bool)))) >>= fun (w__17 : bool) =>
    let valid : bool :=
      if w__17 then
@@ -42158,7 +42158,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((or_boolM ((hartSupports (Ext_Zve64x))  : M (bool)) ((hartSupports (Ext_V))  : M (bool))) >>= fun (w__20 : bool) =>
        returnM (((not (w__20))  : bool)))) >>= fun (w__21 : bool) =>
    let valid : bool :=
@@ -42180,7 +42180,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__24 : bool) => returnM (((not (w__24))  : bool)))) >>= fun (w__25 : bool) =>
    let valid : bool :=
      if w__25 then
@@ -42190,7 +42190,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__26 : bool) => returnM (((not (w__26))  : bool)))) >>= fun (w__27 : bool) =>
    let valid : bool :=
      if w__27 then
@@ -42200,7 +42200,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__28 : bool) => returnM (((not (w__28))  : bool)))) >>= fun (w__29 : bool) =>
    let valid : bool :=
      if w__29 then
@@ -42210,7 +42210,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((or_boolM ((hartSupports (Ext_Zve64x))  : M (bool)) ((hartSupports (Ext_V))  : M (bool))) >>= fun (w__32 : bool) =>
        returnM (((not (w__32))  : bool)))) >>= fun (w__33 : bool) =>
    let valid : bool :=
@@ -42222,7 +42222,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__34 : bool) => returnM (((not (w__34))  : bool)))) >>= fun (w__35 : bool) =>
    let valid : bool :=
      if w__35 then
@@ -42232,7 +42232,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__36 : bool) => returnM (((not (w__36))  : bool)))) >>= fun (w__37 : bool) =>
    let valid : bool :=
      if w__37 then
@@ -42242,7 +42242,7 @@ Definition check_vext_config '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32x)) >>= fun (w__38 : bool) => returnM (((not (w__38))  : bool)))) >>= fun (w__39 : bool) =>
    let valid : bool :=
      if w__39 then
@@ -42670,7 +42670,7 @@ Definition check_misc_extension_dependencies '(tt : unit) : M (bool) :=
           : unit in
        valid
      else valid in
-   (and_boolM (returnM ((true  : bool)))
+   (and_boolM (returnM ((false  : bool)))
       ((hartSupports (Ext_Zve32f)) >>= fun (w__0 : bool) => returnM (((not (w__0))  : bool)))) >>= fun (w__1 : bool) =>
    let valid : bool :=
      if w__1 then
@@ -42682,7 +42682,7 @@ Definition check_misc_extension_dependencies '(tt : unit) : M (bool) :=
        valid
      else valid in
    let valid : bool :=
-     if andb ((true  : bool)) ((orb ((not ((true  : bool)))) ((not ((true  : bool)))))) then
+     if andb ((false  : bool)) ((orb ((not ((true  : bool)))) ((not ((false  : bool)))))) then
        let valid : bool := false in
        let '(_) :=
          (print_endline
