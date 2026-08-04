@@ -23,7 +23,7 @@
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Zquot Bool Lia List.
 From stdpp Require Import bitvector.definitions.
-From stdpp Require Import gmap list_numbers.
+From stdpp Require Import gmap finite list_numbers list_relations.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map.
 From iris.program_logic Require Import language.
@@ -33,7 +33,7 @@ Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
-Require Import KptPt KMap InstrBytes WpGpr.
+Require Import KptPt KMap InstrBytes RegFile WpGpr.
 (* [gsi64] is the general [get_slice_int] unsigned fact; its one home is
    PrintintArith.v (kept there with a minimal import set, because [lia] is
    unusable once the bitvector zify hook is loaded). *)
@@ -199,9 +199,10 @@ Qed.
 (* the GPR file: x1..x31.  Index 0 is x0, hardwired zero -- [WpGpr.gpr_pt]
    at index 0 owns nothing (it is a pure "the value is zero" fact), so no
    ghost cell is needed for it. *)
-Definition boot_gprs : gset register :=
-  list_to_set ((fun i : Z => (R_bitvector_64 (gpr_of_Z i) : register))
-                 <$> seqZ 1 31).
+Definition boot_gpr_list : list register :=
+  (fun i : Z => (R_bitvector_64 (gpr_of_Z i) : register)) <$> seqZ 1 31.
+
+Definition boot_gprs : gset register := list_to_set boot_gpr_list.
 
 (* THE DOCUMENTED MINIMUM, and it is EXACTLY the register footprint of the
    three specs the per-hart boot chain composes -- [SpecEntry.wp_entry_boot],
@@ -227,22 +228,37 @@ Definition boot_gprs : gset register :=
      hence both main arms -- needs it, and [trapinithart] is what seals it
      into [intr_inv].
    The audit table (which spec forces which register, and how it is owned) is
-   in claude-notes/projects/crash.md's M6b section. *)
-Definition boot_D (_ : CPU) : gset register :=
-  {[ (PC : register); (nextPC : register);
-     (cur_privilege : register); (hart_state : register);
-     (mhartid : register); (mstatus : register); (misa : register);
-     (mseccfg : register); (menvcfg : register);
-     (htif_tohost_base : register); (elp : register);
-     (pma_regions : register); (pmpcfg_n : register); (pmpaddr_n : register);
-     (mepc : register); (satp : register); (medeleg : register);
-     (mideleg : register); (mie : register); (mcounteren : register);
-     (stimecmp : register);
-     (minstret : register); (minstret_increment : register);
-     (mcycle : register); (mtime : register); (mip : register);
-     (sig_seip : register); (sig_meip : register);
-     (tlb : register); (stvec : register);
-     (sepc : register); (scause : register); (stval : register) ]} ∪ boot_gprs.
+   in claude-notes/projects/crash.md's M6b section.
+
+   SPELLED AS A LIST, and that is not cosmetic: what a client actually needs
+   is to take the set APART into the named cells its specs ask for, and
+   [big_sepS_list_to_set] does that in ONE step from a decidable [NoDup]
+   ([boot_D_nodup], one [vm_compute] over [register_encode]) -- whereas the
+   set-literal spelling would owe 33 [∉] side conditions instead. *)
+Definition boot_D_named : list register :=
+  [ (PC : register); (nextPC : register);
+    (cur_privilege : register); (hart_state : register);
+    (mhartid : register); (mstatus : register); (misa : register);
+    (mseccfg : register); (menvcfg : register);
+    (htif_tohost_base : register); (elp : register);
+    (pma_regions : register); (pmpcfg_n : register); (pmpaddr_n : register);
+    (mepc : register); (satp : register); (medeleg : register);
+    (mideleg : register); (mie : register); (mcounteren : register);
+    (stimecmp : register);
+    (minstret : register); (minstret_increment : register);
+    (mcycle : register); (mtime : register); (mip : register);
+    (sig_seip : register); (sig_meip : register);
+    (tlb : register); (stvec : register);
+    (sepc : register); (scause : register); (stval : register) ].
+
+Definition boot_D_list : list register := boot_D_named ++ boot_gpr_list.
+
+Definition boot_D (_ : CPU) : gset register := list_to_set boot_D_list.
+
+(* [base.NoDup] and not [NoDup]: this file imports [Stdlib.Lists.List], whose
+   [NoDup] takes the bare name -- and [big_sepS_list_to_set] wants stdpp's. *)
+Lemma boot_D_nodup : base.NoDup boot_D_list.
+Proof. apply (bool_decide_unpack _). vm_compute. reflexivity. Qed.
 
 (* ====================================================================== *)
 (* §3  The bundles, from the reset cells.                                  *)
@@ -315,3 +331,166 @@ Section BootBundles.
   Qed.
 
 End BootBundles.
+
+(* ====================================================================== *)
+(* §4  TAKING [boot_D] APART: the named cells, and the GPR FILE.            *)
+(*                                                                        *)
+(* What adequacy hands a boot client is ONE [big_sepS] over [boot_D c];    *)
+(* what every spec in the chain asks for is a named cell ([mhartid ↦ᵣ _],  *)
+(* [satp ↦ᵣ _], ...) plus [WpGpr.gpr_file] over a [regfile].  This section *)
+(* is that conversion, and it has two halves:                             *)
+(*                                                                        *)
+(*   - [boot_reg_split] -- the set apart, in ONE step, off the decidable   *)
+(*     [boot_D_nodup] ([big_sepS_list_to_set]).                           *)
+(*   - [boot_gpr_file] -- the 31 GPR cells as a [gpr_file].  This is the   *)
+(*     first place in the tree that BUILDS one (every other site           *)
+(*     accesses/updates an existing file), and the load-bearing fact is    *)
+(*     [enum_regidx_eq]: [enum regidx] IS                                 *)
+(*     [Regidx ∘ mword_of_int <$> seqZ 0 32] by CONVERSION -- stdpp's      *)
+(*     [Finite (bv n)] enumerates [Z_to_bv n <$> seqZ 0 (bv_modulus n)]    *)
+(*     and [mword_of_int] IS [Z_to_bv], so no permutation argument and no  *)
+(*     32-element literal is needed anywhere.                             *)
+(* ====================================================================== *)
+
+(* [uint] of a 5-bit literal index, for the [gpr_pt] index-0 test *)
+Lemma uint_mword5 (i : Z) : 0 <= i < 32 -> uint (mword_of_int i : mword 5) = i.
+Proof.
+  intro Hi.
+  pose proof (bv_unsigned_in_range _ (mword_of_int i : mword 5)) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [| exact (proj1 Hr)].
+  unfold SailStdpp.Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_small; [reflexivity |].
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 5)) with 32. exact Hi.
+Qed.
+
+(* THE REGISTER-INDEX ENUMERATION, by conversion alone.  [RegFile]'s
+   [regidx_finite] enumerates [Regidx <$> enum (bv 5)], stdpp's [bv_finite]
+   enumerates [Z_to_bv n <$> seqZ 0 (bv_modulus n)], and [mword_of_int] is
+   [Z_to_bv] -- so the two [change]s below are the whole proof. *)
+Lemma enum_regidx_eq :
+  enum regidx = (fun i : Z => Regidx (mword_of_int i)) <$> seqZ 0 32.
+Proof.
+  change (enum regidx) with (Regidx <$> enum (bv (MachineWord.MachineWord.Z_idx 5))).
+  change (enum (bv (MachineWord.MachineWord.Z_idx 5)))
+    with (Z_to_bv (MachineWord.MachineWord.Z_idx 5)
+            <$> seqZ 0 (bv_modulus (MachineWord.MachineWord.Z_idx 5))).
+  change (bv_modulus (MachineWord.MachineWord.Z_idx 5)) with 32.
+  rewrite <- list_fmap_compose. reflexivity.
+Qed.
+
+Section BootRegs.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* THE AMBIENT HART'S SHARE of the client bundle both adequacy theorems
+     hand out: [riscv_system_adequacy]'s first conjunct at [c := cpu_id],
+     and -- by pure conversion, since [cpu_reg_name] IS [era_reg_name
+     riscv_eraGS] -- [RiscvAdequacy.power_boot_res]'s per-hart register
+     elems.  Spelled with the ambient [↦ᵣ] because that is what every spec
+     downstream asks for; [reg_pointsto_at cpu_id] is the same proposition. *)
+  Definition boot_reg_res (rs : regstate) : iProp Σ :=
+    ([∗ set] r ∈ boot_D cpu_id, r ↦ᵣ register_lookup r rs)%I.
+
+  Local Lemma boot_reg_list (rs : regstate) :
+    boot_reg_res rs
+    ⊣⊢ [∗ list] r ∈ boot_D_list, r ↦ᵣ register_lookup r rs.
+  Proof.
+    rewrite /boot_reg_res /boot_D.
+    apply big_sepS_list_to_set; exact boot_D_nodup.
+  Qed.
+
+  Lemma boot_reg_split (rs : regstate) :
+    boot_reg_res rs ⊢
+      PC ↦ᵣ register_lookup PC rs ∗
+      nextPC ↦ᵣ register_lookup nextPC rs ∗
+      cur_privilege ↦ᵣ register_lookup cur_privilege rs ∗
+      hart_state ↦ᵣ register_lookup hart_state rs ∗
+      mhartid ↦ᵣ register_lookup mhartid rs ∗
+      mstatus ↦ᵣ register_lookup mstatus rs ∗
+      misa ↦ᵣ register_lookup misa rs ∗
+      mseccfg ↦ᵣ register_lookup mseccfg rs ∗
+      menvcfg ↦ᵣ register_lookup menvcfg rs ∗
+      htif_tohost_base ↦ᵣ register_lookup htif_tohost_base rs ∗
+      elp ↦ᵣ register_lookup elp rs ∗
+      pma_regions ↦ᵣ register_lookup pma_regions rs ∗
+      pmpcfg_n ↦ᵣ register_lookup pmpcfg_n rs ∗
+      pmpaddr_n ↦ᵣ register_lookup pmpaddr_n rs ∗
+      mepc ↦ᵣ register_lookup mepc rs ∗
+      satp ↦ᵣ register_lookup satp rs ∗
+      medeleg ↦ᵣ register_lookup medeleg rs ∗
+      mideleg ↦ᵣ register_lookup mideleg rs ∗
+      mie ↦ᵣ register_lookup mie rs ∗
+      mcounteren ↦ᵣ register_lookup mcounteren rs ∗
+      stimecmp ↦ᵣ register_lookup stimecmp rs ∗
+      minstret ↦ᵣ register_lookup minstret rs ∗
+      (R_bool minstret_increment) ↦ᵣ register_lookup minstret_increment rs ∗
+      mcycle ↦ᵣ register_lookup mcycle rs ∗
+      mtime ↦ᵣ register_lookup mtime rs ∗
+      mip ↦ᵣ register_lookup mip rs ∗
+      sig_seip ↦ᵣ register_lookup sig_seip rs ∗
+      sig_meip ↦ᵣ register_lookup sig_meip rs ∗
+      tlb ↦ᵣ register_lookup tlb rs ∗
+      stvec ↦ᵣ register_lookup stvec rs ∗
+      sepc ↦ᵣ register_lookup sepc rs ∗
+      scause ↦ᵣ register_lookup scause rs ∗
+      stval ↦ᵣ register_lookup stval rs ∗
+      ([∗ list] r ∈ boot_gpr_list, r ↦ᵣ register_lookup r rs).
+  Proof.
+    rewrite boot_reg_list /boot_D_list big_sepL_app.
+    iIntros "[Hn $]". rewrite /boot_D_named.
+    iDestruct "Hn" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
+                        H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
+                        H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
+                        H29 & H30 & H31 & H32 & H33 & _)".
+    iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
+            H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33".
+  Qed.
+
+  (* the register FILE a reset hart's GPRs form: x0 reads zero (the [gpr_pt]
+     index-0 entry owns nothing, which is why [boot_D] has no cell for it),
+     x1..x31 read the machine's own values. *)
+  Definition boot_regfile (rs : regstate) : regfile :=
+    fun r => match r with
+             | Regidx i =>
+                 if Z.eqb (uint i) 0 then zero_reg
+                 else register_lookup (R_bitvector_64 (gpr_of_Z (uint i))) rs
+             end.
+
+  (* the missing INTRO for [gpr_file]: the whole file as the per-index run
+     [gpr_file] folds over.  [rf_to_gmap]'s [NoDup] side condition is
+     RegFile's own ([rf_to_gmap_lookup]'s first bullet, verbatim). *)
+  Lemma gpr_file_of_enum (f : regfile) :
+    ([∗ list] r ∈ enum regidx, gpr_pt r (f r)) ⊢ gpr_file f.
+  Proof.
+    iIntros "H". rewrite /gpr_file.
+    iSplitR; [iPureIntro; apply rf_to_gmap_dom |].
+    rewrite /rf_to_gmap big_sepM_list_to_map; last first.
+    { rewrite <- list_fmap_compose.
+      apply NoDup_fmap_2_strong; [| apply NoDup_enum].
+      intros x y ?? [=]; done. }
+    rewrite big_sepL_fmap. iExact "H".
+  Qed.
+
+  Lemma boot_gpr_file (rs : regstate) :
+    ([∗ list] r ∈ boot_gpr_list, r ↦ᵣ register_lookup r rs)
+    ⊢ gpr_file (boot_regfile rs).
+  Proof.
+    iIntros "H". iApply gpr_file_of_enum.
+    rewrite enum_regidx_eq.
+    replace (seqZ 0 32) with (([0] ++ seqZ 1 31)%list)
+      by (rewrite (seqZ_cons 0 32); [reflexivity | lia]).
+    rewrite fmap_app big_sepL_app.
+    iSplitR.
+    { rewrite big_sepL_singleton /gpr_pt /boot_regfile.
+      rewrite (uint_mword5 0 ltac:(lia)). iPureIntro. reflexivity. }
+    rewrite big_sepL_fmap /boot_gpr_list big_sepL_fmap.
+    iApply (big_sepL_impl with "H"). iIntros "!>" (k i Hk) "Hc".
+    apply lookup_seqZ in Hk. destruct Hk as [-> Hlt].
+    rewrite /gpr_pt /boot_regfile (uint_mword5 (1 + Z.of_nat k) ltac:(lia)).
+    replace (Z.eqb (1 + Z.of_nat k) 0) with false
+      by (symmetry; apply Z.eqb_neq; lia).
+    iExact "Hc".
+  Qed.
+
+End BootRegs.

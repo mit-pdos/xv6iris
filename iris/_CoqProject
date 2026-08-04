@@ -696,3 +696,4 @@ BootBridge.v
 ProtoCpuid.v
 ProtoSchedsInv.v
 CrashProto.v
+BootChain.v

@@ -1215,6 +1215,137 @@ chain reaches only through the ASSUMED `kerneltrap`. Neither `SpecEntry`,
 has nothing to pay it into; `timer_cap_intro` from `wp_entry_boot`'s returned
 `mcounteren`/`stimecmp` is the recipe when a real kerneltrap proof asks.
 
+## M6c (1) — the register side of the chain, and THE BLOCKER (LANDED)
+
+Two files, both green and axiom-free, and one finding that stops the
+composition dead until a spec is reshaped.
+
+### What landed
+
+**`BootConfig.v` §4 — taking `boot_D` apart.** What adequacy hands a client is
+ONE `big_sepS` over `boot_D c`; what every spec in the chain asks for is a
+named cell plus `WpGpr.gpr_file`. That conversion is now two lemmas:
+
+- `boot_reg_split` — the 33 named cells plus the GPR list, in one step.
+  `boot_D` is therefore now spelled `list_to_set boot_D_list` (`boot_D_named ++
+  boot_gpr_list`): with the list form the whole decomposition is
+  `big_sepS_list_to_set` off a DECIDABLE `boot_D_nodup` (one `vm_compute` over
+  `register_encode`), where the set-literal spelling would have owed 33 `∉`
+  side conditions. Nothing consumed `boot_D`, so the restatement was free.
+- `boot_gpr_file` — the 31 GPR cells as a `gpr_file`. **This is the first place
+  in the tree that BUILDS a `gpr_file`** (every other site accesses or updates
+  an existing one), and the load-bearing fact is `enum_regidx_eq`: `enum
+  regidx` IS `(fun i => Regidx (mword_of_int i)) <$> seqZ 0 32` **by
+  conversion** — `RegFile.regidx_finite` enumerates `Regidx <$> enum (bv 5)`,
+  stdpp's `bv_finite` enumerates `Z_to_bv n <$> seqZ 0 (bv_modulus n)`, and
+  `mword_of_int` IS `Z_to_bv` — so two `change`s are the whole proof, with no
+  permutation argument and no 32-element bv literal anywhere (a literal would
+  not even close by `vm_compute; reflexivity`: `BvWf` proofs differ).
+  `gpr_file_of_enum` is the missing `gpr_file` intro underneath it.
+
+**`iris/BootChain.v` (new, in `_CoqProject`) §1 — the boot geometry.** All of
+it is CLOSED arithmetic once the hart index is, so every fact is eight
+`vm_compute`s and needs no `lia` at all (which keeps it clear of the
+`bitvector.tactics` zify hook):
+
+- `entry_got = 0x8000a208` is `_entry`'s pc-relative slot
+  (`WpEntryNew.entry_ld_ea`, by `bv_eq; vm_compute`) and `entry_got_bytes` is
+  its eight image bytes — exactly `BootCarve.kernel_data_phys_word`'s one
+  obligation — showing the word is `&stack0` (`KernelSyms.stack0 =
+  0x8000a250`). NB `vm_compute; reflexivity` does NOT close those eight: the
+  sides are `Some <the same bv literal>` with different `BvWf` proofs and print
+  identically, so it is `vm_compute; apply (f_equal Some), bv_eq; reflexivity`.
+- `sp_of n = stack0 + 4096*(n+1)`, and `sp0_val`: `_entry`'s eight
+  instructions write sp/a0/a1, so peeling the eight-deep insert tower bottoms
+  out in a closed term and the initial map never appears. With it, `sp0_uint`,
+  the two `ti_ea_*` TOR bounds `wp_entry_boot` asks for, and the bridge's
+  `sp_of_lo` / `sp_of_hi`.
+- `boot_stack_depth = 512` — the hart's own 4096-byte `stack0` slice is exactly
+  `[uint sp0 - 8*512, uint sp0)`, which is what makes ONE range serve both
+  `wp_entry_boot`'s `4 ≤ n` and the bridge's `boot_stack_slots K_main = 86 ≤ n`.
+- `st_tpv_of_nat` — the tp/cid convention at any hart (`cid_word_of c` IS
+  `mword_of_int (Z.of_nat (fin_to_nat c))`).
+
+**`BootChain.v` §2 — `boot_entry_pre`.** The whole REGISTER side of the chain:
+`reset_regs cpu_id rs` + `kmap_static_claims` + `gen_cert` + this hart's
+`boot_reg_res rs` `={E}=∗` exactly `wp_entry_boot`'s inputs (`mmode_config`
+included — so it allocates this hart's `minstret_inv` and freezes its
+`hw_config` cells on the way), plus the five S-mode registers the M-mode
+contract never touches and `boot_bridge` wants (`tlb`, `stvec`, `sepc`,
+`scause`, `stval`), plus the two PLIC wire pins. Everything below the register
+layer is the carve's and is deliberately not in it.
+
+### THE BLOCKER: `wp_entry_boot` HIDES THE ENTRY mstatus, and `sconf` needs it
+
+`InstrBytes.mmode_config` keeps mstatus under an existential and pins only
+THREE facts about it (MIE = 0, MPRV = 0, SXL = 2). `wp_entry_boot`'s
+postcondition therefore ∀-quantifies the entry mstatus `ms0` with just those
+three, and hands back `mstatus ↦ᵣ cms5 (st_ms1 ms0)`.
+
+`BootBridge.boot_bridge` needs `_get_Mstatus_SIE (cms5 (st_ms1 ms0)) = 0` and
+`IntrDefs.sconf_ms_facts (cms5 (st_ms1 ms0))` — ten mstatus facts —
+and `boot_csrs_reset` discharges them only at `ms0 = mstatus_reset`. **Seven of
+them are not derivable from the three the contract exposes.** Verified by
+computing at a hostile `ms0` that satisfies all three exposed facts
+(`2^63 + 0xA00000000 + SIE + MXR + TVM + TSR + FS + VS + XS`):
+
+| `sconf` wants | at the hostile `ms0` |
+| --- | --- |
+| `SIE = 0` | **1** |
+| `MXR = 0` | **1** |
+| `TSR ≠ 1` | **TSR = 1** |
+| `FS = Off` | **3** |
+| `VS = Off` | **3** |
+| `SD = 0` | **1** |
+| `TVM ≠ 1` | **TVM = 1** |
+| MPRV = 0 / SXL = 2 / `XS = Off` / MPP nominal | ✓ (MRET and the legalization force these) |
+
+So the per-hart chain **cannot be composed as the interfaces stand**, and this
+is bigger than BootBridge's own note predicted ("SIE = 0 is worth lifting into
+`mmode_config` some day"): it is seven fields, not one. Reality is fine — the
+reset mstatus `0xA00000000` has every one of them right and neither `start()`
+(which writes only MPP) nor MRET (MIE/MPIE/MPP/MPRV) touches them — the SPEC
+forgets. Two shapes, and the choice is a design decision, not a proof problem:
+
+1. **Widen `mmode_config`'s mstatus fact set** to the seven (ideally by
+   factoring ONE `mstatus_kernel_facts` predicate that both `mmode_config` and
+   `sconf_ms_facts` are stated over — the guiding principle's "one general
+   abstraction" reading), so `wp_entry_boot`'s post exposes them and the
+   bridge's premises follow by a pure `st_ms1`/`cms5` preservation lemma. This
+   is a bottom-of-tree edit (`InstrBytes.v`) and every M-mode leaf that writes
+   mstatus must be shown to preserve the fields — all of them do.
+2. **Make the M-mode boot path VALUE-EXPLICIT in mstatus**: `wp_entry_boot`
+   (and `WpStartNew.wp_start`, whose post is where the `∀ ms0` originates —
+   its own comment calls it "the (hidden) entry mstatus value") take
+   `mstatus ↦ᵣ ms0` plus the facts instead of the bundle, and name `ms0` in
+   the post. `WpGprMretWp`'s `cms5` is already value-explicit, so the change
+   is confined to `wp_start` + `SpecEntry`/`ProofEntry` — but it un-bundles a
+   premise that every leaf along the way threads.
+
+(1) is the smaller statement change and the honest one — the facts really are
+invariants of kernel M-mode, not incidental. (2) is the smaller *file* change.
+
+### What is left of M6c after this
+
+- the mstatus reshape above (prerequisite for ANY composition);
+- then `boot_entry_run` — apply `Entry.wp_entry_boot` with `boot_entry_pre`'s
+  output and §1's geometry (all its premises now exist), and `boot_bridge` on
+  its post;
+- then the two main arms, which additionally need the SHARED allocation
+  lemma. **One thing that shape settles**: `SpecMain` demands
+  `[∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg` — all EIGHT harts' spare
+  halves — and hart 0 cannot get them from the other harts' `boot_bridge`s
+  (each hart's bridge runs inside that hart's own WP, long after the client's
+  single `={⊤}=∗` has ended). So the SHARED carve must split each
+  `cpus[h].proc` cell itself, give one half to hart `h`'s bundle and collect
+  the other eight into the boot supply — which means `boot_bridge` should take
+  `cpu_proc_half cpu_id p0` rather than the full cell and stop returning a
+  spare. That is a small, forced interface change to BootBridge, and its
+  header comment ("each hart's boot bridge hands its spare half out here, and
+  the eight of them are exactly what main's `scheds_alloc` consumes") is the
+  arrangement that does not work.
+- the `.bss` cut chain and the client ghosts (items 1, 4, 6, 7 below).
+
 ## M6c (NEXT, fresh budget) — the per-hart boot chain
 
 The one lemma M6b exists to make possible, stated per hart:
@@ -1280,7 +1411,8 @@ M6c-pre above.)**
    `pc_is (mword_of_int KernelSyms._entry)` is not constructible. Owning the
    register is necessary but not sufficient: `reset_regs`/`boot_facts` needs a
    `nextPC` conjunct (M6a's machine, one more pin).
-4. **The sp₀ arithmetic.** `wp_entry_boot`'s stack premises and
+4. **(DONE — M6c (1): `BootChain.v` §1.)** **The sp₀ arithmetic.**
+   `wp_entry_boot`'s stack premises and
    `boot_stack_own_phys`'s range are about `uint sp0` where
    `sp0 = m_jal m v_stack0 mhartid_in !!! csp_rs1` = `stack0 + 4096*(c+1)`.
    Nothing in the tree yet computes that: the client needs
