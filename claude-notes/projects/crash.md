@@ -2164,6 +2164,20 @@ yet.
 - ~~PMA table retirement~~ — **DONE** (see "PMA TABLE RETIREMENT" below):
   `pma_boot` IS the model's three-region table, and the U-mode AMO
   classification that blocked it was re-derived at AMOCASQ, AMOCAS included.
+- ~~pmpcfg patch retirement~~ — **DONE** (see "PMPCFG PATCH RETIREMENT" below):
+  `reset_regs`' clause is `pmp_all_off (register_lookup pmpcfg_n rs)`, the
+  predicate its consumers consume, and no longer a pinned 64-entry value.
+- The mseccfg / menvcfg full-value pins: **MEASURED AND BLOCKED**, and the
+  blocker is the fast decode bridge, not the spec shape (see "MSECCFG / MENVCFG
+  PATCH SHARPENING" below). Needs either a field-granular read-frame congruence
+  (measured 15× per decode obligation over 1220 words — not worth it) or the
+  `Zicfilp.supported = false` config flip, which deletes the pins outright and
+  needs the user's approval.
+- The ∀-garbage anchoring of the register clause (`reset()` over arbitrary
+  power-on state instead of the closed `init_regstate` run): still blocked on the
+  symbolic-peeling wall recorded in "NO PATCH CHAIN LEFT" below, and it now owns
+  two named follow-ons — pmpcfg's 64-way `reset_pmp` derivation, and whichever
+  mseccfg/menvcfg exit gets taken.
 
 ### PMA TABLE RETIREMENT — **DONE. `pma_boot` IS THE MODEL'S OWN TABLE**
 
@@ -2352,15 +2366,30 @@ gotchas below.
 **There is no `register_set` patch left in `ColdBoot.cold_regs_boot`** —
 `pma_regions` was the last one and it is now run-derived (see PMA TABLE
 RETIREMENT above), so `cold_regs_boot c = cold_regs (hartid c)` verbatim and
-every conjunct of `reset_regs` is a value the model's chain COMPUTED. What
-remains is not a patch chain but four named platform assumptions, each with its
-own account: **mie / mideleg** (written by no line of the chain — they come out
-of `init_regstate`, i.e. a hart powers up with everything disabled and nothing
-delegated), **mhartid and the reset vector** (the BOARD's two configuration
-writes, made explicitly by `ColdBoot.boot_init` because `reset_sys` and
-`init_boot_requirements` READ them), and the two OVER-CLAIMS that have their own
-retirement notes below: **mseccfg = 0** (honest form: `PMM = disabled at
-power-on`) and **pmpcfg_n = pmpcfg_boot** (honest form: `pmp_all_off`).
+every conjunct of `reset_regs` is a value the model's chain COMPUTED.
+
+**THE NAMED PLATFORM ASSUMPTIONS — the minimal honest list** (i.e. what would
+NOT follow from `reset()` alone over arbitrary power-on garbage; nothing here is
+an Iris/Rocq axiom — `reset_regs_cold_boot` proves all fifteen conjuncts by
+running the model from the closed `init_regstate`):
+
+- **mhartid and the reset vector** — the BOARD's two configuration writes, made
+  explicitly by `ColdBoot.boot_init` because `reset_sys` and
+  `init_boot_requirements` READ them. Irreducible: they ARE the platform.
+- **mie / mideleg = 0** — written by no line of the chain; they come out of
+  `init_regstate`, i.e. a hart powers up with everything disabled and nothing
+  delegated. Irreducible for the same reason (`reset()` never touches them).
+- **mseccfg = 0 and menvcfg = 0** — still pinned as WHOLE VALUES, and the honest
+  field-wise content is only `PMM = disabled at power-on` (+ MLPE / the Zkr seed
+  bits, which the run gives for free, and nothing at all for menvcfg). This is
+  the one remaining over-claim, and it is **not** a spec-shape slip: the fast
+  concrete-state decode bridge consumes all 64 bits of both. See MSECCFG PATCH
+  SHARPENING below for the measurement and the two ways out.
+- **pmpcfg — RETIRED as a value** (see PMPCFG PATCH RETIREMENT below):
+  `reset_regs`' clause is `pmp_all_off (register_lookup pmpcfg_n rs)`, which is
+  what `reset_pmp` WRITES (A = OFF, L = 0 per entry) and all any consumer takes.
+  It leaves this list once the ∀-garbage task derives it from `reset_pmp`'s
+  per-entry RMW instead of from the closed run.
 
 The anchor is still the model's whole cold boot from the
 CLOSED `init_regstate`, not `reset()` over arbitrary power-on state. The
@@ -2397,24 +2426,120 @@ the measurement is the durable part:
   Prompt_monad's `read_reg`, so `Defs` must be imported LAST or nothing unifies
   with `M`).
 
-### PMPCFG PATCH RETIREMENT
+### PMPCFG PATCH RETIREMENT — **DONE. THE CLAUSE IS THE PREDICATE, NOT A VALUE**
 
-`reset_regs`' `pmpcfg_n = pmpcfg_boot` over-claims: the architecture gives only
-A = OFF and L = 0 per entry, which is all `RiscvFetchExec.pmp_all_off` consumes.
-Retiring the pin means deriving `pmp_all_off` from the run — and `reset_pmp` is a
-`foreach_ZM_up 0 63` per-entry RMW, so with `i : Z` unrestricted that is a 64-way
-symbolic index resolution over a `vec_update_dec` tower plus two generic
+`reset_regs`' pmpcfg clause is now
+
+```coq
+/\ pmp_all_off (register_lookup pmpcfg_n rs)
+```
+
+— A = OFF and L = 0 in every entry, which is all `reset_pmp` establishes and all
+any consumer takes. The pinned `pmpcfg_n rs = pmpcfg_boot` is gone, and with it
+the claim over the other five bits (R/W/X and the two reserved) of all 64 entries.
+
+**`pmp_all_off` MOVED DOWN, to `RiscvLang.v`.** A conjunct of `reset_regs` can
+only be spelled in the language file's vocabulary, so the predicate (and, one
+home per fact, its witness `pmpcfg_boot_entry` / `pmp_all_off_pmpcfg_boot`, which
+came from `BootConfig`) lives beside `reset_regs` now. `RiscvFetchExec` keeps
+only `pmp_all_off_allows_all`, the projection to the weaker unlocked-ness
+predicate. Zero call-site churn: every one of the ~11 files naming `pmp_all_off`
+already did `Require Import RiscvLang`, so the unqualified name still resolves.
+`pmpcfg_boot` STAYS — `PowerBoot.boot_regs` writes it (a machine built by writing
+over a dead generation has to write something) and the closed run computes it.
+
+**The consumer edit was three lines**, as predicted: `BootChain.boot_entry_pre` /
+`boot_hart_res` hand out `pmpcfg_n ↦ᵣ register_lookup pmpcfg_n rs`, and
+`boot_entry_bridge` passes that value plus `RiscvLang.reset_regs_pmpcfg` (a new
+named projection) to `SpecEntry.wp_entry_boot` and `BootBridge.boot_bridge`, both
+of which already quantified over `pmpcfg0` and took `pmp_all_off pmpcfg0`.
+`PowerBoot.boot_regs_reset`'s `split_and!; reg_peel` became
+`first [ rewrite boot_regs_pmpcfg; exact pmp_all_off_pmpcfg_boot | reg_peel ]`.
+
+**At the closed run it is a COMPUTED fact, in two steps** (`ColdBoot`):
+`cold_boot_pmpcfg` is the `vm_compute` equality to `pmpcfg_boot` (the `vec` UIP
+trick — a list paired with a length proof, `Eqdep_dec.UIP_dec Nat.eq_dec`, no
+axiom), and `cold_boot_pmp_all_off` rewrites with it and applies the witness.
+Splitting it that way is what keeps the out-of-range `vec_access_dec` indices in
+one place.
+
+**THE OPEN-BASE VERSION IS STILL FUTURE WORK** and is the ∀-garbage anchoring
+task's, not a side effect of this one: over an arbitrary power-on file
+`reset_pmp` is a `foreach_ZM_up 0 63` per-entry RMW, so `pmp_all_off` becomes a
+64-way symbolic index resolution over a `vec_update_dec` tower plus two generic
 bitvector facts (`_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF`,
 `pmpLocked (_update_Pmpcfg_ent_L y 0) = false`) — none of it `vm_compute`-able.
-Consumer side is small: `BootChain.boot_hart_res`'s `pmpcfg_n ↦ᵣ pmpcfg_boot`
-becomes `↦ᵣ register_lookup pmpcfg_n rs`, since `SpecEntry.wp_entry_boot` /
-`WpEntryNew` already take `pmp_all_off pmpcfg0` at a quantified value.
+The pointer is recorded in `ColdBoot.cold_boot_pmp_all_off`'s comment.
 
-### MSECCFG PATCH SHARPENING (recorded 2026-08-04, do with or after pmpcfg)
+### MSECCFG / MENVCFG PATCH SHARPENING — **MEASURED; BLOCKED ON THE DECODE BRIDGE**
 
-The `mseccfg = 0` pin also over-claims, and its honest decomposition is
-per-field, because the register is a grab-bag from four extensions and the
-spec never resets it wholesale:
+The `mseccfg = 0` pin over-claims *architecturally*, and its honest decomposition
+is per-field (below). But it is NOT a spec-shape slip that can be fixed by
+restating the conjunct: **what the tower consumes of mseccfg is the whole 64-bit
+value**, and the consumer is the fast concrete-state decode bridge. The chain,
+measured 2026-08-04:
+
+`reset_regs`' `mseccfg = 0` → `BootConfig.hw_config_intro` (`mseccfg ↦ᵣ boot_w64 0`)
+→ `RiscvFetchExec.hw_config`'s `⌜mseccfg0 = mword_of_int 0⌝` (which sits right
+next to the two honest field facts — it ALREADY carries PMM-disabled and MLPE = 0)
+→ `InstrBytes.instr_lift`'s `mseccfg0 = mword_of_int 0` premise (**83 sites**,
+~40 engine files, thread it) → `RiscvFetchExec.cfg_ok`'s Machine arm
+(`cur_privilege = Machine ∧ mseccfg = 0`) → `WpDecodeBridge.agree_m` /
+`agree_on D_m s dstateM`, whose `D_m` contains mseccfg → **1220 per-word decode
+lemmas in 111 `Code*.v` files**, each closed by `decode_bridge_ms`.
+
+**WHY THE WHOLE VALUE.** `exec_goodb_congr` is whole-value BY CONSTRUCTION:
+`goodb` records that a register was read and continues at the value the CONCRETE
+reference state holds, so the only transport condition it can support is "`s` and
+`dstate` agree on the D-registers". And the decoder does read mseccfg on every
+word — `currentlyEnabled Ext_Zicfilp` is
+`and_boolM (currentlyEnabled Ext_Zicsr) (and_boolM (hartSupports Ext_Zicfilp) (read_reg cur_privilege >>= get_xLPE))`,
+and `get_xLPE` in Machine IS `read mseccfg >>= returnM MLPE`. The value cannot
+change any non-lpad word's decode (the enclosing `and_boolM`'s other conjunct is
+`eq_vec (subrange_vec_dec w 11 0) 0x017`, false), but "cannot change the answer"
+is not something a per-state EVALUATION can check — only a symbolic argument can.
+
+**TWO WAYS OUT, and the second is much cheaper:**
+
+1. *Field-granular read-frame congruence* — run the bridge at a reference state
+   whose mseccfg is the real state's OWN (symbolic) value, so agreement is
+   `reflexivity` and only the Zicfilp guard has to be cased. MEASURED on one word
+   (`auipc a1,0x7` = 0x00007597), and it is not close: the `goodb` obligation goes
+   from **0.029 s to 0.432 s** (15×) and stops being a closed computation — the
+   residual goal is the partially-reduced decoder over an expanded `dstate` record
+   (printing it at `Set Printing Depth 30` costs 6.8 s) and still needs the guard
+   cased and both branches re-reduced — while the concrete-decode obligation goes
+   from **0.008 s to NOT RETURNING IN 200 s**. One symbolic leaf inside a
+   `regstate` field function is enough to wreck the reduction, which is the
+   `NEVER EVALUATE MODEL CODE OVER AN *OPEN* REGISTER FILE` rule from
+   durable-notes showing up in miniature. Times 1220 words: not viable.
+2. **`Zicfilp.supported = false` in `model-xv6iris/sail-config-rv64d.json`.**
+   `and_boolM` short-circuits, so with `hartSupports Ext_Zicfilp` constant-folded
+   to `false` the decoder never runs `read_reg cur_privilege >>= get_xLPE`: it
+   reads NEITHER mseccfg NOR menvcfg, `D_m` / `D_s` lose that member, and both
+   full-value pins — and `cfg_ok` itself — can be DELETED rather than weakened.
+   Precedent: the misa B/V flip ("THE misa DIVERGENCE, CLOSED" above) — when a
+   model fact and a tree constant disagree, ask which describes the machine you
+   mean to verify. QEMU's virt rv64gc does not implement Zicfilp and the kernel
+   contains no `lpad`, so the flip is honest. It is a MACHINE-SEMANTICS decision,
+   so it needs the user's approval, and it is a real sweep (the `elp` cell and the
+   `is_lpad_instruction` guards in `hw_config` / `run_hart_active` go dead,
+   `reset_sys`'s bit-10 write disappears, `config_is_valid` must be re-probed, and
+   the model must be regenerated — ONCE with the config unchanged first, checking
+   `git diff model-xv6iris/` is empty). It SHRINKS the proof; unlike the rescinded
+   Smmpm flip below, it removes pins instead of merely reclassifying one.
+
+**menvcfg is the same wall, one step worse, and was skipped in this pass for that
+reason.** `SmodeCore.smode_config` carries the four honest field facts
+(PBMTE / PMM / LPE / FIOM) AND `menvcfg0 = MENVCFG_S` (**271 references in 56
+files**), and `MENVCFG_S` is the RESET value OR-ed with two bits by the kernel
+(`start()`: `menvcfg |= MENVCFG_ADUE`; `timerinit`: STCE) — so all 64 bits of the
+reset value are consumed downstream of the bridge as well. `reset_sys` never
+touches menvcfg at all, so under the ∀-garbage anchor this pin is pure power-on
+garbage: exit (1) or (2) is on THAT task's critical path, not optional.
+
+The architectural decomposition of the mseccfg pin, unchanged (the register is a
+grab-bag from four extensions and the spec never resets it wholesale):
 
 - bit 10 (MLPE, Zicfilp): architectural — `reset_sys` clears it (gated on
   `hartSupports Ext_Zicfilp` = true here). Comes from the run for free.
@@ -2433,9 +2558,10 @@ spec never resets it wholesale:
 - everything else: inert bits nothing reads; pinned to 0 only because the
   patch is stated as a whole-register value.
 
-End state: shrink the patch from `mseccfg = 0` to `PMM = disabled at
-power-on` (stating the tower's premise field-wise), with MLPE and the seed
-bits derived from the reset run.
+End state, still the target: shrink the patch from `mseccfg = 0` to `PMM =
+disabled at power-on` (stating the tower's premise field-wise), with MLPE and the
+seed bits derived from the reset run — reachable only after exit (1) or (2)
+above, which is what this pass measured and why the conjunct is unchanged.
 
 **CONFIG FLIP RESCINDED (2026-08-04): pointer masking stays enabled.** The
 user first approved disabling `Smmpm`, then withdrew it on learning the

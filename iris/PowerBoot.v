@@ -58,9 +58,20 @@ Local Ltac reg_peel :=
   repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]);
   apply register_lookup_set.
 
+(* pmpcfg's clause is the one [reset_regs] states as a PREDICATE rather than a
+   value ([pmp_all_off]), so it is discharged in two steps: peel to the value
+   this construction writes, then [RiscvLang.pmp_all_off_pmpcfg_boot].  The
+   witness is exactly why [pmpcfg_boot] is still a named value -- a machine
+   built by writing over a dead generation has to write SOMETHING. *)
+Local Lemma boot_regs_pmpcfg (c : CPU) (rs : regstate) :
+  register_lookup pmpcfg_n (boot_regs c rs) = pmpcfg_boot.
+Proof. unfold boot_regs. reg_peel. Qed.
+
 Lemma boot_regs_reset (c : CPU) (rs : regstate) : reset_regs c (boot_regs c rs).
 Proof.
-  unfold reset_regs, boot_regs. split_and!; reg_peel.
+  unfold reset_regs. split_and!;
+    first [ (rewrite boot_regs_pmpcfg; exact pmp_all_off_pmpcfg_boot)
+          | (unfold boot_regs; reg_peel) ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)

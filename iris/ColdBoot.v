@@ -2,7 +2,8 @@
 (* ColdBoot.v -- THE MODEL'S OWN COLD BOOT, and with it the machine-checked *)
 (* justification of [RiscvLang.reset_regs].                                 *)
 (*                                                                          *)
-(* [reset_regs] pins fifteen register values per hart, and until this file   *)
+(* [reset_regs] states fifteen facts per hart -- fourteen register values    *)
+(* plus pmpcfg's [pmp_all_off] -- and until this file                        *)
 (* existed each of them was justified by a table in the notes that said      *)
 (* which line of the Sail model wrote it.  A table is a transcription: it     *)
 (* rots silently when the model is regenerated, and it HAD: the misa pin      *)
@@ -88,13 +89,17 @@
 (*                                                                            *)
 (* WHAT THE RUN DOES *NOT* ESTABLISH -- the rest of the residue, and it is       *)
 (* short:                                                                       *)
-(*  - mie, mideleg, and pmpcfg's R/W/X bits are written by NO line of the        *)
-(*    chain: they come out of the model's initial register file, whose fields    *)
-(*    are [inhabitant] -- i.e. zero.  So they remain PLATFORM assumptions        *)
-(*    -- a hart powers up with every interrupt disabled, nothing delegated,      *)
-(*    and no PMP entry granting anything.  What the theorem adds is that the     *)
-(*    assumption agrees with the model's own power-on state instead of being     *)
-(*    asserted against nothing.                                                 *)
+(*  - mie and mideleg are written by NO line of the chain: they come out of      *)
+(*    the model's initial register file, whose fields are [inhabitant] --        *)
+(*    i.e. zero.  So they remain PLATFORM assumptions -- a hart powers up with   *)
+(*    every interrupt disabled and nothing delegated.  What the theorem adds is  *)
+(*    that the assumption agrees with the model's own power-on state instead of   *)
+(*    being asserted against nothing.                                            *)
+(*  - pmpcfg is NOT in that residue any more: [reset_regs] asks only for         *)
+(*    [pmp_all_off] (A = OFF, L = 0 per entry), which is what [reset_pmp]        *)
+(*    WRITES.  §4's [cold_boot_pmp_all_off] still gets it by computing the       *)
+(*    closed run; deriving it from [reset_pmp]'s per-entry RMW over an OPEN      *)
+(*    power-on file is the ∀-garbage anchoring task's 64-way symbolic proof.     *)
 (*                                                                            *)
 (* THE RUN STARTS FROM [init_regstate], AND THAT IS NOT [boot_shape]'s SHAPE.   *)
 (* [boot_shape] / [PowerBoot.boot_regs] still write the pinned values OVER the  *)
@@ -111,8 +116,8 @@
 (* over a register file CLOSED.                                                 *)
 (*                                                                            *)
 (* COLD ONLY.  This is the power-up path.  [reset] ALONE does not establish      *)
-(* [reset_regs]: mstatus, menvcfg, htif_tohost_base, mhartid, pma_regions and    *)
-(* pmpcfg all get their values from [sail_model_init], which runs once at        *)
+(* [reset_regs]: mstatus, menvcfg, htif_tohost_base, mhartid and pma_regions     *)
+(* all get their values from [sail_model_init], which runs once at               *)
 (* power-up, and [reset_sys] clears only mstatus's MIE and MPRV -- so a WARM     *)
 (* reset would preserve SIE / MXR / TSR / FS / VS / SD / TVM and                 *)
 (* [BootConfig.mstatus_reset_kernel_facts] would be false after one.  If a       *)
@@ -352,6 +357,31 @@ Lemma cold_boot_misa (hid : mword 64) :
   register_lookup misa (cold_regs hid) = boot_w64 0x800000000014112D.
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
+(* THE PMP OBLIGATION IS COMPUTED, NOT PINNED.  [reset_regs] asks for
+   [pmp_all_off] -- A = OFF and L = 0 in every entry, which is all the
+   architecture's [reset_pmp] gives and all a boot consumer takes -- and at the
+   CLOSED cold-boot run the register holds a concrete vector, so the predicate
+   follows from the value the chain computed.  Two steps on purpose: the
+   equality is the [vm_compute] (a [vec] is a list PAIRED WITH a length proof,
+   and the two proofs are built by different lemmas -- the lists are equal and
+   nat equality is decidable, so UIP closes it, no axiom), and the predicate
+   then comes from [RiscvLang.pmp_all_off_pmpcfg_boot], which handles the
+   out-of-range indices.
+   THE OPEN-BASE VERSION IS A DIFFERENT PROOF and is NOT here: over an
+   arbitrary power-on register file [reset_pmp] is a [foreach_ZM_up 0 63]
+   per-entry read-modify-write, so [pmp_all_off] becomes a 64-way symbolic
+   index resolution over a [vec_update_dec] tower plus two generic bitvector
+   facts, none of it [vm_compute]-able.  That belongs to the ∀-garbage
+   anchoring task (claude-notes/projects/crash.md, "PMPCFG PATCH
+   RETIREMENT" / "NO PATCH CHAIN LEFT"). *)
+Lemma cold_boot_pmpcfg (hid : mword 64) :
+  register_lookup pmpcfg_n (cold_regs hid) = pmpcfg_boot.
+Proof. vm_compute; f_equal; apply (Eqdep_dec.UIP_dec Nat.eq_dec). Qed.
+
+Lemma cold_boot_pmp_all_off (hid : mword 64) :
+  pmp_all_off (register_lookup pmpcfg_n (cold_regs hid)).
+Proof. rewrite cold_boot_pmpcfg. exact pmp_all_off_pmpcfg_boot. Qed.
+
 (* NO PATCH LEFT: this is the model's own cold-boot register file, verbatim.
    The PMA table was the last [register_set] here, and [RiscvLang.pma_boot] is
    now the model's own three-region table (§3's [cold_boot_pma] is the tie), so
@@ -370,8 +400,5 @@ Proof.
     first [ reflexivity
           | apply bv_eq; reflexivity
           | exact (cold_boot_pma _)
-            (* pmpcfg_n is a [vec], i.e. a list PAIRED WITH a length proof, and
-               the two proofs are built by different lemmas; the lists are equal
-               and nat equality is decidable, so UIP closes it -- no axiom. *)
-          | (vm_compute; f_equal; apply (Eqdep_dec.UIP_dec Nat.eq_dec)) ].
+          | exact (cold_boot_pmp_all_off _) ].
 Qed.

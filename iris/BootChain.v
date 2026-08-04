@@ -246,7 +246,10 @@ Section BootChain.
     ={E}=∗
       (* --- [wp_entry_boot]'s own inputs --- *)
       mmode_config (DfracOwn 1) ∗
-      pmpcfg_n ↦ᵣ pmpcfg_boot ∗
+      (* pmpcfg comes out at WHATEVER the reset left, not at a pinned value:
+         [reset_regs]' clause is [pmp_all_off] of it, which is what
+         [wp_entry_boot] takes (at a quantified [pmpcfg0]). *)
+      pmpcfg_n ↦ᵣ register_lookup pmpcfg_n rs ∗
       pmpaddr_n ↦ᵣ register_lookup pmpaddr_n rs ∗
       pc_is (mword_of_int KernelSyms._entry) ∗
       gpr_file (boot_regfile rs) ∗
@@ -272,7 +275,7 @@ Section BootChain.
       sig_meip ↦ᵣ register_lookup sig_meip rs.
   Proof.
     intros (Hpc0 & Hnpc0 & Hpv0 & Hhs0 & Hmh0 & Hms0 & Hmisa0 & Hsec0 & Hmenv0 &
-            Hhtif0 & Help0 & Hpma0 & Hpmpc0 & _ & _).
+            Hhtif0 & Help0 & Hpma0 & _ & _ & _).
     iIntros "#Hcl #Hcert Hregs".
     iDestruct (boot_reg_split rs with "Hregs") as
       "(HPC & HnPC & Hpriv & Hhs & Hmh & Hms & Hmisa & Hsec & Hmenv & Hhtif & Help &
@@ -292,7 +295,6 @@ Section BootChain.
     iEval (rewrite Hhtif0) in "Hhtif".
     iEval (rewrite Help0) in "Help".
     iEval (rewrite Hpma0) in "Hpma".
-    iEval (rewrite Hpmpc0) in "Hpmpc".
     (* this hart's two register invariants, and the frozen config bundle *)
     iMod (minstret_inv_alloc E _ _ _ _ _
             with "Hcert Hmst Hminc Hmcy Hmt Hmip") as "#Hmin".
@@ -352,7 +354,7 @@ Section BootRun.
     (
      (* --- [boot_entry_pre]'s output, minus the two wire pins --- *)
      mmode_config (DfracOwn 1) ∗
-     pmpcfg_n ↦ᵣ pmpcfg_boot ∗
+     pmpcfg_n ↦ᵣ register_lookup pmpcfg_n rs ∗
      pmpaddr_n ↦ᵣ register_lookup pmpaddr_n rs ∗
      pc_is (mword_of_int KernelSyms._entry) ∗
      gpr_file (boot_regfile rs) ∗
@@ -413,6 +415,9 @@ Section BootRun.
     intros Hreset.
     pose proof (reset_regs_mie _ _ Hreset) as Hmie0.
     pose proof (reset_regs_mideleg _ _ Hreset) as Hmdl0.
+    (* the PMP fact, by name: [reset_regs] gives [pmp_all_off] of the reset
+       value, which is exactly what both callees take. *)
+    pose proof (reset_regs_pmpcfg _ _ Hreset) as Hpmpc0.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
@@ -441,8 +446,9 @@ Section BootRun.
               (register_lookup medeleg rs) (register_lookup mideleg rs)
               (register_lookup mie rs) (boot_w64 0)
               (register_lookup stimecmp rs) (register_lookup mcounteren rs)
-              pmpcfg_boot (register_lookup pmpaddr_n rs) boot_stack_depth
-              boot_stack_depth_entry pmp_all_off_pmpcfg_boot menvcfg_boot_lpe
+              (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs)
+              boot_stack_depth
+              boot_stack_depth_entry Hpmpc0 menvcfg_boot_lpe
               Hra Hs0b
               with "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
                     Hmenv Hmcen Hstc Hgot Hstk Htext").
@@ -475,10 +481,10 @@ Section BootRun.
               (register_lookup satp rs) (register_lookup mideleg rs)
               (register_lookup mie rs) (boot_w64 0) tv
               (boot_w64 (Z.of_nat (fin_to_nat cpu_id)))
-              (register_lookup mcounteren rs) pmpcfg_boot
+              (register_lookup mcounteren rs) (register_lookup pmpcfg_n rs)
               (register_lookup pmpaddr_n rs) (register_lookup tlb rs)
               (noff_val 0) iv zero_reg
-              pmp_all_off_pmpcfg_boot Hsie Hmsf Hmenvl Hmiez Hsatpm
+              Hpmpc0 Hsie Hmsf Hmenvl Hmiez Hsatpm
               ltac:(exact (st_tpv_of_nat _ Hn))
               boot_stack_depth_bridge
               Hlo Hhi

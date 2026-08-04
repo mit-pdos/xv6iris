@@ -2,8 +2,9 @@
 (* BootConfig.v -- the CONFIG BUNDLES a boot proof needs, built from the    *)
 (* reset machine.                                                          *)
 (*                                                                         *)
-(* [RiscvLang.reset_regs] pins twelve register VALUES per hart, and         *)
-(* [RiscvLang.pma_boot] / [pmpcfg_boot] the two config tables; but what     *)
+(* [RiscvLang.reset_regs] pins fourteen register VALUES per hart (the PMA   *)
+(* table [RiscvLang.pma_boot] among them; pmpcfg is the one clause stated   *)
+(* as a PREDICATE, [pmp_all_off], and not as a value); but what             *)
 (* [SpecEntry.wp_entry_boot] takes is not those values -- it is the bundles *)
 (* [RiscvFetchExec.hw_config] and [InstrBytes.mmode_config], plus the pure  *)
 (* PMA/PMP predicates.  This file is that bridge, and it is the FIRST       *)
@@ -272,44 +273,10 @@ Qed.
 Lemma pma_allows_all_pma_boot : pma_allows_all pma_boot.
 Proof. exact (pma_allows_all_intro pma_allows_ram_pma_boot pma_allows_io_pma_boot). Qed.
 
-(* ====================================================================== *)
-(* §1b  The boot PMP configuration is all-OFF and unlocked.                *)
-(* ====================================================================== *)
-
-(* [pmpcfg_boot] is [vector_init 64 0], and [pmp_all_off] quantifies over a
-   [Z] index with no range premise -- so the OUT-OF-RANGE reads matter, and
-   they are what makes the fact hold at every index: [vec_access_dec] falls
-   back on the [Inhabited] default, which for [mword 8] is the same zero byte
-   the vector is filled with.  Below the index range the fallback is taken by
-   [access_list_inc]'s own guard; above it, by [nth] running off the list. *)
-Local Lemma nth_pmp_zero (k : nat) :
-  nth k (SailStdpp.Values.repeat
-           [(SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 8)] 64)
-      inhabitant
-  = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 8).
-Proof.
-  vm_compute (SailStdpp.Values.repeat _ 64).
-  do 64 (destruct k as [|k]; [reflexivity |]).
-  destruct k; apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma pmpcfg_boot_entry (i : Z) :
-  vec_access_dec pmpcfg_boot i
-  = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 8).
-Proof.
-  unfold pmpcfg_boot, SailStdpp.Values.vec_access_dec,
-         SailStdpp.Values.vector_init.
-  destruct (sumbool_of_bool (64 >=? 0)) as [GE | NGE]; [| discriminate NGE].
-  cbn [projT1].
-  unfold SailStdpp.Values.access_list_dec, SailStdpp.Values.access_list_inc.
-  destruct (_ <? 0); [ apply bv_eq; vm_compute; reflexivity | apply nth_pmp_zero ].
-Qed.
-
-(* the last of M6a's bridge list: [SpecEntry.wp_entry_boot]'s PMP premise. *)
-Lemma pmp_all_off_pmpcfg_boot : pmp_all_off pmpcfg_boot.
-Proof.
-  intro i. rewrite pmpcfg_boot_entry. split; vm_compute; reflexivity.
-Qed.
+(* §1b  The boot PMP configuration is all-OFF and unlocked: that is
+   [RiscvLang.pmp_all_off_pmpcfg_boot] now, next to the predicate and the
+   witness it is about (the reset machine states its PMP obligation as
+   [pmp_all_off], so both had to move below [reset_regs]).                  *)
 
 (* ====================================================================== *)
 (* §2  boot_D: the register set a boot client must ask adequacy for.       *)

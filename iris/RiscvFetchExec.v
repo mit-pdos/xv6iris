@@ -29,21 +29,14 @@ Definition pmp_allows_all (cfg : type_of_register pmpcfg_n) : Prop :=
   forall i, pmpLocked (vec_access_dec cfg i) = false.
 
 (* ====================================================================== *)
-(* The stronger, pre-pmpcfg0-write PMP configuration: every entry is OFF    *)
-(* (disabled) AND unlocked.  With no entry ever matching, M-mode grants     *)
-(* accesses of ANY width -- in particular the 8-byte loads/stores, whose    *)
-(* pmpCheck cannot be discharged from unlocked-ness alone: an 8-byte        *)
-(* access can PARTIALLY overlap a TOR/NA4 region boundary (any multiple     *)
-(* of 4) at an unfortunate pmpaddr value, and a partial match faults even   *)
-(* in M-mode.  The 8-byte data-access WPs therefore take [pmp_all_off];     *)
-(* it holds of the boot-time all-zero pmpcfg by vm_compute and implies      *)
-(* [pmp_allows_all] (for their instruction fetches) by projection.          *)
+(* The stronger, pre-pmpcfg0-write PMP configuration -- every entry OFF     *)
+(* (disabled) AND unlocked -- is [RiscvLang.pmp_all_off], and it lives      *)
+(* THERE because [RiscvLang.reset_regs] states the reset machine's PMP      *)
+(* obligation as that predicate rather than as a pinned register value.     *)
+(* Read its comment for why the 8-byte data-access WPs need it and the      *)
+(* unlocked-ness above does not suffice.  All that is left here is the      *)
+(* projection to the weaker predicate.                                      *)
 (* ====================================================================== *)
-Definition pmp_all_off (cfg : type_of_register pmpcfg_n) : Prop :=
-  forall i, pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec cfg i)) = OFF
-         /\ pmpLocked (vec_access_dec cfg i) = false.
-
-
 Lemma pmp_all_off_allows_all (cfg : type_of_register pmpcfg_n) :
   pmp_all_off cfg -> pmp_allows_all cfg.
 Proof. intros H i. exact (proj2 (H i)). Qed.

@@ -514,32 +514,96 @@ Definition pma_boot : list PMA_Region :=
        PMA_Region_attributes := pma_boot_ram_attrs;
        PMA_Region_include_in_device_tree := true |} ].
 
-(* pmpcfg with every entry OFF and unlocked -- what the model's [reset_pmp]
-   establishes (it clears A and L in all 64 entries) and what
-   [RiscvFetchExec.pmp_all_off] asks for.  All-zero bytes: A = bits[4:3] = 0
-   decodes to OFF and L = bit 7 is clear, and the out-of-range default of
+(* ====================================================================== *)
+(* THE PMP CONFIGURATION A BOOT CONSUMER CONSUMES: every entry OFF         *)
+(* (disabled) AND unlocked.  With no entry ever matching, M-mode grants     *)
+(* accesses of ANY width -- in particular the 8-byte loads/stores, whose    *)
+(* pmpCheck cannot be discharged from unlocked-ness alone: an 8-byte access *)
+(* can PARTIALLY overlap a TOR/NA4 region boundary (any multiple of 4) at   *)
+(* an unfortunate pmpaddr value, and a partial match faults even in M-mode. *)
+(* The 8-byte data-access WPs therefore take [pmp_all_off]; it implies       *)
+(* [RiscvFetchExec.pmp_allows_all] (for their instruction fetches) by        *)
+(* projection ([pmp_all_off_allows_all], which lives with that weaker        *)
+(* predicate).                                                              *)
+(*                                                                        *)
+(* IT LIVES HERE, not with the WPs that consume it, because [reset_regs]    *)
+(* below states the reset machine's PMP obligation AS THIS PREDICATE rather *)
+(* than as a pinned register value -- the spec-design rule that a           *)
+(* hardware-attribute obligation says what the consumer consumes.  The      *)
+(* architecture gives only A = OFF and L = 0 per entry (that is all         *)
+(* [reset_pmp] establishes), and that is exactly what this asks for.        *)
+(* ====================================================================== *)
+Definition pmp_all_off (cfg : type_of_register pmpcfg_n) : Prop :=
+  forall i, pmpAddrMatchType_encdec_backwards
+              (_get_Pmpcfg_ent_A (SailStdpp.Values.vec_access_dec cfg i)) = OFF
+         /\ pmpLocked (SailStdpp.Values.vec_access_dec cfg i) = false.
+
+(* pmpcfg with every entry OFF and unlocked -- the all-zero vector the
+   model's [reset_pmp] leaves behind when it clears A and L in all 64 entries
+   of a power-on-zero register file.  This is a WITNESS, not an obligation:
+   [reset_regs] asks only for [pmp_all_off], and this value is what
+   [PowerBoot.boot_regs] writes and what the closed cold-boot run computes
+   ([ColdBoot.cold_boot_pmpcfg]).  All-zero bytes: A = bits[4:3] = 0 decodes
+   to OFF and L = bit 7 is clear, and the out-of-range default of
    [vec_access_dec] is the [Inhabited] zero as well, so the property holds
    at EVERY index. *)
 Definition pmpcfg_boot
     : SailStdpp.Values.vec (SailStdpp.Values.mword 8) 64 :=
   SailStdpp.Values.vector_init 64 (SailStdpp.Values.mword_of_int 0).
 
+(* [pmpcfg_boot] is [vector_init 64 0], and [pmp_all_off] quantifies over a
+   [Z] index with no range premise -- so the OUT-OF-RANGE reads matter, and
+   they are what makes the fact hold at every index: [vec_access_dec] falls
+   back on the [Inhabited] default, which for [mword 8] is the same zero byte
+   the vector is filled with.  Below the index range the fallback is taken by
+   [access_list_inc]'s own guard; above it, by [nth] running off the list. *)
+Local Lemma nth_pmp_zero (k : nat) :
+  nth k (SailStdpp.Values.repeat
+           [(SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 8)] 64)
+      inhabitant
+  = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 8).
+Proof.
+  vm_compute (SailStdpp.Values.repeat _ 64).
+  do 64 (destruct k as [|k]; [reflexivity |]).
+  destruct k; apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma pmpcfg_boot_entry (i : Z) :
+  SailStdpp.Values.vec_access_dec pmpcfg_boot i
+  = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 8).
+Proof.
+  unfold pmpcfg_boot, SailStdpp.Values.vec_access_dec,
+         SailStdpp.Values.vector_init.
+  destruct (sumbool_of_bool (64 >=? 0)) as [GE | NGE]; [| discriminate NGE].
+  cbn [projT1].
+  unfold SailStdpp.Values.access_list_dec, SailStdpp.Values.access_list_inc.
+  destruct (_ <? 0); [ apply bv_eq; vm_compute; reflexivity | apply nth_pmp_zero ].
+Qed.
+
+Lemma pmp_all_off_pmpcfg_boot : pmp_all_off pmpcfg_boot.
+Proof.
+  intro i. rewrite pmpcfg_boot_entry. split; vm_compute; reflexivity.
+Qed.
+
 (* THE PER-HART RESET REGISTERS.  Every value here is either the model's own
    reset ([sail_model_init]/[reset]) or the platform's configuration; the
-   PREDICATES the boot proof needs of them ([pmp_all_off pmpcfg_boot],
-   [pma_allows_all pma_boot], the MISA bit facts, mstatus's MIE/MPRV/SXL,
-   menvcfg's LPE) are all consequences, proved where those predicates live
-   (they are above this file).
+   remaining PREDICATES the boot proof needs of them ([pma_allows_all
+   pma_boot], the MISA bit facts, mstatus's MIE/MPRV/SXL, menvcfg's LPE) are
+   consequences, proved where those predicates live (they are above this file).
+   ONE conjunct is stated AS THE PREDICATE ITS CONSUMER CONSUMES rather than as
+   a value -- pmpcfg's [pmp_all_off] (above): the architecture gives A = OFF
+   and L = 0 per entry and nothing more, so a pinned [pmpcfg_boot] would claim
+   the other five bits of all 64 entries for no consumer.  Prefer that shape for
+   any future hardware-attribute conjunct.
    NO VALUE BELOW IS TAKEN ON TRUST.  [ColdBoot.reset_regs_cold_boot] runs the
    Sail model's OWN cold-boot chain ([sail_model_init]; the board's reset vector
    and hart id; [init_model]; [init_boot_requirements]) with [RiscvExec.exec]
    and proves this predicate of the register file it produces -- so the
    justification of each value is a compiled theorem, not a table, and a model
-   regeneration that changes one breaks the build.  Exactly ONE conjunct is an
-   explicit [register_set] patch in that theorem, and it is the whole residue:
-   [pma_regions], the one-region idealization.  Read ColdBoot.v's header for
-   that, for the one platform hook the interpreter cannot step, and for the
-   COLD-vs-warm caveat. *)
+   regeneration that changes one breaks the build.  NO conjunct is an explicit
+   [register_set] patch in that theorem any more.  Read ColdBoot.v's header for
+   the one platform hook the interpreter cannot step and for the COLD-vs-warm
+   caveat. *)
 Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* the pc a hart comes out of reset at.  [KernelSyms._entry] is 0x80000000
      but KernelSyms is above this file, so the literal is spelled here and
@@ -573,7 +637,14 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   (* the model's [reset_elp]: no landing pad expected *)
   /\ register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED
   /\ register_lookup pma_regions rs = pma_boot
-  /\ register_lookup pmpcfg_n rs = pmpcfg_boot
+  (* PMP: A = OFF and L = 0 in every entry, and NOT a pinned register value --
+     [pmp_all_off] is exactly what [SpecEntry.wp_entry_boot] /
+     [BootBridge.boot_bridge] take (at a quantified [pmpcfg0]), and it is all
+     the architecture's [reset_pmp] gives.  The closed cold-boot run makes it a
+     COMPUTED fact ([ColdBoot.cold_boot_pmp_all_off]); deriving it from
+     [reset_pmp]'s per-entry RMW over an OPEN power-on register file is the
+     ∀-garbage anchoring task's business (claude-notes/projects/crash.md). *)
+  /\ pmp_all_off (register_lookup pmpcfg_n rs)
   (* mie AND mideleg CLEAR: every interrupt disabled, nothing delegated.  Like
      the [nextPC] pin above these are necessary-and-not-obvious, and for the
      same reason -- the S-mode side's [IntrDefs.sconf] requires that every
@@ -590,10 +661,15 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
   /\ register_lookup mie rs = boot_w64 0
   /\ register_lookup mideleg rs = boot_w64 0.
 
-(* NAMED PROJECTIONS of the two pins above.  [reset_regs] is a fifteen-way
+(* NAMED PROJECTIONS of the three clauses consumers ask for one at a time
+   (pmpcfg, mie, mideleg).  [reset_regs] is a fifteen-way
    conjunction and positional destructuring of it in a consumer is exactly the
    brittleness that adding a conjunct exposes, so anything that wants ONE fact
    asks by name. *)
+Lemma reset_regs_pmpcfg (c : CPU) (rs : regstate) :
+  reset_regs c rs -> pmp_all_off (register_lookup pmpcfg_n rs).
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _ & _). exact H. Qed.
+
 Lemma reset_regs_mie (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup mie rs = boot_w64 0.
 Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
