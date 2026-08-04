@@ -1454,15 +1454,107 @@ Budget note: this is a bottom-of-tree edit (InstrBytes), so every iteration is
 a full `-k` rebuild (~13 min); the WpStartNew work is the only real proof
 content.
 
+### M6c (3) — `boot_entry_bridge`: the M-mode half, composed (LANDED)
+
+`BootChain.v` §3 is the whole M-mode side of one hart in ONE lemma:
+`boot_entry_pre`'s output (minus the wire pins) + the image + this hart's stack
+slice + the bridge's adequacy/`.bss` inputs ⊢ `WP Loop`, with a continuation
+taking exactly `sie_cap_gpr mf K_main false zero_reg`, `cpu_own`, the SIE spare
+quarter, `main_hart_raw` and `pc_is <main>` — i.e. the per-hart half of EITHER
+main arm's precondition (`K_main_secondary = 40 ≤ K_main = 52`, so one
+`sie_cap_gpr` serves both). Axiom-free.
+
+Four things worth knowing before touching it:
+
+- **THE WIRE PINS CANNOT BE TAKEN HERE**, for the same control-flow reason as
+  the `cpus[h].proc` split (M6c (2a)): `WireInv.wire_inv_alloc` wants a
+  `big_sepS` over ALL EIGHT harts' `sig_seip`/`sig_meip`, and it must run
+  before any hart's WP. So the client calls `boot_entry_pre` per hart inside
+  its own `={⊤}=∗`, keeps the sixteen pins, and hands each hart the rest.
+  That is what `boot_entry_pre` being a separate fupd buys.
+- **`sp0` appears at THREE different spellings and the seams are all rewrites
+  of `sp0_val`.** `wp_entry_boot`'s premises and post are at the computed
+  register value `m_jal m v_stack0 mhartid_in !!! Regidx csp_rs1`; §1's facts
+  are at `mword_of_int (sp_of n)`; the two are equal but NOT convertible
+  (`sp0_val` needs `bv_eq`). So: `iEval (rewrite -Hsp)` on the stack before
+  entry, `iEval (rewrite Hsp)` on BOTH the stack and the register file
+  (`st_mout … sp0 …`) after it — forgetting the register file makes the
+  bridge's `iMod` fail, and the failure prints for minutes rather than
+  reporting (hence the file's `Set Printing Depth 40`).
+- **Discharge every pure premise as a NAMED `assert` before the `iApply`**, not
+  as an `ltac:(…)` argument: the goals arrive at the callee's own elaboration
+  of `uint`'s width index (`Z_idx 64` vs `64%N`), where `rewrite` reports "does
+  not match any subterm" on a term you can see — while `exact` closes it by
+  conversion. `Hra`/`Hs0b` (the `ti_ea_*` TOR bounds) and `Hlo`/`Hhi` (the two
+  stack-location bounds) are that pattern.
+- **`boot_csrs_from_kf` needs NO premise about the entry `satp`**: writing 0
+  selects Bare whatever the old value was (`satp_legalized`'s Bare arm returns
+  the WRITTEN value), so the premise `boot_csrs_reset` carried was never
+  needed. Dropped from the general form; `boot_csrs_reset` keeps its verbatim
+  statement and ignores it.
+
+### THE SECOND SPEC GAP: the reset machine does not pin `mie` / `mideleg`
+
+**A DESIGN CALL, recorded rather than taken.** `boot_entry_bridge` takes
+`register_lookup mie rs = boot_w64 0` and `register_lookup mideleg rs =
+boot_w64 0` as PREMISES, and nothing in the tree can discharge them:
+
+- `boot_bridge`'s fourth CSR premise is
+  `and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = zeros' 64`
+  ("every enabled interrupt is delegated" — what `IntrDefs.sconf`'s mie/mideleg
+  conjunct needs). It is **FALSE at an arbitrary entry `mie`**: an M-mode
+  enable such as MEIE (bit 11) survives `start()`'s `csrs sie`, while
+  `legalize_mideleg` forces the matching delegation bit to 0, so the AND is
+  non-zero.
+- `RiscvLang.reset_regs` pins THIRTEEN registers and `mie`/`mideleg` are not
+  among them; `PowerBoot.boot_regs` is a `register_set` tower over the PREVIOUS
+  era's `regstate`, so at a reboot both carry over whatever the crashed kernel
+  left. (`satp` needs nothing — see above. `mepc`/`mcounteren`/`stimecmp` are
+  genuinely arbitrary and the contract quantifies over them.)
+
+This is the same SHAPE as the `nextPC` finding of M6c-pre — a fact reality
+guarantees that the model forgets — and the options are:
+
+1. **Extend `reset_regs` + `PowerBoot.boot_regs` with the two pins** (the
+   nextPC precedent). One `register_set` each; `boot_regs_reset`'s `reg_peel`
+   loop absorbs them with no proof change. It is a bottom-of-tree edit
+   (RiscvLang), so one full rebuild. Honest: a real hart comes out of reset
+   with every interrupt disabled and nothing delegated, and it is what the
+   Sail model's own `reset()` does — the same argument that justified the
+   nextPC pin.
+2. **Prove the bridge's premise for an arbitrary `mideleg0`** and pin only
+   `mie`. Plausible: `legalize_mideleg` overwrites the seven bits that matter
+   and `mdl0`'s residual bits only make the delegation mask BIGGER (which
+   helps). Saves one pin at the cost of a real symbolic proof; `mie` still
+   needs option 1.
+3. Leave the premises where they are (what is landed) and let the boot client
+   owe them — which only postpones (1), since the client's only source of
+   register facts is `boot_facts`.
+
+Recommendation: (1), both pins, together with a re-read of the Sail `reset()`
+to see whether any OTHER register it clears is missing from `reset_regs` —
+this is the second time the list has come up short, so the audit is worth
+doing once rather than one register at a time.
+
+### One footprint note for M6d
+
+`boot_entry_bridge`'s `Print Assumptions` is the 5 `rv64d.*` axioms **plus
+`FunctionalExtensionality.functional_extensionality_dep`** — and both of the
+contracts it composes (`Entry.wp_entry_boot` and `BootBridge.boot_bridge`)
+already carried it before this commit, so it is inherited, not new
+(`boot_entry_pre` is closed). It is a consistent stdlib axiom, but it is NOT in
+either adequacy theorem's footprint today, so **composing the chain into
+adequacy will add it to `riscv_power_adequacy`'s axiom list** and the "exactly 5
+`rv64d.*`" check will then read as a regression when it is not. Trace it to its
+source (most likely a `vec`/`vector_init` extensionality step in the M-mode
+leaf layer) and either discharge it or record it as sanctioned BEFORE M6d, so
+the check keeps its meaning.
+
 ### What is left of M6c after this
 
 - **(DONE — M6c (2b).)** `mstatus_kernel_facts`.
-- then `boot_entry_run` — apply `Entry.wp_entry_boot` with `boot_entry_pre`'s
-  output and §1's geometry (every premise now exists), and `boot_bridge` on its
-  post. NOTE for the application: `wp_entry_boot`'s `sp0` is the let-bound
-  `m_jal m v_stack0 mhartid_in !!! Regidx csp_rs1`, so the premises appear at
-  THAT term — `rewrite (sp0_val (boot_regfile rs) (fin_to_nat cpu_id) _)` in
-  the goal to reach §1's `mword_of_int (sp_of n)` form.
+- **(DONE — M6c (3).)** `boot_entry_bridge`, modulo the `mie`/`mideleg` pins
+  above.
 - then the two main arms. The per-hart/shared split, as designed: the per-hart
   lemma takes the SHARED persistents (`started_inv (main_deposit …)`,
   `dev_inv`, `crash_inv`, `panic_wp_any`, the allocated ghost families) plus

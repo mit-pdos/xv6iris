@@ -338,12 +338,14 @@ Definition mstatus_reset : mword 64 := mword_of_int 0xA00000000.
    [boot_csrs_reset] below -- which needs the value -- can only ever serve the
    power-on instance.  The other three conclusions are closed arithmetic on the
    four zeroed CSRs. *)
+(* NB no premise about [satp0]: WRITING 0 selects Bare whatever the old value
+   was ([satp_legalized]'s Bare arm returns the WRITTEN value), so the boot
+   chain owes nothing about the entry satp. *)
 Lemma boot_csrs_from_kf (ms0 menvcfg0 mie0 mideleg0 satp0 : mword 64) :
   mstatus_kernel_facts ms0 ->
   menvcfg0 = (mword_of_int 0 : mword 64) ->
   mie0 = (mword_of_int 0 : mword 64) ->
   mideleg0 = (mword_of_int 0 : mword 64) ->
-  satp0 = (mword_of_int 0 : mword 64) ->
   _get_Mstatus_SIE (cms5 (st_ms1 ms0)) = ('b"0" : mword 1) /\
   sconf_ms_facts (cms5 (st_ms1 ms0)) /\
   menvcfg_legalized (st_menv_adue menvcfg0)
@@ -352,7 +354,7 @@ Lemma boot_csrs_from_kf (ms0 menvcfg0 mie0 mideleg0 satp0 : mword 64) :
   _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
     = ('b"0000" : mword 4).
 Proof.
-  intros HKF -> -> -> ->.
+  intros HKF -> -> ->.
   pose proof (st_boot_ms_kernel_facts ms0 HKF) as HKF'.
   split_and!.
   - exact (mstatus_kernel_SIE _ HKF').
@@ -378,9 +380,9 @@ Lemma boot_csrs_reset (ms0 menvcfg0 mie0 mideleg0 satp0 : mword 64) :
   _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
     = ('b"0000" : mword 4).
 Proof.
-  intros -> Hmenv Hmie Hmdl Hsatp.
+  intros -> Hmenv Hmie Hmdl _.
   exact (boot_csrs_from_kf mstatus_reset _ _ _ _
-           BootConfig.mstatus_reset_kernel_facts Hmenv Hmie Hmdl Hsatp).
+           BootConfig.mstatus_reset_kernel_facts Hmenv Hmie Hmdl).
 Qed.
 
 Section BootBridge.
