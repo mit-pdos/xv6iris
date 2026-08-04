@@ -1,4 +1,4 @@
-(* SpecSyncProg.v -- the VERIFIED-EXECUTION contracts of the `sync` user
+(* USpecSync.v -- the VERIFIED-EXECUTION contracts of the `sync` user
    program's four functions (claude-notes/projects/user-verified.md):
 
      start @0x12   the ELF entry: prologue, call main, call exit -- DIVERGES
@@ -36,7 +36,7 @@ Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
-Section SpecSyncProg.
+Section USpecSync.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
@@ -109,4 +109,4 @@ Section SpecSyncProg.
     pc_is (mword_of_int SyncSyms.start) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
 
-End SpecSyncProg.
+End USpecSync.

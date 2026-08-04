@@ -2,7 +2,7 @@
 
 **STATUS (2026-08-04): the sync process is FULLY VERIFIED.** The whole Umode
 tier is built and axiom-clean (5 platform axioms + funext everywhere), and
-`ProofSyncProg.v` proves all four contracts — `wp_sync_start` (the
+`UProofSync.v` proves all four contracts — `wp_sync_start` (the
 whole-process top statement), `wp_sync_main`, the sync stub (ecall round
 trip through `xv6_sys_protocol`), and the exit stub.  What remains OPEN for
 this effort: (a) discharging `uv_cap` from the kernel side one day
@@ -169,8 +169,8 @@ numbers + semantic arms + the xv6 table), `UmodeFetch.v` (concrete fetch),
 `WpUmodeStore.v` (the memory-writing leaf).  Per-PROGRAM files hold
 only what is specific to that program (addresses, image, call structure,
 stack budget): `UCode<Prog>.v` (decode + `uinstr` catalog),
-`Spec<Prog>Prog.v`/`Proof<Prog>Prog.v` — for sync: `UCodeSync.v`,
-`SpecSyncProg.v`, `ProofSyncProg.v`.  `iris/_CoqProject` gains
+`USpec<Prog>.v`/`UProof<Prog>.v` — for sync: `UCodeSync.v`,
+`USpecSync.v`, `UProofSync.v`.  `iris/_CoqProject` gains
 `-R ../user-rocq User` so the images are importable.
 
 ## The sync program (what actually gets verified)
@@ -258,7 +258,7 @@ tower → concrete frame → `uv_sys_wp` with the caller's `Ψ` payload).
 2. [DONE] `UCodeSync.v` — decode + `uinstr` facts for all 18 instructions
    (`ui_sync_<off>` lemmas, per-word `udec_<word>` facts, `sync_layout`,
    `sync_text_sub := uimg_sub sync_bytes`, `sync_syms_pins`).
-3. [DONE] `SpecSyncProg.v` — the four contracts (`wp_sync_start_body`,
+3. [DONE] `USpecSync.v` — the four contracts (`wp_sync_start_body`,
    `wp_sync_main_body`, `wp_sync_stub_body`, `wp_exit_stub_body`) over
    `xv6_sys_protocol`; compiles.
 4. [DONE] `UmodeFetch.v` — the concrete fetch layer: the four composers
@@ -349,7 +349,7 @@ tower → concrete frame → `uv_sys_wp` with the caller's `Ψ` payload).
      has this), and the width-8 autocast identities need the index
      expressions `change`d (`8*(0+1)*8-1` is not syntactically `8*8-1`)
      before `autocast_subrange_id` applies.
-8. [DONE] `ProofSyncProg.v` (745 lines, ~6 s + ~9 s for its `Print
+8. [DONE] `UProofSync.v` (745 lines, ~6 s + ~9 s for its `Print
    Assumptions` sentinel) — `wp_sync_exit_stub` / `wp_sync_sync_stub` /
    `wp_sync_main` / `wp_sync_start`, each `Lemma … : wp_<f>_body (CID :=
    CIDp) C pt … Φ`.  Axiom-clean (5 platform + funext).  What to know:
@@ -371,7 +371,7 @@ tower → concrete frame → `uv_sys_wp` with the caller's `Ψ` payload).
      conversion while ssr's keyed matching may not.  `reg_lookup` is only
      safe where the looked-up VALUE is closed (it is `vm_compute`, which
      must never meet a symbolic `add_vec`).
-   - `frame_slot_facts` (in ProofSyncProg.v) is the reusable brick: from
+   - `frame_slot_facts` (in UProofSync.v) is the reusable brick: from
      `uv_frame16 pt M sp0` and `d = 0 ∨ d = 8` it produces ALL of
      `wp_uv_csdsp`'s side conditions for the slot at `sp0-16+d`
      (address, mapped store-leaf, canonicality, in-page bound,
@@ -381,7 +381,7 @@ tower → concrete frame → `uv_sys_wp` with the caller's `Ψ` payload).
      store; its one non-obvious ingredient is `sync_bytes_key_lt` (every
      dumped text key is `< 4096`), proved by `elem_of_list_to_map_2` +
      one `forallb` `vm_compute` over the 2240-entry literal.
-   - Spec/leaf interfaces needed NO changes; `SpecSyncProg.v` and the
+   - Spec/leaf interfaces needed NO changes; `USpecSync.v` and the
      engine/leaf files were used exactly as they stood.
 9. Notes upkeep: README.md pointer line (done), and on completion move to
    `completed/`.

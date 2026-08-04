@@ -1,6 +1,6 @@
-(* ProofSyncProg.v -- the VERIFIED-EXECUTION proofs of the four functions of
+(* UProofSync.v -- the VERIFIED-EXECUTION proofs of the four functions of
    the `sync` user program (claude-notes/projects/user-verified.md).  Each
-   lemma discharges one contract of SpecSyncProg.v, in dependency order:
+   lemma discharges one contract of USpecSync.v, in dependency order:
 
      wp_sync_exit_stub   exit  @0x2c8   c.li a7,2;  ecall            (diverges)
      wp_sync_sync_stub   sync  @0x368   c.li a7,22; ecall; c.jr ra   (returns)
@@ -26,7 +26,7 @@ Require Import ExecCommon WpMmodeLeafBase.
 Require Import UptTree UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeSyscall UmodeFetch.
 Require Import WpUmodeStep WpUmodeLeaf WpUmodeStore.
-Require Import UCodeSync SpecSyncProg.
+Require Import UCodeSync USpecSync.
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -257,7 +257,7 @@ Qed.
 (* §2 The four function proofs.                                           *)
 (* ===================================================================== *)
 
-Section ProofSyncProg.
+Section UProofSync.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
@@ -735,7 +735,7 @@ Section ProofSyncProg.
               Hlay Htext3 Hsp3 Hfr3 with "Hcg Hpc").
   Qed.
 
-End ProofSyncProg.
+End UProofSync.
 
 (* SOUNDNESS SENTINEL.  [wp_sync_start] is the top of this cone (it consumes
    [wp_sync_main], which consumes both stubs), so one printout covers all

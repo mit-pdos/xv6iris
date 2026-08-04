@@ -167,9 +167,9 @@ UmodeSyscall.v
 WpUmodeStep.v
 WpUmodeLeaf.v
 WpUmodeStore.v
-SpecSyncProg.v
+USpecSync.v
 UCodeSync.v
-ProofSyncProg.v
+UProofSync.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
