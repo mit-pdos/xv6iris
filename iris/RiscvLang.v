@@ -143,6 +143,35 @@ Fixpoint run {X} (m : M X) (s : mstate) (x : X) (s' : mstate) {struct m} : Prop 
        end) k
   end.
 
+(* A CPU step never moves the disk IMAGE (crash.md): register effects and
+   RAM accesses do not touch the device fabric at all, and an MMIO
+   transaction goes through [dev_read]/[dev_write], which preserve
+   [v_disk] ([DevModel.dev_read_v_disk]/[dev_write_v_disk]).  This is what
+   lets the hart base rule FRAME [state_interp]'s durable disk conjunct;
+   only the DISK's own DMA step moves the image. *)
+Lemma run_v_disk {X} (m : M X) :
+  forall s x s', run m s x s' ->
+    v_disk (dvirtio (mdev s')) = v_disk (dvirtio (mdev s)).
+Proof.
+  induction m as [y|T oc k IH]; intros s x s' Hrun.
+  - destruct Hrun as [_ ->]. reflexivity.
+  - destruct oc; simpl in Hrun;
+      try (exact (IH _ _ _ _ Hrun));
+      try (exfalso; exact Hrun);
+      try (destruct Hrun as (c & Hrun); exact (IH _ _ _ _ Hrun));
+      (destruct (dev_addr _) eqn:Hd;
+       [ (destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr;
+          [ etransitivity; [exact (IH _ _ _ _ Hrun)|];
+            cbn; exact (dev_read_v_disk _ _ _ _ _ Hdr)
+          | exfalso; exact Hrun ])
+         ||
+         (destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw;
+          [ etransitivity; [exact (IH _ _ _ _ Hrun)|];
+            cbn; exact (dev_write_v_disk _ _ _ _ _ Hdw)
+          | exfalso; exact Hrun ])
+       | try (destruct Hrun as (w & _ & Hrun)); exact (IH _ _ _ _ Hrun) ]).
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 3. The fixed loop body: ONE real fetch-decode-execute cycle.            *)
 (*    The model's [loop] additionally runs [tick_clock tt] after the step  *)

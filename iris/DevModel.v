@@ -772,6 +772,30 @@ Definition dev_write (d : dev_state) (pa : Arch.pa) (n : N) (v : bv (8 * n))
 (* the level the PLIC drives on hart [h]'s S-mode external interrupt pin *)
 Definition dev_seip (d : dev_state) (h : nat) : bool := plic_eip (dplic d) h.
 
+(* No CPU-side MMIO transaction moves the disk IMAGE (crash.md): reads
+   advance at most the UART's rx FIFO, and the virtio window's writes go
+   through [virtio_write], which never touches [v_disk] -- not even the
+   reset command.  These two are what let the hart-side base rules FRAME
+   [state_interp]'s durable disk conjunct. *)
+Lemma dev_read_v_disk (d : dev_state) (pa : Arch.pa) (n : N)
+    (w : bv (8 * n)) (d' : dev_state) :
+  dev_read d pa n = Some (w, d') ->
+  v_disk (dvirtio d') = v_disk (dvirtio d).
+Proof.
+  unfold dev_read. intros H.
+  repeat (case_match; try discriminate); simplify_eq; cbn; reflexivity.
+Qed.
+
+Lemma dev_write_v_disk (d : dev_state) (pa : Arch.pa) (n : N)
+    (v : bv (8 * n)) (d' : dev_state) :
+  dev_write d pa n v = Some d' ->
+  v_disk (dvirtio d') = v_disk (dvirtio d).
+Proof.
+  unfold dev_write. intros H.
+  repeat (case_match; try discriminate); simplify_eq; cbn;
+    eauto using virtio_write_disk.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 4. Power-on state: FIFOs empty, everything masked/zero.                  *)
 (* ---------------------------------------------------------------------- *)
