@@ -62,9 +62,9 @@ Proof. intros H i. exact (proj2 (H i)). Qed.
 (* class's towers consume and no more:                                       *)
 (*                                                                          *)
 (*   [pma_allows_ram] -- kernel RAM (instruction fetch, every data access,   *)
-(*      page-table slots, the lock word).  Needs R, W, X, the atomic support *)
-(*      level and both PTE permissions: this is the class the whole          *)
-(*      M-/S-/U-mode memory tower is stated over.                           *)
+(*      page-table slots, the lock word).  Needs R, W, X, every AMO the      *)
+(*      decoder can produce and both PTE permissions: this is the class the  *)
+(*      whole M-/S-/U-mode memory tower is stated over.                     *)
 (*   [pma_allows_io] -- the device band (UART / PLIC / virtio-mmio).  Needs   *)
 (*      R and W only.  The band is NOT executable and supports NEITHER       *)
 (*      atomics NOR PTE access, and asking for those here would make the     *)
@@ -108,17 +108,22 @@ Definition pma_class_grants (c : pma_class) (r : PMA_Region) : Prop :=
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_executable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true /\
-      (* THE ONE CONJUNCT THE MODEL'S OWN TABLE DOES NOT SATISFY, and it is
-         where the table swap is blocked: the model's DRAM region carries
-         [AMOCASQ], not [AMOSwap].  The AMO leaves (WpAmo) only ever consume
-         [pma_allows_atomic_op … AMOSWAP 4 = true], which AMOCASQ gives -- but
-         the verified-user-mode AMO classifier
-         ([UserMemClassify.exec_pmaCheck_ram_amo_gk] and the four lemmas above
-         it) needs the EXACT support level, because it concludes that a
-         non-AMOSWAP op FAULTS, and at AMOCASQ every op is permitted instead.
-         Weakening this conjunct therefore cannot be done alone; see
-         claude-notes/projects/crash.md, "PMA TABLE RETIREMENT". *)
-      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_atomic_support) = AMOSwap /\
+      (* THE ATOMIC CONJUNCT, STATED AS WHAT THE TOWER CONSUMES rather than as
+         a support LEVEL.  Every AMO the decoder can produce is an [amoop] at
+         one of the widths [1;2;4;8;16] ([word_width_wide]), so this is the
+         whole of what any AMO leaf ever needs -- the M-/S-mode leaves take
+         [pma_allows_atomic_op … AMOSWAP 4 = true] and the U-mode classifier
+         needs it at the op and width it was handed.  It is a [∀], not a pinned
+         level, because a pinned level is a platform detail that then leaks
+         into every consumer: pinning [= AMOSwap] is exactly what made the
+         U-mode classifier CONCLUDE A FAULT for a user-mode [amoadd], which is
+         false of the machine (the model's DRAM carries [AMOCASQ], where every
+         op at every width up to 16 is permitted).  The width premise is a
+         [Z.leb] so a literal-width call site discharges it with [eq_refl]. *)
+      (forall (op : amoop) (n : Z), Z.leb n 16 = true ->
+         pma_allows_atomic_op
+           (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_atomic_support) op n
+         = true) /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_read) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true
   | PmaIo =>

@@ -72,8 +72,8 @@ per-milestone record):
     compiled too: `ColdBoot.pma_model_table` is the model's real
     three-region table, extracted by evaluating the model, with
     `cold_boot_pma` proving it is the register's value — so the
-    idealization is the gap between two compiled values, not a table
-    nobody checked. `init_model`'s `assert (config_is_valid tt)` is
+    table IS the model's own (`cold_boot_pma`), so no `register_set` patch
+    remains at all. `init_model`'s `assert (config_is_valid tt)` is
     SATISFIED (`cold_boot_config_valid`), which is why the chain can be
     anchored there at all; at the idealized table the same check computes
     to false.
@@ -81,25 +81,25 @@ per-milestone record):
     `Axiom` of the model — is lifted to a parameter whose elision is
     itself checked by `reflexivity`. `reset_regs` is a COLD-boot
     description; a warm-reset arm would need its own, weaker, fact set.
-    Still open, and recorded in projects/crash.md: swapping `pma_boot` for
-    the model's table (blocked on a verified-user-mode AMO claim, see the
-    PMA paragraph), and the ∃-garbage anchoring (`reset()` alone over
-    arbitrary power-on state), which waits on symbolic peeling because
-    forcing any register field of the reset's result over an OPEN register
-    file does not compute.
+    Still open, and recorded in projects/crash.md: the ∃-garbage anchoring
+    (`reset()` alone over arbitrary power-on state), which waits on
+    symbolic peeling because forcing any register field of the reset's
+    result over an OPEN register file does not compute.
   - **THE TOWER'S PMA OBLIGATION IS PER ADDRESS CLASS.** The platform's
-    real table (`ColdBoot.pma_model_table`) has three regions — boot ROM
-    `[0x1000, +0x1000)` IOMemory read-only, MMIO band
+    table (`RiscvLang.pma_boot`, the model's own) has three regions — boot
+    ROM `[0x1000, +0x1000)` IOMemory read-only, MMIO band
     `[0x2000000, +0x10000000)` IOMemory R/W, DRAM
     `[0x80000000, +0x8000000)` MainMemory R/W/X with AMOCASQ and PTE
     access — with HOLES between them, so no obligation quantified over all
     addresses can hold of it. `RiscvFetchExec.pma_allows_all` is therefore
     indexed by a class (`pma_class = PmaRam | PmaIo`; a `∀`, not a
     conjunction, so `repeat split` in a config-bundle proof cannot take it
-    apart): `pma_allows_ram` asks R/W/X + the atomic support level + both
-    PTE permissions over `pma_ram_access` (the DRAM range, which is
-    EXACTLY `RiscvPtsto.addr_is_ram`'s), `pma_allows_io` asks R/W only over
-    `pma_io_access` (the band, `mmio_base`/`mmio_size`). Each class carries
+    apart): `pma_allows_ram` asks R/W/X, both PTE permissions, and — stated
+    as what a consumer consumes rather than as a support LEVEL —
+    `∀ op n, n ≤ 16 → pma_allows_atomic_op … op n = true`, i.e. every AMO
+    the decoder can produce, over `pma_ram_access` (the DRAM range, which
+    is EXACTLY `RiscvPtsto.addr_is_ram`'s); `pma_allows_io` asks R/W only
+    over `pma_io_access` (the band, `mmio_base`/`mmio_size`). Each class carries
     the END bound as well as the base bound, because `range_subset`
     compares the access's end against the region's — and every applier
     already owns it (the chunk lemmas return the last byte's

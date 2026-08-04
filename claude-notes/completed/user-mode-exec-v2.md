@@ -156,7 +156,7 @@ WRS Enter_Wait; CSRReg/CSRImm (Illegal ∨ retiring read; writes excluded at U).
 Memory (UserMemArms.v, width-generic): each `execute_*` fact is premise-shaped
 over the UserMemAccess vmem/AMO composer result — Ok IS the retire, Err IS the
 delegated trap, so the composer's Ok/Err disjunction is the classification (AMO
-is op-generic: written value symbolic, AMOCAS guard short-circuits).  Decode:
+is op-generic: written value symbolic, and the AMOCAS guard is a premise).  Decode:
 `decode_total_{u,c}_set` + `agree_u`, with the JAL/BTYPE bit-0 payload
 invariant in `decodable_u` (UserBits kit `aligned_even`/`add_sext_even_64_*`
 turns it into jump_to's premise).  The user page-table / fetch / translate /
@@ -217,12 +217,20 @@ requires the tower:
   interface meets the tower, and the sole thing on the tower's critical path
   downstream of `UserMemClassify`.
 
-AMO gotcha: decode does NOT constrain the op, and AMOSWAP.Q (width 16, a 128-bit
-register-PAIR read-modify-write) genuinely RETIRES on RAM — so rather than an
-intractable decode-inversion to refute it, `arm_AMO_u` PROVES the width-16
-AMOSWAP retire (`user_pt_amo_data_k` generalized to k≤16, `exec_execute_AMO_u_ok_16`
-via `rX_pair`/`wX_pair`); every non-swap op denies at mem_read → trap.  AMOSWAP
-is the only RETIRE case for AMO.
+AMO: decode does NOT constrain the op (`decodable_u (AMO (…,width,…)) =
+awidth_ok width`, i.e. `{1,2,4,8,16}`), and on RAM **every** op RETIRES —
+including AMOCAS, and including width 16 (the 128-bit register-PAIR RMW).  So
+there is no decode-inversion to refute and no per-op fault arm: `arm_AMO_u`
+proves the retire for all of them (`user_pt_amo_data_k` at k≤16;
+`exec_execute_AMO_u_store` / `_store_16` for the store arm,
+`exec_execute_AMO_u_cas_ne` / `_cas_ne_16` for an AMOCAS whose comparand does
+not match, which writes rd and does not store).  What decides the arm is
+`execute_AMO`'s `w__18` — the CAS guard `op = AMOCAS && loaded ≠ rd` — given as
+a PREMISE over the rd value the caller reads, never a case split on the op;
+that is what keeps it one lemma per arm instead of ten.  (Until 2026-08-04 this
+read "only AMOSWAP retires, every other op denies at mem_read"; that was an
+artifact of the idealized AMOSwap-only PMA table, which is gone — the platform's
+DRAM is AMOCASQ.  See projects/crash.md, "PMA TABLE RETIREMENT".)
 
 ZICBOP gotcha: `execute_ZICBOP` retires for EVERY translate outcome
 (Ok/Err/phys-check all reduce to RETIRE), so no ok-vs-denied classification is

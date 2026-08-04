@@ -59,22 +59,21 @@
 (* disagree, ask which of the two is describing the machine you mean to verify     *)
 (* before assuming the constant is the thing to move.                             *)
 (*                                                                            *)
-(* THE PMA TABLE'S MODEL VALUE IS NOW A NAMED, PROVEN FACT -- AND THE PATCH IS *)
-(* WHAT IT IS MEASURED AGAINST.  [sail_model_init] writes a THREE-region table  *)
-(* (boot ROM, MMIO band, DRAM bank); §4 extracts it as [pma_model_table] and    *)
-(* [cold_boot_pma] proves, by running the model, that that IS what the register *)
-(* holds.  [RiscvLang.pma_boot] is still ONE all-permitting region, so the      *)
-(* theorem below still applies [register_set pma_regions pma_boot] -- but the   *)
-(* idealization is now the visible difference between two compiled values       *)
-(* rather than a table nobody compared against the model.                      *)
-(*   WHAT BLOCKS REPLACING [pma_boot] WITH [pma_model_table]: the DRAM region's *)
-(* [PMA_atomic_support] is AMOCASQ, while the verified-user-mode AMO classifier *)
-(* ([UserMemClassify]) consumes the EXACT [= AMOSwap] to conclude that a        *)
-(* non-AMOSWAP user AMO FAULTS -- at AMOCASQ every op is permitted instead, so  *)
-(* that arm has to be re-derived (and Zacas is enabled, so AMOCAS too).  The     *)
-(* tower's PMA obligation is already stated PER ADDRESS CLASS                   *)
-(* ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), which is the other half  *)
-(* the real table needs.  claude-notes/projects/crash.md has the account.       *)
+(* THE PMA TABLE IS THE MODEL'S OWN NOW, AND THE PATCH IS GONE.                *)
+(* [sail_model_init] writes a THREE-region table (boot ROM, MMIO band, DRAM     *)
+(* bank), and [RiscvLang.pma_boot] IS that table: §3's [cold_boot_pma] proves,  *)
+(* by running the model, that it is what the register holds, so the table joins *)
+(* misa in the run-derived column and [cold_regs_boot] applies no               *)
+(* [register_set] at all.  Two things made the swap possible, both recorded in  *)
+(* claude-notes/projects/crash.md: the tower's PMA obligation is stated PER     *)
+(* ADDRESS CLASS ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), since the *)
+(* real table has HOLES; and the RAM class's atomic conjunct asks for what an   *)
+(* AMO leaf consumes ("every op at every width up to 16 is permitted") instead  *)
+(* of pinning a support LEVEL.  Pinning [= AMOSwap] is what had made the        *)
+(* verified-user-mode AMO classifier conclude that a user-mode [amoadd] FAULTS  *)
+(* -- an artifact of the idealized table, false of the machine: the DRAM's      *)
+(* AMOCASQ permits every op, AMOCAS included, so those arms are now checked     *)
+(* RMW memory ops (UserMemClassify / UserMemArms).                              *)
 (*                                                                            *)
 (* THE CONFIG ASSERT IS SATISFIED, NOT AVOIDED.  [init_model ""] starts with     *)
 (* [assert (config_is_valid tt)], and [config_is_valid] READS [pma_regions] (in  *)
@@ -314,11 +313,32 @@ Lemma cold_boot_dev (hid : mword 64) : mdev (cold_state hid) = dev0_state.
 Proof. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 3. THE THEOREM: [reset_regs] is what the model's cold boot produces.     *)
+(* 3. THE PMA TABLE IS THE MODEL'S OWN -- kernel-checked.                    *)
 (*                                                                         *)
-(*    ONE [register_set] is left -- the PMA idealization (see the header) --  *)
-(*    and every other conjunct, misa included, is closed by computing the     *)
-(*    model's own code.  §4 names the value the patch overwrites.             *)
+(*    [sail_model_init] ends with one [write_reg pma_regions [...]] of three *)
+(*    regions, and [RiscvLang.pma_boot] IS that list (the literal lives      *)
+(*    there, with the account of what the three regions are; the values come *)
+(*    from the memory map in model-xv6iris/sail-config-rv64d.json).  This is  *)
+(*    the check: a config or model move that changes a base, a size or an     *)
+(*    attribute breaks the build HERE rather than silently making the         *)
+(*    transcription a fiction -- the same discipline                          *)
+(*    [RiscvFetchExec.MISA_C] / [cold_boot_misa] follow.  [reset] does not     *)
+(*    touch [pma_regions], so this is equally the PRE-reset value: the         *)
+(*    platform's table, as the model configures it.                           *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma cold_boot_pma (hid : mword 64) :
+  register_lookup pma_regions (cold_regs hid) = pma_boot.
+Proof. vm_cast_no_check (eq_refl pma_boot). Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4. THE THEOREM: [reset_regs] is what the model's cold boot produces.     *)
+(*                                                                         *)
+(*    NO [register_set] patch is left: every conjunct, misa and the PMA table  *)
+(*    included, is closed by computing the model's own code.  The PMA table's  *)
+(*    conjunct is §3's [cold_boot_pma] -- applied by name, because a plain     *)
+(*    [reflexivity] there would ask the kernel's LAZY conversion for the       *)
+(*    initializer chain again.                                                 *)
 (* ---------------------------------------------------------------------- *)
 
 (* MISA IS RUN-DERIVED NOW, and this lemma is what says so: [reset_misa] sets
@@ -332,11 +352,14 @@ Lemma cold_boot_misa (hid : mword 64) :
   register_lookup misa (cold_regs hid) = boot_w64 0x800000000014112D.
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
+(* NO PATCH LEFT: this is the model's own cold-boot register file, verbatim.
+   The PMA table was the last [register_set] here, and [RiscvLang.pma_boot] is
+   now the model's own three-region table (§3's [cold_boot_pma] is the tie), so
+   every conjunct of [reset_regs] below is a value the chain COMPUTED.  The
+   name is kept: it is what the boot cone asks for, and a future pin that the
+   chain does not produce would go here. *)
 Definition cold_regs_boot (c : CPU) : regstate :=
-  (* THE ONE PATCH: the PMA table, idealized to one all-permitting region.
-     §4 below is what it is measured against. *)
-  register_set pma_regions pma_boot
-    (cold_regs (boot_w64 (Z.of_nat (fin_to_nat c)))).
+  cold_regs (boot_w64 (Z.of_nat (fin_to_nat c))).
 
 Theorem reset_regs_cold_boot (c : CPU) : reset_regs c (cold_regs_boot c).
 Proof.
@@ -346,115 +369,9 @@ Proof.
   split_and!;
     first [ reflexivity
           | apply bv_eq; reflexivity
+          | exact (cold_boot_pma _)
             (* pmpcfg_n is a [vec], i.e. a list PAIRED WITH a length proof, and
                the two proofs are built by different lemmas; the lists are equal
                and nat equality is decidable, so UIP closes it -- no axiom. *)
           | (vm_compute; f_equal; apply (Eqdep_dec.UIP_dec Nat.eq_dec)) ].
 Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 4. THE MODEL'S OWN PMA TABLE, extracted and kernel-checked.              *)
-(*                                                                         *)
-(*    [sail_model_init] ends with one [write_reg pma_regions [...]] of three *)
-(*    regions (rv64d.v; the values come from the memory map in               *)
-(*    model-xv6iris/sail-config-rv64d.json).  The literal is transcribed here *)
-(*    -- and then CHECKED: [cold_boot_pma] proves it IS what the model's own   *)
-(*    cold boot leaves in the register, so a config or model move that changes *)
-(*    a base, a size or an attribute breaks the build here rather than          *)
-(*    silently making the transcription a fiction (the same discipline           *)
-(*    [RiscvFetchExec.MISA_C] / [cold_boot_misa] follow).                       *)
-(*                                                                             *)
-(*    WHAT THE THREE REGIONS ARE.  The boot ROM at 0x1000 is IOMemory,          *)
-(*    read-only and NOT executable; nothing the proofs touch lives there, and    *)
-(*    it matters only because it is FIRST in the list and so has to be shown     *)
-(*    NOT to match a RAM or device access.  The MMIO band at 0x2000000 (size     *)
-(*    0x10000000) is IOMemory R/W with no atomics and no PTE access, and every   *)
-(*    device window sits inside it (CLINT, PLIC, UART, virtio-mmio --            *)
-(*    [RiscvPtsto.mmio_base]).  The DRAM bank at 0x80000000 (size 0x8000000) is  *)
-(*    MainMemory R/W/X with AMOCASQ atomics and PTE reads/writes, and its range  *)
-(*    is EXACTLY [RiscvPtsto.addr_is_ram]'s.  Between and outside them there are *)
-(*    HOLES -- which is why the tower's obligation is per address class          *)
-(*    ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]) and why an             *)
-(*    all-addresses one could only ever have held of an idealization.            *)
-(* ---------------------------------------------------------------------- *)
-
-Definition pma_model_rom_attrs : PMA := {|
-  PMA_mem_type := IOMemory;
-  PMA_cacheable := true;
-  PMA_coherent := false;
-  PMA_executable := false;
-  PMA_readable := true;
-  PMA_writable := false;
-  PMA_read_idempotent := true;
-  PMA_write_idempotent := true;
-  PMA_misaligned_exceptions := {|
-    PMAMisalignedExceptions_load_store := None;
-    PMAMisalignedExceptions_vector := None;
-    PMAMisalignedExceptions_amo := AccessFault |};
-  PMA_atomic_support := AMONone;
-  PMA_reservability := RsrvNone;
-  PMA_supports_cbo_zero := false;
-  PMA_supports_pte_read := false;
-  PMA_supports_pte_write := false |}.
-
-Definition pma_model_io_attrs : PMA := {|
-  PMA_mem_type := IOMemory;
-  PMA_cacheable := false;
-  PMA_coherent := true;
-  PMA_executable := false;
-  PMA_readable := true;
-  PMA_writable := true;
-  PMA_read_idempotent := false;
-  PMA_write_idempotent := false;
-  PMA_misaligned_exceptions := {|
-    PMAMisalignedExceptions_load_store := None;
-    PMAMisalignedExceptions_vector := None;
-    PMAMisalignedExceptions_amo := AccessFault |};
-  PMA_atomic_support := AMONone;
-  PMA_reservability := RsrvNone;
-  PMA_supports_cbo_zero := false;
-  PMA_supports_pte_read := false;
-  PMA_supports_pte_write := false |}.
-
-Definition pma_model_ram_attrs : PMA := {|
-  PMA_mem_type := MainMemory;
-  PMA_cacheable := true;
-  PMA_coherent := true;
-  PMA_executable := true;
-  PMA_readable := true;
-  PMA_writable := true;
-  PMA_read_idempotent := true;
-  PMA_write_idempotent := true;
-  PMA_misaligned_exceptions := {|
-    PMAMisalignedExceptions_load_store := None;
-    PMAMisalignedExceptions_vector := None;
-    PMAMisalignedExceptions_amo := AccessFault |};
-  PMA_atomic_support := AMOCASQ;
-  PMA_reservability := RsrvEventual;
-  PMA_supports_cbo_zero := true;
-  PMA_supports_pte_read := true;
-  PMA_supports_pte_write := true |}.
-
-Definition pma_model_table : list PMA_Region :=
-  [ {| PMA_Region_base := boot_w64 0x1000;
-       PMA_Region_size := boot_w64 0x1000;
-       PMA_Region_attributes := pma_model_rom_attrs;
-       PMA_Region_include_in_device_tree := false |};
-    {| PMA_Region_base := boot_w64 0x2000000;
-       PMA_Region_size := boot_w64 0x10000000;
-       PMA_Region_attributes := pma_model_io_attrs;
-       PMA_Region_include_in_device_tree := false |};
-    {| PMA_Region_base := boot_w64 ram_lo;
-       PMA_Region_size := boot_w64 (ram_hi - ram_lo);
-       PMA_Region_attributes := pma_model_ram_attrs;
-       PMA_Region_include_in_device_tree := true |} ].
-
-(* THE TIE.  [reset] does not touch [pma_regions], so this is equally the
-   PRE-reset value: the platform's table, as the model configures it. *)
-Lemma cold_boot_pma (hid : mword 64) :
-  register_lookup pma_regions (cold_regs hid) = pma_model_table.
-Proof. vm_cast_no_check (eq_refl pma_model_table). Qed.
-
-(* ...and the idealization is exactly this difference. *)
-Lemma pma_boot_not_model : pma_boot <> pma_model_table.
-Proof. discriminate. Qed.

@@ -305,17 +305,32 @@ Qed.
 (* AMO family.  Unlike LOAD/STORE/LR/SC, execute_AMO does not go through   *)
 (* vmem_read/write: it inlines the read-modify-write (own alignment check, *)
 (* translate, mem_write_ea, mem_read, per-op result, the AMOCAS guard,     *)
-(* mem_write_value, wX).  But the RMW is OP-GENERIC: the written value is   *)
-(* symbolic (mem_write_value is stated forall-v by the composer) and the    *)
-(* w__18 CAS-check short-circuits to false for every non-AMOCAS op, so ONE   *)
-(* retire lemma covers all 9 non-CAS ops.  The RAM pins atomic_support =    *)
-(* AMOSwap, so only AMOSWAP actually retires; the other ops (and misalign / *)
-(* walk faults) take the op-generic fault lemmas below.                     *)
+(* mem_write_value, wX).  The RMW is OP-GENERIC and so are these lemmas:    *)
+(* the written value is symbolic (mem_write_value is stated forall-v by the  *)
+(* composer), so ONE retire lemma covers every op -- all nine RMW ops AND    *)
+(* AMOCAS on a successful compare.                                          *)
+(*                                                                        *)
+(* WHAT DECIDES BETWEEN THE TWO ARMS is [execute_AMO]'s [w__18], THE CAS      *)
+(* GUARD: [op = AMOCAS && loaded <> rd].  For the nine non-CAS ops the        *)
+(* [and_boolM] short-circuits to false with no register read at all, so       *)
+(* [exec_execute_AMO_u_store] is the whole story; for AMOCAS the comparand is *)
+(* read out of rd (a register read: the state does not move) and a MISMATCH    *)
+(* takes [exec_execute_AMO_u_cas_ne], which writes rd and does NOT store.      *)
+(* Hence the guard is a PREMISE here, given as a boolean over the rd value the *)
+(* caller reads with [exec_rX_bits_gpr] -- not a case analysis on the op:      *)
+(* every AMO the decoder produces is permitted by the platform's DRAM          *)
+(* ([RiscvLang.pma_boot]'s AMOCASQ), so no op has a fault arm of its own.      *)
 (* ===================================================================== *)
-Lemma exec_execute_AMO_u_ok
+
+(* the final register file of a [wX_bits rd] -- rd = x0 discards the write *)
+Definition wgpr_state (rd : mword 5) (v : mword 64) (s : mstate) : mstate :=
+  if Z.eqb (uint rd) 0 then s
+  else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v).
+
+Lemma exec_execute_AMO_u_store
     (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
     (addr : physaddr) (pbmt : page_based_mem_type)
-    (loaded : mword (8 * width)) (md : SATPMode) (s s' s'' : mstate) :
+    (loaded : mword (8 * width)) (rdv : mword 64) (md : SATPMode) (s s' s'' : mstate) :
   let rs2_val : bits (width * 8) :=
     trunc (Z.mul (__id width) 8)
       (if Z.eqb (uint rs2) 0 then zero_reg
@@ -332,8 +347,8 @@ Lemma exec_execute_AMO_u_ok
     | AMOCAS => rs2_val end in
   (width <=? xlen_bytes) = true ->
   (width <=? Z.mul xlen_bytes 2) = true ->
-  uint rd <> 0 ->
-  generic_eq op AMOCAS = false ->
+  exec (rX_bits (Regidx rd)) s' = Some (rdv, s') ->
+  andb (generic_eq op AMOCAS) (neq_vec lc (trunc (Z.mul (__id width) 8) rdv)) = false ->
   register_lookup cur_privilege s.(sregs) = User ->
   exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
   exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
@@ -349,12 +364,10 @@ Lemma exec_execute_AMO_u_ok
   exec (mem_write_value addr width (sign_extend' (Z.mul 8 (__id width)) result') (Atomic (op, Data, Data)) pbmt (andb aq rl) rl true) s'
     = Some (Ok true, s'') ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
-    = Some (RETIRE_SUCCESS,
-            set_reg s'' (R_bitvector_64 (gpr_of_Z (uint rd)))
-              (regval_into_reg (sign_extend' 64 lc))).
+    = Some (RETIRE_SUCCESS, wgpr_state rd (sign_extend' 64 lc) s'').
 Proof.
   intros rs2_val lc result'.
-  intros Hw Hw2 Hrd Hop Hcp Heff Hpml Htm Hal Htr Hea Hrdm Hwv.
+  intros Hw Hw2 Hrdv Hguard Hcp Heff Hpml Htm Hal Htr Hea Hrdm Hwv.
   change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
     with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
   unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
@@ -396,26 +409,124 @@ Proof.
   rewrite execR_bind.
   rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
   rewrite execR_returnR_fwd. cbn match.
-  (* and_boolM (returnR (op=?AMOCAS)) B: op<>AMOCAS -> short-circuits to false *)
-  rewrite Hop.
-  assert (Hab : forall (B : Defs.monadR ExecutionResult exception bool),
-           execR (and_boolM (returnR ExecutionResult false) B) s' = Some (inr false, s')).
-  { intro B. unfold and_boolM.
-    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd false s')). cbn match.
-    apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ (Hab _)). cbn match.
+  (* THE CAS GUARD.  [and_boolM] short-circuits for a non-CAS op with no
+     register read; for AMOCAS the rd read runs and the comparison decides.
+     The [match goal] names the guard's own second argument rather than
+     restating it: it is the model's [if width <=? xlen_bytes] branch, already
+     reduced by the [rewrite Hw] above, and spelling it out here would be a
+     transcription to keep in step with the model for no gain. *)
+  match goal with |- context[and_boolM ?A ?B] =>
+    assert (Hab : execR (and_boolM A B) s'
+                  = Some (inr (andb (generic_eq op AMOCAS)
+                                 (neq_vec lc (trunc (Z.mul (__id width) 8) rdv))), s')) end.
+  { assert (Hrdt : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rd)))
+                     (fun w15 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w15))) s'
+                 = Some (inr (trunc (Z.mul (__id width) 8) rdv), s')).
+    { rewrite (execR_liftR_seq _ _ _ _ _ Hrdv). apply execR_returnR_fwd. }
+    unfold and_boolM.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (generic_eq op AMOCAS) s')).
+    destruct (generic_eq op AMOCAS); cbn match; cbn [andb].
+    - rewrite (execR_bind_Some _ _ _ _ _ Hrdt). apply execR_returnR_fwd.
+    - first [ apply execR_returnR_fwd | reflexivity ]. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hab). rewrite Hguard. cbn match.
   (* else branch (w__18 = false): mem_write_value -> Ok true *)
   rewrite (execR_liftR_seq _ _ _ _ _ Hwv). cbn match.
   (* wX_bits rd (sign_extend' 64 loaded) >> RETIRE *)
-  assert (Hwx : exec (wX_bits (Regidx rd) (sign_extend' 64 lc)) s''
-                = Some (tt, set_reg s'' (R_bitvector_64 (gpr_of_Z (uint rd)))
-                              (regval_into_reg (sign_extend' 64 lc)))).
-  { rewrite (exec_wX_bits_gpr rd (sign_extend' 64 lc) s'').
-    rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
   assert (Hwxr : execR (R := ExecutionResult) (Defs.liftR (wX_bits (Regidx rd) (sign_extend' 64 lc))) s''
-               = Some (inr tt, set_reg s'' (R_bitvector_64 (gpr_of_Z (uint rd)))
-                              (regval_into_reg (sign_extend' 64 lc)))).
-  { rewrite execR_liftR. rewrite Hwx. reflexivity. }
+               = Some (inr tt, wgpr_state rd (sign_extend' 64 lc) s'')).
+  { rewrite execR_liftR. rewrite (exec_wX_bits_gpr rd (sign_extend' 64 lc) s'').
+    reflexivity. }
+  rewrite (execR_bind0_Some _ _ _ _ Hwxr).
+  rewrite execR_returnR_fwd. reflexivity.
+Qed.
+
+(* AMOCAS, COMPARE MISMATCH ([w__18] = true): rd := the loaded value and NO
+   store.  The state does not move past the translate's [s'] -- the failed CAS
+   is architecturally a read (plus [mem_write_ea], which announces an intent
+   and writes nothing).  This is the arm the idealized AMOSwap-only table used
+   to hide behind an access fault. *)
+Lemma exec_execute_AMO_u_cas_ne
+    (op : amoop) (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+    (addr : physaddr) (pbmt : page_based_mem_type)
+    (loaded : mword (8 * width)) (rdv : mword 64) (md : SATPMode) (s s' : mstate) :
+  let lc : bits (width * 8) := autocast (T := mword) loaded in
+  (width <=? xlen_bytes) = true ->
+  (width <=? Z.mul xlen_bytes 2) = true ->
+  exec (rX_bits (Regidx rd)) s' = Some (rdv, s') ->
+  andb (generic_eq op AMOCAS) (neq_vec lc (trunc (Z.mul (__id width) 8) rdv)) = true ->
+  register_lookup cur_privilege s.(sregs) = User ->
+  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (translationMode User) s = Some (md, s) ->
+  is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))) width = true ->
+  exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
+  exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (RETIRE_SUCCESS, wgpr_state rd (sign_extend' 64 lc) s').
+Proof.
+  intros lc.
+  intros Hw Hw2 Hrdv Hguard Hcp Heff Hpml Htm Hal Htr Hea Hrdm.
+  change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
+  assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hass).
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+                  = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+  { unfold get_transformed_data_addr.
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+              = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
+                                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+                                      (zeros' 64))), s)).
+    { unfold ext_data_get_addr.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
+  rewrite Hal. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  rewrite Hw.
+  assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
+                    (fun w6 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w6))) s'
+               = Some (inr (trunc (Z.mul (__id width) 8)
+                              (if Z.eqb (uint rs2) 0 then zero_reg
+                               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs))), s')).
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
+  rewrite execR_returnR_fwd. cbn match.
+  match goal with |- context[and_boolM ?A ?B] =>
+    assert (Hab : execR (and_boolM A B) s'
+                  = Some (inr (andb (generic_eq op AMOCAS)
+                                 (neq_vec lc (trunc (Z.mul (__id width) 8) rdv))), s')) end.
+  { assert (Hrdt : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rd)))
+                     (fun w15 : mword 64 => returnR ExecutionResult (trunc (__id width * 8) w15))) s'
+                 = Some (inr (trunc (Z.mul (__id width) 8) rdv), s')).
+    { rewrite (execR_liftR_seq _ _ _ _ _ Hrdv). apply execR_returnR_fwd. }
+    unfold and_boolM.
+    rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (generic_eq op AMOCAS) s')).
+    destruct (generic_eq op AMOCAS); cbn match; cbn [andb].
+    - rewrite (execR_bind_Some _ _ _ _ _ Hrdt). apply execR_returnR_fwd.
+    - first [ apply execR_returnR_fwd | reflexivity ]. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hab). rewrite Hguard. cbn match.
+  (* then branch (w__18 = true): NO store, wX rd (sign_extend loaded) *)
+  assert (Hwxr : execR (R := ExecutionResult) (Defs.liftR (wX_bits (Regidx rd) (sign_extend' 64 lc))) s'
+               = Some (inr tt, wgpr_state rd (sign_extend' 64 lc) s')).
+  { rewrite execR_liftR. rewrite (exec_wX_bits_gpr rd (sign_extend' 64 lc) s').
+    reflexivity. }
   rewrite (execR_bind0_Some _ _ _ _ Hwxr).
   rewrite execR_returnR_fwd. reflexivity.
 Qed.
@@ -594,9 +705,7 @@ Proof.
   reflexivity.
 Qed.
 
-(* --- AMO edge cases: the remaining fault arms + AMOCAS mismatch. --- *)
+(* --- AMO edge cases: the remaining fault arms. --- *)
 (* mem_write_ea Err -> delegated trap. *)
 
 (* mem_write_value Err -> delegated trap (device-only post-read write fault).  *)
-
-(* AMOCAS, compare mismatch (w__18 = true): NO store, rd := sign_extend loaded. *)

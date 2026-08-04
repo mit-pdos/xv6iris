@@ -2161,74 +2161,103 @@ yet.
   choices) when the log's crash proof is designed — request-atomic is the
   current recorded choice.
 - ~~The misa divergence~~ — **DONE** (see "THE misa DIVERGENCE, CLOSED" below).
-- **PMA table retirement** — the per-class obligation and the model-table
-  anchoring LANDED; the table swap itself is blocked on a verified-user-mode
-  claim (see "PMA TABLE RETIREMENT" below).
+- ~~PMA table retirement~~ — **DONE** (see "PMA TABLE RETIREMENT" below):
+  `pma_boot` IS the model's three-region table, and the U-mode AMO
+  classification that blocked it was re-derived at AMOCASQ, AMOCAS included.
 
-### PMA TABLE RETIREMENT — **STEP 2 LANDED; THE TABLE SWAP IS BLOCKED, AND THE BLOCKER IS A U-MODE CLAIM**
+### PMA TABLE RETIREMENT — **DONE. `pma_boot` IS THE MODEL'S OWN TABLE**
 
-**What landed.** The tower's PMA obligation is per ADDRESS CLASS, the model's own
-table is a named and compiled value, and the `init_model ""` anchor's
-configuration assert is a discharged, *named* fact:
+`RiscvLang.pma_boot` is the three-region table `sail_model_init` really writes
+(boot ROM at 0x1000 IOMemory read-only; MMIO band at 0x2000000 IOMemory R/W;
+DRAM at `[ram_lo, ram_hi)` MainMemory R/W/X with `AMOCASQ` atomics and PTE
+access), `ColdBoot.cold_boot_pma` is the compiled tie that proves it by RUNNING
+the model, and `cold_regs_boot` applies **no `register_set` at all** — the PMA
+table joined misa in the run-derived column. `pma_model_table` /
+`pma_boot_not_model` / `pma_boot_attrs` are gone (one home per fact: the literal
+lives in RiscvLang, the check in ColdBoot).
 
-- `RiscvFetchExec.pma_allows_all regions := forall c : pma_class,
-  pma_allows_class c regions`, with `pma_class = PmaRam | PmaIo`,
-  `pma_class_access` giving each class its address range and `pma_class_grants`
-  its attribute list. `pma_allows_ram` / `pma_allows_io` are the two instances;
-  `pma_all_ram` / `pma_all_io` the projections; `pma_allows_all_intro` the
-  converse. RAM asks R/W/X + the atomic support level + both PTE permissions;
-  the device band asks R/W and nothing else (it is not executable and supports
-  neither atomics nor PTE access, which is why they cannot be one obligation).
-- `RiscvExtras.pma_ram_access` / `pma_io_access` are the address premises
-  (`ram_base`-range and the new `mmio_base`/`mmio_size` band in RiscvPtsto),
-  each carrying the width proviso AND THE END BOUND.
-- `ColdBoot.pma_model_table` is the three-region table `sail_model_init` really
-  writes, extracted by evaluating the model, with `cold_boot_pma` proving it IS
-  the register's value (and `pma_boot_not_model` naming the difference). So the
-  idealization is now the gap between two compiled values.
-- `ColdBoot.cold_boot_config_valid`: `config_is_valid` **computes to `true`** at
-  the state the initializers leave. The anchor was already `init_model ""`; what
-  was missing was the fact having a name. At the one-region `pma_boot` the same
-  check computes to **`false`** — so it could never have been anchored there.
+What made the swap possible, and both parts are the durable lessons:
 
-**THE BLOCKER, and it is not in this layer.** The model's DRAM region carries
-`PMA_atomic_support = AMOCASQ`; the RAM class's atomic conjunct is
-`= AMOSwap`, and it cannot be weakened alone:
+- **The obligation is per ADDRESS CLASS** (`pma_class = PmaRam | PmaIo`;
+  see the paragraphs below, which are unchanged). The real table has HOLES, so
+  no all-addresses obligation could ever have held of it.
+- **The RAM class's atomic conjunct asks for what a consumer CONSUMES, not for a
+  support LEVEL.** It is now
+  `∀ (op : amoop) (n : Z), Z.leb n 16 = true → pma_allows_atomic_op … op n = true`
+  — "every AMO the decoder can produce is permitted", `word_width_wide` topping
+  out at 16. A `Z.leb` (not `n ≤ 16`) so a literal-width call site discharges it
+  with `eq_refl`: `Hatomic AMOSWAP 4 eq_refl` is the whole ripple at the one
+  M-/S-mode site that used it (WpSconfLock; the AMO leaves take
+  `pma_allows_atomic_op … AMOSWAP 4 = true` as a section hypothesis and never
+  saw the change). **Pinning a level is what had broken the U-mode tier**: at
+  `= AMOSwap` the classifier CONCLUDED A FAULT for a user-mode `amoadd`. Prefer
+  the consumed form for any future attribute conjunct.
 
-- The AMO leaves (`WpAmo`, `WpSconfLock`) only ever consume
-  `pma_allows_atomic_op … AMOSWAP 4 = true`, which AMOCASQ satisfies. Those are
-  fine either way.
-- But the **verified-user-mode AMO classifier** needs the EXACT support level,
-  because it CONCLUDES A FAULT from it: `UserMemClassify.exec_pmaCheck_ram_amo_gk`
-  and the four lemmas over it conclude
-  `if generic_eq op AMOSWAP then Ok … else Err (E_SAMO_Access_Fault …)`, and
-  `UserMemArms`' comment says so in as many words — "the RAM pins
-  atomic_support = AMOSwap, so only AMOSWAP actually retires; the other ops take
-  the op-generic fault lemmas". At AMOCASQ **every** op is permitted
-  (`pma_allows_atomic_op AMOCASQ op k = (op ≠ AMOCAS) || k ≤ 16`, and k ≤ 16
-  always holds here), so that arm is FALSE for the real machine: a user-mode
-  `amoadd` retires, it does not fault. **That is a claim about the machine, in
-  another subsystem (projects/user-verified.md), and re-deriving it is its own
-  task** — the retire side is op-generic and already proven
-  (`UserMemArms.exec_execute_AMO_u_ok` covers all 9 non-CAS ops), so the flip is
-  mostly *deleting* fault arms; the open question is AMOCAS, which **Zacas is
-  `supported: true`** in the config so the decoder does produce, and which at
-  AMOCASQ becomes permitted too (its arms would need the real CAS semantics).
-- Do NOT "fix" this by weakening the JSON's DRAM region to AMOSwap. That is the
-  cheap-and-wrong direction of the misa lesson (durable-notes): QEMU's DRAM does
-  support amoadd, so an AMOSwap-only bank is a machine that does not exist, and
-  the U-mode tier's "amoadd faults" claim would then be about a fiction. The
-  misa fix went the other way — the config claimed MORE than the machine we mean
-  to verify.
+**THE U-MODE AMO CLAIM, RE-DERIVED (the blocker, resolved).** The verified-user
+tower's AMO classification is now op-generic and fault-free at RAM addresses:
 
-So the remaining work, in order: (1) re-derive the U-mode AMO classification at
-AMOCASQ (all ops permitted; decide AMOCAS); (2) weaken the RAM class's atomic
-conjunct to `pma_allows_atomic_op … AMOSWAP 4 = true` (already the form the AMO
-leaves want); (3) `pma_boot := ColdBoot.pma_model_table` and drop the
-`register_set` patch in `cold_regs_boot`. Step (3) then needs, per class, the
-`range_subset` MISSES as well as the hit — `BootConfig.range_subset_lit_out` is
-proven and kept for exactly that (the boot ROM must be missed by everything, the
-band by every RAM access).
+- `UserMemClassify.exec_pmaCheck_ram_amo_gk` concludes `Some (None, s)` — no
+  `if generic_eq op AMOSWAP` — from the premise
+  `pma_allows_atomic_op … op k = true`. The four lemmas over it
+  (`exec_checked_mem_read_amo_gk`, `exec_mem_read_amo_gk`,
+  `exec_checked_mem_write_amo_gk`, `exec_mem_write_value_amo_gk`) lost their
+  fault arm with it; the two WRITE ones became op-generic (`Atomic (op,…)`
+  instead of `Atomic (AMOSWAP,…)`), which they had to be, because
+  `execute_AMO` issues its store AT THE ACTUAL OP.
+- `user_pt_amo_data_k` hands out `mem_read … = Some (Ok dv, σ')` unconditionally.
+- **What decides the two arms now is `execute_AMO`'s `w__18`, THE CAS GUARD**
+  (`op = AMOCAS && loaded ≠ rd`), not the op. `UserMemArms` has
+  `exec_execute_AMO_u_store` — ONE retire lemma for all nine RMW ops *and*
+  AMOCAS on a matching comparand, replacing `exec_execute_AMO_u_ok` +
+  `_ok_rd0` (merged: the rd = x0 case is `wgpr_state`, the `wX_bits` final
+  state) — and `exec_execute_AMO_u_cas_ne` for the mismatch, which writes rd
+  and does NOT store. `UserMemClassify` has the width-16 twins
+  (`exec_execute_AMO_u_store_16`, generalized from the AMOSWAP-only
+  `_ok_16`, and `exec_execute_AMO_u_cas_ne_16`) over `rX_pair`/`wX_pair`.
+- The guard is a **premise stated over the rd value the caller reads**
+  (`exec (rX_bits (Regidx rd)) s' = Some (rdv, s')`, from `exec_rX_bits_gpr`),
+  never a case analysis on the op. That is what keeps it one lemma.
+- `exec_execute_AMO_u_read_err` / `_read_err_16` are now UNUSED (at the real
+  table a RAM AMO's read cannot fail). Kept: they are the model's genuine
+  read-fault arm and the first thing an AMO-to-a-device classification needs.
+
+**AMOCAS / ZACAS: FULLY SUPPORTED, AND IT WAS A SLICE, NOT A SUB-PROJECT.**
+The user asked for the cost before deciding whether to disable Zacas; the
+measurement said do it, and the config was NOT touched (`Zacas.supported =
+true` stands). The scope, which is the reusable part of the answer:
+
+- **ZERO decode leaves change.** `DecodeSetU.decodable_u (AMO (…,width,…)) =
+  awidth_ok width` — the decode image does not constrain the op at all, so
+  AMOCAS was always in it (it used to be classified through the PMA-deny path).
+  `awidth_ok` is `{1,2,4,8,16}`, and 16 is AMOCAS.Q's width.
+- **ZERO U-mode completeness/classification lemma STATEMENTS change.**
+  `arm_AMO_u` is already `∀ op`, and its conclusion (`base_post`) is a
+  retire-or-trap disjunction that does not say WHICH — so `UserTotalU`,
+  `DecodeSetU`, `ProofUser` and the `USER` module type are textually
+  untouched. The whole re-derivation is internal to
+  `UserMemArms.v` + `UserMemClassify.v`.
+- Cost: 2 new exec-level lemmas + 2 generalized ones + the two engines'
+  arm split. No new WP machinery — the CAS retire path IS the store path
+  (`result' = rs2_val` for AMOCAS), and the mismatch path is a `wX` with the
+  state left at the translate's `s'`.
+
+**THE AXIOM GATES AT THE SWAP** (record, so a future change has a baseline):
+`Print Assumptions xv6_power_adequacy` is EXACTLY the ten axioms of the table at
+the top of this file — unchanged. The U-mode theorems the re-derivation is
+under, measured at the same time and unchanged (the tower gained no import and
+declared no axiom, which `tools/lemma_diff.py` also confirms):
+
+| theorem | axioms |
+| --- | --- |
+| `DecodeSetU.decode_total_u_set` | **none** — closed under the global context |
+| `UserMemClassify.arm_AMO_u` | the 4 `rv64d.*` reservation/term hooks (`load_`/`match_`/`cancel_reservation`, `plat_term_write`) |
+| `ProofUser.UserProof.wp_user_exec_closed` | 5 platform + funext + `UserMemAccess.exec_load_reservation` / `exec_cancel_reservation` (the U-mode tier's own LR/SC hooks, pre-existing) |
+| `UProofSync.wp_sync_start` (in-file sentinel) | 5 platform + funext |
+
+**Do NOT weaken the JSON's DRAM region to AMOSwap** (recorded for the future):
+QEMU's DRAM does support amoadd, so an AMOSwap-only bank is a machine that does
+not exist, and a "amoadd faults" claim about it would be about a fiction. The
+cheap edit was the wrong one here exactly as it was for misa.
 
 **WHY THE APPLIER RIPPLE WAS ONE LINE EACH** (the reusable part): `range_subset`
 (rv64d.v) compares the access's END against the region's, so a class needs an
@@ -2252,10 +2281,12 @@ gotchas below.
 
 **MEASUREMENTS AND GOTCHAS** (all new):
 
-- `config_is_valid` probes: `Some true` at the model's table, `Some false` at the
-  one-region idealization, both **1.4 s / 680 MB** — cheap because a bool forces
-  no `regstate` field (the `is_Some`-probe rule in durable-notes, used the right
-  way round for once).
+- `config_is_valid` probes: `Some true` at the model's table (which is what
+  `pma_boot` now is), `Some false` at the retired one-region idealization, both
+  **1.4 s / 680 MB** — cheap because a bool forces no `regstate` field (the
+  `is_Some`-probe rule in durable-notes, used the right way round for once).
+  That the check was FALSE at the idealization is why the `init_model` anchor
+  could never have rested on it.
 - Cost of the two new `vm_cast_no_check`s in ColdBoot (a SECOND computed state,
   `pre_state`, for the config probe, plus `cold_boot_pma` over the table):
   the whole file is **8.1 s / 870 MB**, i.e. still under the 13.6 s the notes
@@ -2284,13 +2315,54 @@ gotchas below.
   first in `pma_access_ram`. Also in durable-notes.
 - `lia` is unusable in these proofs once an `mword` is in context — including for
   closed bounds like `0 <= 0x1000`. `BootConfig`'s geometry is therefore split
-  into `mword`-free `Z` lemmas (`pma_region_in_arith` / `pma_region_out_arith` /
-  `pma_boot_bounds`) applied to `bv_unsigned a`.
+  into `mword`-free `Z` lemmas (`pma_region_in_arith` / `pma_region_out_arith`,
+  and ONE per class — `pma_boot_ram_geom` / `pma_boot_io_geom` — giving the
+  premises of the two MISSES and the HIT in list order) applied to
+  `bv_unsigned a`.
+- **The region MISS is what a real table costs, and it is three lines.**
+  `range_subset_lit_out` (a region strictly BELOW the access: the first of
+  `range_subset`'s three comparisons already fails) discharges the boot ROM for
+  both classes and the MMIO band for the RAM class; `range_subset_lit_in` the
+  hit. The whole of `pma_allows_ram_pma_boot` is `out, out, in, reflexivity`,
+  and `pma_allows_io_pma_boot` is `out, in, reflexivity`. Pass the region's base
+  and size as the lemma's `B`/`S` **exactly as the table spells them** (`ram_lo`
+  and `ram_hi - ram_lo`, not their values) — `rewrite` needs the syntactic
+  match, and the two `bv_unsigned` premises are `vm_compute` either way.
+- **`cbn match` reduces `execR (returnR …)` outright, so a following
+  `rewrite execR_returnR_fwd` fails with "Found no subterm matching".** It bit
+  the CAS-guard proofs: `destruct b; cbn match` leaves one branch already at
+  `Some (inr v, s)` and the other still a bind. Close both with
+  `first [ apply execR_returnR_fwd | reflexivity ]` (or `apply`, never
+  `rewrite`, on that lemma).
+- **Do not restate a giant model subterm just to name it in an `assert`** —
+  `match goal with |- context[and_boolM ?A ?B] => assert (… execR (and_boolM A B) … ) end`
+  is the idiom (the AMO CAS guard's second argument is the model's
+  `if width <=? xlen_bytes` branch, already reduced by an earlier rewrite, and
+  transcribing it would be one more thing to keep in step with the model).
+- **Two Iris arms that end identically converge through an `iAssert` over the
+  post STATE.** `mem_exec_amo_16`'s store and CAS-mismatch arms both finish with
+  the same ~55 lines of register-PAIR bookkeeping; the arms are
+  `iAssert (|==> ∃ sx, ⌜exec … = Some (RETIRE_SUCCESS, wpair_state rd D sx)⌝ ∗
+  ⌜sx.(sregs) = σ'.(sregs)⌝ ∗ ⌜sx.(mdev) = s.(mdev)⌝ ∗ gen_heap_interp sx.(mem) ∗ udata_own …)`,
+  ~10 lines each, and the tail runs once over the abstract `sx`. Cheaper than a
+  shared Iris lemma and far cheaper than the duplicate.
 
-### THE PATCH CHAIN, AND WHY IT IS STILL `sail_model_init`-ANCHORED
+### NO PATCH CHAIN LEFT — AND WHY THE ANCHOR IS STILL `sail_model_init`
 
-There is no patch chain left — `pma_regions` was the last one (see PMA TABLE
-RETIREMENT above) — but the anchor is still the model's whole cold boot from the
+**There is no `register_set` patch left in `ColdBoot.cold_regs_boot`** —
+`pma_regions` was the last one and it is now run-derived (see PMA TABLE
+RETIREMENT above), so `cold_regs_boot c = cold_regs (hartid c)` verbatim and
+every conjunct of `reset_regs` is a value the model's chain COMPUTED. What
+remains is not a patch chain but four named platform assumptions, each with its
+own account: **mie / mideleg** (written by no line of the chain — they come out
+of `init_regstate`, i.e. a hart powers up with everything disabled and nothing
+delegated), **mhartid and the reset vector** (the BOARD's two configuration
+writes, made explicitly by `ColdBoot.boot_init` because `reset_sys` and
+`init_boot_requirements` READ them), and the two OVER-CLAIMS that have their own
+retirement notes below: **mseccfg = 0** (honest form: `PMM = disabled at
+power-on`) and **pmpcfg_n = pmpcfg_boot** (honest form: `pmp_all_off`).
+
+The anchor is still the model's whole cold boot from the
 CLOSED `init_regstate`, not `reset()` over arbitrary power-on state. The
 intended next shape — `boot_facts`' register clause as "the ARCHITECTURAL
 reset (`reset()` alone, per the privileged spec) of arbitrary power-on garbage,

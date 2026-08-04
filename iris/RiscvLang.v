@@ -421,23 +421,67 @@ Definition boot_byte (a : Z) : bv 8 := default byte0 (boot_image !! a).
 Definition boot_w64 (z : Z) : SailStdpp.Values.mword 64 :=
   SailStdpp.Values.mword_of_int z.
 
-(* THE PLATFORM'S PMA TABLE, STILL IDEALIZED AS ONE ALL-PERMITTING REGION --
-   AND THE MODEL'S OWN TABLE IS NOW A NAMED, PROVEN VALUE BESIDE IT.
-   [ColdBoot.pma_model_table] is the three-region table [sail_model_init]
-   really writes (boot ROM at 0x1000 IOMemory read-only; the MMIO band at
-   0x2000000 IOMemory R/W; the DRAM bank at 0x80000000 = [ram_lo, ram_hi)
-   MainMemory R/W/X with AMOCASQ atomics and PTE access), extracted by
-   evaluating the model and kernel-checked by [ColdBoot.cold_boot_pma] -- so
-   the idealization is no longer a table nobody compared against the model:
-   it is the visible difference between [pma_boot] and a compiled fact.
-   The tower's PMA obligation is per address class already
-   ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), which is what the real
-   table needs; what still blocks REPLACING this table with it is the DRAM
-   region's [PMA_atomic_support = AMOCASQ] against the [= AMOSwap] the
-   verified-user-mode AMO classifier consumes (its "only amoswap retires" arm
-   is an artifact of THIS table).  See "PMA TABLE RETIREMENT" in
-   claude-notes/projects/crash.md. *)
-Definition pma_boot_attrs : PMA := {|
+(* THE PLATFORM'S PMA TABLE -- THE MODEL'S OWN, three regions and the holes
+   between them.  [sail_model_init] ends with one [write_reg pma_regions] of
+   exactly this list (the values come from the memory map in
+   model-xv6iris/sail-config-rv64d.json), and [ColdBoot.cold_boot_pma] proves
+   it by RUNNING the model: the literal here is kernel-checked, so a config or
+   model move that changes a base, a size or an attribute breaks the build
+   rather than silently making this transcription a fiction (the discipline
+   [RiscvFetchExec.MISA_C] / [ColdBoot.cold_boot_misa] follow).
+
+   WHAT THE THREE REGIONS ARE.  The boot ROM at 0x1000 is IOMemory, read-only
+   and NOT executable; nothing the proofs touch lives there, and it matters
+   only because it is FIRST in the list and so has to be shown NOT to match a
+   RAM or a device access.  The MMIO band at 0x2000000 (size 0x10000000) is
+   IOMemory R/W with no atomics and no PTE access, and every device window sits
+   inside it (CLINT, PLIC, UART, virtio-mmio -- [RiscvPtsto.mmio_base]).  The
+   DRAM bank at 0x80000000 (size [ram_hi - ram_lo]) is MainMemory R/W/X with
+   AMOCASQ atomics -- so every AMO the decoder can produce is permitted there,
+   at every width up to 16 -- and PTE reads/writes, and its range is EXACTLY
+   [RiscvPtsto.addr_is_ram]'s.  BETWEEN AND OUTSIDE THEM THERE ARE HOLES,
+   which is why the tower's obligation is per address class
+   ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]) and why an
+   all-addresses one could only ever have held of an idealization. *)
+Definition pma_boot_rom_attrs : PMA := {|
+  PMA_mem_type := IOMemory;
+  PMA_cacheable := true;
+  PMA_coherent := false;
+  PMA_executable := false;
+  PMA_readable := true;
+  PMA_writable := false;
+  PMA_read_idempotent := true;
+  PMA_write_idempotent := true;
+  PMA_misaligned_exceptions := {|
+    PMAMisalignedExceptions_load_store := None;
+    PMAMisalignedExceptions_vector := None;
+    PMAMisalignedExceptions_amo := AccessFault |};
+  PMA_atomic_support := AMONone;
+  PMA_reservability := RsrvNone;
+  PMA_supports_cbo_zero := false;
+  PMA_supports_pte_read := false;
+  PMA_supports_pte_write := false |}.
+
+Definition pma_boot_io_attrs : PMA := {|
+  PMA_mem_type := IOMemory;
+  PMA_cacheable := false;
+  PMA_coherent := true;
+  PMA_executable := false;
+  PMA_readable := true;
+  PMA_writable := true;
+  PMA_read_idempotent := false;
+  PMA_write_idempotent := false;
+  PMA_misaligned_exceptions := {|
+    PMAMisalignedExceptions_load_store := None;
+    PMAMisalignedExceptions_vector := None;
+    PMAMisalignedExceptions_amo := AccessFault |};
+  PMA_atomic_support := AMONone;
+  PMA_reservability := RsrvNone;
+  PMA_supports_cbo_zero := false;
+  PMA_supports_pte_read := false;
+  PMA_supports_pte_write := false |}.
+
+Definition pma_boot_ram_attrs : PMA := {|
   PMA_mem_type := MainMemory;
   PMA_cacheable := true;
   PMA_coherent := true;
@@ -450,17 +494,25 @@ Definition pma_boot_attrs : PMA := {|
     PMAMisalignedExceptions_load_store := None;
     PMAMisalignedExceptions_vector := None;
     PMAMisalignedExceptions_amo := AccessFault |};
-  PMA_atomic_support := AMOSwap;
-  PMA_reservability := RsrvNonEventual;
+  PMA_atomic_support := AMOCASQ;
+  PMA_reservability := RsrvEventual;
   PMA_supports_cbo_zero := true;
   PMA_supports_pte_read := true;
   PMA_supports_pte_write := true |}.
 
-Definition pma_boot : list PMA_Region := [ {|
-  PMA_Region_base := boot_w64 0;
-  PMA_Region_size := boot_w64 0xFFFFFFFFFFFFFFFF;
-  PMA_Region_attributes := pma_boot_attrs;
-  PMA_Region_include_in_device_tree := false |} ].
+Definition pma_boot : list PMA_Region :=
+  [ {| PMA_Region_base := boot_w64 0x1000;
+       PMA_Region_size := boot_w64 0x1000;
+       PMA_Region_attributes := pma_boot_rom_attrs;
+       PMA_Region_include_in_device_tree := false |};
+    {| PMA_Region_base := boot_w64 0x2000000;
+       PMA_Region_size := boot_w64 0x10000000;
+       PMA_Region_attributes := pma_boot_io_attrs;
+       PMA_Region_include_in_device_tree := false |};
+    {| PMA_Region_base := boot_w64 ram_lo;
+       PMA_Region_size := boot_w64 (ram_hi - ram_lo);
+       PMA_Region_attributes := pma_boot_ram_attrs;
+       PMA_Region_include_in_device_tree := true |} ].
 
 (* pmpcfg with every entry OFF and unlocked -- what the model's [reset_pmp]
    establishes (it clears A and L in all 64 entries) and what

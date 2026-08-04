@@ -668,10 +668,12 @@ Section WpSconfLock.
                  with "Hmem Hk Hbytes") as %(Hbytesf_tr & Hram0 & Hram3 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn pa) 4
                (pma_access_ram _ _ _ Hram0 Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl)) as (region_amo & Hmatch_amo & _ & Hread_amo & Hwrite_amo & Hatomic_supp_amo & _ & _).
+    (* the RAM class grants every op at every width up to 16; this leaf wants
+       the one instance [AMOSWAP 4] -- a literal width, so [eq_refl]. *)
     assert (Hatomic_amo : pma_allows_atomic_op
               ((override_PMA (PMA_Region_attributes region_amo) PBMT_PMA).(PMA_atomic_support))
               AMOSWAP 4 = true)
-      by (rewrite Hatomic_supp_amo; vm_compute; reflexivity).
+      by exact (Hatomic_supp_amo AMOSWAP 4 eq_refl).
     assert (Hlo : (ram_base <= uint (pa_of ppn pa))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn pa) + 4 <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn pa) + Z.of_nat 3 < 18446744073709551616)%Z).

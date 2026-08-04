@@ -10,11 +10,11 @@
 (* construction site either bundle has ever had (before it, nothing in the  *)
 (* tree had to produce a [misa ↦ᵣ□ …]).                                    *)
 (*                                                                         *)
-(*   §1 [pma_allows_all pma_boot] -- the platform table really does permit  *)
-(*      every access the model can make.  This is what the M6b-pre repair   *)
-(*      of [pma_allows_all] (its [pma_access_ok] premise) was FOR: with the *)
-(*      predicate quantified over all widths and all addresses it held of   *)
-(*      NO table at all.                                                    *)
+(*   §1 [pma_allows_all pma_boot] -- the platform table (the MODEL's own    *)
+(*      three regions) really does permit every access the kernel makes, PER *)
+(*      ADDRESS CLASS.  A class is what makes the claim true at all: the     *)
+(*      table has holes, so a predicate quantified over all addresses held   *)
+(*      of NO table.                                                        *)
 (*   §2 [boot_D] -- the register set a boot client must ask adequacy for.   *)
 (*   §3 [hw_config_intro] / [mmode_config_intro] -- the bundles, from the   *)
 (*      reset cells.  The five frozen cells are PERSISTED here (they are    *)
@@ -130,10 +130,11 @@ Proof. intros; repeat split; try lia; apply Z.leb_gt; lia. Qed.
    region's base and its [range_subset]-relative end, both closed, so both are
    [vm_compute] at the call site; everything else is the access's own class
    membership.  The [_out] half (a region strictly BELOW the access, hence not
-   matching) is what the MODEL's three-region table needs and the one-region
-   idealization does not: the boot ROM window has to be missed by every access,
-   and the MMIO band by every RAM access.  Kept proven for that swap -- see
-   claude-notes/projects/crash.md. *)
+   matching) is what a REAL table needs and a one-region idealization would not:
+   the boot ROM window has to be missed by every access, and the MMIO band by
+   every RAM access.  Pass [B]/[S] exactly as [pma_boot] spells them ([ram_lo]
+   and [ram_hi - ram_lo], not their values) -- [rewrite] needs the syntactic
+   match, while the two [bv_unsigned] premises [vm_compute] either way. *)
 Local Lemma range_subset_lit_in (a : mword 64) (n B S : Z) :
   bv_unsigned (boot_w64 B : mword 64) = B ->
   bv_unsigned (sub_vec (add_vec (boot_w64 B) (boot_w64 S)) (boot_w64 B)) = S ->
@@ -174,61 +175,98 @@ Proof.
 Qed.
 
 (* THE GEOMETRY, over plain [Z]: [lia] is unusable once an [mword] is in the
-   context (durable-notes), so every inequality the [range_subset] below needs
-   is produced here, in a clean one -- including the closed ones. *)
-Local Lemma pma_boot_bounds (x n : Z) :
-  0 <= x -> 1 <= n -> x + n < 18446744073709551616 ->
-  0 <= 0 /\ 0 <= x /\ x + n <= 0 + 18446744073709551615
-  /\ 0 + 18446744073709551615 < 18446744073709551616.
-Proof. intros. repeat split; lia. Qed.
+   context (durable-notes), so every inequality the three [range_subset]
+   comparisons below need is produced here, in a clean one -- including the
+   closed ones.  ONE lemma per class, giving the premises of the two MISSES
+   (boot ROM, and for RAM the MMIO band as well) and of the HIT, in the order
+   the region list has them. *)
+Local Lemma pma_boot_ram_geom (x n : Z) :
+  1 <= n -> ram_base <= x -> x + n <= ram_base + ram_size ->
+  x + n < 18446744073709551616
+  /\ (0 <= 0x1000 /\ 0x1000 <= x /\ 0x1000 + 0x1000 < x)
+  /\ (0 <= 0x2000000 /\ 0x2000000 <= x /\ 0x2000000 + 0x10000000 < x)
+  /\ (0 <= ram_lo /\ ram_lo <= x /\ x + n <= ram_lo + (ram_hi - ram_lo)
+      /\ ram_lo + (ram_hi - ram_lo) < 18446744073709551616).
+Proof. unfold ram_base, ram_size, ram_lo, ram_hi. intros. repeat split; lia. Qed.
 
-(* THE PLATFORM TABLE PERMITS EVERY ACCESS THE KERNEL MAKES, per class.  The
-   table is still the one-region idealization, so both classes are served by the
-   SAME region and the proofs are the same three [range_subset] comparisons at
-   base 0; what the split buys is that the obligation is now shaped for the
-   model's OWN table ([ColdBoot.pma_model_table]), where each class matches a
-   DIFFERENT region and neither would follow from the other.  The attribute
-   conjuncts are conversion -- they read the literal region's own fields. *)
+Local Lemma pma_boot_io_geom (x n : Z) :
+  1 <= n -> mmio_base <= x -> x + n <= mmio_base + mmio_size ->
+  x + n < 18446744073709551616
+  /\ (0 <= 0x1000 /\ 0x1000 <= x /\ 0x1000 + 0x1000 < x)
+  /\ (0 <= 0x2000000 /\ 0x2000000 <= x /\ x + n <= 0x2000000 + 0x10000000
+      /\ 0x2000000 + 0x10000000 < 18446744073709551616).
+Proof. unfold mmio_base, mmio_size. intros. repeat split; lia. Qed.
+
+(* AMOCASQ PERMITS EVERY AMO THE DECODER CAN PRODUCE.  [pma_allows_atomic_op]
+   restricts AMOCASQ only by [width <= 16], and [word_width_wide] tops out at
+   16, so this holds of every op at every width an [AMO] instruction carries.
+   It is what makes the DRAM region satisfy the RAM class's atomic conjunct --
+   and, at the U-mode tier, why a user-mode [amoadd] RETIRES rather than
+   faulting. *)
+Local Lemma amocasq_allows_atomic (op : amoop) (n : Z) :
+  Z.leb n 16 = true -> pma_allows_atomic_op AMOCASQ op n = true.
+Proof.
+  intro Hn. unfold pma_allows_atomic_op. cbn match.
+  rewrite Hn. apply orb_true_r.
+Qed.
+
+(* THE PLATFORM TABLE PERMITS EVERY ACCESS THE KERNEL MAKES, per class -- at
+   the MODEL'S OWN three-region table.  Each class matches a DIFFERENT region
+   and neither claim follows from the other: a RAM access has to MISS the boot
+   ROM window and the MMIO band (both earlier in the list) before it reaches
+   DRAM, and a device access has to miss the ROM.  That is what
+   [range_subset_lit_out] is for, and it is the half a one-region idealization
+   never needed.  The attribute conjuncts are conversion -- they read the
+   literal region's own fields -- except the atomic one, which is the ∀ over
+   ops and widths [amocasq_allows_atomic] discharges. *)
 Lemma pma_allows_ram_pma_boot : pma_allows_ram pma_boot.
 Proof.
   intros a n (Hn & Hlo & Hfit).
   rewrite uint_unsigned in Hlo Hfit.
-  assert (Hnw : bv_unsigned a + n < 18446744073709551616)
-    by (unfold ram_base, ram_size in Hfit; lia).
-  destruct (pma_boot_bounds (bv_unsigned a) n (proj1 (bvu64_range a)) (proj1 Hn) Hnw)
-    as (B0 & B1 & B2 & B3).
+  destruct (pma_boot_ram_geom (bv_unsigned a) n (proj1 Hn) Hlo Hfit)
+    as (Hnw & (R0 & R1 & R2) & (M0 & M1 & M2) & (D0 & D1 & D2 & D3)).
   eexists. split.
   - unfold matching_pma_region, pma_boot.
     cbn [matching_pma_region_bits_range].
     change (bits_of_physaddr (Physaddr a)) with a.
     rewrite zero_extend'_id.
     cbn [PMA_Region_base PMA_Region_size].
-    rewrite (range_subset_lit_in a n 0 18446744073709551615
+    rewrite (range_subset_lit_out a n 0x1000 0x1000
                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-               (proj1 Hn) B0 B1 B2 B3).
+               (proj1 Hn) R0 R1 R2 Hnw).
+    rewrite (range_subset_lit_out a n 0x2000000 0x10000000
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (proj1 Hn) M0 M1 M2 Hnw).
+    rewrite (range_subset_lit_in a n ram_lo (ram_hi - ram_lo)
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (proj1 Hn) D0 D1 D2 D3).
     reflexivity.
-  - repeat split; reflexivity.
+  - split_and!;
+      [ reflexivity | reflexivity | reflexivity
+      | intros op k Hk; exact (amocasq_allows_atomic op k Hk)
+      | reflexivity | reflexivity ].
 Qed.
 
 Lemma pma_allows_io_pma_boot : pma_allows_io pma_boot.
 Proof.
   intros a n (Hn & Hlo & Hfit).
   rewrite uint_unsigned in Hlo Hfit.
-  assert (Hnw : bv_unsigned a + n < 18446744073709551616)
-    by (unfold mmio_base, mmio_size in Hfit; lia).
-  destruct (pma_boot_bounds (bv_unsigned a) n (proj1 (bvu64_range a)) (proj1 Hn) Hnw)
-    as (B0 & B1 & B2 & B3).
+  destruct (pma_boot_io_geom (bv_unsigned a) n (proj1 Hn) Hlo Hfit)
+    as (Hnw & (R0 & R1 & R2) & (M0 & M1 & M2 & M3)).
   eexists. split.
   - unfold matching_pma_region, pma_boot.
     cbn [matching_pma_region_bits_range].
     change (bits_of_physaddr (Physaddr a)) with a.
     rewrite zero_extend'_id.
     cbn [PMA_Region_base PMA_Region_size].
-    rewrite (range_subset_lit_in a n 0 18446744073709551615
+    rewrite (range_subset_lit_out a n 0x1000 0x1000
                ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
-               (proj1 Hn) B0 B1 B2 B3).
+               (proj1 Hn) R0 R1 R2 Hnw).
+    rewrite (range_subset_lit_in a n 0x2000000 0x10000000
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (proj1 Hn) M0 M1 M2 M3).
     reflexivity.
-  - repeat split; reflexivity.
+  - split_and!; [reflexivity | reflexivity].
 Qed.
 
 Lemma pma_allows_all_pma_boot : pma_allows_all pma_boot.
