@@ -1177,6 +1177,44 @@ about the constants themselves (`0 ≤ kmem_lo`, `ram_hi + 4096 < 2^64`,
 M6b-pre (1). Any new lemma here should be written that way from the start
 rather than after a failure.
 
+## M6c-pre — the chain's missing CONSTRUCTORS (LANDED)
+
+Three of the six M6c gaps below were not client assembly at all: they were
+missing *constructors*, i.e. propositions the chain must build for which the
+tree had no lemma (and, in one case, no true premise). All three are in, and
+one of them changed the SEMANTICS:
+
+- **`nextPC` is now PINNED by `RiscvLang.reset_regs`** (and written by
+  `PowerBoot.boot_regs`, whose `boot_regs_reset` proof needed no change — the
+  `reg_peel` loop handles the extra layer). `InstrBytes.pc_is x` is
+  `PC ↦ᵣ x ∗ nextPC ↦ᵣ x` at ONE `x`, so owning the cell (which `boot_D`
+  already did) is necessary but not sufficient: without the pin the client
+  gets the cell at an arbitrary value and `pc_is (mword_of_int
+  KernelSyms._entry)` is **not constructible**. This is a bottom-of-tree edit
+  (RiscvLang) and costs a full rebuild; it is the only one M6c needs.
+- **`MinstretInv.clock_inv_alloc` / `minstret_inv_alloc`** — the first
+  construction site either invariant has ever had. Both bodies are
+  value-agnostic, so the allocation asks nothing of the five cells'
+  values: `mcycle`/`mtime`/`mip` → `clock_inv`, plus
+  `minstret`/`R_bool minstret_increment` → the `inv minstretN`, plus
+  `gen_cert` FRAMED (its three pieces — birth bound, started bound, era
+  registration — arrive whole in `power_boot_res`, and are the reason
+  the single-generation client bundle already hands out `gen_cert`). Stated at
+  an arbitrary mask `E`. This is the one step from a reset machine's raw
+  register cells to the bundle every WP in the tree threads.
+- **`BootConfig.entry_sym_addr` / `boot_pc_entry`** — `KernelSyms._entry =
+  0x80000000` and its `mword` form. `reflexivity` both, but nothing stated
+  them, and `reset_regs` pins the LITERAL (RiscvLang sits below
+  `kernel-rocq`'s symbol table) while `SpecEntry`'s entry pc is the SYMBOL.
+
+**`TimerCap.timer_cap` is deliberately NOT built.** The rule is "construct
+only what is consumed", and the consumers are `SpecClockintr` /
+`SpecDevintr` / `WpSconfTimer` — the trap-handler path, which the per-hart
+chain reaches only through the ASSUMED `kerneltrap`. Neither `SpecEntry`,
+`BootBridge`, `SpecMain` nor `SpecMainSecondary` mentions it, so the chain
+has nothing to pay it into; `timer_cap_intro` from `wp_entry_boot`'s returned
+`mcounteren`/`stimecmp` is the recipe when a real kerneltrap proof asks.
+
 ## M6c (NEXT, fresh budget) — the per-hart boot chain
 
 The one lemma M6b exists to make possible, stated per hart:
@@ -1213,7 +1251,8 @@ gated on `cid_word = zero_reg`.
 - main itself: `SpecMain` (boot arm) and `SpecMainSecondary`, both proven.
 
 **What it needs that does NOT yet exist — each one is a real gap, not a
-formality. (The `boot_D` item is DONE: slice 2e.)**
+formality. (The `boot_D` item is DONE: slice 2e. Items 2, 3 and 5 are DONE:
+M6c-pre above.)**
 
 1. **The client-side ghosts.** `power_boot_res` provides only ERA ghosts, so
    `fd_slots`, and the names behind every class main's statement binds
@@ -1221,7 +1260,8 @@ formality. (The `boot_D` item is DONE: slice 2e.)**
    are the client's to allocate inside its `={⊤}=∗` — with the matching
    functors in Σ. `fd_slots` in particular has NO memory footprint (slice 2b,
    item 3).
-2. **The register INVARIANTS are the client's too, and two have no
+2. **(DONE — M6c-pre.)** **The register INVARIANTS are the client's too, and
+   two had no
    construction lemma at all.** No register is minted inside adequacy, so
    every invariant over one is allocated by the client out of its `boot_D`
    cell — and while `WireInv.wire_inv_alloc` and `IntrDefs.intr_inv_alloc_off`
@@ -1233,7 +1273,8 @@ formality. (The `boot_D` item is DONE: slice 2e.)**
    `SpecClockintr`/`SpecDevintr` need it, so the chain must build it with
    `timer_cap_intro` from `wp_entry_boot`'s RETURNED
    `mcounteren`/`stimecmp`. Both are prerequisites of even stating the chain.
-3. **`nextPC` IS IN `boot_D` BUT ITS VALUE IS NOT PINNED.** `pc_is x` owns
+3. **(DONE — M6c-pre.)** **`nextPC` IS IN `boot_D` BUT ITS VALUE WAS NOT
+   PINNED.** `pc_is x` owns
    `PC ↦ᵣ x ∗ nextPC ↦ᵣ x` at the SAME `x`, and `reset_regs` has no `nextPC`
    clause — so `power_boot_res` hands the cell at an arbitrary value and
    `pc_is (mword_of_int KernelSyms._entry)` is not constructible. Owning the
@@ -1250,7 +1291,8 @@ formality. (The `boot_D` item is DONE: slice 2e.)**
    ram_size`, and the two `ti_ea_*` PMP-region bounds all dischargeable.
    Note `stack0 = 0x8000a250` is 16-aligned but NOT page-aligned, and the
    eight per-hart slices are `[stack0 + 4096*h, stack0 + 4096*(h+1))`.
-5. **`KernelSyms._entry = 0x80000000`** — M6a's bridge list still owes it;
+5. **(DONE — M6c-pre.)** **`KernelSyms._entry = 0x80000000`** — M6a's bridge
+   list owed it;
    `reset_regs` pins PC to the literal and `SpecEntry`'s entry pc is
    `mword_of_int KernelSyms._entry`, so it is `reflexivity`, but nothing
    states it.

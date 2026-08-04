@@ -31,7 +31,8 @@ Local Open Scope Z_scope.
 
 Definition boot_regs (c : CPU) (rs : regstate) : regstate :=
   register_set PC (boot_w64 0x80000000)
-   (register_set cur_privilege Machine
+   (register_set nextPC (boot_w64 0x80000000)
+    (register_set cur_privilege Machine
     (register_set hart_state (HART_ACTIVE tt)
      (register_set mhartid (boot_w64 (Z.of_nat (fin_to_nat c)))
       (register_set mstatus (boot_w64 0xA00000000)
@@ -41,7 +42,7 @@ Definition boot_regs (c : CPU) (rs : regstate) : regstate :=
           (register_set htif_tohost_base None
            (register_set elp (landing_pad_bits_backwards NO_LP_EXPECTED)
             (register_set pma_regions pma_boot
-             (register_set pmpcfg_n pmpcfg_boot rs))))))))))).
+             (register_set pmpcfg_n pmpcfg_boot rs)))))))))))).
 
 (* peel [register_set]s off a lookup until the one that wrote the register:
    the mismatch side conditions are register disequalities, one [vm_compute]

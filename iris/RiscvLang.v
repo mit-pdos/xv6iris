@@ -479,6 +479,14 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
      but KernelSyms is above this file, so the literal is spelled here and
      the M6 bridge equates the two. *)
   register_lookup PC rs = boot_w64 0x80000000
+  (* ... and nextPC AT THE SAME VALUE.  [InstrBytes.pc_is x] is
+     [PC ↦ᵣ x ∗ nextPC ↦ᵣ x] -- one [x] pinning BOTH cells -- so owning the
+     nextPC cell is necessary but not sufficient: without this clause a boot
+     client gets the cell at an arbitrary value and cannot build [pc_is] at
+     [_entry] at all.  The model keeps the two in lock-step during
+     straight-line execution (a tick sets PC := nextPC), and a reset hart is
+     at the start of such a run. *)
+  /\ register_lookup nextPC rs = boot_w64 0x80000000
   /\ register_lookup cur_privilege rs = Machine
   /\ register_lookup hart_state rs = HART_ACTIVE tt
   (* mhartid IS the hart index: this is what makes [_entry]'s per-hart stack

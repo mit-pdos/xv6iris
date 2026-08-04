@@ -321,6 +321,43 @@ Section MinstretInv.
   Proof. apply _. Qed.
 
   (* ---------------------------------------------------------------------- *)
+  (* THE CONSTRUCTION SITE.  No register is ever minted inside adequacy      *)
+  (* ([RiscvAdequacy.power_boot_res] hands out the era's ghost CELLS at the  *)
+  (* machine's own values), so every invariant over a register is the boot   *)
+  (* client's to allocate -- and while [WireInv.wire_inv_alloc] and          *)
+  (* [IntrDefs.intr_inv_alloc_off] existed, these two did not, which made    *)
+  (* [mmode_config] / [sconf] unconstructible from a reset machine.          *)
+  (*                                                                        *)
+  (* Both bodies are VALUE-AGNOSTIC, so the allocation asks nothing of the   *)
+  (* five values: any five cells will do.  [gen_cert] is not allocated here  *)
+  (* at all -- its three pieces (birth bound, started bound, era             *)
+  (* registration) arrive whole in [power_boot_res] and are simply framed    *)
+  (* in, which is what makes this lemma the client's ONE step from raw       *)
+  (* cells to the bundle every WP in the tree threads.                       *)
+  (* ---------------------------------------------------------------------- *)
+  Lemma clock_inv_alloc (E : coPset) (cy ti ip : mword 64) :
+    mcycle ↦ᵣ cy -∗ mtime ↦ᵣ ti -∗ mip ↦ᵣ ip ={E}=∗ clock_inv.
+  Proof.
+    iIntros "Hcy Hti Hip". rewrite /clock_inv.
+    iApply (inv_alloc clockN E clock_inv_body).
+    iNext. rewrite /clock_inv_body. iExists cy, ti, ip. iFrame "Hcy Hti Hip".
+  Qed.
+
+  Lemma minstret_inv_alloc (E : coPset)
+      (mst : mword 64) (mi : bool) (cy ti ip : mword 64) :
+    gen_cert -∗
+    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi -∗
+    mcycle ↦ᵣ cy -∗ mtime ↦ᵣ ti -∗ mip ↦ᵣ ip ={E}=∗
+    minstret_inv.
+  Proof.
+    iIntros "#Hcert Hmst Hmi Hcy Hti Hip".
+    iMod (clock_inv_alloc E cy ti ip with "Hcy Hti Hip") as "#Hclk".
+    iMod (inv_alloc minstretN E minstret_inv_body with "[Hmst Hmi]") as "#Hmin".
+    { iNext. rewrite /minstret_inv_body. iExists mst, mi. iFrame "Hmst Hmi". }
+    iModIntro. rewrite /minstret_inv. iFrame "Hmin Hclk Hcert".
+  Qed.
+
+  (* ---------------------------------------------------------------------- *)
   (* wp_exec_step_clock -- the tick-absorbing step rule, layered BELOW the   *)
   (* minstret rule.  It presents the caller the PRE-TICK interface: one      *)
   (* successor, one witness ([riscv_step false]), at the FULL mask [⊤] --    *)

@@ -38,7 +38,24 @@ Require Import KptPt KMap InstrBytes WpGpr.
    PrintintArith.v (kept there with a minimal import set, because [lia] is
    unusable once the bitvector zify hook is loaded). *)
 Require Import PrintintArith.
+From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
+
+(* ====================================================================== *)
+(* §0  The [_entry] address bridge -- the last item of M6a's list.         *)
+(*                                                                       *)
+(* [RiscvLang.reset_regs] pins PC and nextPC to the LITERAL 0x80000000     *)
+(* because RiscvLang sits below [kernel-rocq]'s symbol table and cannot    *)
+(* name the symbol; [SpecEntry.wp_entry_boot]'s entry pc is                *)
+(* [mword_of_int KernelSyms._entry].  The two ARE the same address, and    *)
+(* these are the statements that say so -- nothing else in the tree does.  *)
+(* ====================================================================== *)
+
+Lemma entry_sym_addr : KernelSyms._entry = 0x80000000.
+Proof. reflexivity. Qed.
+
+Lemma boot_pc_entry : boot_w64 0x80000000 = (mword_of_int KernelSyms._entry : mword 64).
+Proof. reflexivity. Qed.
 
 (* ====================================================================== *)
 (* §1  The boot PMA table permits everything.                              *)
