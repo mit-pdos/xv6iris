@@ -1550,12 +1550,58 @@ source (most likely a `vec`/`vector_init` extensionality step in the M-mode
 leaf layer) and either discharge it or record it as sanctioned BEFORE M6d, so
 the check keeps its meaning.
 
+### M6c (4) — `boot_hart_secondary`: seven of the eight harts, end to end
+### (LANDED)
+
+`BootChain.v` §4: §3 composed with
+`MainSecondary.wp_main_secondary_sconf`, so for a hart with
+`fin_to_nat c ≠ 0` the chain is CLOSED — reset residue to
+`WP (LoopE gen c)`, nothing left over:
+
+```
+reset_regs cpu_id rs → mie/mideleg pins → fin_to_nat cpu_id ≠ 0 →
+kernel_text -∗ kernel_data -∗ boot_hart_res rs iv dq -∗
+panic_wp_any -∗ started_inv (main_deposit γd γv Φ) -∗ WP Loop {{ Φ }}
+```
+
+`Print Assumptions`: the 5 `rv64d.*` + `wp_printk_gen_sconf` +
+`kerneltrap_returns` (both sanctioned) + the inherited `functional_extensionality_dep`
+(see the footprint note above). No `userinit`, no `consoleintr` — the secondary
+arm reaches neither.
+
+Two interface decisions worth keeping:
+
+- **`boot_hart_res rs iv dq` is the per-hart bundle**, stated once in §3 and
+  reused by §4 (and by the boot arm when it lands): everything
+  `boot_entry_pre` yields except the wire pins, plus this hart's
+  `entry_ld_ea` word and stack slice, plus the bridge's adequacy/`.bss`
+  inputs. It ends in a `True` conjunct so `iFrame` closes it.
+- **What is NOT in it is exactly what is SHARED and PERSISTENT**:
+  `kernel_text`, `kernel_data`, `panic_wp_any`,
+  `started_inv (main_deposit γd γv Φ)`. So `P := main_deposit γd γv Φ`
+  is settled (main-boot's outstanding item), and the shared-allocation lemma's
+  job is now precisely: allocate the client ghost families, `dev_inv`,
+  `wire_inv` (from all eight harts' pins), `started_inv` at that payload, and
+  the boot arm's supply.
+
 ### What is left of M6c after this
 
 - **(DONE — M6c (2b).)** `mstatus_kernel_facts`.
 - **(DONE — M6c (3).)** `boot_entry_bridge`, modulo the `mie`/`mideleg` pins
   above.
-- then the two main arms. The per-hart/shared split, as designed: the per-hart
+- **(DONE — M6c (4).)** `boot_hart_secondary` — the secondary arm, closed.
+- **NEXT: the BOOT arm** (`fin_to_nat c = 0`), which is where the whole boot
+  supply is consumed: §3's continuation plus `main_locks_raw`,
+  `main_globals_raw`, the eight `cpu_proc_half`s, the `park_full` receipts,
+  `dev_inv` + the boot hart's device tokens, the two disk ghosts, `kpt_unset`,
+  `kmap_auth kmap_M0`, the page run, and `wp_main_boot_sconf`'s □-wand at
+  `P := main_deposit` (whose body IS `main_deposit`'s existential — so the wand
+  is `iIntros` + `iExists` + `iFrame`, with `γs` the one the caller quantifies).
+  The arm is selected by `destruct (decide (fin_to_nat cpu_id = 0))`, and
+  `SpecMain`'s `cid_word = zero_reg` premise then follows exactly as
+  `cid_word_of_nz` gives its negation.
+- then the shared-allocation companion, the `.bss` cut chain and the client
+  ghosts (items 1, 6, 7 below). The per-hart/shared split, as designed: the per-hart
   lemma takes the SHARED persistents (`started_inv (main_deposit …)`,
   `dev_inv`, `crash_inv`, `panic_wp_any`, the allocated ghost families) plus
   this hart's residue plus — for the `fin_to_nat c = 0` arm only — the whole

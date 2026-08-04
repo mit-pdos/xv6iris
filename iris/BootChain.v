@@ -47,7 +47,7 @@ Require Import RegFile HartTp InstrBytes WpGpr.
 Require Import KMap KptPt SmodePte.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
-Require Import KernelText.
+Require Import KernelText KernelDataInv.
 Require Import WpEntryNew WpTimerinit WpStartNew.
 Require Import SRegime SmodeCore.
 Require Import IntrDefs.
@@ -55,6 +55,10 @@ Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 Require Import BootConfig BootBridge PowerBoot.
 Require Import SpecEntry LinkEntry.
+Require Import SpecMainSecondary LinkMainSecondary.
+Require Import StartedInv DevModel.
+Require Import WpUart DiskPtsto SpecPanic.
+Require Import WpLock KallocInv FileInv FdSlots.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
@@ -176,6 +180,31 @@ Proof.
   destruct n as [|[|[|[|[|[|[|[|n']]]]]]]]; [.. | lia];
     apply bv_eq; vm_compute; reflexivity.
 Qed.
+
+(* THE HART INDEX AS A WORD, at a SECONDARY hart: nonzero (which is what picks
+   main's spin-loop arm) and inside the PLIC's per-hart bank count. *)
+Lemma cid_word_of_nz (n : nat) :
+  (n < NCPU)%nat -> (n <> 0)%nat ->
+  (mword_of_int (Z.of_nat n) : mword 64) <> zero_reg.
+Proof.
+  unfold NCPU. intros Hn Hnz.
+  destruct n as [|[|[|[|[|[|[|[|n']]]]]]]]; [congruence | .. | lia];
+    intro He; apply (f_equal bv_unsigned) in He; vm_compute in He;
+    discriminate He.
+Qed.
+
+Lemma cid_word_of_lt_dev (n : nat) :
+  (n < NCPU)%nat ->
+  (bv_unsigned (mword_of_int (Z.of_nat n) : mword 64) < Z.of_nat dev_ncpu)%Z.
+Proof.
+  unfold NCPU. intro Hn.
+  destruct n as [|[|[|[|[|[|[|[|n']]]]]]]]; [.. | lia];
+    vm_compute; reflexivity.
+Qed.
+
+(* the secondary arm's stack budget is inside the one the bridge hands out *)
+Lemma K_main_secondary_le : (K_main_secondary <= K_main)%nat.
+Proof. unfold K_main_secondary, K_main. lia. Qed.
 
 (* the boot menvcfg has the Zicfilp landing-pad enable clear *)
 Lemma menvcfg_boot_lpe : _get_MEnvcfg_LPE (boot_w64 0) = ('b"0").
@@ -304,6 +333,50 @@ Section BootRun.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
+     once: [boot_entry_pre]'s output MINUS the two PLIC wire pins, plus the
+     image and this hart's stack slice (the CARVE's outputs), plus the bridge's
+     adequacy-minted and .bss inputs.  The pins are excluded because
+     [WireInv.wire_inv_alloc] wants ALL EIGHT harts' at once and must run before
+     any hart's WP -- see the section header. *)
+  Definition boot_hart_res (rs : regstate) (iv : mword 32) (dq : dfrac)
+      : iProp Σ :=
+    (
+     (* --- [boot_entry_pre]'s output, minus the two wire pins --- *)
+     mmode_config (DfracOwn 1) ∗
+     pmpcfg_n ↦ᵣ pmpcfg_boot ∗
+     pmpaddr_n ↦ᵣ register_lookup pmpaddr_n rs ∗
+     pc_is (mword_of_int KernelSyms._entry) ∗
+     gpr_file (boot_regfile rs) ∗
+     mhartid ↦ᵣ boot_w64 (Z.of_nat (fin_to_nat cpu_id)) ∗
+     mepc ↦ᵣ register_lookup mepc rs ∗
+     satp ↦ᵣ register_lookup satp rs ∗
+     medeleg ↦ᵣ register_lookup medeleg rs ∗
+     mideleg ↦ᵣ register_lookup mideleg rs ∗
+     mie ↦ᵣ register_lookup mie rs ∗
+     menvcfg ↦ᵣ boot_w64 0 ∗
+     mcounteren ↦ᵣ register_lookup mcounteren rs ∗
+     stimecmp ↦ᵣ register_lookup stimecmp rs ∗
+     tlb ↦ᵣ register_lookup tlb rs ∗
+     (∃ v : mword 64, stvec ↦ᵣ v) ∗
+     (∃ v : mword 64, sepc ↦ᵣ v) ∗
+     (∃ v : mword 64, scause ↦ᵣ v) ∗
+     (∃ v : mword 64, stval ↦ᵣ v) ∗
+     (* --- this hart's slice of the image and of the stack --- *)
+     entry_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
+     stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
+     (* --- the bridge's adequacy-minted and .bss inputs --- *)
+     strans_bit strans_bit_bare ∗
+     strans_bit strans_bit_bare ∗
+     ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
+     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     a_cpu_noff cid_word ↦₄ noff_val 0 ∗
+     a_cpu_int cid_word ↦₄ iv ∗
+     cpu_proc_half cpu_id zero_reg ∗
+     cpu_ctx_free ∗
+     True)%I.
+
   Lemma boot_entry_bridge (Φ : mval -> iProp Σ) (rs : regstate)
       (iv : mword 32) (dq : dfrac) :
     reset_regs cpu_id rs ->
@@ -321,40 +394,10 @@ Section BootRun.
        selects Bare whatever the old value was.) *)
     register_lookup mie rs = boot_w64 0 ->
     register_lookup mideleg rs = boot_w64 0 ->
-    (* --- [boot_entry_pre]'s output, minus the two wire pins --- *)
-    mmode_config (DfracOwn 1) -∗
-    pmpcfg_n ↦ᵣ pmpcfg_boot -∗
-    pmpaddr_n ↦ᵣ register_lookup pmpaddr_n rs -∗
-    pc_is (mword_of_int KernelSyms._entry) -∗
-    gpr_file (boot_regfile rs) -∗
-    mhartid ↦ᵣ boot_w64 (Z.of_nat (fin_to_nat cpu_id)) -∗
-    mepc ↦ᵣ register_lookup mepc rs -∗
-    satp ↦ᵣ register_lookup satp rs -∗
-    medeleg ↦ᵣ register_lookup medeleg rs -∗
-    mideleg ↦ᵣ register_lookup mideleg rs -∗
-    mie ↦ᵣ register_lookup mie rs -∗
-    menvcfg ↦ᵣ boot_w64 0 -∗
-    mcounteren ↦ᵣ register_lookup mcounteren rs -∗
-    stimecmp ↦ᵣ register_lookup stimecmp rs -∗
-    tlb ↦ᵣ register_lookup tlb rs -∗
-    (∃ v : mword 64, stvec ↦ᵣ v) -∗
-    (∃ v : mword 64, sepc ↦ᵣ v) -∗
-    (∃ v : mword 64, scause ↦ᵣ v) -∗
-    (∃ v : mword 64, stval ↦ᵣ v) -∗
-    (* --- the image and this hart's stack slice (the CARVE's outputs) --- *)
+    (* the image, PERSISTENT and shared by every hart, so it is not part of
+       the per-hart bundle *)
     kernel_text -∗
-    entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
-    stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth -∗
-    (* --- the bridge's adequacy-minted and .bss inputs --- *)
-    strans_bit strans_bit_bare -∗
-    strans_bit strans_bit_bare -∗
-    ghost_var sie_gname (1/2) ('b"0" : mword 1) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    a_cpu_noff cid_word ↦₄ noff_val 0 -∗
-    a_cpu_int cid_word ↦₄ iv -∗
-    cpu_proc_half cpu_id zero_reg -∗
-    cpu_ctx_free -∗
+    boot_hart_res rs iv dq -∗
     (* --- and what main's arm then wants of this hart --- *)
     (∀ mf : regfile,
        sie_cap_gpr mf K_main false zero_reg -∗
@@ -366,9 +409,10 @@ Section BootRun.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hreset Hmie0 Hmdl0.
-    iIntros "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
-             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval #Htext Hgot Hstk
-             Hbit Hbit2 Hg2 Hg4a Hg4b Hnoff Hint Hproc Hctx Hcont".
+    iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
+              Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
+              Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
+              Hg4a & Hg4b & Hnoff & Hint & Hproc & Hctx & _) Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
@@ -443,3 +487,55 @@ Section BootRun.
   Qed.
 
 End BootRun.
+
+(* ====================================================================== *)
+(* §4  A SECONDARY HART'S WHOLE CHAIN.                                     *)
+(*                                                                        *)
+(* [boot_hart_secondary]: for a hart with [fin_to_nat c <> 0], §3 composed  *)
+(* with [SpecMainSecondary.wp_main_secondary_sconf] -- reset residue to      *)
+(* "spins forever, never stuck", with NOTHING left over.  Seven of the eight *)
+(* harts need only this; the boot hart's arm additionally consumes the whole *)
+(* boot supply and is where the shared allocation lands.                     *)
+(*                                                                        *)
+(* The three inputs beside the per-hart bundle are all PERSISTENT and all    *)
+(* SHARED: the image ([kernel_text] / [kernel_data]), [panic_wp_any], and    *)
+(* the handover channel [started_inv (main_deposit γd γv Φ)] -- which the    *)
+(* client allocates ONCE, at that concrete payload, and hands to all eight   *)
+(* harts (main-boot's outstanding [P] choice, settled).                      *)
+(* ====================================================================== *)
+
+Section BootSecondary.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma boot_hart_secondary (Φ : mval -> iProp Σ) (rs : regstate)
+      (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
+    reset_regs cpu_id rs ->
+    (* the two pins the reset machine does not yet give -- see §3 *)
+    register_lookup mie rs = boot_w64 0 ->
+    register_lookup mideleg rs = boot_w64 0 ->
+    (* a SECONDARY hart: this is what makes main's [beqz a0] fall through *)
+    (fin_to_nat cpu_id <> 0)%nat ->
+    kernel_text -∗
+    kernel_data -∗
+    boot_hart_res rs iv dq -∗
+    panic_wp_any -∗
+    started_inv (main_deposit γd γv Φ) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hreset Hmie0 Hmdl0 Hnz.
+    pose proof (fin_to_nat_lt cpu_id) as Hn.
+    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
+    iApply (boot_entry_bridge Φ rs iv dq Hreset Hmie0 Hmdl0
+              with "Htext Hres").
+    iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
+    iApply (MainSecondary.wp_main_secondary_sconf Φ mf K_main zero_reg γd γv
+              (register_lookup tlb rs)
+              (cid_word_of_nz _ Hn Hnz)
+              (cid_word_of_lt_dev _ Hn)
+              K_main_secondary_le eq_refl
+              with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Hraw").
+  Qed.
+
+End BootSecondary.
