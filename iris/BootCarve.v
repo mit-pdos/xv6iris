@@ -401,6 +401,55 @@ Section BootCarve.
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd).
   Qed.
 
+  (* [pa_add] over a [pa_of_z] base, in [pa_of_z]'s own spelling -- so that a
+     [pa_add]-indexed bundle and [boot_ran_bytes]' run are syntactically the
+     same addresses ([KernelText.pa_add_mword] lands on the raw
+     [mword_of_int], which unifies only up to delta). *)
+  Lemma pa_add_of_z (A : Z) (j : nat) :
+    pa_add (pa_of_z A) j = pa_of_z (A + Z.of_nat j).
+  Proof. unfold pa_of_z. apply pa_add_mword. Qed.
+
+  (* THE [↦ₘ] RUN: [boot_ran_bytes]' bytes, re-indexed by [pa_add] and each
+     upgraded through its static claim.  [boot_ran_own] is the same step over
+     the MAP (which is what a lookup-driven bundle like [kernel_data] wants);
+     this is the form every [pa_add]-indexed bundle needs -- a page
+     ([KallocInv.page_own]), a typed cell, a byte array. *)
+  Lemma boot_ran_mem_run (g : gstate) (lo : Z) (n : nat) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= lo -> lo + Z.of_nat n <= ram_hi ->
+    kmap_static_claims -∗ boot_raw_ran g lo (lo + Z.of_nat n)
+    -∗ ([∗ list] j ∈ seq 0 n,
+          (pa_add (pa_of_z lo) j) ↦ₘ boot_byte (lo + Z.of_nat j)).
+  Proof.
+    intros Hmem Hlo Hhi. iIntros "#Hcl H".
+    unfold text_end in Hlo.
+    assert (Hram : ram_lo <= lo) by (unfold ram_lo; lia).
+    iDestruct (boot_ran_bytes g lo n Hmem Hram Hhi with "H") as "Hbs".
+    rewrite zrun_fmap big_sepL_fmap.
+    iApply (big_sepL_impl with "Hbs"). iIntros "!>" (kk j Hk) "Hb".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    change (0 + kk)%nat with kk.
+    assert (Hin : ram_lo <= lo + Z.of_nat kk < ram_hi).
+    { unfold ram_lo, ram_hi in Hram, Hhi |- *. lia. }
+    rewrite pa_add_of_z.
+    assert (Hkd : addr_is_kdata (pa_of_z (lo + Z.of_nat kk))).
+    { unfold addr_is_kdata, ram_base, ram_size, text_end.
+      rewrite (boot_uint_pa _ Hin). unfold ram_lo, ram_hi in Hin. lia. }
+    assert (Hcanon : uint (pa_of_z (lo + Z.of_nat kk)) < 274877906944)
+      by (unfold addr_is_kdata, ram_base, ram_size in Hkd; lia).
+    iApply (phys_ident_mem _ (DfracOwn 1) _ (kdata_svpn_class _ Hkd)
+              (addr_is_kdata_ram _ Hkd) Hcanon with "Hcl [Hb]").
+    rewrite /phys_pointsto. iFrame "Hb". iPureIntro.
+    exact (addr_is_kdata_ram _ Hkd).
+  Qed.
+
+  (* congruence in the two bounds, so a consumer can retarget a range it just
+     cut without a bare [rewrite] over the whole entailment. *)
+  Lemma boot_ran_eq (g : gstate) (lo hi lo' hi' : Z) :
+    lo = lo' -> hi = hi' -> boot_raw_ran g lo hi ⊢ boot_raw_ran g lo' hi'.
+  Proof. intros -> ->. iIntros "$". Qed.
+
   Lemma boot_ran_persist (g : gstate) (lo hi : Z) :
     ([∗ map] a ↦ b ∈ ran_bytes g lo hi, a ↦ₘ b)
     ==∗ ([∗ map] a ↦ b ∈ ran_bytes g lo hi, a ↦ₘ□ b).

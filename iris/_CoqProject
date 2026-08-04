@@ -588,6 +588,7 @@ CodePrintint.v
 PrintintArith.v
 BootConfig.v
 BootCarve.v
+BootCarveMain.v
 StackBytes.v
 ProofPrintint.v
 LinkPrintint.v

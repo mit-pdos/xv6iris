@@ -877,39 +877,59 @@ which needs its own file's vocabulary (ProcGeom / FdSlots / BcacheInv /
 DiskInv). Those cannot live in BootCarve (it stays below the WP tower on
 purpose): they want a file above SpecMain, which is also where slice 3 goes.
 
-### Slice 3 — the kinit page run (NOT STARTED)
+### Slice 3 — the kinit page run (LANDED)
 
-`[s1entry, PHYSTOP)` → `[∗ list] p ∈ ps, page_own p` + `prun phystop
-s1entry ps` (KallocInv's shapes), peeled SYMBOLICALLY — never enumerate
-(durable-notes' large-map rules). Settled from
-`SpecMain.wp_main_boot_sconf_body`'s actual precondition rather than from
-the design: it asks for `(K_kvmmake + 64 + 3 < length ps)` and nothing
-else about the 64 kstack pages, i.e. **the kstacks come out of the same
-`ps` budget** and do NOT need a separate bundle.
+**`iris/BootCarveMain.v`** (new) — the carve at MAIN's altitude. It exists
+because `page_own` is `KallocInv`'s and `prun` / `PGSIZEv` / `negPGSIZEv` are
+`SpecFreerange`'s, both far above BootCarve, which stays below the WP tower on
+purpose. It is also where slice 2's structured conjuncts belong.
 
-What slice 1b' settles about it:
+`boot_kinit_run` is the deliverable and gives all three things
+`SpecMain.wp_main_boot_sconf_body` asks about the run, at ONE list: the pure
+`prun phystop s1 (pg_run s1 n)`, its `length = n` (which is what the budget
+premise `K_kvmmake + 64 + 3 < length ps` is about — settled: the 64 kstack
+pages come out of this same `ps`, no separate bundle), and
+`[∗ list] p ∈ pg_run s1 n, page_own p`, out of the single range
+`[uint s1 - 4096, uint phystop)`.
 
-- **It cannot live in BootCarve.** `page_own` is `KallocInv`'s and `prun` /
-  `PGSIZEv` / `negPGSIZEv` are `SpecFreerange`'s, both far above; the home is
-  a NEW file above SpecMain (which already imports both), shared with slice
-  2's structured conjuncts.
-- The per-page step is `boot_ran_own` on a `[p, p+4096)` range plus
-  `zrun_fmap` + `big_sepL_impl` to index it by `pa_add p j` — symbolic, one
-  `big_sepL` of 4096, no enumeration; then ONE induction over the page count,
-  exactly like §9's stack induction.
-- **Spell the page list the way `prun` recurses** (`p :: pg_run (s1 + 4096) k`
-  with `p = s1 - 4096`), so `prun` is a structural induction with no list
-  surgery. The two mword facts it needs are cheap:
-  `add_vec s1 negPGSIZEv` IS `pa_stk s1 512` (so `uint_pa_stk` gives its
-  `uint`, and `pa_of_z_uint` its `pa_of_z` spelling), and
-  `add_vec s1 PGSIZEv` IS `pa_add s1 4096` (`PageGeom.kalloc_uint_pa_add`,
-  reachable by qualified name though `Local`).
+- **The run is pinned by ONE equation**, `uint s1 + 4096*n = uint phystop +
+  4096` — the cursor ends exactly one page past PHYSTOP — and that single fact
+  is what makes both of `prun`'s comparisons come out (`<u` false at every
+  step, true at the end). freerange's cursor is `s1` and it frees the page
+  BELOW it, so **the first page is `s1entry - 4096`, not `s1entry`**.
+- **Spell the page list the way `prun` recurses** (`pg_run s1 (S k) =
+  (s1 - PGSIZE) :: pg_run (s1 + PGSIZE) k`): then the pure half is a
+  structural induction with no list surgery at all. The two mword facts are
+  free — `add_vec s1 negPGSIZEv` IS `pa_stk s1 512` (so `StackOwn.uint_pa_stk`
+  gives its `uint` and `pa_of_z_uint` its `pa_of_z` spelling: `pg_below_uint` /
+  `pg_below`) and `add_vec s1 PGSIZEv` IS `pa_add s1 4096`
+  (`PageGeom.kalloc_uint_pa_add`, reachable by qualified name though `Local`):
+  `pg_above_uint`.
+- The resource half is BootCarve's `boot_ran_mem_run` (the range's bytes as a
+  `pa_add`-indexed `↦ₘ` run) at n = 4096 with the contents forgotten, then one
+  induction cutting one page per step — the same shape as §9's stack.
+  `boot_ran_eq` (congruence in the two bounds) is what retargets the residue
+  without a bare `rewrite` over the whole entailment.
 - The concrete run, for the record: `s1entry = 0x80025000`
-  (`PGROUNDUP(0x80023558) + 4096`), so the pages are
-  `0x80024000 + 4096*i` for `i < 32732` — the last is `0x87fff000` and
-  `PHYSTOP = 0x88000000`. `page_valid` holds of all of them
-  (`kmem_lo = 0x80023558 ≤ 0x80024000`); note the first page is `s1entry -
-  4096`, NOT `s1entry`.
+  (`PGROUNDUP(0x80023558) + 4096`), so the pages are `0x80024000 + 4096*i`
+  for `i < 32732` — the last is `0x87fff000`, `PHYSTOP = 0x88000000`, and
+  `page_valid` holds of all of them (`kmem_lo = 0x80023558 ≤ 0x80024000`).
+  Those numbers satisfy every premise, so the lemma is not vacuous; the
+  client's only arithmetic is `uint s1entry = 0x80025000` by `vm_compute`.
+
+**THE ZIFY HOOK IS UNAVOIDABLE IN THIS FILE AND COSTS A DISCIPLINE.**
+`SpecFreerange` requires `bitvector.tactics`, whose hook makes `lia` answer
+*"Cannot find witness"* on a goal mentioning `bv_unsigned` — and it is
+INCONSISTENT about it (`uint s1 ≤ uint phystop` went through; the
+large-literal `kmem_lo ≤ uint s1 - 4096 < kmem_hi` did not), so "it worked
+here" proves nothing. Every arithmetic step in this file is therefore a
+plain-`Z` helper lemma over VARIABLES (`z_run_le`, `z_run_next`,
+`z_run_page`, `z_erlo`, …) applied by `exact`, with the layout constants left
+FOLDED at the call site so no literal ever reaches the hook; the closed facts
+about the constants themselves (`0 ≤ kmem_lo`, `ram_hi + 4096 < 2^64`,
+`kmem_hi = ram_hi`) need no `lia` at all — `discriminate` / `reflexivity`, per
+M6b-pre (1). Any new lemma here should be written that way from the start
+rather than after a failure.
 
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item), now over the
