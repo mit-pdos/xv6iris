@@ -50,8 +50,9 @@
 
 From stdpp Require Import gmap finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.algebra Require Import csum excl.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
-From iris.program_logic Require Import weakestpre adequacy.
+From iris.program_logic Require Import weakestpre lifting adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
@@ -646,4 +647,278 @@ Proof.
   iSplitL.
   { iApply (wp_disk_loop γv with "Hcert Hvinv Hpinv"). }
   iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 7. THE POWER THREAD (claude-notes/design/crash.md): [wp_power_loop]     *)
+(*    alternates PowerOff and PowerOn forever; each PowerOn allocates a    *)
+(*    FRESH ERA over the reset state and discharges the fork obligations   *)
+(*    with the client's ∀-era boot entailment.  [riscv_power_adequacy]     *)
+(*    then needs almost nothing: the initial machine is OFF and nothing    *)
+(*    has ever run, so the fixed layer is the whole allocation.            *)
+(* ---------------------------------------------------------------------- *)
+
+(* [set_seq] arithmetic (the registry's dom shape at a PowerOn insert) *)
+Lemma set_seq_snoc_nat (n : nat) :
+  set_seq (C := gset nat) 0 (n + 1) = set_seq 0 n ∪ {[n]}.
+Proof.
+  apply set_eq; intros x.
+  rewrite elem_of_union elem_of_singleton !elem_of_set_seq. lia.
+Qed.
+Lemma not_in_set_seq_nat (n : nat) : n ∉ set_seq (C := gset nat) 0 n.
+Proof. rewrite elem_of_set_seq. lia. Qed.
+
+Section power.
+  Context {Σ : gFunctors}.
+  Context `{!riscvFixedGS Σ}.
+  Context `{!sieG Σ}.
+
+  (* What a PowerOn hands the boot client, for era [HE] at generation
+     [gen] over the reset state [g']: RAW, ERA-EXPLICIT ghost forms -- the
+     ambient polished forms ([reg_pointsto_at], [↦ₘ], [kmap_auth],
+     [uart_frag], ...) are exactly these at [riscv_eraGS := HE], so a
+     client at the ambient instance converts by pure conversion.  The
+     [↦ₓ□]/[↦ₘ] image split the single-generation adequacy performs is
+     the CLIENT's job here (it has the raw bytes, the kmap frags and the
+     RAM shape; the recipe is [riscv_system_adequacy]'s Htext/Hdata
+     blocks). *)
+  Definition power_boot_res (HE : riscvEraGS) (gen : nat)
+      (D : CPU -> gset register) (nproc : nat) (g' : gstate) : iProp Σ :=
+    (([∗ list] c ∈ enum CPU, [∗ set] r ∈ D c,
+        ghost_map_elem (era_reg_name HE c) r (DfracOwn 1)
+          (existT r (register_lookup r (g'.(gregs) c)))) ∗
+     ([∗ map] a ↦ b ∈ g'.(gmem),
+        pointsto (hG := era_memGS_of HE) a (DfracOwn 1) b) ∗
+     (@ghost_map_auth Σ (SailStdpp.Values.mword 27) _
+        (@SailStdpp.Instances.Decidable_eq_mword 27)
+        (@SailStdpp.Instances.Countable_mword 27) _
+        (era_kmap_name HE) 1 kmap_M0) ∗
+     ([∗ map] vpn ↦ pc ∈ kmap_M0,
+        @ghost_map_elem Σ (SailStdpp.Values.mword 27) _
+          (@SailStdpp.Instances.Decidable_eq_mword 27)
+          (@SailStdpp.Instances.Countable_mword 27) _
+          (era_kmap_name HE) vpn (DfracOwn 1) pc) ∗
+     own (era_kpt_name HE) (Cinl (Excl ()) : kptR) ∗
+     ([∗ list] c ∈ enum CPU,
+        ghost_var (era_strans_name HE c) (1/2)%Qp strans_bit_bare ∗
+        ghost_var (era_strans_name HE c) (1/2)%Qp strans_bit_bare) ∗
+     ([∗ list] c ∈ enum CPU,
+        ghost_var (era_sie_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off ∗
+        ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off) ∗
+     ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 false) ∗
+     ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
+     ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
+     ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
+     gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
+
+  Lemma wp_power_loop (D : CPU -> gset register) (nproc : nat)
+      (Φ : mval -> iProp Σ)
+      (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
+         (forall a b, g'.(gmem) !! a = Some b -> addr_is_ram a) ->
+         g'.(gpow) = true ->
+         (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0) ->
+         ⊢ power_boot_res HE gen D nproc g' ={⊤}=∗
+            ([∗ list] c ∈ enum CPU,
+               WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
+            WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
+            WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
+            WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
+    ⊢ WP (PowerLoopE : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iLöb as "IH".
+    iApply wp_lift_step; first done.
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    destruct (g.(gpow)) eqn:Hpw.
+    - (* PowerOff: bump the generation, drop the power *)
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro.
+        exists [], PowerLoopE,
+          (GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false), [].
+        do 4 right. split_and!; auto. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct Hstep as
+        [ (gen2 & cpu2 & Hc & _)
+        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
+        | (_ & -> & -> & [ (_ & -> & ->) | (Hpw' & _) ]) ] ] ] ];
+        [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
+        | | congruence ].
+      iIntros "_".
+      iMod (mono_nat_own_update (n := g.(ggen)) (S g.(ggen)) with "Hgauth")
+        as "[Hgauth _]"; [lia|].
+      iMod "Hback" as "_". iModIntro.
+      rewrite /start_count Hpw /= in Hdom.
+      iEval (rewrite /start_count Hpw /=) in "Hsauth".
+      iSplitL "Hgauth Hsauth HRauth".
+      { rewrite /state_interp /=.
+        unfold power_interp, start_count. cbn [ggen gpow gregs gmem gdev].
+        replace (S (g.(ggen)) + 0)%nat with (g.(ggen) + 1)%nat by lia.
+        iFrame "Hgauth Hsauth".
+        iExists R. iFrame "HRauth". iPureIntro.
+        split; [exact Hdom|exact I]. }
+      iSplitL; [|done]. iApply "IH".
+    - (* PowerOn: THE SURGERY -- a fresh era over the reset state, then
+         the client's boot entailment discharges the fork obligations *)
+      iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
+      iSplitR.
+      { iPureIntro.
+        exists [], PowerLoopE,
+          (GState g.(gregs) ∅
+             (DevState g.(gdev).(duart) g.(gdev).(dplic)
+                (virtio_reset g.(gdev).(dvirtio)))
+             g.(ggen) true),
+          (power_fork g.(ggen)).
+        do 4 right. split_and!; auto.
+        right. split_and!; auto.
+        rewrite /boot_shape /=. split_and!; auto.
+        intros a b Hl. rewrite lookup_empty in Hl. discriminate Hl. }
+      iIntros (e2 g2 efs Hstep) "!>".
+      destruct Hstep as
+        [ (gen2 & cpu2 & Hc & _)
+        | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
+        | (_ & -> & -> & [ (Hpw' & _) | (_ & -> & Hbs) ]) ] ] ] ];
+        [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
+        | congruence | ].
+      iIntros "_".
+      destruct Hbs as (Hgen2 & Hpow2 & Hram2 & Hvirt2).
+      (* fresh era: registers, memory, devices, and the per-era kernel
+         ghosts, all at brand-new names *)
+      iMod (reg_alloc_cpus g2.(gregs) D (enum CPU) (NoDup_enum CPU))
+        as (f) "Hcpus".
+      iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
+      iMod (gen_heap_init_names (L := Arch.pa) (V := bv 8) g2.(gmem))
+        as (γh γm) "(Hh & Hbytes & _)".
+      iMod (ghost_var_alloc g2.(gdev).(duart)) as (γu) "Hu".
+      iEval (rewrite -Qp.half_half) in "Hu".
+      iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
+      iMod (ghost_var_alloc g2.(gdev).(dplic)) as (γp) "Hp".
+      iEval (rewrite -Qp.half_half) in "Hp".
+      iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
+      iMod (ghost_var_alloc g2.(gdev).(dvirtio)) as (γv) "Hv".
+      iEval (rewrite -Qp.half_half) in "Hv".
+      iDestruct (ghost_var_split with "Hv") as "[HvA HvF]".
+      iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
+      iMod (own_alloc (Cinl (Excl ()) : kptR)) as (γkpt) "Hkpt";
+        [done|].
+      iMod (ghost_var_alloc_halves_cpus strans_bit_bare (enum CPU)
+              (NoDup_enum CPU)) as (γs) "Hs".
+      iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU)
+              (NoDup_enum CPU)) as (γsie) "Hsie".
+      iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γpark).
+      (* the started counter ticks (PowerOff had already bumped [ggen], so
+         the count moves from [ggen + 0] to [ggen + 1]) *)
+      iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
+              with "Hsauth") as "[Hsauth #Hstartlb]".
+      { rewrite /start_count Hpw /=. lia. }
+      (* register the era (the registry has no entry for [ggen]: the
+         power was off, so the dom is [set_seq 0 (ggen + 0)]) *)
+      iMod (ghost_map_insert g.(ggen) HE with "HRauth") as "[HRauth HRelem]".
+      { apply not_elem_of_dom. rewrite Hdom /start_count Hpw /=.
+        rewrite Nat.add_0_r. apply not_in_set_seq_nat. }
+      iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
+      iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hbornlb".
+      (* run the client's boot entailment over the fresh era *)
+      iMod "Hback" as "_".
+      iMod (Hboot HE g.(ggen) g2 Hram2 Hpow2 with
+              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF]")
+        as "(Hwps & Hwpu & Hwpd & Hwpp)".
+      { rewrite Hvirt2. eauto. }
+      { rewrite /power_boot_res.
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF".
+        iFrame "Helems".
+        iSplitR; [iExact "Hbornlb"|].
+        iSplitR; [|iExact "HRelem"].
+        assert (Hsg : (g.(ggen) + 1)%nat = S g.(ggen)) by lia.
+        iEval (rewrite Hsg) in "Hstartlb".
+        iExact "Hstartlb". }
+      iModIntro.
+      rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA".
+      { rewrite /state_interp /=.
+        unfold power_interp, start_count. cbn [ggen gpow gregs gmem gdev].
+        rewrite Hgen2 Hpow2.
+        iFrame "Hgauth Hsauth".
+        iExists (<[g.(ggen) := HE]> R). iFrame "HRauth".
+        iSplitR.
+        { iPureIntro.
+          rewrite dom_insert_L Hdom set_seq_snoc_nat. set_solver. }
+        iExists HE.
+        iSplitR.
+        { iPureIntro. by rewrite lookup_insert. }
+        rewrite /era_interp. iSplitL "Hauths".
+        { rewrite /gregs_interp_at. iApply big_sepL_enum_to_set.
+          iExact "Hauths". }
+        iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
+        iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
+      iSplitR; [iApply "IH"|].
+      (* the fork obligations: the new generation's whole complement *)
+      rewrite /power_fork big_sepL_app big_sepL_fmap /=.
+      iSplitL "Hwps"; [iExact "Hwps"|].
+      iSplitL "Hwpu"; [iExact "Hwpu"|].
+      iSplitL "Hwpd"; [iExact "Hwpd"|].
+      iSplitL "Hwpp"; [iExact "Hwpp"|done].
+  Qed.
+End power.
+
+(* THE POWER ADEQUACY: the machine starts POWERED OFF with nothing ever
+   run; if the client can boot ANY era from ANY reset state, every
+   configuration reachable under any schedule of power-cycles, hart steps
+   and device steps is reducible. *)
+Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
+    (D : CPU -> gset register) (nproc : nat) (g : gstate)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
+                    (g' : gstate),
+       (forall a b, g'.(gmem) !! a = Some b -> addr_is_ram a) ->
+       g'.(gpow) = true ->
+       (exists v0, g'.(gdev).(dvirtio) = virtio_reset v0) ->
+       ⊢ power_boot_res HE gen D nproc g' ={⊤}=∗
+          ([∗ list] c ∈ enum CPU,
+             WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
+          WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
+          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
+          WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
+  forall t2 g2 e2,
+    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
+    e2 ∈ t2 ->
+    reducible (Λ := riscv_lang) e2 g2.
+Proof.
+  intros t2 g2 e2 Hrtc He2.
+  apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
+  cut (forall e : expr riscv_lang, e ∈ t2 -> not_stuck e g2).
+  { intros Hns. destruct (Hns e2 He2) as [[v Hv]|Hred];
+      [discriminate Hv|exact Hred]. }
+  eapply (wp_strong_adequacy Σ riscv_lang NotStuck
+            [PowerLoopE : expr riscv_lang] g n κs t2 g2 _
+            (fun _ => 0%nat)); last exact Hsteps.
+  intros Hinv.
+  iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgauth _]".
+  iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hsauth _]".
+  iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
+  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ γgen γstart _ γreg).
+  iModIntro.
+  iExists
+    (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
+       (@power_interp Σ F g')%I),
+    [fun _ : mval => True%I],
+    (fun _ : mval => True%I),
+    (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
+  cbv zeta beta.
+  iSplitL "Hgauth Hsauth HRauth".
+  { (* the initial state interpretation: OFF, nothing ever started *)
+    rewrite /power_interp. iFrame "Hgauth Hsauth".
+    iExists ∅. iFrame "HRauth".
+    iSplitR.
+    { iPureIntro. rewrite dom_empty_L /start_count Hpow /=.
+      rewrite Nat.add_0_r Hgen0 /=. done. }
+    rewrite Hpow. done. }
+  iSplitL.
+  { cbn. iSplitL; [|done].
+    iApply (@wp_power_loop Σ F _ D nproc (fun _ => True%I) (Hboot F)). }
+  iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
+  iApply fupd_mask_intro; [set_solver|]. iIntros "_".
+  iPureIntro. intros e He. exact (Hns e eq_refl He).
 Qed.

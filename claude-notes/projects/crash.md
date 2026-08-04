@@ -136,8 +136,27 @@ template for milestones 1–4.
    - `wp_power_loop` (surgery: fresh era allocation over the reset
      state, registry insert, both counters bumped appropriately, fork
      obligations from the client's joint ∀-era entailment) + the minimal
-     adequacy over `[PowerLoopE]`, validated device-only first.
-   CrashProto.v is the working template for every piece.
+     adequacy over `[PowerLoopE]`.
+   **ALL OF STAGE 2e LANDED** (with milestones 3 and 4): the semantic
+   switch, `wp_dead`, the four-way base-rule split, `power_boot_res`
+   (the ∀-era client bundle in RAW, ERA-EXPLICIT ghost forms — the
+   polished ambient forms are these at `riscv_eraGS := HE` by pure
+   conversion, so no instance gymnastics), `wp_power_loop`, and
+   `riscv_power_adequacy` (pool `[PowerLoopE]`, machine starts OFF,
+   any schedule of power cycles).  THE WHOLE TREE COMPILED UNCHANGED
+   above the base rules.  Baseline 5 axioms.  Notable proof facts:
+   `state_interp` in a goal is the irisGS PROJECTION — unfold it with
+   `rewrite /state_interp /=` BEFORE `unfold power_interp`; and inside
+   `wp_power_loop` allocate the heap with `gen_heap_init_names` (the
+   names-form keeps the reconstructed `era_memGS_of` instance
+   ι-convertible — `gen_heap_init`'s bundled form needs record η, which
+   Coq does not have).
+   **Remaining: M5** (durable disk: relocate `dn_img`'s auth into the
+   fixed `state_interp` conjunct, `crash_inv`, vslot write permits) and
+   **M6** (the boot composition as the ∀-era entailment instantiating
+   `power_boot_res`, absorbing main-boot's outstanding item; also
+   tighten `boot_shape` with the device-reset facts and hart reset
+   registers as its consumers arrive).
 3. **Death machinery**: `wp_dead`, the base rules' four-way case split
    (`> gen` dead / live / off-refuted-by-registry / `< gen`
    refuted-by-birth-bound), birth lb + era registration folded into the
