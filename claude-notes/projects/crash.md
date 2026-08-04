@@ -151,12 +151,65 @@ template for milestones 1–4.
    names-form keeps the reconstructed `era_memGS_of` instance
    ι-convertible — `gen_heap_init`'s bundled form needs record η, which
    Coq does not have).
-   **Remaining: M5** (durable disk: relocate `dn_img`'s auth into the
-   fixed `state_interp` conjunct, `crash_inv`, vslot write permits) and
-   **M6** (the boot composition as the ∀-era entailment instantiating
-   `power_boot_res`, absorbing main-boot's outstanding item; also
-   tighten `boot_shape` with the device-reset facts and hart reset
-   registers as its consumers arrive).
+   **Remaining: M5** (durable disk) and **M6** (boot composition).
+
+## M5 execution plan (scoped 2026-08-04 against the code)
+
+The disk-image ghost must survive power cycles; anything linear parked
+in an ERA invariant is stranded at a crash (invariants are never
+deallocated), and `virtio_proto` — which rides in the per-era
+`disk_inv` — today owns `∃ dmap, ghost_map_auth (dn_img γ) 1 dmap ∗
+⌜disk_view dmap (v_disk v)⌝` (VirtioProto.v:1182). So:
+
+1. **Pin the image name to the fixed layer**: `riscvFixedGS` gains
+   `riscvF_diskGS :: ghost_mapG Σ Z (bv 8)` + `riscv_disk_name : gname`;
+   `disk_ghosts_alloc` (VirtioProto.v:~1475) stops allocating `gimg`
+   and CONSTRUCTS `DiskNames` with `dn_img := riscv_disk_name` — every
+   client statement (`disk_bytes γ …`) is then unchanged, the frags
+   survive eras, and each era's OTHER disk ghosts (slots/nc/np/claim —
+   which SHOULD die with in-flight requests) stay era-fresh.
+2. **Relocate the auth+tie into `power_interp`** as a fixed conjunct
+   `∃ dmap, ghost_map_auth riscv_disk_name 1 dmap ∗ ⌜disk_view dmap
+   (v_disk (dvirtio (gdev g)))⌝` (present at both power states; both
+   power arms FRAME it — PowerOn's `virtio_reset` keeps `v_disk`).
+   `virtio_proto` drops the ∃-auth-tie prefix; the two lemmas that use
+   the auth internally (VirtioProto.v:1289 — the live-flip constructor —
+   and :1603 — the completion step) take auth+tie as premises/returns.
+3. **Preservation obligations**: hart steps never move `v_disk` — prove
+   ONE pure lemma `run (riscv_step tick) σ u σ' → v_disk (dvirtio (mdev
+   σ')) = v_disk (dvirtio (mdev σ))` by induction over the monad
+   (exec_run_det's structure: 14 trivial arms + MemRead/MemWrite via
+   per-device pure lemmas; VirtioModel:476 already notes no MMIO write
+   touches the image — check for existing `virtio_write`/`virtio_read`
+   image-preservation lemmas). uart/plic steps are trivial.  The hart
+   base rule and uart/plic rules then frame the conjunct; **only
+   `wp_disk_step` hands it over** (DMA completions are the one place
+   `v_disk` moves), and `wp_disk_loop` updates the auth there via the
+   modified completion lemma.
+4. **Who needs the auth when** (checked): the auth is touched ONLY at
+   (a) the initial mint — allocation-time, boot/adequacy-side, fine;
+   (b) DMA completion — device thread, has `state_interp` via
+   `wp_disk_step`, fine.  Driver-side ghost moves (enqueue deposits,
+   receipt claims) move FRAGS through `disk_inv` and never the auth, so
+   no instruction-level leaf needs the fixed conjunct — this is what
+   makes the relocation compatible with the accessor-form device
+   leaves.  Watch: any `disk_bytes`-MINT a driver lemma performs
+   lazily would need the auth — grep mint users before starting; if one
+   exists, pre-mint at allocation instead (the image map is a lazy
+   partial view, `disk_view` tolerates any dom).
+5. **`crash_inv`** (after the relocation): `inv crashN (∃ …,
+   disk_bytes-frags ∗ P_fs …)` with `P_fs` an iProp over fixed-layer
+   ghosts; allocated once in `riscv_power_adequacy`'s fixed allocation
+   (client supplies the initial `P_fs`); both power arms never open it.
+   The vslot WRITE PERMIT (the `vs_data` precedent): the enqueuer
+   deposits an iProp wand alongside the OUT slot; the completion step
+   consumes it to re-establish `P_fs` after updating the auth.
+
+**M6** — the boot composition as the ∀-era entailment instantiating
+`power_boot_res` (absorbs main-boot's outstanding item); tighten
+`boot_shape` with the device-reset facts (uart/plic reset, so the
+device corollary can run under power) and the harts' reset registers
+(SpecEntry.v's coming-out-of-reset state, so `wp_entry_boot` composes).
 3. **Death machinery**: `wp_dead`, the base rules' four-way case split
    (`> gen` dead / live / off-refuted-by-registry / `< gen`
    refuted-by-birth-bound), birth lb + era registration folded into the
