@@ -23,7 +23,12 @@
    entry 0, and the register file [st_mout ...] with tp = mhartid.  [tv] is
    the (unconstrained) value timerinit() read out of the mtime device, and
    [ms0] the entry mstatus, hidden behind the ∀ in the continuation together
-   with the three facts [mmode_config] pins about it.
+   with the four facts [mmode_config] pins about it.  The fourth,
+   [MstatusFacts.mstatus_kernel_facts ms0], is what makes this contract
+   COMPOSABLE with the S-mode side: the mstatus <main> starts on is
+   [cms5 (st_ms1 ms0)], and [WpStartNew.st_boot_ms_kernel_facts] turns HoKF
+   into the eleven facts [BootBridge.boot_bridge] (hence [IntrDefs.sconf])
+   requires of it.  MIE / MPRV / SXL come out separately as before.
 
    NOTE on requires: unlike the other Spec files, this one is not stated over
    the definitional layer alone -- the post-state vocabulary it needs
@@ -46,6 +51,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpGprCsrwA WpGprCsrwB.
 Require Import WpGprMretWp.
 Require Import InstrBytes WpEntryNew WpTimerinit WpStartNew StackOwn.
+Require Import MstatusFacts.
 Require Import KernelText.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -97,7 +103,8 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
   ( ∀ (tv : mword 64) (ms0 : mword 64)
       (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
       (HoPRV : eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false)
-      (HoSXL : _get_Mstatus_SXL ms0 = ('b"10")),
+      (HoSXL : _get_Mstatus_SXL ms0 = ('b"10"))
+      (HoKF : mstatus_kernel_facts ms0),
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ cms5 (st_ms1 ms0) -∗

@@ -49,6 +49,7 @@ Require Import KptShare.   (* tlb_res_pt: the SHARED table's per-hart residue *)
 Require Import SRegime.
 Require Import ProcGeom.   (* a_cpu_noff / a_cpu_int / a_cpu_proc: the enabled arm owns them *)
 Require Import MstatusBits WpIntrCore.
+Require Import MstatusFacts.
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
    namespace doesn't shadow anything here. *)
 Require WpGprCsrwCommon.
@@ -111,6 +112,26 @@ Definition sconf_ms_facts (ms : mword 64) : Prop :=
   _get_Mstatus_SD ms = 'b"0" /\
   WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true /\
   eq_vec (_get_Mstatus_TVM ms) ('b"1") = false.
+
+(* THE ONE-WAY BRIDGE from the M-mode side's fact bundle.
+   [MstatusFacts.mstatus_kernel_facts] (which [InstrBytes.mmode_config]
+   carries, so the M-mode boot contract's post exposes it) is
+   [sconf_ms_facts] plus the SIE pin, with MPP stated down there as the BIT
+   DISEQUALITY -- [have_nom_val] lives in WpGprCsrwCommon, above
+   MstatusFacts.  This is the only step that needs proving, and it is the
+   reason [sconf_ms_facts] keeps its verbatim statement (it is inside [sconf];
+   changing it would change [sconf]). *)
+Lemma sconf_ms_facts_of_kernel (ms : mword 64) :
+  mstatus_kernel_facts ms -> sconf_ms_facts ms.
+Proof.
+  intros (_ & HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
+  unfold sconf_ms_facts. split_and!; try assumption.
+  (* MPP: the reserved encoding 'b"10" is the ONLY one [have_nom_val] rejects *)
+  unfold WpGprCsrwCommon.have_nom_val.
+  destruct (eq_vec (_get_Mstatus_MPP ms) ('b"00")); [reflexivity |].
+  destruct (eq_vec (_get_Mstatus_MPP ms) ('b"01")); [reflexivity |].
+  rewrite HMPP. reflexivity.
+Qed.
 
 Lemma intr_ms_facts_iff (ms : mword 64) :
   intr_ms_facts ms

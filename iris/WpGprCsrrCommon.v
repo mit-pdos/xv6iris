@@ -190,7 +190,7 @@ Section WpCsrrGprShared.
       mmode_config (DfracOwn (q/2)) ∗ mmode_config (DfracOwn (q/2)).
   Proof.
     iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL & %HKF)".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
     iDestruct "Hms" as "[Hms1 Hms2]".
@@ -204,7 +204,7 @@ Section WpCsrrGprShared.
     mmode_config (DfracOwn q).
   Proof.
     iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
-    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL & %HKF)".
     iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
     iDestruct (reg_pointsto_agree_csrr with "Hms1 Hms2") as %<-.
     iCombine "Hhs1 Hhs2" as "Hhs".

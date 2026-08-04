@@ -6,12 +6,18 @@
    [mmode_config (DfracOwn 1)] + [pmpcfg_n ↦ᵣ pmpcfg0] at FULL ownership and
    lets the caller reg_update those cells while exhibiting [s_exec].
 
-   Also proves the field-preservation facts of [mstatus_legalized] that let a
-   chain REBUILD [mmode_config (DfracOwn 1)] after the mstatus write:
-     - MIE / MPRV of the legalized value depend ONLY on the written value [v];
+   Also THE HOME of the field-preservation facts of [mstatus_legalized] that
+   let a chain REBUILD [mmode_config (DfracOwn 1)] after the mstatus write --
+   all TWELVE fields the kernel's mstatus contract tracks (MIE plus
+   [MstatusFacts.mstatus_kernel_facts]'s eleven):
+     - MIE / MPRV / MXR / TSR / TVM / SIE of the legalized value depend ONLY
+       on the written value [v];
+     - XS is Off and SD / FS / VS are functions of [v] alone;
      - SXL is preserved from the OLD mstatus (never touched by the legalizer);
      - MPP of the legalized value depends only on [v] (the fact the boot chain
-       uses to know MPP = Supervisor at the eventual MRET). *)
+       uses to know MPP = Supervisor at the eventual MRET).
+   Under them, ONE get-over-update row family ([q<FIELD>_u<SETTER>]) covering
+   every field × every setter the legalizer and MRET perform. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -98,164 +104,457 @@ Proof.
   rewrite orb_false_l orb_false_r. reflexivity.
 Qed.
 
-(* ---- get-over-update pair facts for the Mstatus fields the legalizer
-   touches.  Each is one instance of the two bv window lemmas above at the
-   concrete field positions; discharged by a uniform tactic. ---- *)
-Local Ltac guu :=
-  unfold _get_Mstatus_MIE, _get_Mstatus_MPRV, _get_Mstatus_SXL, _get_Mstatus_MPP,
+(* ---- get-over-update rows: getter X through one setter Y, one instance of
+   the two bv window lemmas above at the concrete field positions, discharged
+   by a uniform tactic.  ONE family for the whole tree ([q]): the rows for the
+   eight fields beyond MIE/MPRV/SXL/MPP were proved in WpSieFlipBits.v (which
+   requires IntrDefs and so is invisible to the M-mode boot chain) and live
+   here now, together with the [mstatus_legalized] field lemmas over them --
+   WpStartNew.v needs both to show that [start()]'s mstatus write preserves
+   [MstatusFacts.mstatus_kernel_facts], and WpSieFlipBits reaches them through
+   its existing [Require Import WpGprCsrwC].  The rows over the five setters
+   MRET performs (MIE / MPIE / MPP / MPRV / MPELP -- WpGprMretWp's cms1..cms5)
+   are here for the same reason.  The tactics are NOT [Local] because
+   WpSieFlipBits's own remaining [lift_X] / [sX_and2] ladders use them. ---- *)
+Ltac quu :=
+  unfold _get_Mstatus_SIE, _get_Mstatus_MIE, _get_Mstatus_MPRV, _get_Mstatus_SXL,
+         _get_Mstatus_MPP, _get_Mstatus_MXR, _get_Mstatus_TSR, _get_Mstatus_XS,
+         _get_Mstatus_FS, _get_Mstatus_VS, _get_Mstatus_SD, _get_Mstatus_SUM,
+         _get_Mstatus_TVM, _get_Mstatus_TW, _get_Mstatus_SPELP, _get_Mstatus_MPELP,
+         _get_Mstatus_SPP, _get_Mstatus_SPIE, _get_Mstatus_MPIE, _get_Mstatus_UXL,
          _update_Mstatus_SD, _update_Mstatus_SIE, _update_Mstatus_MIE,
          _update_Mstatus_SPIE, _update_Mstatus_MPIE, _update_Mstatus_SPP,
          _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS,
          _update_Mstatus_XS, _update_Mstatus_MPRV, _update_Mstatus_SUM,
          _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW,
-         _update_Mstatus_TSR, _update_Mstatus_SPELP, _update_Mstatus_MPELP;
+         _update_Mstatus_TSR, _update_Mstatus_SPELP, _update_Mstatus_MPELP,
+         _update_Mstatus_UXL;
   unfold subrange_vec_dec, update_subrange_vec_dec;
   rewrite !autocast_refl;
   unfold to_word_idx, to_word, get_word;
   rewrite !MachineWord.MachineWord.cast_idx_refl.
 
-Local Ltac gu_disj :=
-  guu;
+Ltac qu_disj :=
+  quu;
   apply bv_extract_update_slice_disjoint;
   [ first [ left; vm_compute; let X := fresh in intro X; discriminate X
           | right; vm_compute; let X := fresh in intro X; discriminate X ]
   | vm_compute; let X := fresh in intro X; discriminate X ].
 
-Local Ltac gu_same :=
-  guu;
+Ltac qu_same :=
+  quu;
   apply bv_extract_update_slice_same;
   vm_compute; let X := fresh in intro X; discriminate X.
 
-(* MIE (bit 3) *)
-Lemma gMIE_uSD (w : mword 64) x : _get_Mstatus_MIE (_update_Mstatus_SD w x) = _get_Mstatus_MIE w.
-Proof. gu_disj. Qed.
-Lemma gMIE_uSIE (w : mword 64) x : _get_Mstatus_MIE (_update_Mstatus_SIE w x) = _get_Mstatus_MIE w.
-Proof. gu_disj. Qed.
-Lemma gMIE_uMIE (w : mword 64) x : _get_Mstatus_MIE (_update_Mstatus_MIE w x) = x.
-Proof. gu_same. Qed.
 
-(* MPRV (bit 17) *)
-Lemma gMPRV_uSD (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SD w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uSIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SIE w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uMIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MIE w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uSPIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SPIE w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uMPIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPIE w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uSPP (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SPP w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uMPP (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPP w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uVS (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_VS w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uFS (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_FS w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uXS (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_XS w x) = _get_Mstatus_MPRV w.
-Proof. gu_disj. Qed.
-Lemma gMPRV_uMPRV (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPRV w x) = x.
-Proof. gu_same. Qed.
+(* row MIE (bit 3) *)
+Lemma qMIE_uSD (w : mword 64) x : _get_Mstatus_MIE (_update_Mstatus_SD w x) = _get_Mstatus_MIE w.
+Proof. qu_disj. Qed.
+Lemma qMIE_uSIE (w : mword 64) x : _get_Mstatus_MIE (_update_Mstatus_SIE w x) = _get_Mstatus_MIE w.
+Proof. qu_disj. Qed.
+Lemma qMIE_uMIE (w : mword 64) x : _get_Mstatus_MIE (_update_Mstatus_MIE w x) = x.
+Proof. qu_same. Qed.
 
-(* MPP (bits 12..11) *)
-Lemma gMPP_uSD (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SD w x) = _get_Mstatus_MPP w.
-Proof. gu_disj. Qed.
-Lemma gMPP_uSIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SIE w x) = _get_Mstatus_MPP w.
-Proof. gu_disj. Qed.
-Lemma gMPP_uMIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MIE w x) = _get_Mstatus_MPP w.
-Proof. gu_disj. Qed.
-Lemma gMPP_uSPIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SPIE w x) = _get_Mstatus_MPP w.
-Proof. gu_disj. Qed.
-Lemma gMPP_uMPIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MPIE w x) = _get_Mstatus_MPP w.
-Proof. gu_disj. Qed.
-Lemma gMPP_uSPP (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SPP w x) = _get_Mstatus_MPP w.
-Proof. gu_disj. Qed.
-Lemma gMPP_uMPP (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MPP w x) = x.
-Proof. gu_same. Qed.
+(* row SIE *)
+Lemma qSIE_uSD (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_SD w x) = _get_Mstatus_SIE w.
+Proof. qu_disj. Qed.
+Lemma qSIE_uSIE (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_SIE w x) = x.
+Proof. qu_same. Qed.
+Lemma qSIE_uMIE (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_MIE w x) = _get_Mstatus_SIE w.
+Proof. qu_disj. Qed.
+Lemma qSIE_uMPIE (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_MPIE w x) = _get_Mstatus_SIE w.
+Proof. qu_disj. Qed.
+Lemma qSIE_uMPP (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_MPP w x) = _get_Mstatus_SIE w.
+Proof. qu_disj. Qed.
+Lemma qSIE_uMPRV (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_MPRV w x) = _get_Mstatus_SIE w.
+Proof. qu_disj. Qed.
+Lemma qSIE_uMPELP (w : mword 64) x : _get_Mstatus_SIE (_update_Mstatus_MPELP w x) = _get_Mstatus_SIE w.
+Proof. qu_disj. Qed.
 
-(* SXL (bits 35..34) -- never written by the legalizer *)
-Lemma gSXL_uSD (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SD w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uSIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SIE w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uMIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MIE w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uSPIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPIE w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uMPIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPIE w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uSPP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPP w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uMPP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPP w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uVS (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_VS w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uFS (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_FS w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uXS (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_XS w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uMPRV (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPRV w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uSUM (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SUM w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uMXR (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MXR w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uTVM (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_TVM w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uTW (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_TW w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uTSR (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_TSR w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uSPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPELP w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
-Lemma gSXL_uMPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPELP w x) = _get_Mstatus_SXL w.
-Proof. gu_disj. Qed.
+(* row MPRV *)
+Lemma qMPRV_uSD (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SD w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uSIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SIE w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uMIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MIE w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uSPIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SPIE w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uMPIE (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPIE w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uSPP (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SPP w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uMPP (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPP w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uVS (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_VS w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uFS (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_FS w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uXS (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_XS w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uSUM (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SUM w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uMXR (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MXR w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uSPELP (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_SPELP w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uUXL (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_UXL w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
+Lemma qMPRV_uMPRV (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPRV w x) = x.
+Proof. qu_same. Qed.
+Lemma qMPRV_uMPELP (w : mword 64) x : _get_Mstatus_MPRV (_update_Mstatus_MPELP w x) = _get_Mstatus_MPRV w.
+Proof. qu_disj. Qed.
 
-(* ====================================================================== *)
-(* Invariant preservation of [mstatus_legalized o v]:                       *)
-(*   - MIE / MPRV / MPP of the result depend ONLY on the written value [v]  *)
-(*     (so a caller that knows the concrete v discharges them by vm math);  *)
-(*   - SXL of the result equals SXL of the OLD mstatus [o] (preserved       *)
-(*     UNCONDITIONALLY: the legalizer never touches bits 35..34).           *)
-(* ====================================================================== *)
+(* row MXR *)
+Lemma qMXR_uSD (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_SD w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uSIE (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_SIE w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uMIE (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_MIE w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uSPIE (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_SPIE w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uMPIE (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_MPIE w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uSPP (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_SPP w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uMPP (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_MPP w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uVS (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_VS w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uFS (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_FS w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uXS (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_XS w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uMPRV (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_MPRV w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uSUM (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_SUM w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+Lemma qMXR_uMXR (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_MXR w x) = x.
+Proof. qu_same. Qed.
+Lemma qMXR_uMPELP (w : mword 64) x : _get_Mstatus_MXR (_update_Mstatus_MPELP w x) = _get_Mstatus_MXR w.
+Proof. qu_disj. Qed.
+
+(* row TSR *)
+Lemma qTSR_uSD (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_SD w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uSIE (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_SIE w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uMIE (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_MIE w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uSPIE (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_SPIE w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uMPIE (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_MPIE w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uSPP (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_SPP w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uMPP (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_MPP w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uVS (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_VS w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uFS (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_FS w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uXS (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_XS w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uMPRV (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_MPRV w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uSUM (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_SUM w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uMXR (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_MXR w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uTVM (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_TVM w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uTW (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_TW w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uSPELP (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_SPELP w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uUXL (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_UXL w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+Lemma qTSR_uTSR (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_TSR w x) = x.
+Proof. qu_same. Qed.
+Lemma qTSR_uMPELP (w : mword 64) x : _get_Mstatus_TSR (_update_Mstatus_MPELP w x) = _get_Mstatus_TSR w.
+Proof. qu_disj. Qed.
+
+(* row TVM (rwx-kmap: sconf_ms_facts gains the TVM=0 conjunct) *)
+Lemma qTVM_uSD (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SD w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uSIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uMIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uSPIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SPIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uMPIE (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPIE w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uSPP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SPP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uMPP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uVS (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_VS w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uFS (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_FS w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uXS (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_XS w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uMPRV (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPRV w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uSUM (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SUM w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uMXR (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MXR w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uSPELP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_SPELP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uUXL (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_UXL w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+Lemma qTVM_uTVM (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_TVM w x) = x.
+Proof. qu_same. Qed.
+Lemma qTVM_uMPELP (w : mword 64) x : _get_Mstatus_TVM (_update_Mstatus_MPELP w x) = _get_Mstatus_TVM w.
+Proof. qu_disj. Qed.
+
+(* row XS *)
+Lemma qXS_uSD (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_SD w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uSIE (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_SIE w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uMIE (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_MIE w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uSPIE (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_SPIE w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uMPIE (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_MPIE w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uSPP (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_SPP w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uMPP (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_MPP w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uVS (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_VS w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uFS (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_FS w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uXS (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_XS w x) = x.
+Proof. qu_same. Qed.
+Lemma qXS_uMPRV (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_MPRV w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+Lemma qXS_uMPELP (w : mword 64) x : _get_Mstatus_XS (_update_Mstatus_MPELP w x) = _get_Mstatus_XS w.
+Proof. qu_disj. Qed.
+
+(* row FS *)
+Lemma qFS_uSD (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_SD w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uSIE (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_SIE w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uMIE (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_MIE w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uSPIE (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_SPIE w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uMPIE (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_MPIE w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uSPP (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_SPP w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uMPP (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_MPP w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uVS (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_VS w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uFS (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_FS w x) = x.
+Proof. qu_same. Qed.
+Lemma qFS_uMPRV (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_MPRV w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+Lemma qFS_uMPELP (w : mword 64) x : _get_Mstatus_FS (_update_Mstatus_MPELP w x) = _get_Mstatus_FS w.
+Proof. qu_disj. Qed.
+
+(* row VS *)
+Lemma qVS_uSD (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_SD w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uSIE (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_SIE w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uMIE (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_MIE w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uSPIE (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_SPIE w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uMPIE (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_MPIE w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uSPP (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_SPP w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uMPP (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_MPP w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uVS (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_VS w x) = x.
+Proof. qu_same. Qed.
+Lemma qVS_uMPRV (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_MPRV w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+Lemma qVS_uMPELP (w : mword 64) x : _get_Mstatus_VS (_update_Mstatus_MPELP w x) = _get_Mstatus_VS w.
+Proof. qu_disj. Qed.
+
+(* row SD *)
+Lemma qSD_uSD (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_SD w x) = x.
+Proof. qu_same. Qed.
+Lemma qSD_uMIE (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_MIE w x) = _get_Mstatus_SD w.
+Proof. qu_disj. Qed.
+Lemma qSD_uMPIE (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_MPIE w x) = _get_Mstatus_SD w.
+Proof. qu_disj. Qed.
+Lemma qSD_uMPP (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_MPP w x) = _get_Mstatus_SD w.
+Proof. qu_disj. Qed.
+Lemma qSD_uMPRV (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_MPRV w x) = _get_Mstatus_SD w.
+Proof. qu_disj. Qed.
+Lemma qSD_uMPELP (w : mword 64) x : _get_Mstatus_SD (_update_Mstatus_MPELP w x) = _get_Mstatus_SD w.
+Proof. qu_disj. Qed.
+
+(* row MPP *)
+Lemma qMPP_uSD (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SD w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uSIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SIE w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uMIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MIE w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uSPIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SPIE w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uMPIE (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MPIE w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uSPP (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SPP w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uVS (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_VS w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uFS (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_FS w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uXS (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_XS w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uSUM (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SUM w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uMXR (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MXR w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uSPELP (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_SPELP w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uUXL (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_UXL w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uMPP (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MPP w x) = x.
+Proof. qu_same. Qed.
+Lemma qMPP_uMPRV (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MPRV w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+Lemma qMPP_uMPELP (w : mword 64) x : _get_Mstatus_MPP (_update_Mstatus_MPELP w x) = _get_Mstatus_MPP w.
+Proof. qu_disj. Qed.
+
+(* row SXL *)
+Lemma qSXL_uSD (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SD w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uSIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SIE w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uMIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MIE w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uSPIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPIE w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uMPIE (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPIE w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uSPP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPP w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uMPP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPP w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uVS (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_VS w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uFS (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_FS w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uXS (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_XS w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uMPRV (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPRV w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uSUM (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SUM w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uMXR (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MXR w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uTVM (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_TVM w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uTW (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_TW w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uTSR (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_TSR w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uSPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_SPELP w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+Lemma qSXL_uMPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPELP w x) = _get_Mstatus_SXL w.
+Proof. qu_disj. Qed.
+
+(* ---- L4: fields of [mstatus_legalized o v] ---- *)
 Lemma mstatus_legalized_MIE (o v : mword 64) :
   _get_Mstatus_MIE (mstatus_legalized o v) = _get_Mstatus_MIE v.
 Proof.
   unfold mstatus_legalized. cbn zeta.
-  rewrite gMIE_uSD gMIE_uSIE gMIE_uMIE. reflexivity.
+  rewrite qMIE_uSD qMIE_uSIE qMIE_uMIE. reflexivity.
 Qed.
+
+Lemma mstatus_legalized_SIE (o v : mword 64) :
+  _get_Mstatus_SIE (mstatus_legalized o v) = _get_Mstatus_SIE v.
+Proof. unfold mstatus_legalized. cbn zeta. rewrite qSIE_uSD qSIE_uSIE. reflexivity. Qed.
 
 Lemma mstatus_legalized_MPRV (o v : mword 64) :
   _get_Mstatus_MPRV (mstatus_legalized o v) = _get_Mstatus_MPRV v.
-Proof.
-  unfold mstatus_legalized. cbn zeta.
-  rewrite gMPRV_uSD gMPRV_uSIE gMPRV_uMIE gMPRV_uSPIE gMPRV_uMPIE gMPRV_uSPP
-          gMPRV_uMPP gMPRV_uVS gMPRV_uFS gMPRV_uXS gMPRV_uMPRV.
-  reflexivity.
-Qed.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qMPRV_uSD qMPRV_uSIE qMPRV_uMIE qMPRV_uSPIE qMPRV_uMPIE qMPRV_uSPP
+          qMPRV_uMPP qMPRV_uVS qMPRV_uFS qMPRV_uXS qMPRV_uMPRV. reflexivity. Qed.
 
 Lemma mstatus_legalized_SXL (o v : mword 64) :
   _get_Mstatus_SXL (mstatus_legalized o v) = _get_Mstatus_SXL o.
-Proof.
-  unfold mstatus_legalized. cbn zeta.
-  rewrite gSXL_uSD gSXL_uSIE gSXL_uMIE gSXL_uSPIE gSXL_uMPIE gSXL_uSPP
-          gSXL_uMPP gSXL_uVS gSXL_uFS gSXL_uXS gSXL_uMPRV gSXL_uSUM gSXL_uMXR
-          gSXL_uTVM gSXL_uTW gSXL_uTSR gSXL_uSPELP gSXL_uMPELP.
-  reflexivity.
-Qed.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qSXL_uSD qSXL_uSIE qSXL_uMIE qSXL_uSPIE qSXL_uMPIE qSXL_uSPP qSXL_uMPP qSXL_uVS qSXL_uFS qSXL_uXS qSXL_uMPRV qSXL_uSUM qSXL_uMXR qSXL_uTVM qSXL_uTW qSXL_uTSR qSXL_uSPELP qSXL_uMPELP. reflexivity. Qed.
 
-(* MPP of the legalized mstatus is determined by [v] alone: the value the
-   boot chain needs to know MPP = Supervisor at the eventual MRET. *)
+Lemma mstatus_legalized_MXR (o v : mword 64) :
+  _get_Mstatus_MXR (mstatus_legalized o v) = _get_Mstatus_MXR v.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qMXR_uSD qMXR_uSIE qMXR_uMIE qMXR_uSPIE qMXR_uMPIE qMXR_uSPP
+          qMXR_uMPP qMXR_uVS qMXR_uFS qMXR_uXS qMXR_uMPRV qMXR_uSUM qMXR_uMXR.
+  reflexivity. Qed.
+
+Lemma mstatus_legalized_TSR (o v : mword 64) :
+  _get_Mstatus_TSR (mstatus_legalized o v) = _get_Mstatus_TSR v.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qTSR_uSD qTSR_uSIE qTSR_uMIE qTSR_uSPIE qTSR_uMPIE qTSR_uSPP
+          qTSR_uMPP qTSR_uVS qTSR_uFS qTSR_uXS qTSR_uMPRV qTSR_uSUM qTSR_uMXR
+          qTSR_uTVM qTSR_uTW qTSR_uTSR. reflexivity. Qed.
+
+Lemma mstatus_legalized_TVM (o v : mword 64) :
+  _get_Mstatus_TVM (mstatus_legalized o v) = _get_Mstatus_TVM v.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qTVM_uSD qTVM_uSIE qTVM_uMIE qTVM_uSPIE qTVM_uMPIE qTVM_uSPP
+          qTVM_uMPP qTVM_uVS qTVM_uFS qTVM_uXS qTVM_uMPRV qTVM_uSUM qTVM_uMXR
+          qTVM_uTVM. reflexivity. Qed.
+
+Lemma mstatus_legalized_XS (o v : mword 64) :
+  _get_Mstatus_XS (mstatus_legalized o v) = extStatus_map_forwards Off.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qXS_uSD qXS_uSIE qXS_uMIE qXS_uSPIE qXS_uMPIE qXS_uSPP
+          qXS_uMPP qXS_uVS qXS_uFS qXS_uXS. reflexivity. Qed.
+
+Lemma mstatus_legalized_FS (o v : mword 64) :
+  _get_Mstatus_FS (mstatus_legalized o v)
+  = legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS v).
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qFS_uSD qFS_uSIE qFS_uMIE qFS_uSPIE qFS_uMPIE qFS_uSPP
+          qFS_uMPP qFS_uVS qFS_uFS. reflexivity. Qed.
+
+Lemma mstatus_legalized_VS (o v : mword 64) :
+  _get_Mstatus_VS (mstatus_legalized o v)
+  = legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS v).
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qVS_uSD qVS_uSIE qVS_uMIE qVS_uSPIE qVS_uMPIE qVS_uSPP
+          qVS_uMPP qVS_uVS. reflexivity. Qed.
+
+Lemma mstatus_legalized_SD (o v : mword 64) :
+  _get_Mstatus_SD (mstatus_legalized o v)
+  = bool_to_bit
+      (orb (generic_eq (extStatus_map_backwards
+              (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS v))) Dirty)
+        (orb (generic_eq (extStatus_map_backwards (extStatus_map_forwards Off)) Dirty)
+          (generic_eq (extStatus_map_backwards
+              (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS v))) Dirty))).
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qSD_uSD.
+  rewrite qFS_uSIE qFS_uMIE qFS_uSPIE qFS_uMPIE qFS_uSPP qFS_uMPP qFS_uVS qFS_uFS.
+  rewrite qXS_uSIE qXS_uMIE qXS_uSPIE qXS_uMPIE qXS_uSPP qXS_uMPP qXS_uVS qXS_uFS qXS_uXS.
+  rewrite qVS_uSIE qVS_uMIE qVS_uSPIE qVS_uMPIE qVS_uSPP qVS_uMPP qVS_uVS.
+  reflexivity. Qed.
+
 Lemma mstatus_legalized_MPP (o v : mword 64) :
   _get_Mstatus_MPP (mstatus_legalized o v)
   = (if have_nom_val (_get_Mstatus_MPP v)
      then _get_Mstatus_MPP v else privLevel_to_bits User).
-Proof.
-  unfold mstatus_legalized. cbn zeta.
-  rewrite gMPP_uSD gMPP_uSIE gMPP_uMIE gMPP_uSPIE gMPP_uMPIE gMPP_uSPP gMPP_uMPP.
-  reflexivity.
-Qed.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qMPP_uSD qMPP_uSIE qMPP_uMIE qMPP_uSPIE qMPP_uMPIE qMPP_uSPP qMPP_uMPP.
+  reflexivity. Qed.
 
 (* ====================================================================== *)
 (* pmpcfg0 written value: collapse the 8 per-byte [pmp_cfg_step]s of         *)

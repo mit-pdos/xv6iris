@@ -34,6 +34,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
 Require Import KptPt KMap InstrBytes RegFile WpGpr.
+Require Import MstatusFacts.
 (* [gsi64] is the general [get_slice_int] unsigned fact; its one home is
    PrintintArith.v (kept there with a minimal import set, because [lia] is
    unusable once the bitvector zify hook is loaded). *)
@@ -264,6 +265,19 @@ Proof. apply (bool_decide_unpack _). vm_compute. reflexivity. Qed.
 (* §3  The bundles, from the reset cells.                                  *)
 (* ====================================================================== *)
 
+(* THE RESET mstatus SATISFIES THE KERNEL CONTRACT.  This is the anchor of
+   the whole [mstatus_kernel_facts] arrangement: every field the S-mode side
+   needs is already right coming out of reset, so the widened [mmode_config]
+   costs the boot client nothing.  (Some conjuncts are mword equalities whose
+   sides print identically but carry different [BvWf] proofs -- those need
+   [bv_eq] before [vm_compute], the usual trap.) *)
+Lemma mstatus_reset_kernel_facts : mstatus_kernel_facts (boot_w64 0xA00000000).
+Proof.
+  unfold mstatus_kernel_facts.
+  split_and!; first [ vm_compute; reflexivity
+                    | apply bv_eq; vm_compute; reflexivity ].
+Qed.
+
 Section BootBundles.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -311,8 +325,8 @@ Section BootBundles.
   Qed.
 
   (* [mmode_config] at the reset mstatus (0xA00000000: SXL = UXL = 2,
-     MIE = MPRV = 0 -- the model's own [sail_model_init]).  The three
-     mstatus facts are [vm_compute] on that pinned value; the rest is
+     MIE = MPRV = 0 -- the model's own [sail_model_init]).  All FOUR mstatus
+     facts are [vm_compute] on that pinned value; the rest is
      [InstrBytes.mmode_config_rebuild]. *)
   Lemma mmode_config_intro (dq : dfrac) :
     hw_config -∗
@@ -327,6 +341,7 @@ Section BootBundles.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
+              mstatus_reset_kernel_facts
               with "Hhw Hinv Hhs Hpriv Hms").
   Qed.
 

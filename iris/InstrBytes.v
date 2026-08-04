@@ -15,6 +15,7 @@ Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
+Require Import MstatusFacts.
 Require Import KptPt KMap.
 Local Open Scope Z_scope.
 
@@ -733,7 +734,21 @@ Section InstrBytes.
      [minstret_inv], plus ownership of hart_state (ACTIVE), cur_privilege
      (Machine), and mstatus (with MIE clear, so [dispatchInterrupt] is a no-op
      by [dispatchInterrupt_none_from_regs]).  A [wp_instr] step consumes it and
-     hands it back (unchanged) for the next instruction. *)
+     hands it back (unchanged) for the next instruction.
+
+     The mstatus value also satisfies [MstatusFacts.mstatus_kernel_facts] --
+     the ELEVEN-field contract the S-mode side of the kernel runs under
+     ([IntrDefs.sconf_ms_facts] plus the SIE pin).  That is not decoration:
+     without it the M-mode boot contract's postcondition cannot tell the
+     S-mode side what it needs, and seven of the eleven are NOT derivable from
+     MIE/MPRV/SXL (verified at a hostile mstatus -- see
+     claude-notes/projects/crash.md, M6c).  Reality supplies it easily: the
+     reset mstatus 0xA00000000 has every field right, and the only mstatus
+     writes on the M-mode path are start()'s MPP write and MRET, both of which
+     preserve it ([WpStartNew.st_ms1_kernel_facts] / [cms5_kernel_facts]).
+     MIE / MPRV / SXL are kept as separate conjuncts even though MPRV and SXL
+     overlap the bundle: MIE is not part of it (it is about M-mode delivery),
+     and keeping the other two spares every leaf a projection. *)
   (* [dq]-fractional: the non-duplicable register cells (hart_state,
      cur_privilege, mstatus) are held at fraction [dq]; hw_config / minstret_inv
      are persistent.  A client owning [mmode_config (DfracOwn 1)] can split off a
@@ -747,7 +762,8 @@ Section InstrBytes.
        mstatus ↦ᵣ{ dq } mstatus0 ∗
        ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
        ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
-       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝)%I.
+       ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ ∗
+       ⌜ mstatus_kernel_facts mstatus0 ⌝)%I.
 
   (* [dq]-fractional register cells split/combine: a client owning
      [mmode_config (DfracOwn 1)] may hand a half to [wp_instr] and keep the
@@ -784,7 +800,8 @@ Section InstrBytes.
       mstatus ↦ᵣ{ dq } mstatus0 ∗
       ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
       ⌜ eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ⌝ ∗
-      ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝.
+      ⌜ _get_Mstatus_SXL mstatus0 = 'b"10" ⌝ ∗
+      ⌜ mstatus_kernel_facts mstatus0 ⌝.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* mmode_config_rebuild: reassemble [mmode_config] from raw cells, given the
@@ -796,6 +813,7 @@ Section InstrBytes.
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    mstatus_kernel_facts mstatus0 ->
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -803,9 +821,9 @@ Section InstrBytes.
     mstatus ↦ᵣ{ dq } mstatus0 -∗
     mmode_config dq.
   Proof.
-    iIntros (HmIE HMPRV HSXL) "#Hhw #Hinv Hhs Hpriv Hms".
+    iIntros (HmIE HMPRV HSXL HKF) "#Hhw #Hinv Hhs Hpriv Hms".
     iFrame "Hhw Hinv Hhs Hpriv". iExists mstatus0. iFrame "Hms".
-    iPureIntro. exact (conj HmIE (conj HMPRV HSXL)).
+    iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))).
   Qed.
 
   (* fraction-generic split/combine (the [DfracOwn 1] versions above are the
@@ -816,7 +834,7 @@ Section InstrBytes.
       mmode_config (DfracOwn (q/2)) ∗ mmode_config (DfracOwn (q/2)).
   Proof.
     iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL & %HKF)".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
     iDestruct "Hms" as "[Hms1 Hms2]".
@@ -830,7 +848,7 @@ Section InstrBytes.
     mmode_config (DfracOwn q).
   Proof.
     iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
-    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL & %HKF)".
     iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
     iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
     iCombine "Hhs1 Hhs2" as "Hhs".
@@ -876,7 +894,7 @@ Section InstrBytes.
   Proof.
     iIntros (Hpmp Hstat) "Hmm Hpmpc Hpc Hinstr H".
     iDestruct "Hmm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst" as (mstatus0) "(Hmstatus & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -907,7 +925,8 @@ Section InstrBytes.
     { iIntros "Hhs' Hpc'". iApply ("Hcont" with "[- Hpc' Hpmpc] Hpmpc Hpc'").
       iFrame "Hhw Hinv Hhs' Hpriv".
       iExists mstatus0. iFrame "Hmstatus".
-        iSplitR; [ iPureIntro; exact HmIE | ]. iSplitR; iPureIntro; [ exact HMPRV | exact HSXL ]. }
+        iSplitR; [ iPureIntro; exact HmIE | ]. iSplitR; [ iPureIntro; exact HMPRV | ].
+        iSplitR; iPureIntro; [ exact HSXL | exact HKF ]. }
     iDestruct "Hexec" as %Hexec.
     destruct is_rvc.
     - (* RVC: instr_lift gives F_RVC h decoding to i0 with the state-generic

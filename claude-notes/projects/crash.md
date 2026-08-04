@@ -1339,14 +1339,54 @@ comments now describe the working arrangement, and BootBridge's mis-filing of
 `stvec` as ".bss, from the memory image" is corrected (it is a Sail register —
 slice 2e's finding).
 
-### M6c (2b) — `mstatus_kernel_facts`: THE PLAN, and the reconnaissance (NOT
-### YET IMPLEMENTED)
+### M6c (2b) — `mstatus_kernel_facts` (LANDED)
 
-The decided shape (coordinator's call, option (1) of the blocker above): ONE
-shared predicate, put inside `mmode_config`'s existential, so
-`wp_entry_boot`'s post binder carries it and `boot_bridge`'s ten facts follow.
-**Everything below was verified by reading the tree; it is what makes the job
-small, and it was the main design risk.**
+The blocker above is GONE: `InstrBytes.mmode_config` now carries
+`MstatusFacts.mstatus_kernel_facts mstatus0`, `SpecEntry.wp_entry_boot`'s post
+hands it out as `HoKF`, and `BootBridge.boot_csrs_from_kf` turns it into the
+bridge's five premises without the client ever learning the entry mstatus
+value.  The recorded plan (kept below, since its reconnaissance is what made
+the job small) held with **three corrections**, all worth remembering:
+
+- **THE FIELD-LEMMA FAMILY'S HOME IS `WpGprCsrwC.v`, NOT `MstatusBits.v`.**
+  MstatusBits cannot host a lemma about `mstatus_legalized` at all —
+  that definition (and `have_nom_val`) lives in `WpGprCsrwCommon.v`, ABOVE it,
+  and moving it down would drag `bitvector.tactics`' zify hook along the same
+  way step 1 rejected for the predicate.  WpGprCsrwC is the right home and was
+  already half of it: it owns `bv_extract_update_slice_disjoint`/`_same`, the
+  `g<F>_u<G>` rows, and FOUR of the eleven field lemmas
+  (MIE/MPRV/SXL/MPP) — the WpSieFlipBits primed family duplicated three of
+  those.  So the move collapses two families into one: the `q` rows and the
+  eleven `mstatus_legalized_<FIELD>` lemmas (unprimed) live in WpGprCsrwC, the
+  `g` rows are retired (`gMIE_*` renamed `qMIE_*`, its two external users in
+  WpStartNew re-pointed), and WpSieFlipBits — which already
+  `Require Import`s WpGprCsrwC — lost 380 lines and keeps only L3 and up.
+- **THE WIDENING DOES RIPPLE, to 44 sites in 8 files** — step 3 checked
+  `mmode_config_rebuild`'s call sites but not the leaves that destructure and
+  re-close the bundle BY HAND.  `%HmIE & %HMPRV & %HSXL` (24 sites) and
+  `exact (conj HmIE (conj HMPRV HSXL))` (20) are two exact strings across
+  WpMmode{Load,Store}, WpGprCsrr{A,B,Common}, WpGprCsrw{A,B} and InstrBytes;
+  every one of those leaves only READS mstatus, so each is one `& %HKF` / one
+  extra `conj` and the sweep is `sed`.  Cheap, but it is 44 sites, not 6.
+- **The mask step is SIX lemmas, not ten.**  Only SIE/MXR/TSR/TVM (1-bit) and
+  FS/VS (2-bit) need `_get_Mstatus_X (st_va5_40 ms) = _get_Mstatus_X ms`: XS is
+  Off unconditionally out of the legalizer, SD is a function of FS/XS/VS, and
+  SXL/MIE/MPRV/MPP were already there.  `st_va5_40_MIE`'s existing script
+  factors into two width-indexed tactics (`st_keep1`/`st_keep2`) with a
+  `Z.testbit`-matching inner tactic — the mask bits are only decidable at a
+  CONCRETE index, so a 2-bit field must still split j into 0 and 1.
+
+Also landed, beyond the plan: `WpStartNew.cms5_updates` (MRET's composite as
+the five field setters it is, `reflexivity`) plus `cms5_kernel_facts` and the
+composite `st_boot_ms_kernel_facts`; the 22 extra `q` rows the cms5 ladder
+needs; `BootConfig.mstatus_reset_kernel_facts` (the anchor — the reset mstatus
+satisfies all eleven, which is what makes the widening free for the client);
+`IntrDefs.sconf_ms_facts_of_kernel` (the one-way bridge, whose only content is
+MPP: `have_nom_val` rejects exactly the reserved `'b"10"`).  Both preservation
+lemmas live in WpStartNew because that is the ONLY file where the row family
+(WpGprCsrwC), `cms5` (WpGprMretWp) and the predicate are all in scope.
+
+THE PLAN AS RECORDED (its reconnaissance is still the reason this was small):
 
 1. **The predicate.** `mstatus_kernel_facts ms` := `IntrDefs.sconf_ms_facts`'s
    ten conjuncts **plus** `_get_Mstatus_SIE ms = 'b"0"`. Home: a NEW tiny
@@ -1416,8 +1456,7 @@ content.
 
 ### What is left of M6c after this
 
-- **`mstatus_kernel_facts` (M6c (2b) above) — the prerequisite for ANY
-  composition.** Nothing else on this list is blocked by it, but the chain is.
+- **(DONE — M6c (2b).)** `mstatus_kernel_facts`.
 - then `boot_entry_run` — apply `Entry.wp_entry_boot` with `boot_entry_pre`'s
   output and §1's geometry (every premise now exists), and `boot_bridge` on its
   post. NOTE for the application: `wp_entry_boot`'s `sp0` is the let-bound

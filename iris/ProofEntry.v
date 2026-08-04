@@ -79,13 +79,13 @@ Section ProofEntry.
               Hbnd_ra Hbnd_s0
               with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
                     Hmcen Hstc Hstko Htext [Hcont Hstk]").
-    iIntros (tv ms0 HoIE HoPRV HoSXL)
+    iIntros (tv ms0 HoIE HoPRV HoSXL HoKF)
       "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
        Hmenv Hmcen Hstc Hstko".
     (* ---- <main>, in S-mode: the composed continuation ---- *)
     iEval (change st_main with pcMain) in "Hpc".
     iEval (change st_main with pcMain) in "Hmepc".
-    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL
+    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL HoKF
               with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl
                     Hmie Hmenv Hmcen Hstc Hstk Hstko").
   Qed.

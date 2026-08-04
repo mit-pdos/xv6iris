@@ -71,6 +71,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import StackOwn.
 Require Import RegFile.
 Require Import WpGprCsrwCommon.
+Require Import MstatusFacts.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras WpGpr.
 Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
@@ -238,6 +239,149 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* The OTHER windows of the mstatus write value, all PRESERVED: the AND    *)
+(* mask 0xffffffffffffe7ff clears only bits 12 and 11 and the OR mask sets *)
+(* only bit 11, so every field outside MPP reads through unchanged.  These *)
+(* six are the ones [mstatus_kernel_facts] tracks (SIE, MXR, TSR, TVM     *)
+(* 1-bit; FS, VS 2-bit); XS and SD need none -- the legalizer determines   *)
+(* them outright.  Same script as [st_va5_40_MIE] above, factored into two *)
+(* width-indexed tactics rather than copied six times.                     *)
+(* ===================================================================== *)
+Local Ltac st_keep_norm :=
+  repeat match goal with
+  | |- context[Z.of_N ?t] =>
+      let v := eval vm_compute in (Z.of_N t) in
+      progress (replace (Z.of_N t) with v by (vm_compute; reflexivity))
+  end.
+
+(* at a CONCRETE bit index the two mask bits are decidable: the AND mask has
+   it set, the OR mask has it clear, so the window reads through. *)
+Local Ltac st_keep_bit :=
+  repeat match goal with
+  | |- context[Z.testbit 0xffffffffffffe7ff ?k] =>
+      replace (Z.testbit 0xffffffffffffe7ff k) with true by (vm_compute; reflexivity)
+  | |- context[Z.testbit 0x800 ?k] =>
+      replace (Z.testbit 0x800 k) with false by (vm_compute; reflexivity)
+  end;
+  rewrite andb_true_r orb_false_r; reflexivity.
+
+Local Ltac st_keep_row :=
+  rewrite !Z.mod_pow2_bits_low; [| lia | lia];
+  rewrite !Z.shiftr_spec; [| lia | lia];
+  rewrite Z.lor_spec Z.land_spec; st_keep_bit.
+
+Local Ltac st_keep1 :=
+  st_bit_open; st_keep_norm;
+  apply Z.bits_inj'; intros j Hj;
+  destruct (decide (j < 1)) as [Hj1 | Hj1];
+  [ replace j with 0 by lia; st_keep_row
+  | rewrite !Z.mod_pow2_bits_high; [reflexivity | lia | lia] ].
+
+Local Ltac st_keep2 :=
+  st_bit_open; st_keep_norm;
+  apply Z.bits_inj'; intros j Hj;
+  destruct (decide (j < 2)) as [Hj2 | Hj2];
+  [ destruct (decide (j = 0)) as [-> | Hj0];
+    [ st_keep_row | replace j with 1 by lia; st_keep_row ]
+  | rewrite !Z.mod_pow2_bits_high; [reflexivity | lia | lia] ].
+
+Lemma st_va5_40_SIE (x : mword 64) :
+  _get_Mstatus_SIE (st_va5_40 x) = _get_Mstatus_SIE x.
+Proof. unfold _get_Mstatus_SIE. st_keep1. Qed.
+
+Lemma st_va5_40_MXR (x : mword 64) :
+  _get_Mstatus_MXR (st_va5_40 x) = _get_Mstatus_MXR x.
+Proof. unfold _get_Mstatus_MXR. st_keep1. Qed.
+
+Lemma st_va5_40_TSR (x : mword 64) :
+  _get_Mstatus_TSR (st_va5_40 x) = _get_Mstatus_TSR x.
+Proof. unfold _get_Mstatus_TSR. st_keep1. Qed.
+
+Lemma st_va5_40_TVM (x : mword 64) :
+  _get_Mstatus_TVM (st_va5_40 x) = _get_Mstatus_TVM x.
+Proof. unfold _get_Mstatus_TVM. st_keep1. Qed.
+
+Lemma st_va5_40_FS (x : mword 64) :
+  _get_Mstatus_FS (st_va5_40 x) = _get_Mstatus_FS x.
+Proof. unfold _get_Mstatus_FS. st_keep2. Qed.
+
+Lemma st_va5_40_VS (x : mword 64) :
+  _get_Mstatus_VS (st_va5_40 x) = _get_Mstatus_VS x.
+Proof. unfold _get_Mstatus_VS. st_keep2. Qed.
+
+(* ===================================================================== *)
+(* THE KERNEL mstatus CONTRACT IS PRESERVED BY THE M-MODE BOOT PATH.       *)
+(*                                                                        *)
+(* [MstatusFacts.mstatus_kernel_facts] is what the S-mode side of the      *)
+(* kernel runs under ([IntrDefs.sconf_ms_facts] plus the SIE pin), and     *)
+(* [InstrBytes.mmode_config] carries it, so the boot contract's post can   *)
+(* hand it on.  The two mstatus writes between here and <main> preserve it:*)
+(*   - start()'s [csrw mstatus] writes MPP := Supervisor, i.e. [st_ms1];   *)
+(*   - MRET writes MIE/MPIE/MPP/MPRV (+ MPELP), i.e. [cms5].               *)
+(* Both lemmas live HERE because this is the only file in which the row    *)
+(* family (WpGprCsrwC), [cms5] (WpGprMretWp) and the predicate are all in  *)
+(* scope at once -- WpGprMretWp does not see the rows.                     *)
+(* ===================================================================== *)
+
+Lemma st_ms1_kernel_facts (ms : mword 64) :
+  mstatus_kernel_facts ms -> mstatus_kernel_facts (st_ms1 ms).
+Proof.
+  unfold mstatus_kernel_facts, st_ms1.
+  intros (HSIE & HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
+  split_and!.
+  - rewrite mstatus_legalized_SIE st_va5_40_SIE. exact HSIE.
+  - rewrite mstatus_legalized_MPRV st_va5_40_MPRV. exact HMPRV.
+  - rewrite mstatus_legalized_SXL. exact HSXL.
+  - rewrite mstatus_legalized_MXR st_va5_40_MXR. exact HMXR.
+  - rewrite mstatus_legalized_TSR st_va5_40_TSR. exact HTSR.
+  - rewrite mstatus_legalized_XS. reflexivity.
+  - rewrite mstatus_legalized_FS st_va5_40_FS HFS. vm_compute. reflexivity.
+  - rewrite mstatus_legalized_VS st_va5_40_VS HVS. vm_compute. reflexivity.
+  - rewrite mstatus_legalized_SD st_va5_40_FS st_va5_40_VS HFS HVS.
+    vm_compute. reflexivity.
+  - rewrite mstatus_legalized_MPP st_va5_40_MPP. vm_compute. reflexivity.
+  - rewrite mstatus_legalized_TVM st_va5_40_TVM. exact HTVM.
+Qed.
+
+(* MRET's composite as the five field setters it is, so the row family
+   applies (the shape [ProofEntry] already uses at [cms2]). *)
+Lemma cms5_updates (ms : mword 64) :
+  cms5 ms = _update_Mstatus_MPELP
+              (_update_Mstatus_MPRV
+                 (_update_Mstatus_MPP
+                    (_update_Mstatus_MPIE
+                       (_update_Mstatus_MIE ms (_get_Mstatus_MPIE ms)) ('b"1"))
+                    (privLevel_to_bits User))
+                 ('b"0"))
+              (landing_pad_bits_backwards NO_LP_EXPECTED).
+Proof. reflexivity. Qed.
+
+Lemma cms5_kernel_facts (ms : mword 64) :
+  mstatus_kernel_facts ms -> mstatus_kernel_facts (cms5 ms).
+Proof.
+  unfold mstatus_kernel_facts.
+  intros (HSIE & HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
+  rewrite cms5_updates. split_and!.
+  - rewrite qSIE_uMPELP qSIE_uMPRV qSIE_uMPP qSIE_uMPIE qSIE_uMIE. exact HSIE.
+  - rewrite qMPRV_uMPELP qMPRV_uMPRV. vm_compute. reflexivity.
+  - rewrite qSXL_uMPELP qSXL_uMPRV qSXL_uMPP qSXL_uMPIE qSXL_uMIE. exact HSXL.
+  - rewrite qMXR_uMPELP qMXR_uMPRV qMXR_uMPP qMXR_uMPIE qMXR_uMIE. exact HMXR.
+  - rewrite qTSR_uMPELP qTSR_uMPRV qTSR_uMPP qTSR_uMPIE qTSR_uMIE. exact HTSR.
+  - rewrite qXS_uMPELP qXS_uMPRV qXS_uMPP qXS_uMPIE qXS_uMIE. exact HXS.
+  - rewrite qFS_uMPELP qFS_uMPRV qFS_uMPP qFS_uMPIE qFS_uMIE. exact HFS.
+  - rewrite qVS_uMPELP qVS_uMPRV qVS_uMPP qVS_uMPIE qVS_uMIE. exact HVS.
+  - rewrite qSD_uMPELP qSD_uMPRV qSD_uMPP qSD_uMPIE qSD_uMIE. exact HSD.
+  - rewrite qMPP_uMPELP qMPP_uMPRV qMPP_uMPP. vm_compute. reflexivity.
+  - rewrite qTVM_uMPELP qTVM_uMPRV qTVM_uMPP qTVM_uMPIE qTVM_uMIE. exact HTVM.
+Qed.
+
+(* the composite the boot contract's postcondition needs: the mstatus <main>
+   starts on is [cms5 (st_ms1 ms0)]. *)
+Lemma st_boot_ms_kernel_facts (ms : mword 64) :
+  mstatus_kernel_facts ms -> mstatus_kernel_facts (cms5 (st_ms1 ms)).
+Proof. intros H. exact (cms5_kernel_facts _ (st_ms1_kernel_facts _ H)). Qed.
+
+(* ===================================================================== *)
 (* menvcfg.LPE (bit 2) is never set by the boot flow: the legalizer's     *)
 (* LPE field is written from the written value, whose bit 2 the           *)
 (* [STCE |= bit63] OR does not touch.  Get-over-update ladder in the      *)
@@ -388,7 +532,7 @@ Proof.
     with (_update_Mstatus_MIE (st_ms1 ms) (_get_Mstatus_MPIE (st_ms1 ms))).
   match goal with |- context[update_subrange_vec_dec ?w 7 7 ?x] =>
     change (update_subrange_vec_dec w 7 7 x) with (_update_Mstatus_MPIE w x) end.
-  rewrite gMPP_uMPIE gMPP_uMIE.
+  rewrite qMPP_uMPIE qMPP_uMIE.
   unfold st_ms1. rewrite mstatus_legalized_MPP. rewrite st_va5_40_MPP.
   replace (have_nom_val ('b"01" : mword 2)) with true by (vm_compute; reflexivity).
   vm_compute. reflexivity.
@@ -673,11 +817,16 @@ Section WpStartThm.
     stack_own_phys sp0 n -∗
     kernel_text -∗
     (* the continuation is universally quantified over the (hidden) entry
-       mstatus value [ms0] with its mmode_config invariant facts. *)
+       mstatus value [ms0] with its mmode_config invariant facts -- including
+       [HoKF], the eleven-field kernel contract, which is what lets the S-mode
+       side of the boot chain say anything about the mstatus <main> starts on
+       ([st_boot_ms_kernel_facts] carries it through start()'s write and the
+       MRET).  HoPRV / HoSXL overlap HoKF and are kept for consumers. *)
     ( ∀ (tv : mword 64) (ms0 : mword 64)
         (HoIE : eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false)
         (HoPRV : eq_vec (_get_Mstatus_MPRV ms0) ('b"1") = false)
-        (HoSXL : _get_Mstatus_SXL ms0 = ('b"10")),
+        (HoSXL : _get_Mstatus_SXL ms0 = ('b"10"))
+        (HoKF : mstatus_kernel_facts ms0),
       hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ Supervisor -∗
       mstatus ↦ᵣ cms5 (st_ms1 ms0) -∗
@@ -847,12 +996,12 @@ Section WpStartThm.
     (* ---- unbundle the FULL config once, naming the entry mstatus [ms0];
        split all cells in half: a working bundle at 1/2 + pinned halves. ---- *)
     iDestruct (mmode_config_unbundle with "Hmm") as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
-    iDestruct "Hmst" as (ms0) "(Hms & %HoIE & %HoPRV & %HoSXL)".
+    iDestruct "Hmst" as (ms0) "(Hms & %HoIE & %HoPRV & %HoSXL & %HoKF)".
     iDestruct "Hhs" as "[HhsA HhsK]".
     iDestruct "Hpriv" as "[HprivA HprivK]".
     iDestruct "Hms" as "[HmsA HmsK]".
     iDestruct "Hpcf" as "[HpcfA HpcfK]".
-    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) ms0 HoIE HoPRV HoSXL
+    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) ms0 HoIE HoPRV HoSXL HoKF
                   with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
     (* invariant facts of the post-csrw mstatus value *)
     assert (HmIE1 : eq_vec (_get_Mstatus_MIE (st_ms1 ms0)) ('b"1") = false).
@@ -861,6 +1010,7 @@ Section WpStartThm.
     { unfold st_ms1. rewrite mstatus_legalized_MPRV. rewrite st_va5_40_MPRV. exact HoPRV. }
     assert (HSXL1 : _get_Mstatus_SXL (st_ms1 ms0) = ('b"10")).
     { unfold st_ms1. rewrite mstatus_legalized_SXL. exact HoSXL. }
+    pose proof (st_ms1_kernel_facts ms0 HoKF) as HKF1.
 
     (* ---- 30. c.addi sp, -16 ---- *)
     iApply (wp_addi_gpr Φ st_pc30 true csp_rs1 csp_rs1 (sign_extend' 12 i9) m pmpcfg0 (1/2)%Qp
@@ -984,7 +1134,7 @@ Section WpStartThm.
     iDestruct "Hpriv" as "[HprivA HprivK]".
     iDestruct "Hms" as "[HmsA HmsK]".
     iDestruct "Hpcf" as "[HpcfA HpcfK]".
-    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1
+    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1 HKF1
                   with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
 
     (* ---- 42. auipc a5, 1 ---- *)
@@ -1148,7 +1298,7 @@ Section WpStartThm.
     iDestruct "Hpriv" as "[HprivA HprivK]".
     iDestruct "Hms" as "[HmsA HmsK]".
     iDestruct "Hpcf" as "[HpcfA HpcfK]".
-    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1
+    iPoseProof (mmode_config_rebuild (DfracOwn (1/2)) (st_ms1 ms0) HmIE1 HMPRV1 HSXL1 HKF1
                   with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
 
     (* ---- ADUE write: [menvcfg |= 1<<61] (start+0x58..0x62) ---- *)
@@ -1309,7 +1459,7 @@ Section WpStartThm.
     iDestruct (stack_own_phys_2_intro with "Htra Hts0") as "Ht34".
     iDestruct (stack_own_phys_split_2 sp0 2 4 ltac:(lia) with "[$Ht12 $Ht34]") as "Htop".
     iDestruct (stack_own_phys_split_2 sp0 4 n ltac:(lia) with "[$Htop $Hdeep]") as "Hstk".
-    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Hstk").
+    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL HoKF with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen Hstc Hstk").
   Qed.
 
 

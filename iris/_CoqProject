@@ -22,6 +22,7 @@ PageGeom.v
 KptExecMap.v
 RiscvExec.v
 MinstretInv.v
+MstatusFacts.v
 WireInv.v
 WpVirtio.v
 VirtioQueue.v

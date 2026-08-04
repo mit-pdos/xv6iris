@@ -718,7 +718,7 @@ Section WpCsrwGprNewB.
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -767,7 +767,7 @@ Section WpCsrwGprNewB.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
@@ -798,7 +798,7 @@ Section WpCsrwGprNewB.
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -847,7 +847,7 @@ Section WpCsrwGprNewB.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
@@ -880,7 +880,7 @@ Section WpCsrwGprNewB.
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -932,7 +932,7 @@ Section WpCsrwGprNewB.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hmie Hmdl").
@@ -964,7 +964,7 @@ Section WpCsrwGprNewB.
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -1017,7 +1017,7 @@ Section WpCsrwGprNewB.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
@@ -1049,7 +1049,7 @@ Section WpCsrwGprNewB.
     iIntros (Hpmp Hstat Hrs1) "Hmm [Hpmpc_wp Hpmpc_k] [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL)".
+    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
@@ -1097,7 +1097,7 @@ Section WpCsrwGprNewB.
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV HSXL)). }
+    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
     iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
     iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
     iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
