@@ -157,6 +157,13 @@ are working on that effort — the relevant `projects/` file.
   shared-block lemmas, what the contract deliberately does not say, and the one
   thing standing between sys_pipe and a `LinkSysPipe.v`: `fileclose`, its only
   callee without a proof.
+- **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
+  execution (the Umode tier): the `uv_cap` capability (the sie-cap analog
+  carrying the kernel's interrupt + syscall trap services as assumed
+  round-trip contracts), the concrete-image memory layer (`umem`/`uinstr`
+  over user VAs), the interrupt-absorbing step engine with hart-switching
+  continuations, the Umode leaf WPs, and the sync program's function proofs
+  (start/main + the sync/exit ecall stubs).
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
   `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹

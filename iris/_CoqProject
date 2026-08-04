@@ -1,6 +1,7 @@
 -R . xv6iris
 -R ../model-xv6iris Riscv
 -R ../kernel-rocq Kernel
+-R ../user-rocq User
 # SailStdpp.ConcurrencyInterfaceBuiltins and SailStdpp.Base (which pulls in
 # Prompt_monad) both bind ">>=" etc. to their own monad's `bind`; harmless but
 # noisy once both are in scope (as they are throughout this proof), so silence
@@ -157,6 +158,17 @@ UserMem.v
 UserFetch.v
 UserCompute.v
 UserStepFull.v
+UmodeMem.v
+UmodeCap.v
+UmodeFetch.v
+UmodeAbi.v
+UmodeSyscall.v
+WpUmodeStep.v
+WpUmodeLeaf.v
+WpUmodeStore.v
+SpecSyncProg.v
+UCodeSync.v
+ProofSyncProg.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
