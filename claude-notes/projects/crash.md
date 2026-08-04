@@ -83,12 +83,26 @@ template for milestones 1–4.
    - The `wp_next (fun (CID : CpuId) => …)` continuation lambdas — all
      ~250 — need NO change: gen stays ambient across a migration, which
      is exactly the intended same-generation-resumption semantics.
-   **STAGE 2b (next)**: `ggen`/`gpow` gstate fields (inert: every arm
-   preserves them). **STAGE 2c**: state_interp fixed conjuncts (mono-nat
-   + registry + durable tie) + adequacy allocation. **STAGE 2d**: birth
-   lb + era registration into per-era `minstret_inv`. **STAGE 2e** (the
-   semantic switch, with milestone 3): gating premises + corpse arms +
-   `PowerLoopE` + fork + `PowerModel.v` (`boot_shape`, `dev_reset`).
+   **STAGE 2b LANDED**: inert `ggen`/`gpow` gstate fields (every arm
+   preserves them; nothing reads them). **STAGE 2c LANDED**: the
+   mono-nat generation ghost in `riscvFixedGS` (`riscv_gen_name`),
+   `gen_auth (ggen g)` as `state_interp`'s fourth conjunct framed by all
+   four lifting rules, `gen_born`/`gen_dead` (the persistent birth/death
+   certificates), adequacy allocation. Deliberately DEFERRED from 2c:
+   the gen→era REGISTRY — its value type must be Σ-free data (an era as
+   plain gnames + gname lists, `park_name : nat → gname` becomes an
+   NPROC list, `gen_heapGS` reconstructed from the fixed `gen_heapGpreS`
+   + two stored gnames), because a `ghost_mapΣ nat (riscvEraGS Σ)`
+   functor cannot mention Σ. Land that reshape together with its first
+   consumer.
+   **STAGE 2d (next)**: fold `gen_born gen_id` (+ later the era
+   registration) into `minstret_inv`; adequacy pins `gen_id = ggen g`
+   (premise) and mints the birth certificate for the client bundle.
+   **STAGE 2e** (the semantic switch, with milestone 3): gating premises
+   + corpse arms + `PowerLoopE` + fork + `PowerModel.v` (`boot_shape`,
+   `dev_reset`) + `wp_dead` + the four-way base-rule split +
+   `wp_power_loop` + the minimal adequacy over `[PowerLoopE]`.
+   CrashProto.v is the working template for every piece.
 3. **Death machinery**: `wp_dead`, the base rules' four-way case split
    (`> gen` dead / live / off-refuted-by-registry / `< gen`
    refuted-by-birth-bound), birth lb + era registration folded into the
