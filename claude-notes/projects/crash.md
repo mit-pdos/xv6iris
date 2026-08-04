@@ -2272,11 +2272,34 @@ spec never resets it wholesale:
 
 End state: shrink the patch from `mseccfg = 0` to `PMM = disabled at
 power-on` (stating the tower's premise field-wise), with MLPE and the seed
-bits derived from the reset run. Candidate config question, NOT yet
-user-approved: xv6 never uses pointer masking, so disabling
-Smmpm/Smnpm/Ssnpm in the JSON (same treatment as B/V) might make even the
-PMM garbage harmless — but first check whether the tower's readers gate on
-`currentlyEnabled (Ext_Smmpm)` or read the raw field, and remember the B/V
-lesson: evaluate `config_is_valid` after any extension flip (dependent
-families can force more flips).
+bits derived from the reset run.
+
+**USER-APPROVED (2026-08-04): disable pointer masking in the config** —
+`Smmpm` per the user's directive, and `Smnpm`/`Ssnpm` with it (recommended
+scope: xv6 runs S/U mode, where the same read path consults
+`menvcfg.PMM`/`senvcfg.PMM`, `smode_config` carries the same premise, and
+`menvcfg = 0` is another whole-register pin with the same story). Run this
+AFTER the PMA table retirement lands (regen + same files). The finding that
+shapes what the flip buys, verified against the generated model:
+
+- The read path `transform_effective_address → get_pmlen →
+  is_pmm_applicable → get_pmm` NEVER consults
+  `currentlyEnabled (Ext_Smmpm)` — `get_pmm Machine` reads the raw
+  `mseccfg.PMM` bits (`is_pmm_applicable` checks only access kind,
+  privilege/MXR, xlen). Upstream maintains "PMM = 0 when unimplemented" via
+  `sail_model_init` zeroing + `legalize_mseccfg` refusing writes — init plus
+  write path, never the read path. So the flip does NOT remove the proof's
+  dependence on the initial field value; under reset-only boot the premise
+  remains.
+- What the flip DOES buy: the priv spec makes unimplemented-extension
+  fields read-only zero, so with Smmpm off the `PMM = 0` pin stops being a
+  platform choice and becomes an architecturally mandated fact the model
+  merely can't establish through `reset()` (it stores `mseccfg` as raw
+  bits). Reclassify the pin as a documented model-representation artifact —
+  same epistemic class as the `cancel_reservation` hook. Possibly worth an
+  upstream report (`is_pmm_applicable` arguably should gate on the
+  extension).
+- B/V lesson applies: evaluate `config_is_valid` after the flip (the
+  pointer-masking family may have dependents; the `supported_pmlen_7/16`
+  subfields ride along).
 
