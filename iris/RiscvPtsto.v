@@ -2,7 +2,7 @@
 From Stdlib Require Import Eqdep_dec ZArith.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
+From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat.
 From iris.algebra Require Import csum excl agree.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
@@ -113,6 +113,12 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
   riscvF_parkGS :: ghost_varG Σ bool;
+  (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
+     COUNTER, a mono-nat mirroring [gstate.(ggen)].  FIXED-layer -- it is
+     the one ghost that spans power cycles; [gen_dead] below is the
+     persistent death certificate the corpse arms run on. *)
+  riscvF_genGS :: mono_natG Σ;
+  riscv_gen_name : gname;
 }.
 
 Class riscvEraGS (Σ : gFunctors) := RiscvEraGS {
@@ -229,6 +235,19 @@ Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name.
+
+(* The generation counter's three faces (claude-notes/design/crash.md).
+   [gen_auth] rides in [state_interp] pinned to [gstate.(ggen)]; the lower
+   bounds are persistent.  [gen_born gen] is every generation-[gen]
+   resource bundle's birth certificate (it will ride in that era's
+   [minstret_inv]); [gen_dead gen] is the stable death certificate --
+   PowerOff bumps [ggen], so a generation once passed is dead forever. *)
+Definition gen_auth `{!riscvGS Σ} (n : nat) : iProp Σ :=
+  mono_nat_auth_own riscv_gen_name 1 n.
+Definition gen_born `{!riscvGS Σ} (gen : nat) : iProp Σ :=
+  mono_nat_lb_own riscv_gen_name gen.
+Definition gen_dead `{!riscvGS Σ} (gen : nat) : iProp Σ :=
+  mono_nat_lb_own riscv_gen_name (S gen).
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks
@@ -944,7 +963,8 @@ Definition gregs_interp `{!riscvGS Σ} (gr : CPU -> regstate) : iProp Σ :=
 Global Program Instance riscv_irisGS `{!riscvGS Σ} : irisGS riscv_lang Σ := {
   iris_invGS := riscv_invGS;
   state_interp g _ _ _ :=
-    (gregs_interp g.(gregs) ∗ gen_heap_interp g.(gmem) ∗ dev_interp g.(gdev))%I;
+    (gregs_interp g.(gregs) ∗ gen_heap_interp g.(gmem) ∗ dev_interp g.(gdev) ∗
+     gen_auth g.(ggen))%I;
   fork_post _ := True%I;
   num_laters_per_step _ := 0%nat;
 }.

@@ -166,7 +166,7 @@ Section WPExec.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev)) with "[Hri Hmem Hdev]")
       as (σ' σ'') "(%Hexecf & %Hexect & Hk)".
@@ -191,7 +191,7 @@ Section WPExec.
       | destruct (Huniqf _ _ Hrun2) as [_ ->] ];
       iMod "Hk" as "[(Hri' & Hmem' & Hdev') HWP]";
       iDestruct ("Hclose" with "Hri'") as "Hgr'";
-      iIntros "_ !>"; rewrite /state_interp /=; iFrame "Hgr' Hmem' Hdev' HWP".
+      iIntros "_ !>"; rewrite /state_interp /=; iFrame "Hgr' Hmem' Hdev' Hgen HWP".
   Qed.
 
 End WPExec.
@@ -226,7 +226,7 @@ Section WPDev.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. do 4 eexists. right; left. eexists.
@@ -240,7 +240,7 @@ Section WPDev.
       [ discriminate Hcontra | | discriminate Hcontra | discriminate Hcontra ].
     injection Hue as <-.
     iMod ("Hk" $! d' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' Hgen HWP".
   Qed.
 
   (* the disk: [dvirtio]/[dplic] AND the byte memory.  The BYTE MEMORY is
@@ -258,7 +258,7 @@ Section WPDev.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. do 4 eexists. right; right; left. eexists.
@@ -273,7 +273,7 @@ Section WPDev.
       [ discriminate Hcontra | discriminate Hcontra | | discriminate Hcontra ].
     injection Hde as <-.
     iMod ("Hk" $! d' m' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' Hgen HWP".
   Qed.
 
   (* the wire: reads [dplic], writes ONE hart's registers.  Memory and the
@@ -289,7 +289,7 @@ Section WPDev.
   Proof.
     iIntros "H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "[Hgr [Hmem Hdev]]".
+    iIntros (g ns κ κs nt) "[Hgr [Hmem [Hdev Hgen]]]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. do 4 eexists. right; right; right. eexists.
@@ -304,7 +304,7 @@ Section WPDev.
       [ discriminate Hcontra | discriminate Hcontra | discriminate Hcontra | ].
     injection Hpe as <-.
     iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' HWP".
+    iIntros "_ !>". rewrite /state_interp /=. iFrame "Hgr' Hmem' Hdev' Hgen HWP".
   Qed.
 
 End WPDev.

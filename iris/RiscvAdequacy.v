@@ -50,7 +50,7 @@
 
 From stdpp Require Import gmap finite bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
+From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
 From iris.program_logic Require Import weakestpre adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -96,6 +96,8 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      [SpecProcinit.procs_inv_alloc] as the third guarded slot of every
      proc's lock resource. *)
   riscv_pre_parkGS :: ghost_varG Σ bool;
+  (* the generation counter (crash/power layer) *)
+  riscv_pre_genGS :: mono_natG Σ;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -110,7 +112,8 @@ Definition riscvΣ : gFunctors :=
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
      GFunctor kptR;
-     ghost_varΣ bool ].
+     ghost_varΣ bool;
+     mono_natΣ ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -404,7 +407,8 @@ Proof.
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
   (* EVERY proc slot's park receipt, minted at [false] *)
   iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
-  set (HR := RiscvGS Σ (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _)
+  iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth _]".
+  set (HR := RiscvGS Σ (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ γgen)
                (RiscvEraGS Σ f Hgen γu γp γv γk γkpt γs γsie γpark)).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
@@ -480,16 +484,17 @@ Proof.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
        (gregs_interp g'.(gregs) ∗ gen_heap_interp g'.(gmem) ∗
-        dev_interp g'.(gdev))%I),
+        dev_interp g'.(gdev) ∗ gen_auth g'.(ggen))%I),
     (replicate (length (cpu_pool cs)) (fun _ : mval => True%I)),
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ HR)).
   cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA HvA".
+  iSplitL "Hauths Hh HuA HpA HvA Hgenauth".
   { (* the initial state interpretation *)
     iSplitL "Hauths".
     { rewrite /gregs_interp. iApply big_sepL_enum_to_set. iExact "Hauths". }
-    iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
+    iFrame "Hh". iSplitR "Hgenauth"; last iExact "Hgenauth".
+    iSplitL "HuA"; [iExact "HuA"|].
     iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
   iSplitL "Hwps Hwpu Hwpd Hwpp".
   { (* the WPs of the initial threads: the harts, then the three devices *)
