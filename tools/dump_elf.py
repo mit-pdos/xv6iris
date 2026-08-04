@@ -1,31 +1,45 @@
 #!/usr/bin/env python3
-"""Dump the RISC-V instructions of a built xv6 kernel into a Rocq (.v) file.
+"""Dump a RISC-V ELF image into Rocq (.v) / Lean definitions.
 
-The xv6 kernel is an ELF executable (``kernel/kernel``).  We disassemble its
-executable sections with ``objdump`` and emit a self-contained Rocq file that
-lists every instruction as a record:
+Works for any statically-linked rv64 ELF built by the xv6 tree: the KERNEL
+(``xv6-riscv/kernel/kernel``, loaded at 0x80000000 in S/M-mode) and the
+USER-SPACE programs (``xv6-riscv/user/_sync`` & friends, linked at virtual
+address 0 by ``user/user.ld`` and loaded by ``exec()`` into a per-process page
+table).  Nothing here is kernel-specific: every generated name is derived from
+``--prefix``, so a kernel dump and a user-program dump can be `Require`d into
+the same proof without clashing.
 
-    Record kinstr := MkKInstr {
-      ki_addr  : Z;     (* virtual address of the instruction          *)
-      ki_width : nat;   (* instruction width in bits: 16 (RVC) or 32   *)
-      ki_enc   : Z;     (* the instruction word, exactly as Sail fetches it
-                           from memory (little-endian bytes -> integer) *)
-      ki_asm   : string (* objdump disassembly, kept only for humans    *)
-    }.
+We disassemble the executable sections with ``objdump`` and emit:
 
-The ``ki_enc`` value is precisely the integer that the Sail RISC-V model
-obtains when it fetches the instruction from memory and assembles the bytes
-little-endian.  It is therefore the value to feed into Sail's instruction
-decoder (e.g. ``encdec_backwards`` / ``encdec_compressed_backwards``) once the
-Sail RISC-V Rocq semantics are imported.
+  ``--format rocq``       the TEXT image as ``<prefix>_bytes : gmap Z (bv 8)``,
+                          keyed by byte address, plus ``<prefix>_instrs``, a
+                          decode index (instruction number -> addr/width/enc).
+  ``--format rocq-data``  every loadable byte NOT covered by an instruction, as
+                          ``<prefix>_data : gmap Z (bv 8)``, plus the image
+                          geometry the loader needs: ``<prefix>MemBase``,
+                          ``<prefix>MemEnd``, ``<prefix>Entry`` (the ELF entry
+                          pc) and ``<prefix>_segments`` (the PT_LOAD table).
+  ``--format rocq-syms``  the symbol table, one ``Definition <sym> : Z`` each.
+
+  (``lean``, ``lean-data``, ``lean-syms``, ``lean-decode`` are the Lean mirrors
+  from the previous iteration of this development.)
+
+The byte VALUES are exactly what the Sail RISC-V model fetches from memory: an
+instruction word is its little-endian bytes assembled into an integer, i.e. the
+value to feed ``encdec_backwards`` / ``encdec_compressed_backwards``.
 
 Usage:
-    dump_kernel.py [--kernel PATH] [--out PATH] [--objdump PROG] [--name N]
+    dump_elf.py [--elf PATH] [--prefix P] [--format F] [--out PATH]
+                [--objdump PROG] [--name N]
 
 Defaults assume the layout of this project:
-    kernel  = <repo>/xv6-riscv/kernel/kernel
-    out     = <repo>/rocq/KernelInstrs.v
+    elf     = <repo>/xv6-riscv/kernel/kernel
+    prefix  = derived from the ELF basename ("_sync" -> "sync")
     objdump = $OBJDUMP or riscv64-linux-gnu-objdump (then a few fallbacks)
+
+Outputs are only rewritten when their content actually changes, so re-running
+the dumper (e.g. after an unrelated edit to this script) does not touch the
+mtime of a generated .v and therefore does not trigger a Rocq rebuild.
 """
 
 from __future__ import annotations
@@ -55,6 +69,85 @@ OBJDUMP_CANDIDATES = [
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
+GEN_BY = "tools/" + os.path.basename(__file__)
+
+
+def write_if_changed(path: str, text: str) -> None:
+    """Write `text` to `path`, but leave the file (and its mtime) alone when the
+    content is already identical.  The generated .v files are prerequisites of a
+    Rocq build; rewriting one with identical bytes would still invalidate every
+    .vo that depends on it."""
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    try:
+        with open(path) as f:
+            if f.read() == text:
+                return
+    except FileNotFoundError:
+        pass
+    with open(path, "w") as f:
+        f.write(text)
+
+
+@dataclass
+class Names:
+    """Every generated Rocq/Lean identifier, derived from one `--prefix`.
+
+    The kernel dump keeps the historical names (`kernel_bytes`, `kernel_data`,
+    `kernelMemBase`, ...); a user program linked at address 0 gets `sync_bytes`,
+    `syncMemBase`, ... so both can be `Require`d side by side."""
+    prefix: str          # "kernel", "sync", ...
+
+    @property
+    def camel(self) -> str:      # "kernel" -> "Kernel";  "sync" -> "Sync"
+        return "".join(p.capitalize() for p in self.prefix.split("_"))
+
+    @property
+    def bytes_(self) -> str:  return f"{self.prefix}_bytes"
+    @property
+    def instrs(self) -> str:  return f"{self.prefix}_instrs"
+    @property
+    def data(self) -> str:    return f"{self.prefix}_data"
+    @property
+    def syms(self) -> str:    return f"{self.prefix}_symbols"
+    @property
+    def base(self) -> str:    return f"{self.prefix}MemBase"
+    @property
+    def end(self) -> str:     return f"{self.prefix}MemEnd"
+    @property
+    def entry(self) -> str:   return f"{self.prefix}Entry"
+    @property
+    def segs(self) -> str:    return f"{self.prefix}_segments"
+    # The decode-index RECORD keeps one fixed name across all images.  It holds
+    # no image-specific data (addr/width/enc), and naming it per-prefix would
+    # rewrite every one of the ~8500 entries of a kernel re-dump — burying a
+    # real address change in thousands of lines of rename noise, in exactly the
+    # diff you re-dump in order to read.  A file Requiring two dumps qualifies
+    # (`Kernel.KernelInstrs.kinstr` vs `User.SyncInstrs.kinstr`); the maps
+    # themselves, which is what proofs actually name, are prefixed.
+    @property
+    def record(self) -> str:  return "kinstr"
+    @property
+    def ctor(self) -> str:    return "MkKInstr"
+
+    # Lean mirrors (camelCase, as in the previous iteration of this project).
+    @property
+    def lean_instrs(self) -> str: return f"{self.prefix}Instrs"
+    @property
+    def lean_data(self) -> str:   return f"{self.prefix}Data"
+    @property
+    def lean_syms(self) -> str:   return f"{self.prefix}Symbols"
+    @property
+    def lean_encs(self) -> str:   return f"{self.prefix}Encs"
+
+
+def default_prefix(elf: str) -> str:
+    """A dump prefix from the ELF's file name: `kernel/kernel` -> `kernel`,
+    `user/_sync` -> `sync` (xv6 links user programs as `_<name>`)."""
+    base = os.path.basename(elf).lstrip("_")
+    base = re.sub(r"[^A-Za-z0-9_]", "_", base)
+    if not re.match(r"^[A-Za-z_]", base):
+        base = "_" + base
+    return base
 
 
 @dataclass
@@ -136,8 +229,9 @@ def lean_string(s: str) -> str:
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def emit_lean(items: list[object], out_path: str, kernel: str, objdump: str,
-              name: str) -> tuple[int, int]:
+def emit_lean(items: list[object], out_path: str, elf: str, objdump: str,
+              names: Names) -> tuple[int, int]:
+    name = names.lean_instrs
     insns = [it for it in items if isinstance(it, Insn)]
     n = len(insns)
     lo = min((it.addr for it in insns), default=0)
@@ -146,14 +240,14 @@ def emit_lean(items: list[object], out_path: str, kernel: str, objdump: str,
     lines: list[str] = []
     w = lines.append
     w("/- ------------------------------------------------------------------")
-    w("   AUTO-GENERATED by tools/dump_kernel.py -- DO NOT EDIT BY HAND.")
-    w(f"   Source kernel : {os.path.relpath(kernel, REPO)}")
+    w(f"   AUTO-GENERATED by {GEN_BY} -- DO NOT EDIT BY HAND.")
+    w(f"   Source ELF    : {os.path.relpath(elf, REPO)}")
     w(f"   Disassembler  : {objdump}")
     w(f"   Instructions  : {n}")
     w(f"   Address range : 0x{lo:x} .. 0x{hi:x}")
     w("   ------------------------------------------------------------------ -/")
     w("")
-    w("/-- One instruction of the kernel image.  `enc` is exactly the integer the")
+    w("/-- One instruction of the image.  `enc` is exactly the integer the")
     w("    Sail RISC-V decoder consumes: the instruction word assembled from the")
     w("    little-endian memory bytes.  Feed it to `encdec_backwards`")
     w("    (32-bit) or `encdec_compressed_backwards` (16-bit) as a `BitVec`.")
@@ -217,59 +311,86 @@ def emit_lean(items: list[object], out_path: str, kernel: str, objdump: str,
     w(f"/- Total instructions = {n} (in {len(chunk_names)} chunks of <= {CHUNK}). -/")
     w("")
 
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
 
 
-def load_segments(kernel: str) -> list[tuple[int, bytes]]:
-    """Return the ELF's PT_LOAD segments as (vaddr, file_bytes) — the loadable
-    on-disk image (code + data; excludes zero-initialised .bss tail)."""
+@dataclass
+class Segment:
+    """One PT_LOAD program header: what the loader must map, and from where."""
+    vaddr: int
+    filesz: int
+    memsz: int
+    flags: int          # PF_X=1, PF_W=2, PF_R=4
+    data: bytes         # the `filesz` on-disk bytes
+
+    def flag_str(self) -> str:
+        return ("R" if self.flags & 4 else "-") + \
+               ("W" if self.flags & 2 else "-") + \
+               ("X" if self.flags & 1 else "-")
+
+
+@dataclass
+class Elf:
+    """The bits of a 64-bit little-endian ELF this dumper needs: the entry pc
+    and the PT_LOAD segments.  A user program (`user/_sync`) has a low, often
+    ZERO, base vaddr and an entry that is *not* the first byte of .text (xv6
+    links `start` ahead of `main`), so neither may be assumed."""
+    path: str
+    entry: int
+    segments: list[Segment]     # PT_LOAD only, in program-header order
+
+
+def read_elf(path: str) -> Elf:
     import struct
-    f = open(kernel, "rb").read()
-    if f[:4] != b"\x7fELF" or f[4] != 2:
-        sys.exit("expected a 64-bit ELF kernel")
+    f = open(path, "rb").read()
+    if f[:4] != b"\x7fELF" or f[4] != 2 or f[5] != 1:
+        sys.exit(f"{path}: expected a 64-bit little-endian ELF")
+    e_entry = struct.unpack_from("<Q", f, 0x18)[0]
     e_phoff = struct.unpack_from("<Q", f, 0x20)[0]
     e_phentsize = struct.unpack_from("<H", f, 0x36)[0]
     e_phnum = struct.unpack_from("<H", f, 0x38)[0]
-    segs: list[tuple[int, bytes]] = []
+    segs: list[Segment] = []
     for i in range(e_phnum):
         off = e_phoff + i * e_phentsize
         p_type = struct.unpack_from("<I", f, off)[0]
+        if p_type != 1:  # PT_LOAD
+            continue
+        p_flags = struct.unpack_from("<I", f, off + 4)[0]
         p_offset = struct.unpack_from("<Q", f, off + 8)[0]
         p_vaddr = struct.unpack_from("<Q", f, off + 16)[0]
         p_filesz = struct.unpack_from("<Q", f, off + 32)[0]
-        if p_type == 1 and p_filesz:  # PT_LOAD
-            segs.append((p_vaddr, f[p_offset:p_offset + p_filesz]))
-    return segs
+        p_memsz = struct.unpack_from("<Q", f, off + 40)[0]
+        segs.append(Segment(vaddr=p_vaddr, filesz=p_filesz, memsz=p_memsz,
+                            flags=p_flags,
+                            data=f[p_offset:p_offset + p_filesz]))
+    if not segs:
+        sys.exit(f"{path}: no PT_LOAD segments")
+    return Elf(path=path, entry=e_entry, segments=segs)
 
 
-def image_extent(kernel: str) -> tuple[int, int]:
+def load_segments(elf_path: str) -> list[tuple[int, bytes]]:
+    """The loadable on-disk image as (vaddr, file_bytes) per PT_LOAD segment
+    (code + data; excludes the zero-initialised .bss tail).  A segment with
+    `filesz = 0` (xv6 user programs have one: .data is empty, .bss is not)
+    contributes no bytes."""
+    return [(s.vaddr, s.data) for s in read_elf(elf_path).segments if s.filesz]
+
+
+def image_extent(elf_path: str) -> tuple[int, int]:
     """Return (base, end) of the loadable image *including* zero-init .bss:
     base = lowest PT_LOAD vaddr, end = highest vaddr + memsz."""
-    import struct
-    f = open(kernel, "rb").read()
-    e_phoff = struct.unpack_from("<Q", f, 0x20)[0]
-    e_phentsize = struct.unpack_from("<H", f, 0x36)[0]
-    e_phnum = struct.unpack_from("<H", f, 0x38)[0]
-    base, end = None, 0
-    for i in range(e_phnum):
-        off = e_phoff + i * e_phentsize
-        if struct.unpack_from("<I", f, off)[0] != 1:  # PT_LOAD
-            continue
-        p_vaddr = struct.unpack_from("<Q", f, off + 16)[0]
-        p_memsz = struct.unpack_from("<Q", f, off + 40)[0]
-        base = p_vaddr if base is None else min(base, p_vaddr)
-        end = max(end, p_vaddr + p_memsz)
-    return (base or 0, end)
+    segs = read_elf(elf_path).segments
+    return (min(s.vaddr for s in segs), max(s.vaddr + s.memsz for s in segs))
 
 
-def emit_lean_syms(items: list[object], out_path: str, kernel: str,
-                   objdump: str, name: str) -> tuple[int, int]:
-    """Emit the ELF symbol table as `kernelSymbols : List (String × Nat)` plus a
-    `sym : String -> Nat` lookup, so Lean code can name addresses (`sym "main"`)
-    instead of hard-coding them."""
+def emit_lean_syms(items: list[object], out_path: str, elf: str,
+                   objdump: str, names: Names) -> tuple[int, int]:
+    """Emit the ELF symbol table as `<prefix>Symbols : List (String × Nat)` plus
+    a `sym : String -> Nat` lookup, so Lean code can name addresses
+    (`sym "main"`) instead of hard-coding them."""
+    name = names.lean_syms
+    kernel = elf
     # Derive the matching `nm` from the objdump program (same tool prefix).
     base = os.path.basename(objdump)
     nm = objdump[: -len("objdump")] + "nm" if base.endswith("objdump") else "nm"
@@ -294,7 +415,7 @@ def emit_lean_syms(items: list[object], out_path: str, kernel: str,
 
     lines: list[str] = []
     w = lines.append
-    w("/- AUTO-GENERATED by tools/dump_kernel.py (--format lean-syms).")
+    w(f"/- AUTO-GENERATED by {GEN_BY} (--format lean-syms).")
     w(f"   Symbol table of {os.path.relpath(kernel, REPO)}: {n} symbols.")
     w("   `sym \"name\"` returns the symbol's address (0 if unknown). -/")
     w("")
@@ -315,20 +436,19 @@ def emit_lean_syms(items: list[object], out_path: str, kernel: str,
     w(f"def sym (n : String) : Nat := (({name}.find? (fun p => p.1 == n)).map (·.2)).getD 0")
     w("")
 
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
 
 
-def emit_lean_data(items: list[object], out_path: str, kernel: str,
-                   objdump: str, name: str) -> tuple[int, int]:
-    """Emit the loadable *data* of the kernel image as a `List KInstr` of 64-bit
+def emit_lean_data(items: list[object], out_path: str, elf: str,
+                   objdump: str, names: Names) -> tuple[int, int]:
+    """Emit the loadable *data* of the image as a `List KInstr` of 64-bit
     words (reusing the KInstr shape; width is in bits).  "Data" = every byte of
     the PT_LOAD image not covered by a dumped instruction, so code (from
-    `kernelInstrs`) + this together reconstruct the full on-disk image.  Zero
-    bytes inside the image are kept (the model faults on reads of unmapped
+    the instruction dump) + this together reconstruct the full on-disk image.
+    Zero bytes inside the image are kept (the model faults on reads of unmapped
     memory, so the data sections must be present in full)."""
+    name, kernel = names.lean_data, elf
     insns = [it for it in items if isinstance(it, Insn)]
     covered = set()
     for it in insns:
@@ -363,16 +483,19 @@ def emit_lean_data(items: list[object], out_path: str, kernel: str,
 
     lines: list[str] = []
     w = lines.append
-    w("/- AUTO-GENERATED by tools/dump_kernel.py (--format lean-data).")
+    w(f"/- AUTO-GENERATED by {GEN_BY} (--format lean-data).")
     w(f"   Loadable data of {os.path.relpath(kernel, REPO)} not covered by")
     w(f"   instructions: {n} words, address range 0x{lo:x}..0x{hi:x}.")
     w("   Reuses `KInstr` (width in bits); load it the same way as the code. -/")
-    w("import KernelInstrs")
+    w(f"import {names.camel}Instrs")
     w("")
+    elf_info = read_elf(kernel)
     base, end = image_extent(kernel)
-    w(f"/-- Lowest loadable address. -/\ndef kernelMemBase : Nat := 0x{base:x}")
+    w(f"/-- Lowest loadable address. -/\ndef {names.base} : Nat := 0x{base:x}")
     w(f"/-- End of the loadable image including zero-init .bss (vaddr+memsz). -/")
-    w(f"def kernelMemEnd : Nat := 0x{end:x}")
+    w(f"def {names.end} : Nat := 0x{end:x}")
+    w(f"/-- ELF entry point (the initial pc). -/")
+    w(f"def {names.entry} : Nat := 0x{elf_info.entry:x}")
     w("")
     CHUNK = 200
     chunk_names: list[str] = []
@@ -390,20 +513,19 @@ def emit_lean_data(items: list[object], out_path: str, kernel: str,
         w(f"def {name} : List KInstr := []")
     w("")
 
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
 
 
-def emit_lean_decode(items: list[object], out_path: str, kernel: str,
-                     objdump: str, name: str) -> tuple[int, int]:
-    """Emit a Lean harness that decodes every kernel instruction through the
-    (reduced, executable) Sail model and reports coverage.
+def emit_lean_decode(items: list[object], out_path: str, elf: str,
+                     objdump: str, names: Names) -> tuple[int, int]:
+    """Emit a Lean harness that decodes every instruction of the image through
+    the (reduced, executable) Sail model and reports coverage.
 
     Drop the file into the generated model package directory
     (build/model/Lean_RV64D_executable) and run with `lake env lean`.
     """
+    name, kernel = names.lean_encs, elf
     insns = [it for it in items if isinstance(it, Insn)]
     # Distinct (enc, width); decode is a pure function of the word.
     pairs = sorted({(it.enc, it.width) for it in insns})
@@ -412,11 +534,11 @@ def emit_lean_decode(items: list[object], out_path: str, kernel: str,
 
     lines: list[str] = []
     w = lines.append
-    w("/- AUTO-GENERATED by tools/dump_kernel.py (--format lean-decode).")
+    w(f"/- AUTO-GENERATED by {GEN_BY} (--format lean-decode).")
     w("   Place in the generated model package (Lean_RV64D_executable) and run:")
     w("     lake build LeanRV64DExecutable.ZcbInsts   -- compressed decoder (orphan module)")
-    w("     lake env lean KernelDecode.lean")
-    w(f"   Source kernel: {os.path.relpath(kernel, REPO)}  ({n_all} instrs, {n} distinct). -/")
+    w(f"     lake env lean {names.camel}Decode.lean")
+    w(f"   Source ELF: {os.path.relpath(kernel, REPO)}  ({n_all} instrs, {n} distinct). -/")
     w("import LeanRV64DExecutable")
     w("import LeanRV64DExecutable.ZcbInsts   -- encdec_compressed_backwards lives here")
     w("open LeanRV64DExecutable.Functions")
@@ -450,7 +572,7 @@ def emit_lean_decode(items: list[object], out_path: str, kernel: str,
     w("  if width == 32 then encdec_backwards (BitVec.ofNat 32 enc)")
     w("  else encdec_compressed_backwards (BitVec.ofNat 16 enc)")
     w("")
-    w("/-- Decode the whole kernel; count OK vs ILLEGAL. -/")
+    w("/-- Decode the whole image; count OK vs ILLEGAL. -/")
     w(f"def coverage : SailM (Nat × Nat) := do")
     w("  let mut ok := 0")
     w("  let mut bad := 0")
@@ -470,14 +592,13 @@ def emit_lean_decode(items: list[object], out_path: str, kernel: str,
     w('  | .error _ _ => "error"')
     w("")
 
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
 
 
-def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
-              name: str) -> tuple[int, int]:
+def emit_rocq(items: list[object], out_path: str, elf: str, objdump: str,
+              names: Names) -> tuple[int, int]:
+    name, kernel = names.bytes_, elf
     insns = [it for it in items if isinstance(it, Insn)]
     n = len(insns)
     lo = min((it.addr for it in insns), default=0)
@@ -511,8 +632,8 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     lines: list[str] = []
     w = lines.append
     w("(* ------------------------------------------------------------------ *)")
-    w("(* AUTO-GENERATED by tools/dump_kernel.py -- DO NOT EDIT BY HAND.      *)")
-    w(f"(* Source kernel : {os.path.relpath(kernel, REPO)}")
+    w(f"(* AUTO-GENERATED by {GEN_BY} -- DO NOT EDIT BY HAND.         *)")
+    w(f"(* Source ELF    : {os.path.relpath(kernel, REPO)}")
     w(f"   Disassembler : {objdump}")
     w(f"   Instructions : {n}   Bytes : {nbytes}")
     w(f"   Address range: 0x{lo:x} .. 0x{hi:x}                              *)")
@@ -523,10 +644,10 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     w("From stdpp.bitvector Require Import definitions.")
     w("Import ListNotations.")
     w("")
-    w("(* The kernel text image, exposed as a [gmap] keyed by individual byte")
+    w("(* The text image, exposed as a [gmap] keyed by individual byte")
     w("   ADDRESS mapping to that byte's VALUE (a [bv 8]).  Fetching an")
     w("   instruction at [pc] of width [W] bytes is just [W] consecutive byte")
-    w("   lookups ([kernel_bytes !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte")
+    w(f"   lookups ([{name} !! pc], [!! (pc+1)], ...), so the 2- vs 4-byte")
     w("   encodings and adjacent-byte windows need no special handling.  The map")
     w("   is built from a single flat (address, byte) list with [list_to_map];")
     w("   no chunking is needed because each entry is tiny (two numbers). *)")
@@ -543,7 +664,7 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     w(f"   addresses, so [{name} !! addr] yields that byte. *)")
     w("")
     # CRITICAL for build speed: keep typeclass resolution from ever unfolding this
-    # giant map.  Without this, resolving e.g. [Persistent ([∗ map] .. kernel_bytes ..)]
+    # giant map.  Without this, resolving e.g. [Persistent ([∗ map] .. <prefix>_bytes ..)]
     # forces the 20k-entry [list_to_map] and takes ~2 MINUTES per resolution; with it,
     # ~0ms.  [vm_compute]/[reflexivity] still unfold it (they ignore this), so byte
     # lookups are unaffected.
@@ -552,16 +673,17 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
     # Auxiliary per-instruction DECODE-INDEX metadata: just (address, width-bits,
     # encoding) per instruction, NO asm, so the flat list elaborates without
     # chunking.  This is NOT the byte-storage format (that is the per-byte
-    # [kernel_bytes] above, which owns every byte); it only lets a proof name the
-    # i-th instruction so it can pick the right decode lemma + fetch window.  The
-    # window bytes themselves are still extracted per-byte via [kernel_window].
-    w("Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.")
+    # [<prefix>_bytes] above, which owns every byte); it only lets a proof name
+    # the i-th instruction so it can pick the right decode lemma + fetch window.
+    # The window bytes themselves are still extracted per-byte from the map.
+    w(f"Record {names.record} := {names.ctor} "
+      "{ ki_addr : Z; ki_width : nat; ki_enc : Z }.")
     w("")
     w("(* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup")
     w("   of the i-th instruction.  [Typeclasses Opaque] so resolution never forces")
-    w("   the map (cf. kernel_bytes). *)")
+    w(f"   the map (cf. {name}). *)")
     cur_label2 = None
-    w("Definition kernel_instrs : gmap Z kinstr := list_to_map [")
+    w(f"Definition {names.instrs} : gmap Z {names.record} := list_to_map [")
     first2 = True
     insn_idx = 0
     for it in items:
@@ -573,29 +695,30 @@ def emit_rocq(items: list[object], out_path: str, kernel: str, objdump: str,
             cur_label2 = None
         sep = "  " if first2 else "; "
         first2 = False
-        w(f"{sep}(({insn_idx})%Z, MkKInstr (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z)")
+        w(f"{sep}(({insn_idx})%Z, {names.ctor} (0x{it.addr:x})%Z {it.width}%nat (0x{it.enc:x})%Z)")
         insn_idx += 1
     w("].")
     w("")
-    w("Global Typeclasses Opaque kernel_instrs.")
+    w(f"Global Typeclasses Opaque {names.instrs}.")
     w("")
 
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
 
 
-def emit_rocq_data(items: list[object], out_path: str, kernel: str,
-                   objdump: str, name: str) -> tuple[int, int]:
-    """The loadable DATA of the kernel image (every PT_LOAD byte NOT covered by a
+def emit_rocq_data(items: list[object], out_path: str, elf: str,
+                   objdump: str, names: Names) -> tuple[int, int]:
+    """The loadable DATA of the image (every PT_LOAD byte NOT covered by a
     dumped instruction), as a PER-BYTE `gmap Z (bv 8)` keyed by byte ADDRESS ->
-    byte VALUE -- exactly like [kernel_bytes] for the code.  Plus [kernelMemBase]
-    and [kernelMemEnd] (= vaddr+memsz, INCLUDING zero-init .bss).  [kernel_bytes]
-    (code) + this map = the full on-disk image; the BSS zero-init region is
-    [kernelMemBase, kernelMemEnd) minus the loaded bytes.  ONE flat [list_to_map]
-    (no chunking; each entry is tiny), and [Typeclasses Opaque] so resolution
-    never forces the map (cf. kernel_bytes)."""
+    byte VALUE -- exactly like [<prefix>_bytes] for the code.  Plus the geometry
+    a loader needs: [<prefix>MemBase], [<prefix>MemEnd] (= vaddr+memsz,
+    INCLUDING zero-init .bss), [<prefix>Entry] (the initial pc) and
+    [<prefix>_segments] (the PT_LOAD table: what to map, and with what
+    permissions).  [<prefix>_bytes] (code) + this map = the full on-disk image;
+    the BSS zero-init region is [MemBase, MemEnd) minus the loaded bytes.  ONE
+    flat [list_to_map] (no chunking; each entry is tiny), and [Typeclasses
+    Opaque] so resolution never forces the map."""
+    name, kernel = names.data, elf
     insns = [it for it in items if isinstance(it, Insn)]
     covered: set[int] = set()
     for it in insns:
@@ -612,14 +735,16 @@ def emit_rocq_data(items: list[object], out_path: str, kernel: str,
     lo = data_addrs[0] if data_addrs else 0
     hi = (data_addrs[-1] + 1) if data_addrs else 0
     base, end = image_extent(kernel)
+    elf_info = read_elf(kernel)
 
     lines: list[str] = []
     w = lines.append
     w("(* ------------------------------------------------------------------ *)")
-    w("(* AUTO-GENERATED by tools/dump_kernel.py (--format rocq-data).        *)")
+    w(f"(* AUTO-GENERATED by {GEN_BY} (--format rocq-data).           *)")
     w(f"(* Loadable data of {os.path.relpath(kernel, REPO)} not covered by")
     w(f"   instructions: {n} bytes, address range 0x{lo:x} .. 0x{hi:x}.")
-    w("   Per-byte [gmap], same shape as [kernel_bytes] for the code.        *)")
+    w(f"   Per-byte [gmap], same shape as [{names.bytes_}] for the code.")
+    w("                                                                       *)")
     w("(* ------------------------------------------------------------------ *)")
     w("")
     w("From Stdlib Require Import List ZArith.")
@@ -628,9 +753,26 @@ def emit_rocq_data(items: list[object], out_path: str, kernel: str,
     w("Import ListNotations.")
     w("")
     w("(* Lowest loadable address. *)")
-    w(f"Definition kernelMemBase : Z := 0x{base:x}%Z.")
+    w(f"Definition {names.base} : Z := 0x{base:x}%Z.")
     w("(* End of the loadable image INCLUDING zero-init .bss (vaddr + memsz). *)")
-    w(f"Definition kernelMemEnd : Z := 0x{end:x}%Z.")
+    w(f"Definition {names.end} : Z := 0x{end:x}%Z.")
+    w("(* ELF entry point: the pc the image starts executing at.  For a user")
+    w("   program this is what [exec] puts in the trapframe's epc -- NOT the")
+    w("   lowest text address (xv6 links `start` ahead of `main`). *)")
+    w(f"Definition {names.entry} : Z := 0x{elf_info.entry:x}%Z.")
+    w("")
+    w("(* The PT_LOAD program headers, in program-header order:")
+    w("     (vaddr, filesz, memsz, flags)   with flags = PF_X 1 | PF_W 2 | PF_R 4.")
+    w("   [filesz] bytes come from the image maps above (code + data); the")
+    w("   remaining [memsz - filesz] bytes are zero-filled (.bss).  This is what")
+    w("   a loader walks: for a user program, one entry per [exec] segment. *)")
+    segs = ";\n".join(
+        f"    ((0x{s.vaddr:x})%Z, (0x{s.filesz:x})%Z, (0x{s.memsz:x})%Z, ({s.flags})%Z)"
+        f"   (* {s.flag_str()} *)"
+        for s in elf_info.segments)
+    w(f"Definition {names.segs} : list (Z * Z * Z * Z) := [")
+    w(segs)
+    w("  ].")
     w("")
     w(f"Definition {name} : gmap Z (bv 8) := list_to_map [")
     for i, a in enumerate(data_addrs):
@@ -638,15 +780,13 @@ def emit_rocq_data(items: list[object], out_path: str, kernel: str,
         w(f"{sep}((0x{a:x})%Z, Z_to_bv 8 (0x{image[a]:x})%Z)")
     w("].")
     w("")
-    # Keep typeclass resolution from ever forcing this giant map (cf. kernel_bytes).
+    # Keep typeclass resolution from ever forcing this giant map (cf. the code map).
     w(f"Global Typeclasses Opaque {name}.")
     w("")
     w(f"(* Total data bytes = {n}; keys are byte addresses, [{name} !! addr]. *)")
     w("")
 
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
 
 
@@ -672,12 +812,15 @@ def rocq_ident(nm_name: str) -> str:
     return ident
 
 
-def emit_rocq_syms(items: list[object], out_path: str, kernel: str,
-                   objdump: str, name: str) -> tuple[int, int]:
+def emit_rocq_syms(items: list[object], out_path: str, elf: str,
+                   objdump: str, names: Names) -> tuple[int, int]:
     """Rocq mirror of emit_lean_syms: the ELF symbol table as one
     `Definition <name> : Z := 0x...%Z.` per symbol, so proofs can name
-    addresses directly (`KernelSyms._entry`, `KernelSyms.kernelvec`, ...)
-    instead of going through a map lookup."""
+    addresses directly (`KernelSyms._entry`, `KernelSyms.kernelvec`,
+    `SyncSyms.main`, ...) instead of going through a map lookup.  Each dump
+    lives in its own module, so the same symbol name (`main`) in the kernel and
+    in a user program does not clash."""
+    kernel = elf
     base = os.path.basename(objdump)
     nm = objdump[: -len("objdump")] + "nm" if base.endswith("objdump") else "nm"
     if not shutil.which(nm):
@@ -699,7 +842,7 @@ def emit_rocq_syms(items: list[object], out_path: str, kernel: str,
     n = len(syms)
 
     # Sanitize to valid Rocq identifiers and check the sanitization didn't
-    # introduce any collisions (it hasn't, as of the current kernel image,
+    # introduce any collisions (it hasn't, as of the current images,
     # but a future symbol set might: fail loudly rather than silently
     # shadowing one Definition with another).
     idents: dict[str, str] = {}
@@ -714,11 +857,11 @@ def emit_rocq_syms(items: list[object], out_path: str, kernel: str,
     lines: list[str] = []
     w = lines.append
     w("(* ------------------------------------------------------------------ *)")
-    w("(* AUTO-GENERATED by tools/dump_kernel.py (--format rocq-syms).        *)")
+    w(f"(* AUTO-GENERATED by {GEN_BY} (--format rocq-syms).           *)")
     w(f"(* Symbol table of {os.path.relpath(kernel, REPO)}: {n} symbols.")
     w("   One [Definition <name> : Z] per symbol -- refer to a symbol's")
-    w("   address directly as `KernelSyms.<name>` (e.g. `KernelSyms._entry`,")
-    w("   `KernelSyms.kernelvec`). A handful of ELF names aren't valid Rocq")
+    w(f"   address directly as `{names.camel}Syms.<name>` (e.g.")
+    w(f"   `{names.camel}Syms.main`). A handful of ELF names aren't valid Rocq")
     w("   identifiers as-is (e.g. GCC's `.0`/`.1` static-local disambiguation")
     w("   suffixes); those are sanitized (non-ident chars -> `_`), noted below.")
     w("                                                                       *)")
@@ -738,67 +881,57 @@ def emit_rocq_syms(items: list[object], out_path: str, kernel: str,
     w(f"(* Total symbols = {n}. *)")
     w("")
 
-    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    with open(out_path, "w") as f:
-        f.write("\n".join(lines))
+    write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)
+
+
+# format -> (emitter, default output directory, default file suffix).  The
+# default file name is <Module><suffix>, e.g. KernelInstrs.v / SyncInstrs.v.
+FORMATS = {
+    "lean":        (emit_lean,        "lean",        "Instrs.lean"),
+    "lean-data":   (emit_lean_data,   "lean",        "Data.lean"),
+    "lean-syms":   (emit_lean_syms,   "lean",        "Syms.lean"),
+    "lean-decode": (emit_lean_decode, "lean",        "Decode.lean"),
+    "rocq":        (emit_rocq,        "kernel-rocq", "Instrs.v"),
+    "rocq-data":   (emit_rocq_data,   "kernel-rocq", "Data.v"),
+    "rocq-syms":   (emit_rocq_syms,   "kernel-rocq", "Syms.v"),
+}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--kernel", default=os.path.join(REPO, "xv6-riscv", "kernel", "kernel"))
-    ap.add_argument("--format",
-                    choices=["lean", "lean-data", "lean-syms", "lean-decode",
-                             "rocq", "rocq-data", "rocq-syms"],
-                    default="lean",
-                    help="output: 'lean' (instruction data), 'lean-data' "
-                         "(loadable data words), 'lean-syms' (symbol table), "
-                         "'lean-decode' (decode/coverage harness), or 'rocq'. "
+    ap.add_argument("--elf", "--kernel", dest="elf",
+                    default=os.path.join(REPO, "xv6-riscv", "kernel", "kernel"),
+                    help="the ELF to dump: the xv6 kernel (default) or a user "
+                         "program, e.g. xv6-riscv/user/_sync")
+    ap.add_argument("--prefix", default=None,
+                    help="prefix for every generated name (<prefix>_bytes, "
+                         "<prefix>MemBase, ...).  Default: from the ELF's file "
+                         "name ('kernel', '_sync' -> 'sync')")
+    ap.add_argument("--format", choices=list(FORMATS), default="lean",
+                    help="output: 'rocq' (text image + decode index), "
+                         "'rocq-data' (loadable data + image geometry), "
+                         "'rocq-syms' (symbol table), or their 'lean' mirrors "
+                         "('lean', 'lean-data', 'lean-syms', 'lean-decode'). "
                          "Default: lean")
     ap.add_argument("--out", default=None,
-                    help="output file (default depends on --format)")
+                    help="output file (default depends on --format and --prefix)")
     ap.add_argument("--objdump", default=None)
-    ap.add_argument("--name", default=None,
-                    help="name of the generated instruction-list definition")
     args = ap.parse_args()
 
-    if not os.path.exists(args.kernel):
-        sys.exit(f"kernel not found: {args.kernel}\n"
-                 "Build it first (cd xv6-riscv && make kernel/kernel).")
+    if not os.path.exists(args.elf):
+        sys.exit(f"ELF not found: {args.elf}\n"
+                 "Build it first: `make -C xv6-riscv kernel/kernel` for the "
+                 "kernel, `make -C xv6-riscv fs.img` for the user programs.")
 
-    if args.format == "lean":
-        out = args.out or os.path.join(REPO, "lean", "KernelInstrs.lean")
-        name = args.name or "kernelInstrs"
-        emit_fn = emit_lean
-    elif args.format == "lean-data":
-        out = args.out or os.path.join(REPO, "lean", "KernelData.lean")
-        name = args.name or "kernelData"
-        emit_fn = emit_lean_data
-    elif args.format == "lean-syms":
-        out = args.out or os.path.join(REPO, "lean", "KernelSyms.lean")
-        name = args.name or "kernelSymbols"
-        emit_fn = emit_lean_syms
-    elif args.format == "lean-decode":
-        out = args.out or os.path.join(REPO, "lean", "KernelDecode.lean")
-        name = args.name or "kernelEncs"
-        emit_fn = emit_lean_decode
-    elif args.format == "rocq-data":
-        out = args.out or os.path.join(REPO, "kernel-rocq", "KernelData.v")
-        name = args.name or "kernel_data"
-        emit_fn = emit_rocq_data
-    elif args.format == "rocq-syms":
-        out = args.out or os.path.join(REPO, "kernel-rocq", "KernelSyms.v")
-        name = args.name or "kernel_symbols"
-        emit_fn = emit_rocq_syms
-    else:
-        out = args.out or os.path.join(REPO, "rocq", "KernelInstrs.v")
-        name = args.name or "kernel_bytes"
-        emit_fn = emit_rocq
+    names = Names(prefix=args.prefix or default_prefix(args.elf))
+    emit_fn, out_dir, suffix = FORMATS[args.format]
+    out = args.out or os.path.join(REPO, out_dir, names.camel + suffix)
 
     objdump = find_objdump(args.objdump)
-    items = disassemble(objdump, args.kernel)
-    n, nlines = emit_fn(items, out, args.kernel, objdump, name)
+    items = disassemble(objdump, args.elf)
+    n, nlines = emit_fn(items, out, args.elf, objdump, names)
     print(f"Wrote {n} instructions ({nlines} lines) to {out}")
 
 
