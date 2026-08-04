@@ -778,15 +778,11 @@ Procedure to repeat: `make dump`, then `git diff --stat kernel-rocq/` and
 confirm insertions only; a single deletion means image drift and the regen
 must be reverted, not committed.
 
-**VERIFICATION STATUS of this slice, stated exactly:** the full `-k` rebuild
-that the `kernel-rocq` regen forces was at **508 of ~660 files with ZERO
-errors** when this was committed (a budget wall, not a failure). Everything
-that could possibly be affected had already recompiled clean in that run:
-`KernelInstrs`/`KernelData`, `RiscvLang`, `KernelText`, `BootCarve` (log line
-88) and `RiscvAdequacy`. The files still queued were downstream whole-function
-proofs, which appended lemmas cannot affect. **The next session should
-re-run `make -f CoqMakefile -j16 -k` and the four checkers before building on
-top of this**, and if the tail is clean, drop this paragraph.
+**VERIFICATION (complete):** the full `-k` rebuild the regen forces came
+back green -- 674 files, zero errors -- and `lemma_diff` / `spec_vacuity` /
+`proof_coverage --check` are clean, with `Print Assumptions` on BOTH
+`riscv_power_adequacy` and `riscv_device_adequacy` still exactly the 5
+`rv64d.*` axioms.
 
 **BUDGET WARNING for any future dumper change:** regenerating `kernel-rocq/`
 invalidates `RiscvLang.vo` (RiscvLang names the image) and therefore the
