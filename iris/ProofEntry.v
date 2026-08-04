@@ -26,7 +26,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import WpEntryNew WpTimerinit WpStartNew.
+Require Import WpEntryNew WpStartNew.
 Require Import SpecEntry.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.

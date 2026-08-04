@@ -72,7 +72,7 @@ Require Import StackOwn.
 Require Import RegFile.
 Require Import WpGprCsrwCommon.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode ExecCommon WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras WpGpr.
 Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeUtype.
@@ -85,10 +85,8 @@ Require Import WpGprMretWp.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeMret.
 Require Import InstrBytes KernelText WpTimerinit.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import WpDecodeBridge.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Require Import CodeStart.

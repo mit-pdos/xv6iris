@@ -749,7 +749,6 @@ Qed.
    [exec_execute_ZICOND_RTYPE_gpr] (ZicondGpr.v) is already total and
    premise-free, so the totality form is a corollary. *)
 Require Import ZicondGpr.
-Require Import WpMmodeLeafBase.
 
 Lemma exec_execute_ZICOND_RTYPE_total (i2 i1 ird : mword 5)
     (op : zicondop) (s : mstate) :

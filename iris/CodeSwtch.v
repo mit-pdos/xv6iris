@@ -14,12 +14,10 @@ Require Import WpDecode KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.
 Require Import SmodeCore KernelRvcDecode.
-Require Import VcGen VcGenS.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import WpDecodeBridge.
-Require Import SwtchCtx.
 Local Open Scope Z_scope.
 Import Defs.
 

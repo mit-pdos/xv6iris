@@ -4,7 +4,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvExec RiscvTryStep RiscvFetchExec ExecCommon.
+Require Import RiscvLang RiscvExec RiscvFetchExec ExecCommon.
 Local Open Scope Z_scope.
 
 

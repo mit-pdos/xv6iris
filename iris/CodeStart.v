@@ -8,28 +8,17 @@ From iris.base_logic.lib Require Import ghost_map.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import StackOwn.
-Require Import RegFile.
-Require Import WpGprCsrwCommon.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras WpDecode ExecCommon WpGpr.
-Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode ExecCommon.
 Require Import WpMmodeLeafBase.
-Require Import WpMmodeUtype.
-Require Import WpMmodeAddiw.
-Require Import WpMmodeItype.
-Require Import WpMmodeRtype.
-Require Import WpMmodeStore.
-Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
+Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB.
 Require Import WpGprMretWp.
 Require Import WpMmodeLeafBase.
-Require Import WpMmodeMret.
-Require Import InstrBytes KernelText WpTimerinit CodeTimerinit.
+Require Import InstrBytes KernelText CodeTimerinit.
 Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import WpDecodeBridge.
-Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 

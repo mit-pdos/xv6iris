@@ -10,7 +10,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpDecode ExecCommon WpGpr WpGprCsrwCommon.
+Require Import MinstretInv InstrBytes WpDecode ExecCommon WpGpr.
 Require Import SRegime.
 Require Import KptShare.
 Require Import SmodeCore WpMmodeLeafBase.
