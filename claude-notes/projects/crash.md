@@ -509,6 +509,91 @@ fudgeable:**
    pmpcfg_boot`, `pma_allows_all pma_boot` (blocked on 1),
    mstatus's MIE/MPRV/SXL from `0xA00000000`, `_get_MEnvcfg_LPE 0 = 0`.
 
+## M6b-pre (NOT STARTED — scoped 2026-08-04, execute in this order)
+
+Two prerequisites, both identified in M6a. The scoping below is measured,
+not guessed.
+
+**(1) Make `pma_allows_all` satisfiable.** Current shape
+(RiscvFetchExec.v:60):
+```coq
+forall (a : mword 64) (n : Z), exists r,
+  matching_pma_region regions (Physaddr a) n = Some r /\ <permissive>
+```
+The fix is the two bounds the model itself assumes (the Sail source's own
+precondition comment on `matching_pma_region` is `1 <= width <= 4096`):
+```coq
+forall (a : mword 64) (n : Z),
+  1 <= n <= 4096 -> uint a + n <= 2^64 -> exists r, …
+```
+`uint a + n <= 2^64` is the one that matters: `range_subset` (rv64d.v:6273)
+compares `a_begin ≤u a_end` *relative to the region base*, so a wrapping
+access matches NO region, whatever the table.
+
+BLAST RADIUS, measured: `pma_allows_all` appears 141 times in 35 files,
+but almost all of those THREAD it as a premise (`pma_allows_all
+(register_lookup pma_regions σ.(sregs)) ->`) and are unaffected. What
+needs work is the APPLIER sites — the lemmas that instantiate the ∀ and
+hand a `matching_pma_region … = Some region` hypothesis down (30 files
+carry such hypotheses, always at a CONCRETE width 2/4/8, so the `1 <= n
+<= 4096` half is a literal check). Each applier must produce `uint a + n
+<= 2^64` from its local context; in every real case the address is owned
+and therefore canonical, so `RiscvPtsto.mem_canonical` (`uint a < 2^38`)
+is the source — the work is threading that fact from the points-to to the
+applier, NOT inventing it. Start at `RiscvFetchExec.pma_allows_all_pte_read`
+(→ `KptPt.pma_allows_pte_read`, which is also address-unbounded and needs
+the same treatment) and walk outward; expect the bound to stop at the
+first lemma that already owns the bytes.
+
+**A proof that cannot supply the bound is a LATENT BUG, not an
+inconvenience**: it means the proof only went through because the
+unbounded premise was unsatisfiable. Record any such site rather than
+weakening around it.
+
+Then: `pma_allows_all pma_boot` (the M6a-pinned table: one region, base 0,
+size 2^64-1, all-permitting) becomes provable — `range_subset` reduces to
+`a ≤u a + n` under the new bound.
+
+**(2) Construct `hw_config`.** It has NO construction site in the tree
+today (only consumers), which is why nothing has had to produce
+`misa ↦ᵣ□ …`. With M6a's `reset_regs` pinning the values, the recipe is:
+take the per-hart register elems out of `power_boot_res` (they arrive as
+`ghost_map_elem … (existT r (register_lookup r (g'.(gregs) c)))`, i.e. AT
+the `reset_regs` values), `RiscvPtsto.reg_pointsto_persist` the five
+frozen ones (misa, mseccfg, pma_regions, htif_tohost_base, elp — template
+`TimerCap.v:95`), and discharge the pure facts by `vm_compute` from the
+pinned values. `mmode_config` additionally wants hart_state/cur_privilege
+/mstatus at a fraction (all pinned) plus `minstret_inv` (allocated by the
+client, not here).
+
+`boot_D : CPU -> gset register` (to define in PowerBoot.v) is the
+documented MINIMUM the boot client must ask adequacy for: the twelve
+`reset_regs` registers (PC, cur_privilege, hart_state, mhartid, mstatus,
+misa, mseccfg, menvcfg, htif_tohost_base, elp, pma_regions, pmpcfg_n)
++ pmpaddr_n + the eight `wp_entry_boot` quantifies (mepc, satp, medeleg,
+mideleg, mie, mcounteren, stimecmp) + the `minstret_inv` cells
+(minstret, mcycle, mtime, mip) + the GPR file. Cross-check against
+`riscv_system_adequacy`'s `D` at the existing client before fixing it.
+
+## M6b (NOT STARTED) — the boot-image carving library
+
+`iris/BootCarve.v`: from `power_boot_res`'s raw mem conjunct plus
+`boot_facts`, produce the bundles SpecEntry/SpecMain's preconditions
+mention. Three slices, each landable green on its own:
+(a) the three-way split — sub-`text_end` bytes → `kernel_text` (lift the
+    `Htext` ↦ₓ□ persist block out of `riscv_system_adequacy`'s proof into
+    a reusable lemma instead of duplicating it, together with the
+    `kmap_static_claims` persist step), `[text_end, img_end)` →
+    `kernel_data` + owned ↦ₘ, and the PHYSICAL cuts (stack0 pages for
+    `stack_own_phys`, the `entry_ld_ea` word) taken out BEFORE the ↦ₘ
+    upgrade;
+(b) typed 4/8-byte cells at kernel-symbol addresses with their image
+    values (bss = 0, data = the dump's words), following InstrBytes'
+    `word_pointsto_join4` and `kernel_data_window`;
+(c) the kinit page run `[s1entry, PHYSTOP)` → `[∗ list] p ∈ ps, page_own p`
+    + `prun`, peeled SYMBOLICALLY (durable-notes large-map rules).
+Nothing wires into adequacy until M6c/M6d.
+
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item), now over the
 pinned `boot_facts`: carve the image out of the RAM-total memory
