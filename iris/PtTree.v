@@ -432,12 +432,6 @@ Definition pt_addr1 (p2 : mword 64) (vpn : mword 27) : mword 64 :=
 Definition pt_addr0 (p1 : mword 64) (vpn : mword 27) : mword 64 :=
   u_pte_addr (u_next_base p1) (vpn_idx 0 vpn).
 
-(* [CommonWalk.u_pte_addr_no_wrap] in the leaf slot's own spelling -- the
-   address premise the [pma_allows_pte_write] appliers discharge. *)
-Lemma pt_addr0_no_wrap (p1 : mword 64) (vpn : mword 27) (n : Z) :
-  Z.leb n 4096 = true -> uint (pt_addr0 p1 vpn) + n < 18446744073709551616.
-Proof. exact (u_pte_addr_no_wrap (u_next_base p1) (vpn_idx 0 vpn) n). Qed.
-
 (* ===================================================================== *)
 (* §3 Per-vpn walk facts (SHALLOW: the explicit 3-level path).            *)
 (* ===================================================================== *)
@@ -810,6 +804,19 @@ Definition pt_slot_mem (sg : mstate) (a : Arch.pa) (w : mword 64) : Prop :=
      sg.(mem) !! pa_add a j = Some (nth_byte w j)) /\
   addr_is_ram a /\ addr_is_ram (pa_add a 7) /\
   is_aligned_paddr (Physaddr a) 8 = true.
+
+(* A SLOT IS IN THE RAM PMA CLASS.  This is the walk layer's only supplier of
+   [pma_allows_pte_read] / [pma_allows_pte_write]'s address premise, and it is
+   free: [pt_slot_mem] already records both ends of the slot in RAM, which is
+   exactly what the class asks (base at or above the DRAM base, END at or
+   below its top -- the end bound being the one an all-addresses statement
+   silently skipped). *)
+Lemma pt_slot_ram_access (sg : mstate) (a : Arch.pa) (w : mword 64) :
+  pt_slot_mem sg a w -> pma_ram_access a 8.
+Proof.
+  intros (_ & Hlo & Hhi & _).
+  exact (pma_access_ram a 8 7 Hlo Hhi (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl).
+Qed.
 
 Lemma addr_is_ram_pa0 (a : Arch.pa) : addr_is_ram (pa_add a 0) -> addr_is_ram a.
 Proof.

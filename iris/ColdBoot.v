@@ -59,13 +59,36 @@
 (* disagree, ask which of the two is describing the machine you mean to verify     *)
 (* before assuming the constant is the thing to move.                             *)
 (*                                                                            *)
+(* THE PMA TABLE'S MODEL VALUE IS NOW A NAMED, PROVEN FACT -- AND THE PATCH IS *)
+(* WHAT IT IS MEASURED AGAINST.  [sail_model_init] writes a THREE-region table  *)
+(* (boot ROM, MMIO band, DRAM bank); §4 extracts it as [pma_model_table] and    *)
+(* [cold_boot_pma] proves, by running the model, that that IS what the register *)
+(* holds.  [RiscvLang.pma_boot] is still ONE all-permitting region, so the      *)
+(* theorem below still applies [register_set pma_regions pma_boot] -- but the   *)
+(* idealization is now the visible difference between two compiled values       *)
+(* rather than a table nobody compared against the model.                      *)
+(*   WHAT BLOCKS REPLACING [pma_boot] WITH [pma_model_table]: the DRAM region's *)
+(* [PMA_atomic_support] is AMOCASQ, while the verified-user-mode AMO classifier *)
+(* ([UserMemClassify]) consumes the EXACT [= AMOSwap] to conclude that a        *)
+(* non-AMOSWAP user AMO FAULTS -- at AMOCASQ every op is permitted instead, so  *)
+(* that arm has to be re-derived (and Zacas is enabled, so AMOCAS too).  The     *)
+(* tower's PMA obligation is already stated PER ADDRESS CLASS                   *)
+(* ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), which is the other half  *)
+(* the real table needs.  claude-notes/projects/crash.md has the account.       *)
+(*                                                                            *)
+(* THE CONFIG ASSERT IS SATISFIED, NOT AVOIDED.  [init_model ""] starts with     *)
+(* [assert (config_is_valid tt)], and [config_is_valid] READS [pma_regions] (in  *)
+(* [check_mem_layout], which wants the CLINT inside a configured IOMemory        *)
+(* region, and in [within_configured_pma_memory]); everything else in its twelve *)
+(* checks is pure configuration.  The chain runs at the MODEL's table, where it   *)
+(* is TRUE -- [cold_boot_config_valid] says so as a lemma rather than leaving it  *)
+(* implicit in [cold_boot_exec], because a rejected config shows up only as       *)
+(* [cold_state]'s [lazymatch] finding no [Some], which says nothing about WHY.    *)
+(* (At the one-region idealization the same check computes to FALSE, which is     *)
+(* why the assert could never have been anchored on [pma_boot] itself.)           *)
+(*                                                                            *)
 (* WHAT THE RUN DOES *NOT* ESTABLISH -- the rest of the residue, and it is       *)
 (* short:                                                                       *)
-(*  - [pma_regions = pma_boot] is an IDEALIZATION, not a model fact:            *)
-(*    [sail_model_init] writes a THREE-region table (a ROM window, the MMIO      *)
-(*    band, and the DRAM bank) while [pma_boot] is ONE all-permitting region.    *)
-(*    It is taken as a patch ([register_set pma_regions pma_boot]), so the       *)
-(*    idealization is visible in the statement rather than buried.               *)
 (*  - mie, mideleg, and pmpcfg's R/W/X bits are written by NO line of the        *)
 (*    chain: they come out of the model's initial register file, whose fields    *)
 (*    are [inhabitant] -- i.e. zero.  So they remain PLATFORM assumptions        *)
@@ -201,10 +224,17 @@ Proof. reflexivity. Qed.
 (* the reservation hook, as the model documents it: it moves no machine state *)
 Definition cold_hook : M unit := returnm tt.
 
-Definition boot_init (hid : mword 64) : M unit :=
+(* the chain's PRE-[init_model] half: the compiled register initializers plus
+   the board's two hooks.  Split out because the config assert lives at exactly
+   this state -- [config_is_valid] reads [pma_regions], which
+   [sail_model_init] has by then written and which [reset] never touches. *)
+Definition boot_pre (hid : mword 64) : M unit :=
   sail_model_init tt >>
   set_pc_reset_address (boot_w64 0x80000000) >>
-  write_reg mhartid hid >>
+  write_reg mhartid hid.
+
+Definition boot_init (hid : mword 64) : M unit :=
+  boot_pre hid >>
   init_model_at "" cold_hook >>
   init_boot_requirements tt.
 
@@ -231,6 +261,26 @@ Definition cold_s0 : mstate := MState init_regstate ∅ dev0_state.
      instead of being RESTATED as the chain's output: it sits inside [prim_step]
      and hence inside WP goals all over the tree, where any tactic that reduces
      the goal would meet the chain. The values live there; the proof lives here. *)
+(* THE PRE-[init_model] STATE, computed once, and the model's own verdict on
+   the configuration at it.  Both are [vm_cast_no_check]s for the reason the
+   header gives: a plain [reflexivity] would leave the kernel's LAZY evaluator
+   to redo the whole initializer chain. *)
+Definition pre_state (hid : mword 64) : mstate.
+Proof.
+  let x := eval vm_compute in (exec (boot_pre hid) cold_s0) in
+  lazymatch x with Some (_, ?s) => exact s end.
+Defined.
+
+Lemma boot_pre_exec (hid : mword 64) :
+  exec (boot_pre hid) cold_s0 = Some (tt, pre_state hid).
+Proof. vm_cast_no_check (eq_refl (Some (tt, pre_state hid))). Qed.
+
+(* THE CONFIG IS VALID -- the positive fact the [init_model] anchor rests on.
+   It reads registers only, so the state comes back unchanged. *)
+Lemma cold_boot_config_valid (hid : mword 64) :
+  exec (config_is_valid tt) (pre_state hid) = Some (true, pre_state hid).
+Proof. vm_cast_no_check (eq_refl (Some (true, pre_state hid))). Qed.
+
 Definition cold_state (hid : mword 64) : mstate.
 Proof.
   let x := eval vm_compute in (exec (boot_init hid) cold_s0) in
@@ -266,9 +316,9 @@ Proof. reflexivity. Qed.
 (* ---------------------------------------------------------------------- *)
 (* 3. THE THEOREM: [reset_regs] is what the model's cold boot produces.     *)
 (*                                                                         *)
-(*    ONE [register_set] is left -- the PMA idealization (see the header) -- *)
-(*    and every other conjunct, misa included, is closed by computing the    *)
-(*    model's own code.                                                     *)
+(*    ONE [register_set] is left -- the PMA idealization (see the header) --  *)
+(*    and every other conjunct, misa included, is closed by computing the     *)
+(*    model's own code.  §4 names the value the patch overwrites.             *)
 (* ---------------------------------------------------------------------- *)
 
 (* MISA IS RUN-DERIVED NOW, and this lemma is what says so: [reset_misa] sets
@@ -283,7 +333,8 @@ Lemma cold_boot_misa (hid : mword 64) :
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Definition cold_regs_boot (c : CPU) : regstate :=
-  (* THE ONE PATCH: the PMA table, idealized to one all-permitting region *)
+  (* THE ONE PATCH: the PMA table, idealized to one all-permitting region.
+     §4 below is what it is measured against. *)
   register_set pma_regions pma_boot
     (cold_regs (boot_w64 (Z.of_nat (fin_to_nat c)))).
 
@@ -300,3 +351,110 @@ Proof.
                and nat equality is decidable, so UIP closes it -- no axiom. *)
           | (vm_compute; f_equal; apply (Eqdep_dec.UIP_dec Nat.eq_dec)) ].
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4. THE MODEL'S OWN PMA TABLE, extracted and kernel-checked.              *)
+(*                                                                         *)
+(*    [sail_model_init] ends with one [write_reg pma_regions [...]] of three *)
+(*    regions (rv64d.v; the values come from the memory map in               *)
+(*    model-xv6iris/sail-config-rv64d.json).  The literal is transcribed here *)
+(*    -- and then CHECKED: [cold_boot_pma] proves it IS what the model's own   *)
+(*    cold boot leaves in the register, so a config or model move that changes *)
+(*    a base, a size or an attribute breaks the build here rather than          *)
+(*    silently making the transcription a fiction (the same discipline           *)
+(*    [RiscvFetchExec.MISA_C] / [cold_boot_misa] follow).                       *)
+(*                                                                             *)
+(*    WHAT THE THREE REGIONS ARE.  The boot ROM at 0x1000 is IOMemory,          *)
+(*    read-only and NOT executable; nothing the proofs touch lives there, and    *)
+(*    it matters only because it is FIRST in the list and so has to be shown     *)
+(*    NOT to match a RAM or device access.  The MMIO band at 0x2000000 (size     *)
+(*    0x10000000) is IOMemory R/W with no atomics and no PTE access, and every   *)
+(*    device window sits inside it (CLINT, PLIC, UART, virtio-mmio --            *)
+(*    [RiscvPtsto.mmio_base]).  The DRAM bank at 0x80000000 (size 0x8000000) is  *)
+(*    MainMemory R/W/X with AMOCASQ atomics and PTE reads/writes, and its range  *)
+(*    is EXACTLY [RiscvPtsto.addr_is_ram]'s.  Between and outside them there are *)
+(*    HOLES -- which is why the tower's obligation is per address class          *)
+(*    ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]) and why an             *)
+(*    all-addresses one could only ever have held of an idealization.            *)
+(* ---------------------------------------------------------------------- *)
+
+Definition pma_model_rom_attrs : PMA := {|
+  PMA_mem_type := IOMemory;
+  PMA_cacheable := true;
+  PMA_coherent := false;
+  PMA_executable := false;
+  PMA_readable := true;
+  PMA_writable := false;
+  PMA_read_idempotent := true;
+  PMA_write_idempotent := true;
+  PMA_misaligned_exceptions := {|
+    PMAMisalignedExceptions_load_store := None;
+    PMAMisalignedExceptions_vector := None;
+    PMAMisalignedExceptions_amo := AccessFault |};
+  PMA_atomic_support := AMONone;
+  PMA_reservability := RsrvNone;
+  PMA_supports_cbo_zero := false;
+  PMA_supports_pte_read := false;
+  PMA_supports_pte_write := false |}.
+
+Definition pma_model_io_attrs : PMA := {|
+  PMA_mem_type := IOMemory;
+  PMA_cacheable := false;
+  PMA_coherent := true;
+  PMA_executable := false;
+  PMA_readable := true;
+  PMA_writable := true;
+  PMA_read_idempotent := false;
+  PMA_write_idempotent := false;
+  PMA_misaligned_exceptions := {|
+    PMAMisalignedExceptions_load_store := None;
+    PMAMisalignedExceptions_vector := None;
+    PMAMisalignedExceptions_amo := AccessFault |};
+  PMA_atomic_support := AMONone;
+  PMA_reservability := RsrvNone;
+  PMA_supports_cbo_zero := false;
+  PMA_supports_pte_read := false;
+  PMA_supports_pte_write := false |}.
+
+Definition pma_model_ram_attrs : PMA := {|
+  PMA_mem_type := MainMemory;
+  PMA_cacheable := true;
+  PMA_coherent := true;
+  PMA_executable := true;
+  PMA_readable := true;
+  PMA_writable := true;
+  PMA_read_idempotent := true;
+  PMA_write_idempotent := true;
+  PMA_misaligned_exceptions := {|
+    PMAMisalignedExceptions_load_store := None;
+    PMAMisalignedExceptions_vector := None;
+    PMAMisalignedExceptions_amo := AccessFault |};
+  PMA_atomic_support := AMOCASQ;
+  PMA_reservability := RsrvEventual;
+  PMA_supports_cbo_zero := true;
+  PMA_supports_pte_read := true;
+  PMA_supports_pte_write := true |}.
+
+Definition pma_model_table : list PMA_Region :=
+  [ {| PMA_Region_base := boot_w64 0x1000;
+       PMA_Region_size := boot_w64 0x1000;
+       PMA_Region_attributes := pma_model_rom_attrs;
+       PMA_Region_include_in_device_tree := false |};
+    {| PMA_Region_base := boot_w64 0x2000000;
+       PMA_Region_size := boot_w64 0x10000000;
+       PMA_Region_attributes := pma_model_io_attrs;
+       PMA_Region_include_in_device_tree := false |};
+    {| PMA_Region_base := boot_w64 ram_lo;
+       PMA_Region_size := boot_w64 (ram_hi - ram_lo);
+       PMA_Region_attributes := pma_model_ram_attrs;
+       PMA_Region_include_in_device_tree := true |} ].
+
+(* THE TIE.  [reset] does not touch [pma_regions], so this is equally the
+   PRE-reset value: the platform's table, as the model configures it. *)
+Lemma cold_boot_pma (hid : mword 64) :
+  register_lookup pma_regions (cold_regs hid) = pma_model_table.
+Proof. vm_cast_no_check (eq_refl pma_model_table). Qed.
+
+(* ...and the idealization is exactly this difference. *)
+Lemma pma_boot_not_model : pma_boot <> pma_model_table.
+Proof. discriminate. Qed.

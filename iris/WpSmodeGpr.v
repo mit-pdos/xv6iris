@@ -309,33 +309,8 @@ End SDataTranslate.
 (* [uint] of a small offset from a base that does not wrap: used to turn the
    RAM-ness of an access's LAST byte into the fit bound [uint a + 8 <= ram top]
    that [ram_pmp_match] needs. *)
-Lemma uint_pa_add (a : mword 64) (j : nat) :
-  (uint a + Z.of_nat j < 18446744073709551616)%Z ->
-  uint (pa_add a j) = uint a + Z.of_nat j.
-Proof.
-  intro Hlt. rewrite !uint_unsigned in Hlt |- *.
-  unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
-    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
-  unfold MachineWord.MachineWord.add.
-  rewrite bv_add_unsigned.
-  assert (Hj : bv_unsigned (mword_of_int (Z.of_nat j) : mword 64) = Z.of_nat j).
-  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
-    rewrite Z_to_bv_unsigned. apply bv_wrap_small.
-    pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
-    assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
-    split.
-    - apply Nat2Z.is_nonneg.
-    - apply Z.le_lt_trans with (bv_unsigned a + Z.of_nat j).
-      + rewrite <- (Z.add_0_l (Z.of_nat j)) at 1. apply Z.add_le_mono_r. exact Har.
-      + exact Hlt. }
-  rewrite Hj.
-  apply bv_wrap_small.
-  pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
-  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
-  split.
-  - apply Z.add_nonneg_nonneg. exact Har. apply Nat2Z.is_nonneg.
-  - exact Hlt.
-Qed.
+(* [uint_pa_add] lives in RiscvExtras.v (one home): the offset-[j] byte of an
+   access is at [uint a + j] whenever the sum does not wrap. *)
 
 
 (* ===================================================================== *)

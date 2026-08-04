@@ -518,6 +518,193 @@ Qed.
 (* explicit preconditions.                                                 *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE BYTE AT OFFSET [j] OF AN ACCESS, as unsigned arithmetic.  ONE home for
+   this (it used to have two, in SmodePte and WpSmodeGpr); every consumer that
+   needs "the last byte of an n-byte access is at [uint a + n - 1]" -- the PMA
+   address classes below, the PMP range matches, the chunk lemmas -- goes
+   through it. *)
+Lemma uint_pa_add (a : mword 64) (j : nat) :
+  (uint a + Z.of_nat j < 18446744073709551616)%Z ->
+  uint (pa_add a j) = uint a + Z.of_nat j.
+Proof.
+  intro Hlt. rewrite !uint_unsigned in Hlt |- *.
+  unfold pa_add, add_vec_int, add_vec, Operators_mwords.word_binop,
+    Operators_mwords.with_word', to_word, get_word, SailStdpp.Values.with_word.
+  unfold MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  assert (Hj : bv_unsigned (mword_of_int (Z.of_nat j) : mword 64) = Z.of_nat j).
+  { unfold mword_of_int, Values.mword_of_int, MachineWord.MachineWord.Z_to_word.
+    rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+    pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
+    assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+    split.
+    - apply Nat2Z.is_nonneg.
+    - apply Z.le_lt_trans with (bv_unsigned a + Z.of_nat j).
+      + rewrite <- (Z.add_0_l (Z.of_nat j)) at 1. apply Z.add_le_mono_r. exact Har.
+      + exact Hlt. }
+  rewrite Hj.
+  apply bv_wrap_small.
+  pose proof (bv_unsigned_in_range 64 a) as Har. destruct Har as [Har _].
+  assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
+  split.
+  - apply Z.add_nonneg_nonneg. exact Har. apply Nat2Z.is_nonneg.
+  - exact Hlt.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE TWO PMA ADDRESS CLASSES.                                            *)
+(*                                                                         *)
+(* The platform's PMA table has THREE regions and holes between them (see  *)
+(* [RiscvLang.pma_boot], which is the model's own table, tied to it by      *)
+(* [ColdBoot.cold_boot_pma]), so "the table permits this access" is a       *)
+(* statement about WHERE the access is -- there is no table at all under    *)
+(* which every address is permitted.  Both classes carry three things: the  *)
+(* model's own width proviso on a [matching_pma_region] lookup              *)
+(* (1 <= n <= 4096, rv64d.v), and the two bounds that make the lookup's     *)
+(* [range_subset] test succeed -- the base at or above the region's, and the *)
+(* END address at or below the region's end.                                *)
+(*                                                                         *)
+(* THE END BOUND IS NOT IMPLIED BY THE BASE BOUND, and that is the whole    *)
+(* reason these are new: [range_subset] compares the access's END against   *)
+(* the region's, so an 8-byte access whose base is the last byte of DRAM    *)
+(* matches NO region and faults.  Every applier owns the end bound -- the   *)
+(* chunk lemmas hand back the LAST byte's [addr_is_ram] alongside the        *)
+(* base's, and [PtTree.pt_slot_mem] carries both for a PTE slot.             *)
+(* ---------------------------------------------------------------------- *)
+
+(* KERNEL RAM: the DRAM bank.  Grants R/W/X, atomics, and PTE reads/writes. *)
+Definition pma_ram_access (a : mword 64) (n : Z) : Prop :=
+  1 <= n <= 4096 /\ ram_base <= uint a /\ uint a + n <= ram_base + ram_size.
+
+(* THE DEVICE BAND: UART / PLIC / virtio-mmio / CLINT.  Grants R/W only --
+   not execute, not PTE access, not atomics. *)
+Definition pma_io_access (a : mword 64) (n : Z) : Prop :=
+  1 <= n <= 4096 /\ mmio_base <= uint a /\ uint a + n <= mmio_base + mmio_size.
+
+(* ALL the arithmetic of the class constructors, over plain [Z]: [lia] is
+   unusable once an [mword] is in the context (durable-notes), so the
+   inequalities are done here, in a clean one.  [k] is the offset of ANY owned
+   byte at or beyond the access's last one -- an inequality, not an equality,
+   because a two-byte fetch half is licensed by the four-byte window's last
+   byte just as well as by its own. *)
+Lemma pma_fit_last (x n k : Z) :
+  0 <= k -> n - 1 <= k -> x + k < ram_base + ram_size ->
+  x + n <= ram_base + ram_size.
+Proof. unfold ram_base, ram_size. lia. Qed.
+
+(* an owned byte of a RAM access cannot be the wraparound of a huge offset:
+   the bank tops out at PHYSTOP and the offset is below the model's own
+   maximum access width, so the sum is nowhere near 2^64. *)
+Lemma pma_k_bound (n : Z) : 1 <= n <= 4096 -> n - 1 <= 4095.
+Proof. lia. Qed.
+
+Lemma pma_fit_byte (x : Z) :
+  x < ram_base + ram_size -> x + 1 <= ram_base + ram_size.
+Proof. unfold ram_base, ram_size. lia. Qed.
+
+Lemma pma_nowrap_ram (x k : Z) :
+  x < ram_base + ram_size -> k <= 4095 -> x + k < 18446744073709551616.
+Proof. unfold ram_base, ram_size. lia. Qed.
+
+Lemma pma_fit_io (x n hi : Z) :
+  x < hi -> n <= 4096 -> hi + 4095 <= mmio_base + mmio_size ->
+  x + n <= mmio_base + mmio_size.
+Proof. unfold mmio_base, mmio_size. lia. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* Discharging a CLASS MEMBERSHIP at an applier, with no tactic at all.     *)
+(* Every premise below is either a fact the applier already owns or a       *)
+(* boolean check closed by [eq_refl]: deliberately so, because [lia] is     *)
+(* unusable at these sites -- the [bitvector.tactics] zify hook fails to    *)
+(* find a witness even for a CLOSED bound like [1 <= 4 <= 4096] once a [bv] *)
+(* is in the context (durable-notes).  The arithmetic is done here, in a    *)
+(* clean context, once.                                                    *)
+(* ---------------------------------------------------------------------- *)
+
+(* the width half: at a literal width both checks are [eq_refl]; a variable
+   width comes with its own [0 < n <= m] pair and [m] closed. *)
+Lemma pma_width_ok (n : Z) :
+  Z.leb 1 n = true -> Z.leb n 4096 = true -> 1 <= n <= 4096.
+Proof.
+  intros H1 H2. apply Z.leb_le in H1. apply Z.leb_le in H2. exact (conj H1 H2).
+Qed.
+
+Lemma pma_width_le (n m : Z) :
+  0 < n -> n <= m -> Z.leb m 4096 = true -> 1 <= n <= 4096.
+Proof. intros H1 H2 H3. apply Z.leb_le in H3. split; lia. Qed.
+
+(* THE RAM CLASS, from the two [addr_is_ram] facts an applier owns: the
+   access's base, and ANY owned byte at or beyond its last one ([k] is that
+   byte's offset; the [Z.leb] check is [eq_refl] whenever the width and the
+   offset are literals, which is every fixed-width leaf).  The
+   at-or-beyond slack is what lets the two halves of a split four-byte fetch
+   both be licensed by the window's last byte. *)
+(* PREMISE ORDER IS LOAD-BEARING: the two [addr_is_ram]s come first (they pin
+   [a] and [k]), then the width bound (it pins [n]), and only then the two
+   [Z.leb] checks -- an application's arguments are elaborated left to right and
+   its conclusion unified LAST, so an [eq_refl] placed before the argument that
+   determines [n] is checked against [(?n - 1 <=? 3) = true] and fails. *)
+Lemma pma_access_ram (a : mword 64) (n : Z) (k : nat) :
+  addr_is_ram a -> addr_is_ram (pa_add a k) -> 1 <= n <= 4096 ->
+  Z.leb (n - 1) (Z.of_nat k) = true -> Z.leb (Z.of_nat k) 4095 = true ->
+  pma_ram_access a n.
+Proof.
+  intros [Hlo Hhi] Hk Hn Hnk Hk4.
+  apply Z.leb_le in Hnk. apply Z.leb_le in Hk4.
+  destruct Hk as [_ Hkhi].
+  rewrite (uint_pa_add a k (pma_nowrap_ram (uint a) (Z.of_nat k) Hhi Hk4)) in Hkhi.
+  exact (conj Hn (conj Hlo (pma_fit_last (uint a) n (Z.of_nat k)
+                             (Nat2Z.is_nonneg k) Hnk Hkhi))).
+Qed.
+
+(* the VARIABLE-WIDTH form: [k] is the access's own last byte, given by an
+   equation rather than a closed check (a byte-loop chunk's width is a
+   variable, so no [Z.leb] on it is [eq_refl]).  Here the offset's upper bound
+   comes from the equation and the width bound, so there is nothing extra to
+   discharge. *)
+Lemma pma_access_ram_at (a : mword 64) (n : Z) (k : nat) :
+  Z.of_nat k = n - 1 -> addr_is_ram a -> addr_is_ram (pa_add a k) ->
+  1 <= n <= 4096 -> pma_ram_access a n.
+Proof.
+  intros Hk Hlo Hhi Hn.
+  apply (pma_access_ram a n k Hlo Hhi Hn).
+  - apply Z.leb_le. rewrite Hk. apply Z.le_refl.
+  - apply Z.leb_le. rewrite Hk. exact (pma_k_bound n Hn).
+Qed.
+
+(* a ONE-byte access needs no end bound at all: the base being in the bank IS
+   the end being in the bank. *)
+Lemma pma_access_ram_byte (a : mword 64) : addr_is_ram a -> pma_ram_access a 1.
+Proof.
+  intros [Hlo Hhi].
+  exact (conj (pma_width_ok 1 eq_refl eq_refl)
+              (conj Hlo (pma_fit_byte (uint a) Hhi))).
+Qed.
+
+(* the same class from the RANGE BOUNDS themselves, where the applier has
+   already computed them (several memory leaves derive an [Hlo]/[Hfit] pair
+   for their PMP range match and can reuse it here). *)
+Lemma pma_access_ram_fit (a : mword 64) (n : Z) :
+  (ram_base <= uint a)%Z -> (uint a + n <= ram_base + ram_size)%Z ->
+  1 <= n <= 4096 -> pma_ram_access a n.
+Proof. intros Hlo Hfit Hn. exact (conj Hn (conj Hlo Hfit)). Qed.
+
+(* THE DEVICE CLASS, from the window bounds the device leaves already own
+   ([plic_base <= uint a8 < plic_base + plic_size], and the UART / virtio
+   analogues).  [lo] and [hi] are closed at every use and the end check is
+   taken at the model's MAXIMUM access width, so both band checks are [eq_refl]
+   even where the width is a variable (WpUart's byte accesses). *)
+Lemma pma_access_io (a : mword 64) (n lo hi : Z) :
+  (lo <= uint a)%Z -> (uint a < hi)%Z ->
+  Z.leb mmio_base lo = true ->
+  Z.leb (hi + 4095) (mmio_base + mmio_size) = true ->
+  1 <= n <= 4096 -> pma_io_access a n.
+Proof.
+  intros Hlo Hhi Hb1 Hb2 Hn. apply Z.leb_le in Hb1. apply Z.leb_le in Hb2.
+  exact (conj Hn (conj (Z.le_trans _ _ _ Hb1 Hlo)
+                       (pma_fit_io (uint a) n hi Hhi (proj2 Hn) Hb2))).
+Qed.
+
 (* the low 39 bits of a RAM address are the address itself (as a bv 39):
    [uint a < 2^39], so the [subrange 38:0] extraction loses nothing. *)
 (* The low 39 bits of an address below 2^39 are the address.  Both the RAM

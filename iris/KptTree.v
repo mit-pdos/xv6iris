@@ -717,7 +717,8 @@ Section KptTranslate.
     - (* O3: the walk writes the A/D-updated leaf back *)
       destruct Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
       destruct (Hpmaw (pt_addr0 p1 vpn)
-            (pt_addr0_no_wrap _ _ 8 eq_refl)) as (region0 & Hm0 & Hw0).
+            (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
+               eq_refl eq_refl)) as (region0 & Hm0 & Hw0).
       assert (Hwr : exec (write_pte
                  (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8
                  (p0' : mword 64)) σ
@@ -826,13 +827,13 @@ Section KptTranslateAddr.
     assert (Hsm0' : pt_slot_mem σ (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0)) p0)
       by exact Hsm0.
     destruct (Hpmar (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18))
-           (u_pte_addr_no_wrap _ _ 8 eq_refl))
+           (pt_slot_ram_access _ _ _ Hsm2'))
       as (region2 & Hm2 & Hs2).
     destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9))
-           (u_pte_addr_no_wrap _ _ 8 eq_refl))
+           (pt_slot_ram_access _ _ _ Hsm1'))
       as (region1 & Hm1 & Hs1).
     destruct (Hpmar (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))
-           (u_pte_addr_no_wrap _ _ 8 eq_refl))
+           (pt_slot_ram_access _ _ _ Hsm0'))
       as (region0 & Hm0r & Hs0).
     pose proof (pt_read_pte_slot σ _ p2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2.
     pose proof (pt_read_pte_slot σ _ p1 region1 Hsm1' HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1.
@@ -871,7 +872,8 @@ Section KptTranslateAddr.
         * (* hit + write-back (O3) *)
           destruct Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
           destruct (Hpmaw (pt_addr0 p1 vpn)
-            (pt_addr0_no_wrap _ _ 8 eq_refl)) as (regionw & Hmw & Hww).
+            (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
+               eq_refl eq_refl)) as (regionw & Hmw & Hww).
           assert (Hwr : exec (write_pte
                      (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8
                      (q0' : mword 64)) σ

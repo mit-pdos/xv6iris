@@ -91,7 +91,7 @@ Qed.
 (* the unsigned value of an address [8*k] bytes below [sp], when the
    subtraction does not underflow.  Stated with [sp : mword 64] (never
    [Arch.pa], whose width is an unreduced [if] -- durable-notes), like
-   [SmodePte.uint_pa_add], whose proof shape this mirrors.  Both consumers
+   [RiscvExtras.uint_pa_add], whose proof shape this mirrors.  Both consumers
    are boot-path: BootBridge's physical->VA stack conversion and BootCarve's
    carve of a hart's stack out of the raw boot image. *)
 Lemma z_stk_sub (u d : Z) :

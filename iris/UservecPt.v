@@ -225,13 +225,14 @@ Section WpUsdPt.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb
              [Hpc Hnpc] Hfile Hinstr Hbw Hcont".
     iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_tf.
+    iDestruct (phys_word_pointsto_ram7 with "Hbw") as %Hram_tf7.
     iDestruct "Hbw" as "[%Hbal Hbytes]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    destruct (Hpma_all tfpa 8
-                 (pma_access_ram _ _ Hram_tf (pma_width_ok 8 eq_refl eq_refl))) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
+    destruct (pma_all_ram Hpma_all tfpa 8
+                 (pma_access_ram _ _ _ Hram_tf Hram_tf7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc
               (STORE (imm, Regidx rs2, Regidx (mword_of_int 10), 8))
               mstatus0 mie_v mdv0 menvcfg0 dq

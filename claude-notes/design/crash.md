@@ -61,25 +61,49 @@ per-milestone record):
   - **`reset_regs`' VALUES ARE PROVEN, not transcribed.**
     `ColdBoot.reset_regs_cold_boot` runs the Sail model's own cold-boot
     chain (`sail_model_init`; the board's reset vector and hart id;
-    `init_model`; `init_boot_requirements`) with `RiscvExec.exec` and
+    `init_model ""`; `init_boot_requirements`) with `RiscvExec.exec` and
     proves `reset_regs` of the register file it produces, so a model
-    regeneration that changes a reset value breaks the build. Two
-    conjunct is an explicit `register_set` patch in that statement and it
-    is the whole residue: `pma_regions`, the one-region idealization.
-    (misa used to be a second patch — the model's config enabled B and V,
-    so its cold boot left `0x800000000034112F`. Fixed at the config, not
-    the constant: B and V are disabled in the model config, `reset_misa`
-    now produces `MISA_C`, and misa is run-derived.) The remaining patch,
-    and the anchoring question behind it (`reset()` alone, per the ISA,
-    versus the model's whole cold boot), are ordered follow-up tasks in
-    projects/crash.md: PMA table retirement re-enables `init_model`'s
-    config assert, and the ∃-garbage anchoring waits on symbolic peeling,
-    because forcing any register field of the reset's result over an open
-    register file does not compute.
+    regeneration that changes a reset value breaks the build. EXACTLY ONE
+    conjunct is still an explicit `register_set` patch and it is the whole
+    residue: `pma_regions`, the one-region idealization. (misa used to be a
+    second patch — the model's config enabled B and V, so its cold boot
+    left `0x800000000034112F`. Fixed at the config, not the constant, and
+    `cold_boot_misa` is the tie.) What the patch is measured AGAINST is now
+    compiled too: `ColdBoot.pma_model_table` is the model's real
+    three-region table, extracted by evaluating the model, with
+    `cold_boot_pma` proving it is the register's value — so the
+    idealization is the gap between two compiled values, not a table
+    nobody checked. `init_model`'s `assert (config_is_valid tt)` is
+    SATISFIED (`cold_boot_config_valid`), which is why the chain can be
+    anchored there at all; at the idealized table the same check computes
+    to false.
     The chain's one uninterpretable step — `cancel_reservation`, an
     `Axiom` of the model — is lifted to a parameter whose elision is
     itself checked by `reflexivity`. `reset_regs` is a COLD-boot
     description; a warm-reset arm would need its own, weaker, fact set.
+    Still open, and recorded in projects/crash.md: swapping `pma_boot` for
+    the model's table (blocked on a verified-user-mode AMO claim, see the
+    PMA paragraph), and the ∃-garbage anchoring (`reset()` alone over
+    arbitrary power-on state), which waits on symbolic peeling because
+    forcing any register field of the reset's result over an OPEN register
+    file does not compute.
+  - **THE TOWER'S PMA OBLIGATION IS PER ADDRESS CLASS.** The platform's
+    real table (`ColdBoot.pma_model_table`) has three regions — boot ROM
+    `[0x1000, +0x1000)` IOMemory read-only, MMIO band
+    `[0x2000000, +0x10000000)` IOMemory R/W, DRAM
+    `[0x80000000, +0x8000000)` MainMemory R/W/X with AMOCASQ and PTE
+    access — with HOLES between them, so no obligation quantified over all
+    addresses can hold of it. `RiscvFetchExec.pma_allows_all` is therefore
+    indexed by a class (`pma_class = PmaRam | PmaIo`; a `∀`, not a
+    conjunction, so `repeat split` in a config-bundle proof cannot take it
+    apart): `pma_allows_ram` asks R/W/X + the atomic support level + both
+    PTE permissions over `pma_ram_access` (the DRAM range, which is
+    EXACTLY `RiscvPtsto.addr_is_ram`'s), `pma_allows_io` asks R/W only over
+    `pma_io_access` (the band, `mmio_base`/`mmio_size`). Each class carries
+    the END bound as well as the base bound, because `range_subset`
+    compares the access's end against the region's — and every applier
+    already owns it (the chunk lemmas return the last byte's
+    `addr_is_ram`; `PtTree.pt_slot_mem` carries both ends of a PTE slot).
 - The corpse arm is a SELF-LOOP, not a retire-to-value: reaching a value
   would force `Φ dead_val` through every leaf lemma in the tree; the
   self-loop keeps the dead branch Φ-generic. Deliberate consequence:

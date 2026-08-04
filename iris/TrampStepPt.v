@@ -130,8 +130,8 @@ Section TrampFetchPt.
           iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
-        destruct (Lpma pa 4
-                   (pma_access_ram _ _ Hram (pma_width_ok 4 eq_refl eq_refl)))
+        destruct (pma_all_ram Lpma pa 4
+                   (pma_access_ram _ _ _ Hram Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl))
           as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hfetch : exec (fetch tt) σ = Some (F_Base w, s1)).
         { apply (exec_fetch_F_Base_4_S_gen_pa pc pa w σ s1 region Lpc Hal Htr1).
@@ -196,11 +196,11 @@ Section TrampFetchPt.
         pose proof (addr_is_ram_not_in_sig _ Hraml) as Hnsl.
         pose proof (addr_is_ram_not_in_clint _ Hramh) as Hnch.
         pose proof (addr_is_ram_not_in_sig _ Hramh) as Hnsh.
-        destruct (Lpma pa 2
-                   (pma_access_ram _ _ Hraml (pma_width_ok 2 eq_refl eq_refl)))
+        destruct (pma_all_ram Lpma pa 2
+                   (pma_access_ram _ _ _ Hraml Hraml1 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
           as (regl & Hml0 & Hxl & _ & _).
-        destruct (Lpma (add_vec_int pa 2) 2
-                   (pma_access_ram _ _ Hramh (pma_width_ok 2 eq_refl eq_refl)))
+        destruct (pma_all_ram Lpma (add_vec_int pa 2) 2
+                   (pma_access_ram _ _ _ Hramh Hramh1 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
           as (regh & Hmh0 & Hxh & _ & _).
         (* --- low chunk: σ -> s1 --- *)
         iMod (Habs pc pa σ Hcanon Hvpn Hident Lmisa Lmenv Lhtif Lpriv LSXL Lpma
@@ -324,8 +324,8 @@ Section TrampFetchPt.
           iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
-        destruct (Lpma pa 4
-                   (pma_access_ram _ _ Hram (pma_width_ok 4 eq_refl eq_refl)))
+        destruct (pma_all_ram Lpma pa 4
+                   (pma_access_ram _ _ _ Hram Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl))
           as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hfetch : exec (fetch tt) σ = Some (F_RVC h, s1)).
         { rewrite <- Hsub.
@@ -383,8 +383,8 @@ Section TrampFetchPt.
           iDestruct (phys_valid with "Hmem Hpj") as %Hmj. iPureIntro. exact Hmj. }
         pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
-        destruct (Lpma pa 2
-                   (pma_access_ram _ _ Hram (pma_width_ok 2 eq_refl eq_refl)))
+        destruct (pma_all_ram Lpma pa 2
+                   (pma_access_ram _ _ _ Hram Hram1 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
           as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hfetch : exec (fetch tt) σ = Some (F_RVC h, s1)).
         { apply (exec_fetch_RVC_2_S_gen_pa pc pa h σ s1 region Lpc HmisaC

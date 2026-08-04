@@ -421,18 +421,22 @@ Definition boot_byte (a : Z) : bv 8 := default byte0 (boot_image !! a).
 Definition boot_w64 (z : Z) : SailStdpp.Values.mword 64 :=
   SailStdpp.Values.mword_of_int z.
 
-(* THE PLATFORM'S PMA TABLE, idealized as ONE all-permitting region over the
-   whole address space.  This is the honest reading of the assumption the
-   whole M-mode tower already makes ([RiscvFetchExec.pma_allows_all], which
-   every fetch/memory lemma takes as a premise): the platform's physical
-   memory attributes permit what the kernel does.  Pinning a table here is
-   what will let the M6 client DISCHARGE that premise instead of assuming
-   it.  (Note for M6: [pma_allows_all] as currently stated quantifies over
-   ALL widths [n : Z], including ones that wrap the 64-bit address space, so
-   it is not satisfiable by ANY table -- [range_subset] fails on the wrap.
-   It has to be restricted to the widths the model itself allows
-   ([1 <= n <= 4096], no wraparound) before this table can serve; see the
-   M6a entry in claude-notes/projects/crash.md.) *)
+(* THE PLATFORM'S PMA TABLE, STILL IDEALIZED AS ONE ALL-PERMITTING REGION --
+   AND THE MODEL'S OWN TABLE IS NOW A NAMED, PROVEN VALUE BESIDE IT.
+   [ColdBoot.pma_model_table] is the three-region table [sail_model_init]
+   really writes (boot ROM at 0x1000 IOMemory read-only; the MMIO band at
+   0x2000000 IOMemory R/W; the DRAM bank at 0x80000000 = [ram_lo, ram_hi)
+   MainMemory R/W/X with AMOCASQ atomics and PTE access), extracted by
+   evaluating the model and kernel-checked by [ColdBoot.cold_boot_pma] -- so
+   the idealization is no longer a table nobody compared against the model:
+   it is the visible difference between [pma_boot] and a compiled fact.
+   The tower's PMA obligation is per address class already
+   ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), which is what the real
+   table needs; what still blocks REPLACING this table with it is the DRAM
+   region's [PMA_atomic_support = AMOCASQ] against the [= AMOSwap] the
+   verified-user-mode AMO classifier consumes (its "only amoswap retires" arm
+   is an artifact of THIS table).  See "PMA TABLE RETIREMENT" in
+   claude-notes/projects/crash.md. *)
 Definition pma_boot_attrs : PMA := {|
   PMA_mem_type := MainMemory;
   PMA_cacheable := true;

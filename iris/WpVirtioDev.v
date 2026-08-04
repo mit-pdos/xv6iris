@@ -218,8 +218,9 @@ Proof.
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-  destruct (Hpma_all a8 4
-             (pma_access_lt _ _ _ (proj2 Hrange) eq_refl (pma_width_ok 4 eq_refl eq_refl))) as (region_ld & Hmatch_ld & _ & Hread_ld & _ & _).
+  destruct (pma_all_io Hpma_all a8 4
+             (pma_access_io _ _ virtio_base (virtio_base + virtio_size) (proj1 Hrange) (proj2 Hrange)
+                eq_refl eq_refl (pma_width_ok 4 eq_refl eq_refl))) as (region_ld & Hmatch_ld & Hread_ld & _).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
   iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
@@ -401,8 +402,9 @@ Proof.
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-  destruct (Hpma_all a8 4
-             (pma_access_lt _ _ _ (proj2 Hrange) eq_refl (pma_width_ok 4 eq_refl eq_refl))) as (region_st & Hmatch_st & _ & _ & Hwrite_st & _).
+  destruct (pma_all_io Hpma_all a8 4
+             (pma_access_io _ _ virtio_base (virtio_base + virtio_size) (proj1 Hrange) (proj2 Hrange)
+                eq_refl eq_refl (pma_width_ok 4 eq_refl eq_refl))) as (region_st & Hmatch_st & _ & Hwrite_st).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
   iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.

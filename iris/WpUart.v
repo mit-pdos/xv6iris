@@ -39,7 +39,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 (* re-import the model AFTER Base so the model's names (read_kind/Read_plain/
    write_kind/...) win over SailStdpp's homonyms -- same order as WpLoad.v. *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras RiscvFetchExec.
 Require Import WireInv WpVirtio.
 (* the disk's DMA lease is now carried in the KEYED driver protocol
    ([virtio_proto], VirtioProto.v) rather than as the bare [virtio_lease];
@@ -119,15 +119,21 @@ Proof.
   apply Z2N.id. unfold uart_base in *. lia.
 Qed.
 
-(* NO WRAPAROUND at a UART register: the whole MMIO window sits below 2^38, so
-   an access of any width the model allows cannot wrap.  This is the address
-   premise [RiscvFetchExec.pma_allows_all] asks of its appliers. *)
-Lemma uart_pa_access_ok off n :
+(* A UART REGISTER IS IN THE DEVICE PMA CLASS: the whole window sits inside
+   the platform's MMIO band ([RiscvPtsto.mmio_base, + mmio_size)), which is
+   what [RiscvFetchExec.pma_allows_io] asks of its appliers.  (It used to be
+   the strictly weaker "the access does not wrap", which was all the
+   all-addresses [pma_allows_all] needed; the real table grants R/W here and
+   nothing outside its three regions.) *)
+Lemma uart_pa_access_io off n :
   0 <= off < uart_size -> 1 <= n <= 4096 ->
-  pma_access_ok (uart_pa off) n.
+  pma_io_access (uart_pa off) n.
 Proof.
-  intros Hoff Hn. apply (pma_access_lt _ _ (uart_base + uart_size)); [| reflexivity | exact Hn].
-  rewrite (uint_uart_pa off Hoff). lia.
+  intros Hoff Hn.
+  apply (pma_access_io _ _ uart_base (uart_base + uart_size));
+    [ rewrite (uint_uart_pa off Hoff); lia
+    | rewrite (uint_uart_pa off Hoff); lia
+    | reflexivity | reflexivity | exact Hn ].
 Qed.
 
 Lemma dev_addr_uart off : 0 <= off < uart_size -> dev_addr (uart_pa off) = true.

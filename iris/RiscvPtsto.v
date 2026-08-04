@@ -395,6 +395,21 @@ Notation "r ↦ᵣ□ v" := (reg_pointsto r DfracDiscarded v)
 Definition ram_base : Z := 0x80000000.       (* 2147483648 *)
 Definition ram_size : Z := 0x8000000.        (* 134217728 = 128 MiB *)
 
+(* THE MMIO BAND, the platform's other configured region: one IOMemory window
+   covering every device the kernel touches.  It is the model's OWN second PMA
+   region ([RiscvLang.pma_boot], whose value is the compiled
+   [ColdBoot.cold_boot_pma] fact), and every device window in the tree sits
+   inside it -- CLINT at 0x2000000, PLIC [plic_base, +plic_size) =
+   [0xC000000, 0xC400000), UART [uart_base, +8) at 0x10000000, virtio-mmio
+   [virtio_base, +0x1000) at 0x10001000.  Unlike RAM it is NOT readable and
+   writable by fiat: the band grants R/W but is NOT executable and does NOT
+   support PTE reads/writes or atomics, which is exactly why the PMA premise
+   the device towers take ([RiscvFetchExec.pma_allows_io]) is weaker than the
+   RAM one and why the two address classes are stated separately. *)
+Definition mmio_base : Z := 0x2000000.       (* 33554432 *)
+Definition mmio_size : Z := 0x10000000.      (* 268435456 = 256 MiB *)
+
+
 (* A physical byte address is "real" RAM iff it lies inside that DRAM bank.
    This is STRICTLY stronger than merely being outside the platform MMIO
    ranges: the whole bank sits above every MMIO window (CLINT ends at
@@ -1437,6 +1452,18 @@ Section Bridge.
       apply bv_eq. rewrite bv_add_unsigned Z_to_bv_unsigned.
       rewrite bv_wrap_0 Z.add_0_r. apply bv_wrap_small. apply bv_unsigned_in_range. }
     rewrite Hpa0 in Hram0. iPureIntro. exact Hram0.
+  Qed.
+
+  (* ...AND ITS LAST BYTE.  The cell owns all eight bytes, so this is the
+     same read at index 7 -- and it is what the PMA RAM class needs: the
+     platform's DRAM region ends at PHYSTOP, so an 8-byte access is inside it
+     only if its END is ([RiscvExtras.pma_access_ram]). *)
+  Lemma phys_word_pointsto_ram7 a dq w : a ↦ₚ₈{dq} w ⊢ ⌜addr_is_ram (pa_add a 7)⌝.
+  Proof.
+    iIntros "Hw". iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbs") as "Hb7".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iDestruct (phys_ram with "Hb7") as %Hram7. iPureIntro. exact Hram7.
   Qed.
 
   Global Instance phys_pointsto_discarded_persistent a b : Persistent (a ↦ₚ□ b).

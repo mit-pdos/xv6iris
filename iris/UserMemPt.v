@@ -545,9 +545,10 @@ Section UserMemPtGeneric.
       iSplit; [ iPureIntro; exact Htr | ].
       iSplit; [ iPureIntro | ].
       { set (pa := u_walk_pa w va) in *.
-        destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+        destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
                    : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa k
-                  (pma_access_ram _ _ Hram0 (pma_width_le k 8 Hk Hk8 eq_refl)))
+                  (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
+                     Hram0 Hram7 (pma_width_le k 8 Hk Hk8 eq_refl)))
           as (region & Hpmam & _ & Hrd & _).
         pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
@@ -637,9 +638,10 @@ Section UserMemPtGeneric.
                             PBMT_PMA false false false) σ'
                     = Some (Ok true,
                             MState σ'.(sregs) (write_bytes σ'.(mem) pa (Z.to_N k) v) σ'.(mdev))).
-      { destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+      { destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
                    : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa k
-                  (pma_access_ram _ _ Hram0 (pma_width_le k 8 Hk Hk8 eq_refl)))
+                  (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
+                     Hram0 Hram7 (pma_width_le k 8 Hk Hk8 eq_refl)))
           as (region & Hpmam & _ & _ & Hwrb).
         pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.

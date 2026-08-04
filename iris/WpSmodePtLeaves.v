@@ -508,8 +508,8 @@ Section WpSmodePtLoad.
     iDestruct (s_mem_chunk s_tr pa a8 0 8 8 (nth_byte v) ppn dqm
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(Hbytesf_tr & Hram0 & Hram7 & Hkd).
-    destruct (Hpma_all (pa_of ppn a8) 8
-               (pma_access_ram _ _ Hram0 (pma_width_ok 8 eq_refl eq_refl))) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
+    destruct (pma_all_ram Hpma_all (pa_of ppn a8) 8
+               (pma_access_ram _ _ _ Hram0 Hram7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     assert (Hlo : (ram_base <= uint (pa_of ppn a8))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn a8) + 8 <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn a8) + Z.of_nat 7 < 18446744073709551616)%Z).
@@ -942,8 +942,8 @@ Section WpSmodePtStore.
     iDestruct (s_mem_chunk s_tr pa a8 0 8 8 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hb") as %(_ & Hram0 & Hram7 & Hkd).
-    destruct (Hpma_all (pa_of ppn a8) 8
-               (pma_access_ram _ _ Hram0 (pma_width_ok 8 eq_refl eq_refl))) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
+    destruct (pma_all_ram Hpma_all (pa_of ppn a8) 8
+               (pma_access_ram _ _ _ Hram0 Hram7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     assert (Hlo : (ram_base <= uint (pa_of ppn a8))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn a8) + 8 <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn a8) + Z.of_nat 7 < 18446744073709551616)%Z).

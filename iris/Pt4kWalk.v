@@ -260,13 +260,14 @@ Qed.
 
 (* NO WRAPAROUND: a PTE slot address is a 44-bit ppn ++ a 9-bit index ++ 000,
    hence below 2^56, so an access of any width the model allows (<= 4096) that
-   starts there cannot wrap the 64-bit physical space.  This is the address
-   premise [KptPt.pma_allows_pte_read] / [PtTreeAdue.pma_allows_pte_write] /
-   [RiscvFetchExec.pma_allows_all] ask of their appliers -- a wrapping access
-   matches NO region ([range_subset] compares the access's end against the
-   region's relative to the region base), so without it those predicates are
-   satisfiable by no table at all.  The arithmetic is packaged over plain [Z]
-   because [lia] is unusable on a goal mentioning [bv_unsigned]. *)
+   starts there cannot wrap the 64-bit physical space.  This is the SLOT
+   GEOMETRY bound, and it is all it is: the PMA predicates
+   ([KptPt.pma_allows_pte_read] / [PtTreeAdue.pma_allows_pte_write]) ask their
+   appliers for the RAM CLASS ([RiscvExtras.pma_ram_access], both ends of the
+   access inside the DRAM bank), which is strictly more -- not-wrapping was
+   only ever enough for the one-region idealization of the table.  The
+   arithmetic is packaged over plain [Z] because [lia] is unusable on a goal
+   mentioning [bv_unsigned]. *)
 Lemma pte_addr_no_wrap_Z (b i n : Z) :
   0 <= b < 17592186044416 -> 0 <= i < 512 -> n <= 4096 ->
   b * 4096 + i * 8 + n < 18446744073709551616.

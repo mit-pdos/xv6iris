@@ -53,6 +53,7 @@ Section WpLdGpr.
     intros offset ea Hpmp Hstat Hrd.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbw Hcont".
     iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_ea.
+    iDestruct (phys_word_pointsto_ram7 with "Hbw") as %Hram_ea7.
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -62,8 +63,8 @@ Section WpLdGpr.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    destruct (Hpma_all ea 8
-               (pma_access_ram _ _ Hram_ea (pma_width_ok 8 eq_refl eq_refl))) as (region & Hmatch & _ & Hread & _).
+    destruct (pma_all_ram Hpma_all ea 8
+               (pma_access_ram _ _ _ Hram_ea Hram_ea7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
  (pmp_all_off_allows_all _ Hpmp) Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
@@ -220,6 +221,7 @@ Section MmodeLoadTor.
     intros offset ea Hpmp Hstat Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
     iDestruct (phys_word_pointsto_ram with "Hbytes") as %Hram_ea.
+    iDestruct (phys_word_pointsto_ram7 with "Hbytes") as %Hram_ea7.
     iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -229,8 +231,8 @@ Section MmodeLoadTor.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    destruct (Hpma_all ea 8
-               (pma_access_ram _ _ Hram_ea (pma_width_ok 8 eq_refl eq_refl))) as (region & Hmatch & _ & Hread & _).
+    destruct (pma_all_ram Hpma_all ea 8
+               (pma_access_ram _ _ _ Hram_ea Hram_ea7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch & _ & Hread & _).
     iApply (wp_instr Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".

@@ -319,9 +319,17 @@ Section InstrBytes.
           iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
           iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+        (* the access's LAST byte: byte 3 of the same owned window, with the
+           offset kept (this is the fact AT [pa_add .. 3], not at the base). *)
+        iAssert (⌜addr_is_ram (pa_add (fetch_pa pc) 3)⌝)%I as %Hram3.
+        { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (text_ident_phys _ _ _ (Hstat 3%nat ltac:(lia)) with "Hbundle Hb3") as "Hb3".
+          iDestruct (phys_ram with "Hb3") as %Hr3.
+          rewrite fetch_pa_id. iPureIntro. exact Hr3. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
-        destruct (Hpma0 (fetch_pa pc) 4
-                   (pma_access_ram _ _ Hram (pma_width_ok 4 eq_refl eq_refl))) as (region & Hmatch0 & Hexec0 & _ & _).
+        destruct (pma_all_ram Hpma0 (fetch_pa pc) 4
+                   (pma_access_ram _ _ _ Hram Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr (fetch_pa pc)) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
         exact (exec_fetch_done pc region w σ Lpc Lpriv Hpmp Hmatch Hexec0
@@ -360,12 +368,23 @@ Section InstrBytes.
           iDestruct (text_ident_phys _ _ _ (Hstat 2%nat ltac:(lia)) with "Hbundle Hb2") as "Hb2".
           iDestruct (phys_ram with "Hb2") as %Hr2. rewrite Hoff fetch_pa_id.
           iPureIntro. exact Hr2. }
+        (* the window's LAST byte licenses BOTH halves' end bounds: the low
+           half's own last byte is at offset 1, and [pma_access_ram] takes any
+           owned byte at or beyond it. *)
+        iAssert (⌜addr_is_ram (pa_add (fetch_pa pc) 3)⌝)%I as %Hram3.
+        { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (text_ident_phys _ _ _ (Hstat 3%nat ltac:(lia)) with "Hbundle Hb3") as "Hb3".
+          iDestruct (phys_ram with "Hb3") as %Hr3.
+          rewrite fetch_pa_id. iPureIntro. exact Hr3. }
+        assert (Hramh1 : addr_is_ram (pa_add (fetch_pa (add_vec_int pc 2)) 1)).
+        { rewrite (Haddr 1%nat ltac:(lia)). change (2 + 1)%nat with 3%nat. exact Hram3. }
         iPureIntro.
         pose proof (addr_is_ram_not_in_clint _ Hraml) as Hncl; pose proof (addr_is_ram_not_in_sig _ Hraml) as Hnsl; pose proof (addr_is_ram_not_in_clint _ Hramh) as Hnch; pose proof (addr_is_ram_not_in_sig _ Hramh) as Hnsh.
-        destruct (Hpma0 (fetch_pa pc) 2
-                   (pma_access_ram _ _ Hraml (pma_width_ok 2 eq_refl eq_refl))) as (regl & Hml0 & Hxl & _ & _).
-        destruct (Hpma0 (fetch_pa (add_vec_int pc 2)) 2
-                   (pma_access_ram _ _ Hramh (pma_width_ok 2 eq_refl eq_refl))) as (regh & Hmh0 & Hxh & _ & _).
+        destruct (pma_all_ram Hpma0 (fetch_pa pc) 2
+                   (pma_access_ram _ _ _ Hraml Hram3 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl)) as (regl & Hml0 & Hxl & _ & _).
+        destruct (pma_all_ram Hpma0 (fetch_pa (add_vec_int pc 2)) 2
+                   (pma_access_ram _ _ _ Hramh Hramh1 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl)) as (regh & Hmh0 & Hxh & _ & _).
         assert (Hml : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr (fetch_pa pc)) 2 = Some regl) by (rewrite Lpma; exact Hml0).
         assert (Hmh : matching_pma_region (register_lookup pma_regions σ.(sregs))
@@ -407,9 +426,16 @@ Section InstrBytes.
           iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
           iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+        (* the access's LAST byte: byte 3 of the same owned window. *)
+        iAssert (⌜addr_is_ram (pa_add (fetch_pa pc) 3)⌝)%I as %Hram3.
+        { iDestruct (big_sepL_lookup _ _ 3%nat 3%nat with "Hbytes") as "Hb3".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (text_ident_phys _ _ _ (Hstat 3%nat ltac:(lia)) with "Hbundle Hb3") as "Hb3".
+          iDestruct (phys_ram with "Hb3") as %Hr3.
+          rewrite fetch_pa_id. iPureIntro. exact Hr3. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
-        destruct (Hpma0 (fetch_pa pc) 4
-                   (pma_access_ram _ _ Hram (pma_width_ok 4 eq_refl eq_refl))) as (region & Hmatch0 & Hexec0 & _ & _).
+        destruct (pma_all_ram Hpma0 (fetch_pa pc) 4
+                   (pma_access_ram _ _ _ Hram Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr (fetch_pa pc)) 4 = Some region) by (rewrite Lpma; exact Hmatch0).
         assert (HisRVC' : isRVC (subrange_vec_dec w 15 0) = true) by (rewrite Hsub; exact HisRVC).
@@ -435,9 +461,16 @@ Section InstrBytes.
           iDestruct (text_ident_phys _ _ _ (Hstat 0%nat ltac:(lia)) with "Hbundle Hb0") as "Hb0".
           iDestruct (phys_ram with "Hb0") as %Hr0. rewrite pa_add_0 in Hr0.
           rewrite fetch_pa_id. iPureIntro. exact Hr0. }
+        (* the access's LAST byte: byte 1, the other half of the owned pair. *)
+        iAssert (⌜addr_is_ram (pa_add (fetch_pa pc) 1)⌝)%I as %Hram1.
+        { iDestruct (big_sepL_lookup _ _ 1%nat 1%nat with "Hbytes") as "Hb1".
+          { rewrite lookup_seq_lt; [reflexivity | lia]. }
+          iDestruct (text_ident_phys _ _ _ (Hstat 1%nat ltac:(lia)) with "Hbundle Hb1") as "Hb1".
+          iDestruct (phys_ram with "Hb1") as %Hr1.
+          rewrite fetch_pa_id. iPureIntro. exact Hr1. }
         iPureIntro. pose proof (addr_is_ram_not_in_clint _ Hram) as Hnc; pose proof (addr_is_ram_not_in_sig _ Hram) as Hns.
-        destruct (Hpma0 (fetch_pa pc) 2
-                   (pma_access_ram _ _ Hram (pma_width_ok 2 eq_refl eq_refl))) as (region & Hmatch0 & Hexec0 & _ & _).
+        destruct (pma_all_ram Hpma0 (fetch_pa pc) 2
+                   (pma_access_ram _ _ _ Hram Hram1 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch0 & Hexec0 & _ & _).
         assert (Hmatch : matching_pma_region (register_lookup pma_regions σ.(sregs))
                   (Physaddr (fetch_pa pc)) 2 = Some region) by (rewrite Lpma; exact Hmatch0).
         assert (HmisaC' : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)

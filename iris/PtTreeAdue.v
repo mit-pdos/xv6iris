@@ -646,19 +646,19 @@ End PtFront.
    [pma_allows_pte_read]; holds for the boot table, which allows all) *)
 Definition pma_allows_pte_write (regions : list PMA_Region) : Prop :=
   forall (a : mword 64),
-    (uint a + 8 < 18446744073709551616)%Z ->
+    pma_ram_access a 8 ->
     exists r,
     matching_pma_region regions (Physaddr a) 8 = Some r /\
     (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true.
 
-(* the boot [pma_allows_all] table serves 8-byte PTE writes: a direct
-   projection now that [pma_allows_all] pins [PMA_supports_pte_write]. *)
+(* the platform table serves 8-byte PTE writes AT A RAM ADDRESS: a direct
+   projection now that [pma_allows_ram] pins [PMA_supports_pte_write].  See
+   KptPt's read twin for why the RAM restriction is the honest statement. *)
 Lemma pma_allows_all_pte_write (pmar0 : list PMA_Region) :
   pma_allows_all pmar0 -> pma_allows_pte_write pmar0.
 Proof.
-  intros H a Hnw.
-  destruct (H a 8 (pma_access_of_no_wrap a 8 (pma_width_ok 8 eq_refl eq_refl) Hnw))
-    as (r & Hm & _ & _ & _ & _ & _ & Hpw).
+  intros H a Hram.
+  destruct (pma_all_ram H a 8 Hram) as (r & Hm & _ & _ & _ & _ & _ & Hpw).
   exists r. split; [exact Hm | exact Hpw].
 Qed.
 

@@ -87,32 +87,6 @@ Proof.
   change (2 ^ 64) with 18446744073709551616. apply Z.mod_small. exact Hn.
 Qed.
 
-(* ALL the arithmetic of §1, over plain [Z] and hence where [lia] still
-   works: inside the main lemma the context carries an [mword], and the
-   [bitvector.tactics] zify hook then fails to find a witness even for closed
-   bounds (durable-notes). *)
-Local Lemma pma_boot_arith (x n : Z) :
-  0 <= x -> 1 <= n <= 4096 -> x + n < 18446744073709551616 ->
-  (0 <= n < 18446744073709551616)
-  /\ (0 <= x + n < 18446744073709551616)
-  /\ Z.leb x 18446744073709551615 = true
-  /\ Z.leb (x + n) 18446744073709551615 = true
-  /\ Z.leb x (x + n) = true.
-Proof.
-  intros H0 Hn Hw. repeat split; try lia; apply Z.leb_le; lia.
-Qed.
-
-(* the region base is 0, so [range_subset]'s "relative to the base"
-   subtraction is the identity *)
-Local Lemma bvu_sub_b0 (x : mword 64) :
-  bv_unsigned (sub_vec x (boot_w64 0)) = bv_unsigned x.
-Proof.
-  rewrite sub_vec64_unsigned.
-  assert (Hb : bv_unsigned (boot_w64 0 : mword 64) = 0)
-    by (vm_compute; reflexivity).
-  rewrite Hb Z.sub_0_r. exact (wrap64_small _ (bvu64_range x)).
-Qed.
-
 (* a non-wrapping access's end address, as unsigned arithmetic *)
 Local Lemma bvu_add_width (x : mword 64) (n : Z) :
   0 <= n < 18446744073709551616 ->
@@ -123,36 +97,142 @@ Proof.
   exact (wrap64_small _ Hw).
 Qed.
 
-(* THE PAYOFF of the [pma_access_ok] repair: one all-permitting region over
-   the whole physical space serves every access the model can make.  The
-   geometry is [range_subset]'s three unsigned comparisons, taken relative to
-   the region base 0; the first two are the 64-bit range itself and the third
-   -- "the access does not wrap" -- is exactly what [pma_access_ok] supplies. *)
-Lemma pma_allows_all_pma_boot : pma_allows_all pma_boot.
+(* ALL the arithmetic of §1, over plain [Z] and hence where [lia] still
+   works: inside the main lemmas the context carries an [mword], and the
+   [bitvector.tactics] zify hook then fails to find a witness even for closed
+   bounds (durable-notes).  Every inequality the geometry needs is produced
+   here, once, in a clean context: [_in] for the region an access lies in,
+   [_out] for a region BELOW it (which is how a RAM access misses the boot-ROM
+   window and the MMIO band -- they are earlier in the list, so missing them
+   is as load-bearing as matching DRAM). *)
+Local Lemma pma_region_in_arith (x n B S : Z) :
+  0 <= x -> 1 <= n -> 0 <= B -> B <= x -> x + n <= B + S ->
+  B + S < 18446744073709551616 ->
+  (0 <= n < 18446744073709551616)
+  /\ (0 <= x + n < 18446744073709551616)
+  /\ (0 <= x - B < 18446744073709551616)
+  /\ (0 <= x + n - B < 18446744073709551616)
+  /\ Z.leb (x - B) S = true
+  /\ Z.leb (x + n - B) S = true
+  /\ Z.leb (x - B) (x + n - B) = true.
+Proof. intros; repeat split; try lia; apply Z.leb_le; lia. Qed.
+
+Local Lemma pma_region_out_arith (x n B S : Z) :
+  0 <= x -> 1 <= n -> 0 <= B -> B <= x -> B + S < x ->
+  x + n < 18446744073709551616 ->
+  (0 <= n < 18446744073709551616)
+  /\ (0 <= x + n < 18446744073709551616)
+  /\ (0 <= x - B < 18446744073709551616)
+  /\ Z.leb (x - B) S = false.
+Proof. intros; repeat split; try lia; apply Z.leb_gt; lia. Qed.
+
+(* [range_subset] AT A LITERAL REGION.  The two [bv_unsigned] premises are the
+   region's base and its [range_subset]-relative end, both closed, so both are
+   [vm_compute] at the call site; everything else is the access's own class
+   membership.  The [_out] half (a region strictly BELOW the access, hence not
+   matching) is what the MODEL's three-region table needs and the one-region
+   idealization does not: the boot ROM window has to be missed by every access,
+   and the MMIO band by every RAM access.  Kept proven for that swap -- see
+   claude-notes/projects/crash.md. *)
+Local Lemma range_subset_lit_in (a : mword 64) (n B S : Z) :
+  bv_unsigned (boot_w64 B : mword 64) = B ->
+  bv_unsigned (sub_vec (add_vec (boot_w64 B) (boot_w64 S)) (boot_w64 B)) = S ->
+  1 <= n -> 0 <= B -> B <= bv_unsigned a -> bv_unsigned a + n <= B + S ->
+  B + S < 18446744073709551616 ->
+  range_subset a (to_bits 64 n) (boot_w64 B) (boot_w64 S) = true.
 Proof.
-  intros a n [Hn Hnw].
-  assert (Hnw' : bv_unsigned a + n < 18446744073709551616)
-    by (rewrite <- uint_unsigned; exact Hnw).
-  destruct (pma_boot_arith (bv_unsigned a) n (proj1 (bvu64_range a)) Hn Hnw')
-    as (Hnr & Hsr & Hle1 & Hle2 & Hle3).
-  assert (Hmax : bv_unsigned (sub_vec (add_vec (boot_w64 0)
-                   (boot_w64 0xFFFFFFFFFFFFFFFF)) (boot_w64 0))
-                 = 18446744073709551615) by (vm_compute; reflexivity).
+  intros HB Hbend Hn HB0 Hlo Hfit Htop.
+  destruct (pma_region_in_arith (bv_unsigned a) n B S
+              (proj1 (bvu64_range a)) Hn HB0 Hlo Hfit Htop)
+    as (Hnr & Hsr & Hbr & Her & Hle1 & Hle2 & Hle3).
+  unfold range_subset, zopz0zIzJ_u.
+  rewrite !uint_unsigned Hbend.
+  rewrite !sub_vec64_unsigned HB (bvu_add_width a n Hnr Hsr).
+  rewrite (wrap64_small _ Hbr) (wrap64_small _ Her).
+  apply andb_true_intro; split; [exact Hle1 |].
+  apply andb_true_intro; split; [exact Hle2 | exact Hle3].
+Qed.
+
+(* ...and the MISS, for an access strictly ABOVE the region: the first of
+   [range_subset]'s three comparisons already fails. *)
+Local Lemma range_subset_lit_out (a : mword 64) (n B S : Z) :
+  bv_unsigned (boot_w64 B : mword 64) = B ->
+  bv_unsigned (sub_vec (add_vec (boot_w64 B) (boot_w64 S)) (boot_w64 B)) = S ->
+  1 <= n -> 0 <= B -> B <= bv_unsigned a -> B + S < bv_unsigned a ->
+  bv_unsigned a + n < 18446744073709551616 ->
+  range_subset a (to_bits 64 n) (boot_w64 B) (boot_w64 S) = false.
+Proof.
+  intros HB Hbend Hn HB0 Hlo Habove Htop.
+  destruct (pma_region_out_arith (bv_unsigned a) n B S
+              (proj1 (bvu64_range a)) Hn HB0 Hlo Habove Htop)
+    as (Hnr & Hsr & Hbr & Hlef).
+  unfold range_subset, zopz0zIzJ_u.
+  rewrite !uint_unsigned Hbend.
+  rewrite !sub_vec64_unsigned HB (bvu_add_width a n Hnr Hsr).
+  rewrite (wrap64_small _ Hbr).
+  rewrite Hlef. reflexivity.
+Qed.
+
+(* THE GEOMETRY, over plain [Z]: [lia] is unusable once an [mword] is in the
+   context (durable-notes), so every inequality the [range_subset] below needs
+   is produced here, in a clean one -- including the closed ones. *)
+Local Lemma pma_boot_bounds (x n : Z) :
+  0 <= x -> 1 <= n -> x + n < 18446744073709551616 ->
+  0 <= 0 /\ 0 <= x /\ x + n <= 0 + 18446744073709551615
+  /\ 0 + 18446744073709551615 < 18446744073709551616.
+Proof. intros. repeat split; lia. Qed.
+
+(* THE PLATFORM TABLE PERMITS EVERY ACCESS THE KERNEL MAKES, per class.  The
+   table is still the one-region idealization, so both classes are served by the
+   SAME region and the proofs are the same three [range_subset] comparisons at
+   base 0; what the split buys is that the obligation is now shaped for the
+   model's OWN table ([ColdBoot.pma_model_table]), where each class matches a
+   DIFFERENT region and neither would follow from the other.  The attribute
+   conjuncts are conversion -- they read the literal region's own fields. *)
+Lemma pma_allows_ram_pma_boot : pma_allows_ram pma_boot.
+Proof.
+  intros a n (Hn & Hlo & Hfit).
+  rewrite uint_unsigned in Hlo Hfit.
+  assert (Hnw : bv_unsigned a + n < 18446744073709551616)
+    by (unfold ram_base, ram_size in Hfit; lia).
+  destruct (pma_boot_bounds (bv_unsigned a) n (proj1 (bvu64_range a)) (proj1 Hn) Hnw)
+    as (B0 & B1 & B2 & B3).
   eexists. split.
   - unfold matching_pma_region, pma_boot.
     cbn [matching_pma_region_bits_range].
     change (bits_of_physaddr (Physaddr a)) with a.
     rewrite zero_extend'_id.
     cbn [PMA_Region_base PMA_Region_size].
-    assert (Hrs : range_subset a (to_bits 64 n)
-                    (boot_w64 0) (boot_w64 0xFFFFFFFFFFFFFFFF) = true).
-    { unfold range_subset, zopz0zIzJ_u.
-      rewrite !uint_unsigned Hmax !bvu_sub_b0 (bvu_add_width a n Hnr Hsr).
-      apply andb_true_intro; split; [exact Hle1 |].
-      apply andb_true_intro; split; [exact Hle2 | exact Hle3]. }
-    rewrite Hrs. reflexivity.
+    rewrite (range_subset_lit_in a n 0 18446744073709551615
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (proj1 Hn) B0 B1 B2 B3).
+    reflexivity.
   - repeat split; reflexivity.
 Qed.
+
+Lemma pma_allows_io_pma_boot : pma_allows_io pma_boot.
+Proof.
+  intros a n (Hn & Hlo & Hfit).
+  rewrite uint_unsigned in Hlo Hfit.
+  assert (Hnw : bv_unsigned a + n < 18446744073709551616)
+    by (unfold mmio_base, mmio_size in Hfit; lia).
+  destruct (pma_boot_bounds (bv_unsigned a) n (proj1 (bvu64_range a)) (proj1 Hn) Hnw)
+    as (B0 & B1 & B2 & B3).
+  eexists. split.
+  - unfold matching_pma_region, pma_boot.
+    cbn [matching_pma_region_bits_range].
+    change (bits_of_physaddr (Physaddr a)) with a.
+    rewrite zero_extend'_id.
+    cbn [PMA_Region_base PMA_Region_size].
+    rewrite (range_subset_lit_in a n 0 18446744073709551615
+               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+               (proj1 Hn) B0 B1 B2 B3).
+    reflexivity.
+  - repeat split; reflexivity.
+Qed.
+
+Lemma pma_allows_all_pma_boot : pma_allows_all pma_boot.
+Proof. exact (pma_allows_all_intro pma_allows_ram_pma_boot pma_allows_io_pma_boot). Qed.
 
 (* ====================================================================== *)
 (* §1b  The boot PMP configuration is all-OFF and unlocked.                *)

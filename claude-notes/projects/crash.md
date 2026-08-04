@@ -2161,47 +2161,138 @@ yet.
   choices) when the log's crash proof is designed — request-atomic is the
   current recorded choice.
 - ~~The misa divergence~~ — **DONE** (see "THE misa DIVERGENCE, CLOSED" below).
+- **PMA table retirement** — the per-class obligation and the model-table
+  anchoring LANDED; the table swap itself is blocked on a verified-user-mode
+  claim (see "PMA TABLE RETIREMENT" below).
 
-### PMA TABLE RETIREMENT (and with it, the config assert) — three steps, in order
+### PMA TABLE RETIREMENT — **STEP 2 LANDED; THE TABLE SWAP IS BLOCKED, AND THE BLOCKER IS A U-MODE CLAIM**
 
-The end state: the boot anchor is the model's own `init_model ""`, config validity
-is a discharged obligation, and the `pma_regions` patch is gone. It has to be
-done in this order, because step 3 is only *satisfiable* after steps 1–2.
+**What landed.** The tower's PMA obligation is per ADDRESS CLASS, the model's own
+table is a named and compiled value, and the `init_model ""` anchor's
+configuration assert is a discharged, *named* fact:
 
-1. **`pma_boot` becomes the model's real three-region table** — ROM
-   0x1000/IOMemory, the MMIO band 0x2000000 + 0x10000000/IOMemory, RAM
-   0x80000000 + 0x8000000/MainMemory — and it is **NOT hand-transcribed**:
-   anchor it with an evaluation lemma tying it to the `write_reg pma_regions [...]`
-   literal at the end of `sail_model_init` (rv64d.v ~line 43318). Extract **just
-   that write's value**; do NOT run `sail_model_init` itself (its register inits
-   are the ISA-UNSPECIFIED part, and it is the source of the 19 GB open-base
-   blow-up recorded below). The table is platform state that `reset()`
-   deliberately does not touch, so it stays a pre-reset pin — but "proven from
-   the model" rather than transcribed, exactly like `ColdBoot`'s other values.
-2. **Restate `pma_allows_all`'s obligations per ADDRESS CLASS** and re-anchor its
-   consumers: kernel RAM accesses match the MainMemory region; UART / PLIC /
-   virtio accesses match the IOMemory band with the attributes those device
-   towers need. Note honestly that `pma_allows_all` as it stands quantifies over
-   ALL addresses, which the real three-region table CANNOT satisfy — so the
-   predicate's address side is what has to be restated, not just the table.
-3. **THEN switch the boot anchor from `reset` back to `init_model ""`.** The
-   config validation is wanted back once it is satisfiable: `config_is_valid` at
-   the real table should compute to `true`, provable as a `vm_cast_no_check`
-   lemma (the positive twin of `ColdBoot.config_is_valid_pma_boot`), the assert
-   then discharges, and the anchor becomes exactly the model's own startup
-   sequence. **Why it cannot be done first:** `config_is_valid` is FALSE at
-   `pma_boot` — `check_mem_layout` wants the CLINT inside a configured IOMemory
-   region and `pma_boot` is one all-permitting *MainMemory* region — so anchoring
-   on `init_model` today would leave the PowerOn arm with NO successors: an
-   unprovable reducibility witness, and a vacuous system theorem if it were ever
-   admitted. `config_is_valid` reads exactly ONE register (`pma_regions`, in
-   `check_mem_layout` and `within_configured_pma_memory`); everything else in its
-   twelve checks is pure configuration, which is why the fix is entirely about
-   the table.
+- `RiscvFetchExec.pma_allows_all regions := forall c : pma_class,
+  pma_allows_class c regions`, with `pma_class = PmaRam | PmaIo`,
+  `pma_class_access` giving each class its address range and `pma_class_grants`
+  its attribute list. `pma_allows_ram` / `pma_allows_io` are the two instances;
+  `pma_all_ram` / `pma_all_io` the projections; `pma_allows_all_intro` the
+  converse. RAM asks R/W/X + the atomic support level + both PTE permissions;
+  the device band asks R/W and nothing else (it is not executable and supports
+  neither atomics nor PTE access, which is why they cannot be one obligation).
+- `RiscvExtras.pma_ram_access` / `pma_io_access` are the address premises
+  (`ram_base`-range and the new `mmio_base`/`mmio_size` band in RiscvPtsto),
+  each carrying the width proviso AND THE END BOUND.
+- `ColdBoot.pma_model_table` is the three-region table `sail_model_init` really
+  writes, extracted by evaluating the model, with `cold_boot_pma` proving it IS
+  the register's value (and `pma_boot_not_model` naming the difference). So the
+  idealization is now the gap between two compiled values.
+- `ColdBoot.cold_boot_config_valid`: `config_is_valid` **computes to `true`** at
+  the state the initializers leave. The anchor was already `init_model ""`; what
+  was missing was the fact having a name. At the one-region `pma_boot` the same
+  check computes to **`false`** — so it could never have been anchored there.
+
+**THE BLOCKER, and it is not in this layer.** The model's DRAM region carries
+`PMA_atomic_support = AMOCASQ`; the RAM class's atomic conjunct is
+`= AMOSwap`, and it cannot be weakened alone:
+
+- The AMO leaves (`WpAmo`, `WpSconfLock`) only ever consume
+  `pma_allows_atomic_op … AMOSWAP 4 = true`, which AMOCASQ satisfies. Those are
+  fine either way.
+- But the **verified-user-mode AMO classifier** needs the EXACT support level,
+  because it CONCLUDES A FAULT from it: `UserMemClassify.exec_pmaCheck_ram_amo_gk`
+  and the four lemmas over it conclude
+  `if generic_eq op AMOSWAP then Ok … else Err (E_SAMO_Access_Fault …)`, and
+  `UserMemArms`' comment says so in as many words — "the RAM pins
+  atomic_support = AMOSwap, so only AMOSWAP actually retires; the other ops take
+  the op-generic fault lemmas". At AMOCASQ **every** op is permitted
+  (`pma_allows_atomic_op AMOCASQ op k = (op ≠ AMOCAS) || k ≤ 16`, and k ≤ 16
+  always holds here), so that arm is FALSE for the real machine: a user-mode
+  `amoadd` retires, it does not fault. **That is a claim about the machine, in
+  another subsystem (projects/user-verified.md), and re-deriving it is its own
+  task** — the retire side is op-generic and already proven
+  (`UserMemArms.exec_execute_AMO_u_ok` covers all 9 non-CAS ops), so the flip is
+  mostly *deleting* fault arms; the open question is AMOCAS, which **Zacas is
+  `supported: true`** in the config so the decoder does produce, and which at
+  AMOCASQ becomes permitted too (its arms would need the real CAS semantics).
+- Do NOT "fix" this by weakening the JSON's DRAM region to AMOSwap. That is the
+  cheap-and-wrong direction of the misa lesson (durable-notes): QEMU's DRAM does
+  support amoadd, so an AMOSwap-only bank is a machine that does not exist, and
+  the U-mode tier's "amoadd faults" claim would then be about a fiction. The
+  misa fix went the other way — the config claimed MORE than the machine we mean
+  to verify.
+
+So the remaining work, in order: (1) re-derive the U-mode AMO classification at
+AMOCASQ (all ops permitted; decide AMOCAS); (2) weaken the RAM class's atomic
+conjunct to `pma_allows_atomic_op … AMOSWAP 4 = true` (already the form the AMO
+leaves want); (3) `pma_boot := ColdBoot.pma_model_table` and drop the
+`register_set` patch in `cold_regs_boot`. Step (3) then needs, per class, the
+`range_subset` MISSES as well as the hit — `BootConfig.range_subset_lit_out` is
+proven and kept for exactly that (the boot ROM must be missed by everything, the
+band by every RAM access).
+
+**WHY THE APPLIER RIPPLE WAS ONE LINE EACH** (the reusable part): `range_subset`
+(rv64d.v) compares the access's END against the region's, so a class needs an
+end bound the base bound does NOT imply — an 8-byte access based on the last
+byte of DRAM matches NO region. Every applier already owned it: the chunk lemmas
+(`s_mem_chunk`, `s_fetch_chunk`, `udata_read_word_g`, …) hand back the LAST
+byte's `addr_is_ram` next to the base's, and `PtTree.pt_slot_mem` carries both
+ends of a PTE slot (hence `PtTree.pt_slot_ram_access`, one line per walk site).
+The only shape with no last byte was the 8-byte physical word cell, and
+`RiscvPtsto.phys_word_pointsto_ram7` covers all six of those. The discharge kit
+is `RiscvExtras.pma_access_ram` (literal width and offset: two `eq_refl`
+checks), `pma_access_ram_at` (variable width, offset by an equation),
+`pma_access_ram_byte`, `pma_access_ram_fit`, `pma_access_io`; `uint_pa_add` now
+has ONE home there (it had two, in SmodePte and WpSmodeGpr).
+
+**Keeping `pma_allows_all` as the name of the (class-indexed) obligation is what
+kept the sweep small**: `hw_config` and its ~97 destructs and the ~130 lemmas
+that merely thread the premise are textually unchanged; only the ~50 sites that
+APPLY it moved. And it is a `∀ c`, NOT a conjunction, on purpose — see the
+gotchas below.
+
+**MEASUREMENTS AND GOTCHAS** (all new):
+
+- `config_is_valid` probes: `Some true` at the model's table, `Some false` at the
+  one-region idealization, both **1.4 s / 680 MB** — cheap because a bool forces
+  no `regstate` field (the `is_Some`-probe rule in durable-notes, used the right
+  way round for once).
+- Cost of the two new `vm_cast_no_check`s in ColdBoot (a SECOND computed state,
+  `pre_state`, for the config probe, plus `cold_boot_pma` over the table):
+  the whole file is **8.1 s / 870 MB**, i.e. still under the 13.6 s the notes
+  recorded for one state. Both extra facts are shallow reads of an
+  already-computed record, which is why they are nearly free.
+- The PTE-read/write predicates (`KptPt` / `PtTreeAdue`) took the class premise
+  too: their address side is `pma_ram_access a 8` now, not "the access does not
+  wrap". That is the honest form — the ROM window and the MMIO band both carry
+  `PMA_supports_pte_read = false`, so a page table outside DRAM does not walk on
+  this platform. `CommonWalk.u_pte_addr_no_wrap` / `PtTree.pt_addr0_no_wrap`
+  retired with it; `Pt4kWalk.pte_addr_at_no_wrap` stays as the slot-geometry
+  bound.
+- **A conjunction would have been the wrong shape for `pma_allows_all`.** Tried
+  it: every config-bundle preservation proof ends with
+  `repeat split; assumption` (`UserMemClassify.cfg_okR_pres` and friends), which
+  splits the conjunction into its two halves and leaves goals the bundled
+  hypothesis no longer matches. The class INDEX makes it a `∀`, which `split`
+  cannot touch, and no such proof had to change.
+- **A tactic in an ARGUMENT position whose expected type is still an evar can
+  diverge.** `exact (conj (conj … ltac:(discriminate)) …)` ran `discriminate` on
+  an open goal: RiscvExtras.v went from **2 s to >12 min at ~1 GB and climbing**,
+  with no error. Also lifted into durable-notes.
+- **Premise ORDER decides whether an `eq_refl` bound check elaborates**: a
+  `Z.leb (n - 1) (Z.of_nat k) = true` premise placed before the argument that
+  pins `n` fails with `(?n - 1 <=? 3) = true`. The index-pinning premises come
+  first in `pma_access_ram`. Also in durable-notes.
+- `lia` is unusable in these proofs once an `mword` is in context — including for
+  closed bounds like `0 <= 0x1000`. `BootConfig`'s geometry is therefore split
+  into `mword`-free `Z` lemmas (`pma_region_in_arith` / `pma_region_out_arith` /
+  `pma_boot_bounds`) applied to `bv_unsigned a`.
 
 ### THE PATCH CHAIN, AND WHY IT IS STILL `sail_model_init`-ANCHORED
 
-The intended next shape — `boot_facts`' register clause as "the ARCHITECTURAL
+There is no patch chain left — `pma_regions` was the last one (see PMA TABLE
+RETIREMENT above) — but the anchor is still the model's whole cold boot from the
+CLOSED `init_regstate`, not `reset()` over arbitrary power-on state. The
+intended next shape — `boot_facts`' register clause as "the ARCHITECTURAL
 reset (`reset()` alone, per the privileged spec) of arbitrary power-on garbage,
 plus a named platform patch chain" — is **blocked on an evaluation wall**, and
 the measurement is the durable part:

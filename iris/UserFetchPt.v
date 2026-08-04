@@ -125,8 +125,8 @@ Section UserFetchPtWord.
       as %(iw & Hbytes & Hram0 & Hram3).
     iPureIntro.
     set (pa := u_walk_pa w va) in *.
-    destruct (Hall pa 4
-               (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl))) as (region & Hpmam & Hexec & _).
+    destruct (pma_all_ram Hall pa 4
+               (pma_access_ram _ _ _ Hram0 Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hpmam & Hexec & _).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
     assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
@@ -350,9 +350,9 @@ Section UserFetchPtSplit.
                      (Physaddr (u_walk_pa w va)) 2 false false false) σ1
                    = Some (Ok ilo, σ1)).
     { set (pa := u_walk_pa w va) in *.
-      destruct ((ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+      destruct (pma_all_ram (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
                  : pma_allows_all (register_lookup pma_regions σ1.(sregs))) pa 2
-                (pma_access_ram _ _ Hram1a (pma_width_ok 2 eq_refl eq_refl)))
+                (pma_access_ram _ _ _ Hram1a Hram1b (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
         as (region & Hpmam & Hexec & _).
       pose proof (addr_is_ram_not_in_clint _ Hram1a) as Hnc.
       pose proof (addr_is_ram_not_in_sig _ Hram1a) as Hns.
@@ -417,10 +417,10 @@ Section UserFetchPtSplit.
                        (Physaddr (u_walk_pa wh (add_vec_int va 2))) 2 false false false) σ2
                      = Some (Ok ihi, σ2)).
       { set (pah := u_walk_pa wh (add_vec_int va 2)) in *.
-        destruct ((ltac:(rewrite (Tr2 pma_regions ltac:(vm_compute; reflexivity))
+        destruct (pma_all_ram (ltac:(rewrite (Tr2 pma_regions ltac:(vm_compute; reflexivity))
                                  (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
                    : pma_allows_all (register_lookup pma_regions σ2.(sregs))) pah 2
-                  (pma_access_ram _ _ Hram2a (pma_width_ok 2 eq_refl eq_refl)))
+                  (pma_access_ram _ _ _ Hram2a Hram2b (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
           as (region & Hpmam & Hexec & _).
         pose proof (addr_is_ram_not_in_clint _ Hram2a) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram2a) as Hns.
@@ -580,9 +580,9 @@ Section UserFetchPtSplitFault.
                      (Physaddr (u_walk_pa w va)) 2 false false false) σ1
                    = Some (Ok ilo, σ1)).
     { set (pa := u_walk_pa w va) in *.
-      destruct ((ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+      destruct (pma_all_ram (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
                  : pma_allows_all (register_lookup pma_regions σ1.(sregs))) pa 2
-                (pma_access_ram _ _ Hram1a (pma_width_ok 2 eq_refl eq_refl)))
+                (pma_access_ram _ _ _ Hram1a Hram1b (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
         as (region & Hpmam & Hexec & _).
       pose proof (addr_is_ram_not_in_clint _ Hram1a) as Hnc.
       pose proof (addr_is_ram_not_in_sig _ Hram1a) as Hns.
