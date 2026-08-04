@@ -175,6 +175,16 @@ Record virtio_state := VirtioState {
 Definition set_vcfg (v : virtio_state) (c : virtio_cfg) : virtio_state :=
   VirtioState c (v_isr v) (v_seen v) (v_used_idx v) (v_disk v).
 
+(* THE DISK IMAGE'S GHOST VIEW (claude-notes/design/crash.md).  The image is
+   a TOTAL function, while its ghost mirror is a partial map -- a fragment
+   exists only for offsets somebody minted, exactly as [mem_view] relates
+   the byte memory to its ghost map.  The predicate lives HERE, in the
+   iris-free model, rather than with the points-to it serves
+   ([DiskPtsto.v]): the auth it ties is DURABLE and rides in
+   [RiscvPtsto.power_interp], which is below the driver protocol. *)
+Definition disk_view (dmap : gmap Z (bv 8)) (dk : Z -> bv 8) : Prop :=
+  forall (o : Z) (b : bv 8), dmap !! o = Some b -> dk o = b.
+
 Definition zero32 : bv 32 := Z_to_bv 32 0.
 Definition zero16 : bv 16 := Z_to_bv 16 0.
 Definition zero64 : Arch.pa := Z_to_bv 64 0.

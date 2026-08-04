@@ -624,7 +624,7 @@ Proof.
   { done. }
   { iIntros (v Hvok) "Hproto _".
     destruct (Hwrite v Hvok) as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk').
-    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused' Hdisk'
+    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused'
                  with "Hproto") as "Hproto".
     iModIntro. iExists v'.
     iSplitR; [iPureIntro; exact Hvw|].

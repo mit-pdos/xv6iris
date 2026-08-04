@@ -405,7 +405,7 @@ Section VdiLeaves.
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (set_vcfg v c') c'
               ltac:(rewrite Hcv; exact Hl0) Hl1 eq_refl
-              ltac:(exact Hsn) ltac:(exact Hui) eq_refl
+              ltac:(exact Hsn) ltac:(exact Hui)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (set_vcfg v c').
       iSplitR.
@@ -461,7 +461,7 @@ Section VdiLeaves.
         as %(Hcv & Hsn & Hui).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (virtio_reset v) virtio_cfg0
-              ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl eq_refl
+              ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (virtio_reset v).
       iSplitR.
@@ -527,7 +527,7 @@ Section VdiLeaves.
         as %(Hcv & Hsn & Hui).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_intro γv v (set_vcfg v (virtio_init_cfg pd pav pu))
-              pd pav pu ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl
+              pd pav pu ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl
               Hpal Hdisj with "Hproto Hmine Hidx Hpage")
         as "(Hproto & Hpub & #Hcfg)".
       iModIntro. iExists (set_vcfg v (virtio_init_cfg pd pav pu)).

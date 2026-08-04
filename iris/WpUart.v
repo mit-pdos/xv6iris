@@ -845,13 +845,23 @@ Section DevLoops.
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_disk_loop γd Φ :
+    (* the disk names are the CANONICAL ones: the image gname is the DURABLE
+       fixed-layer one, which is what identifies the auth [wp_disk_step] hands
+       over with the fragments [virtio_proto] holds.  [disk_ghosts_alloc]
+       exports this equation. *)
+    dn_img γd = riscv_disk_name ->
     gen_cert -∗ disk_inv γd -∗ plic_inv -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
+    intros Himg.
     iIntros "#Hcert #Hvinv #Hpinv".
     iLöb as "IH".
     iApply (wp_disk_step with "Hcert").
-    iIntros (gr m d) "(Hgr & Hmem & Hdev)".
+    (* the fourth component is the DURABLE image auth ([wp_disk_step] hands it
+       over because a DMA completion is the one step that moves [v_disk]): the
+       latch and stutter arms FRAME it, and the completion arm passes it
+       through [virtio_proto_step] (claude-notes/design/crash.md). *)
+    iIntros (gr m d) "(Hgr & Hmem & Hdev & Hdur)".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' m' Hstep).
     iMod "Hmask" as "_".
@@ -868,12 +878,21 @@ Section DevLoops.
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hdisk.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk with "Hmem Hlease")
-        as "[Hmem' Hlease']".
+      (* the auth [wp_disk_step] handed over is at the DURABLE gname; the
+         fragments this invariant holds are at [dn_img γd] -- the same map,
+         by [Himg]. *)
+      iEval (rewrite -Himg Hv) in "Hdur".
+      iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
+              with "Hmem Hdur Hlease") as "(Hmem' & Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
-      iModIntro. iFrame "Hgr Hmem' Hdev'". iApply "IH".
+      iModIntro. iFrame "Hgr Hmem' Hdev'".
+      iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
+      iEval (rewrite Himg) in "Hdauth'".
+      iSplitL "Hdauth'".
+      { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
+      iApply "IH".
     - (* The queue the driver published is MALFORMED, so the device may write
          anything anywhere.  This case is REFUTED, not handled: the lease's
          positive well-formedness obligation says the device is never in that
@@ -901,9 +920,14 @@ Section DevLoops.
       { iNext. iExists p'. iFrame "Hp'". iPureIntro.
         apply (plic_ok_latch p p' virtio_irq_id);
           [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
-      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+      iModIntro. iFrame "Hgr Hmem Hdev'".
+      iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+      iSplitL "Hdauth".
+      { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
-      iModIntro. iFrame "Hgr Hmem Hdev". iApply "IH".
+      iModIntro. iFrame "Hgr Hmem Hdev".
+      iSplitL "Hdur"; [iExact "Hdur"|]. iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

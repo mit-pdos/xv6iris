@@ -9,6 +9,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.
+Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the DURABLE disk image *)
 Require Import PtreeType.   (* [ptree]: the carrier of the shared kernel table's ghost *)
 Local Open Scope Z_scope.
 
@@ -219,6 +220,20 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      ambient era to the one [state_interp]'s existential holds. *)
   riscvF_registryGS :: ghost_mapG Σ nat riscvEraGS;
   riscv_registry_name : gname;
+  (* THE DURABLE DISK IMAGE (claude-notes/design/crash.md): a byte-granularity
+     ghost map mirroring [v_disk], tied to the state by [disk_dur_interp]
+     below.  FIXED-layer, because the image is the ONE machine component a
+     power cycle preserves -- anything linear parked in an era invariant is
+     stranded at a crash, so the auth cannot live in [virtio_proto] (which
+     rides in the per-era [disk_inv]).  The era's OTHER disk ghosts
+     (slots/counters/claims) stay era-fresh: in-flight requests SHOULD die
+     with the device reset.  [DiskPtsto.disk_names]'s [dn_img] field is
+     always this gname, so every client [disk_bytes γ …] is unchanged and
+     its fragments survive a boot.  The class comes from [DiskImg.v], BELOW
+     both this file and DiskPtsto.v, because the auth here and the driver's
+     fragments there must carry the same [ghost_mapG] instance. *)
+  riscvF_diskGS :: diskImgG Σ;
+  riscv_disk_name : gname;
 }.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
@@ -279,6 +294,17 @@ Definition start_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
   mono_nat_auth_own riscv_start_name 1 n.
 Definition gen_started `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_start_name (S gen).
+
+(* THE DURABLE DISK TIE (claude-notes/design/crash.md): the fixed-layer image
+   auth, pinned to the state's own [v_disk].  It is a conjunct of
+   [power_interp] at BOTH power states, and both power arms FRAME it --
+   PowerOff touches no device state at all and PowerOn's [virtio_reset] keeps
+   [v_disk], which is exactly what makes the image (and hence every
+   [disk_bytes] fragment) crash-surviving.  Of the whole tree only the DISK
+   thread's DMA completion moves [v_disk], so only [wp_disk_step] hands this
+   conjunct over to its caller. *)
+Definition disk_dur_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
+  disk_img_auth riscv_disk_name (v_disk (dvirtio (gdev g))).
 
 (* the registry element: generation [gen] runs era [E].  Persistent. *)
 Definition era_registered `{!riscvFixedGS Σ} (gen : nat) (E : riscvEraGS) : iProp Σ :=
@@ -1031,7 +1057,8 @@ Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
       ghost_map_auth riscv_registry_name 1 R ∗
       ⌜dom R = set_seq 0 (start_count g)⌝ ∗
       (if g.(gpow) then (∃ E, ⌜R !! g.(ggen) = Some E⌝ ∗ era_interp E g)%I
-       else True%I)))%I.
+       else True%I)) ∗
+   disk_dur_interp g)%I.
 
 Global Program Instance riscv_irisGS `{!riscvFixedGS Σ} : irisGS riscv_lang Σ := {
   iris_invGS := riscvF_invGS;

@@ -285,6 +285,16 @@ Inductive uart_step (d : dev_state) : dev_state -> Prop :=
   (* the totality stutter -- see TOTALITY above *)
   | UartStepIdle : uart_step d d.
 
+(* A UART step never moves the disk IMAGE either (crash.md): each arm
+   rebuilds the fabric through [set_duart]/[set_dplic], which keep
+   [dvirtio] verbatim.  This is what lets [wp_uart_step] FRAME
+   [state_interp]'s durable disk conjunct.  ([plic_step] and the disk's own
+   latch/idle arms need no lemma: their [d'] is syntactically [d] or
+   [set_dplic d _], so the framing is by conversion.) *)
+Lemma uart_step_v_disk (d d' : dev_state) :
+  uart_step d d' -> v_disk (dvirtio d') = v_disk (dvirtio d).
+Proof. intros H. destruct H; reflexivity. Qed.
+
 (* The disk: complete a queued request by DMA, scribble anywhere if the queue
    the driver published is malformed, latch its own interrupt source, or
    stutter.  This is the only relation that carries the byte memory. *)

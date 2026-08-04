@@ -101,6 +101,12 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_genGS :: mono_natG Σ;
   (* the generation REGISTRY (crash/power layer): gen -> era record *)
   riscv_pre_registryGS :: ghost_mapG Σ nat riscvEraGS;
+  (* the DURABLE DISK IMAGE (crash/power layer): the one ghost that spans
+     power cycles.  Capacity only -- the theorems below allocate it EMPTY
+     (nothing minted yet) and pin it into the fixed layer.  [DiskImg.v] owns
+     the class, so the fixed-layer auth and [DiskPtsto]'s fragments share the
+     instance. *)
+  riscv_pre_diskGS :: diskImgG Σ;
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -117,7 +123,8 @@ Definition riscvΣ : gFunctors :=
      GFunctor kptR;
      ghost_varΣ bool;
      mono_natΣ;
-     ghost_mapΣ nat riscvEraGS ].
+     ghost_mapΣ nat riscvEraGS;
+     diskImgΣ ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -429,12 +436,18 @@ Proof.
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hstartauth #Hstartlb]".
   set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
+  (* the durable disk image, EMPTY: no fragment has been minted, and
+     [disk_view ∅ _] holds vacuously (crash.md).  Minting the client's initial
+     [disk_bytes] over the mkfs image is [DiskPtsto.disk_bytes_mint] against
+     this auth, and lands with the crash invariant. *)
+  iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
   assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
     by apply lookup_empty.
   iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
-               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg)
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
+                  _ γdisk)
                E0).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
@@ -521,10 +534,13 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ HR))).
   cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth".
+  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth".
   { (* the initial state interpretation: generation 0, power on, the one
-       registered era *)
-    rewrite /power_interp. iFrame "Hgenauth Hstartauth".
+       registered era, the empty durable image *)
+    rewrite /power_interp /disk_dur_interp /disk_img_auth. iFrame "Hgenauth Hstartauth".
+    iSplitR "Hdiskauth"; last first.
+    { iExists ∅. iFrame "Hdiskauth". iPureIntro.
+      intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
     iExists {[ 0%nat := E0 ]}. iFrame "HRauth".
     iSplitR.
     { iPureIntro. rewrite dom_singleton_L /start_count Hpow Hgen0 /=.
@@ -617,7 +633,7 @@ Proof.
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
   iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx)
-    as (γv) "(Hproto & _ & _ & _)".
+    as (γv) "(%Himg & Hproto & _ & _ & _)".
   iMod (dev_inv_alloc _ γ γv with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto]") as "#Hinv".
   { rewrite /dev_inv_body.
     iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).
@@ -645,7 +661,7 @@ Proof.
   iSplitL.
   { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
   iSplitL.
-  { iApply (wp_disk_loop γv with "Hcert Hvinv Hpinv"). }
+  { iApply (wp_disk_loop γv _ Himg with "Hcert Hvinv Hpinv"). }
   iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.
 
@@ -728,7 +744,7 @@ Section power.
   Proof.
     iLöb as "IH".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (g.(gpow)) eqn:Hpw.
     - (* PowerOff: bump the generation, drop the power *)
@@ -751,11 +767,16 @@ Section power.
       iMod "Hback" as "_". iModIntro.
       rewrite /start_count Hpw /= in Hdom.
       iEval (rewrite /start_count Hpw /=) in "Hsauth".
-      iSplitL "Hgauth Hsauth HRauth".
+      iSplitL "Hgauth Hsauth HRauth Hdur".
       { rewrite /state_interp /=.
-        unfold power_interp, start_count. cbn [ggen gpow gregs gmem gdev].
+        unfold power_interp, disk_dur_interp, disk_img_auth, start_count.
+        cbn [ggen gpow gregs gmem gdev].
         replace (S (g.(ggen)) + 0)%nat with (g.(ggen) + 1)%nat by lia.
         iFrame "Hgauth Hsauth".
+        (* the durable image is FRAMED: PowerOff touches no device state *)
+        iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+        iSplitR "Hdauth"; last first.
+        { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
         iExists R. iFrame "HRauth". iPureIntro.
         split; [exact Hdom|exact I]. }
       iSplitL; [|done]. iApply "IH".
@@ -836,11 +857,18 @@ Section power.
         iExact "Hstartlb". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
-      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA".
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdur".
       { rewrite /state_interp /=.
-        unfold power_interp, start_count. cbn [ggen gpow gregs gmem gdev].
+        unfold power_interp, disk_dur_interp, disk_img_auth, start_count.
+        cbn [ggen gpow gregs gmem gdev].
         rewrite Hgen2 Hpow2.
         iFrame "Hgauth Hsauth".
+        (* the durable image RIDES THROUGH the reset: [virtio_reset] keeps
+           [v_disk], which is the whole point of the fixed-layer conjunct *)
+        iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+        iSplitR "Hdauth"; last first.
+        { iExists dmap. iFrame "Hdauth". iPureIntro.
+          rewrite Hvirt2. exact Hdview. }
         iExists (<[g.(ggen) := HE]> R). iFrame "HRauth".
         iSplitR.
         { iPureIntro.
@@ -898,7 +926,9 @@ Proof.
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgauth _]".
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hsauth _]".
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
-  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ γgen γstart _ γreg).
+  iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
+  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
+              _ γdisk).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -907,9 +937,13 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
   cbv zeta beta.
-  iSplitL "Hgauth Hsauth HRauth".
-  { (* the initial state interpretation: OFF, nothing ever started *)
-    rewrite /power_interp. iFrame "Hgauth Hsauth".
+  iSplitL "Hgauth Hsauth HRauth Hdiskauth".
+  { (* the initial state interpretation: OFF, nothing ever started, the
+       durable image empty (no fragment minted yet) *)
+    rewrite /power_interp /disk_dur_interp /disk_img_auth. iFrame "Hgauth Hsauth".
+    iSplitR "Hdiskauth"; last first.
+    { iExists ∅. iFrame "Hdiskauth". iPureIntro.
+      intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
     iExists ∅. iFrame "HRauth".
     iSplitR.
     { iPureIntro. rewrite dom_empty_L /start_count Hpow /=.

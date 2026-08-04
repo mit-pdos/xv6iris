@@ -3,15 +3,21 @@
 (*                                                                         *)
 (* The virtio disk's image is a total function [v_disk : Z -> bv 8].  The  *)
 (* driver-facing resource for it is a byte-granularity ghost map: the      *)
-(* AUTH rides inside the device invariant (VirtioProto.v), tied to the     *)
-(* image by [disk_view] -- the exact analogue of [mem_view]: a fragment    *)
-(* exists only for offsets somebody minted, and the model's disk stays     *)
+(* AUTH rides in [RiscvPtsto.power_interp]'s DURABLE conjunct (it is the   *)
+(* one ghost that spans power cycles -- claude-notes/design/crash.md),     *)
+(* tied to the image by [VirtioModel.disk_view] -- the exact analogue of   *)
+(* [mem_view]: a fragment exists only for offsets somebody minted, and the *)
+(* model's disk stays                                                      *)
 (* total underneath.  [disk_bytes]/[disk_block] are the derived forms the  *)
 (* function specs use ([virtio_disk_rw] moves a whole 1024-byte block).   *)
 (*                                                                         *)
 (* This file also owns the OTHER driver-protocol ghosts, so a single       *)
 (* [disk_names] record travels through [dev_inv] (mirroring [uart_names]): *)
-(*   dn_img  -- the disk image map above;                                  *)
+(*   dn_img  -- the disk image map above.  ALWAYS [riscv_disk_name] (the   *)
+(*              fixed-layer gname): the image outlives an era, so unlike   *)
+(*              the four ghosts below it is not re-allocated at a boot;    *)
+(*              it stays a FIELD so every client statement                 *)
+(*              ([disk_bytes γ …]) keeps its spelling;                     *)
 (*   dn_slot -- ghost_map nat vslot: the auth covers every in-flight       *)
 (*              request; the FRAGMENT for position [p] is the publisher's  *)
 (*              RECEIPT, and presenting it is what licenses the reclaim;   *)
@@ -32,6 +38,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import VirtioModel.
 Require Import VirtioQueue.
+Require Import DiskImg.
 
 Local Open Scope Z_scope.
 
@@ -69,8 +76,11 @@ Record dclaim := DClaim {
 (* the ghost classes and the name bundle                                   *)
 (* ---------------------------------------------------------------------- *)
 
+(* NB: the disk IMAGE map is deliberately NOT here -- it is [DiskImg.diskImgG],
+   below both this file and RiscvPtsto.v, because the durable auth rides in the
+   fixed layer's [state_interp] while the fragments below are elements of the
+   same map (claude-notes/design/crash.md). *)
 Class diskGhostG (Σ : gFunctors) := DiskGhostG {
-  disk_img_inG  :: ghost_mapG Σ Z (bv 8);
   (* a receipt records the slot AND the pin map deposited at publish *)
   disk_slot_inG :: ghost_mapG Σ nat (vslot * gmap Arch.pa (bv 8));
   disk_nc_inG   :: mono_natG Σ;
@@ -86,7 +96,7 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
 }.
 
 Definition diskGhostΣ : gFunctors :=
-  #[ghost_mapΣ Z (bv 8); ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
+  #[ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
     mono_natΣ; ghost_varΣ nat; ghost_mapΣ nat dclaim;
     GFunctor (dfrac_agreeR (leibnizO virtio_cfg))].
 
@@ -106,8 +116,10 @@ Record disk_names := DiskNames {
 (* the disk view and the points-to                                         *)
 (* ---------------------------------------------------------------------- *)
 
-Definition disk_view (dmap : gmap Z (bv 8)) (dk : Z -> bv 8) : Prop :=
-  forall (o : Z) (b : bv 8), dmap !! o = Some b -> dk o = b.
+(* [disk_view] itself lives in [VirtioModel.v]: the auth it ties is the
+   DURABLE one in [RiscvPtsto.power_interp] (claude-notes/design/crash.md),
+   which is below this file, so the predicate has to be stated in the
+   iris-free model. *)
 
 (* peeling the first byte off a disk range read *)
 Lemma disk_read_cons (dk : Z -> bv 8) (o : Z) (n : nat) :
@@ -127,7 +139,7 @@ Proof.
 Qed.
 
 Section DiskPtsto.
-  Context `{!diskGhostG Σ}.
+  Context `{!diskGhostG Σ, !diskImgG Σ}.
 
   (* -- the frozen live configuration ------------------------------------ *)
 

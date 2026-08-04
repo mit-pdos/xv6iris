@@ -153,57 +153,137 @@ template for milestones 1–4.
    Coq does not have).
    **Remaining: M5** (durable disk) and **M6** (boot composition).
 
-## M5 execution plan (scoped 2026-08-04 against the code)
+## M5 (durable disk) — steps 1-4 LANDED, step 5 remains
 
 The disk-image ghost must survive power cycles; anything linear parked
 in an ERA invariant is stranded at a crash (invariants are never
 deallocated), and `virtio_proto` — which rides in the per-era
-`disk_inv` — today owns `∃ dmap, ghost_map_auth (dn_img γ) 1 dmap ∗
-⌜disk_view dmap (v_disk v)⌝` (VirtioProto.v:1182). So:
+`disk_inv` — used to own `∃ dmap, ghost_map_auth (dn_img γ) 1 dmap ∗
+⌜disk_view dmap (v_disk v)⌝`.
 
-1. **Pin the image name to the fixed layer**: `riscvFixedGS` gains
-   `riscvF_diskGS :: ghost_mapG Σ Z (bv 8)` + `riscv_disk_name : gname`;
-   `disk_ghosts_alloc` (VirtioProto.v:~1475) stops allocating `gimg`
-   and CONSTRUCTS `DiskNames` with `dn_img := riscv_disk_name` — every
-   client statement (`disk_bytes γ …`) is then unchanged, the frags
-   survive eras, and each era's OTHER disk ghosts (slots/nc/np/claim —
-   which SHOULD die with in-flight requests) stay era-fresh.
-2. **Relocate the auth+tie into `power_interp`** as a fixed conjunct
-   `∃ dmap, ghost_map_auth riscv_disk_name 1 dmap ∗ ⌜disk_view dmap
-   (v_disk (dvirtio (gdev g)))⌝` (present at both power states; both
-   power arms FRAME it — PowerOn's `virtio_reset` keeps `v_disk`).
-   `virtio_proto` drops the ∃-auth-tie prefix; the two lemmas that use
-   the auth internally (VirtioProto.v:1289 — the live-flip constructor —
-   and :1603 — the completion step) take auth+tie as premises/returns.
-3. **Preservation obligations**: hart steps never move `v_disk` — prove
-   ONE pure lemma `run (riscv_step tick) σ u σ' → v_disk (dvirtio (mdev
-   σ')) = v_disk (dvirtio (mdev σ))` by induction over the monad
-   (exec_run_det's structure: 14 trivial arms + MemRead/MemWrite via
-   per-device pure lemmas; VirtioModel:476 already notes no MMIO write
-   touches the image — check for existing `virtio_write`/`virtio_read`
-   image-preservation lemmas). uart/plic steps are trivial.  The hart
-   base rule and uart/plic rules then frame the conjunct; **only
-   `wp_disk_step` hands it over** (DMA completions are the one place
-   `v_disk` moves), and `wp_disk_loop` updates the auth there via the
-   modified completion lemma.
-4. **Who needs the auth when** (checked): the auth is touched ONLY at
-   (a) the initial mint — allocation-time, boot/adequacy-side, fine;
-   (b) DMA completion — device thread, has `state_interp` via
-   `wp_disk_step`, fine.  Driver-side ghost moves (enqueue deposits,
-   receipt claims) move FRAGS through `disk_inv` and never the auth, so
-   no instruction-level leaf needs the fixed conjunct — this is what
-   makes the relocation compatible with the accessor-form device
-   leaves.  Watch: any `disk_bytes`-MINT a driver lemma performs
-   lazily would need the auth — grep mint users before starting; if one
-   exists, pre-mint at allocation instead (the image map is a lazy
-   partial view, `disk_view` tolerates any dom).
-5. **`crash_inv`** (after the relocation): `inv crashN (∃ …,
-   disk_bytes-frags ∗ P_fs …)` with `P_fs` an iProp over fixed-layer
-   ghosts; allocated once in `riscv_power_adequacy`'s fixed allocation
-   (client supplies the initial `P_fs`); both power arms never open it.
-   The vslot WRITE PERMIT (the `vs_data` precedent): the enqueuer
-   deposits an iProp wand alongside the OUT slot; the completion step
-   consumes it to re-establish `P_fs` after updating the auth.
+**LANDED (M5a — 658 files green, `spec_vacuity` clean, `lemma_diff`
+reporting only the deliberate `disk_view` move, `Print Assumptions
+riscv_power_adequacy` still exactly the 5 `rv64d.*` axioms):**
+
+1. **The image name is FIXED-layer.** `riscvFixedGS` carries
+   `riscvF_diskGS :: diskImgG Σ` + `riscv_disk_name`;
+   `VirtioProto.disk_ghosts_alloc` no longer allocates `gimg`, it
+   CONSTRUCTS `DiskNames riscv_disk_name gslot gnc gnp gclaim gcfg`.
+   `dn_img` stays a field, so every client statement (`disk_bytes γ …`)
+   is textually unchanged and the fragments survive an era; the era's
+   OTHER disk ghosts (slots/nc/np/claim) stay era-fresh, which is what
+   we want — in-flight requests die with the device reset.
+2. **The auth+tie is `power_interp`'s FOURTH conjunct**, as
+   `disk_dur_interp g := disk_img_auth riscv_disk_name (v_disk (dvirtio
+   (gdev g)))`. `disk_view` MOVED from DiskPtsto.v to VirtioModel.v — it
+   has to be stated in the iris-free model, since the auth it ties now
+   lives below the driver protocol — and `disk_img_auth γi dk := ∃ dmap,
+   ghost_map_auth γi 1 dmap ∗ ⌜disk_view dmap dk⌝` lives in a NEW tiny
+   file **`iris/DiskImg.v`** together with the class `diskImgG` that
+   types it. That file exists for ONE reason, and it is the trap this
+   milestone nearly fell into: **the fixed-layer AUTH and DiskPtsto's
+   FRAGMENTS must carry the same `ghost_mapG Σ Z (bv 8)` INSTANCE.** A
+   field in `riscvFixedGS` and the old `diskGhostG.disk_img_inG` are two
+   different Σ slots whose resources cannot interact, they print
+   identically, and *no proof can bridge two abstract instances* — the
+   symptom is `iSpecialize: cannot instantiate … ghost_map_auth (dn_img
+   γd) … with … ghost_map_auth riscv_disk_name …` at the WpUart seam.
+   Since RiscvPtsto sits BELOW DiskPtsto, neither can take the class
+   from the other, so it goes in a file below both; `diskGhostG` dropped
+   its image field (and `diskGhostΣ` its `ghost_mapΣ Z (bv 8)`, which
+   moved to `diskImgΣ`), which leaves `riscvFixedGS`'s
+   `riscvF_diskGS :: diskImgG Σ` the UNIQUE source of that instance in
+   every riscvGS context — so no consumer needed a `Context` change.
+   Two alternatives were considered and rejected, both for the same
+   reason: threading an instance-equality premise, or making the fixed
+   layer carry an abstract `(Z -> bv 8) -> iProp Σ` field, would each
+   have to be discharged BY THE ADEQUACY CLIENT — which only ever sees
+   an ABSTRACT `riscvGS Σ` and therefore cannot prove anything about the
+   fixed layer's disk ghost. Both would have forced a new parameter into
+   `riscv_system_adequacy`'s client entailment.
+3. **Preservation.** `RiscvLang.run_v_disk` (hart steps, over
+   `DevModel.dev_read_v_disk`/`dev_write_v_disk`) and
+   `RiscvLang.uart_step_v_disk`; `plic_step` and the disk's own
+   latch/idle arms need no lemma (their `d'` is `d` or `set_dplic d _`,
+   so the framing is by conversion). All four base rules now
+   destructure `(Hgauth & Hsauth & HR & Hdur)`; three FRAME the
+   conjunct and **only `wp_disk_step` hands it over** — its callback
+   receives `disk_img_auth (v_disk (dvirtio d))` and owes
+   `disk_img_auth (v_disk (dvirtio d'))`. `wp_disk_loop` (WpUart.v)
+   threads it: frame on latch/idle, and through the modified
+   `virtio_proto_step` on the DMA completion.
+4. **Both power arms frame it** (PowerOff touches no device state;
+   PowerOn's `boot_shape` gives `dvirtio g' = virtio_reset (dvirtio g)`
+   and `virtio_reset` keeps `v_disk` by conversion), and adequacy
+   allocates it EMPTY (`disk_view ∅ _` is vacuous). `riscvGpreS` gained
+   `riscv_pre_diskGS`, `riscvΣ` gained `ghost_mapΣ Z (bv 8)`.
+
+Deliberate interface changes (all justified, none silent):
+`virtio_proto_intro_gen` lost its `ghost_map_auth`+`disk_view`
+premises; `virtio_proto_intro` / `virtio_proto_cfg_write` /
+`virtio_proto_stable` lost their now-dead `v_disk` premises (3 call
+sites: ProofVirtioDiskInit ×2, WpVirtioDev ×1); `virtio_proto_step`
+TAKES `ghost_map_auth (dn_img γ) 1 dmap` + `⌜disk_view dmap (v_disk v)⌝`
+and RETURNS `∃ dmap'` with the tie at the post-state;
+`disk_ghosts_alloc_mint` was DELETED — with the auth in the fixed layer
+it is exactly `disk_ghosts_alloc` followed by
+`DiskPtsto.disk_bytes_mint` against the (still empty) durable auth, and
+it had no caller. (NB: `lemma_diff` sees only COLUMN-0 declarations, so
+a lemma deleted from inside a `Section` — as this one was — is invisible
+to it. It did report DiskPtsto's `disk_view` as GONE: that is the move
+to VirtioModel.)
+
+Proof-engineering gotchas this milestone paid for:
+
+- **Adding a conjunct to `power_interp` breaks the base rules' dead
+  branches in a confusing way.** `state_interp` is ONE ∗-conjunct of
+  `wp_lift_step`'s goal, so after `iFrame "Hgauth Hsauth"` the residue
+  is `(∃R …) ∗ disk_dur_interp g` — a single goal, not two — and the
+  old `iSplitL "HRauth Hera"` then splits state_interp from the WP
+  instead. The symptom is *"iExists: ((∃ R …) ∗ disk_dur_interp g) not
+  an existential"*. Fix: nest (`iSplitL "HRauth Hera Hdur"` then split
+  inside).
+- **`bv` is NOT in scope in RiscvExec.v** (`Require Import RiscvLang`
+  does not re-export stdpp's `bitvector.definitions`), so a rule
+  statement cannot spell `gmap Z (bv 8)` there. Another reason the raw
+  ∃-form is packaged as `DiskImg.disk_img_auth`.
+- **The gname still needs an equation.** `dn_img` stays a field of
+  `disk_names` (so every `disk_bytes γ …` keeps its spelling), so
+  `wp_disk_loop` takes `dn_img γd = riscv_disk_name` as a pure premise
+  and `disk_ghosts_alloc` EXPORTS it (`⌜dn_img γ = riscv_disk_name⌝`, as
+  its first conjunct — the client is the only one who knows which γ was
+  allocated). The conversion happens in the two `iEval (rewrite ±Himg)
+  in "…"` at the wp_disk_loop seam; VirtioProto's lemmas stay in their
+  own vocabulary (`disk_img_auth (dn_img γ) …`).
+- **`iExists` / `iDestruct … as (x)` DO see through folded definitions**
+  (two layers deep; measured on a scratch file). No `rewrite /def` is
+  needed before introducing or destructuring a definition that unfolds
+  to an `∃`.
+- **Transport a `disk_view` across a preservation lemma with a named
+  `assert`, not with `rewrite` on the ⌜⌝ goal.** State it in the
+  POST-state's own spelling (`disk_view dmap (v_disk (dvirtio (mdev
+  σ2')))`), prove it by `rewrite Hvd; exact Hdview`, and close the
+  proofmode goal with `exact` — whether the goal's gstate projections
+  got reduced by `/=` is unpredictable, and `exact` is conversion-robust
+  while ssreflect's `rewrite` is not.
+
+**REMAINING (M5b): `crash_inv` and the write permits.**
+`inv crashN (∃ …, disk_bytes-frags ∗ P_fs …)` with `P_fs` an iProp over
+fixed-layer ghosts; allocated once in `riscv_power_adequacy`'s fixed
+allocation (client supplies the initial `P_fs`); both power arms never
+open it. The initial MINT of the client's `disk_bytes` over the mkfs
+image lands here too (deferred from M5a: adequacy allocates the auth
+empty and `power_boot_res` says nothing about the disk yet) — it is
+`DiskPtsto.disk_bytes_mint` at the empty auth. The vslot WRITE PERMIT
+(the `vs_data` precedent): the enqueuer deposits an iProp wand
+alongside the OUT slot; `virtio_proto_step` consumes it to re-establish
+`P_fs` after updating the auth. **Watch:** `virtio_proto`'s live arm
+still parks `disk_bytes` fragments (`slot_pend_res`/`slot_done_res`) of
+the now-DURABLE map inside the per-era `disk_inv`, so a crash strands
+the fragments of every in-flight block — sound, but those bytes can
+never be re-claimed. Either the permit design must hand them back at
+the crash boundary, or `P_fs` must be stated over the not-in-flight
+range only. Decide this WITH the permits, not after.
 
 **M6** — the boot composition as the ∀-era entailment instantiating
 `power_boot_res` (absorbs main-boot's outstanding item); tighten

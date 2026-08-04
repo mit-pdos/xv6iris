@@ -9,6 +9,7 @@
 -arg -notation-overridden
 RiscvModelBytes.v
 VirtioModel.v
+DiskImg.v
 DevModel.v
 RiscvLang.v
 RegFile.v
