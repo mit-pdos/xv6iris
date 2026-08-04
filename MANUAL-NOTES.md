@@ -63,6 +63,17 @@ Big things that still need to be done/explored:
 - liveness, or at least deadlock avoidance
   - acquire currently calls panic if already holding lock on same CPU
   - lock ordering could solve deadlock and acquire's panic
+- user process verification
+  - who owns user process memory?
+    - want points-to for user code, but kernel may need to reclaim on kill
+    - current generic user safety proof puts user page ownership inside PT, with existential contents
+    - perhaps need a user ghost heap
+  - refinement proofs for user process execution?
+    - clean spec capturing isolated execution of user process
+    - clean spec for system call semantics
+    - faster verification of sequential execution
+    - hard to reason about interacting processes
+    - probably could be a layer on top of WP/CSL-style specs for user code
 
 Don't know where else to put this:
 
