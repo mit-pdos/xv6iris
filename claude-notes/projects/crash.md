@@ -2247,3 +2247,36 @@ Consumer side is small: `BootChain.boot_hart_res`'s `pmpcfg_n ↦ᵣ pmpcfg_boot
 becomes `↦ᵣ register_lookup pmpcfg_n rs`, since `SpecEntry.wp_entry_boot` /
 `WpEntryNew` already take `pmp_all_off pmpcfg0` at a quantified value.
 
+### MSECCFG PATCH SHARPENING (recorded 2026-08-04, do with or after pmpcfg)
+
+The `mseccfg = 0` pin also over-claims, and its honest decomposition is
+per-field, because the register is a grab-bag from four extensions and the
+spec never resets it wholesale:
+
+- bit 10 (MLPE, Zicfilp): architectural — `reset_sys` clears it (gated on
+  `hartSupports Ext_Zicfilp` = true here). Comes from the run for free.
+- bits 8/9 (USEED/SSEED, Zkr): **platform config, provable from the model** —
+  the JSON's `Zkr.sseed_reset_value`/`useed_reset_value` (both `false`) are
+  constant-folded into `reset_sys` as the `bool_to_bit false` writes. Also
+  from the run.
+- bits 33:32 (PMM, Smmpm): **the genuine platform assumption** — neither the
+  spec nor the model resets PMM; power-on garbage. This is the one field the
+  tower consumes beyond MLPE (`RiscvFetchExec` needs
+  `pmm_mode_backwards (_get_Seccfg_PMM …) = PMM_Disabled`), and Smmpm is
+  `supported: true` in the config, so garbage here would mean pointer masking
+  randomly on at boot.
+- MML/MMWP/RLB (bits 0–2, Smepmp): the model does not implement Smepmp at
+  all — the fields don't exist; nothing reads them.
+- everything else: inert bits nothing reads; pinned to 0 only because the
+  patch is stated as a whole-register value.
+
+End state: shrink the patch from `mseccfg = 0` to `PMM = disabled at
+power-on` (stating the tower's premise field-wise), with MLPE and the seed
+bits derived from the reset run. Candidate config question, NOT yet
+user-approved: xv6 never uses pointer masking, so disabling
+Smmpm/Smnpm/Ssnpm in the JSON (same treatment as B/V) might make even the
+PMM garbage harmless — but first check whether the tower's readers gate on
+`currentlyEnabled (Ext_Smmpm)` or read the raw field, and remember the B/V
+lesson: evaluate `config_is_valid` after any extension flip (dependent
+families can force more flips).
+
