@@ -1,7 +1,8 @@
 name: CI
 
 # Builds the Sail-generated Rocq model (model-xv6iris/), the checked-in kernel
-# dump (kernel-rocq/), and the Iris proofs (iris/).
+# dump (kernel-rocq/), the checked-in user-program dumps (user-rocq/), and the
+# Iris proofs (iris/).
 #
 # It deliberately does NOT:
 #   * build the xv6 kernel ELF (the `xv6-riscv/` tree is .gitignored / absent),
@@ -91,27 +92,38 @@ jobs:
       #     target whose .v rules depend on the (absent) kernel ELF and would
       #     otherwise clone+build xv6 and regenerate KernelInstrs.v.
       #
-      # The kernel-rocq CoqMakefile is generated first (cheap); the model's is
-      # produced by `make model` itself.  Both sub-builds are then backgrounded
-      # and waited on, and the step fails if either one fails.
-      - name: Build Sail model + kernel dump (in parallel, no ELF rebuild / no regen)
+      # The same reasoning covers user-rocq/ (the dumped USER program images,
+      # e.g. _sync): its top-level `user-rocq` target likewise depends on the
+      # absent user ELFs, so CI generates its CoqMakefile and compiles the
+      # checked-in .v directly.  The iris build needs its .vo (iris/_CoqProject
+      # maps `-R ../user-rocq User`; UCodeSync.v Requires User.SyncInstrs).
+      #
+      # The kernel-rocq / user-rocq CoqMakefiles are generated first (cheap);
+      # the model's is produced by `make model` itself.  All three sub-builds
+      # are then backgrounded and waited on; the step fails if any one fails.
+      - name: Build Sail model + kernel/user dumps (in parallel, no ELF rebuild / no regen)
         run: |
           make SWITCH="$GITHUB_WORKSPACE" kernel-rocq/CoqMakefile
+          make SWITCH="$GITHUB_WORKSPACE" user-rocq/CoqMakefile
 
           make SWITCH="$GITHUB_WORKSPACE" model &
           pid_model=$!
           opam exec -- make -C kernel-rocq -f CoqMakefile -j"$(nproc)" &
           pid_kernel=$!
+          opam exec -- make -C user-rocq -f CoqMakefile -j"$(nproc)" &
+          pid_user=$!
 
           rc=0
           wait $pid_model || rc=1
           wait $pid_kernel || rc=1
+          wait $pid_user || rc=1
           exit $rc
 
       # ---- 3. Iris proofs (iris/) ----
       # Built directly (not via `make proofs`) for the same reason: `proofs`
       # depends on the `kernel-rocq` target which pulls in the kernel ELF.  The
-      # model and kernel-rocq .vo from the previous steps are on disk already.
+      # model, kernel-rocq and user-rocq .vo from the previous steps are on
+      # disk already.
       - name: Build Iris proofs (iris/)
         run: |
           make SWITCH="$GITHUB_WORKSPACE" iris/CoqMakefile

@@ -90,18 +90,22 @@ jobs:
 
       # ---- Build, so that .vo/.glob exist for every file. ----
       # Same ELF-free / regen-free path as ci.yml.
-      - name: Build Sail model + kernel dump
+      - name: Build Sail model + kernel/user dumps
         run: |
           make SWITCH="$GITHUB_WORKSPACE" kernel-rocq/CoqMakefile
+          make SWITCH="$GITHUB_WORKSPACE" user-rocq/CoqMakefile
 
           make SWITCH="$GITHUB_WORKSPACE" model &
           pid_model=$!
           opam exec -- make -C kernel-rocq -f CoqMakefile -j"$(nproc)" &
           pid_kernel=$!
+          opam exec -- make -C user-rocq -f CoqMakefile -j"$(nproc)" &
+          pid_user=$!
 
           rc=0
           wait $pid_model || rc=1
           wait $pid_kernel || rc=1
+          wait $pid_user || rc=1
           exit $rc
 
       - name: Build Iris proofs (iris/)
@@ -185,6 +189,8 @@ jobs:
         run: |
           make SWITCH="$GITHUB_WORKSPACE" model 2>&1 | tee "$RUNNER_TEMP/build.log"
           opam exec -- make -C kernel-rocq -f CoqMakefile -j"$(nproc)" 2>&1 \
+            | tee -a "$RUNNER_TEMP/build.log"
+          opam exec -- make -C user-rocq -f CoqMakefile -j"$(nproc)" 2>&1 \
             | tee -a "$RUNNER_TEMP/build.log"
           opam exec -- make -C iris -f CoqMakefile -j"$(nproc)" 2>&1 \
             | tee -a "$RUNNER_TEMP/build.log"
