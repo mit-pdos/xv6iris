@@ -645,7 +645,9 @@ End PtFront.
 (* the PMA table serves 8-byte PTE writes everywhere (mirror of KptPt's
    [pma_allows_pte_read]; holds for the boot table, which allows all) *)
 Definition pma_allows_pte_write (regions : list PMA_Region) : Prop :=
-  forall (a : mword 64), exists r,
+  forall (a : mword 64),
+    (uint a + 8 < 18446744073709551616)%Z ->
+    exists r,
     matching_pma_region regions (Physaddr a) 8 = Some r /\
     (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true.
 
@@ -654,7 +656,9 @@ Definition pma_allows_pte_write (regions : list PMA_Region) : Prop :=
 Lemma pma_allows_all_pte_write (pmar0 : list PMA_Region) :
   pma_allows_all pmar0 -> pma_allows_pte_write pmar0.
 Proof.
-  intros H a. destruct (H a 8) as (r & Hm & _ & _ & _ & _ & _ & Hpw).
+  intros H a Hnw.
+  destruct (H a 8 (pma_access_of_no_wrap a 8 (pma_width_ok 8 eq_refl eq_refl) Hnw))
+    as (r & Hm & _ & _ & _ & _ & _ & Hpw).
   exists r. split; [exact Hm | exact Hpw].
 Qed.
 

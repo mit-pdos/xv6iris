@@ -506,74 +506,137 @@ fudgeable:**
    `TimerCap.v:95`), then the pure facts by `vm_compute`. The bridges it
    needs, none of which landed here: `KernelSyms._entry = 0x80000000`,
    `MISA_C = <the pinned misa>` (reflexivity), `pmp_all_off
-   pmpcfg_boot`, `pma_allows_all pma_boot` (blocked on 1),
-   mstatus's MIE/MPRV/SXL from `0xA00000000`, `_get_MEnvcfg_LPE 0 = 0`.
+   pmpcfg_boot`, `pma_allows_all pma_boot` (blocked on 1 — UNBLOCKED, see
+   M6b-pre below), mstatus's MIE/MPRV/SXL from `0xA00000000`,
+   `_get_MEnvcfg_LPE 0 = 0`.
 
-## M6b-pre (NOT STARTED — scoped 2026-08-04, execute in this order)
+## M6b-pre (1) `pma_allows_all` made satisfiable — LANDED
 
-Two prerequisites, both identified in M6a. The scoping below is measured,
-not guessed.
+The predicate quantified over ALL widths and ALL addresses, so it held of
+NO PMA table at all: `matching_pma_region` compares an access's END
+address against the region's *relative to the region base*
+(`range_subset`, rv64d.v:6273), so an access whose byte range wraps the
+64-bit space matches nothing, whatever the table. Every spec taking it as
+a premise — the whole M-mode/S-mode fetch and data-access tower — was
+therefore vacuously satisfiable. Repaired shape (RiscvFetchExec.v), ONE
+premise:
 
-**(1) Make `pma_allows_all` satisfiable.** Current shape
-(RiscvFetchExec.v:60):
 ```coq
-forall (a : mword 64) (n : Z), exists r,
-  matching_pma_region regions (Physaddr a) n = Some r /\ <permissive>
+Definition pma_access_ok (a : mword 64) (n : Z) : Prop :=
+  1 <= n <= 4096 /\ uint a + n < 18446744073709551616.
+
+Definition pma_allows_all (regions : list PMA_Region) : Prop :=
+  forall (a : mword 64) (n : Z), pma_access_ok a n -> exists r, …
 ```
-The fix is the two bounds the model itself assumes (the Sail source's own
-precondition comment on `matching_pma_region` is `1 <= width <= 4096`):
-```coq
-forall (a : mword 64) (n : Z),
-  1 <= n <= 4096 -> uint a + n <= 2^64 -> exists r, …
-```
-`uint a + n <= 2^64` is the one that matters: `range_subset` (rv64d.v:6273)
-compares `a_begin ≤u a_end` *relative to the region base*, so a wrapping
-access matches NO region, whatever the table.
 
-BLAST RADIUS, measured: `pma_allows_all` appears 141 times in 35 files,
-but almost all of those THREAD it as a premise (`pma_allows_all
-(register_lookup pma_regions σ.(sregs)) ->`) and are unaffected. What
-needs work is the APPLIER sites — the lemmas that instantiate the ∀ and
-hand a `matching_pma_region … = Some region` hypothesis down (30 files
-carry such hypotheses, always at a CONCRETE width 2/4/8, so the `1 <= n
-<= 4096` half is a literal check). Each applier must produce `uint a + n
-<= 2^64` from its local context; in every real case the address is owned
-and therefore canonical, so `RiscvPtsto.mem_canonical` (`uint a < 2^38`)
-is the source — the work is threading that fact from the points-to to the
-applier, NOT inventing it. Start at `RiscvFetchExec.pma_allows_all_pte_read`
-(→ `KptPt.pma_allows_pte_read`, which is also address-unbounded and needs
-the same treatment) and walk outward; expect the bound to stop at the
-first lemma that already owns the bytes.
+- **The address bound is STRICT — `< 2^64`, not the `<= 2^64` M6a
+  guessed.** `range_subset`'s third comparison is `a ≤u a + n`; at
+  `uint a + n = 2^64` the end address wraps to 0 and the comparison fails
+  for every `a ≠ 0`, so the non-strict shape is unsatisfiable at the one
+  address `2^64 - n` and the repair would have to be done twice.
+- `1 <= n <= 4096` is the Sail source's own precondition comment on
+  `matching_pma_region`. `pma_boot`'s satisfiability only needs `0 <= n`;
+  the width bound is kept because it is what keeps the predicate honest
+  for a table with finitely-sized regions.
+- Bundling both halves into ONE named premise is what keeps an applier to
+  a single extra argument.
+- `KptPt.pma_allows_pte_read` and `PtTreeAdue.pma_allows_pte_write` took
+  the same treatment at their fixed width 8, spelled as the RAW
+  inequality `uint a + 8 < 2^64`: both files sit BELOW RiscvFetchExec and
+  cannot name `pma_access_ok`. `pma_allows_all_pte_read` /
+  `pma_allows_all_pte_write` bridge the two forms with
+  `pma_access_of_no_wrap`.
 
-**A proof that cannot supply the bound is a LATENT BUG, not an
-inconvenience**: it means the proof only went through because the
-unbounded premise was unsatisfiable. Record any such site rather than
-weakening around it.
+**THE DISCHARGE LAYER IS TACTIC-FREE, AND THAT IS NOT COSMETIC.**
+`ltac:(lia)` at an applier fails with *"Cannot find witness"* even on the
+CLOSED goal `1 <= 4 <= 4096` — the `bitvector.tactics` zify hook, once any
+`bv` is in the context (hit in InstrBytes.v and PtTreeAdue.v). That cost
+two full build cycles. So every premise an applier passes is either a
+fact it already owns or a boolean check closed by `eq_refl`:
 
-Then: `pma_allows_all pma_boot` (the M6a-pinned table: one region, base 0,
-size 2^64-1, all-permitting) becomes provable — `range_subset` reduces to
-`a ≤u a + n` under the new bound.
+- `pma_width_ok n eq_refl eq_refl` (literal width) /
+  `pma_width_le n m Hlo Hhi eq_refl` (a variable width, from its own
+  `0 < n` and `n <= m` with `m` closed — `width`/`k` at WpSconfMem,
+  UserMemPt, UserMemClassify) — both RiscvFetchExec.v.
+- `pma_access_ram _ _ Hram <width>` — 45 of the 72 sites: `s_mem_chunk` /
+  `s_fetch_chunk` / `udata_read_word_g` already hand out `addr_is_ram`.
+- `pma_access_lt _ _ _ (proj2 Hrange) eq_refl <width>` — the device
+  windows (WpPlic, WpVirtioDev) already take
+  `<base> <= uint a8 < <base> + <size>`; `WpUart.uart_pa_access_ok` is the
+  same move packaged for `uart_pa off`.
+- `Pt4kWalk.pte_addr_at_no_wrap` — STRUCTURAL, no context at all: a PTE
+  slot address is a 44-bit ppn ++ a 9-bit index ++ 000, hence < 2^56.
+  Restated as `CommonWalk.u_pte_addr_no_wrap` and
+  `PtTree.pt_addr0_no_wrap` for the walk layer's two spellings (19 sites
+  in KptTree / TransPt / UserPtTree).
+- `pma_access_canonical` (from `RiscvPtsto.mem_canonical`, the source M6a
+  expected to be the common one) exists but has NO user: every applier
+  turned out to have something sharper.
 
-**(2) Construct `hw_config`.** It has NO construction site in the tree
-today (only consumers), which is why nothing has had to produce
-`misa ↦ᵣ□ …`. With M6a's `reset_regs` pinning the values, the recipe is:
-take the per-hart register elems out of `power_boot_res` (they arrive as
-`ghost_map_elem … (existT r (register_lookup r (g'.(gregs) c)))`, i.e. AT
-the `reset_regs` values), `RiscvPtsto.reg_pointsto_persist` the five
-frozen ones (misa, mseccfg, pma_regions, htif_tohost_base, elp — template
-`TimerCap.v:95`), and discharge the pure facts by `vm_compute` from the
-pinned values. `mmode_config` additionally wants hart_state/cur_privilege
-/mstatus at a fraction (all pinned) plus `minstret_inv` (allocated by the
-client, not here).
+**72 applier sites over 22 files, and NO LATENT BUG** — every site could
+supply the bound. Two families had to EXTRACT the fact rather than find
+it: the M-mode 8-byte load/store leaves (WpMmodeLoad / WpMmodeStore) and
+the trapframe-word leaves (UserretPt / UservecPt) own a `↦ₚ₈` and read
+`addr_is_ram` off it with
+`iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_ea`, which must
+come BEFORE the `↦ₚ₈` is destructured into `(%Halign & Hbytes)` (a
+pure-conclusion `iDestruct` keeps its input, so nothing is lost; in the
+two Pt files the `iIntros` pattern had to stop destructuring it inline).
 
-`boot_D : CPU -> gset register` (to define in PowerBoot.v) is the
-documented MINIMUM the boot client must ask adequacy for: the twelve
-`reset_regs` registers (PC, cur_privilege, hart_state, mhartid, mstatus,
-misa, mseccfg, menvcfg, htif_tohost_base, elp, pma_regions, pmpcfg_n)
-+ pmpaddr_n + the eight `wp_entry_boot` quantifies (mepc, satp, medeleg,
-mideleg, mie, mcounteren, stimecmp) + the `minstret_inv` cells
-(minstret, mcycle, mtime, mip) + the GPR file. Cross-check against
-`riscv_system_adequacy`'s `D` at the existing client before fixing it.
+Gotchas worth keeping:
+
+- **A scripted `(H addr)` → `(H addr bound)` rewrite must MOVE the closing
+  paren.** Appending the new argument inside the address's own application
+  gives *"Illegal application (Non-functional construction)"* naming the
+  ADDRESS as the non-function — one build cycle.
+- Closed `Z` order goals need no `lia`: `Z.lt x y` is `(x ?= y) = Lt`
+  (so `reflexivity`) and `Z.le x y` is `(x ?= y) <> Gt` (so
+  `discriminate`). That is how the arithmetic inside the helper lemmas is
+  closed. Where real arithmetic is needed, package it over plain `Z`
+  variables in a top-level lemma (`pma_no_wrap_Z`) and apply it as a
+  closed fact.
+- The `-k` build only reveals ONE FRONTIER per cycle: a failure in a
+  bottleneck file (InstrBytes, PtTreeAdue) skips everything above it, so
+  budget several cycles and fix appliers proactively by grepping for the
+  application sites first. Grep for the applied HYPOTHESIS names, not for
+  `pma_allows_all`: the sites are named `Hpma_all` / `Hpma0` / `Hpmar` /
+  `Hpmaw` / `Hall` / `Lpma` / `Hpma'`, and a grep that misses one family
+  (`Lpma`, in SmodeCorePt and TrampStepPt) costs a cycle.
+
+Still open from the M6a bridge list: `pmp_all_off pmpcfg_boot` (needs a
+`vec_access_dec`-of-`vector_init` fact at a SYMBOLIC index — `pmpcfg_boot`
+is `vector_init 64 (mword_of_int 0)`, and the out-of-range default is the
+`Inhabited` zero, so the property does hold at every index).
+
+## M6b-pre (2) `hw_config` / `mmode_config` / `boot_D` — NEXT (recipe settled)
+
+`iris/BootConfig.v` (new) is the home: the first CONSTRUCTION site either
+bundle will have had. What goes in it:
+
+- `pma_allows_all_pma_boot` — **the payoff of (1)**: the M6a-pinned table
+  (one region, base 0, size 2^64-1, all-permitting) satisfies the repaired
+  predicate. The proof is `range_subset`'s three unsigned comparisons at
+  region base 0, over `uint_to_bits64` (`uint (to_bits 64 n) = n` in
+  range, from `PrintintArith.gsi64`) and `RiscvExtras`'
+  `add_vec64_unsigned` / `sub_vec64_unsigned` / `bv_wrap_small`. All of
+  its arithmetic is packaged in ONE plain-`Z` helper (`pma_boot_arith`)
+  for the `lia` reason above.
+- `boot_D : CPU -> gset register` — the documented MINIMUM a boot client
+  asks adequacy for: the twelve `reset_regs` registers (PC,
+  cur_privilege, hart_state, mhartid, mstatus, misa, mseccfg, menvcfg,
+  htif_tohost_base, elp, pma_regions, pmpcfg_n) + nextPC (`pc_is` owns
+  BOTH, and `reset_regs` does not pin it) + pmpaddr_n + what
+  `wp_entry_boot` quantifies (mepc, satp, medeleg, mideleg, mie,
+  mcounteren, stimecmp) + the `minstret_inv` cells (minstret,
+  `R_bool minstret_increment`, mcycle, mtime, mip) + the GPR file
+  (x1..x31) + the wire pins (sig_seip, sig_meip — the existing device
+  client's whole `D`).
+- `hw_config_intro` / `mmode_config_intro` — from the AMBIENT `↦ᵣ` cells
+  at the pinned `reset_regs` values (`power_boot_res`'s era-explicit elems
+  are these by pure conversion, per M2's note). `reg_pointsto_persist` on
+  the five frozen cells (misa, mseccfg, pma_regions, htif_tohost_base,
+  elp; template `TimerCap.v:95`) is the only ghost step; every pure
+  conjunct is `vm_compute` on a pinned value.
 
 ## M6b (NOT STARTED) — the boot-image carving library
 

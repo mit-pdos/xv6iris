@@ -57,8 +57,24 @@ Proof. intros H i. exact (proj2 (H i)). Qed.
 (* [PMA_executable]/[PMA_readable] side-conditions and the explicit region  *)
 (* parameters.                                                              *)
 (* ====================================================================== *)
+(*   The [pma_access_ok] premise carries the model's OWN side conditions on a  *)
+(* [matching_pma_region] lookup, and it is what makes the predicate            *)
+(* satisfiable at all.  The Sail source's precondition comment on              *)
+(* [matching_pma_region] is [1 <= width <= 4096]; and the lookup compares the  *)
+(* access's end address against the region's RELATIVE to the region base       *)
+(* ([range_subset], rv64d.v), so an access whose byte range WRAPS the 64-bit   *)
+(* physical space matches no region, whatever the table -- quantified over     *)
+(* all [a] and [n] with no bounds, this predicate held of NO table and every   *)
+(* spec taking it as a premise was vacuously satisfied.  An applier always     *)
+(* owns the bound: its address is in RAM ([pma_access_ram]), or carries a      *)
+(* sub-2^38 range fact ([pma_access_lt] -- the device windows), or is a PTE    *)
+(* slot address ([CommonWalk.u_pte_addr_no_wrap]).                             *)
+Definition pma_access_ok (a : mword 64) (n : Z) : Prop :=
+  1 <= n <= 4096 /\ uint a + n < 18446744073709551616.
+
 Definition pma_allows_all (regions : list PMA_Region) : Prop :=
   forall (a : mword 64) (n : Z),
+    pma_access_ok a n ->
     exists r,
       matching_pma_region regions (Physaddr a) n = Some r /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_executable) = true /\
@@ -68,12 +84,71 @@ Definition pma_allows_all (regions : list PMA_Region) : Prop :=
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_read) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true.
 
+(* ---------------------------------------------------------------------- *)
+(* Discharging [pma_access_ok] AT AN APPLIER, with no tactic at all.  Every *)
+(* premise below is either a fact the applier already owns or a boolean     *)
+(* check closed by [eq_refl]: deliberately so, because [lia] is unusable at  *)
+(* these sites -- the [bitvector.tactics] zify hook fails to find a witness  *)
+(* even for a CLOSED bound like [1 <= 4 <= 4096] once a [bv] is in           *)
+(* the context (durable-notes).  The arithmetic is done here, in a clean     *)
+(* context, once.                                                           *)
+(* ---------------------------------------------------------------------- *)
+
+(* the width half: at a literal width both checks are [eq_refl]; a variable
+   width comes with its own [0 < n <= m] pair and [m] closed. *)
+Lemma pma_width_ok (n : Z) :
+  Z.leb 1 n = true -> Z.leb n 4096 = true -> 1 <= n <= 4096.
+Proof.
+  intros H1 H2. apply Z.leb_le in H1. apply Z.leb_le in H2. exact (conj H1 H2).
+Qed.
+
+Lemma pma_width_le (n m : Z) :
+  0 < n -> n <= m -> Z.leb m 4096 = true -> 1 <= n <= 4096.
+Proof. intros H1 H2 H3. apply Z.leb_le in H3. split; lia. Qed.
+
+(* the address half, from canonicality -- [RiscvPtsto.mem_canonical] on any
+   owned byte gives [uint a < 2^38]. *)
+Lemma pma_access_canonical (a : mword 64) (n : Z) :
+  (uint a < 274877906944)%Z -> 1 <= n <= 4096 -> pma_access_ok a n.
+Proof.
+  intros Ha Hn. split; [exact Hn |].
+  refine (Z.lt_le_trans _ _ _ (Z.add_lt_le_mono _ _ _ _ Ha (proj2 Hn)) _).
+  discriminate.
+Qed.
+
+(* from the address being real RAM (the bank tops out at PHYSTOP) *)
+Lemma pma_access_ram (a : mword 64) (n : Z) :
+  addr_is_ram a -> 1 <= n <= 4096 -> pma_access_ok a n.
+Proof.
+  intros [_ Hhi] Hn. apply (pma_access_canonical a n); [| exact Hn].
+  refine (Z.lt_trans _ _ _ Hhi _). reflexivity.
+Qed.
+
+(* from ANY sub-2^38 upper bound the applier owns -- the form the device
+   leaves are in ([plic_base <= uint a8 < plic_base + plic_size]).  [bound] is
+   closed at every use, so the middle premise is [eq_refl]. *)
+Lemma pma_access_lt (a : mword 64) (n bound : Z) :
+  uint a < bound -> Z.ltb bound 274877906944 = true -> 1 <= n <= 4096 ->
+  pma_access_ok a n.
+Proof.
+  intros Ha Hb Hn. apply Z.ltb_lt in Hb.
+  exact (pma_access_canonical a n (Z.lt_trans _ _ _ Ha Hb) Hn).
+Qed.
+
+(* from a raw no-wraparound inequality (what the walk layer's PTE-slot bound
+   [CommonWalk.u_pte_addr_no_wrap] produces). *)
+Lemma pma_access_of_no_wrap (a : mword 64) (n : Z) :
+  1 <= n <= 4096 -> uint a + n < 18446744073709551616 -> pma_access_ok a n.
+Proof. intros Hn Ha. exact (conj Hn Ha). Qed.
+
 (* the boot [pma_allows_all] table serves 8-byte PTE reads: a direct
    projection now that [pma_allows_all] pins [PMA_supports_pte_read]. *)
 Lemma pma_allows_all_pte_read (pmar0 : list PMA_Region) :
   pma_allows_all pmar0 -> KptPt.pma_allows_pte_read pmar0.
 Proof.
-  intros H a. destruct (H a 8) as (r & Hm & _ & _ & _ & _ & Hpr & _).
+  intros H a Hnw.
+  destruct (H a 8 (pma_access_of_no_wrap a 8 (pma_width_ok 8 eq_refl eq_refl) Hnw))
+    as (r & Hm & _ & _ & _ & _ & Hpr & _).
   exists r. split; [exact Hm | exact Hpr].
 Qed.
 

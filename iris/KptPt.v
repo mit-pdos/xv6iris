@@ -298,9 +298,18 @@ Proof. vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 
 (* the concrete boot PMA table lets every 8-byte aligned RAM read serve as
-   a PTE read.  (Same fact WpSmodeUart / UptInv thread; they can alias.)  *)
+   a PTE read.  (Same fact WpSmodeUart / UptInv thread; they can alias.)
+   The address premise is the model's own no-wraparound side condition: a
+   [matching_pma_region] lookup compares the access's end address against the
+   region's RELATIVE to the region base ([range_subset], rv64d.v), so an access
+   whose byte range wraps the 64-bit space matches NO region, whatever the
+   table -- without the premise the predicate is satisfiable by nothing at all.
+   Every applier owns the bound: a PTE slot address is a 44-bit ppn ++ a 9-bit
+   index ++ 000, hence below 2^56 ([Pt4kWalk.pte_addr_at_no_wrap]).  *)
 Definition pma_allows_pte_read (regions : list PMA_Region) : Prop :=
-  forall (a : mword 64), exists r,
+  forall (a : mword 64),
+    (uint a + 8 < 18446744073709551616)%Z ->
+    exists r,
     matching_pma_region regions (Physaddr a) 8 = Some r /\
     (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_read) = true.
 

@@ -3855,7 +3855,8 @@ Section LRComposersG.
       as %(dv & Hbytes & Hram0 & Hram7).
     set (pa := u_walk_pa w va) in *.
     destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 4)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 4
+                  (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl)))
       as (region & Hpmam & _ & Hrd & _).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
@@ -3960,7 +3961,8 @@ Section LRComposersG.
       as %(dv & Hbytes & Hram0 & Hram7).
     set (pa := u_walk_pa w va) in *.
     destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 8)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 8
+                  (pma_access_ram _ _ Hram0 (pma_width_ok 8 eq_refl eq_refl)))
       as (region & Hpmam & _ & Hrd & _).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
@@ -4630,7 +4632,8 @@ Section SCComposersG.
       as %(dv0 & _ & Hram0 & Hram7).
     set (pa := u_walk_pa w va) in *.
     destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 4)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 4
+                  (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl)))
       as (region & Hpmam & _ & _ & Hwrb).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
@@ -4773,7 +4776,8 @@ Section SCComposersG8.
       as %(dv0 & _ & Hram0 & Hram7).
     set (pa := u_walk_pa w va) in *.
     destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 8)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa 8
+                  (pma_access_ram _ _ Hram0 (pma_width_ok 8 eq_refl eq_refl)))
       as (region & Hpmam & _ & _ & Hwrb).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
@@ -5641,7 +5645,8 @@ Section AmoGeneric.
       as %(dv & Hbytes & Hram0 & Hram7).
     set (pa := u_walk_pa w va) in *.
     destruct ((ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa k)
+               : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa k
+                  (pma_access_ram _ _ Hram0 (pma_width_le k 16 Hk Hk16 eq_refl)))
       as (region & Hpmam & _ & Hrd & Hwrat).
     pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
     pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
@@ -6925,7 +6930,8 @@ Section ZicbopExec.
         by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp).
       assert (Hpma' : pma_allows_all (register_lookup pma_regions σ'.(sregs)))
         by (rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hpma).
-      destruct (Hpma' pa 64) as (region & Hpmam & Hxr & Hrr & Hwr & _).
+      destruct (Hpma' pa 64
+                 (pma_access_ram _ _ Hram0 (pma_width_ok 64 eq_refl eq_refl))) as (region & Hpmam & Hxr & Hrr & Hwr & _).
       assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
                 (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
                 (uint pa) (uint (to_bits 64 64)) = PMP_Match).

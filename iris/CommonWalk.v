@@ -30,6 +30,17 @@ Import Defs.
 Definition u_pte_addr (base : mword 44) (idx : mword 9) : mword 64 :=
   zero_extend' 64 (concat_vec base (concat_vec idx (zeros' 3))).
 
+(* NO WRAPAROUND at a PTE slot -- the address premise every
+   [pma_allows_pte_read] / [pma_allows_pte_write] / [pma_allows_all] applier
+   in the walk layer discharges.  [u_pte_addr] IS [Pt4kWalk.pte_addr_at], so
+   this is that file's bound restated in the walk layer's spelling; the
+   [pt_addr2]/[pt_addr1]/[pt_addr0] (PtTree) spellings are delta-reducible to
+   it, so [exact (u_pte_addr_no_wrap _ _ _ H)] closes their goals too. *)
+Lemma u_pte_addr_no_wrap (base : mword 44) (idx : mword 9) (n : Z) :
+  Z.leb n 4096 = true ->
+  uint (u_pte_addr base idx) + n < 18446744073709551616.
+Proof. exact (Pt4kWalk.pte_addr_at_no_wrap base idx n). Qed.
+
 (* the next-level base ppn recorded in a non-leaf PTE *)
 Definition u_next_base (pte : mword 64) : mword 44 :=
   autocast (T := mword) (PPN_of_PTE pte).

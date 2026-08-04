@@ -366,7 +366,9 @@ Section SmodeCorePt.
                      with "Hmem Hk Hbytes") as %(Hbf & Hram0 & Hram3).
         pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
-        destruct (Lpma (pa_of ppn pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
+        destruct (Lpma (pa_of ppn pc) 4
+                   (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl)))
+          as (region & Hmatch0 & Hexec0 & _ & _).
         destruct Hgr1 as (HA & Hord & HX & HW & HR & Hcov).
         assert (Hfetch : exec (fetch tt) σ = Some (F_Base w, s1)).
         { apply (exec_fetch_F_Base_4_S_gen pc (pa_of ppn pc) w σ s1 region Lpc Hal Htr1).
@@ -464,8 +466,12 @@ Section SmodeCorePt.
         pose proof (addr_is_ram_not_in_sig _ Hraml0) as Hnsl.
         pose proof (addr_is_ram_not_in_clint _ Hramh0) as Hnch.
         pose proof (addr_is_ram_not_in_sig _ Hramh0) as Hnsh.
-        destruct (Lpma (pa_of ppnl pc) 2) as (regl & Hml0 & Hxl & _ & _).
-        destruct (Lpma (pa_of ppnh (add_vec_int pc 2)) 2) as (regh & Hmh0 & Hxh & _ & _).
+        destruct (Lpma (pa_of ppnl pc) 2
+                   (pma_access_ram _ _ Hraml0 (pma_width_ok 2 eq_refl eq_refl)))
+          as (regl & Hml0 & Hxl & _ & _).
+        destruct (Lpma (pa_of ppnh (add_vec_int pc 2)) 2
+                   (pma_access_ram _ _ Hramh0 (pma_width_ok 2 eq_refl eq_refl)))
+          as (regh & Hmh0 & Hxh & _ & _).
         destruct Hgr1 as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
         destruct Hgr2 as (HA2 & Hord2 & HX2 & HW2 & HR2 & Hcov2).
         assert (Hfetch : exec (fetch tt) σ = Some (F_Base w, s2)).
@@ -534,7 +540,9 @@ Section SmodeCorePt.
                      with "Hmem Hk Hbytes") as %(Hbf & Hram0 & Hram3).
         pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
-        destruct (Lpma (pa_of ppn pc) 4) as (region & Hmatch0 & Hexec0 & _ & _).
+        destruct (Lpma (pa_of ppn pc) 4
+                   (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl)))
+          as (region & Hmatch0 & Hexec0 & _ & _).
         destruct Hgr1 as (HA & Hord & HX & HW & HR & Hcov).
         assert (Hfetch : exec (fetch tt) σ = Some (F_RVC h, s1)).
         { rewrite <- Hsub.
@@ -583,7 +591,9 @@ Section SmodeCorePt.
                      with "Hmem Hk Hbytes") as %(Hbf & Hram0 & Hram1).
         pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
         pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
-        destruct (Lpma (pa_of ppn pc) 2) as (region & Hmatch0 & Hexec0 & _ & _).
+        destruct (Lpma (pa_of ppn pc) 2
+                   (pma_access_ram _ _ Hram0 (pma_width_ok 2 eq_refl eq_refl)))
+          as (region & Hmatch0 & Hexec0 & _ & _).
         destruct Hgr1 as (HA & Hord & HX & HW & HR & Hcov).
         assert (Hfetch : exec (fetch tt) σ = Some (F_RVC h, s1)).
         { apply (exec_fetch_RVC_2_S_gen pc (pa_of ppn pc) h σ s1 region Lpc HmisaC

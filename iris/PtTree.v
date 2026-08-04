@@ -432,6 +432,12 @@ Definition pt_addr1 (p2 : mword 64) (vpn : mword 27) : mword 64 :=
 Definition pt_addr0 (p1 : mword 64) (vpn : mword 27) : mword 64 :=
   u_pte_addr (u_next_base p1) (vpn_idx 0 vpn).
 
+(* [CommonWalk.u_pte_addr_no_wrap] in the leaf slot's own spelling -- the
+   address premise the [pma_allows_pte_write] appliers discharge. *)
+Lemma pt_addr0_no_wrap (p1 : mword 64) (vpn : mword 27) (n : Z) :
+  Z.leb n 4096 = true -> uint (pt_addr0 p1 vpn) + n < 18446744073709551616.
+Proof. exact (u_pte_addr_no_wrap (u_next_base p1) (vpn_idx 0 vpn) n). Qed.
+
 (* ===================================================================== *)
 (* §3 Per-vpn walk facts (SHALLOW: the explicit 3-level path).            *)
 (* ===================================================================== *)

@@ -258,6 +258,38 @@ Proof.
   apply Z.rem_mul. lia.
 Qed.
 
+(* NO WRAPAROUND: a PTE slot address is a 44-bit ppn ++ a 9-bit index ++ 000,
+   hence below 2^56, so an access of any width the model allows (<= 4096) that
+   starts there cannot wrap the 64-bit physical space.  This is the address
+   premise [KptPt.pma_allows_pte_read] / [PtTreeAdue.pma_allows_pte_write] /
+   [RiscvFetchExec.pma_allows_all] ask of their appliers -- a wrapping access
+   matches NO region ([range_subset] compares the access's end against the
+   region's relative to the region base), so without it those predicates are
+   satisfiable by no table at all.  The arithmetic is packaged over plain [Z]
+   because [lia] is unusable on a goal mentioning [bv_unsigned]. *)
+Lemma pte_addr_no_wrap_Z (b i n : Z) :
+  0 <= b < 17592186044416 -> 0 <= i < 512 -> n <= 4096 ->
+  b * 4096 + i * 8 + n < 18446744073709551616.
+Proof. lia. Qed.
+
+Lemma pte_addr_at_no_wrap (base : mword 44) (idx : mword 9) (n : Z) :
+  Z.leb n 4096 = true ->
+  uint (pte_addr_at base idx) + n < 18446744073709551616.
+Proof.
+  intro Hnb. apply Z.leb_le in Hnb. rename Hnb into Hn.
+  pose proof (bv_unsigned_in_range _ base) as Hb. unfold bv_modulus in Hb.
+  change (MachineWord.MachineWord.Z_idx 44) with 44%N in Hb.
+  change (Z.of_N 44%N) with 44 in Hb.
+  change (2 ^ 44) with 17592186044416 in Hb.
+  pose proof (bv_unsigned_in_range _ idx) as Hi. unfold bv_modulus in Hi.
+  change (MachineWord.MachineWord.Z_idx 9) with 9%N in Hi.
+  change (Z.of_N 9%N) with 9 in Hi.
+  change (2 ^ 9) with 512 in Hi.
+  rewrite uint_unsigned.
+  rewrite pte_addr_at_unsigned.
+  exact (pte_addr_no_wrap_Z _ _ _ Hb Hi Hn).
+Qed.
+
 (* the 4KB page base of ppn [base], as walk/mappages arguments spell it *)
 Lemma page_base_unsigned (base : mword 44) :
   bv_unsigned (zero_extend' 64 (concat_vec base (zeros' 12 : mword 12)))

@@ -317,7 +317,8 @@ Section WpSconfMem.
     assert (Hbytesf_tr : forall j : nat, (N.of_nat j < Z.to_N width)%N ->
               s_tr.(mem) !! (pa_add (pa_of ppn pa) j) = Some (nth_byte v j)).
     { intros j Hj. apply Hbytesf. lia. }
-    destruct (Hpma_all (pa_of ppn pa) width) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
+    destruct (Hpma_all (pa_of ppn pa) width
+               (pma_access_ram _ _ Hram0 (pma_width_le width 8 Hw0 Hw8 eq_refl))) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
     assert (Hlo : (ram_base <= uint (pa_of ppn pa))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn pa) + width <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn pa) + Z.of_nat wlast < 18446744073709551616)%Z).
@@ -897,7 +898,8 @@ Section WpSconfMem.
     iDestruct (s_mem_chunk s_tr pa pa 0 (Z.to_nat width) (Z.to_nat width) (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff' Hcan
                  with "Hmem Hk Hbytes") as %(_ & Hram0 & Hraml & Hkd).
-    destruct (Hpma_all (pa_of ppn pa) width) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
+    destruct (Hpma_all (pa_of ppn pa) width
+               (pma_access_ram _ _ Hram0 (pma_width_le width 8 Hw0 Hw8 eq_refl))) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     assert (Hlo : (ram_base <= uint (pa_of ppn pa))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn pa) + width <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn pa) + Z.of_nat wlast < 18446744073709551616)%Z).
@@ -1219,7 +1221,8 @@ Section WpSconfMem.
     (* the byte's OWN claim + canonicality + region (refold to keep) *)
     iDestruct (mem_pointsto_acc with "Hbyte") as (ppn) "(#Hk & %Hcan & %Hram0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hbyte".
-    destruct (Hpma_all (pa_of ppn pa) 1) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
+    destruct (Hpma_all (pa_of ppn pa) 1
+               (pma_access_ram _ _ Hram0 (pma_width_ok 1 eq_refl eq_refl))) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid    with "Hreg Hmenv") as %Lmenv.
@@ -1519,7 +1522,8 @@ Section WpSconfMem.
     iDestruct (s_mem_chunk s_tr pa pa 0 8 8 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hb") as %(_ & Hram0 & Hram7 & Hkd).
-    destruct (Hpma_all (pa_of ppn pa) 8) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
+    destruct (Hpma_all (pa_of ppn pa) 8
+               (pma_access_ram _ _ Hram0 (pma_width_ok 8 eq_refl eq_refl))) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     assert (Hlo : (ram_base <= uint (pa_of ppn pa))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn pa) + 8 <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn pa) + Z.of_nat 7 < 18446744073709551616)%Z).
@@ -1701,7 +1705,8 @@ Section WpSconfMem.
     iDestruct (s_mem_chunk s_tr pa pa 0 4 4 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(_ & Hram0 & Hram3 & Hkd).
-    destruct (Hpma_all (pa_of ppn pa) 4) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
+    destruct (Hpma_all (pa_of ppn pa) 4
+               (pma_access_ram _ _ Hram0 (pma_width_ok 4 eq_refl eq_refl))) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
     assert (Hlo : (ram_base <= uint (pa_of ppn pa))%Z) by (destruct Hram0 as [Hl _]; exact Hl).
     assert (Hfit : (uint (pa_of ppn pa) + 4 <= ram_base + ram_size)%Z).
     { assert (Hnw : (uint (pa_of ppn pa) + Z.of_nat 3 < 18446744073709551616)%Z).

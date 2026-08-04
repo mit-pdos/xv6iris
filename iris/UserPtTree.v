@@ -353,15 +353,18 @@ Section UserPtFault.
         | [ (p2 & w1 & Hsm2 & Hv2 & Hn2 & Hsm1 & Hinv1)
           | (p2 & p1 & w0 & Hsm2 & Hv2 & Hn2 & Hsm1 & Hv1 & Hn1 & Hsm0 & Hinv0) ] ].
       - rewrite Ha2 in Hsm2.
-        destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18)))
+        destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
           as (region2 & Hm2 & Hs2).
         left. exists w2.
         split; [| exact Hinv2].
         exact (pt_read_pte_slot σ _ w2 region2 Hsm2 HA' Hord' HR' Hcov' Hm2 Hs2 Hhtif).
       - rewrite Ha2 in Hsm2.
-        destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18)))
+        destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
           as (region2 & Hm2 & Hs2).
-        destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9)))
+        destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
           as (region1 & Hm1 & Hs1).
         right; left. exists p2, w1.
         split; [exact (pt_read_pte_slot σ _ p2 region2 Hsm2 HA' Hord' HR' Hcov' Hm2 Hs2 Hhtif) |].
@@ -369,11 +372,14 @@ Section UserPtFault.
         split; [| exact Hinv1].
         exact (pt_read_pte_slot σ _ w1 region1 Hsm1 HA' Hord' HR' Hcov' Hm1 Hs1 Hhtif).
       - rewrite Ha2 in Hsm2.
-        destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18)))
+        destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
           as (region2 & Hm2 & Hs2).
-        destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9)))
+        destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
           as (region1 & Hm1 & Hs1).
-        destruct (Hpmar (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0)))
+        destruct (Hpmar (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
           as (region0 & Hm0 & Hs0).
         right; right. exists p2, p1, w0.
         split; [exact (pt_read_pte_slot σ _ p2 region2 Hsm2 HA' Hord' HR' Hcov' Hm2 Hs2 Hhtif) |].
@@ -457,11 +463,14 @@ Section UserPtFault.
       assert (Ha2 : pt_addr2 t vpn = u_pte_addr uroot (subrange_vec_dec vpn 26 18)).
       { unfold pt_addr2. rewrite Hbase. reflexivity. }
       rewrite Ha2 in Hsm2.
-      destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18)))
+      destruct (Hpmar (u_pte_addr uroot (subrange_vec_dec vpn 26 18))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
         as (region2 & Hm2 & Hs2).
-      destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9)))
+      destruct (Hpmar (u_pte_addr (u_next_base p2) (subrange_vec_dec vpn 17 9))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
         as (region1 & Hm1 & Hs1).
-      destruct (Hpmar (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0)))
+      destruct (Hpmar (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
         as (region0 & Hm0 & Hs0).
       exact (exec_translate_pt_denied acc User mxr do_sum vpn uroot
                p2 p1 (pte_set_ad w a0 d0) σ

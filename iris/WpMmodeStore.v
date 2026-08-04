@@ -55,6 +55,7 @@ Section WpStoreGpr.
   Proof.
     intros offset ea Hpmp Hstat.
     iIntros "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hbw Hcont".
+    iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_ea.
     iDestruct "Hbw" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -64,7 +65,8 @@ Section WpStoreGpr.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite & _).
+    destruct (Hpma_all ea 8
+               (pma_access_ram _ _ Hram_ea (pma_width_ok 8 eq_refl eq_refl))) as (region & Hmatch & _ & _ & Hwrite & _).
     iApply (wp_instr Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
  (pmp_all_off_allows_all _ Hpmp) Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
@@ -197,6 +199,7 @@ Section MmodeStoreTor.
   Proof.
     intros offset ea Hpmp Hstat Htor.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] Hfile Hinstr Hbytes Hcont".
+    iDestruct (phys_word_pointsto_ram with "Hbytes") as %Hram_ea.
     iDestruct "Hbytes" as "(%Halign & Hbytes)".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
@@ -206,7 +209,8 @@ Section MmodeStoreTor.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    destruct (Hpma_all ea 8) as (region & Hmatch & _ & _ & Hwrite & _).
+    destruct (Hpma_all ea 8
+               (pma_access_ram _ _ Hram_ea (pma_width_ok 8 eq_refl eq_refl))) as (region & Hmatch & _ & _ & Hwrite & _).
     iApply (wp_instr Φ pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 8)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".

@@ -119,6 +119,17 @@ Proof.
   apply Z2N.id. unfold uart_base in *. lia.
 Qed.
 
+(* NO WRAPAROUND at a UART register: the whole MMIO window sits below 2^38, so
+   an access of any width the model allows cannot wrap.  This is the address
+   premise [RiscvFetchExec.pma_allows_all] asks of its appliers. *)
+Lemma uart_pa_access_ok off n :
+  0 <= off < uart_size -> 1 <= n <= 4096 ->
+  pma_access_ok (uart_pa off) n.
+Proof.
+  intros Hoff Hn. apply (pma_access_lt _ _ (uart_base + uart_size)); [| reflexivity | exact Hn].
+  rewrite (uint_uart_pa off Hoff). lia.
+Qed.
+
 Lemma dev_addr_uart off : 0 <= off < uart_size -> dev_addr (uart_pa off) = true.
 Proof.
   intros Hoff. unfold dev_addr. apply Z.ltb_lt.

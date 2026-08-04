@@ -73,7 +73,8 @@ Context `{GEN : GenId} `{CID : CpuId}.
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-  destruct (Hpma_all (uart_pa off) 1) as (region_st & Hmatch_st & _ & _ & Hwrite_st & _).
+  destruct (Hpma_all (uart_pa off) 1
+             (uart_pa_access_ok off 1 Hoff (pma_width_ok 1 eq_refl eq_refl))) as (region_st & Hmatch_st & _ & _ & Hwrite_st & _).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
   iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.
@@ -244,7 +245,8 @@ Qed.
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
     "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-  destruct (Hpma_all (uart_pa off) 1) as (region_ld & Hmatch_ld & _ & Hread_ld & _ & _).
+  destruct (Hpma_all (uart_pa off) 1
+             (uart_pa_access_ok off 1 Hoff (pma_width_ok 1 eq_refl eq_refl))) as (region_ld & Hmatch_ld & _ & Hread_ld & _ & _).
   iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
   iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
   iDestruct (reg_valid_dq with "Hreg Hms")   as %Lms.

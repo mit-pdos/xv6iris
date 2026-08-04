@@ -127,11 +127,14 @@ Section Pt2Translate.
       by exact Hsm1.
     assert (Hsm0' : pt_slot_mem σ (u_pte_addr (u_next_base pc1) (subrange_vec_dec vpn 8 0)) p0c)
       by exact Hsm0.
-    destruct (Hpmar (u_pte_addr rc (subrange_vec_dec vpn 26 18)))
+    destruct (Hpmar (u_pte_addr rc (subrange_vec_dec vpn 26 18))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
       as (region2 & Hm2 & Hs2).
-    destruct (Hpmar (u_pte_addr (u_next_base pc2) (subrange_vec_dec vpn 17 9)))
+    destruct (Hpmar (u_pte_addr (u_next_base pc2) (subrange_vec_dec vpn 17 9))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
       as (region1 & Hm1 & Hs1).
-    destruct (Hpmar (u_pte_addr (u_next_base pc1) (subrange_vec_dec vpn 8 0)))
+    destruct (Hpmar (u_pte_addr (u_next_base pc1) (subrange_vec_dec vpn 8 0))
+           (u_pte_addr_no_wrap _ _ 8 eq_refl))
       as (region0 & Hm0r & Hs0).
     pose proof (pt_read_pte_slot σ _ pc2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2.
     pose proof (pt_read_pte_slot σ _ pc1 region1 Hsm1' HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1.
@@ -211,7 +214,8 @@ Section Pt2Translate.
         * (* hit + write-back through the cached pteAddr: the PREVIOUS
              tree's L0 slot (O3prev) *)
           destruct Hsm0p as (Hbytes0 & Hram0 & Hram0' & Hal0).
-          destruct (Hpmaw (pt_addr0 pp1 vpn)) as (regionw & Hmw & Hww).
+          destruct (Hpmaw (pt_addr0 pp1 vpn)
+            (pt_addr0_no_wrap _ _ 8 eq_refl)) as (regionw & Hmw & Hww).
           assert (Hwr : exec (write_pte
                      (Physaddr (u_pte_addr (u_next_base pp1) (subrange_vec_dec vpn 8 0))) 8
                      (q0' : mword 64)) σ
@@ -285,7 +289,8 @@ Section Pt2Translate.
         destruct (update_PTE_Bits (pte_set_ad p0c a' d' : mword 64) acc) as [q0'|] eqn:Hupq.
         * (* hit + write-back into the CURRENT tree's L0 slot (O3cur) *)
           destruct Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
-          destruct (Hpmaw (pt_addr0 pc1 vpn)) as (regionw & Hmw & Hww).
+          destruct (Hpmaw (pt_addr0 pc1 vpn)
+            (pt_addr0_no_wrap _ _ 8 eq_refl)) as (regionw & Hmw & Hww).
           assert (Hwr : exec (write_pte
                      (Physaddr (u_pte_addr (u_next_base pc1) (subrange_vec_dec vpn 8 0))) 8
                      (q0' : mword 64)) σ
