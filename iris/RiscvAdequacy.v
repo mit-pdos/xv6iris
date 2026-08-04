@@ -383,6 +383,10 @@ Proof.
   intros Hinv.
   (* allocate every ghost component at the initial state [g] *)
   iMod (gen_heap_init g.(gmem)) as (Hgen) "(Hh & Hbytes & _)".
+  (* expose the bundle's three components, so [riscv_memGS HR] below is a
+     CONSTRUCTOR application convertible (ι, no record η needed) with the
+     instance the freshly minted [pointsto]/[gen_heap_interp] carry *)
+  destruct Hgen as [Hmpre Hhn Hmn].
   iMod (reg_alloc_cpus g.(gregs) D (enum CPU) (NoDup_enum CPU))
     as (f) "Hcpus".
   iMod (ghost_var_alloc g.(gdev).(duart)) as (γu) "Hu".
@@ -408,8 +412,8 @@ Proof.
   (* EVERY proc slot's park receipt, minted at [false] *)
   iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth _]".
-  set (HR := RiscvGS Σ (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ γgen)
-               (RiscvEraGS Σ f Hgen γu γp γv γk γkpt γs γsie γpark)).
+  set (HR := RiscvGS Σ (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen)
+               (RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark)).
   (* persist the ~49k static fragments into the claims bundle
      (uniform-claims stage A'; symbolic -- the map is never enumerated) *)
   iAssert (|==> kmap_static_claims)%I with "[Hkfrags]" as ">#Hkbundle".

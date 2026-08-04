@@ -95,13 +95,48 @@ template for milestones 1–4.
    + two stored gnames), because a `ghost_mapΣ nat (riscvEraGS Σ)`
    functor cannot mention Σ. Land that reshape together with its first
    consumer.
-   **STAGE 2d (next)**: fold `gen_born gen_id` (+ later the era
-   registration) into `minstret_inv`; adequacy pins `gen_id = ggen g`
-   (premise) and mints the birth certificate for the client bundle.
-   **STAGE 2e** (the semantic switch, with milestone 3): gating premises
-   + corpse arms + `PowerLoopE` + fork + `PowerModel.v` (`boot_shape`,
-   `dev_reset`) + `wp_dead` + the four-way base-rule split +
-   `wp_power_loop` + the minimal adequacy over `[PowerLoopE]`.
+   **STAGE 2d LANDED**: `gen_born gen_id` rides in `minstret_inv` (third
+   persistent conjunct; one destructure site, inside MinstretInv.v).
+   **STAGE 2e-pre (next)**: the Σ-free era reshape — `riscvEraGS`
+   becomes plain data (gnames + gname LISTS: `era_reg_names`/
+   `era_strans_names`/`era_sie_names` length-NCPU, `era_park_names`
+   length-nproc, heap/meta gnames with `gen_heapGS` reconstructed from a
+   new fixed `gen_heapGpreS` field), compat accessors via `nth`, so the
+   record is a legal `ghost_map` VALUE type (`ghost_map` constrains only
+   keys, but the FUNCTOR `ghost_mapΣ nat (riscvEraGS Σ)` cannot mention
+   Σ — hence Σ-free).
+   **STAGE 2e** (the semantic switch, with milestone 3), design settled:
+   - `PowerModel.v`: `boot_shape` (initially: the device corollary's
+     hypotheses — Hram/plic_ok/virtio not-live+zero counters/`v_disk`
+     preserved; hart reset registers join at M6), `dev_reset`.
+   - Language: real arms gated on `gpow = true ∧ ggen = gen`; corpse
+     self-loop arms on the complement; `PowerLoopE` — PowerOff bumps
+     ggen + drops gpow, PowerOn sets gpow + `boot_shape` reset + forks
+     `(LoopE ggen <$> enum CPU) ++ [UartLoopE ggen; DiskLoopE ggen;
+     PlicLoopE ggen]`.
+   - **The off-refutation WITHOUT the registry dom-shape**: a second
+     fixed mono-nat `γstart` tracking STARTED generations, value
+     `ggen + (if gpow then 1 else 0)` — monotone under both arms
+     (PowerOff: ggen+1, pow 0 → same count; PowerOn: +1).
+     `gen_started gen := lb (gen+1)`; a thread at `ggen = gen ∧ ¬gpow`
+     contradicts it (count = gen, lb says ≥ gen+1). The registry keeps
+     the dom-shape only for PowerOn's fresh-insert side condition.
+   - `state_interp` goes ∃-era: fixed conjuncts + `∃ R, registry auth R
+     ∗ ⌜dom R = set_seq 0 started⌝ ∗ (gpow → ⌜R !! ggen = Some E⌝ ∗
+     interp E g)` where `interp E g` is today's triple stated at an
+     EXPLICIT era record (new `_at`-parameterized forms of
+     gregs_interp/gen_heap_interp/dev_interp).
+   - `gen_cert := gen_born gen_id ∗ gen_started gen_id ∗
+     gen_id ↪[γreg]□ riscv_eraGS` replaces `gen_born` in `minstret_inv`;
+     the ~5 raw lifting rules take it as one explicit persistent premise
+     (their interior callers extract it from `minstret_inv`); the live
+     branch's era agreement is elem-vs-auth on the registry.
+   - `wp_dead` from `gen_dead`; four-way split: dead / live /
+     off-refuted-by-`gen_started` / unborn-refuted-by-`gen_born`.
+   - `wp_power_loop` (surgery: fresh era allocation over the reset
+     state, registry insert, both counters bumped appropriately, fork
+     obligations from the client's joint ∀-era entailment) + the minimal
+     adequacy over `[PowerLoopE]`, validated device-only first.
    CrashProto.v is the working template for every piece.
 3. **Death machinery**: `wp_dead`, the base rules' four-way case split
    (`> gen` dead / live / off-refuted-by-registry / `< gen`

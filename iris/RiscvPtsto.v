@@ -113,6 +113,12 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
   riscvF_parkGS :: ghost_varG Σ bool;
+  (* the byte memory's PRE-class: the era layer stores only the two heap
+     GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
+     the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
+     the generation registry -- claude-notes/projects/crash.md); the
+     full [gen_heapGS] is reconstructed below as [riscv_memGS]. *)
+  riscvF_memGpreS :: gen_heapGpreS Arch.pa (bv 8) Σ;
   (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
      COUNTER, a mono-nat mirroring [gstate.(ggen)].  FIXED-layer -- it is
      the one ghost that spans power cycles; [gen_dead] below is the
@@ -121,13 +127,14 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscv_gen_name : gname;
 }.
 
-Class riscvEraGS (Σ : gFunctors) := RiscvEraGS {
+Record riscvEraGS := RiscvEraGS {
   (* one register-map ghost name PER hart.  A [ghost_map] element on
      [cpu_reg_name c] owns a register of hart [c].  The function is total (every
      [CPU] is a real hart) and its per-hart authoritative maps are threaded by
      [gregs_interp] below. *)
   era_reg_name : CPU -> gname;
-  era_memGS :: gen_heapGS Arch.pa (bv 8) Σ;
+  era_heap_name : gname;
+  era_meta_name : gname;
   era_uart_name : gname;
   era_plic_name : gname;
   era_virtio_name : gname;
@@ -205,7 +212,7 @@ Class riscvEraGS (Σ : gFunctors) := RiscvEraGS {
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_fixedGS :: riscvFixedGS Σ;
-  riscv_eraGS :: riscvEraGS Σ;
+  riscv_eraGS : riscvEraGS;
 }.
 
 (* Compatibility names: the tree references these; signatures verbatim.
@@ -225,16 +232,17 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
 Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
-Definition riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ := era_memGS.
-Definition cpu_reg_name `{!riscvGS Σ} : CPU -> gname := era_reg_name.
-Definition uart_name `{!riscvGS Σ} : gname := era_uart_name.
-Definition plic_name `{!riscvGS Σ} : gname := era_plic_name.
-Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name.
-Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name.
-Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name.
-Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name.
-Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name.
-Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name.
+Global Instance riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ :=
+  GenHeapGS _ _ _ (era_heap_name riscv_eraGS) (era_meta_name riscv_eraGS).
+Definition cpu_reg_name `{!riscvGS Σ} : CPU -> gname := era_reg_name riscv_eraGS.
+Definition uart_name `{!riscvGS Σ} : gname := era_uart_name riscv_eraGS.
+Definition plic_name `{!riscvGS Σ} : gname := era_plic_name riscv_eraGS.
+Definition virtio_name `{!riscvGS Σ} : gname := era_virtio_name riscv_eraGS.
+Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
+Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
+Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
+Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
+Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
 
 (* The generation counter's three faces (claude-notes/design/crash.md).
    [gen_auth] rides in [state_interp] pinned to [gstate.(ggen)]; the lower
