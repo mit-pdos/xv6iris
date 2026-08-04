@@ -18199,3 +18199,23 @@ Definition kernel_data : gmap Z (bv 8) := list_to_map [
 Global Typeclasses Opaque kernel_data.
 
 (* Total data bytes = 18164; keys are byte addresses, [kernel_data !! addr]. *)
+
+(* KEY RANGE.  [kernel_data_lo <= a < kernel_data_hi] for every key [a]: the decidable
+   [map_Forall] check, closed by one [vm_compute], so the proof term is
+   [eq_refl] and no list ever enters it.  Bounds are LITERALS (this file
+   is below iris/ and cannot name [ram_lo]/[text_end]/[img_end]); the
+   consumer bridges them arithmetically. *)
+Definition kernel_data_lo : Z := 0x8000541e%Z.
+Definition kernel_data_hi : Z := 0x8000a220%Z.
+
+Lemma kernel_data_range_bool :
+  bool_decide (map_Forall (fun (a : Z) (_ : bv 8) =>
+                 (kernel_data_lo <= a < kernel_data_hi)%Z) kernel_data) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma kernel_data_range (a : Z) (b : bv 8) :
+  kernel_data !! a = Some b -> (kernel_data_lo <= a < kernel_data_hi)%Z.
+Proof.
+  pose proof kernel_data_range_bool as H.
+  apply bool_decide_eq_true_1 in H. exact (H a b).
+Qed.

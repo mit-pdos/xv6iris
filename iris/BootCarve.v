@@ -46,6 +46,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto.
 Require Import KptPt KMap.
+Require Import RiscvExtras PowerBoot.   (* [boot_uint_pa]: the RAM-range address round-trip *)
+Require Import KernelText.             (* the [kernel_text] bundle this produces *)
+From Kernel Require KernelInstrs.
 Local Open Scope Z_scope.
 
 Section BootCarve.
@@ -170,6 +173,55 @@ Section BootCarve.
     iApply (phys_ident_mem a (DfracOwn 1) b (kdata_svpn_class a Hkd)
               (addr_is_kdata_ram a Hkd) Hcanon with "Hkbundle [Hb]").
     rewrite /phys_pointsto. iFrame "Hb". iPureIntro. exact (addr_is_kdata_ram a Hkd).
+  Qed.
+
+  (* ================================================================== *)
+  (* §5  The NAMED text bundle.                                         *)
+  (* ================================================================== *)
+
+  (* [KernelText.kernel_text] is a [big_sepM] over the WHOLE 23340-entry
+     [KernelInstrs.kernel_bytes], so producing it from the text half needs
+     "every key of that map is in RAM and below [text_end]" -- and that is the
+     fact whose hand proof is fatal (going back through [list_to_map] puts the
+     list into the proof term and the [Qed] never returns).  It is therefore
+     GENERATED, by tools/dump_elf.py, as [KernelInstrs.kernel_bytes_range]: a
+     decidable [map_Forall] check closed by one [vm_compute], whose proof term
+     is [eq_refl].  All this lemma does is bridge its LITERAL bounds (that file
+     is below iris/ and cannot name [ram_lo]/[text_end]) and read the image
+     value back out of [boot_byte]. *)
+
+  (* the loader really did leave [kernel_bytes]' byte at its address *)
+  Local Lemma boot_byte_text (a : Z) (b : bv 8) :
+    KernelInstrs.kernel_bytes !! a = Some b -> boot_byte a = b.
+  Proof.
+    intro Hlk.
+    pose proof (KernelInstrs.kernel_bytes_range a b Hlk) as Hr.
+    unfold KernelInstrs.kernel_bytes_lo, KernelInstrs.kernel_bytes_hi in Hr.
+    unfold boot_byte, boot_image.
+    rewrite (map_lookup_filter_Some_2 _ _ a b);
+      [ reflexivity
+      | apply lookup_union_Some_l; exact Hlk
+      | cbn; unfold img_end; lia ].
+  Qed.
+
+  (* [kernel_text] is PERSISTENT and so is the half it comes from, so nothing
+     is consumed: the input can be re-used for the physical cuts. *)
+  Lemma kernel_text_intro (g : gstate) :
+    (forall a : Z, (ram_lo <= a < ram_hi)%Z ->
+       g.(gmem) !! (SailStdpp.Values.mword_of_int a : Arch.pa) = Some (boot_byte a)) ->
+    ([∗ map] a ↦ b ∈ sub_text g, a ↦ₓ□ b) -∗ kernel_text.
+  Proof.
+    iIntros (Hmem) "#Ht". rewrite /kernel_text.
+    iApply big_sepM_intro. iIntros "!>" (a b Hlk).
+    pose proof (KernelInstrs.kernel_bytes_range a b Hlk) as Hr.
+    unfold KernelInstrs.kernel_bytes_lo, KernelInstrs.kernel_bytes_hi in Hr.
+    assert (Hram : (ram_lo <= a < ram_hi)%Z) by (unfold ram_lo, ram_hi; lia).
+    assert (Huint : uint (SailStdpp.Values.mword_of_int a : Arch.pa) = a)
+      by exact (boot_uint_pa a Hram).
+    iApply (big_sepM_lookup _ _ (SailStdpp.Values.mword_of_int a : Arch.pa) b with "Ht").
+    rewrite /sub_text. apply map_lookup_filter_Some_2.
+    - rewrite <- (boot_byte_text a b Hlk). exact (Hmem a Hram).
+    - cbn. rewrite Huint. unfold text_end. lia.
   Qed.
 
 End BootCarve.

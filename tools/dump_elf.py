@@ -596,6 +596,45 @@ def emit_lean_decode(items: list[object], out_path: str, elf: str,
     return n, len(lines)
 
 
+def rocq_range_lemmas(w, name: str, addrs: list[int]) -> None:
+    """Emit the KEY-RANGE facts for a per-byte `gmap Z (bv 8)`.
+
+    A consumer that has to turn the map into a per-address resource needs
+    "every key is in [lo, hi)", and the direction it needs is the one that
+    is FATAL to prove by hand: going back through `list_to_map` (stdpp's
+    `elem_of_list_to_map_2`) puts the whole 20k-entry list into the proof
+    term and the `Qed` never returns.  So the fact is generated here as a
+    DECIDABLE check closed by one `vm_compute`: the proof term is `eq_refl`,
+    no list, and it elaborates in about a second.
+
+    The bounds are emitted as LITERALS -- kernel-rocq/ sits below iris/ and
+    cannot name `ram_lo`/`text_end`/`img_end`; the iris side bridges the
+    literals by `lia`.
+    """
+    lo = addrs[0]
+    hi = addrs[-1] + 1
+    w("(* KEY RANGE.  [%s_lo <= a < %s_hi] for every key [a]: the decidable" % (name, name))
+    w("   [map_Forall] check, closed by one [vm_compute], so the proof term is")
+    w("   [eq_refl] and no list ever enters it.  Bounds are LITERALS (this file")
+    w("   is below iris/ and cannot name [ram_lo]/[text_end]/[img_end]); the")
+    w("   consumer bridges them arithmetically. *)")
+    w(f"Definition {name}_lo : Z := 0x{lo:x}%Z.")
+    w(f"Definition {name}_hi : Z := 0x{hi:x}%Z.")
+    w("")
+    w(f"Lemma {name}_range_bool :")
+    w(f"  bool_decide (map_Forall (fun (a : Z) (_ : bv 8) =>")
+    w(f"                 ({name}_lo <= a < {name}_hi)%Z) {name}) = true.")
+    w("Proof. vm_compute. reflexivity. Qed.")
+    w("")
+    w(f"Lemma {name}_range (a : Z) (b : bv 8) :")
+    w(f"  {name} !! a = Some b -> ({name}_lo <= a < {name}_hi)%Z.")
+    w("Proof.")
+    w(f"  pose proof {name}_range_bool as H.")
+    w("  apply bool_decide_eq_true_1 in H. exact (H a b).")
+    w("Qed.")
+    w("")
+
+
 def emit_rocq(items: list[object], out_path: str, elf: str, objdump: str,
               names: Names) -> tuple[int, int]:
     name, kernel = names.bytes_, elf
@@ -670,6 +709,7 @@ def emit_rocq(items: list[object], out_path: str, elf: str, objdump: str,
     # lookups are unaffected.
     w(f"Global Typeclasses Opaque {name}.")
     w("")
+    rocq_range_lemmas(w, name, addrs)
     # Auxiliary per-instruction DECODE-INDEX metadata: just (address, width-bits,
     # encoding) per instruction, NO asm, so the flat list elaborates without
     # chunking.  This is NOT the byte-storage format (that is the per-byte
@@ -785,6 +825,7 @@ def emit_rocq_data(items: list[object], out_path: str, elf: str,
     w("")
     w(f"(* Total data bytes = {n}; keys are byte addresses, [{name} !! addr]. *)")
     w("")
+    rocq_range_lemmas(w, name, data_addrs)
 
     write_if_changed(out_path, "\n".join(lines))
     return n, len(lines)

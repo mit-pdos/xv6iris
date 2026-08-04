@@ -3109,6 +3109,26 @@ Definition sync_bytes : gmap Z (bv 8) := list_to_map [
 
 Global Typeclasses Opaque sync_bytes.
 
+(* KEY RANGE.  [sync_bytes_lo <= a < sync_bytes_hi] for every key [a]: the decidable
+   [map_Forall] check, closed by one [vm_compute], so the proof term is
+   [eq_refl] and no list ever enters it.  Bounds are LITERALS (this file
+   is below iris/ and cannot name [ram_lo]/[text_end]/[img_end]); the
+   consumer bridges them arithmetically. *)
+Definition sync_bytes_lo : Z := 0x0%Z.
+Definition sync_bytes_hi : Z := 0x8c0%Z.
+
+Lemma sync_bytes_range_bool :
+  bool_decide (map_Forall (fun (a : Z) (_ : bv 8) =>
+                 (sync_bytes_lo <= a < sync_bytes_hi)%Z) sync_bytes) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma sync_bytes_range (a : Z) (b : bv 8) :
+  sync_bytes !! a = Some b -> (sync_bytes_lo <= a < sync_bytes_hi)%Z.
+Proof.
+  pose proof sync_bytes_range_bool as H.
+  apply bool_decide_eq_true_1 in H. exact (H a b).
+Qed.
+
 Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.
 
 (* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup

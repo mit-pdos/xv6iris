@@ -31822,6 +31822,26 @@ Definition kernel_bytes : gmap Z (bv 8) := list_to_map [
 
 Global Typeclasses Opaque kernel_bytes.
 
+(* KEY RANGE.  [kernel_bytes_lo <= a < kernel_bytes_hi] for every key [a]: the decidable
+   [map_Forall] check, closed by one [vm_compute], so the proof term is
+   [eq_refl] and no list ever enters it.  Bounds are LITERALS (this file
+   is below iris/ and cannot name [ram_lo]/[text_end]/[img_end]); the
+   consumer bridges them arithmetically. *)
+Definition kernel_bytes_lo : Z := 0x80000000%Z.
+Definition kernel_bytes_hi : Z := 0x80006120%Z.
+
+Lemma kernel_bytes_range_bool :
+  bool_decide (map_Forall (fun (a : Z) (_ : bv 8) =>
+                 (kernel_bytes_lo <= a < kernel_bytes_hi)%Z) kernel_bytes) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma kernel_bytes_range (a : Z) (b : bv 8) :
+  kernel_bytes !! a = Some b -> (kernel_bytes_lo <= a < kernel_bytes_hi)%Z.
+Proof.
+  pose proof kernel_bytes_range_bool as H.
+  apply bool_decide_eq_true_1 in H. exact (H a b).
+Qed.
+
 Record kinstr := MkKInstr { ki_addr : Z; ki_width : nat; ki_enc : Z }.
 
 (* Keyed by instruction INDEX (program order, 0-based) for O(log n) lookup

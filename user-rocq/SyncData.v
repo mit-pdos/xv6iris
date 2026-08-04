@@ -1192,3 +1192,23 @@ Definition sync_data : gmap Z (bv 8) := list_to_map [
 Global Typeclasses Opaque sync_data.
 
 (* Total data bytes = 1156; keys are byte addresses, [sync_data !! addr]. *)
+
+(* KEY RANGE.  [sync_data_lo <= a < sync_data_hi] for every key [a]: the decidable
+   [map_Forall] check, closed by one [vm_compute], so the proof term is
+   [eq_refl] and no list ever enters it.  Bounds are LITERALS (this file
+   is below iris/ and cannot name [ram_lo]/[text_end]/[img_end]); the
+   consumer bridges them arithmetically. *)
+Definition sync_data_lo : Z := 0x8c0%Z.
+Definition sync_data_hi : Z := 0xd44%Z.
+
+Lemma sync_data_range_bool :
+  bool_decide (map_Forall (fun (a : Z) (_ : bv 8) =>
+                 (sync_data_lo <= a < sync_data_hi)%Z) sync_data) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma sync_data_range (a : Z) (b : bv 8) :
+  sync_data !! a = Some b -> (sync_data_lo <= a < sync_data_hi)%Z.
+Proof.
+  pose proof sync_data_range_bool as H.
+  apply bool_decide_eq_true_1 in H. exact (H a b).
+Qed.

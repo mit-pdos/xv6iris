@@ -729,32 +729,83 @@ this file:**
   `bi_scope` as bi-negation, so the complement filter needs its own
   named definition (`co_sub_text`).
 
-### Slice 1b — what slice 1 still owes (NOT STARTED)
+### Slice 1b — the generated range facts + `kernel_text` (LANDED, partial)
 
-- **The PHYSICAL cuts, taken out before the `↦ₘ` upgrade**: the `stack0`
-  pages (for `stack_own_phys` per hart) and the `entry_ld_ea` word, as raw
-  `↦ₚ`. Both live above `text_end`, so they come out of `supra_text`;
-  the shape needed is a key-set deletion on that filtered map plus the
-  per-byte presence from `boot_facts`' RAM-total clause.
-- **The NAMED bundles `kernel_text` / `kernel_data`**, and this is a REAL
-  WALL, not a proof difficulty: `kernel_text` is a `big_sepM` over the
-  whole 23340-entry `KernelInstrs.kernel_bytes`, so producing it from the
-  sub-`text_end` half needs
-  `∀ a b, kernel_bytes !! a = Some b → ram_lo <= a < text_end`
-  (and the same for `KernelData.kernel_data` above `text_end`). That is a
-  fact about a `list_to_map` of 23k entries, and the direction needed is
-  the one durable-notes records as fatal — `elem_of_list_to_map_2` puts
-  the list into the proof term and the `Qed` does not come back (M6a paid
-  for this once already). The M6a fix ("cut the domain with a filter")
-  does not apply, because `kernel_text`'s definition is fixed.
-  The honest options, to decide before slice 1b:
-  (i) have **`tools/dump_elf.py` emit the range fact** alongside the map
-      (it already prints the range in the file header comment:
-      `0x80000000 .. 0x80006120`), as a `map_Forall` lemma proved by one
-      `vm_compute` on a `bool_decide` — no list in the proof term; or
-  (ii) restate `kernel_text` over a domain-FILTERED image, which changes
-      a definition every WP proof in the tree consumes.
-  (i) is much the cheaper and keeps `kernel_text` untouched.
+**The range wall is gone, and the fix is in the DUMPER.** `tools/dump_elf.py`
+now emits, after each per-byte `gmap Z (bv 8)` it generates, the map's KEY
+RANGE as a decidable check closed by one `vm_compute`
+(`rocq_range_lemmas`):
+
+```coq
+Definition <map>_lo : Z := 0x…%Z.   Definition <map>_hi : Z := 0x…%Z.
+Lemma <map>_range_bool :
+  bool_decide (map_Forall (fun (a : Z) (_ : bv 8) =>
+                 (<map>_lo <= a < <map>_hi)%Z) <map>) = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma <map>_range (a : Z) (b : bv 8) :
+  <map> !! a = Some b -> (<map>_lo <= a < <map>_hi)%Z.
+```
+
+The proof term is `eq_refl` — **no list ever enters it**, which is the whole
+point: the hand proof would have to go back through `list_to_map`
+(`elem_of_list_to_map_2`) and that `Qed` does not come back. Cost measured:
+~1 s of `vm_compute` per map. Bounds are LITERALS because `kernel-rocq/`
+sits below `iris/` and cannot name `ram_lo`/`text_end`/`img_end`; BootCarve
+bridges them by `lia`.
+
+Facts now available, and both matter for what is left:
+- `kernel_bytes` keys ∈ `[0x80000000, 0x80006120)` — entirely below
+  `text_end` (0x80007000), so the whole text map lands in `sub_text`.
+- `kernel_data` keys ∈ `[0x8000541e, 0x8000a220)`. Two things to know:
+  it **STRADDLES `text_end`** (which is exactly why `KernelDataInv.kernel_data`
+  filters at `text_end` — the sub-etext bytes belong to the `↦ₓ□` half), and
+  its upper bound is **exactly `img_end`**, which is what makes the
+  `boot_byte` lookup land inside `boot_image`'s filter.
+
+`BootCarve.kernel_text_intro` is the first NAMED bundle: from the `↦ₓ□` half
+plus `boot_facts`' RAM-total-and-loaded clause it produces
+`KernelText.kernel_text`. It CONSUMES NOTHING (both the input half and
+`kernel_text` are persistent), so the same half still serves the physical
+cuts. `boot_byte_text` is the one-line bridge "the loader left
+`kernel_bytes`' byte at its address" (`lookup_union_Some_l` on
+`kernel_bytes ∪ kernel_data`, then the `< img_end` filter).
+
+**REGEN SAFETY (the hard requirement) — verified:** `make dump` at the
+pinned `XV6_REV` produced `40 insertions(+), 0 deletions(-)` across
+`kernel-rocq/KernelInstrs.v` and `KernelData.v` — every byte-map literal
+UNCHANGED, only the appended lemmas. Same for `user-rocq/Sync{Instrs,Data}.v`.
+Procedure to repeat: `make dump`, then `git diff --stat kernel-rocq/` and
+confirm insertions only; a single deletion means image drift and the regen
+must be reverted, not committed.
+
+**VERIFICATION STATUS of this slice, stated exactly:** the full `-k` rebuild
+that the `kernel-rocq` regen forces was at **508 of ~660 files with ZERO
+errors** when this was committed (a budget wall, not a failure). Everything
+that could possibly be affected had already recompiled clean in that run:
+`KernelInstrs`/`KernelData`, `RiscvLang`, `KernelText`, `BootCarve` (log line
+88) and `RiscvAdequacy`. The files still queued were downstream whole-function
+proofs, which appended lemmas cannot affect. **The next session should
+re-run `make -f CoqMakefile -j16 -k` and the four checkers before building on
+top of this**, and if the tail is clean, drop this paragraph.
+
+**BUDGET WARNING for any future dumper change:** regenerating `kernel-rocq/`
+invalidates `RiscvLang.vo` (RiscvLang names the image) and therefore the
+WHOLE iris tree — a dumper edit costs one full ~15 min rebuild, not a
+single-file check.
+
+### Slice 1b — what still remains
+
+- **`kernel_data_intro`.** `KernelDataInv.kernel_data` is `↦ₘ□`
+  (PERSISTED), while the data half arrives OWNED, and main needs the .bss
+  cells owned. So `supra_text` needs a SECOND cut, at `img_end`: below it →
+  persist into `kernel_data`; at or above it → stays owned for slice 2's
+  typed cells. The two are disjoint because `kernel_data`'s upper bound IS
+  `img_end` (see above) and every `main_globals_raw` cell is .bss. The
+  `< img_end` range fact is already generated.
+- **The PHYSICAL cuts**: the `stack0` pages (`stack_own_phys` per hart) and
+  the `entry_ld_ea` word, as raw `↦ₚ`, taken out of `supra_text` before the
+  `↦ₘ` upgrade — a key-set deletion on that filtered map plus the per-byte
+  presence from `boot_facts`.
 
 ### Slice 2 — typed cells (NOT STARTED)
 
