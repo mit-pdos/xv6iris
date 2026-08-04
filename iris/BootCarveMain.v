@@ -38,17 +38,71 @@ Require Import BootCarve.
 Require Import PageGeom KallocInv.
 Require Import SpecFreerange.
 Require Import WpLock SpecProcinit.
+(* the vocabulary of the STRUCTURED conjuncts (slice 2b).  [Import] is not
+   transitive, so each file whose predicate is named below has to be imported
+   here even though [SpecMain] already requires all of them. *)
+Require Import ProcGeom UserPtTree ProcInv SwtchCtx SchedCtx.
+Require Import SleepLock BcacheInv SpecIinit.
+Require Import DiskInv SpecVirtioDiskInit.
+Require Import SpecMain.
 Local Open Scope Z_scope.
 
 (* --- the alignment arithmetic the structured carves need, over plain [Z] --- *)
+(* Divisor-generic, because the shapes mix [↦₈] and [↦₄] cells: an OFFSET into
+   a record, and the base of the [i]th element of a stride family. *)
+Lemma z_mod_addo (d A o : Z) : A mod d = 0 -> o mod d = 0 -> (A + o) mod d = 0.
+Proof. intros H1 H2. rewrite Zplus_mod H1 H2. reflexivity. Qed.
+
+Lemma z_mod_mul (d b s : Z) (i : nat) :
+  b mod d = 0 -> s mod d = 0 -> (b + s * Z.of_nat i) mod d = 0.
+Proof.
+  intros H1 H2. rewrite Zplus_mod H1 Zmult_mod H2 Z.mul_0_l. reflexivity.
+Qed.
+
 Lemma z_mod8_addo (A o : Z) :
   A mod 8 = 0 -> o mod 8 = 0 -> (A + o) mod 8 = 0.
-Proof. intros H1 H2. rewrite Zplus_mod H1 H2. reflexivity. Qed.
+Proof. exact (z_mod_addo 8 A o). Qed.
 
 Lemma z_mod8_mod4 (A : Z) : A mod 8 = 0 -> A mod 4 = 0.
 Proof.
   intro H. apply Z.mod_divide in H; [| lia]. apply Z.mod_divide; [lia |].
   apply (Z.divide_trans 4 8); [exists 2; reflexivity | exact H].
+Qed.
+
+(* the two window-bookkeeping steps a stride family's per-element carve needs,
+   over VARIABLES (so no layout literal ever reaches the zify hook): the
+   element is at or above the base, and its own record fits inside the array's
+   upper bound.  [stride * N] is one atom on both sides, which is what keeps
+   these linear. *)
+Lemma z_lo_trans (t base A : Z) : t <= base -> base <= A -> t <= A.
+Proof. lia. Qed.
+
+Lemma z_win_hi (A base stride N w hi : Z) :
+  A + stride <= base + stride * N -> base + stride * N <= hi -> w <= stride ->
+  A + w <= hi.
+Proof. lia. Qed.
+
+(* THE side-condition lemma every stride family's per-element carve is applied
+   through: out of the element's index and the family's four CLOSED facts (the
+   base is above [lo], the array's top is below [hi], the record fits in the
+   stride, base and stride are 8-aligned) it produces exactly the three
+   premises a cell carve takes.  Written once, over variables: the caller's
+   whole obligation per family is four [vm_compute]s. *)
+Lemma z_stride_side (base stride : Z) (N : nat) (w lo hi : Z) (i : nat) (A : Z) :
+  (i < N)%nat -> A = base + stride * Z.of_nat i ->
+  0 <= w <= stride -> lo <= base -> base + stride * Z.of_nat N <= hi ->
+  base mod 8 = 0 -> stride mod 8 = 0 ->
+  lo <= A /\ A + w <= hi /\ A mod 8 = 0.
+Proof.
+  intros Hi HA Hw Hlo Hhi Hb8 Hs8.
+  assert (Hst : 0 <= stride) by lia.
+  assert (Hi0 : 0 <= Z.of_nat i) by apply Nat2Z.is_nonneg.
+  assert (H1 : 0 <= stride * Z.of_nat i) by (apply Z.mul_nonneg_nonneg; lia).
+  assert (H2 : stride * (Z.of_nat i + 1) <= stride * Z.of_nat N).
+  { apply Z.mul_le_mono_nonneg_l; [exact Hst |].
+    assert (Hle : Z.of_nat (S i) <= Z.of_nat N) by (apply inj_le; lia).
+    rewrite Nat2Z.inj_succ in Hle. lia. }
+  split_and!; [lia | rewrite HA; lia | rewrite HA; exact (z_mod_mul 8 base stride i Hb8 Hs8)].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -130,6 +184,84 @@ Lemma z_kmem_hi_ram_hi : kmem_hi = ram_hi.
 Proof. reflexivity. Qed.
 Lemma z_of_nat_4096 : Z.of_nat 4096%nat = 4096.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 0b. The [struct disk] cell addresses, in [pa_of_z] spelling.            *)
+(*                                                                        *)
+(* [DiskInv]'s geometry is [pa_add disk_base <nat offset>] rather than the *)
+(* [add_vec _ (mword_of_int _)] every other struct field uses, so the      *)
+(* bridge is [BootCarve.pa_add_of_z] and the whole content is pushing      *)
+(* [Z.of_nat] through the offset.  [disk_lock] is the one address of the   *)
+(* eleven main locks that needs a bridge at all (the other ten ARE         *)
+(* [mword_of_int <symbol>]).                                              *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma d_info_b_of_z (i : nat) :
+  d_info_b i = pa_of_z (KernelSyms.disk + 40 + 16 * Z.of_nat i).
+Proof. unfold d_info_b. rewrite pa_add_of_z. f_equal. lia. Qed.
+
+Lemma d_info_status_of_z (i : nat) :
+  d_info_status i
+  = pa_add (pa_of_z (KernelSyms.disk + 40 + 16 * Z.of_nat i)) 8%nat.
+Proof. unfold d_info_status. rewrite !pa_add_of_z. f_equal. lia. Qed.
+
+Lemma d_ops_of_z (i : nat) :
+  d_ops i = pa_of_z (KernelSyms.disk + 168 + 16 * Z.of_nat i).
+Proof. unfold d_ops. rewrite pa_add_of_z. f_equal. lia. Qed.
+
+Lemma d_ops_res_of_z (i : nat) :
+  pa_add disk_base (168 + 16 * i + 4)%nat
+  = pa_add (pa_of_z (KernelSyms.disk + 168 + 16 * Z.of_nat i)) 4%nat.
+Proof. rewrite !pa_add_of_z. f_equal. lia. Qed.
+
+Lemma d_ops_sec_of_z (i : nat) :
+  pa_add disk_base (168 + 16 * i + 8)%nat
+  = pa_add (pa_of_z (KernelSyms.disk + 168 + 16 * Z.of_nat i)) 8%nat.
+Proof. rewrite !pa_add_of_z. f_equal. lia. Qed.
+
+(* The three index families' addresses, in the family carve's own spelling.
+   All three hold BY DEFINITION -- [ArrCursor.acur base stride i] IS
+   [pa_of_z (base + stride * i)] -- and [proc_addr] is that same term up to
+   one [add_vec] normalisation ([SpecProcinit.proc_addr_acur]). *)
+Lemma bnode_of_z (k : nat) :
+  bnode k = pa_of_z (buf_base + buf_stride * Z.of_nat k).
+Proof. reflexivity. Qed.
+
+Lemma inode_lock_of_z (i : nat) :
+  inode_lock i = pa_of_z (inode_lock_base + inode_stride * Z.of_nat i).
+Proof. reflexivity. Qed.
+
+Lemma proc_addr_of_z (i : nat) :
+  proc_addr i = pa_of_z (KernelSyms.proc + proc_size * Z.of_nat i).
+Proof. rewrite proc_addr_acur. reflexivity. Qed.
+
+Lemma disk_lock_of_z : disk_lock = pa_of_z (KernelSyms.disk + 296).
+Proof.
+  assert (E : (sign_extend' 64 (mword_of_int 0x128 : mword 12) : mword 64)
+              = mword_of_int 296) by (apply bv_eq; vm_compute; reflexivity).
+  unfold disk_lock. rewrite E. apply off_of_z.
+Qed.
+
+(* the eleven [struct spinlock] windows [main_locks_raw] enumerates, IN
+   ADDRESS ORDER and pairwise disjoint -- which is what lets a client cut all
+   eleven out of the one .bss range with [boot_ran_split] alone.  Every step
+   is [x + 24 <= y] on two literals, so the whole check is one [vm_compute]
+   per conjunct.  (The full .bss decomposition -- which of these gaps holds
+   which other bundle -- is tabulated in claude-notes/projects/crash.md.) *)
+Lemma main_lock_windows :
+  img_end <= KernelSyms.cons /\
+  KernelSyms.cons + 24 <= KernelSyms.pr /\
+  KernelSyms.pr + 24 <= KernelSyms.tx_lock /\
+  KernelSyms.tx_lock + 24 <= KernelSyms.kmem /\
+  KernelSyms.kmem + 24 <= KernelSyms.pid_lock /\
+  KernelSyms.pid_lock + 24 <= KernelSyms.wait_lock /\
+  KernelSyms.wait_lock + 24 <= KernelSyms.tickslock /\
+  KernelSyms.tickslock + 24 <= KernelSyms.bcache /\
+  KernelSyms.bcache + 24 <= KernelSyms.itable /\
+  KernelSyms.itable + 24 <= KernelSyms.ftable /\
+  KernelSyms.ftable + 24 <= KernelSyms.disk + 296 /\
+  KernelSyms.disk + 296 + 24 <= ram_hi.
+Proof. split_and!; vm_compute; discriminate. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1. The page list, spelled the way [prun] recurses.                      *)
@@ -282,6 +414,413 @@ Section BootCarveMain.
                  with "Hcl H2") as (vcpu) "H2".
     rewrite /lk_raw /lock_name_field /lk_cpu E8 E16 !off_of_z.
     iExists vlock, vname, vcpu. iFrame "H0 H1 H2".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE OTHER THREE FLAT SHAPES -- each [boot_lk_raw]'s pattern at its   *)
+  (* own offsets.  The residue between two cells (a record's padding, or  *)
+  (* a field no bundle claims) is DROPPED: [boot_raw_ran] is affine.      *)
+  (* Every cut is taken in ADDRESS ORDER, and a window is re-anchored by  *)
+  (* an EMPTY split rather than by [boot_ran_eq] -- [boot_ran_split g lo   *)
+  (* mid hi] with [lo = mid] pointwise but not syntactically is what      *)
+  (* makes the next window's [lo] literally the [A + off] the cell lemma  *)
+  (* asks for.                                                          *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [SleepLock.sl_raw]: six cells out of a [struct sleeplock]'s 44 bytes --
+     [locked ↦₄] at +0, the inner spinlock's three ([lk ↦₄] at +8,
+     [lk.name ↦₈] at +16, [lk.cpu ↦₈] at +24), then [name ↦₈] at +32 and
+     [pid ↦₄] at +40.  Serves every sleeplock in the image: the NBUF buffer
+     locks and the NINODE inode locks. *)
+  Lemma boot_sl_raw (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 44 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 44) -∗ sl_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (E8 : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
+                 = mword_of_int 8) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
+                  = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E32 : (sign_extend' 64 (mword_of_int 32 : mword 12) : mword 64)
+                  = mword_of_int 32) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E40 : (sign_extend' 64 (mword_of_int 40 : mword 12) : mword 64)
+                  = mword_of_int 40) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hal4 : A mod 4 = 0) by exact (z_mod8_mod4 A Hal).
+    assert (En16 : A + 8 + 8 = A + 16) by lia.
+    assert (En24 : A + 8 + 16 = A + 24) by lia.
+    (* +0: locked *)
+    iDestruct (boot_ran_split g A (A + 4) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell4 g A Hmem Hlo ltac:(lia) Hal4 with "Hcl H0")
+      as (vlocked) "H0".
+    (* +8: the inner spinlock's own word *)
+    iDestruct (boot_ran_split g (A + 4) (A + 8) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 8) (A + 8 + 4) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[H1 H]".
+    iDestruct (boot_ran_cell4 g (A + 8) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 8 Hal4 eq_refl)) with "Hcl H1")
+      as (vlk) "H1".
+    (* +16: the inner spinlock's name field *)
+    iDestruct (boot_ran_split g (A + 8 + 4) (A + 16) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 16) (A + 16 + 8) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[H2 H]".
+    iDestruct (boot_ran_cell8 g (A + 16) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 16 Hal eq_refl)) with "Hcl H2")
+      as (vlkname) "H2".
+    (* +24: the inner spinlock's cpu field *)
+    iDestruct (boot_ran_split g (A + 16 + 8) (A + 24) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 24) (A + 24 + 8) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[H3 H]".
+    iDestruct (boot_ran_cell8 g (A + 24) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 24 Hal eq_refl)) with "Hcl H3")
+      as (vcpu) "H3".
+    (* +32: the sleeplock's own name field *)
+    iDestruct (boot_ran_split g (A + 24 + 8) (A + 32) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 32) (A + 32 + 8) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[H4 H]".
+    iDestruct (boot_ran_cell8 g (A + 32) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 32 Hal eq_refl)) with "Hcl H4")
+      as (vname) "H4".
+    (* +40: pid *)
+    iDestruct (boot_ran_split g (A + 32 + 8) (A + 40) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 40) (A + 40 + 4) (A + 44) ltac:(lia) ltac:(lia)
+                 with "H") as "[H5 _]".
+    iDestruct (boot_ran_cell4 g (A + 40) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 40 Hal4 eq_refl)) with "Hcl H5")
+      as (vpid) "H5".
+    rewrite /sl_raw /sl_lkcpu /sl_name_field /sl_pid /lock_name_field /sl_lk
+            E8 E16 E32 E40 !off_of_z En16 En24.
+    iExists vlocked, vlk, vpid, vlkname, vcpu, vname.
+    iFrame "H0 H1 H2 H3 H4 H5".
+  Qed.
+
+  (* [BcacheInv.blink_raw]: the LRU link pair, [prev ↦₈] at +72 and
+     [next ↦₈] at +80 of a [struct buf]. *)
+  Lemma boot_blink_raw (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 88 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g (A + 72) (A + 88)
+    -∗ blink_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (E72 : (sign_extend' 64 (mword_of_int 72 : mword 12) : mword 64)
+                  = mword_of_int 72) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E80 : (sign_extend' 64 (mword_of_int 80 : mword 12) : mword 64)
+                  = mword_of_int 80) by (apply bv_eq; vm_compute; reflexivity).
+    iDestruct (boot_ran_split g (A + 72) (A + 72 + 8) (A + 88)
+                 ltac:(lia) ltac:(lia) with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell8 g (A + 72) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 72 Hal eq_refl)) with "Hcl H0")
+      as (vprev) "H0".
+    iDestruct (boot_ran_split g (A + 72 + 8) (A + 80) (A + 88)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 80) (A + 80 + 8) (A + 88)
+                 ltac:(lia) ltac:(lia) with "H") as "[H1 _]".
+    iDestruct (boot_ran_cell8 g (A + 80) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 80 Hal eq_refl)) with "Hcl H1")
+      as (vnext) "H1".
+    rewrite /blink_raw /bprev /bnext E72 E80 !off_of_z.
+    iSplitL "H0"; [iExists vprev; iExact "H0" | iExists vnext; iExact "H1"].
+  Qed.
+
+  (* [DiskInv.disk_slot_raw i] is NOT contiguous: it is slot [i]'s 16-byte
+     [ops[i]] header at [disk+168+16i] plus its [info[i]] pair at
+     [disk+40+16i].  So it comes out of TWO stride families over the same
+     index, merged by [big_sepL_sep] -- which is also why the halves get
+     names: the family's [Φ] is a function of the ADDRESS, so each half has
+     to be a predicate on one. *)
+  Local Definition dinfo_raw (a : Arch.pa) : iProp Σ :=
+    ((∃ w : SailStdpp.Values.mword 64, a ↦₈ w) ∗
+     (∃ sb : bv 8, (pa_add a 8%nat) ↦ₘ sb))%I.
+
+  Local Definition dops_raw (a : Arch.pa) : iProp Σ :=
+    (∃ (t r : SailStdpp.Values.mword 32) (s : SailStdpp.Values.mword 64),
+       a ↦₄ t ∗ (pa_add a 4%nat) ↦₄ r ∗ (pa_add a 8%nat) ↦₈ s)%I.
+
+  Lemma boot_dinfo_raw (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 16 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 16) -∗ dinfo_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    iDestruct (boot_ran_split g A (A + 8) (A + 16) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell8 g A Hmem Hlo ltac:(lia) Hal with "Hcl H0")
+      as (w) "H0".
+    iDestruct (boot_ran_split g (A + 8) (A + 8 + 1) (A + 16) ltac:(lia) ltac:(lia)
+                 with "H") as "[H1 _]".
+    iDestruct (boot_ran_byte g (A + 8) Hmem ltac:(lia) ltac:(lia) with "Hcl H1")
+      as "H1".
+    rewrite /dinfo_raw pa_add_of_z (_ : A + Z.of_nat 8%nat = A + 8);
+      [| lia ].
+    iSplitL "H0"; [iExists w; iExact "H0" | iExists (boot_byte (A + 8)); iExact "H1"].
+  Qed.
+
+  Lemma boot_dops_raw (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 16 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 16) -∗ dops_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (Hal4 : A mod 4 = 0) by exact (z_mod8_mod4 A Hal).
+    iDestruct (boot_ran_split g A (A + 4) (A + 16) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell4 g A Hmem Hlo ltac:(lia) Hal4 with "Hcl H0")
+      as (t) "H0".
+    iDestruct (boot_ran_split g (A + 4) (A + 4 + 4) (A + 16) ltac:(lia) ltac:(lia)
+                 with "H") as "[H1 H]".
+    iDestruct (boot_ran_cell4 g (A + 4) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 4 Hal4 eq_refl)) with "Hcl H1")
+      as (r) "H1".
+    iDestruct (boot_ran_split g (A + 4 + 4) (A + 8) (A + 16) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 8) (A + 8 + 8) (A + 16) ltac:(lia) ltac:(lia)
+                 with "H") as "[H _]".
+    iDestruct (boot_ran_cell8 g (A + 8) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 8 Hal eq_refl)) with "Hcl H")
+      as (s) "H".
+    rewrite /dops_raw !pa_add_of_z (_ : A + Z.of_nat 4%nat = A + 4);
+      [| lia ].
+    rewrite (_ : A + Z.of_nat 8%nat = A + 8); [| lia ].
+    iExists t, r, s. iFrame "H0 H1 H".
+  Qed.
+
+  (* the eight slots, out of the two ranges. *)
+  Lemma boot_disk_slots (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g (KernelSyms.disk + 40)
+                   (KernelSyms.disk + 40 + 16 * Z.of_nat 8%nat) -∗
+    boot_raw_ran g (KernelSyms.disk + 168)
+                   (KernelSyms.disk + 168 + 16 * Z.of_nat 8%nat)
+    -∗ ([∗ list] i ∈ seq 0 8, disk_slot_raw i).
+  Proof.
+    intro Hmem. iIntros "#Hcl Hi Ho".
+    iDestruct (boot_stride_family_seq g dinfo_raw (KernelSyms.disk + 40) 16 8%nat
+                 ltac:(lia)
+                 ltac:(intros i A Hi HA _ _;
+                       destruct (z_stride_side (KernelSyms.disk + 40) 16 8%nat 16
+                                   text_end ram_hi i A Hi HA
+                                   ltac:(lia) ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; reflexivity)
+                                   ltac:(vm_compute; reflexivity))
+                         as (Q1 & Q2 & Q3);
+                       iApply (boot_dinfo_raw g A Hmem Q1 Q2 Q3))
+                 with "Hcl Hi") as "Hi".
+    iDestruct (boot_stride_family_seq g dops_raw (KernelSyms.disk + 168) 16 8%nat
+                 ltac:(lia)
+                 ltac:(intros i A Hi HA _ _;
+                       destruct (z_stride_side (KernelSyms.disk + 168) 16 8%nat 16
+                                   text_end ram_hi i A Hi HA
+                                   ltac:(lia) ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; reflexivity)
+                                   ltac:(vm_compute; reflexivity))
+                         as (Q1 & Q2 & Q3);
+                       iApply (boot_dops_raw g A Hmem Q1 Q2 Q3))
+                 with "Hcl Ho") as "Ho".
+    iAssert ([∗ list] i ∈ seq 0 8,
+               (dinfo_raw (pa_of_z (KernelSyms.disk + 40 + 16 * Z.of_nat i)) ∗
+                dops_raw (pa_of_z (KernelSyms.disk + 168 + 16 * Z.of_nat i))))%I
+      with "[Hi Ho]" as "H".
+    { rewrite big_sepL_sep. iFrame "Hi Ho". }
+    iApply (big_sepL_mono with "H"). iIntros (k i _) "[Hi Ho]".
+    rewrite /disk_slot_raw /ops_own
+            (d_info_b_of_z i) (d_info_status_of_z i) (d_ops_of_z i)
+            (d_ops_res_of_z i) (d_ops_sec_of_z i) /dinfo_raw /dops_raw.
+    iDestruct "Hi" as "[Hb Hs]". iFrame "Ho Hs Hb".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE TWO SLEEPLOCK FAMILIES.                                         *)
+  (*                                                                    *)
+  (* A buffer's per-element carve gives BOTH things [main_globals_raw]    *)
+  (* asks of it -- the sleeplock at +16 and the LRU link pair at +72/+80  *)
+  (* -- so the two big-ops are ONE family plus [big_sepL_sep], not two    *)
+  (* traversals of the same range (which could not both own it).          *)
+  (* ------------------------------------------------------------------ *)
+  (* the per-element shape, NAMED: the family's [Φ] is applied to the element
+     address, and a LAMBDA there leaves the per-element goal a beta-redex that
+     [iApply] will not see through. *)
+  Local Definition bnode_raw (a : Arch.pa) : iProp Σ :=
+    (sl_raw (buf_lock a) ∗ blink_raw a)%I.
+
+  Lemma boot_buf_node (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 88 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 88) -∗ bnode_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
+                  = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+    iDestruct (boot_ran_split g A (A + 16) (A + 88) ltac:(lia) ltac:(lia)
+                 with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 16) (A + 16 + 44) (A + 88)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hs H]".
+    iDestruct (boot_sl_raw g (A + 16) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 16 Hal eq_refl)) with "Hcl Hs")
+      as "Hs".
+    iDestruct (boot_ran_split g (A + 16 + 44) (A + 72) (A + 88)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_blink_raw g A Hmem Hlo Hhi Hal with "Hcl H") as "H".
+    rewrite /bnode_raw /buf_lock E16 off_of_z. iFrame "Hs H".
+  Qed.
+
+  Lemma boot_bcache_nodes (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g buf_base (buf_base + buf_stride * Z.of_nat NBUF)
+    -∗ ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
+       ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)).
+  Proof.
+    intro Hmem. iIntros "#Hcl H".
+    iDestruct (boot_stride_family_seq g bnode_raw
+                 buf_base buf_stride NBUF
+                 ltac:(unfold buf_stride; lia)
+                 ltac:(intros i A Hi HA _ _;
+                       destruct (z_stride_side buf_base buf_stride NBUF 88
+                                   text_end ram_hi i A Hi HA
+                                   ltac:(unfold buf_stride; lia)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; reflexivity)
+                                   ltac:(vm_compute; reflexivity))
+                         as (Q1 & Q2 & Q3);
+                       assert (T1 : A <= A + 88) by lia;
+                       assert (T2 : A + 88 <= A + buf_stride)
+                         by (unfold buf_stride; lia);
+                       iIntros "#Hcl H";
+                       iDestruct (boot_ran_split g A (A + 88) (A + buf_stride)
+                                    T1 T2 with "H") as "[H _]";
+                       iApply (boot_buf_node g A Hmem Q1 Q2 Q3 with "Hcl H"))
+                 with "Hcl H") as "H".
+    rewrite /bnode_raw big_sepL_sep. iDestruct "H" as "[H1 H2]".
+    iSplitL "H1".
+    - iApply (big_sepL_mono with "H1"). iIntros (n k _) "Hk".
+      rewrite (bnode_of_z k). iExact "Hk".
+    - iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
+      rewrite (bnode_of_z k). iExact "Hk".
+  Qed.
+
+  (* the NINODE inode sleeplocks: the same family, at the itable's stride, and
+     with nothing else per element. *)
+  Lemma boot_inode_locks (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g inode_lock_base
+                   (inode_lock_base + inode_stride * Z.of_nat NINODE)
+    -∗ ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)).
+  Proof.
+    intro Hmem. iIntros "#Hcl H".
+    iDestruct (boot_stride_family_seq g sl_raw
+                 inode_lock_base inode_stride NINODE
+                 ltac:(unfold inode_stride; lia)
+                 ltac:(intros i A Hi HA _ _;
+                       destruct (z_stride_side inode_lock_base inode_stride NINODE
+                                   44 text_end ram_hi i A Hi HA
+                                   ltac:(unfold inode_stride; lia)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; reflexivity)
+                                   ltac:(vm_compute; reflexivity))
+                         as (Q1 & Q2 & Q3);
+                       assert (T1 : A <= A + 44) by lia;
+                       assert (T2 : A + 44 <= A + inode_stride)
+                         by (unfold inode_stride; lia);
+                       iIntros "#Hcl H";
+                       iDestruct (boot_ran_split g A (A + 44) (A + inode_stride)
+                                    T1 T2 with "H") as "[H _]";
+                       iApply (boot_sl_raw g A Hmem Q1 Q2 Q3 with "Hcl H"))
+                 with "Hcl H") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (n i _) "Hi".
+    rewrite (inode_lock_of_z i). iExact "Hi".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* [SpecMain.main_locks_raw]'s ELEVEN.                                 *)
+  (*                                                                    *)
+  (* Inherently eleven applications of [boot_lk_raw]: the eleven         *)
+  (* [struct spinlock]s sit at UNRELATED symbols, not at a stride.  What *)
+  (* the lemma buys is the address bridge for each (ten of them ARE      *)
+  (* [mword_of_int <symbol>]; [disk_lock] alone needs [disk_lock_of_z])  *)
+  (* and the ORDER -- the windows are taken in ADDRESS order, which is   *)
+  (* the order the client's cuts out of the one .bss range must follow   *)
+  (* ([main_lock_windows] is that check).                               *)
+  (* ------------------------------------------------------------------ *)
+  Lemma boot_main_locks_raw (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g KernelSyms.cons (KernelSyms.cons + 24) -∗
+    boot_raw_ran g KernelSyms.pr (KernelSyms.pr + 24) -∗
+    boot_raw_ran g KernelSyms.tx_lock (KernelSyms.tx_lock + 24) -∗
+    boot_raw_ran g KernelSyms.kmem (KernelSyms.kmem + 24) -∗
+    boot_raw_ran g KernelSyms.pid_lock (KernelSyms.pid_lock + 24) -∗
+    boot_raw_ran g KernelSyms.wait_lock (KernelSyms.wait_lock + 24) -∗
+    boot_raw_ran g KernelSyms.tickslock (KernelSyms.tickslock + 24) -∗
+    boot_raw_ran g KernelSyms.bcache (KernelSyms.bcache + 24) -∗
+    boot_raw_ran g KernelSyms.itable (KernelSyms.itable + 24) -∗
+    boot_raw_ran g KernelSyms.ftable (KernelSyms.ftable + 24) -∗
+    boot_raw_ran g (KernelSyms.disk + 296) (KernelSyms.disk + 296 + 24)
+    -∗ main_locks_raw.
+  Proof.
+    intro Hmem. iIntros "#Hcl H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11".
+    iDestruct (boot_lk_raw g KernelSyms.cons Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H1") as "H1".
+    iDestruct (boot_lk_raw g KernelSyms.pr Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H2") as "H2".
+    iDestruct (boot_lk_raw g KernelSyms.tx_lock Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H3") as "H3".
+    iDestruct (boot_lk_raw g KernelSyms.kmem Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H4") as "H4".
+    iDestruct (boot_lk_raw g KernelSyms.pid_lock Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H5") as "H5".
+    iDestruct (boot_lk_raw g KernelSyms.wait_lock Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H6") as "H6".
+    iDestruct (boot_lk_raw g KernelSyms.tickslock Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H7") as "H7".
+    iDestruct (boot_lk_raw g KernelSyms.bcache Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H8") as "H8".
+    iDestruct (boot_lk_raw g KernelSyms.itable Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H9") as "H9".
+    iDestruct (boot_lk_raw g KernelSyms.ftable Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H10") as "H10".
+    iDestruct (boot_lk_raw g (KernelSyms.disk + 296) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl H11") as "H11".
+    rewrite /main_locks_raw /pid_lock_addr /wait_lock_addr /bcache_addr
+            /itable_addr disk_lock_of_z.
+    iSplitL "H1"; [iExact "H1"|]. iSplitL "H3"; [iExact "H3"|].
+    iSplitL "H2"; [iExact "H2"|]. iSplitL "H4"; [iExact "H4"|].
+    iSplitL "H5"; [iExact "H5"|]. iSplitL "H6"; [iExact "H6"|].
+    iSplitL "H7"; [iExact "H7"|]. iSplitL "H8"; [iExact "H8"|].
+    iSplitL "H9"; [iExact "H9"|]. iSplitL "H10"; [iExact "H10"|].
+    iExact "H11".
   Qed.
 
   (* one page, out of its own 4096-byte range: [BootCarve.boot_ran_mem_run]

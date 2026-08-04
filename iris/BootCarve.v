@@ -840,10 +840,18 @@ Section BootCarve.
     rewrite Nat2Z.inj_succ Z.mul_succ_r. lia.
   Qed.
 
+  (* The per-element premise carries the element's INDEX and the equation
+     [A = base + stride * i], not merely [A]'s range: an aligned-cell carve
+     needs [A mod 8 = 0], which follows from the base's and the stride's
+     alignment and is NOT a consequence of "A lies in the array".  The two
+     range facts ride along because the induction has them anyway, and
+     re-deriving them from the equation would be nonlinear. *)
   Lemma boot_stride_family (g : gstate) (Φ : Arch.pa -> iProp Σ)
       (base stride : Z) (N : nat) :
     0 <= stride ->
-    (forall A : Z, base <= A -> A + stride <= base + stride * Z.of_nat N ->
+    (forall (i : nat) (A : Z),
+       (i < N)%nat -> A = base + stride * Z.of_nat i ->
+       base <= A -> A + stride <= base + stride * Z.of_nat N ->
        kmap_static_claims -∗ boot_raw_ran g A (A + stride) -∗ Φ (pa_of_z A)) ->
     kmap_static_claims -∗ boot_raw_ran g base (base + stride * Z.of_nat N)
     -∗ ([∗ list] A ∈ zstride base stride N, Φ (pa_of_z A)).
@@ -866,12 +874,16 @@ Section BootCarve.
       change (zstride base stride (S k))
         with (base :: zstride (base + stride) stride k).
       iSplitL "Hh".
-      + iApply (Hone base ltac:(lia) ltac:(rewrite Hsucc; lia) with "Hcl Hh").
+      + iApply (Hone 0%nat base ltac:(lia) ltac:(lia) ltac:(lia)
+                  ltac:(rewrite Hsucc; lia) with "Hcl Hh").
       + iDestruct (boot_ran_eq g _ _ (base + stride)
                      (base + stride + stride * Z.of_nat k) eq_refl Hsucc
                      with "Ht") as "Ht".
         iApply (IH (base + stride) with "Hcl Ht").
-        intros A HA1 HA2. iApply (Hone A ltac:(lia) ltac:(rewrite Hsucc; lia)).
+        intros i A Hi HA HA1 HA2.
+        iApply (Hone (S i) A ltac:(lia)
+                  ltac:(rewrite Nat2Z.inj_succ Z.mul_succ_r; lia)
+                  ltac:(lia) ltac:(rewrite Hsucc; lia)).
   Qed.
 
   (* ...and the same in the [seq 0 N]-indexed spelling every conjunct of
@@ -879,7 +891,9 @@ Section BootCarve.
   Lemma boot_stride_family_seq (g : gstate) (Φ : Arch.pa -> iProp Σ)
       (base stride : Z) (N : nat) :
     0 <= stride ->
-    (forall A : Z, base <= A -> A + stride <= base + stride * Z.of_nat N ->
+    (forall (i : nat) (A : Z),
+       (i < N)%nat -> A = base + stride * Z.of_nat i ->
+       base <= A -> A + stride <= base + stride * Z.of_nat N ->
        kmap_static_claims -∗ boot_raw_ran g A (A + stride) -∗ Φ (pa_of_z A)) ->
     kmap_static_claims -∗ boot_raw_ran g base (base + stride * Z.of_nat N)
     -∗ ([∗ list] i ∈ seq 0 N, Φ (pa_of_z (base + stride * Z.of_nat i))).

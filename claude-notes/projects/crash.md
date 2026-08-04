@@ -674,14 +674,12 @@ and holds everything stated in a callee's vocabulary (kinit's page run today;
 slice 2's structured conjuncts next). Keeping BootCarve low is what keeps its
 `lia` usable — the higher file is under `bitvector.tactics`' zify hook.
 
-**STATE: slices 1a, 1b, 1b', 2a, 2b-machinery and 3 are LANDED. M6b IS NOT
-COMPLETE**: what remains is slice 2b's four structured shapes
-(`sl_raw`/`blink_raw`/`disk_slot_raw` — each `boot_lk_raw`'s pattern at its own
-offsets — and `proc_raw`/`proc_pub`, the big one) plus `main_locks_raw`'s
-eleven-lock assembly, all in BootCarveMain.v; see slice 2b below, which says
-exactly what each owes. **Everything `SpecEntry`'s precondition needs is
+**STATE: slices 1a, 1b, 1b', 2a, 2b, 2c and 3 are LANDED. M6b IS NOT
+COMPLETE**: what remains is `proc_raw`/`proc_pub` (slice 2d) and the `boot_D`
+audit (slice 2e); every other structured conjunct now has its own lemma in
+BootCarveMain.v. **Everything `SpecEntry`'s precondition needs is
 done**; `SpecMain`'s still needs those bundles, and two of its conjuncts turn
-out not to be carves at all (slice 2b item 3). The M6c hand-off — the per-hart
+out not to be carves at all (slice 2b's `fd_slots` finding). The M6c hand-off — the per-hart
 chain, what exists for it and the six things that do NOT — is its own section
 below.
 
@@ -933,10 +931,7 @@ chain of cuts rather than a proof:
 
 **WHAT REMAINS OF M6b, exactly:**
 
-1. **The other three small shapes**, each `boot_lk_raw`'s pattern at its own
-   offsets: `SleepLock.sl_raw` (6 cells), `BcacheInv.blink_raw` (2), and
-   `DiskInv.disk_slot_raw` (`ops_own i` + a byte + a word).
-2. **`proc_raw` / `proc_pub`, the big one.** `proc_raw` is `lk_raw` +
+1. **`proc_raw` / `proc_pub`, the big one.** `proc_raw` is `lk_raw` +
    `p_state ↦₄` + `p_kstack ↦₈` + `ProcInv.proc_dormant_nofd`, and that last
    one is itself `proc_fields` + `ofile_cells` + `own_ctx (p_context pa)` +
    the PINNED `p_pagetable ↦₈ 0` / `p_trapframe ↦₈ 0` + a pure constraint on
@@ -949,7 +944,7 @@ chain of cuts rather than a proof:
    (`word_pointsto_frac_split` does, for `↦₈`); and both families are 64
    copies at stride `proc_size = 360`, i.e. one `boot_stride_family_seq`
    each, never 64 instances.
-3. **`fd_slots` IS NOT A CARVE AT ALL, and this is a finding for M6c rather
+2. **`fd_slots` IS NOT A CARVE AT ALL, and this is a finding for M6c rather
    than for BootCarve.** `FdSlots.fd_slots n` is `own fdslot_name (◯ n)` — a
    GHOST fragment, with no memory footprint whatever; it is minted at boot by
    `fd_slots_alloc`. So `main_globals_raw`'s
@@ -959,17 +954,67 @@ chain of cuts rather than a proof:
    `sieG`, `fdslotG`, `uartGhostG`, `diskGhostG`): `power_boot_res` provides
    only the ERA ghosts, so the client's Σ must carry those functors and the
    client allocates them.
-4. **`main_locks_raw`'s assembly**: eleven `boot_lk_raw`s at UNRELATED symbol
-   addresses, so this one is inherently eleven applications — but the cuts
-   have to be taken in ADDRESS ORDER out of the one `.bss` range, so sort the
-   eleven symbols first (`cons`, `tx_lock`, `pr`, `kmem`, `pid_lock`,
-   `wait_lock`, `tickslock`, `bcache`, `itable`, `ftable`, `disk_lock`) and
-   check by `vm_compute` that they do not overlap.
 
 `BootCarveMain.v` is under the zify hook (see slice 3), so write every new
 arithmetic step there as a plain-`Z` helper from the start. Note the
 `boot_lk_raw`-style goals are all about a `Z` variable `A` and plain `lia`
 works on them — the hook only bites goals mentioning `uint`/`bv_unsigned`.
+
+### Slice 2c — the remaining flat structures + the lock assembly (LANDED)
+
+Three shapes and two families, all `boot_lk_raw`'s pattern at their own
+offsets, plus `main_locks_raw`. **Every one is a chain of cuts; there is no
+new proof idea in any of them, and that is the point of §10/§11.**
+
+- `boot_sl_raw` — `SleepLock.sl_raw` out of a `struct sleeplock`'s 44 bytes:
+  `locked ↦₄` +0, the inner spinlock's three (`lk ↦₄` +8, `lk.name ↦₈` +16,
+  `lk.cpu ↦₈` +24), `name ↦₈` +32, `pid ↦₄` +40.
+- `boot_blink_raw` — `BcacheInv.blink_raw`, `prev`/`next` at +72/+80.
+- `boot_buf_node` (+ `boot_bcache_nodes`) — the NBUF buffers: ONE family whose
+  per-element carve gives BOTH of `main_globals_raw`'s buffer big-ops (the
+  sleeplock at +16 and the link pair), split by `big_sepL_sep`. The head
+  SENTINEL needs no extra lemma: `bhead` IS `bnode NBUF`, so `boot_blink_raw`
+  at `buf_base + buf_stride*NBUF` serves it (`bnode_of_z` at `NBUF`).
+- `boot_inode_locks` — the NINODE inode sleeplocks, same family at stride 136.
+- `boot_dinfo_raw` / `boot_dops_raw` / `boot_disk_slots` — `disk_slot_raw` is
+  **NOT contiguous** (`ops[i]` at `disk+168+16i`, `info[i]` at `disk+40+16i`),
+  so it is TWO families over the same index merged by `big_sepL_sep`.
+- `boot_main_locks_raw` — the eleven, each from its own 24-byte range. Ten of
+  the addresses ARE `mword_of_int <symbol>` (conversion closes them); only
+  `disk_lock` needs a bridge (`disk_lock_of_z`). `main_lock_windows` is the
+  pure address-order/non-overlap check the client's cut chain needs.
+
+**FIVE THINGS TO KNOW BEFORE ADDING ANOTHER FAMILY OR SHAPE:**
+
+1. **`boot_stride_family`'s per-element premise had to carry the INDEX.** Its
+   old form gave the carve only `base ≤ A ≤ …`, from which `A mod 8 = 0` does
+   NOT follow — an aligned cell carve is unprovable for an arbitrary `A` in
+   the array. The premise is now `(i < N) → A = base + stride*i → base ≤ A →
+   A + stride ≤ base + stride*N → …`; the two range facts ride along because
+   the induction has them anyway and re-deriving them from the equation is
+   nonlinear. `z_stride_side` turns the index plus FOUR closed facts (base
+   above `lo`, top below `hi`, record fits the stride, base and stride
+   8-aligned) into exactly the three premises a cell carve takes — so a new
+   family costs four `vm_compute`s.
+2. **The per-element carve is handed `[A, A + stride)`, not its own window.**
+   A shape narrower than the stride (44 in 136, 88 in 1112, 360 in
+   `proc_size`) needs one `boot_ran_split` to trim first. Two `assert`s and a
+   split inside the `ltac:` term; the failure otherwise reads *"iApply: cannot
+   apply"* on a lemma that visibly matches.
+3. **A LAMBDA `Φ` leaves the per-element goal a beta-redex `iApply` will not
+   see through** — same "cannot apply" message. Name the per-element shape
+   (`bnode_raw`, `dinfo_raw`, `dops_raw`, `proc_slot_raw` are `Local
+   Definition`s for exactly this reason), or pass an existing predicate by
+   eta (`sl_raw` itself is the inode family's `Φ`). `cbn beta` does NOT fix it.
+4. **Re-anchor a window with an EMPTY split, never `boot_ran_eq`.**
+   `boot_ran_split g (A+16+8) (A+24) hi` hands back an empty left piece and a
+   residue whose `lo` is literally the `A + off` the next cell lemma asks for.
+   The whole 14-window `struct proc` chain is written this way and needs no
+   range congruence at all.
+5. **`ltac:(vm_compute; discriminate)` fails on a goal with EVARS.** Writing
+   `z_lo_trans _ _ _ ltac:(…) H` leaves the first two arguments open, the
+   `vm_compute` does nothing and `discriminate` reports *"No primitive
+   equality found"*. Give such a helper its arguments EXPLICITLY.
 
 ### Slice 3 — the kinit page run (LANDED)
 
