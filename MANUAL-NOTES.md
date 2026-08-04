@@ -48,6 +48,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - big refactors get mired in complexity on the first pass: kpt-rwx refactor, explicit-cpuid refactor, user-mode execution, cleaning up first version of instruction leaf specs
 - crash handling: ghost "power" thread turns on/off power repeatedly, bumping generation counter and forking off HART "threads" when powering up a new gen
 - user-mode proof: kernel either has a proven WP for user process, or a generic safety-only WP valid for all user code
+- explicit power on / power off forced instantiating WPs for HART entry, which caught pma_matches_all unsatisfiability
 
 Big things that still need to be done/explored:
 
