@@ -751,3 +751,5 @@ WeakExec.v
 WeakAdequacy.v
 WeakView.v
 WeakVProp.v
+WeakBridge.v
+WeakFence.v

@@ -375,11 +375,21 @@ statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
   function proof that owns its memory (directly or through a lock) keeps its
   statement and its proof script shape**. The kmap/translation conjuncts
   inside `mem_pointsto` ride along unchanged.
-- **Fence modalities** for the `fence rw,rw` publication sites:
-  `Δ P` ("P at my release floor" — what a later store publishes) and
-  `∇ P` ("P at my acquire frontier" — what a later succ-R fence delivers),
-  with `{P} fence-with-pred-RW {Δ' …}`-style leaf rules mapped onto the
-  vrOld/vwOld→vrNew/vwNew lattice. Ghost state passes through both freely.
+- **Fence modalities** for the `fence rw,rw` publication sites. REVISED at
+  M2b, and the revision is forced by the index: the frontier a succ-R fence
+  delivers is `View (vrNew ⊔ vrOld ⊔ vwOld) coh`, and `vrOld`/`vwOld` are
+  not part of the `biIndex` — so `∇ P` cannot be a `vProp → vProp` without
+  iRC11's THREE-view index (cur/acq/rel). It is delivered instead at the
+  `vwp_hold` altitude, where the hart's `wstate` is in hand:
+  `vwp_acq P ws := monPred_at P (acq_view ws)`, with
+  `vwp_acq P ws ⊢ vwp_hold P (fence_post ws true true true sw)` (an
+  equality of views, so the rule is `reflexivity`). And `Δ` is NOT a
+  modality: promise-free, a predecessor-W fence constrains nothing, and the
+  writer side's real content is the timestamp-domination lemma — the
+  releaser's whole index is below `S (length log)`, so it may deposit
+  anything it holds at the objective scalar view `view_scl (S (length log))`
+  (`WeakFence.release_deposit`, resting on `WeakMem.ws_bounded`). Ghost
+  state passes through both freely.
 - **Locks**: `is_lock γ lk s R` keeps its interface; `lock_inv` becomes
   objective by storing `∃V. lk-word-history-tied V ∗ @V R`: release (fence
   rw,w + sw) deposits the holder's view at the new lock-word message's
@@ -465,17 +475,22 @@ this tractable:
   the fence leaves, StartedInv-style escrows, and the virtio cone's device
   seam. The interesting *spec* changes are confined to the sync primitives.
 - **The pinned-fragment transfer bridge (found at M2a) is the sweep's
-  force multiplier.** Every existing decode lemma (~1220) and exec-level
-  instruction leaf is stated over `RiscvExec.exec` / `mstate` (flat mem).
-  When every read of a run is PINNED — owned `↦w` at the hart's index, or
-  timestamp-0 text — the collapse lemma (`readable_latest_pin`) says each
-  read returns `wflat`'s value, so `wexec` on `wmstate` corresponds to
-  `exec` on `MState (wm_regs σ) (wflat (wm_img σ) (wm_log σ)) (wm_dev σ)`.
-  ONE transfer lemma on that fragment re-derives the whole existing leaf
-  library; only genuinely racy accesses (lock words, `started`, virtio
-  ring) drop to the weak arm and get new leaves — which is exactly the
-  design's intended split. Build the bridge BEFORE porting any leaf by
-  hand (M2b item 0).
+  force multiplier — LANDED at M2b as `iris/WeakBridge.v`.** Every existing
+  decode lemma (~1220) and exec-level instruction leaf is stated over
+  `RiscvExec.exec` / `mstate` (flat mem). When every read of a run is
+  PINNED, the collapse lemma (`readable_latest_pin`) says each read returns
+  `wflat`'s value, so `wexec` on `wmstate` corresponds to `exec` on
+  `wflat_st σ = MState (wm_regs σ) (wflat (wm_img σ) (wm_log σ)) (wm_dev σ)`
+  — both directions, `exec_of_wexec_pinned` (what a leaf CONSUMES inside
+  `wp_wexec_step`'s ∀-oracle continuation) and `wexec_of_exec_pinned` (the
+  reducibility witness), packaged as `wexec_pinned_agree`. A read is pinned
+  three ways: the access kind forces it (`ak_coh`, and `ak_latest` — so
+  **every AMO read transfers with no ownership at all**), the byte is owned
+  at the hart's index, or the byte was never written this era (all kernel
+  text: so fetch and decode ride for free). Only genuinely racy DATA
+  accesses (lock words, `started`, virtio ring) drop to the weak arm and get
+  new leaves — which is exactly the design's intended split. Port no leaf by
+  hand that the bridge can carry.
 - Build the new tree in parallel namespaces first (M0–M3 touch no existing
   file), validate the interfaces on a vertical slice (spinlock + one client
   cone + the started handoff), THEN sweep.

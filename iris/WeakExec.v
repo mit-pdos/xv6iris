@@ -191,14 +191,16 @@ Section WeakHart.
   Proof.
     iIntros (Hgid) "H".
     iApply (wp_lift_step (Λ := weak_riscv_lang)); first done.
-    iIntros (g ns κ κs nt) "(%Hpin & Hgr & Hdev & Hlog & Hlat & Hws)".
+    iIntros (g ns κ κs nt) "(%Hpin & %Hbnd & Hgr & Hdev & Hlog & Hlat & Hws)".
     destruct Hpin as [Hpow Hgen].
     assert (Hlive : wthread_live g gen_id) by (split; [exact Hpow|by rewrite Hgid]).
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iDestruct (wws_interp_acc with "Hws") as "[Hwsc Hwsclose]".
     iMod ("H" $! (whart_view g cpu_id) with "[Hri Hdev Hlog Hlat Hwsc]")
       as "(%Hred & Hk)".
-    { rewrite /wmstate_interp /whart_view /=. iFrame "Hri Hdev Hlog Hlat Hwsc". }
+    { rewrite /wmstate_interp /whart_view /=.
+      iSplitR; [iPureIntro; exact (Hbnd cpu_id)|].
+      iFrame "Hri Hdev Hlog Hlat Hwsc". }
     iModIntro. iSplitR.
     { iPureIntro. destruct Hred as (χ & σ0 & χ' & Hex).
       pose proof (wexec_wrun _ _ _ _ _ _ _ Hex) as Hrun.
@@ -213,15 +215,29 @@ Section WeakHart.
     (* the era-initial image is never written, so the post-state's image IS
        the one the state interpretation holds ([WeakInterp.wrun_img]) *)
     assert (Himg : wm_img s' = wgimg g) by exact (wrun_img _ _ _ _ _ Hrun).
+    (* the OTHER harts' views did not move, but the log may have grown:
+       [ws_bounded] is monotone in its bound, and the log is append-only *)
+    assert (Hlen : (length (wglog g) ≤ length (wm_log s'))%nat).
+    { destruct (wrun_log_app _ _ _ _ _ Hrun) as (lext & Hlext).
+      rewrite whart_view_log in Hlext. rewrite Hlext length_app. lia. }
     iIntros "_".
     iMod ("Hk" $! tick s' with "[//]")
-      as "((Hri' & Hdev' & Hlog' & Hlat' & Hwsc') & HWP)".
+      as "((%Hbnd' & Hri' & Hdev' & Hlog' & Hlat' & Hwsc') & HWP)".
+    assert (Hbnd2 : ∀ c : CPU,
+              ws_bounded (wgws (whart_write g cpu_id s') c)
+                         (length (wglog (whart_write g cpu_id s')))).
+    { intros c. rewrite whart_write_log.
+      destruct (decide (c = cpu_id)) as [->|Hne].
+      - rewrite whart_write_ws_eq. exact Hbnd'.
+      - rewrite (whart_write_ws_ne _ _ _ _ Hne).
+        exact (ws_bounded_mono _ _ _ (Hbnd c) Hlen). }
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iDestruct ("Hwsclose" with "Hwsc'") as "Hws'".
     iEval (rewrite Himg) in "Hlat'".
     iModIntro. iFrame "HWP". iSplitL; [|done].
     rewrite /weak_state_interp /=.
     iSplitR; [by iPureIntro; split|].
+    iSplitR; [iPureIntro; exact Hbnd2|].
     iFrame "Hgr' Hdev' Hlog' Hlat' Hws'".
   Qed.
 

@@ -865,3 +865,96 @@ Proof.
   intros Hall Hok. rewrite -(wread_all_seen s ak pa n ts w Hall Hok).
   by apply wread_bytes_complete.
 Qed.
+
+(** THE VIEW-BOUND INVARIANT ([WeakMem.ws_bounded]) — every timestamp a hart
+    holds is a real one, i.e. below the log's length.  Together with
+    [wrun_log_app] above this is what M2's state interpretation carries for
+    EVERY hart, and what makes the hart's index [w_vrNew ⊔ coh(a)] a genuine
+    position in the log ([WeakMem.ws_bounded_scl]). *)
+
+Lemma barrier_post_bounded ws b n :
+  ws_bounded ws n → ws_bounded (barrier_post ws b) n.
+Proof.
+  intros Hb. destruct b; rewrite /barrier_post;
+    first [ exact Hb
+          | by apply fence_post_bounded
+          | by apply fence_post_bounded, fence_post_bounded ].
+Qed.
+
+(** An admissible byte's timestamp is inside the log — it holds a value, and
+    [WeakMem.log_byte_bounded] bounds any timestamp that does. *)
+Lemma wbyte_ok_bounded s ak a t b :
+  wbyte_ok s ak a t b → (t ≤ length (wm_log s))%nat.
+Proof.
+  intros [Hv _]. apply (log_byte_bounded (wimg s) (wm_log s) t a). by exists b.
+Qed.
+
+Lemma wread_ok_ts_bounded s ak pa n ts w :
+  wread_ok s ak pa n ts w → Forall (λ t, (t ≤ length (wm_log s))%nat) ts.
+Proof.
+  intros [Hlen Hbytes]. apply Forall_lookup_2. intros j t Hj.
+  pose proof (lookup_lt_Some ts j t Hj) as Hjlt. rewrite Hlen in Hjlt.
+  rewrite -(list_lookup_total_correct ts j t Hj).
+  apply (wbyte_ok_bounded s ak (acc_addr pa j) (ts !!! j) (nth_byte w j)).
+  apply Hbytes. lia.
+Qed.
+
+Lemma wread_post_bounded s ak pa n ts w :
+  ws_bounded (wm_ws s) (length (wm_log s)) →
+  wread_ok s ak pa n ts w →
+  ws_bounded (wm_ws (wread_post s ak pa ts))
+             (length (wm_log (wread_post s ak pa ts))).
+Proof.
+  intros Hb Hok. rewrite wread_post_log /wread_post.
+  destruct (ak_coh ak); [exact Hb|].
+  rewrite /wset_ws /=. apply load_post_run_bounded; [exact Hb|].
+  exact (wread_ok_ts_bounded s ak pa n ts w Hok).
+Qed.
+
+(** The write case: the log grows by ONE, and the store's timestamp is the
+    fresh top [S (length (wm_log s))] — which is exactly the new length. *)
+Lemma wwrite_post_bounded tid s ak pa n v :
+  ws_bounded (wm_ws s) (length (wm_log s)) →
+  ws_bounded (wm_ws (wwrite_post tid s ak pa n v))
+             (length (wm_log (wwrite_post tid s ak pa n v))).
+Proof.
+  intros Hb. rewrite wwrite_post_log length_app /= /wwrite_post /=.
+  apply (store_post_run_bounded _ _ _ _ _ (length (wm_log s))); [exact Hb|lia|lia].
+Qed.
+
+(** THE INVARIANT'S PRESERVATION over a whole step — the [ws_bounded] twin of
+    [wrun_ws_le], with exactly the same induction. *)
+Lemma wrun_ws_bounded tid {X} (m : M X) :
+  forall s x s', wrun tid m s x s' ->
+    ws_bounded (wm_ws s) (length (wm_log s)) ->
+    ws_bounded (wm_ws s') (length (wm_log s')).
+Proof.
+  induction m as [y|T oc k IH]; intros s x s' Hrun Hb.
+  - destruct Hrun as [_ ->]. exact Hb.
+  - destruct oc; simpl in Hrun;
+      try (exact (IH _ _ _ _ Hrun Hb));
+      try (exfalso; exact Hrun);
+      try (destruct Hrun as (c & Hrun); exact (IH _ _ _ _ Hrun Hb)).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        exact (IH _ _ _ _ Hrun Hb).
+      * destruct Hrun as (w & ts & Hok & Hrun).
+        apply (IH _ _ _ _ Hrun). eapply wread_post_bounded; [exact Hb|exact Hok].
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        exact (IH _ _ _ _ Hrun Hb).
+      * apply (IH _ _ _ _ Hrun). by apply wwrite_post_bounded.
+    + (* Barrier *)
+      apply (IH _ _ _ _ Hrun). by apply barrier_post_bounded.
+Qed.
+
+Lemma wexec_ws_bounded tid {X} (m : M X) χ s x s' χ' :
+  wexec tid m χ s = Some (x, s', χ') →
+  ws_bounded (wm_ws s) (length (wm_log s)) →
+  ws_bounded (wm_ws s') (length (wm_log s')).
+Proof.
+  intros Hex. apply (wrun_ws_bounded tid m s x s').
+  exact (wexec_wrun tid m χ s x s' χ' Hex).
+Qed.

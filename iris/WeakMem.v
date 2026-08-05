@@ -810,3 +810,190 @@ Proof.
   - apply store_post_coh.
   - rewrite length_app /=. intros (t & ? & ? & ?). lia.
 Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** [ws_bounded]: every view a hart holds is a real timestamp
+
+    THE MACHINE INVARIANT of M2b.  A [wstate] is a bundle of timestamps; the
+    step functions only ever join them with timestamps drawn from the log, so
+    every view a hart holds stays below the log's length.  Stated over a NAT
+    bound rather than a log: the bound is then monotone ([ws_bounded_mono]),
+    which is exactly what the OTHER harts need when the stepping hart appends.
+    THE TIE IS ALWAYS USED AT [n = length log] — see
+    [WeakInterp.wrun_ws_bounded] and [WeakGhost.weak_state_interp].
+
+    THE FORWARD-BANK CONJUNCT IS NOT OPTIONAL.  [fwd_view] puts a BANKED view
+    into a load's post-view ([load_post_at]'s [vpost]), so without a bound on
+    the bank's second components [load_post_at] would not preserve
+    boundedness — the banked view would flow straight into [w_vrOld]. *)
+
+Definition ws_bounded (ws : wstate) (n : nat) : Prop :=
+  (w_vrOld ws ≤ n)%nat ∧ (w_vwOld ws ≤ n)%nat ∧
+  (w_vrNew ws ≤ n)%nat ∧ (w_vwNew ws ≤ n)%nat ∧ (w_vRel ws ≤ n)%nat ∧
+  (∀ a, (coh ws a ≤ n)%nat) ∧
+  (∀ a tv, w_fwd ws !! a = Some tv → (tv.1 ≤ n)%nat ∧ (tv.2 ≤ n)%nat).
+
+Lemma ws_bounded_init n : ws_bounded ws_init n.
+Proof.
+  rewrite /ws_bounded. split_and!; try (simpl; lia).
+  - intros a. rewrite coh_init. lia.
+  - intros a tv. rewrite /ws_init /= lookup_empty. done.
+Qed.
+
+Lemma ws_bounded_mono ws n n' :
+  ws_bounded ws n → (n ≤ n')%nat → ws_bounded ws n'.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd) Hle.
+  rewrite /ws_bounded. split_and!; try lia.
+  - intros a. pose proof (Hcoh a). lia.
+  - intros a tv Ha. destruct (Hfwd a tv Ha). split; lia.
+Qed.
+
+(** The [coh] half of every preservation proof below: an insert stays bounded
+    if the inserted value is. *)
+Local Lemma coh_upd_bounded ws vrO vwO vrN vwN vR fwd a v n :
+  (∀ a', (coh ws a' ≤ n)%nat) → (v ≤ n)%nat →
+  ∀ a', (coh {| w_coh := <[a := v]> (w_coh ws); w_vrOld := vrO; w_vwOld := vwO;
+                w_vrNew := vrN; w_vwNew := vwN; w_vRel := vR; w_fwd := fwd |} a'
+         ≤ n)%nat.
+Proof.
+  intros Hm Hv a'. destruct (decide (a' = a)) as [->|Hne].
+  - rewrite coh_upd_eq. exact Hv.
+  - rewrite coh_upd_ne //. apply Hm.
+Qed.
+
+Lemma load_vpre_bounded ws aq n : ws_bounded ws n → (load_vpre ws aq ≤ n)%nat.
+Proof.
+  intros (_ & _ & Hrn & _ & Hrel & _ & _).
+  rewrite /load_vpre. destruct aq; lia.
+Qed.
+
+Lemma fwd_view_bounded ws aq a t n :
+  ws_bounded ws n → (t ≤ n)%nat → (fwd_view ws aq a t ≤ n)%nat.
+Proof.
+  intros (_ & _ & _ & _ & _ & _ & Hfwd) Ht. rewrite /fwd_view.
+  destruct aq; [exact Ht|].
+  destruct (w_fwd ws !! a) as [[tf vf]|] eqn:Hf; [|exact Ht].
+  case_bool_decide; [|exact Ht].
+  destruct (Hfwd a (tf, vf) Hf) as [_ Hvf]. exact Hvf.
+Qed.
+
+Lemma load_post_at_bounded ws aq vpre a t n :
+  ws_bounded ws n → (vpre ≤ n)%nat → (t ≤ n)%nat →
+  ws_bounded (load_post_at ws aq vpre a t) n.
+Proof.
+  intros Hb Hvp Ht.
+  pose proof (fwd_view_bounded ws aq a t n Hb Ht) as Hfv.
+  destruct Hb as (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd).
+  rewrite /ws_bounded /load_post_at /=.
+  split_and!; try (destruct aq; lia).
+  - apply coh_upd_bounded; [exact Hcoh|]. pose proof (Hcoh a). lia.
+  - exact Hfwd.
+Qed.
+
+Lemma store_post_bounded ws rl a t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
+  ws_bounded (store_post ws rl a t) n'.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd) Ht Hle.
+  rewrite /ws_bounded /store_post /=.
+  split_and!; try (destruct rl; lia).
+  - apply coh_upd_bounded.
+    + intros a'. pose proof (Hcoh a'). lia.
+    + pose proof (Hcoh a). lia.
+  - intros a' tv. destruct (decide (a' = a)) as [->|Hne].
+    + rewrite lookup_insert. intros [= <-]. simpl. split; lia.
+    + rewrite lookup_insert_ne //. intros Ha'.
+      destruct (Hfwd a' tv Ha'). split; lia.
+Qed.
+
+Lemma fence_post_bounded ws pr pw sr sw n :
+  ws_bounded ws n → ws_bounded (fence_post ws pr pw sr sw) n.
+Proof.
+  intros (Hro & Hwo & Hrn & Hwn & Hrel & Hcoh & Hfwd).
+  rewrite /ws_bounded /fence_post /=.
+  split_and!; try (destruct pr, pw, sr, sw; simpl; lia).
+  - exact Hcoh.
+  - exact Hfwd.
+Qed.
+
+(** ... and the multi-byte folds the interpreter's read/write arms build. *)
+
+Local Lemma load_post_fold_bounded aq vpre n ats :
+  (vpre ≤ n)%nat →
+  ∀ ws, ws_bounded ws n → Forall (λ p : Z * nat, (p.2 ≤ n)%nat) ats →
+    ws_bounded (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) n.
+Proof.
+  intros Hvp. induction ats as [|at_ l IH]; intros ws Hb Hall; [exact Hb|].
+  apply Forall_cons_1 in Hall as [Hat Hl].
+  simpl. apply IH; [|exact Hl]. by apply load_post_at_bounded.
+Qed.
+
+(** NOTE the pre-view: [load_post_bytes] folds [load_post_at] with the
+    pre-view computed ONCE from [ws], so the bound needed on it is exactly
+    [load_vpre_bounded] and there is no [vpre] premise to state. *)
+Lemma load_post_bytes_bounded ws aq ats n :
+  ws_bounded ws n → Forall (λ p : Z * nat, (p.2 ≤ n)%nat) ats →
+  ws_bounded (load_post_bytes ws aq ats) n.
+Proof.
+  intros Hb Hall. rewrite /load_post_bytes.
+  apply load_post_fold_bounded; [by apply load_vpre_bounded|exact Hb|exact Hall].
+Qed.
+
+Local Lemma store_post_fold_bounded rl t n' as_ :
+  (t ≤ n')%nat →
+  ∀ ws, ws_bounded ws n' →
+    ws_bounded (foldl (λ w a, store_post w rl a t) ws as_) n'.
+Proof.
+  intros Ht. induction as_ as [|a l IH]; intros ws Hb; [exact Hb|].
+  simpl. apply IH. by apply (store_post_bounded ws rl a t n' n').
+Qed.
+
+Lemma store_post_bytes_bounded ws rl as_ t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
+  ws_bounded (store_post_bytes ws rl as_ t) n'.
+Proof.
+  intros Hb Ht Hle. rewrite /store_post_bytes.
+  apply store_post_fold_bounded; [exact Ht|].
+  eapply ws_bounded_mono; [exact Hb|exact Hle].
+Qed.
+
+(** The contiguous-run transport: byte [j] of the access sits at
+    [base + j], and only the SECOND component of the zipped pair carries a
+    timestamp. *)
+Local Lemma Forall_zip_seq (base : Z) (n : nat) (ts : list nat) :
+  Forall (λ t, (t ≤ n)%nat) ts →
+  ∀ k, Forall (λ p : Z * nat, (p.2 ≤ n)%nat)
+         (zip_with (λ j t, (base + Z.of_nat j, t)) (seq k (length ts)) ts).
+Proof.
+  induction ts as [|t l IH]; intros Hall k; [constructor|].
+  apply Forall_cons_1 in Hall as [Ht Hl].
+  (* [seq k (S m) = k :: seq (S k) m] holds by [reflexivity] *)
+  simpl. constructor; [exact Ht|]. by apply IH.
+Qed.
+
+Lemma load_post_run_bounded ws aq base ts n :
+  ws_bounded ws n → Forall (λ t, (t ≤ n)%nat) ts →
+  ws_bounded (load_post_run ws aq base ts) n.
+Proof.
+  intros Hb Hall. rewrite /load_post_run.
+  apply load_post_bytes_bounded; [exact Hb|by apply Forall_zip_seq].
+Qed.
+
+Lemma store_post_run_bounded ws rl base cnt t n n' :
+  ws_bounded ws n → (t ≤ n')%nat → (n ≤ n')%nat →
+  ws_bounded (store_post_run ws rl base cnt t) n'.
+Proof.
+  intros Hb Ht Hle. rewrite /store_post_run.
+  by apply (store_post_bytes_bounded ws rl _ t n n').
+Qed.
+
+(** THE PAYOFF.  The hart's own index into the log — its read floor joined
+    with a byte's coherence floor, i.e. exactly [readable]'s window — is a
+    real timestamp.  This is what M3's lock transfer consumes; the view-level
+    restatement lives above [WeakView], not here. *)
+Lemma ws_bounded_scl ws n :
+  ws_bounded ws n → ∀ a, (Nat.max (w_vrNew ws) (coh ws a) ≤ n)%nat.
+Proof.
+  intros (_ & _ & Hrn & _ & _ & Hcoh & _) a. pose proof (Hcoh a). lia.
+Qed.

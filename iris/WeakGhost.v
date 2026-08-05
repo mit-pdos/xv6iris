@@ -405,12 +405,22 @@ Section resources.
   Definition wgen_pin (g : wgstate) : Prop :=
     wgpow g = true /\ wggen g = 0%nat.
 
-  (** The GLOBAL state interpretation.  The first three conjuncts are the
-      existing tree's, verbatim in shape ([RiscvPtsto.era_interp] minus its
-      [gen_heap_interp] and its disk-image auth); the last three are the
-      weak-memory ones. *)
+  (** The GLOBAL state interpretation.  The register/device/log/latest
+      conjuncts are the existing tree's, verbatim in shape
+      ([RiscvPtsto.era_interp] minus its [gen_heap_interp] and its disk-image
+      auth); the rest are the weak-memory ones.
+
+      THE SECOND CONJUNCT is the M2b machine invariant: every view EVERY hart
+      holds is a real timestamp of the current log ([WeakMem.ws_bounded]).
+      Its POSITION matters — the three device rules of [WeakExec] destruct
+      only the FIRST conjunct and pass the rest along as one hypothesis, so
+      keeping it second leaves them compiling unchanged.  It is preserved
+      across a hart step by [WeakInterp.wrun_ws_bounded] for the stepping
+      hart, and by [WeakMem.ws_bounded_mono] + [WeakInterp.wrun_log_app] for
+      every other hart. *)
   Definition weak_state_interp (g : wgstate) : iProp Σ :=
     (⌜wgen_pin g⌝ ∗
+     ⌜∀ c : CPU, ws_bounded (wgws g c) (length (wglog g))⌝ ∗
      gregs_interp (wgregs g) ∗
      dev_interp (wgdev g) ∗
      wlog_auth (wglog g) ∗
@@ -420,9 +430,12 @@ Section resources.
   (** ... and ONE HART's view of it, which is what the lifting rule hands to
       its caller: [RiscvPtsto.mstate_interp] with the memory conjunct
       replaced by the log + latest-write pair, plus this hart's weak-state
-      cell.  Everything in it is about [σ] alone. *)
+      cell.  Everything in it is about [σ] alone — including the FIRST
+      conjunct, this hart's instance of the M2b view-bound invariant, which
+      the lifting rule hands out and takes back at the successor state. *)
   Definition wmstate_interp `{CpuId} (σ : wmstate) : iProp Σ :=
-    (reg_interp σ.(wm_regs) ∗
+    (⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝ ∗
+     reg_interp σ.(wm_regs) ∗
      dev_interp σ.(wm_dev) ∗
      wlog_auth σ.(wm_log) ∗
      wlat_interp σ.(wm_img) σ.(wm_log) ∗

@@ -4,8 +4,9 @@ Design: [`design/weak-memory.md`](../design/weak-memory.md) (PROPOSAL).
 Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`),
 M1a (`iris/WeakInterp.v` + fwd-bank wire-in), M1b (`iris/WeakLang.v`),
 M1c (`iris/WeakGhost.v`, `iris/WeakExec.v`, `iris/WeakAdequacy.v`),
-M2a (`iris/WeakView.v`, `iris/WeakVProp.v`).
-Next: M2b.
+M2a (`iris/WeakView.v`, `iris/WeakVProp.v`),
+M2b (`iris/WeakBridge.v`, `iris/WeakFence.v`, + `ws_bounded`).
+Next: M3.
 
 ## M0 — model spike (no Iris)
 
@@ -173,9 +174,15 @@ Validate the operational design before anything depends on it.
       Two forced extensions to existing files:
       `WeakMem.readable_latest_pin` (the collapse lemma; `readable_top_unique`
       is now its `vpre = 0` corollary) and `WeakGhost.wlat_agree_store`.
-- [ ] **M2b** — the `↦₈`/`↦₄`/`↦ₛ` towers on `↦w`; the fetch/`instr`/decode
-      bridge onto `wpt_img`; the `wexec`↔`exec` pinned-read transfer (see
-      the seam facts below); fence modalities + fence leaf WPs; AMO leaf WPs.
+- [x] **M2b — the pinned-fragment transfer bridge, the fence frontier and
+      the AMO read half** (`WeakBridge.v` / `WeakFence.v`, + `ws_bounded` in
+      `WeakMem`/`WeakInterp`/`WeakGhost`/`WeakExec`): DONE, with cuts (see
+      the block below). NOT done, and deliberately deferred: the `↦w₈`/`↦w₄`
+      multi-byte towers and the `↦ₛ` string family (M4-adjacent, no design
+      content), and the fetch/`instr`/decode restatement onto `wpt_img` —
+      which the bridge SUPERSEDES for the exec-level library (the decode
+      lemmas transfer as-is; only the WP-level `instr` resource still has to
+      be restated, at M3/M4).
 
 ### What M2a established (read before M2b/M3)
 
@@ -279,6 +286,143 @@ Validate the operational design before anything depends on it.
   `wpt_wread_word`, `wpt_wwrite_byte` are ALL **closed under the global
   context** — the vProp layer adds nothing, not even the 5 platform axioms
   (it never touches `try_step`).
+
+### What M2b established (read before M3)
+
+- **Inventory**: `WeakBridge.v` 686 lines / 2.7 s, `WeakFence.v` 414 lines /
+  2.1 s (both new); `WeakMem.v` +187, `WeakInterp.v` +93,
+  `WeakGhost.v` +19/−6, `WeakExec.v` +19/−3, `WeakAdequacy.v` +3 (all
+  `ws_bounded`). Everything in `WeakFence.v` and every bridge lemma is
+  **closed under the global context** — the vProp/view layer still adds no
+  axiom; only the PoC transfer, which mentions the model's `execute`,
+  inherits the usual rv64d platform axioms.
+  `weak_system_adequacy`'s footprint is byte-identical before and after.
+
+- **THE BRIDGE IS `WeakBridge.v`, AND ITS OBJECT IS `wflat_st`.**
+  `wflat_st σ := MState (wm_regs σ) (wflat (wm_img σ) (wm_log σ)) (wm_dev σ)` —
+  registers and devices are literally the same objects, memory is the
+  coherent flat projection. Two directions, BOTH proved, over the same
+  run predicate:
+  - `exec_of_wexec_pinned : pinned_exec tid m σ → wlog_wf (wm_log σ) →
+    wexec tid m χ σ = Some (x,σ',χ') → exec m (wflat_st σ) = Some (x, wflat_st σ')`
+    — **the consumption direction**, and the one M3's leaves need: inside
+    `wp_wexec_step`'s ∀-oracle continuation a leaf is HANDED a `wexec` fact
+    at an oracle it did not choose, and this turns it into an `exec` fact
+    that the leaf's EXISTING library lemma pins by `exec`'s functionality.
+  - `wexec_of_exec_pinned : … → exec m (wflat_st σ) = Some (x,t') →
+    ∃ χ σ' χ', wexec tid m χ σ = Some (x,σ',χ') ∧ wflat_st σ' = t'` — the
+    **reducibility** direction, which discharges the same rule's
+    `∃ χ σ0 χ'` premise out of the exec witness the leaf already carries.
+  - `wexec_pinned_agree` packages both against ONE `exec` fact and is what
+    a leaf actually applies: "the machine can step, and however it steps,
+    the value, the registers, the devices and the flat memory are the SC
+    ones". The TIMESTAMPS still vary; nothing observable does.
+  - `wexec_pinned_wlog_wf` re-establishes `wlog_wf` for the next
+    instruction. (`wlog_wf` is currently a threaded premise, NOT a state-
+    interpretation conjunct — see the cuts.)
+- **THE PINNED PREDICATE'S FINAL SHAPE.**
+  `pinned_read σ a := latest_ts (wm_log σ) a ≤ w_vrNew (wm_ws σ) ⊔ coh (wm_ws σ) a`
+  — the hart's own logical index (`WeakVProp.ws_view`/`WeakView.flr`) covers
+  the latest write to the byte. Three ways a read is pinned, and taking ALL
+  THREE is what makes the bridge worth having:
+  (1) the ACCESS KIND forces it — `ak_coh` (fetch/walker) or `ak_latest`
+  (every exclusive/AMO read half), whose admissibility condition IS
+  `WeakMem.latest`. **So an `amoswap` read transfers with NO ownership and
+  no view hypothesis at all**;
+  (2) the byte is OWNED at the hart's index (`WeakBridge.wpt_pinned_read`:
+  `wpt_at` + `wlat_lookup` + `latest_val_ts`, six lines);
+  (3) the byte was NEVER WRITTEN this era (`latest_ts = 0`, so
+  `pinned_read_unwritten` closes it) — **all kernel text and rodata, hence
+  the whole fetch/decode path, for free** (`wpt_img_pinned_read`).
+  `wpt_pinned_acc` converts an owned `n`-byte footprint into the read arm's
+  whole obligation.
+- **`pinned_exec` is a `Fixpoint` over the monad in `wexec`'s own shape**
+  (the `mchoice_free` idiom), collecting per-ACCESS: `acc_wf` (wrap-freedom
+  of the range) and, only where `ak_pins ak = false`, pinnedness of the
+  read footprint. Its recursive successors are the CANONICAL ones (reads at
+  `coh_ts`); `wread_pinned_ts` is what says the actual run cannot use any
+  others. NOTE for M3: a leaf must discharge BOTH `pinned_exec` and
+  `WeakExec.wexec_covers` (via `mchoice_free`) over the peeled instruction —
+  the same peel, done twice. Merging them into one predicate is the obvious
+  future cleanup.
+- **WRAP-FREEDOM IS NOT BUREAUCRACY.** `wflat` is `Arch.pa`-keyed and the
+  log is `Z`-keyed, so a message that wraps the address space is genuinely
+  not described by `wflat` (`wflat_lookup` needs `wlog_wf`). `acc_wf pa n :=
+  pa_z pa + n ≤ 2^64` is discharged from `RiscvPtsto.addr_is_ram`. The
+  WRITE arm needs no wrap side condition for the memory correspondence
+  itself — `z_pa (acc_addr pa j) = pa_add pa j` is UNCONDITIONAL (both sides
+  wrap identically), and `bytes_map`'s insert chain IS `write_bytes`' foldr —
+  only `wlog_wf` for the NEXT access needs it.
+- **PROOF OF CONCEPT: `wexec_execute_ITYPE_ADDI` is one `apply` of
+  `wexec_pinned_agree` over `ExecCommon.exec_execute_ITYPE_ADDI`.** No view
+  reasoning, no re-peeling of the model, no new proof about the instruction.
+- **`ws_bounded` (WeakMem) IS the enabler of VA-based transfer**: every view
+  a hart holds is a real timestamp of the current log —
+  `ws_bounded ws n := the five scalars ≤ n ∧ (∀ a, coh ws a ≤ n) ∧ (∀ a tv,
+  w_fwd ws !! a = Some tv → tv.1 ≤ n ∧ tv.2 ≤ n)`. Three things to know:
+  it is stated over a NAT bound (always used at `length log`, and monotone
+  in it, which is what the non-stepping harts need after a log append);
+  **the FORWARD-BANK conjunct is not optional** — `fwd_view` puts a banked
+  view into a load's post-view, so without it `load_post` would not preserve
+  boundedness; and the payoff is the one-line `ws_bounded_scl`.
+  `WeakInterp.wrun_ws_bounded` is the preservation theorem (+ the
+  `wexec_ws_bounded` corollary), and it lands in BOTH state interpretations:
+  `⌜∀ c, ws_bounded (wgws g c) (length (wglog g))⌝` as the SECOND conjunct of
+  `weak_state_interp` — deliberately after `⌜wgen_pin g⌝`, because the three
+  device rules destruct only the first conjunct and pass the rest along as
+  one hypothesis, so they compiled unchanged — and
+  `⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝` as the FIRST conjunct of
+  `wmstate_interp`. Only `wp_wrun_step` had to be reproved (+19/−3: hand the
+  fact out, and on the way back re-establish it for the stepping hart from
+  the continuation and for every other hart by `ws_bounded_mono` over
+  `wrun_log_app`); `wp_wexec_step` and the device rules needed nothing.
+  Two gotchas found doing it: stdpp's `Forall_cons` (the biimplication)
+  fails to elaborate under `apply … in` here (*"Unable to find an instance
+  for the variable x"*) — use `Forall_cons_1`; and `Forall_lookup_total_2`
+  cannot resolve its `Inhabited` instance in `WeakInterp.v`, so go through
+  `Forall_lookup_2` + `list_lookup_total_correct`.
+- **THE FENCE MODALITY IS A DISCIPLINE OPERATOR, NOT A vProp CONNECTIVE,
+  AND THAT IS A FINDING.** `WeakInterp.barrier_post` with `rw,rw` moves the
+  hart's index to `acq_view ws := View (vrNew ⊔ vrOld ⊔ vwOld) (w_coh ws)`
+  — EXACTLY: `ws_view (fence_post ws true true true sw) = acq_view ws` is
+  `reflexivity`. But `vrOld`/`vwOld` are NOT part of the `biIndex`
+  (`WeakView.view = (vrNew, coh)`), so "the frontier" is not a function of
+  the index and `∇ P` cannot be a `vProp → vProp`. iRC11 pays for a real
+  `∇` with a THREE-view index (cur/acq/rel); that upgrade is deferred.
+  Delivered instead: `vwp_acq P ws := monPred_at P (acq_view ws)` at the
+  `vwp_hold` altitude, with `vwp_acq_fence`/`vwp_acq_barrier` (the rule),
+  `vwp_acq_intro` (a `P @@ V` with `V ⊑ acq_view ws` enters), the
+  structural laws, and the pred-R-only twin `acq_view_r`. **Δ is NOT a
+  modality here**: promise-free, a predecessor-W fence constrains nothing,
+  and what the writer side actually needs is the timestamp-domination
+  LEMMA — `ws_view_store_dom`/`release_deposit`.
+- **THE HANDOFF, in two lemmas, is the M3 skeleton** (`WeakFence.v` §5):
+  `release_acquire_transfer : ws_bounded ws_r (length log) →
+   vwp_hold P ws_r ⊢ vwp_hold P (load_post_at ws_a true vpre a' (S (length log)))`
+  (the spinlock: whatever the releaser held at its index when its store took
+  the log's fresh top, the acquirer holds after an acquire-AMO that reads
+  that timestamp — no invariant, no ghost state, no fence), and
+  `release_fence_transfer` (the same through a plain read plus a succ-R
+  fence — the `started`/MP shape, premise `S (length log) ≤ w_vrOld ws_a`,
+  which `load_post_vrOld_nofwd` supplies). Both are pure view arithmetic
+  over `release_deposit` (writer) and `amo_acq_gain` (reader).
+- **THE AMO READ HALF NEEDS NO VIEW.** `wamo_read_latest` : `ak_latest ak =
+  true → wbyte_ok σ ak a t' b → wlat_interp -∗ wlat_pointsto a dq t v -∗
+  ⌜t' = t ∧ b = v⌝` — the element pins the value AND the timestamp with no
+  hypothesis about the reader, so the rule fires off an element held in an
+  INVARIANT (elements are `iProp`s, hence objective), which is the
+  M3-relevant form. `wpt_amo_read` is the owned restatement;
+  `amo_acq_gain : view_scl t ⊑ ws_view (load_post_at ws true vpre a t)` is
+  the index gain — note the SCALAR, which is the entire difference between
+  an acquire and a plain load (`load_byte_gain` gives only `view_byte a t`),
+  and the reason the release deposit is a scalar view.
+- **CUTS (from the bottom of the M2b list, as instructed):** the `↦w₈`/`↦w₄`
+  multi-byte towers and `↦ₛ` (item 3) — no design content, M4-adjacent
+  bookkeeping over `wpt_wread_word`; `wlog_wf` as a state-interpretation
+  conjunct (it is a threaded premise with a preservation lemma —
+  `wexec_pinned_wlog_wf` — so nothing is unprovable, but M3 will probably
+  want it next to `ws_bounded`); and the three-view `biIndex` upgrade that
+  a genuine `vProp`-level `∇`/`Δ` pair would need.
 
 ## M3 — vertical slice (the interface test)
 

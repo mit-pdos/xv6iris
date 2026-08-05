@@ -182,6 +182,9 @@ Proof.
   { (* the initial state interpretation *)
     rewrite /weak_state_interp.
     iSplitR; [iPureIntro; by split|].
+    (* the fresh era: every hart is at [ws_init] over an EMPTY log *)
+    iSplitR.
+    { iPureIntro. intros c. rewrite (Hws c) Hlog. apply ws_bounded_init. }
     iSplitL "Hauths".
     { rewrite /gregs_interp. iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)).
       iExact "Hauths". }
