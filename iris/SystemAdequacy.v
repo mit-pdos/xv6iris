@@ -131,6 +131,7 @@ Section SystemBoot.
     iDestruct (dev_inv_uart with "Hdev") as "#Huinv".
     iDestruct (dev_inv_plic with "Hdev") as "#Hpinv".
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
+    iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
     iSplitL "Hh0 Hhrest Hlk Hgl Hhalves Hpark Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
@@ -156,7 +157,8 @@ Section SystemBoot.
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hpanic Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].
-    iSplitR; [iApply (wp_disk_loop γv _ Hdimg with "Hcert Hcinv Hvinv Hpinv") |].
+    iSplitR;
+      [iApply (wp_disk_loop γv _ Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
     iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
   Qed.
 

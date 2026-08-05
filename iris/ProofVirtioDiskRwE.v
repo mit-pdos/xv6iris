@@ -61,6 +61,7 @@ Require Import VirtioModel DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
+Require Import PermInv.
 Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
@@ -219,13 +220,14 @@ Section ProofVirtioDiskRwE.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) : iProp Σ :=
+      (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
+      (kq : nat * positive) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
        ⌜vdrw_regs M sp0 b wr sector /\ vdrw_hi M m0⌝ -∗
        ⌜tri_ok (h, m2, t)⌝ -∗
-       ⌜pk !! q = Some (DClaim b (vdrwd_slot b h wr sector
+       ⌜pk !! q = Some (DClaim b (vdrwd_slot kq b h wr sector
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin)⌝ -∗
        ⌜pin ∖ range_map (d_ring pav (q `mod` 8)) 2
@@ -244,7 +246,7 @@ Section ProofVirtioDiskRwE.
        park_hlf j true -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr fr -∗
-       disk_claim γd q (DClaim b (vdrwd_slot b h wr sector
+       disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
@@ -260,7 +262,7 @@ Section ProofVirtioDiskRwE.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (h m2 t : nat) (q : nat) (pin : _)
-      (m0 : regfile) : iProp Σ :=
+      (m0 : regfile) (kq : nat * positive) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ M : regfile,
        ⌜vdrw_regs M sp0 b wr sector
@@ -275,7 +277,7 @@ Section ProofVirtioDiskRwE.
        park_hlf j true -∗
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
-       disk_claim γd q (DClaim b (vdrwd_slot b h wr sector
+       disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
@@ -290,7 +292,7 @@ Section ProofVirtioDiskRwE.
                             (vdrwd_bufwin b wr bs_buf))
         /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
-       vdrw_p5_exit CID0 γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 -∗
+       vdrw_p5_exit CID0 γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 kq -∗
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -363,7 +365,7 @@ Section ProofVirtioDiskRwE.
       (γu : uart_names) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) :
+      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) (kq : nat * positive) :
     (K_virtio_disk_rw <= K)%nat ->
     (j < NPROC)%nat -> γs !! j = Some γl ->
     eb = true ->
@@ -373,8 +375,10 @@ Section ProofVirtioDiskRwE.
     scheds_inv Φ γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    vdrw_p5_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 -∗
-    P4.vdrw_p4_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0.
+    vdrw_p5_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk
+                 m0 kq -∗
+    P4.vdrw_p4_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
+                    bs_disk m0 kq.
   Proof.
     intros HK Hj Hjl Heb.
     iIntros "#Htext #Hpanic #Hpinv #Hscheds #Hdinv #Hlk Hexit".
@@ -382,7 +386,7 @@ Section ProofVirtioDiskRwE.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
             "%Hrh %Ha1 %Hok %Hpinr %Hal Hcg Hown Hpay Hpc Hctx Hpark Htok Hbody Hclaim Hrm Hrt Hidx".
     destruct Hrh as (Hregs & Hhi).
-    set (V := DClaim b (vdrwd_slot b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
+    set (V := DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
                      (h, m2, t) pin).
     pose proof Hregs as Hregs'.
     destruct Hregs' as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).
@@ -395,7 +399,7 @@ Section ProofVirtioDiskRwE.
     iPoseProof (rwi_19c with "Htext") as "Hi19c".
     (* ================= THE LOOP, first (it is used by both arms) ======= *)
     iAssert (vdrw_p5_loop CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector
-               bs_buf bs_disk h m2 t q pin m0)%I with "[]" as "Hloop".
+               bs_buf bs_disk h m2 t q pin m0 kq)%I with "[]" as "Hloop".
     { iLöb as "IH". rewrite {2}/vdrw_p5_loop.
       iIntros (CIDlp Hslp M') "%Hinv Hcg Hown Hpay Hpc Hctx Hpark Htok HR Hclaim Hrm Hrt Hidx
                     %HokL %HalL %HpinrL HexitL".

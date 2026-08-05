@@ -787,12 +787,18 @@ Section BreadBlocks.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu T4
                 (K - 6)%nat eb C bno (mword_of_int 0 : mword 32) bs bsl eb
+                True%I
                 HKrw Hbno Hkdata Hj Hgl Heb
                 with "Hcg Hcnt Htext Hpc Hpanic Hprocs Hscheds Hoctx Hpark
-                      Hdev Hgeom Hdlock [Hbuf] Hdb [-]").
+                      Hdev Hgeom Hdlock [Hbuf] Hdb [] [-]").
       { iEval (rewrite HT4a0). rewrite /bpa. iExact "Hbuf". }
+      (* bread's rw call is a READ: no disk byte moves, so the identity
+         permit at the trivial receipt is the honest one.  Permits are
+         uniform, which is what keeps the DMA completion from having to know
+         the direction. *)
+      { iApply disk_write_permit_trivial. }
       (* rw PARKS: it returns on hart [CIDrw]. *)
-      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdb".
+      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdb _".
       iPoseProof (bdi_d0 with "Htext") as "Hid0".
       iPoseProof (bdi_d2 with "Htext") as "Hid2".
       iPoseProof (bdi_d4 with "Htext") as "Hid4".

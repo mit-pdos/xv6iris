@@ -41,6 +41,7 @@ Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskPtsto.
 Require Import VirtioProto.
+Require Import PermInv.
 Require Import KptPt.
 Require Import KMap.
 Require Export BufOwn.
@@ -342,6 +343,14 @@ Section DiskInv.
        phys_map (dc_pinr pav p v) ∗
        phys_pointsto (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
        disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
+       (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
+          CLAIM's own slot, so a woken publisher -- whose claim fragment pins
+          [dc_slot v], hence [vs_perm (dc_slot v)] -- gets it back at exactly
+          the key IT deposited, and can therefore match the invariant's
+          receipt against its own saved proposition.  An existential key here
+          would come back opaque and no receipt could ever be collected (the
+          [vs_data] rule, one layer up). *)
+       perm_done (dn_perm γ) (vs_perm (dc_slot v)) ∗
        (if vs_is_out (dc_slot v) then emp
         else phys_list (vr_buf (vs_req (dc_slot v))) bs))%I.
 
@@ -942,9 +951,14 @@ Qed.
 (* [bs] is the BLOCK's content, in both directions: an OUT request's payload
    (which the pin covers) or an IN request's current disk content (which the
    published pending resource pins).  See [VirtioQueue.vs_data]. *)
+(* [kq] is the CRASH-PERMIT key ([VirtioQueue.vs_perm]): the permit-invariant
+   map key and the saved-prop gname [PermInv.perm_deposit] chose for this
+   request.  Pure data; it is what lets the woken publisher recognize its own
+   receipt, since its claim pins the slot. *)
 Definition rw_slot (hd : nat) (ty : bv 32) (sec : bv 64) (buf sts : Arch.pa)
-    (bs : list (bv 8)) : vslot :=
-  VSlot (VioReq (Z_to_bv 16 (Z.of_nat hd)) ty sec buf (Z_to_bv 32 1024) sts) bs.
+    (bs : list (bv 8)) (kq : nat * positive) : vslot :=
+  VSlot (VioReq (Z_to_bv 16 (Z.of_nat hd)) ty sec buf (Z_to_bv 32 1024) sts)
+        bs kq.
 
 Lemma bv16_small (k : nat) : (k < 8)%nat -> bv_unsigned (Z_to_bv 16 (Z.of_nat k)) = Z.of_nat k.
 Proof.
@@ -956,7 +970,7 @@ Qed.
 Lemma mk_pin_slot_ok
     (c : virtio_cfg) (p : nat) (pd : Arch.pa) (pin : gmap Arch.pa (bv 8))
     (hd md td : nat) (hops buf sts : Arch.pa) (ty : bv 32) (sec : bv 64)
-    (bs : list (bv 8)) :
+    (bs : list (bv 8)) (kq : nat * positive) :
   vc_qnum c = Z_to_bv 32 8 ->
   vc_desc c = pd ->
   (hd < 8)%nat -> (md < 8)%nat -> (td < 8)%nat ->
@@ -982,7 +996,7 @@ Lemma mk_pin_slot_ok
   (* the status byte is in [struct disk], the buffer in a [struct buf]: the
      device's status write never lands inside the data it is filling in *)
   sts ∉ pa_range buf 1024 ->
-  slot_pin_ok c p (rw_slot hd ty sec buf sts bs) pin.
+  slot_pin_ok c p (rw_slot hd ty sec buf sts bs kq) pin.
 Proof.
   intros Hq Hc Hh Hm Ht Hring Hdh Hdm Hdt Hty Hsec Htyv Hout Hstat.
   (* the two flag computations *)

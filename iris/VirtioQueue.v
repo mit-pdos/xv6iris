@@ -529,6 +529,21 @@ Record vslot := VSlot {
      quantified list there would come back opaque and no read could be tied
      back to the caller's [disk_block]. *)
   vs_data : list (bv 8);
+  (* THE CRASH-PERMIT KEY (PermInv.v; claude-notes/design/fs-log.md stage 4).
+     Every published request carries a permit -- an OUT request the client's
+     real one, an IN request the trivial identity ([disk_write_permit True]),
+     which is why this is a PAIR and not an option: keeping it uniform is
+     what keeps the completion direction-agnostic (the completing slot is
+     chosen inside [virtio_proto_step], so its caller cannot case-split on
+     the direction).  [fst] is the permit invariant's map key, [snd] is the
+     saved-proposition gname that pins the client's receipt.  PURE DATA, so
+     the slot stays timeless and rides [disk_inv] -- that is the whole point
+     of the split, and the [vs_data] rule again: an exclusive resource taken
+     across a sleep must be IDENTIFIED in the record the invariant keys on,
+     or the woken publisher gets it back opaque.
+     Spelled [positive] because this file is deliberately iris-free;
+     [gname := positive], so every consumer reads it as a gname. *)
+  vs_perm : nat * positive;
 }.
 
 Definition vs_is_out (sl : vslot) : bool :=

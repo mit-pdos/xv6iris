@@ -42,6 +42,7 @@ Require Import VirtioModel.
 Require Import WpVirtio.
 Require Import VirtioQueue.
 Require Import DiskPtsto.
+Require Import PermInv.
 
 Local Open Scope Z_scope.
 
@@ -1131,25 +1132,27 @@ Section VirtioProto.
      what lets the woken publisher identify the fragments it gets back with
      the [disk_block] it handed in.
 
-     NO CRASH WRITE PERMIT LIVES HERE, AND IT CANNOT (claude-notes/design/
-     crash.md, and the M5b entry in projects/crash.md).  The natural home for
-     the enqueuer's obligation is this record -- it is the [vs_data]
-     precedent, an exclusive resource recorded where the invariant keys on the
-     request -- but [disk_inv_body] MUST BE [Timeless]: every driver site that
-     opens it (eight of them today) does so inside an MMIO atomic-update
-     accessor, where there is no step
-     left to absorb a [▷], so a non-timeless body cannot be used at all.  A
-     permit is an iProp (a wand over an arbitrary [riscv_crash_pred]) and is
-     therefore never timeless, and there is no way to smuggle an iProp through
-     a timeless invariant -- saved propositions are not timeless either
-     ([own γ (to_agree (Next P))] over a non-discrete OFE).  So the permit
-     needs a channel of its own; until it exists, [virtio_proto_step] mints
-     the identity permit at the completion. *)
+     THE CRASH WRITE PERMIT ITSELF CANNOT LIVE HERE, AND ITS KEY MUST
+     (claude-notes/design/crash.md, and the M5b entry in projects/crash.md).
+     The natural home for the enqueuer's obligation is this record -- it is
+     the [vs_data] precedent, an exclusive resource recorded where the
+     invariant keys on the request -- but [disk_inv_body] MUST BE [Timeless]:
+     every driver site that opens it (eight of them today) does so inside an
+     MMIO atomic-update accessor, where there is no step left to absorb a
+     [▷], so a non-timeless body cannot be used at all.  A permit is an iProp
+     (a wand over an arbitrary [riscv_crash_pred]) and is therefore never
+     timeless, and there is no way to smuggle an iProp through a timeless
+     invariant -- saved propositions are not timeless either ([own γ (to_agree
+     (Next P))] over a non-discrete OFE).  So the permit lives in its own
+     non-timeless invariant ([PermInv.perm_inv (dn_perm γ)]) and what rides
+     HERE is its TIMELESS SKELETON: the ghost-map element [perm_pend], keyed
+     by the pure [vs_perm sl] the slot records. *)
   Definition slot_pend_res (γ : disk_names) (sl : vslot) : iProp Σ :=
     (∃ bs : list (bv 8),
        ⌜length bs = vs_len sl⌝ ∗
        ⌜vs_is_out sl = false -> bs = vs_data sl⌝ ∗
-       disk_bytes γ (vs_sector_off sl) bs)%I.
+       disk_bytes γ (vs_sector_off sl) bs ∗
+       perm_pend (dn_perm γ) (vs_perm sl))%I.
 
   Definition slot_done_res (γ : disk_names) (c : virtio_cfg)
       (dma : gmap Arch.pa (bv 8)) (p : nat) (sl : vslot) : iProp Σ :=
@@ -1166,7 +1169,11 @@ Section VirtioProto.
           = Some (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl))))⌝ ∗
        ⌜dma !! vr_status (vs_req sl) = Some byte_zero⌝ ∗
        ⌜vs_is_out sl = false ->
-          read_byte_list dma (vr_buf (vs_req sl)) (vs_len sl) = Some bs⌝)%I.
+          read_byte_list dma (vr_buf (vs_req sl)) (vs_len sl) = Some bs⌝ ∗
+       (* the SPENT permit's token: the completion moved the cell to [false]
+          and parked the receipt in [PermInv]; this is what the woken
+          publisher presents to collect it. *)
+       perm_done (dn_perm γ) (vs_perm sl))%I.
 
   (* the completion record mentions only three windows of the lease, so it
      rides through any change to the lease that leaves those bytes alone *)
@@ -1181,8 +1188,8 @@ Section VirtioProto.
     slot_done_res γ c dma p sl -∗ slot_done_res γ c dma' p sl.
   Proof.
     intros Helem Hstat Hbuf. iIntros "H".
-    iDestruct "H" as (bs) "(%Hlen & Hbs & %Hout & %Hre & %Hst & %Hbl)".
-    iExists bs. iFrame "Hbs". iPureIntro. split_and!.
+    iDestruct "H" as (bs) "(%Hlen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hperm)".
+    iExists bs. iFrame "Hbs Hperm". iPureIntro. split_and!.
     - exact Hlen.
     - exact Hout.
     - apply (read_bytes_transfer dma dma'); [| exact Hre ].
@@ -1282,7 +1289,12 @@ Section VirtioProto.
         ⌜dn_img γ = disk_img_name⌝ ∗
         virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
         ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) ∗
-        disk_done_lb γ 0%nat.
+        disk_done_lb γ 0%nat ∗
+        (* THE CRASH-PERMIT CHANNEL, empty: nothing is in flight at power-on,
+           so no permit is owed.  Handed out as the BODY (not the invariant)
+           because [WpUart.dev_inv_alloc] is what seals it, beside
+           [disk_inv]. *)
+        perm_inv_body (dn_perm γ).
   Proof.
     intros Hlive Hsn Hui.
     iMod (ghost_map_alloc_empty (K:=nat)
@@ -1291,17 +1303,19 @@ Section VirtioProto.
     iMod (ghost_var_alloc 0%nat) as (gnp) "Hnp".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "Hclaim".
     iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
+    iMod (perm_ghost_alloc) as (gperm) "Hperm".
     iDestruct (disk_cfg_is_split
-                 (DiskNames disk_img_name gslot gnc gnp gclaim gcfg)
+                 (DiskNames disk_img_name gslot gnc gnp gclaim gcfg gperm)
                  (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".
     { rewrite /disk_cfg_is. cbn [dn_cfg]. iExact "Hcfg". }
-    iModIntro. iExists (DiskNames disk_img_name gslot gnc gnp gclaim gcfg).
+    iModIntro.
+    iExists (DiskNames disk_img_name gslot gnc gnp gclaim gcfg gperm).
     iSplitR; [iPureIntro; reflexivity|].
     iFrame "Hcfg2".
-    rewrite /disk_done_lb. cbn [dn_nc dn_claim].
-    iFrame "Hclaim Hlb".
+    rewrite /disk_done_lb. cbn [dn_nc dn_claim dn_perm].
+    iFrame "Hclaim Hlb Hperm".
     rewrite /virtio_proto.
-    cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg].
+    cbn [dn_img dn_slot dn_nc dn_np dn_claim dn_cfg dn_perm].
     rewrite Hlive.
     iSplitL "Hcfg1"; [iExact "Hcfg1"|].
     iSplitR; [iPureIntro; exact Hsn|].
@@ -1533,16 +1547,17 @@ Section VirtioProto.
      [virtio_proto]: the auth is pinned to the machine's own [v_disk], so it
      belongs to whoever is stepping the machine (claude-notes/design/crash.md).
 
-     It also HANDS BACK a crash WRITE PERMIT
-     ([RiscvPtsto.disk_write_permit]), so that the caller can spend it on
-     [riscv_crash_pred] at this very instant: the step where the durable image
-     changes is the step where the client's durability property has to be
-     re-established.  The permit is UNCONDITIONAL (the caller does not know,
-     and does not want to know, the completed request's direction) and today
-     it is MINTED here as the identity -- nothing deposits one, because a
-     [vslot] cannot hold an iProp (see [slot_pend_res]).  This return is the
-     interface that will not change when the log lands; only the permit's
-     source will. *)
+     IT IS AN ACCESSOR OVER THE CRASH-PERMIT CHANNEL.  The completing slot
+     parked a [perm_pend] token ([slot_pend_res]); this lemma hands that
+     token OUT and demands the SPENT one ([perm_done] at the same key) back,
+     which is exactly the shape [WpUart.wp_disk_loop] needs: between the two
+     it opens [crashN] and [PermInv.permN] and runs the client's view shift
+     on the crash predicate, at the very instant the durable image changes.
+     The key [kq] is EXISTENTIAL here because the caller does not know, and
+     does not want to know, which request completed or in which direction --
+     permits are uniform, so there is nothing to case-split on.  The auth
+     handoff ([disk_img_auth] in, updated out) is unchanged; it simply rides
+     the close-wand now. *)
   Lemma virtio_proto_step (γ : disk_names) (v : virtio_state)
       (m : gmap Arch.pa (bv 8)) (mv : vmem) (v' : virtio_state)
       (w : gmap Arch.pa (bv 8)) :
@@ -1550,8 +1565,11 @@ Section VirtioProto.
     virtio_req_step v mv = Some (v', w) ->
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
-      gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
-      disk_write_permit True ∗ virtio_proto γ v'.
+      ∃ kq : nat * gname,
+        perm_pend (dn_perm γ) kq ∗
+        (perm_done (dn_perm γ) kq -∗
+           gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
+           virtio_proto γ v').
   Proof.
     iIntros (Hview Hstep) "Hm Hauth Hp".
     iDestruct "Hauth" as (dmap) "[Hauth %Hdv]".
@@ -1594,15 +1612,7 @@ Section VirtioProto.
     (* the disk ghost move, uniform over the request direction *)
     iDestruct (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl with "Hpend")
       as "[Hslres Hpend]".
-    iDestruct "Hslres" as (bs) "(%Hbslen & %Hbspin & Hbs)".
-    (* THE PERMIT for the write this step performs.  Minted here as the
-       IDENTITY, because nothing deposits one yet: the enqueue-side channel
-       needs a non-timeless home (see [slot_pend_res]).  The RETURN is the
-       interface that matters and it is final -- when the log lands, only the
-       source of this permit changes, not [wp_disk_loop] and not the
-       [wp_disk_step] seam. *)
-    iAssert (disk_write_permit True) as "Hperm";
-      [ iApply disk_write_permit_trivial |].
+    iDestruct "Hslres" as (bs) "(%Hbslen & %Hbspin & Hbs & Hpend0)".
     iAssert (|==> ∃ (dmap' : gmap Z (bv 8)) (bs' : list (bv 8)),
                ghost_map_auth (dn_img γ) 1 dmap' ∗
                disk_bytes γ (vs_sector_off sl) bs' ∗
@@ -1689,8 +1699,10 @@ Section VirtioProto.
           * apply slot_fp_wr. unfold slot_wr. rewrite Hox.
             apply elem_of_union_r, pa_range_intro. exact Hj.
           * apply elem_of_union_r. exact Hc. }
-    (* rebuild *)
-    iModIntro. iFrame "Hm Hperm".
+    (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
+       out, and the caller owes the spent one back at the same key. *)
+    iModIntro. iExists (vs_perm sl). iFrame "Hpend0". iIntros "Hdone0".
+    iFrame "Hm".
     iSplitL "Hauth".
     { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
     rewrite /virtio_proto vslot_post_cfg Hlive.
@@ -1724,8 +1736,8 @@ Section VirtioProto.
     { apply not_elem_of_dom. intro Hc.
       pose proof (vpo_done_lt _ _ _ Hok _ Hc). lia. }
     rewrite (big_sepM_insert _ (vp_done pr) (vp_nc pr) sl Hdnone).
-    iSplitL "Hbs".
-    { iExists bs'. iFrame "Hbs". iPureIntro. split_and!.
+    iSplitL "Hbs Hdone0".
+    { iExists bs'. iFrame "Hbs Hdone0". iPureIntro. split_and!.
       - exact Hlen'.
       - exact Hout'.
       - apply read_bytes_of_list. intros j Hj.
@@ -2079,6 +2091,10 @@ Section VirtioProto.
        virtio_proto γ v ∗ disk_pub γ np ∗ disk_done_lb γ (S p) ∗
        phys_map pin ∗
        phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
+       (* the SPENT crash permit's token: the completion already ran the
+          client's view shift and parked the receipt in [PermInv]; this is
+          what the woken publisher presents to collect it. *)
+       perm_done (dn_perm γ) (vs_perm sl) ∗
        (∃ bs : list (bv 8),
           ⌜length bs = vs_len sl⌝ ∗
           ⌜bs = vs_data sl⌝ ∗
@@ -2112,7 +2128,7 @@ Section VirtioProto.
     pose proof (vpo_standing _ _ _ Hok p sl pin Hs Hpin) as Hstand.
     iDestruct (big_sepM_delete _ (vp_done pr) p sl Hdone with "Hdone")
       as "[Hdres Hdone]".
-    iDestruct "Hdres" as (bs) "(%Hbslen & Hbs & %Hout & %Hre & %Hst & %Hbl)".
+    iDestruct "Hdres" as (bs) "(%Hbslen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hdone0)".
     (* the used-ring element the reclaimer reads *)
     assert (HEMsub : range_map (used_elem_pa (v_cfg v) p) 4
                        (nth_byte (Z_to_bv 32 (bv_unsigned (vr_head (vs_req sl)))))
@@ -2223,7 +2239,7 @@ Section VirtioProto.
     assert (Hsp : (S p <= vp_nc pr)%nat) by lia.
     iDestruct (mono_nat_lb_own_le (S p) Hsp with "Hlbnc") as "#Hlbp".
     (* rebuild *)
-    iModIntro. iFrame "Hpub Hlbp Hpin Hstm".
+    iModIntro. iFrame "Hpub Hlbp Hpin Hstm Hdone0".
     iSplitR "Hbs Hbuf"; last first.
     { iExists bs. iFrame "Hbs". iSplitR; [iPureIntro; exact Hbslen|].
       iSplitR; [iPureIntro; exact Hout|].

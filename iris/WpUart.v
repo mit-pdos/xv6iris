@@ -46,6 +46,7 @@ Require Import WireInv WpVirtio.
    these two are required AFTER SailStdpp.Base/Values above, exactly like
    WpVirtio, so their (RiscvPtsto-mirroring) elaboration is unaffected. *)
 Require Import DiskPtsto VirtioProto.
+Require Import PermInv.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -722,7 +723,7 @@ Section DevLoops.
      client threads [dev_inv] and borrows the fragment by opening the relevant
      half around the access. *)
   Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
-    (uart_inv γ ∗ plic_inv ∗ disk_inv γd)%I.
+    (uart_inv γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv (dn_perm γd))%I.
 
   Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
@@ -732,17 +733,28 @@ Section DevLoops.
      touches; the projections are wands out of a persistent premise, so a
      leaf holding [dev_inv] in its intuitionistic context keeps it. *)
   Lemma dev_inv_uart γ γd : dev_inv γ γd -∗ uart_inv γ.
-  Proof. iIntros "(#H & _ & _)". iExact "H". Qed.
+  Proof. iIntros "(#H & _ & _ & _)". iExact "H". Qed.
   Lemma dev_inv_plic γ γd : dev_inv γ γd -∗ plic_inv.
-  Proof. iIntros "(_ & #H & _)". iExact "H". Qed.
+  Proof. iIntros "(_ & #H & _ & _)". iExact "H". Qed.
   Lemma dev_inv_disk γ γd : dev_inv γ γd -∗ disk_inv γd.
-  Proof. iIntros "(_ & _ & #H)". iExact "H". Qed.
+  Proof. iIntros "(_ & _ & #H & _)". iExact "H". Qed.
+  (* THE CRASH-PERMIT CHANNEL rides the SAME bundle (PermInv.v), which is why
+     no client spec statement changed when it landed: every driver proof that
+     already threads [dev_inv] can open [permN] to deposit its permit at
+     enqueue and to collect its receipt after the wake. *)
+  Lemma dev_inv_perm γ γd : dev_inv γ γd -∗ perm_inv (dn_perm γd).
+  Proof. iIntros "(_ & _ & _ & #H)". iExact "H". Qed.
 
   (* ... and the bundle allocation, at the EXISTING signature: the old
      ∃-triple body is split into the three per-device bodies. *)
-  Lemma dev_inv_alloc E γ γd : dev_inv_body γ γd ={E}=∗ dev_inv γ γd.
+  (* The permit body is a SEPARATE premise rather than a conjunct of
+     [dev_inv_body]: that body carries a [Timeless] instance (it is what the
+     three timeless per-device invariants are carved out of), and
+     [perm_inv_body] is deliberately NOT timeless. *)
+  Lemma dev_inv_alloc E γ γd :
+    dev_inv_body γ γd -∗ perm_inv_body (dn_perm γd) ={E}=∗ dev_inv γ γd.
   Proof.
-    iIntros "Hbody". rewrite /dev_inv_body.
+    iIntros "Hbody Hperm". rewrite /dev_inv_body.
     iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hproto & %Hpok & %Hvok)".
     iMod (uart_inv_alloc E γ with "[Hu Hg]") as "#Huinv".
     { iExists u. iFrame "Hu Hg". }
@@ -750,7 +762,8 @@ Section DevLoops.
     { iExists p. iFrame "Hp". iPureIntro. exact Hpok. }
     iMod (disk_inv_alloc E γd with "[Hv Hproto]") as "#Hdinv".
     { iExists v. iFrame "Hv Hproto". iPureIntro. exact Hvok. }
-    iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv".
+    iMod (perm_inv_alloc E (dn_perm γd) with "Hperm") as "#Hqinv".
+    iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv Hqinv".
   Qed.
 
   (* Allocate all four UART ghosts from an initial device state.  Hands back
@@ -884,11 +897,12 @@ Section DevLoops.
        deposited at enqueue re-establishes the crash predicate
        (claude-notes/design/crash.md).  [crashN] is disjoint from [diskN] and
        [plicN], so the two openings compose. *)
-    gen_cert -∗ crash_inv -∗ disk_inv γd -∗ plic_inv -∗
+    gen_cert -∗ crash_inv -∗ perm_inv (dn_perm γd) -∗ disk_inv γd -∗
+    plic_inv -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Himg.
-    iIntros "#Hcert #Hcinv #Hvinv #Hpinv".
+    iIntros "#Hcert #Hcinv #Hqinv #Hvinv #Hpinv".
     iLöb as "IH".
     iApply (wp_disk_step with "Hcert").
     (* the fourth component is the ERA's image auth ([wp_disk_step] hands it
@@ -896,6 +910,14 @@ Section DevLoops.
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
     iIntros (gr m d) "(Hgr & Hmem & Hdev & Hdur)".
+    (* THE PERMIT INVARIANT IS OPENED IN THE FIRST (⊤ -> ∅) LEG, before the
+       arm is even known.  It has to be: [perm_inv_body] is NOT timeless (it
+       holds the clients' view shifts), so the only [▷]-stripping opportunity
+       in this rule is the one BETWEEN the legs -- the [iNext] two lines down.
+       Opening it unconditionally costs nothing: three of the four arms hand
+       it straight back.  [permN], [crashN] and [devN] are pairwise disjoint,
+       so the openings compose ([solve_ndisj]). *)
+    iInv "Hqinv" as "Hpbody" "Hpclose".
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' m' Hstep).
     iMod "Hmask" as "_".
@@ -916,18 +938,27 @@ Section DevLoops.
          fragments this invariant holds are at [dn_img γd] -- the same map,
          by [Himg]. *)
       iEval (rewrite -Himg Hv) in "Hdur".
+      (* the protocol step is an ACCESSOR over the permit channel: it hands
+         out the completing request's PENDING token and owes the SPENT one *)
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
-              with "Hmem Hdur Hlease") as "(Hmem' & Hdur' & Hperm & Hlease')".
-      (* THE COMMIT INSTANT: the image has just changed, so the crash
-         predicate is re-established here, by the permit the enqueuer
-         deposited in the OUT slot (the identity, for a read or until the log
-         lands).  This is the only opening of [crashN] in the tree. *)
+              with "Hmem Hdur Hlease") as (kq) "[Hpend Hback]".
+      (* THE COMMIT INSTANT -- the linearization point of every disk write in
+         the system.  The durable image has just changed, so the crash
+         predicate is re-established HERE, by running the client's own view
+         shift (deposited at enqueue, transported by [PermInv]) on the
+         [▷]-body of [crash_inv].  The crash predicate's later is NOT
+         stripped: it is arbitrary, hence not timeless, and the permit's type
+         takes it under the later.  This is the only opening of [crashN] in
+         the tree. *)
       iInv "Hcinv" as "HP" "Hcclose".
-      iMod ("Hperm" with "HP") as "[HP _]".
+      iMod (perm_consume_kq (dn_perm γd) kq with "Hpbody Hpend HP")
+        as "(Hpbody & Hdone & HP)".
       iMod ("Hcclose" with "HP") as "_".
+      iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem' Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
       iEval (rewrite Himg) in "Hdauth'".
@@ -961,12 +992,14 @@ Section DevLoops.
       { iNext. iExists p'. iFrame "Hp'". iPureIntro.
         apply (plic_ok_latch p p' virtio_irq_id);
           [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
       iSplitL "Hdauth".
       { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
       iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".
       iSplitL "Hdur"; [iExact "Hdur"|]. iApply "IH".
   Qed.

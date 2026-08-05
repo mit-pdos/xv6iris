@@ -893,8 +893,9 @@ Section BootAlloc.
             ltac:(rewrite Hv0; apply virtio_reset_not_live)
             ltac:(rewrite Hv0; apply virtio_reset_seen)
             ltac:(rewrite Hv0; apply virtio_reset_used_idx))
-      as (γv) "(%Himg & Hproto & Hcfg & Hclaim & #Hdone)".
-    iMod (dev_inv_alloc ⊤ γd γv with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hproto]")
+      as (γv) "(%Himg & Hproto & Hcfg & Hclaim & #Hdone & Hpbody)".
+    iMod (dev_inv_alloc ⊤ γd γv
+            with "[Huf Hpf Hvf Hacc Hout Htxa Hdla Hproto] Hpbody")
       as "#Hdev".
     { rewrite /dev_inv_body.
       iExists (g.(gdev).(duart)), (g.(gdev).(dplic)), (g.(gdev).(dvirtio)).

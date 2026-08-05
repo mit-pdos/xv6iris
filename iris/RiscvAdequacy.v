@@ -65,6 +65,7 @@ Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans
 Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
 Require Import PlicPlan DiskPtsto VirtioProto WpUart.
+Require Import PermInv.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
 
 (* ---------------------------------------------------------------------- *)
@@ -628,8 +629,9 @@ Proof.
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
   iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx)
-    as (γv) "(%Himg & Hproto & _ & _ & _)".
-  iMod (dev_inv_alloc _ γ γv with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto]") as "#Hinv".
+    as (γv) "(%Himg & Hproto & _ & _ & _ & Hpbody)".
+  iMod (dev_inv_alloc _ γ γv
+          with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto] Hpbody") as "#Hinv".
   { rewrite /dev_inv_body.
     iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).
     iFrame "Hacc Hout Htx Hdl".
@@ -652,11 +654,12 @@ Proof.
   iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
   iDestruct (dev_inv_plic with "Hinv") as "#Hpinv".
   iDestruct (dev_inv_disk with "Hinv") as "#Hvinv".
+  iDestruct (dev_inv_perm with "Hinv") as "#Hqinv".
   iModIntro. iSplitR; [done|].
   iSplitL.
   { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
   iSplitL.
-  { iApply (wp_disk_loop γv _ Himg with "Hcert Hcinv Hvinv Hpinv"). }
+  { iApply (wp_disk_loop γv _ Himg with "Hcert Hcinv Hqinv Hvinv Hpinv"). }
   iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.
 

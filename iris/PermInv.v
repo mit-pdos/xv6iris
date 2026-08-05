@@ -204,40 +204,45 @@ Section perm.
     rewrite /perm_slot /=. iExists Q. iFrame "Hsp HQ".
   Qed.
 
-  (* THE SEAM SHAPE [wp_disk_loop] consumes.  A completing request either
-     carries a permit ([Some (k, γq)] -- what an OUT slot parks) or does not
-     ([None] -- a read moves no disk byte, so the identity is honest and the
-     crash predicate comes back untouched).  Packaging the option this way is
-     what lets the disk thread stay direction-agnostic: it opens [permN] in
-     [wp_disk_step]'s FIRST leg without knowing which request will complete,
-     learns the option from [virtio_proto_step], and runs ONE lemma either
-     way.  (The recorded gotcha, verbatim: the caller does not know the
-     direction -- the completing slot is chosen inside the protocol lemma.) *)
-  Definition perm_pend (γP : gname) (o : option (nat * gname)) : iProp Σ :=
-    match o with
-    | None => emp
-    | Some (k, γq) => perm_tok γP k true γq
-    end%I.
+  (* THE SEAM SHAPE [wp_disk_loop] consumes, in the PAIR form the request
+     slots store ([VirtioQueue.vs_perm]).  Permits are UNIFORM: every
+     published request carries one, an OUT request the client's real one and
+     an IN request the trivial identity.  That is what lets the disk thread
+     stay direction-agnostic -- it opens [permN] in [wp_disk_step]'s FIRST
+     leg without knowing which request will complete, learns the pair from
+     [virtio_proto_step], and runs ONE lemma either way.  (The recorded
+     gotcha, verbatim: the caller does not know the direction -- the
+     completing slot is chosen inside the protocol lemma.) *)
+  Definition perm_pend (γP : gname) (kq : nat * gname) : iProp Σ :=
+    perm_tok γP kq.1 true kq.2.
 
-  Definition perm_done (γP : gname) (o : option (nat * gname)) : iProp Σ :=
-    match o with
-    | None => emp
-    | Some (k, γq) => perm_tok γP k false γq
-    end%I.
+  Definition perm_done (γP : gname) (kq : nat * gname) : iProp Σ :=
+    perm_tok γP kq.1 false kq.2.
 
-  Global Instance perm_pend_timeless γP o : Timeless (perm_pend γP o).
-  Proof. rewrite /perm_pend. destruct o as [[k γq]|]; apply _. Qed.
-  Global Instance perm_done_timeless γP o : Timeless (perm_done γP o).
-  Proof. rewrite /perm_done. destruct o as [[k γq]|]; apply _. Qed.
+  Global Instance perm_pend_timeless γP kq : Timeless (perm_pend γP kq).
+  Proof. rewrite /perm_pend. apply _. Qed.
+  Global Instance perm_done_timeless γP kq : Timeless (perm_done γP kq).
+  Proof. rewrite /perm_done. apply _. Qed.
 
-  Lemma perm_consume_opt (γP : gname) (o : option (nat * gname)) :
-    perm_inv_body γP -∗ perm_pend γP o -∗ ▷ riscv_crash_pred ==∗
-      perm_inv_body γP ∗ perm_done γP o ∗ ▷ riscv_crash_pred.
+  Lemma perm_consume_kq (γP : gname) (kq : nat * gname) :
+    perm_inv_body γP -∗ perm_pend γP kq -∗ ▷ riscv_crash_pred ==∗
+      perm_inv_body γP ∗ perm_done γP kq ∗ ▷ riscv_crash_pred.
   Proof.
-    iIntros "Hbody Hpend HP". destruct o as [[k γq]|]; last first.
-    { iModIntro. iFrame "Hbody HP". done. }
+    iIntros "Hbody Hpend HP". rewrite /perm_pend /perm_done.
     iMod (perm_consume with "Hbody Hpend HP") as "(Hbody & Htok & HP)".
     iModIntro. iFrame "Hbody Htok HP".
+  Qed.
+
+  (* the pair form of the deposit: what an enqueuer calls, returning exactly
+     the [vs_perm] it must publish in its slot *)
+  Lemma perm_deposit_kq (γP : gname) (Q : iProp Σ) (E : coPset) :
+    ↑permN ⊆ E ->
+    perm_inv γP -∗ disk_write_permit Q ={E}=∗
+      ∃ kq : nat * gname, perm_pend γP kq ∗ perm_receipt kq.2 Q.
+  Proof.
+    iIntros (HE) "#Hinv Hperm".
+    iMod (perm_deposit γP Q E HE with "Hinv Hperm") as (k γq) "[Htok #Hrc]".
+    iModIntro. iExists (k, γq). rewrite /perm_pend /=. iFrame "Htok Hrc".
   Qed.
 
   (* ==================================================================== *)
@@ -293,6 +298,16 @@ Section perm.
     { iNext. iApply (saved_prop_agree γq DfracDiscarded DfracDiscarded Q' Q
                        with "Hsp Hrc"). }
     iModIntro. iNext. iNext. iRewrite -"Heq". iExact "HQ".
+  Qed.
+
+  (* the pair form of the collection: what a woken enqueuer calls, over the
+     [vs_perm] its own claim pinned *)
+  Lemma perm_collect_kq (γP : gname) (kq : nat * gname) (Q : iProp Σ) :
+    perm_inv_body γP -∗ perm_receipt kq.2 Q -∗ perm_done γP kq ==∗
+      perm_inv_body γP ∗ ▷ Q.
+  Proof.
+    iIntros "Hbody #Hrc Htok". rewrite /perm_done.
+    iApply (perm_collect_body with "Hbody Hrc Htok").
   Qed.
 
 End perm.

@@ -56,6 +56,7 @@ Require Import HartTp WpNext.
 Require Import CpuOwn FdSlots.
 Require Import DiskPtsto VirtioProto DiskInv.
 Require Import WpUart.
+Require Import PermInv.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import SwtchCtx.
 Require Import VirtioDiskRwDefs.
@@ -95,7 +96,8 @@ Section ProofVirtioDiskRwDSeam.
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (bs_buf bs_disk : list (bv 8)) (m0 : regfile) : iProp Σ :=
+      (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
+      (kq : nat * positive) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
@@ -121,7 +123,7 @@ Section ProofVirtioDiskRwDSeam.
        park_hlf j true -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr fr -∗
-       disk_claim γd q (DClaim b (vdrwd_slot b h wr sector
+       disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                 (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
@@ -166,7 +168,7 @@ Section ProofVirtioDiskRwDSeam.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (m0 : regfile) :
+      (m0 : regfile) (kq : nat * positive) :
     (uint bno < 2147483648)%Z ->
     length bs_buf = 1024%nat ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
@@ -175,12 +177,14 @@ Section ProofVirtioDiskRwDSeam.
     disk_geom γd pd pav pu -∗
     ([∗ list] k ↦ x ∈ bs_buf, pa_add (b_data b) k ↦ₘ x) -∗
     disk_block γd (uint bno) bs_disk -∗
+    (* the crash permit's token, on its way into the published slot *)
+    perm_pend (dn_perm γd) kq -∗
     vdrw_p4_exit CID γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
-                 bs_buf bs_disk m0 -∗
+                 bs_buf bs_disk m0 kq -∗
     vdrw_p3_exit_x CID γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0.
   Proof.
     intros Hbno Hlenbuf Hbufkd.
-    iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hexit".
+    iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".
     rewrite /vdrw_p3_exit_x.
     iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hpin %Hfacts %Hdisj0 %Hal
              Hcg Hown Hpay Hpc Hctx Hpark Htok Hbody Hchain Hidx".
@@ -200,17 +204,17 @@ Section ProofVirtioDiskRwDSeam.
     (* the sector arithmetic P1 deferred *)
     assert (Hoff : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z = (1024 * uint bno)%Z).
     { rewrite (vdrwd_sector_raw_val bno Hbno). lia. }
-    iApply (wp_vdrw_p4 (CID := CIDx) γu γd Φ (proc_addr jp) M (K - 12)%nat pd pav pu b wr (vdrw_sector_raw bno)
+    iApply (wp_vdrw_p4 (CID := CIDx) kq γu γd Φ (proc_addr jp) M (K - 12)%nat pd pav pu b wr (vdrw_sector_raw bno)
               np nr h m2 t fl pk tr
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false)
               bs_buf bs_disk (1024 * uint bno)%Z
               Hok Hdisj0 Hch Hcm Hct Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5
-              with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hbuf Hdisk [-]").
+              with "Hcg Htext Hpc Hdinv Hgeom Hbody Hchain Hbuf Hdisk Hpend [-]").
     iIntros (M1 pin) "%F %Hpinr Hcg Hpc Hbody Hclaim Hrm Hrt".
     destruct F as (Hcs & H1a1).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np (S np) nr
-              (<[ np := DClaim b (vdrwd_slot b h wr (vdrw_sector_raw bno)
+              (<[ np := DClaim b (vdrwd_slot kq b h wr (vdrw_sector_raw bno)
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin ]> fl) pk
               (<[ np := (h, m2, t) ]> tr)

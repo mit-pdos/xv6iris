@@ -40,6 +40,7 @@ Require Import Riscv.rv64d_types.
 Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskImg.
+Require Import PermInv.
 
 Local Open Scope Z_scope.
 
@@ -94,12 +95,18 @@ Class diskGhostG (Σ : gFunctors) := DiskGhostG {
      persistent fact so a driver can tie [v_cfg v] to the pages it
      programmed at init (see [disk_cfg] below) *)
   disk_cfg_inG :: inG Σ (dfrac_agreeR (leibnizO virtio_cfg));
+  (* THE CRASH-PERMIT CHANNEL's typing (PermInv.v).  Bundled HERE rather than
+     added as a separate class to every driver signature: [diskGhostG] is
+     already a premise of every statement that mentions a [disk_names], so
+     nesting it means NO spec signature in the tree changes. *)
+  disk_permG :: permG Σ;
 }.
 
 Definition diskGhostΣ : gFunctors :=
   #[ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
     mono_natΣ; ghost_varΣ nat; ghost_mapΣ nat dclaim;
-    GFunctor (dfrac_agreeR (leibnizO virtio_cfg))].
+    GFunctor (dfrac_agreeR (leibnizO virtio_cfg));
+    permΣ].
 
 Global Instance subG_diskGhostG Σ : subG diskGhostΣ Σ -> diskGhostG Σ.
 Proof. solve_inG. Qed.
@@ -111,6 +118,10 @@ Record disk_names := DiskNames {
   dn_np    : gname;
   dn_claim : gname;
   dn_cfg   : gname;
+  (* the CRASH-PERMIT channel's ghost-map name (PermInv.v): the auth lives in
+     [PermInv.perm_inv (dn_perm γ)], allocated per era beside [disk_inv], and
+     its ELEMENTS ([PermInv.perm_tok]) ride the timeless request slots. *)
+  dn_perm  : gname;
 }.
 
 (* ---------------------------------------------------------------------- *)

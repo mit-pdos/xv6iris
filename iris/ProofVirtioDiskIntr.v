@@ -49,6 +49,7 @@ Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
+Require Import PermInv.
 Require Import SpecPanic SpecWakeup SpecAcquire SpecRelease.
 Require Import CodeVirtioDiskIntr.
 Require Import SpecVirtioDiskIntr.
@@ -1170,7 +1171,10 @@ Section VtDevRam.
       disk_pub γd np -∗ disk_done_lb γd (S p) -∗
       phys_map pin -∗
       phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero -∗
-      (∃ bs : list (bv 8),
+      (* the SPENT crash permit's token rides WITH the payoff, on its way
+         from the completed slot to [DiskInv.parked_res] (PermInv.v) *)
+      (perm_done (dn_perm γd) (vs_perm sl) ∗
+       ∃ bs : list (bv 8),
          ⌜length bs = vs_len sl⌝ ∗
          ⌜bs = vs_data sl⌝ ∗
          disk_bytes γd (vs_sector_off sl) bs ∗
@@ -1204,7 +1208,8 @@ Section VtDevRam.
                          disk_pub γd np ∗ disk_done_lb γd (S p) ∗
                          phys_map pin ∗
                          phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
-                         (∃ bs : list (bv 8),
+                         (perm_done (dn_perm γd) (vs_perm sl) ∗
+                          ∃ bs : list (bv 8),
                             ⌜length bs = vs_len sl⌝ ∗
                             ⌜bs = vs_data sl⌝ ∗
                             disk_bytes γd (vs_sector_off sl) bs ∗
@@ -1863,6 +1868,8 @@ Section VtBody.
   Definition vt_payoff (γd : disk_names) (sl : vslot) (pin : _) : iProp Σ :=
     (phys_map pin ∗
      phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
+     (* the SPENT crash permit's token, on its way to [DiskInv.parked_res] *)
+     perm_done (dn_perm γd) (vs_perm sl) ∗
      (∃ bs : list (bv 8),
         ⌜length bs = vs_len sl⌝ ∗
         ⌜bs = vs_data sl⌝ ∗
@@ -2834,12 +2841,14 @@ Section VtLoopProof.
                  Hq8 Hfresh with "[Hcell] Hring") as "Hring".
     { iExists (vr_head (vs_req sl)). iExact "Hcell". }
     (* the parked payoff *)
+    iDestruct "Hrest" as "[Hperm Hrest]".
     iDestruct "Hrest" as (bs) "(%Hbslen & %Hbsout & Hbytes & Hbuf)".
-    iAssert (parked_res γd pav nr vv) with "[Hbdisk Hinfob Hpinr Hstat Hbytes Hbuf]" as "Hparked".
+    iAssert (parked_res γd pav nr vv)
+      with "[Hbdisk Hinfob Hpinr Hstat Hbytes Hbuf Hperm]" as "Hparked".
     { iExists bs. iEval (rewrite -Hslh) in "Hinfob".
       iEval (rewrite -Hstatus) in "Hstat".
       rewrite /dc_pinr /dc_ring_map.
-      iFrame "Hbdisk Hinfob Hpinr Hstat Hbytes Hbuf".
+      iFrame "Hbdisk Hinfob Hpinr Hstat Hbytes Hperm Hbuf".
       iPureIntro. split_and!; [ exact Hlink | exact Hbslen | exact Hbsout ]. }
     (* the maps *)
     assert (Hpknr : pk !! nr = None).

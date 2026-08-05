@@ -423,10 +423,16 @@ Section ProofBwrite.
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bsd b
+              True%I
               HKrw Hbno Hkdata Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hoctx Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
+              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hoctx Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk [] [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk".
+    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4):
+       bwrite's public contract does not change in this phase, so it deposits
+       the identity view shift at the trivial receipt.  The real permits get
+       threaded here when the log lands. *)
+    { iApply disk_write_permit_trivial. }
+    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk _".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
