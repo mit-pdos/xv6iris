@@ -18,59 +18,50 @@ From stdpp Require Import gmap finite bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang.
+Require Import ColdBoot.   (* the ∃-witness: the closed cold-boot run *)
 Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. The reset REGISTER file: the pinned values written over whatever the  *)
-(*    dead generation left.  Everything [reset_regs] does not mention rides *)
-(*    through unchanged -- it is exactly the set the boot proof quantifies   *)
-(*    over.                                                                 *)
+(* 1. The reset REGISTER file.                                              *)
+(*                                                                          *)
+(*    [boot_facts]' register clause is "the model's own boot chain RAN, from  *)
+(*    SOME power-on file, up to [boot_patch]", so this construction's job is  *)
+(*    to EXHIBIT one such run -- and [ColdBoot] has it: the chain from the    *)
+(*    model's own [init_regstate], computed with the VM.  So the reset        *)
+(*    register file no longer depends on the dying generation's registers at  *)
+(*    all (it used to be pinned VALUES written over them, which was the       *)
+(*    weaker shape this task retired); [init_regstate] is simply one          *)
+(*    convenient power-on instance, and [BootReset.reset_regs_of_run] is what *)
+(*    says the facts hold at EVERY instance.                                 *)
 (* ---------------------------------------------------------------------- *)
 
-Definition boot_regs (c : CPU) (rs : regstate) : regstate :=
-  (* mie / mideleg first (order is irrelevant -- the peel loop finds each
-     writer): every interrupt disabled and nothing delegated, the platform's
-     power-on values.  See [reset_regs]' comment and the register-by-register
-     account in claude-notes/projects/crash.md (M6c (5)). *)
-  register_set mie (boot_w64 0)
-  (register_set mideleg (boot_w64 0)
-  (register_set PC (boot_w64 0x80000000)
-   (register_set nextPC (boot_w64 0x80000000)
-    (register_set cur_privilege Machine
-    (register_set hart_state (HART_ACTIVE tt)
-     (register_set mhartid (boot_w64 (Z.of_nat (fin_to_nat c)))
-      (register_set mstatus (boot_w64 0xA00000000)
-       (register_set misa (boot_w64 0x800000000014112D)
-        (register_set mseccfg (boot_w64 0)
-         (register_set menvcfg (boot_w64 0)
-          (register_set htif_tohost_base None
-           (register_set elp (landing_pad_bits_backwards NO_LP_EXPECTED)
-            (register_set pma_regions pma_boot
-             (register_set pmpcfg_n pmpcfg_boot rs)))))))))))))).
+Definition boot_hid (c : CPU) : SailStdpp.Values.mword 64 := boot_w64 (Z.of_nat (fin_to_nat c)).
 
-(* peel [register_set]s off a lookup until the one that wrote the register:
-   the mismatch side conditions are register disequalities, one [vm_compute]
-   each, and the loop stops exactly at the writer (where the disequality is
-   false and the side goal fails). *)
-Local Ltac reg_peel :=
-  repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]);
-  apply register_lookup_set.
+Definition boot_regs (c : CPU) : regstate := boot_patch (cold_regs (boot_hid c)).
 
-(* pmpcfg's clause is the one [reset_regs] states as a PREDICATE rather than a
-   value ([pmp_all_off]), so it is discharged in two steps: peel to the value
-   this construction writes, then [RiscvLang.pmp_all_off_pmpcfg_boot].  The
-   witness is exactly why [pmpcfg_boot] is still a named value -- a machine
-   built by writing over a dead generation has to write SOMETHING. *)
-Local Lemma boot_regs_pmpcfg (c : CPU) (rs : regstate) :
-  register_lookup pmpcfg_n (boot_regs c rs) = pmpcfg_boot.
-Proof. unfold boot_regs. reg_peel. Qed.
+(* THE WITNESS IS A REAL RUN: the model's boot chain, from [init_regstate] to
+   the register file this construction hands over. *)
+Lemma boot_regs_run (c : CPU) :
+  run (ArchReset.boot_prog (boot_hid c))
+      (MState init_regstate ∅ dev0_state) tt
+      (MState (cold_regs (boot_hid c)) ∅ dev0_state).
+Proof. exact (cold_boot_run_shape (boot_hid c)). Qed.
 
-Lemma boot_regs_reset (c : CPU) (rs : regstate) : reset_regs c (boot_regs c rs).
+(* ... and it still satisfies [reset_regs], which is the sanity anchor: the
+   patch writes over the closed run exactly the three registers the run does
+   not pin, at the values the run itself produces. *)
+Lemma boot_regs_reset (c : CPU) : reset_regs c (boot_regs c).
 Proof.
-  unfold reset_regs. split_and!;
-    first [ (rewrite boot_regs_pmpcfg; exact pmp_all_off_pmpcfg_boot)
-          | (unfold boot_regs; reg_peel) ].
+  pose proof (reset_regs_cold_boot c) as Hc.
+  unfold reset_regs in Hc.
+  destruct Hc as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12
+                  & H13 & H14 & H15).
+  unfold reset_regs, boot_regs, boot_patch, boot_hid, cold_regs_boot in *.
+  split_and!;
+    first [ apply register_lookup_set
+          | (repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]);
+             first [ assumption | exact pmp_all_off_pmpcfg_boot ]) ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -171,7 +162,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition boot_gstate (g : gstate) : gstate :=
-  GState (fun c => boot_regs c (g.(gregs) c)) boot_mem
+  GState (fun c => boot_regs c) boot_mem
          (DevState uart0_state plic0_state (virtio_reset g.(gdev).(dvirtio)))
          g.(ggen) true.
 
@@ -188,7 +179,9 @@ Proof.
   - reflexivity.
   - exact boot_mem_in_ram.
   - exact boot_mem_lookup.
-  - intro c. apply boot_regs_reset.
+  - (* the register clause: the closed cold-boot run is the witness *)
+    intro c. exists init_regstate, (cold_regs (boot_hid c)).
+    split; [ exact (boot_regs_run c) | reflexivity ].
   - reflexivity.
   - reflexivity.
   - exists g.(gdev).(dvirtio). reflexivity.

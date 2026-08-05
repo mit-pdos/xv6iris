@@ -17,6 +17,12 @@ From iris.program_logic Require Import language.
 (* (= the [mstate.mem] type).  Importing them here would retype mstate.mem and   *)
 (* clash with read_bytes.  See the import line just above RiscvModelExecClose.    *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
+(* THE PROGRAM A POWER-ON RUNS -- [boot_facts]' register clause names it, so it
+   has to live below this file.  [Require] without [Import] on purpose:
+   ArchReset.v imports SailStdpp.Base, and importing that HERE would make
+   [Countable_mword] canonical and retype [mstate.mem] (see the note above).
+   Import is not transitive, so requiring it changes nothing. *)
+Require ArchReset.
 Require Import RiscvModelBytes.
 Require Export DevModel.
 (* The LOADED KERNEL IMAGE, as the loader/firmware leaves it at a boot
@@ -678,6 +684,29 @@ Lemma reset_regs_mideleg (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup mideleg rs = boot_w64 0.
 Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
+(* THE NAMED PLATFORM PATCH: what the model's own boot chain does NOT write, and
+   therefore the honest list of what a power-on is ASSUMED to leave behind.
+   Everything else in [reset_regs] is DERIVED from the chain, at an arbitrary
+   power-on register file ([BootReset.reset_regs_of_run]).
+   - mie / mideleg: no line of the chain touches them.  A hart powers up with
+     every interrupt disabled and nothing delegated.  Necessary and not obvious:
+     the S-mode side's [IntrDefs.sconf] wants every enabled interrupt delegated,
+     and start()'s [csrs sie] does not clear an M-mode enable it finds already
+     set while [legalize_mideleg] forces the matching delegation bit to 0 -- so
+     at a nonzero entry [mie] the boot chain's bridge is not provable at all.
+   - pmpcfg: the chain's [reset_pmp] DOES clear A and L in all 64 entries, and
+     that is what [reset_regs] asks for ([pmp_all_off]).  Deriving it over an
+     OPEN power-on file is a 64-way symbolic index resolution over a
+     [vec_update_dec] tower (claude-notes/projects/crash.md); until that lands
+     the value is written here, which is why [pmpcfg_boot] is still a name.
+   The two whole-value pins mseccfg = 0 and menvcfg = 0 are NOT in this list:
+   [sail_model_init] writes both ([legalize_mseccfg] / [legalize_menvcfg] of
+   zero), so the run establishes them. *)
+Definition boot_patch (rs : regstate) : regstate :=
+  register_set mie (boot_w64 0)
+    (register_set mideleg (boot_w64 0)
+      (register_set pmpcfg_n pmpcfg_boot rs)).
+
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client
    ([RiscvAdequacy.power_boot_res]'s [Hboot] premise). *)
@@ -692,7 +721,21 @@ Definition boot_facts (g' : gstate) : Prop :=
   /\ (forall a : Z, (ram_lo <= a < ram_hi)%Z ->
         g'.(gmem) !! (SailStdpp.Values.mword_of_int a : Arch.pa)
         = Some (boot_byte a))
-  /\ (forall c : CPU, reset_regs c (g'.(gregs) c))
+  (* THE REGISTER SIDE, ANCHORED ON THE MODEL'S OWN BOOT CODE rather than on a
+     table of values: for each hart there are a power-on file [rs0] and a
+     landing file [rs1] such that the model's boot chain RAN from the one to the
+     other, and this hart's registers are [rs1] under the named platform patch.
+     [rs0] is arbitrary garbage, which is the point: [BootReset.reset_regs_of_run]
+     derives [reset_regs] -- the fifteen-way fact set every consumer still asks
+     for by name -- from this clause for EVERY [rs0], and
+     [PowerBoot.boot_shape_boot_gstate] satisfies it with one convenient
+     instance ([init_regstate], where ColdBoot computes the whole run with the
+     VM).  Memory and the device fabric are pinned on both sides because the
+     chain touches neither. *)
+  /\ (forall c : CPU, exists rs0 rs1 : regstate,
+        run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))))
+            (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state)
+        /\ g'.(gregs) c = boot_patch rs1)
   (* the devices are reset: FIFOs empty, no interrupt enabled or pending,
      the disk's queue not live (its IMAGE survives -- see [boot_shape]) *)
   /\ g'.(gdev).(duart) = uart0_state

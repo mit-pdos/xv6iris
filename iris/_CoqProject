@@ -8,6 +8,7 @@
 # the resulting "notation was already used" warning project-wide.
 -arg -w
 -arg -notation-overridden
+ArchReset.v
 RiscvModelBytes.v
 VirtioModel.v
 DiskImg.v
@@ -31,6 +32,7 @@ VirtioProto.v
 RiscvExtras.v
 PowerBoot.v
 ColdBoot.v
+BootReset.v
 AlignBits.v
 RiscvTryStep.v
 RiscvFetchExec.v

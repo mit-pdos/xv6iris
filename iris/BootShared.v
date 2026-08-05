@@ -38,6 +38,7 @@ Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.
 Require Import BootChain.
 Require Import RiscvAdequacy.
+Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -74,9 +75,17 @@ Lemma boot_mem_of_facts (g : gstate) :
   forall x : Z, ram_lo <= x < ram_hi -> g.(gmem) !! pa_of_z x = Some (boot_byte x).
 Proof. intros (_ & _ & Hmem & _) x Hx. exact (Hmem x Hx). Qed.
 
+(* [boot_facts]' register clause is the model's own boot chain over ARBITRARY
+   power-on garbage; [BootReset.reset_regs_of_run] is the bridge to the
+   fifteen-way fact set every consumer above asks for by name.  This is that
+   bridge's only caller, which is why the whole chain above is unchanged. *)
 Lemma boot_regs_of_facts (g : gstate) :
   boot_facts g -> forall c : CPU, reset_regs c (g.(gregs) c).
-Proof. intros (_ & _ & _ & Hr & _) c. exact (Hr c). Qed.
+Proof.
+  intros (_ & _ & _ & Hr & _) c.
+  destruct (Hr c) as (rs0 & rs1 & Hrun & Heq).
+  rewrite Heq. exact (BootReset.reset_regs_of_run c rs0 rs1 Hrun).
+Qed.
 
 (* THE CUT CURSOR, and it is the whole shape of the .bss chain: the client owns
    ONE range and walks it in ADDRESS order, taking each bundle's window and

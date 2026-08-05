@@ -26,20 +26,13 @@
 (*   [init_model ""]          the config-validity assert + [reset]             *)
 (*   [init_boot_requirements] the firmware step: a0 := mhartid, a1 := DTB      *)
 (*                                                                            *)
-(* THE ONE PLATFORM HOOK THE INTERPRETER CANNOT STEP.  [reset_sys] calls       *)
-(* [cancel_reservation], which rv64d declares as an *Axiom* (the LR/SC          *)
-(* reservation is platform state, outside [regstate]).  An opaque element of    *)
-(* the monad is not a constructor application, so [run]/[exec] -- both          *)
-(* structural fixpoints on the program -- are STUCK on it: neither an           *)
-(* interpretation of [reset] nor a case analysis of one can exist without a     *)
-(* further axiom about the hook, and the boot cone deliberately has none        *)
-(* (contrast [UserMemAccess.exec_cancel_reservation], which is why the U-mode   *)
-(* tier can step an LR/SC).  So §1 copies the model's [reset_sys] with the      *)
-(* hook as a PARAMETER and [reset_sys_at_split] proves, by [reflexivity], that  *)
-(* the copy at [cancel_reservation tt] IS [reset_sys] -- the copy's fidelity is *)
-(* kernel-checked, and the elision is provably the only difference.  Same for   *)
-(* [reset] and [init_model].  The hook is then instantiated with a state        *)
-(* no-op, which is what the model documents it to be.                          *)
+(* THE PROGRAM IS [ArchReset.boot_prog], not a copy of the model made here:    *)
+(* [reset_sys] calls [cancel_reservation], which rv64d declares as an *Axiom*, *)
+(* and [run]/[exec] are STUCK on an opaque element of the monad -- so the      *)
+(* chain has to be run at a copy with that hook lifted to a parameter.  That   *)
+(* copy, its [reflexivity] fidelity checks and the program itself all live in   *)
+(* ArchReset.v (BELOW the language file, because [RiscvLang.boot_facts] names   *)
+(* the program); read its header for the account.  This file only RUNS it.     *)
 (*                                                                            *)
 (* THE FIRST THING IT FOUND: misa -- AND IT IS NOW FIXED AT THE SOURCE.  The     *)
 (* pin said 0x800000000014112D ([RiscvFetchExec.MISA_C]); [reset_misa] writes    *)
@@ -101,19 +94,21 @@
 (*    closed run; deriving it from [reset_pmp]'s per-entry RMW over an OPEN      *)
 (*    power-on file is the ∀-garbage anchoring task's 64-way symbolic proof.     *)
 (*                                                                            *)
-(* THE RUN STARTS FROM [init_regstate], AND THAT IS NOT [boot_shape]'s SHAPE.   *)
-(* [boot_shape] / [PowerBoot.boot_regs] still write the pinned values OVER the  *)
-(* dying generation's registers and leave every other register alone, which is  *)
-(* weaker than a real power cycle and is what keeps a missing pin an unprovable *)
-(* premise rather than an unsound step.  This file justifies the VALUES, not    *)
-(* that shape.  Running the chain from an arbitrary [regstate] instead would    *)
-(* justify both at once and was tried: it is computationally pathological.      *)
-(* [regstate]'s fields are FUNCTIONS and [register_set] wraps each one in a      *)
-(* fresh [fun r' => if r' =? r then v else ...], so over an OPEN base the ~300   *)
-(* writes of the chain become a tower of closures whose readback explodes --     *)
-(* [vm_compute] ran >8 min at 4.6 GB, [lazy] reached 19 GB, while the same run   *)
-(* from [init_regstate] is under a second.  Keep any evaluation of model code    *)
-(* over a register file CLOSED.                                                 *)
+(* THE RUN STARTS FROM [init_regstate] -- ONE convenient power-on file, and    *)
+(* that is now all it claims to be.  [RiscvLang.boot_facts]' register clause is *)
+(* "the model's own boot chain RAN, from SOME power-on file, up to the named    *)
+(* patch", and [BootReset.v] proves that chain's facts over an ARBITRARY file   *)
+(* by symbolic peeling; this file is the compiled evidence layer under it --    *)
+(* the closed run whose every value the VM checks, and the ∃-WITNESS            *)
+(* [PowerBoot] hands the power thread ([cold_boot_run_shape] below).  Running   *)
+(* the chain from an arbitrary [regstate] by EVALUATION was tried and is        *)
+(* computationally pathological: [regstate]'s fields are FUNCTIONS and          *)
+(* [register_set] wraps each one in a fresh                                     *)
+(* [fun r' => if r' =? r then v else ...], so over an OPEN base the ~300        *)
+(* writes become a tower of closures whose readback explodes -- [vm_compute]    *)
+(* ran >8 min at 4.6 GB, [lazy] reached 19 GB, while the same run from          *)
+(* [init_regstate] is under a second.  Keep any EVALUATION of model code over a *)
+(* register file CLOSED; the open-base route is peeling, not computing.         *)
 (*                                                                            *)
 (* COLD ONLY.  This is the power-up path.  [reset] ALONE does not establish      *)
 (* [reset_regs]: mstatus, menvcfg, htif_tohost_base, mhartid and pma_regions     *)
@@ -127,6 +122,7 @@
 From stdpp Require Import gmap finite bitvector.definitions.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import ArchReset.
 Require Import RiscvLang.
 Require Import RiscvExec.
 Import Defs.
@@ -136,110 +132,13 @@ Open Scope bool.
 Open Scope Z.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. The model's own [reset_sys] / [reset] / [init_model], with the ONE    *)
-(*    platform hook lifted to a parameter.  Each [_split] lemma is the      *)
-(*    kernel's check that the copy beside it is the model's code verbatim.   *)
-(* ---------------------------------------------------------------------- *)
-
-Definition reset_sys_at (hook : M unit) : M (unit) :=
-   write_reg cur_privilege Machine >>
-   ((read_reg mstatus)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
-   write_reg mstatus (update_subrange_vec_dec (w__0) (3) (3) (('b"0"))) >>
-   ((read_reg mstatus)  : M (mword 64)) >>= fun (w__1 : mword 64) =>
-   write_reg mstatus (update_subrange_vec_dec (w__1) (17) (17) (('b"0"))) >>
-   (reset_tvecs (tt)) >>
-   ((read_reg mstatus)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
-   (long_csr_write_callback ("mstatus") ("mstatush") (w__2)) >>
-   (reset_misa (tt)) >>
-   hook >>
-   ((read_reg pc_reset_address)  : M (mword 64)) >>= fun (w__3 : mword 64) =>
-   write_reg PC w__3 >>
-   ((read_reg pc_reset_address)  : M (mword 64)) >>= fun (w__4 : mword 64) =>
-   write_reg nextPC w__4 >>
-   write_reg mcause (zeros' (64)) >>
-   ((read_reg mcause)  : M (mword 64)) >>= fun (w__5 : mword 64) =>
-   (csr_name_write_callback ("mcause") (w__5)) >>
-   (reset_pmp (tt)) >>
-   ((read_reg mseccfg)  : M (mword 64)) >>= fun (w__6 : mword 64) =>
-   write_reg mseccfg (update_subrange_vec_dec (w__6) (9) (9) ((bool_to_bit ((false  : bool))))) >>
-   ((read_reg mseccfg)  : M (mword 64)) >>= fun (w__7 : mword 64) =>
-   write_reg mseccfg (update_subrange_vec_dec (w__7) (8) (8) ((bool_to_bit ((false  : bool))))) >>
-   (hartSupports (Ext_Zicfilp)) >>= fun (w__8 : bool) =>
-   (if w__8 return M (unit) then
-      ((read_reg mseccfg)  : M (mword 64)) >>= fun (w__9 : mword 64) =>
-      write_reg mseccfg (update_subrange_vec_dec (w__9) (10) (10) (('b"0")))
-       : M (unit)
-    else returnM (tt)) >>
-   (reset_stateen (tt)) >>
-   write_reg vstart (zeros' (64)) >>
-   write_reg vl (zeros' (64)) >>
-   ((read_reg vcsr)  : M (mword 3)) >>= fun (w__10 : mword 3) =>
-   write_reg vcsr (update_subrange_vec_dec (w__10) (2) (1) (('b"00"))) >>
-   ((read_reg vcsr)  : M (mword 3)) >>= fun (w__11 : mword 3) =>
-   write_reg vcsr (update_subrange_vec_dec (w__11) (0) (0) (('b"0"))) >>
-   ((read_reg vtype)  : M (mword 64)) >>= fun (w__12 : mword 64) =>
-   write_reg vtype (update_subrange_vec_dec (w__12) ((Z.sub (64) (1))) ((Z.sub (64) (1))) (('b"1"))) >>
-   ((read_reg vtype)  : M (mword 64)) >>= fun (w__13 : mword 64) =>
-   write_reg
-     vtype
-     (update_subrange_vec_dec (w__13) ((Z.sub (64) (2))) (8) ((zeros' ((Z.sub (64) (9)))))) >>
-   ((read_reg vtype)  : M (mword 64)) >>= fun (w__14 : mword 64) =>
-   write_reg vtype (update_subrange_vec_dec (w__14) (7) (7) (('b"0"))) >>
-   ((read_reg vtype)  : M (mword 64)) >>= fun (w__15 : mword 64) =>
-   write_reg vtype (update_subrange_vec_dec (w__15) (6) (6) (('b"0"))) >>
-   ((read_reg vtype)  : M (mword 64)) >>= fun (w__16 : mword 64) =>
-   write_reg vtype (update_subrange_vec_dec (w__16) (5) (3) (('b"000"))) >>
-   ((read_reg vtype)  : M (mword 64)) >>= fun (w__17 : mword 64) =>
-   write_reg vtype (update_subrange_vec_dec (w__17) (2) (0) (('b"000")))
-    : M (unit).
-
-
-Lemma reset_sys_at_split : reset_sys tt = reset_sys_at (cancel_reservation tt).
-Proof. reflexivity. Qed.
-
-Definition reset_at (hook : M unit) : M (unit) :=
-   write_reg hart_state (HART_ACTIVE (tt)) >>
-   (reset_sys_at hook) >> (reset_vmem (tt)) >> (reset_elp (tt)) >> returnM ((ext_reset (tt))).
-
-Lemma reset_at_split : reset tt = reset_at (cancel_reservation tt).
-Proof. reflexivity. Qed.
-
-Definition init_model_at (config_filename : string) (hook : M unit) : M (unit) :=
-   (config_is_valid (tt)) >>= fun (w__0 : bool) =>
-   assert_exp' w__0 (String.append
-                       ((if generic_eq (config_filename) ("") then "Default config"
-                         else String.append ("Config in ") (config_filename))) (" is invalid.")) >>= fun _ =>
-   (reset_at hook)
-    : M (unit).
-
-Lemma init_model_at_split (config_filename : string) :
-  init_model config_filename = init_model_at config_filename (cancel_reservation tt).
-Proof. reflexivity. Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 2. THE COLD-BOOT PROGRAM, and the state it produces.                    *)
+(* 2. THE COLD-BOOT RUN: the machine the chain starts from, and the state    *)
+(*    [ArchReset.boot_prog] produces at it.                                 *)
 (*                                                                         *)
 (*    [hid] is the hart id the platform wires to this hart; the run is       *)
 (*    parametric in it (ONE evaluation covers all eight harts, since the     *)
 (*    only thing the chain does with it is store it and copy it into a0).    *)
 (* ---------------------------------------------------------------------- *)
-
-(* the reservation hook, as the model documents it: it moves no machine state *)
-Definition cold_hook : M unit := returnm tt.
-
-(* the chain's PRE-[init_model] half: the compiled register initializers plus
-   the board's two hooks.  Split out because the config assert lives at exactly
-   this state -- [config_is_valid] reads [pma_regions], which
-   [sail_model_init] has by then written and which [reset] never touches. *)
-Definition boot_pre (hid : mword 64) : M unit :=
-  sail_model_init tt >>
-  set_pc_reset_address (boot_w64 0x80000000) >>
-  write_reg mhartid hid.
-
-Definition boot_init (hid : mword 64) : M unit :=
-  boot_pre hid >>
-  init_model_at "" cold_hook >>
-  init_boot_requirements tt.
 
 (* the machine the chain runs on: the model's own initial register file, no
    RAM and reset devices.  Nothing in the chain touches memory or a device --
@@ -250,7 +149,7 @@ Definition cold_s0 : mstate := MState init_regstate ∅ dev0_state.
    [cold_state] is built by [vm_compute] rather than written down, and
    [cold_boot_exec] is what makes that legitimate: it says this state IS what
    [exec] gets from the model's chain.  Two reasons it has to be done this way
-   and not by leaving [exec (boot_init hid) cold_s0] in every statement:
+   and not by leaving [exec (ArchReset.boot_prog hid) cold_s0] in every statement:
    - THE VM COSTS A SECOND, THE KERNEL COSTS GIGABYTES.  [vm_compute] runs the
      ~300-write chain in well under a second, but a plain [reflexivity] closes
      the goal with an [eq_refl] whose type the kernel then rechecks with its
@@ -270,12 +169,12 @@ Definition cold_s0 : mstate := MState init_regstate ∅ dev0_state.
    to redo the whole initializer chain. *)
 Definition pre_state (hid : mword 64) : mstate.
 Proof.
-  let x := eval vm_compute in (exec (boot_pre hid) cold_s0) in
+  let x := eval vm_compute in (exec (ArchReset.boot_pre hid) cold_s0) in
   lazymatch x with Some (_, ?s) => exact s end.
 Defined.
 
 Lemma boot_pre_exec (hid : mword 64) :
-  exec (boot_pre hid) cold_s0 = Some (tt, pre_state hid).
+  exec (ArchReset.boot_pre hid) cold_s0 = Some (tt, pre_state hid).
 Proof. vm_cast_no_check (eq_refl (Some (tt, pre_state hid))). Qed.
 
 (* THE CONFIG IS VALID -- the positive fact the [init_model] anchor rests on.
@@ -286,7 +185,7 @@ Proof. vm_cast_no_check (eq_refl (Some (true, pre_state hid))). Qed.
 
 Definition cold_state (hid : mword 64) : mstate.
 Proof.
-  let x := eval vm_compute in (exec (boot_init hid) cold_s0) in
+  let x := eval vm_compute in (exec (ArchReset.boot_prog hid) cold_s0) in
   lazymatch x with Some (_, ?s) => exact s end.
 Defined.
 
@@ -295,18 +194,18 @@ Definition cold_regs (hid : mword 64) : regstate := sregs (cold_state hid).
 (* THE TIE: [cold_state] is the model's own cold boot, run by the language's
    own interpreter.  Every fact below is therefore a fact about the model. *)
 Lemma cold_boot_exec (hid : mword 64) :
-  exec (boot_init hid) cold_s0 = Some (tt, cold_state hid).
+  exec (ArchReset.boot_prog hid) cold_s0 = Some (tt, cold_state hid).
 Proof. vm_cast_no_check (eq_refl (Some (tt, cold_state hid))). Qed.
 
 (* and hence the LANGUAGE's own relation holds of it, with the uniqueness that
    makes it the ONLY thing the chain can do: the model's cold boot is a [run] of
    the machine RiscvLang defines, not a separate semantics. *)
 Lemma cold_boot_run (hid : mword 64) :
-  run (boot_init hid) cold_s0 tt (cold_state hid).
+  run (ArchReset.boot_prog hid) cold_s0 tt (cold_state hid).
 Proof. exact (proj1 (exec_run_det _ _ _ _ (cold_boot_exec hid))). Qed.
 
 Lemma cold_boot_run_unique (hid : mword 64) (u : unit) (s : mstate) :
-  run (boot_init hid) cold_s0 u s -> s = cold_state hid.
+  run (ArchReset.boot_prog hid) cold_s0 u s -> s = cold_state hid.
 Proof. intro H. exact (proj2 (proj2 (exec_run_det _ _ _ _ (cold_boot_exec hid)) _ _ H)). Qed.
 
 (* the chain leaves RAM and the device fabric alone *)
@@ -315,6 +214,24 @@ Proof. reflexivity. Qed.
 
 Lemma cold_boot_dev (hid : mword 64) : mdev (cold_state hid) = dev0_state.
 Proof. reflexivity. Qed.
+
+(* THE WITNESS SHAPE.  [RiscvLang.boot_facts] asks for a run between two states
+   spelled as [MState _ ∅ dev0_state] (the chain touches neither memory nor a
+   device, so pinning both ends' non-register halves costs nothing and saves
+   every consumer an equation).  This is that spelling of [cold_boot_run], and
+   it is what [PowerBoot] hands the power thread as the ∃-witness. *)
+Lemma cold_state_shape (hid : mword 64) :
+  cold_state hid = MState (cold_regs hid) ∅ dev0_state.
+Proof.
+  pose proof (cold_boot_mem hid) as Hm. pose proof (cold_boot_dev hid) as Hd.
+  unfold cold_regs. destruct (cold_state hid) as [rs m d].
+  cbn [sregs mem mdev] in Hm, Hd |- *. rewrite Hm, Hd. reflexivity.
+Qed.
+
+Lemma cold_boot_run_shape (hid : mword 64) :
+  run (ArchReset.boot_prog hid) (MState init_regstate ∅ dev0_state) tt
+      (MState (cold_regs hid) ∅ dev0_state).
+Proof. rewrite <- cold_state_shape. exact (cold_boot_run hid). Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. THE PMA TABLE IS THE MODEL'S OWN -- kernel-checked.                    *)

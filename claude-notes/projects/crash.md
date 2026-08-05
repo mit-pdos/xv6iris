@@ -42,6 +42,9 @@ No `wp_consoleintr_sconf`: the boot chain reaches consoleintr only through the
 assumed `kerneltrap`, so it is not in the cone.
 
 **THE COMPOSITION, in one line each** (every file in `_CoqProject`):
+`ArchReset` (the model's boot program, hook elided) → `ColdBoot` (that program
+run CLOSED, by the VM) + `BootReset` (the same program peeled over ARBITRARY
+power-on garbage — `boot_facts`' register anchor) →
 `BootCarve` + `BootCarveMain` (the image-carving library) → `BootConfig` (the
 register set and the config bundles) → `BootChain` (one hart's whole life,
 twice: `boot_hart_primary` / `boot_hart_secondary`) → `BootShared`
@@ -2167,17 +2170,23 @@ yet.
 - ~~pmpcfg patch retirement~~ — **DONE** (see "PMPCFG PATCH RETIREMENT" below):
   `reset_regs`' clause is `pmp_all_off (register_lookup pmpcfg_n rs)`, the
   predicate its consumers consume, and no longer a pinned 64-entry value.
-- The mseccfg / menvcfg full-value pins: **MEASURED AND BLOCKED**, and the
-  blocker is the fast decode bridge, not the spec shape (see "MSECCFG / MENVCFG
-  PATCH SHARPENING" below). Needs either a field-granular read-frame congruence
-  (measured 15× per decode obligation over 1220 words — not worth it) or the
-  `Zicfilp.supported = false` config flip, which deletes the pins outright and
-  needs the user's approval.
-- The ∀-garbage anchoring of the register clause (`reset()` over arbitrary
-  power-on state instead of the closed `init_regstate` run): still blocked on the
-  symbolic-peeling wall recorded in "NO PATCH CHAIN LEFT" below, and it now owns
-  two named follow-ons — pmpcfg's 64-way `reset_pmp` derivation, and whichever
-  mseccfg/menvcfg exit gets taken.
+- ~~The mseccfg / menvcfg full-value pins~~ — **NO LONGER ASSUMPTIONS AT ALL**
+  (2026-08-05, a side effect of the ∀-garbage anchoring): `sail_model_init`
+  WRITES both (`legalize_mseccfg` / `legalize_menvcfg` of zero), and the anchor
+  program includes it, so the garbage-run peel DERIVES both values. The pins
+  stay in `reset_regs` verbatim (the user's decision: "keep the whole-value
+  pins" — nothing was weakened or deleted), and the decode bridge's whole-value
+  consumption recorded below is unchanged; what changed is that the *justification*
+  is now the model's own initializer rather than a stated platform assumption.
+  The measurement in "MSECCFG / MENVCFG PATCH SHARPENING" is kept as the record
+  of why a FIELD-WISE restatement is still not available.
+- ~~The ∀-garbage anchoring of the register clause~~ — **DONE** (see "THE
+  ∀-GARBAGE ANCHOR" below): `boot_facts`' register clause is now "the model's own
+  boot chain RAN, from some power-on file, up to `boot_patch`", and
+  `BootReset.reset_regs_of_run` derives `reset_regs` from it for EVERY power-on
+  file. One follow-on remains: **pmpcfg's 64-way `reset_pmp` derivation** — the
+  loop's FRAME half is proved (`BootReset.exec_reset_pmp`), the per-entry
+  `pmp_all_off` half is not, so the value is still written by `boot_patch`.
 
 ### PMA TABLE RETIREMENT — **DONE. `pma_boot` IS THE MODEL'S OWN TABLE**
 
@@ -2361,70 +2370,103 @@ gotchas below.
   ~10 lines each, and the tail runs once over the abstract `sx`. Cheaper than a
   shared Iris lemma and far cheaper than the duplicate.
 
-### NO PATCH CHAIN LEFT — AND WHY THE ANCHOR IS STILL `sail_model_init`
+### THE ∀-GARBAGE ANCHOR — **DONE. `boot_facts` IS A RUN, NOT A TABLE**
 
-**There is no `register_set` patch left in `ColdBoot.cold_regs_boot`** —
-`pma_regions` was the last one and it is now run-derived (see PMA TABLE
-RETIREMENT above), so `cold_regs_boot c = cold_regs (hartid c)` verbatim and
-every conjunct of `reset_regs` is a value the model's chain COMPUTED.
+`RiscvLang.boot_facts`' register clause is now
 
-**THE NAMED PLATFORM ASSUMPTIONS — the minimal honest list** (i.e. what would
-NOT follow from `reset()` alone over arbitrary power-on garbage; nothing here is
-an Iris/Rocq axiom — `reset_regs_cold_boot` proves all fifteen conjuncts by
-running the model from the closed `init_regstate`):
+```coq
+/\ (forall c : CPU, exists rs0 rs1 : regstate,
+      run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))))
+          (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state)
+      /\ g'.(gregs) c = boot_patch rs1)
+```
 
-- **mhartid and the reset vector** — the BOARD's two configuration writes, made
-  explicitly by `ColdBoot.boot_init` because `reset_sys` and
-  `init_boot_requirements` READ them. Irreducible: they ARE the platform.
-- **mie / mideleg = 0** — written by no line of the chain; they come out of
-  `init_regstate`, i.e. a hart powers up with everything disabled and nothing
-  delegated. Irreducible for the same reason (`reset()` never touches them).
-- **mseccfg = 0 and menvcfg = 0** — still pinned as WHOLE VALUES, and the honest
-  field-wise content is only `PMM = disabled at power-on` (+ MLPE / the Zkr seed
-  bits, which the run gives for free, and nothing at all for menvcfg). This is
-  the one remaining over-claim, and it is **not** a spec-shape slip: the fast
-  concrete-state decode bridge consumes all 64 bits of both. See MSECCFG PATCH
-  SHARPENING below for the measurement and the two ways out.
-- **pmpcfg — RETIRED as a value** (see PMPCFG PATCH RETIREMENT below):
-  `reset_regs`' clause is `pmp_all_off (register_lookup pmpcfg_n rs)`, which is
-  what `reset_pmp` WRITES (A = OFF, L = 0 per entry) and all any consumer takes.
-  It leaves this list once the ∀-garbage task derives it from `reset_pmp`'s
-  per-entry RMW instead of from the closed run.
+— "the model's own boot chain RAN, from SOME power-on register file, and this
+hart's registers are its output under the named platform patch".  `rs0` is
+arbitrary power-on garbage, and both directions are proved:
 
-The anchor is still the model's whole cold boot from the
-CLOSED `init_regstate`, not `reset()` over arbitrary power-on state. The
-intended next shape — `boot_facts`' register clause as "the ARCHITECTURAL
-reset (`reset()` alone, per the privileged spec) of arbitrary power-on garbage,
-plus a named platform patch chain" — is **blocked on an evaluation wall**, and
-the measurement is the durable part:
+- **`BootReset.reset_regs_of_run` (∀ direction, the one consumers use):** for
+  EVERY `rs0`, a run of the chain yields `reset_regs c (boot_patch rs1)`.
+  `BootShared.boot_regs_of_facts` is its only caller, so nothing above it
+  changed — every consumer still asks for `reset_regs` by name.
+- **`PowerBoot.boot_shape_boot_gstate` (∃ direction, the witness):** `rs0 :=
+  init_regstate`, `rs1 := ColdBoot.cold_regs hid`, i.e. the closed cold-boot run.
+  That is now ColdBoot's job — the compiled evidence layer, and one convenient
+  garbage instance. `PowerBoot.boot_regs` no longer takes the dying generation's
+  registers at all (it used to write pinned VALUES over them, which was exactly
+  the shape this task retired).
 
-- The reset program itself is short and a probe that FORCES NOTHING is cheap:
-  `exec ArchReset.arch_reset` over an OPEN `regstate`, checked only for
-  `is_Some`, is **1.2 s / 650 MB**.
-- But **forcing any single register field of the result explodes**: `PC`,
-  `nextPC`, `cur_privilege`, `hart_state` and `elp` each hit a 100 s timeout at
-  ~4 GB. A field of `regstate` is a FUNCTION and `register_set` wraps it in a
-  fresh `fun r' => if r' =? r then v else <old> r'`, so over an open base
-  applying a field to the ~100-write tower is what blows up — and every
-  consumer-facing fact is exactly such an application. `is_Some` is cheap
-  because it applies no field at all; that is the trap to remember when
-  measuring.
-- `native_compute` is not an escape: the build passes `-native-compiler no`.
-- So the ∃-garbage anchoring needs **symbolic peeling** of the write tower
-  (`exec_bind0_Some` / `exec_write_reg` / `irrelevant_register_set` /
-  `register_lookup_set`, keeping the tower FOLDED and never forcing a field) —
-  ~100 steps plus the RMW reads inside `reset_misa` / `reset_pmp` / the vtype
-  chain. That is its own task, not a side effect of another one.
-- Until it is done, `ColdBoot` stays anchored on the model's full cold boot at
-  the CLOSED `init_regstate`, where everything computes in 13.6 s; the price is
-  the one recorded above — the values are justified, the *shape*
-  (`boot_shape`/`PowerBoot.boot_regs` writing pinned values over the dying
-  generation) is not.
-- The kernel-checked-copy technique this needs is already in the tree
-  (`ColdBoot.reset_sys_at` + `reset_sys_at_split`, and the module-local
-  `Import SailStdpp.Base` / `Import Defs` ORDER trap: `Base` re-exports
-  Prompt_monad's `read_reg`, so `Defs` must be imported LAST or nothing unifies
-  with `M`).
+**THE FILE LAYOUT.** `ArchReset.v` (new, below the language file, requires only
+the model) holds the model's `reset_sys`/`reset`/`init_model` copies with the
+`cancel_reservation` hook lifted to a parameter, their `reflexivity` fidelity
+ties, and the program `boot_prog` — it had to move out of ColdBoot because
+`boot_facts` NAMES the program.  `BootReset.v` (new) is the peeling kit and the
+garbage-run theorem.  `ColdBoot.v` keeps the closed run.
+
+**THE NAMED PLATFORM ASSUMPTIONS — the minimal honest list**, i.e. what does NOT
+follow from the chain and is written by `RiscvLang.boot_patch`:
+
+- **mie / mideleg = 0** — written by no line of the chain; they are a hart's
+  power-on state. Irreducible.
+- **pmpcfg = `pmpcfg_boot`** — NOT irreducible: `reset_pmp` really does clear A
+  and L in all 64 entries, which is exactly what `reset_regs` asks for
+  (`pmp_all_off`). Only the loop's FRAME half is proved here; the per-entry half
+  is the 64-way index resolution below. This is the one item left.
+
+Everything else — PC, nextPC, cur_privilege, hart_state, mhartid, mstatus, misa,
+**mseccfg**, **menvcfg**, htif_tohost_base, elp, pma_regions — is now DERIVED at
+an arbitrary power-on file.  (mhartid and the reset vector are still the BOARD's
+two configuration writes, but they are now writes INSIDE the anchored program
+rather than a patch over its output: `ArchReset.boot_pre`.)
+
+**WHY THE PROGRAM INCLUDES `sail_model_init`.** The anchor is the model's whole
+boot entry point, not `reset()` alone. That is the honest choice AND the cheap
+one: `reset()` alone leaves mstatus, misa's MXL, htif_tohost_base, menvcfg,
+mseccfg and pma_regions unwritten, so a reset-only anchor would have had to pin
+all six as whole-value platform assumptions — a strictly LONGER assumption list
+than the one above. `sail_model_init` IS the model's account of power-on, and it
+reads no register, so the peel takes it in ~40 steps.
+
+**THE KIT (`BootReset.v` §0), and it is now the durable recipe** — lifted into
+durable-notes.md, "THE ESCAPE FROM AN OPEN REGISTER FILE IS A SYMBOLIC PEEL":
+the program is CLOSED so it may be reduced freely while the state stays a folded
+`register_set` tower; one lemma per monad constructor; every read resolved the
+instant it is peeled (an unresolved one gets stored and the tower then contains a
+copy of itself — the doubling); dispatch on the head constructor by `lazymatch`
+and make the goal shape an `Inductive`, because a FAILING `apply` unfolds `exec`
+and starts evaluating the interpreter over the tower.
+
+**MEASUREMENTS (2026-08-05, isolated `coqc`):**
+
+| thing | cost |
+| --- | --- |
+| `BootReset.v` whole file (~135 register effects + the 64-way loop + the config assert) | **37.8 s / 0.96 GB** |
+| `exec_boot_pre` (sail_model_init + the board's two writes, ~45 effects) | 11.2 s |
+| `exec_config_is_valid` at an OPEN file (3 pma_regions reads, 12 checks) | 7.7 s |
+| the same config probe at the CLOSED cold-boot state (ColdBoot) | 1.4 s |
+| one field of the reset applied to an open file, by EVALUATION (the old wall) | 100 s timeout at ~4 GB |
+
+So the per-field cost is not per-field at all: the peel produces every conjunct
+of `post_ok` in one pass, and the whole file is cheaper than ONE field's failed
+`vm_compute` used to be.
+
+**THE FOUR TRAPS THAT COST THE MOST TIME** (all four are now in durable-notes):
+
+1. A failing `apply` in a `first [...]` chain let unification unfold `exec` and
+   evaluate the interpreter over the tower: **minutes per step, no error**, and
+   once it instantiated the state argument with a half-reduced `set_reg` tower
+   the rest of the proof was quietly off the rails. Syntactic dispatch +
+   `Inductive pfin` fixed it (2.5 s for the step that had been taking 3 min).
+2. `hnf` is ALL-OR-NOTHING and bitvector equality does not reduce under the lazy
+   evaluator, so the head comes back untouched. Walk the bind spine by lemma
+   (`exec_assoc`, stated at `exec` so it needs no funext) and settle the test
+   with `vm_compute` on that subterm.
+3. VM-normalising the blocked HEAD instead: the `currentlyEnabled` /
+   `hartSupports` cone is a well-founded recursion whose `Acc` guard doubles per
+   bit — **7.7 GB** before the kill.
+4. `first [ unfold A | unfold B ]` under an outer `progress`: `unfold A`
+   succeeded without changing the goal, `first` committed, `progress` failed, and
+   the peel stopped one blocker early with no diagnostic.
 
 ### PMPCFG PATCH RETIREMENT — **DONE. THE CLAUSE IS THE PREDICATE, NOT A VALUE**
 
@@ -2463,13 +2505,30 @@ axiom), and `cold_boot_pmp_all_off` rewrites with it and applies the witness.
 Splitting it that way is what keeps the out-of-range `vec_access_dec` indices in
 one place.
 
-**THE OPEN-BASE VERSION IS STILL FUTURE WORK** and is the ∀-garbage anchoring
-task's, not a side effect of this one: over an arbitrary power-on file
-`reset_pmp` is a `foreach_ZM_up 0 63` per-entry RMW, so `pmp_all_off` becomes a
-64-way symbolic index resolution over a `vec_update_dec` tower plus two generic
-bitvector facts (`_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF`,
-`pmpLocked (_update_Pmpcfg_ent_L y 0) = false`) — none of it `vm_compute`-able.
-The pointer is recorded in `ColdBoot.cold_boot_pmp_all_off`'s comment.
+**THE OPEN-BASE VERSION IS HALF DONE, AND THE REMAINING HALF IS THE LAST ITEM OF
+THE RESET-ANCHORING TRACK.** `BootReset.pmp_loop_frame` / `exec_reset_pmp` prove
+the FRAME half over an arbitrary power-on file — "the loop touches pmpcfg and
+nothing else", which is what lets the rest of the chain be peeled across it — by
+an induction over `foreach_ZM_up'` that is GENERIC IN THE LOOP BODY (the body is
+taken from the goal with `lazymatch … context[foreach_ZM_up' _ _ _ _ _ ?b]`,
+never transcribed) and keeps the vector abstract. Sealing `reset_pmp` `Opaque` is
+what makes that seam possible: its body reads pmpcfg TWICE and writes a
+`vec_update_dec` built from both, so peeling the 64 iterations would double the
+term 64 times.
+What is left is the per-entry half: `pmp_all_off` of the loop's output, i.e. a
+64-way symbolic index resolution needing (a) `vec_access_dec (vec_update_dec v i
+x) i = x` and its `j ≠ i` twin over `vec (mword 8) 64` (both reduce to
+`nth`/`list_update` facts through the `length_list l - 1` index flip, so
+`destruct v as [l Hl]` first), (b) an out-of-range fact `vec_access_dec v j =
+inhabitant` for `j < 0 \/ 63 < j` — needed because `pmp_all_off` quantifies over
+ALL of `Z` — and (c) the two generic bitvector facts
+`_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF` and
+`pmpLocked (_update_Pmpcfg_ent_L y 0) = false` at an OPEN entry `x`, which is
+where the "bitvector equality does not reduce under the lazy evaluator" rule
+above will bite. Strengthen `pmp_loop_frame`'s conclusion with the two extra
+conjuncts (`∀ j, i <= j <= 63 -> off (access j)` and "unchanged below `i`")
+rather than writing a second loop lemma. When it lands, pmpcfg leaves
+`RiscvLang.boot_patch` and the honest assumption list is exactly mie / mideleg.
 
 ### MSECCFG / MENVCFG PATCH SHARPENING — **MEASURED; DECIDED: THE PINS STAY**
 
