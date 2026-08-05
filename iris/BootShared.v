@@ -728,6 +728,44 @@ Section BootAlloc.
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
+  (* ZIPPING THE FOUR PER-HART FAMILIES: DO IT HERE, NOT AT THE USE SITE.
+     [big_sepL_sep] is a [⊣⊢], so [rewrite !big_sepL_sep] is a SETOID rewrite
+     over the whole [envs_entails Δ Q] -- and although the use site's [iAssert
+     ... with "[Hregs Hstrans Hsie Hharts]"] narrows the SPATIAL context to four
+     hypotheses, the INTUITIONISTIC one is untouched and at boot it is enormous
+     (the claims bundle, [gen_cert], the device invariant, the kernel text).
+     That one line measured 12.7 s of BootShared's 27 s -- and BootShared sits
+     on the build's critical-path TAIL ([BootChain] -> [BootShared] ->
+     [SystemAdequacy] all run at 1x parallelism), so it was wall time, not just
+     CPU.  Proved here, with an empty proofmode context, the same rewrite is
+     free; the call site becomes one first-order [iApply].  Same family as the
+     [wp_next_off] -> [wp_next_off_intro] rule in claude-notes/optimization.md:
+     never leave a big-op/BI identity to a setoid rewrite inside a large goal. *)
+  Lemma boot_hart_pre_combine (g : gstate) :
+    ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) -∗
+    ([∗ list] c ∈ enum CPU, hart_strans c) -∗
+    ([∗ list] c ∈ enum CPU, hart_sie c) -∗
+    ([∗ list] c ∈ enum CPU, boot_hart_bss c) -∗
+    [∗ list] c ∈ enum CPU,
+      (boot_reg_res (CID := c) (g.(gregs) c) ∗ hart_strans c ∗ hart_sie c ∗
+       boot_hart_bss c).
+  Proof.
+    (* THREE [iApply]s OF THE WAND FORM, NOT [rewrite !big_sepL_sep].
+       [big_sepL_sep] is a [⊣⊢], so rewriting with it is SETOID rewriting, and
+       its cost scales with the size of the CONCRETE predicates it has to build
+       [Proper] proofs over -- here [boot_reg_res] / [hart_sie] / [boot_hart_bss]
+       at eight harts.  Measured: the rewrite spelling costs 11.8 s and, unlike
+       the usual context-size traps, hoisting it into this empty-context lemma
+       does NOT help (11.76 s here vs 12.7 s at the use site) -- the size is in
+       the predicates, not the goal around them.  [big_sepL_sep_2] is the wand
+       form of the same fact; [iApply] matches it by head and never enters the
+       setoid machinery. *)
+    iIntros "H1 H2 H3 H4".
+    iApply (big_sepL_sep_2 with "H1 [H2 H3 H4]").
+    iApply (big_sepL_sep_2 with "H2 [H3 H4]").
+    iApply (big_sepL_sep_2 with "H3 H4").
+  Qed.
+
   (* ONE hart's register side, run inside the shared fupd so the two PLIC wire
      pins can be kept back for [wire_inv]. *)
   Lemma boot_hart_pre (h : CPU) (g : gstate) (E : coPset) :
@@ -860,7 +898,7 @@ Section BootAlloc.
                (boot_reg_res (CID := c) (g.(gregs) c) ∗
                 hart_strans c ∗ hart_sie c ∗ boot_hart_bss c))%I
       with "[Hregs Hstrans Hsie Hharts]" as "Hpre".
-    { rewrite !big_sepL_sep. iFrame "Hregs Hstrans Hsie Hharts". }
+    { iApply (boot_hart_pre_combine with "Hregs Hstrans Hsie Hharts"). }
     iAssert ([∗ list] c ∈ enum CPU, |={⊤}=>
                ((∃ iv : mword 32,
                    boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗

@@ -93,10 +93,79 @@ converting them:
   `rewrite H` whose LHS is a projection of a `set`-bound state.**  Sites where
   the `rewrite H` comes FIRST on the line are fine and were converted.
 
-The 282 remaining `unfold ... set_reg` sites are ones where the `unfold` and the
-`cbn` are on different lines, or where there is no `cbn` at all; they are
-un-swept, not deliberate.  Convert them the same way when touching those files,
-checking the two shapes above.
+**THE SWEEP IS COMPLETE — do not go looking for more.**  An earlier draft of
+this note claimed "282 remaining sites"; that was a bad grep (`unfold
+([^.]*?set_reg[^.]*?)[.;]` matches greedily across the `;` into the *converted*
+`rewrite ?sregs_set_reg`, so it counted the fix as a miss).  Counting only
+`set_reg` appearing in an `unfold`'s comma-separated NAME LIST, **24 sites
+remain and all 24 are legitimate**:
+
+- **11 are `unfold set_reg at 1`** — a SINGLE-occurrence unfold, already linear
+  (3 copies of one level, not `3^N`).  Nothing to fix.
+- **7 are the `rewrite Hmdevtr` / whole-state-`f_equal` sites** documented above.
+- **6 are whole-state equations** (`MinstretInv`, `SmodePte`, `WpPushOffCsr`)
+  of the form `set_reg s r v = s`, which need the `MState` constructor exposed
+  for `f_equal`/`register_set_*_id` to apply.
+
+## The OTHER shape: a setoid rewrite whose cost is in the PREDICATE, not the context
+
+`BootShared`'s `rewrite !big_sepL_sep` — zipping four per-hart families before
+`iFrame` — measured **12.7 s of that file's 27 s**, and `BootShared` is on the
+build's critical-path **TAIL** (`BootChain -> BootShared -> SystemAdequacy`, all
+at 1x parallelism), so it was wall time.
+
+The instructive part is that **the usual fix did not work.**  `big_sepL_sep` is
+a `⊣⊢`, so rewriting with it is setoid rewriting over `envs_entails Δ Q`, and
+the reflex (see the `set_solver` and `wp_next_off` rules) is "the context is too
+big — hoist it into a small-context lemma".  Hoisting it into a top-level lemma
+with an EMPTY proofmode context changed nothing: **11.76 s there vs 12.7 s at
+the use site.**  The size is in the *predicates* the rewrite must build `Proper`
+proofs over (`boot_reg_res` / `hart_sie` / `boot_hart_bss` at eight harts), not
+in the goal around them.
+
+**The fix is to leave the setoid machinery entirely: use the WAND form.**  Iris
+ships `big_sepL_sep_2` (`iris/bi/big_op.v`) next to `big_sepL_sep`; `iApply`
+matches it by head and never enters setoid rewriting.  Three `iApply
+(big_sepL_sep_2 with ...)` in place of one `rewrite !big_sepL_sep` took
+**BootShared 28.3 s -> 15.3 s CPU (1.85x)**, isolated, min of two interleaved.
+
+**Do NOT sweep this one.**  The tree has six other `rewrite big_sepL_sep` sites
+and every one is cheap — `BootCarveMain` 0.12 s, `DiskBoot` 0.40 s / 0.17 s,
+`ProcInv` 0.05 s, `ProofFreewalk`/`BioInv` sub-second — precisely because their
+predicates are small.  Look up a candidate's per-sentence cost in the
+`*.v.timing` files before touching it; the site count tells you nothing.
+
+## Boot-chain audit (2026-08-05): two non-bugs and one real fix
+
+Tree sizes say the boot chain looks pathological (`ColdBoot` 5,482,721/3,698 =
+**1483x**, `BootReset` 4,539,073/6,151 = **738x**), but `-profile` says the time
+is NOT in `Qed` there:
+
+- **`ColdBoot`** — 8.85 s in `let x := eval vm_compute in ...` plus 2.72 s in the
+  following `Defined.`, i.e. the 5.5M-node term IS the cold-boot state computed
+  once into its own `Definition`.  That is the documented fix from
+  durable-notes, not a bug; leave it alone.
+- **`BootReset`** — 14.85 s in one `peel` on `exec_config_is_valid`, of which
+  **98 % is `phnf`** (`let P' := eval hnf in P in change P with P'`), 7.54 s in a
+  single call.  The cost is the `eval hnf` over the Sail `config_is_valid`
+  program, NOT the `change`'s conversion check: swapping in `change_no_check`
+  was measured at **28.7 s -> 27.3 s**, i.e. noise, and was rejected (no reason
+  to weaken a check for that).  Shortening this needs a real refactor — prove
+  the twelve config checks by a dedicated lemma instead of peeling the monad —
+  and `BootReset` is OFF the critical path, so it is CPU only.
+
+## Where the pipe/printk proofs' cost is: nowhere in particular
+
+`ProofPrintk` / `ProofPipealloc` / `ProofPiperead` / `ProofPipewrite` carry the
+tree's biggest proof terms (26–45 M nodes) but at **224–298x** over DAGs of
+87k–149k distinct subterms — an ordinary ratio for an Iris proof that large, not
+a duplication bug.  Their per-sentence profiles are flat: 1600–6700 sentences
+each, the single largest item is the `Qed` itself (14–35 s) and the rest is a
+long tail of 2–9 s `iApply`/`iFrame`.  There is no `unfold`-style bomb to
+remove; shrinking them means the structural remedy already in this file (split
+into `Qed`-sealed chunk lemmas of ~5–6 instructions), which is a design change,
+not a tactic swap.  Do not go hunting for a hot statement there — it was looked
+for, twice, and there is not one.
 
 ## Proof performance rules (apply proactively when writing new proofs)
 
