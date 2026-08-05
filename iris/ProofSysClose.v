@@ -502,9 +502,12 @@ Section ProofSysClose.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argfd.wp_argfd_sconf Φ γf M6 (av - 4)%nat n eb p C 0%nat v
               pid V (word_hi w3) w4 b
-              ltac:(unfold NARG; lia) HM6a0 Harg Hnzfd Hnzf Hn
+              ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
               ltac:(unfold argfd_stack; lia)
-              with "Hcg Hcpu Htext Hdata Hpc Hpriv Hs3hi Hs4 [-]").
+              with "Hcg Hcpu Htext Hdata Hpc Hpriv [Hs3hi] Hs4 [-]").
+    { (* sys_close DOES want the descriptor index, so its [pfd] is a real
+         stack address -- [ofd_out]'s non-null case *)
+      iApply (ofd_out_intro _ _ Hnzfd with "Hs3hi"). }
     iIntros (CID9 Hs9 A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
     assert (Hpc16 : ret_pc (M6 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sys_close + 0x16))
@@ -560,6 +563,7 @@ Section ProofSysClose.
     rewrite /argfd_post. iDestruct "Hpost" as "[Hfail | Hsucc]".
     - (* ================= FAILURE: argfd returned -1 ================= *)
       iDestruct "Hfail" as "([%Hr %Hnone] & Hfdcell & Hfcell)".
+      iDestruct (ofd_out_elim _ _ Hnzfd with "Hfdcell") as "Hfdcell".
       assert (HA7a0' : A7 !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64))
         by (rewrite HA7a0; exact Hr).
       iApply (wp_blt_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.sys_close + 0x18))
@@ -589,6 +593,7 @@ Section ProofSysClose.
       split; [exact Hmfa0 | exact Hnone].
     - (* ================= SUCCESS: fd names a live file ================= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & Hfdcell & Hfcell)".
+      iDestruct (ofd_out_elim _ _ Hnzfd with "Hfdcell") as "Hfdcell".
       pose proof (arg_fd_lookup v (pv_ofile V) fd fv Hsome) as (Hfdlt & Hlk & Hfvnz & Hsext).
       assert (HA7a0' : A7 !!! Regidx (mword_of_int 10 : mword 5) = (zero_reg : mword 64))
         by (rewrite HA7a0; exact Hr).

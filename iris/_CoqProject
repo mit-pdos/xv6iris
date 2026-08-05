@@ -737,3 +737,8 @@ CrashProto.v
 BootChain.v
 BootShared.v
 SystemAdequacy.v
+CodeSysDup.v
+SpecSysDup.v
+ProofSysDup.v
+LinkArgfd.v
+LinkSysDup.v

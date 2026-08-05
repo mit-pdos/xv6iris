@@ -146,6 +146,84 @@ Section ProofArgfd.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
+  (*  +0x38 .. +0x3c: [if (pfd) *pfd = fd], BOTH ways.                    *)
+  (* =================================================================== *)
+  (* argfd's callers disagree about [pfd]: sys_close passes a stack local,
+     sys_dup passes 0.  The two arms converge at +0x40 with IDENTICAL
+     registers -- an [sw] writes none -- so the branch is one sub-block taken
+     once here, rather than a case split that would duplicate the whole tail
+     from +0x40 down.  [SpecArgfd.ofd_out] is the resource that is a cell in
+     one arm and nothing in the other. *)
+  Lemma af_pfd `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+      (Mt : regfile) (nav : nat) (pfd : mword 64) (oldfd wfd : mword 32)
+      (p : mword 64) (b : bool) :
+    Mt !!! Regidx (mword_of_int 18 : mword 5) = pfd ->
+    Mt !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 wfd ->
+    sie_cap_gpr Mt nav b p -∗
+    kernel_text -∗
+    pc_is (mword_of_int (KernelSyms.argfd + 0x38) : mword 64) -∗
+    ofd_out pfd oldfd -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr Mt nav b p -∗
+      pc_is (mword_of_int (KernelSyms.argfd + 0x40) : mword 64) -∗
+      ofd_out pfd wfd -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hs2 Ha4.
+    assert (Ha4' : forall CID' : CpuId,
+              rget (CID := CID') Mt (mword_of_int 14 : mword 5) = sign_extend' 64 wfd)
+      by (intros CID'; rgne; exact Ha4).
+    iIntros "Hcg #Htext Hpc Hcell Hcont".
+    iPoseProof (afi_38 with "Htext") as "Hi38".
+    iPoseProof (afi_3c with "Htext") as "Hi3c".
+    destruct (decide (pfd = (zero_reg : mword 64))) as [Hz|Hnz].
+    - (* pfd == 0: the branch is TAKEN and no store happens *)
+      iPoseProof (ofd_out_null pfd wfd Hz) as "Hout".
+      iApply (wp_beqz_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x38))
+                (mword_of_int 8 : mword 13) (mword_of_int 18 : mword 5) Mt nav b
+                ltac:(vm_compute; discriminate)
+                ltac:(rgne; rewrite Hs2 Hz; apply eq_vec_true_iff; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi38 [-]").
+      iNext. iIntros (CID1 Hk1) "Hcg Hpc".
+      assert (Htgt : add_vec (mword_of_int (KernelSyms.argfd + 0x38) : mword 64)
+                       (sign_extend' 64 (mword_of_int 8 : mword 13))
+                     = mword_of_int (KernelSyms.argfd + 0x40))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt) in "Hpc".
+      iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" with "Hcg Hpc Hout").
+    - (* pfd <> 0: fall through and store *)
+      iDestruct (ofd_out_elim pfd oldfd Hnz with "Hcell") as "Hcell".
+      iApply (wp_beqz_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x38))
+                (mword_of_int 8 : mword 13) (mword_of_int 18 : mword 5) Mt nav b
+                ltac:(vm_compute; discriminate)
+                ltac:(rgne; rewrite Hs2; apply eq_vec_false_iff; exact Hnz)
+                with "Hcg Hpc Hi38 [-]").
+      iIntros (CID1 Hk1) "Hcg Hpc".
+      assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.argfd + 0x38) : mword 64) 4
+                      = mword_of_int (KernelSyms.argfd + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp3c) in "Hpc".
+      assert (Haddrp : add_vec (Mt !!! Regidx (mword_of_int 18 : mword 5))
+                         (sign_extend' 64 (mword_of_int 0 : mword 12)) = pfd)
+        by (rewrite Hs2; apply addv_sext0).
+      iEval (rewrite -Haddrp) in "Hcell".
+      iApply (wp_sw_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x3c))
+                (mword_of_int 14 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0 : mword 12)
+                Mt nav oldfd b
+                with "Hcg Hpc Hi3c Hcell [-]").
+      iIntros (CID2 Hk2) "Hcg Hpc Hcell".
+      iEval (rewrite Haddrp Ha4' trunc32_sext64) in "Hcell".
+      assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x3c) : mword 64) 4
+                      = mword_of_int (KernelSyms.argfd + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp40) in "Hpc".
+      iDestruct (ofd_out_intro pfd wfd Hnz with "Hcell") as "Hout".
+      iSpecialize ("Hcont" $! CID2 with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" with "Hcg Hpc Hout").
+  Qed.
+
+  (* =================================================================== *)
   (*  The shared tail at +0x46: the epilogue, entered by all three arms.  *)
   (* =================================================================== *)
   Lemma af_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
@@ -373,7 +451,7 @@ Section ProofArgfd.
     : wp_argfd_sconf_body Φ γf m av n eb p C i v pid V oldfd oldf b.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].
-    intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzfd Hnzf Hn Hav.
+    intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzf Hn Hav.
     unfold argfd_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
@@ -1015,30 +1093,10 @@ Section ProofArgfd.
         assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x36) : mword 64) 2
                         = mword_of_int (KernelSyms.argfd + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp38) in "Hpc".
-        (* ---- +0x38: beq s2,x0 -- pfd is not null, so fall through ---- *)
-        iApply (wp_beqz_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x38))
-                  (mword_of_int 8 : mword 13) (mword_of_int 18 : mword 5) C5 (av - 6)%nat b
-                  ltac:(vm_compute; discriminate)
-                  ltac:(rewrite HC5s2'; apply eq_vec_false_iff; exact Hnzfd)
-                  with "Hcg Hpc Hi38 [-]").
-        iIntros (CID23 Hk23) "Hcg Hpc".
-        assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.argfd + 0x38) : mword 64) 4
-                        = mword_of_int (KernelSyms.argfd + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
-        iEval (rewrite Hpp3c) in "Hpc".
-        (* ---- +0x3c: sw a4,0(s2) -- *pfd = fd ---- *)
-        assert (Haddrp : add_vec (C5 !!! Regidx (mword_of_int 18 : mword 5))
-                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = pfd)
-          by (rewrite HC5s2; apply addv_sext0).
-        iEval (rewrite -Haddrp) in "Hfdcell".
-        iApply (wp_sw_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x3c))
-                  (mword_of_int 14 : mword 5) (mword_of_int 18 : mword 5) (mword_of_int 0 : mword 12)
-                  C5 (av - 6)%nat oldfd b
-                  with "Hcg Hpc Hi3c Hfdcell [-]").
+        (* ---- +0x38 .. +0x3c: [if (pfd) *pfd = fd], both ways ---- *)
+        iApply (af_pfd (CID0 := CID22) Φ C5 (av - 6)%nat pfd oldfd
+                  (trunc32 v) p b HC5s2 HC5a4 with "Hcg Htext Hpc Hfdcell [-]").
         iIntros (CID24 Hk24) "Hcg Hpc Hfdcell".
-        iEval (rewrite Haddrp HC5a4' trunc32_sext64) in "Hfdcell".
-        assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.argfd + 0x3c) : mword 64) 4
-                        = mword_of_int (KernelSyms.argfd + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
-        iEval (rewrite Hpp40) in "Hpc".
         (* ---- +0x40: c.li a0,0 ---- *)
         iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x40))
                   (mword_of_int 10 : mword 5) (mword_of_int 0 : mword 6)

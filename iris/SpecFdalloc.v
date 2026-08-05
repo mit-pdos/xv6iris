@@ -36,9 +36,23 @@
      +0x3e  b7ed        c.j      -0x26        back to the epilogue
 
    THE CONTRACT.  "Takes over file reference from caller on success", says
-   the comment, and that is exactly the resource story: the [file_ref] goes
-   IN and, on success, ends up inside [proc_priv] as descriptor [fd]'s
-   reference; on failure it comes back out untouched.
+   the comment -- but that is the CALLER's obligation, not fdalloc's.  fdalloc
+   stores a pointer; it never touches a [file_ref].  So the contract is stated
+   over the block SPLIT at the fd table ([ProcInv.proc_priv_core] plus
+   [ProcInv.proc_ofiles_owe]), and it takes no reference at all: on success the
+   descriptor it filled joins the caller's payload DEFICIT, which the caller
+   settles from whatever reference it holds.
+     This is strictly weaker than demanding the [file_ref] up front, and it is
+   what sys_dup needs: there, [filedup] wants the SOURCE descriptor's reference
+   in hand, so that descriptor is already payloadless when fdalloc runs, and a
+   spec taking a whole [proc_priv] could not be applied at all.  The deficit
+   set [D] is a pure spectator here -- fdalloc's code cannot tell which
+   descriptors are on loan, and does not need to: it only ever fills a NULL
+   one, and [ProcInv.proc_ofiles_owe]'s non-null clause on lent descriptors is
+   what makes "the cell I found is null" enough to know it is not one.
+     Callers that do hold the reference (sys_open, sys_pipe) settle the deficit
+   immediately after the call with [ProcInv.proc_ofiles_repay], which is one
+   line.  See claude-notes/design/file-table.md.
 
    WHICH descriptor is not a choice -- it is the LEAST free one, a function
    of the process's own (thread-local) array.  [fd_frees] below names that
@@ -186,25 +200,27 @@ Section SpecFdalloc.
   (* fdalloc's result, keyed by the returned a0.  The two arms are decided
      by the process's own descriptor array, so the disjunction is a CASE
      ANALYSIS on [fd_frees], not an unconstrained choice. *)
-  Definition fdalloc_post (γf : gname) (p : mword 64) (pid : mword 32)
-      (V : pprivate) (k : nat) (q : Qp) (Cf : fcontent) (r : mword 64) : iProp Σ :=
-    ((* the table is full: nothing happened, and the caller keeps its
-        reference (xv6's callers close it themselves) *)
+  Definition fdalloc_post (γf : gname) (p : mword 64)
+      (V : pprivate) (D : gset nat) (k : nat) (r : mword 64) : iProp Σ :=
+    ((* the table is full: nothing happened *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ fd_frees (pv_ofile V) = []⌝ ∗
-       proc_priv γf p pid V ∗ file_ref γf k q Cf
+       proc_ofiles_owe γf p (pv_ofile V) D
      ∨
-     (* the least free descriptor now names the file, and the unit it used
-        to own comes back to the caller *)
+     (* the least free descriptor now names the file.  Two things changed: the
+        unit that descriptor used to own comes back to the caller, and the
+        descriptor now OWES a payload -- it names a file whose reference the
+        caller still holds. *)
      ∃ (fd : nat) (l : list nat),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
         fd_frees (pv_ofile V) = fd :: l⌝ ∗
-       proc_priv γf p pid (upd_ofile V fd (fnode k)) ∗ fd_slot)%I.
+       proc_ofiles_owe γf p (pv_ofile (upd_ofile V fd (fnode k)))
+         ({[fd]} ∪ D) ∗ fd_slot)%I.
 
 End SpecFdalloc.
 
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
-    (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
+    (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fdalloc in
@@ -218,15 +234,18 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  proc_priv γf p pid V -∗
-  file_ref γf k q Cf -∗
+  (* the block SPLIT at the fd table: fdalloc needs the core only to reach
+     myproc's tier, and the array in whatever loan state the caller left it *)
+  proc_priv_core p pid V -∗
+  proc_ofiles_owe γf p (pv_ofile V) D -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      fdalloc_post γf p pid V k q Cf (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      proc_priv_core p pid V -∗
+      fdalloc_post γf p V D k (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -234,8 +253,8 @@ Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
-      (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
+      (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool),
-      wp_fdalloc_sconf_body Φ γf k q Cf m av n eb p C pid V b.
+      wp_fdalloc_sconf_body Φ γf k D m av n eb p C pid V b.
 End FDALLOC.

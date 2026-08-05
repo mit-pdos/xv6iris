@@ -220,19 +220,21 @@ frac component tracks *outstanding* fraction rather than being pinned at 1.
   file_ref γ k q C)`.
 - **`fork`.** One `filedup` per open fd halves the parent's fraction and bumps
   the count; parent and child each end with a genuine `file_ref`.
-- **`sys_dup` — the one pattern the landed resources do NOT cover.**
+- **`sys_dup` — the pattern that forced the fd-table split, and it is PROVEN**
+  (`SpecSysDup.v` / `CodeSysDup.v` / `ProofSysDup.v` / `LinkSysDup.v`; 24
+  instructions, ~9 min to check).
   `fdalloc(f)` stores the pointer *before* `filedup(f)` runs, so there is a
   window in which two `ofile` entries name one file and only one reference
-  exists. Soundness is not the problem (the fd table is thread-local, so the
-  window is unobservable); the problem is that nothing can currently *state*
-  it.
+  exists. Soundness was never the problem (the fd table is thread-local, so the
+  window is unobservable); the problem was that nothing could *state* it.
 
-  **It is not an fd-slot shortage, and the allowance does not help.** Each
+  **It was not an fd-slot shortage, and the allowance does not help.** Each
   process does own `fd_slots FDSPARE` (routed by procinit, above) for exactly
   this family of situations. But sys_dup's missing resource is a `file_ref`,
   and **a unit cannot become a reference.** Spelled out, because it is the
-  crux and it is worth having written down — a `file_ref γ k q C` is three
-  things at once:
+  crux and it is worth having written down — a `file_ref γ k q C` is two
+  things at once (the landed `FileInv.v`; the `file_payload` third component
+  below is designed but NOT yet built, see the payload open item):
 
   1. `fref_tok γ k q = own γ (◯ {[k := (q, 1%positive)]})` — a fragment of the
      auth whose authoritative element lives in the **ftable lock's** resource;
@@ -297,25 +299,61 @@ frac component tracks *outstanding* fraction rather than being pinned at 1.
   once (the source, loaned out; the destination, written but not yet backed),
   which `filedup`'s two halves then settle together.
 
-  **So the shape to build is a payload DEFICIT SET, and it is cheap.** Add one
-  predicate beside `proc_priv` — `proc_priv_owe γf pa pid V D`, the private
-  block in which every `fd ∈ D` contributes only its cell — with
-  `proc_priv_owe … ∅ ⊣⊢ proc_priv …`, a lend lemma (`fd ∉ D`, the slot
-  non-null → `file_ref` out, `D ∪ {fd}` back) and its inverse. Then:
+  **What was built: the block SPLIT AT THE FD TABLE, with the deficit local to
+  the array.** The first design put the deficit on the whole block
+  (`proc_priv_owe γf pa pid V D`); that is *not enough*, and the reason is
+  worth recording — the deficit has to survive being passed to a callee, and
+  `SpecPiperead`/`SpecPipewrite`/`SpecFdalloc` all take `proc_priv`. A deficit
+  block is **not `proc_priv ∗ anything`** (the lent descriptor's cell names a
+  file, so `ofile_slot` demands the missing reference), so there is no frame
+  lemma and no way to hand one to a `proc_priv`-taking callee. What landed
+  instead, in `ProcInv.v`:
 
-  - **`fdalloc`'s spec loses its `file_ref` premise entirely** and is stated
-    over `proc_priv_owe … D` → `proc_priv_owe … (D ∪ {fd})` plus the
-    `fd_slot`. That is honest — fdalloc's code only writes a pointer; the
-    reference was never what it consumed, only what its *caller* needed to
-    restore the invariant — and it is strictly weaker, so it is a better spec
-    than the current one on its own merits. Its loop is unaffected: the scan
-    reads cells only (`proc_priv_ofile_read`), so a payload-less descriptor
-    costs it nothing.
-  - **Nothing else changes.** Every other function keeps `proc_priv`; no
-    consumer of a non-null descriptor has to refute a new disjunct, which is
-    what rules out the tempting alternative of a third `ofile_slot` case. Only
-    `sys_pipe`'s two call sites move: each settles its deficit from the
-    `file_ref` it is already holding, immediately after the call.
+  - `proc_priv γf pa pid V = proc_priv_core pa pid V ∗ proc_ofiles γf pa (pv_ofile V)`
+    — a definitional split, `proc_priv_split` the equivalence. The core is
+    everything with no file-layer content, and it does not constrain the
+    descriptor array at all (`proc_priv_core_upd_ofile`).
+  - `proc_ofiles_owe γf pa fs D` — the array with the payloads of `D` missing.
+    Its lent case carries `⌜v ≠ 0⌝`, which is what lets **fdalloc derive
+    `fd ∉ D` from "the cell I found is null"**: fdalloc is generic in `D` and
+    never learns it, and without the non-null clause it could not tell a free
+    descriptor from a lent one.
+  - `proc_ofiles_owe_acc` is the one piece of bigop surgery — open descriptor
+    `fd`, close it back with a new **value** and under a new **deficit set**
+    that agrees away from `fd`. `proc_ofiles_lend` / `_repay` / `_install` /
+    `_owe_read` are one-liners over it. It needs `big_sepL_delete_insert` (the
+    remainder after deleting index `i` cannot see a store at `i`), because
+    `big_sepL_insert_acc` changes only the value and
+    `big_sepL_lookup_acc_impl` only the predicate, and a descriptor going on
+    loan changes both at once.
+  - `proc_priv_lend` / `proc_priv_join` / `proc_priv_settle` at the block's
+    altitude — the last is the caller-of-fdalloc one-liner.
+
+  Consequences, all of which landed:
+
+  - **`fdalloc`'s spec lost its `file_ref` premise entirely**, along with its
+    `q` and `Cf` parameters. It is stated over `proc_priv_core` plus
+    `proc_ofiles_owe … D` → `… ({[fd]} ∪ D)` plus the released `fd_slot`. That
+    is honest — fdalloc's code only writes a pointer; the reference was never
+    what it consumed, only what its *caller* needed to restore the invariant —
+    and it is strictly weaker, so it is a better spec on its own merits. Its
+    loop was unaffected (the scan reads cells only), so re-proving it was a
+    four-line edit.
+  - **`argfd`'s `pfd` went generic**, because sys_dup passes 0 there:
+    `SpecArgfd.ofd_out` is a cell when the pointer is non-null and `emp` when
+    it is not, and `ProofArgfd.af_pfd` is the `if (pfd)` branch as ONE
+    sub-block (both arms rejoin at +0x40 with identical registers, so a case
+    split there would have duplicated the whole tail). sys_close, the other
+    caller, wraps its stack local with `ofd_out_intro` — a two-line change.
+    **sys_read will want the same treatment for `pf`.**
+  - **Only `sys_pipe`'s two call sites moved**, exactly as predicted: split,
+    call with `D = ∅`, `proc_priv_settle` from the `file_ref` it already holds.
+    16 of the 19 `proc_priv`-taking specs did not change at all.
+
+  And sys_dup's own ledger closes with **zero allowance**: the `fd_slot`
+  fdalloc releases is precisely the one `filedup` consumes. The two descriptors
+  are provably distinct (the source is non-null by `arg_fd`, the destination
+  null by `fd_frees`), which is what lets the two repayments not collide.
 
   `fork`, which `filedup`s *before* installing, needs none of this.
 - **`argfd` / a syscall using a file.** No reference is taken: the syscall
@@ -366,6 +404,30 @@ factored out of the other six fields in `FileInv.v` so the swap touches one
 definition rather than every caller.
 
 ## Open items
+
+- **THE PAYLOAD LINK DOES NOT EXIST, and it is the next real design step.**
+  `file_ref` in the landed `FileInv.v` is `fref_tok ∗ file_fields` — the
+  `file_payload q C` third component described above is designed and NOT built.
+  Consequences, all currently true:
+  * `pipealloc` returns `file_ref γf k 1 C ∗ pipe_ref γp w 1` as *separate*
+    resources (`SpecPipealloc.v`), and `sys_pipe`'s postcondition is
+    `proc_priv … ∗ fd_slot ∗ fd_slot` — **both `pipe_ref`s are dropped on the
+    floor.** Iris is affine so that typechecks; it means the descriptors
+    sys_pipe creates are not connected to the pipe in the model.
+  * `sys_read`/`sys_write` on a pipe fd have nowhere to obtain the `pipe_ref`
+    that `piperead`/`pipewrite` demand. They are blocked on this, not on the
+    fd-table split.
+  * `fileclose`'s last-reference arm needs the whole payload for
+    `pipeclose(ff.pipe, ff.writable)` / `iput(ff.ip)`, which is likely part of
+    why it is the one unproven hole damming the proved-but-unlinked cone.
+
+  The fix is `file_payload q C` as a disjunction on `fc_type C` (FD_PIPE → that
+  end's `pipe_ref` at `q`; FD_INODE/FD_DEVICE → an inode ref at `q`; FD_NONE →
+  `emp`) moved INSIDE `file_ref`, so `filedup`'s halving splits it and
+  `fileclose` at `q = 1` collects it whole. It touches `filealloc`, `filedup`,
+  `fileclose`, `pipealloc`, `sys_pipe`, `ofile_slot` and `fdalloc` — bigger
+  than the fd-table split was, and it re-proves fdalloc, so do not interleave
+  the two.
 
 ## Why `f->ref++` cannot overflow: the fd-slot resource
 
@@ -441,10 +503,11 @@ requires it vacuous. (A "dup budget" pool with a lifetime cap and no returns
 was also tried and is strictly worse — it bounds calls rather than live
 references, and its supply has no principled source.)
 
-- **`fdalloc` is the other half of the descriptor story** (`SpecFdalloc.v`,
-  specified, not yet proven): it takes a `file_ref`, installs it in the LEAST
-  free descriptor, and hands back the `fd_slot` that the emptied descriptor
-  used to own. Which descriptor is not a choice — `fd_frees fs` names the free
+- **`fdalloc` is the other half of the descriptor story** (`SpecFdalloc.v` /
+  `ProofFdalloc.v` / `LinkFdalloc.v`, proven and linked): it installs a pointer
+  in the LEAST free descriptor and hands back the `fd_slot` that the emptied
+  descriptor used to own, taking NO reference of its own (see the sys_dup entry
+  above for why that is the honest contract). Which descriptor is not a choice — `fd_frees fs` names the free
   ones in order, and `fd_frees_insert` ("filling the head pops it") is what
   makes two successive calls compose without re-deriving anything. That pure
   layer is what `sys_pipe`'s postcondition is stated over.
@@ -479,13 +542,15 @@ references, and its supply has no principled source.)
   same reason sys_dup's is — the fd table is thread-local. Its fd lookup
   contract is `SpecArgfd.v` (`arg_fd`, a FUNCTION of the syscall argument and
   the descriptor array, so the postcondition is not an unconstrained
-  "succeeded or not"), and `argfd` itself is proven in `ProofArgfd.v` — also
-  unlinked, because `ARGINT` has no implementation while `argraw` is parked.
+  "succeeded or not"), and `argfd` is proven AND linked (`LinkArgfd.v`, over
+  `LinkArgint` + `LinkMyproc`) — that became writable when argraw stopped being
+  parked, and had simply not been written.
 - **`procinit` is where the supply gets routed, and it is proven and linked**
   (`SpecProcinit.v` / `ProofProcinit.v` / `LinkProcinit.v`, over `INITLOCK`;
-  47 s / 1.6 GB). Its precondition takes `fd_slots (NPROC * NOFILE)` and its
-  64 processes as fd-slot-free blocks (`proc_dormant_nofd`); the routing is
-  `fd_slots_split_n` into NPROC bundles of NOFILE and
+  47 s / 1.6 GB). Its precondition takes the WHOLE supply,
+  `fd_slots (NPROC * (NOFILE + FDSPARE))`, and its 64 processes as
+  fd-slot-free blocks (`proc_dormant_nofd`); the routing is
+  `fd_slots_split_n` into NPROC bundles and
   `ProcInv.proc_dormant_seal` to glue a bundle onto each block. **Do the
   routing ONCE, before the loop** — procinit's code never touches an fd, so a
   local `proc_seal` (a `proc_raw` whose block is already a real

@@ -421,17 +421,17 @@ Section ProofFdalloc.
   (*  The whole function.                                                 *)
   (* =================================================================== *)
   Lemma wp_fdalloc_sconf (Φ : mval -> iProp Σ)
-      (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
+      (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_fdalloc_sconf_body Φ γf k q Cf m av n eb p C pid V b.
+    : wp_fdalloc_sconf_body Φ γf k D m av n eb p C pid V b.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].
     intros pcE ret_tgt Ha0 Hk Hn Hav.
     unfold fdalloc_stack in Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc Hpv Href Hcont".
-    iDestruct (proc_priv_ofile_len with "Hpv") as "%Hlen".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc Hcore Hpv Hcont".
+    iDestruct (proc_ofiles_owe_len with "Hpv") as "%Hlen".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (fdi_00 with "Htext") as "Hi00".
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -697,8 +697,8 @@ Section ProofFdalloc.
       sie_cap_gpr (CID:=CID0) M (av - 4)%nat b p -∗
       cpu_own (CID:=CID0) n eb p C b -∗
       pc_is (CID:=CID0) (mword_of_int (FDA + 0x1a) : mword 64) -∗
-      proc_priv γf p pid V -∗
-      file_ref γf k q Cf -∗
+      proc_priv_core p pid V -∗
+      proc_ofiles_owe γf p (pv_ofile V) D -∗
       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
@@ -709,14 +709,15 @@ Section ProofFdalloc.
           sie_cap_gpr mf av b p -∗
           cpu_own n eb p C b -∗
           pc_is ret_tgt -∗
-          fdalloc_post γf p pid V k q Cf (mf !!! Regidx Ra0) -∗
+          proc_priv_core p pid V -∗
+          fdalloc_post γf p V D k (mf !!! Regidx Ra0) -∗
           WP (Loop : expr riscv_lang) {{ Φ }}) -∗
       WP (Loop : expr riscv_lang) {{ Φ }})%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (fd CID0 M) "%Hfuel %Hfd %Hpre %Hinv Hcg Hcpu Hpc Hpv Href Hc1 Hc2 Hc3 Hc4 Hcont".
+      { iIntros (fd CID0 M) "%Hfuel %Hfd %Hpre %Hinv Hcg Hcpu Hpc Hcore Hpv Hc1 Hc2 Hc3 Hc4 Hcont".
         exfalso. unfold NOFILE in Hfd, Hfuel. lia. }
-      iIntros (fd CID0 M) "%Hfuel %Hfd %Hpre %Hinv Hcg Hcpu Hpc Hpv Href Hc1 Hc2 Hc3 Hc4 Hcont".
+      iIntros (fd CID0 M) "%Hfuel %Hfd %Hpre %Hinv Hcg Hcpu Hpc Hcore Hpv Hc1 Hc2 Hc3 Hc4 Hcont".
       destruct Hinv as (HMa0 & HMa2 & HMa3 & HMa5 & HMs1 & HMsp & HMcs).
       (* the descriptor this iteration reads *)
       assert (Hlk : exists w, pv_ofile V !! fd = Some w).
@@ -728,7 +729,7 @@ Section ProofFdalloc.
       iPoseProof (fdi_20 with "Htext") as "Hi20".
       iPoseProof (fdi_22 with "Htext") as "Hi22".
       (* ---- +0x1a: c.ld a4,0(a5) -- a4 := p->ofile[fd] ---- *)
-      iDestruct (proc_priv_ofile_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
+      iDestruct (proc_ofiles_owe_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
       assert (Haddr : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                       = p_ofile p fd) by (rewrite HMa5; apply addv_sext0).
       iApply (wp_cld_s_sconf Φ (mword_of_int (FDA + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
@@ -832,9 +833,11 @@ Section ProofFdalloc.
           rewrite /G1 upd_ne; [exact HL1s1 | reg_neq]. }
         (* +0x3c: c.sd s1,0(a2) -- p->ofile[fd] = f *)
         rewrite Hwz in Hw.
-        iDestruct (proc_priv_ofile _ _ _ _ fd (zero_reg : mword 64) Hw with "Hpv")
-          as "[Hslot Hpvback]".
-        iDestruct (ofile_slot_null with "Hslot") as "[Hcell Hfdslot]".
+        (* fdalloc's whole resource move, and it needs NO [file_ref]: the free
+           descriptor's unit comes out with its cell, and writing the pointer
+           puts the descriptor in the caller's payload deficit. *)
+        iDestruct (proc_ofiles_install _ _ _ _ fd Hw with "Hpv")
+          as "(Hcell & Hfdslot & Hpvback)".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                           = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
         iApply (wp_csd_s_sconf Φ (mword_of_int (FDA + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
@@ -843,8 +846,8 @@ Section ProofFdalloc.
         { iEval (rgne; rewrite Haddr3c). iExact "Hcell". }
         iIntros (CIDcs HsCs) "Hcg Hpc Hcell".
         iEval (rgne; rgne; rewrite Haddr3c HG3s1) in "Hcell".
-        iDestruct (ofile_slot_file _ _ _ k q Cf Hk with "Hcell Href") as "Hslot".
-        iDestruct ("Hpvback" $! (fnode k) with "Hslot") as "Hpv".
+        iDestruct ("Hpvback" $! (fnode k) with "[%] Hcell") as "Hpv";
+          [exact (fnode_ne_zero k Hk)|].
         assert (Hpc3e : add_vec_int (mword_of_int (FDA + 0x3c) : mword 64) 2 = mword_of_int (FDA + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc3e) in "Hpc".
         (* +0x3e: c.j -> the epilogue, with fd still in a0 *)
@@ -883,8 +886,9 @@ Section ProofFdalloc.
         iDestruct (cpu_own_transport CID0 CIDfx n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CIDfx with "[%]"); [wp_next_chain|].
         destruct (fda_frees_found _ fd Hw Hpre) as [l Hfrees].
-        iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpv Hfdslot]"); [exact Hcsf|].
+        iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv Hfdslot]"); [exact Hcsf|].
         rewrite /fdalloc_post. iRight. iExists fd, l.
+        cbn [upd_ofile pv_ofile].
         iSplitR; [iPureIntro; split; [exact Hfa0 | exact Hfrees]|].
         iFrame "Hpv Hfdslot".
       - (* ============ BUSY: advance, and either loop or give up ======== *)
@@ -997,9 +1001,9 @@ Section ProofFdalloc.
           iIntros (CIDfy HsFy mf) "[%Hcsf %Hfa0] Hcg Hpc".
           iDestruct (cpu_own_transport CID0 CIDfy n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDfy with "[%]"); [wp_next_chain|].
-          iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpv Href]"); [exact Hcsf|].
+          iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv]"); [exact Hcsf|].
           rewrite /fdalloc_post. iLeft.
-          iSplitR; [| iFrame "Hpv Href"].
+          iSplitR; [| iFrame "Hpv"].
           iPureIntro. split; [exact Hfa0|].
           apply fda_frees_none. intros j v Hjv.
           apply (Hpre' j v ltac:(unfold NOFILE in Hend |- *;
@@ -1022,7 +1026,7 @@ Section ProofFdalloc.
           assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".
           iDestruct (cpu_own_transport CID0 CIDtaken n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-          iApply ("IHf" $! (S fd) CIDtaken N2 with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpv Href Hc1 Hc2 Hc3 Hc4 Hcont").
+          iApply ("IHf" $! (S fd) CIDtaken N2 with "[%] [%] [%] [%] Hcg Hcpu Hpc Hcore Hpv Hc1 Hc2 Hc3 Hc4 Hcont").
           * unfold NOFILE in Hfuel |- *. lia.
           * unfold NOFILE in Hfd, Hne |- *. lia.
           * exact Hpre'.
@@ -1030,7 +1034,7 @@ Section ProofFdalloc.
             split; [exact HN2a5|]. split; [exact HN2s1|]. split; [exact HN2sp|].
             exact HN2cs. }
     (* enter the loop at descriptor 0 with NOFILE units of fuel *)
-    iApply ("Hloop" $! NOFILE 0%nat CID12 B4 with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpv Href Hr24 Hr16 Hr8 Hgap Hcont").
+    iApply ("Hloop" $! NOFILE 0%nat CID12 B4 with "[%] [%] [%] [%] Hcg Hcpu Hpc Hcore Hpv Hr24 Hr16 Hr8 Hgap Hcont").
     - lia.
     - unfold NOFILE; lia.
     - intros j w Hj. exfalso. lia.

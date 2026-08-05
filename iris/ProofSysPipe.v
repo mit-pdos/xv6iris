@@ -1449,10 +1449,14 @@ Section ProofSysPipe.
       rewrite /X0 upd_ne; [| congruence]. apply HthrW1; assumption. }
     iDestruct (cpu_own_transport CID34 CID40 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Fdalloc.wp_fdalloc_sconf Φ γf k0 1%Qp Cf0 X1 (av - 8)%nat 0%nat eb p C pid V b
+    (* fdalloc now takes the block SPLIT at the fd table and no reference of
+       its own; [Href0] stays here and settles the deficit on the way out. *)
+    iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
+    rewrite -(proc_ofiles_owe_empty γf p (pv_ofile V)).
+    iApply (Fdalloc.wp_fdalloc_sconf Φ γf k0 ∅ X1 (av - 8)%nat 0%nat eb p C pid V b
               HX1a0 Hk0lt sp_noff0 Havfd
-              with "Hcg Hcpu Htext Hdata Hpc Hpriv Href0 [-]").
-    iIntros (CID41 Hcr41 Y0) "%HcsY0 Hcg Hcpu Hpc Hpost1".
+              with "Hcg Hcpu Htext Hdata Hpc Hcore Hof [-]").
+    iIntros (CID41 Hcr41 Y0) "%HcsY0 Hcg Hcpu Hpc Hcore Hpost1".
     assert (Hpc38 : ret_pc (X1 !!! Regidx Rra) = mword_of_int (SP + 0x38))
       by (rewrite HX1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc38) in "Hpc".
@@ -1480,7 +1484,8 @@ Section ProofSysPipe.
     (* +0x3c blt a0,x0 -- did the first fdalloc fail? *)
     rewrite /fdalloc_post. iDestruct "Hpost1" as "[Hf1 | Hs1]".
     { (* ===== the ftable had no free descriptor: close both, return -1 ===== *)
-      iDestruct "Hf1" as "([%Hr1 %Hnone] & Hpriv & Href0)".
+      iDestruct "Hf1" as "([%Hr1 %Hnone] & Hof)".
+      iDestruct (proc_priv_join with "Hcore Hof") as "Hpriv".
       iApply (wp_blt_x0_taken_s_sconf Φ (mword_of_int (SP + 0x3c))
                 (mword_of_int 136 : mword 13) Ra0 Y0 (av - 8)%nat b
                 ltac:(vm_compute; discriminate)
@@ -1518,11 +1523,15 @@ Section ProofSysPipe.
       iSplitR "Hua Hub"; [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
       iLeft. iSplitR; [done|]. iExact "Hpriv". }
     (* ===== the first descriptor is taken ===== *)
-    iDestruct "Hs1" as (fd0 l0) "([%Hr1 %Hfr0] & Hpriv & Hu0)".
+    iDestruct "Hs1" as (fd0 l0) "([%Hr1 %Hfr0] & Hof & Hu0)".
     pose proof (fd_frees_head_lt (pv_ofile V) fd0 l0 Hfr0) as Hfd0lt.
-    iDestruct (proc_priv_ofile_len with "Hpriv") as %Hlen1.
+    iDestruct (proc_ofiles_owe_len with "Hof") as %Hlen1.
     rewrite upd_ofile_length in Hlen1.
     assert (Hfd0N : (fd0 < NOFILE)%nat) by (rewrite -Hlen1; exact Hfd0lt).
+    (* SETTLE: the descriptor fdalloc filled owes a payload, and this is the
+       reference pipealloc handed us for that end. *)
+    iDestruct (proc_priv_settle γf p pid V fd0 k0 1%Qp Cf0 Hfd0N Hlen1 Hk0lt
+                 with "Hcore Hof Href0") as "Hpriv".
     destruct (sp_fd_range fd0 Hfd0N) as [Hfd0b16 Hfd0b31].
     iApply (wp_blt_x0_fall_s_sconf Φ (mword_of_int (SP + 0x3c))
               (mword_of_int 136 : mword 13) Ra0 Y0 (av - 8)%nat b
@@ -1589,11 +1598,13 @@ Section ProofSysPipe.
       rewrite /Z0 upd_ne; [| congruence]. apply HthrY0; assumption. }
     iDestruct (cpu_own_transport CID41 CID47 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Fdalloc.wp_fdalloc_sconf Φ γf k1 1%Qp Cf1 Z1 (av - 8)%nat 0%nat eb p C pid
+    iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
+    rewrite -(proc_ofiles_owe_empty γf p (pv_ofile (upd_ofile V fd0 (fnode k0)))).
+    iApply (Fdalloc.wp_fdalloc_sconf Φ γf k1 ∅ Z1 (av - 8)%nat 0%nat eb p C pid
               (upd_ofile V fd0 (fnode k0)) b
               HZ1a0 Hk1lt sp_noff0 Havfd
-              with "Hcg Hcpu Htext Hdata Hpc Hpriv Href1 [-]").
-    iIntros (CID48 Hcr48 U0) "%HcsU0 Hcg Hcpu Hpc Hpost2".
+              with "Hcg Hcpu Htext Hdata Hpc Hcore Hof [-]").
+    iIntros (CID48 Hcr48 U0) "%HcsU0 Hcg Hcpu Hpc Hcore Hpost2".
     assert (Hpc48 : ret_pc (Z1 !!! Regidx Rra) = mword_of_int (SP + 0x48))
       by (rewrite HZ1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc48) in "Hpc".
@@ -1625,7 +1636,8 @@ Section ProofSysPipe.
     { cbn [upd_ofile pv_ofile]. by apply list_lookup_insert. }
     rewrite /fdalloc_post. iDestruct "Hpost2" as "[Hf2 | Hs2]".
     { (* ===== no second descriptor: undo the first, close both ===== *)
-      iDestruct "Hf2" as "([%Hr2 %Hnone2] & Hpriv & Href1)".
+      iDestruct "Hf2" as "([%Hr2 %Hnone2] & Hof)".
+      iDestruct (proc_priv_join with "Hcore Hof") as "Hpriv".
       iApply (wp_blt_x0_taken_s_sconf Φ (mword_of_int (SP + 0x4c))
                 (mword_of_int 100 : mword 13) Ra0 U0 (av - 8)%nat b
                 ltac:(vm_compute; discriminate)
@@ -1733,7 +1745,7 @@ Section ProofSysPipe.
       iSplitR "Hua Hub"; [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
       iLeft. iSplitR; [done|]. iExact "Hpriv". }
     (* ===== both descriptors are taken: copy them out ===== *)
-    iDestruct "Hs2" as (fd1 l1) "([%Hr2 %Hfr1] & Hpriv & Hu1)".
+    iDestruct "Hs2" as (fd1 l1) "([%Hr2 %Hfr1] & Hof & Hu1)".
     (* the second descriptor is a DIFFERENT one: [fd_frees] only names free
        slots, and fd0 is no longer free. *)
     assert (Hfr1' : fd_frees (pv_ofile V) = fd0 :: fd1 :: l1).
@@ -1751,9 +1763,14 @@ Section ProofSysPipe.
       by rewrite list_lookup_insert_ne in Hfree1; [| congruence]. }
     assert (Hfd1lt : (fd1 < length (pv_ofile V))%nat).
     { apply lookup_lt_is_Some_1. by exists (zero_reg : mword 64). }
-    iDestruct (proc_priv_ofile_len with "Hpriv") as %Hlen2.
+    iDestruct (proc_ofiles_owe_len with "Hof") as %Hlen2.
     rewrite !upd_ofile_length in Hlen2.
     assert (Hfd1N : (fd1 < NOFILE)%nat) by (rewrite -Hlen2; exact Hfd1lt).
+    assert (Hlen2' : length (pv_ofile (upd_ofile V fd0 (fnode k0))) = NOFILE)
+      by (rewrite upd_ofile_length; exact Hlen2).
+    iDestruct (proc_priv_settle γf p pid (upd_ofile V fd0 (fnode k0)) fd1 k1
+                 1%Qp Cf1 Hfd1N Hlen2' Hk1lt
+                 with "Hcore Hof Href1") as "Hpriv".
     destruct (sp_fd_range fd1 Hfd1N) as [Hfd1b16 Hfd1b31].
     iApply (wp_blt_x0_fall_s_sconf Φ (mword_of_int (SP + 0x4c))
               (mword_of_int 100 : mword 13) Ra0 U0 (av - 8)%nat b

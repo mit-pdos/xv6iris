@@ -370,45 +370,53 @@ the evidence for every offset. This file is only the worklist.
       units as premises; that stays the convention, and no landed spec
       restated.
 
-- [ ] **S4c — `proc_priv_owe`, the payload deficit set.** This is what
-      `sys_dup` needs, and the analysis is in the `sys_dup` bullet of
-      [`design/file-table.md`](../design/file-table.md) — read it before
-      starting. Short version: sys_dup must hold TWO descriptors payload-less
-      at once (the source, whose reference `filedup` needs in hand; the
-      destination, written but not yet backed), and **no fd-slot capability
-      substitutes for a `file_ref`** — the file-table note spells out why (a
-      reference carries a points-to *fraction* of the file's content cells and
-      a count contribution in an auth the ftable lock owns; a unit carries
-      neither). sys_dup's ledger in fact balances with zero allowance:
-      fdalloc's released unit is the one `filedup` consumes. The fix is one
-      new predicate beside
-      `proc_priv` — `proc_priv_owe γf pa pid V D`, where every `fd ∈ D`
-      contributes only its cell — with `proc_priv_owe … ∅ ⊣⊢ proc_priv …` plus
-      a lend/repay pair.
+- [x] **S4c — the fd table SPLIT OUT of `proc_priv`, and `sys_dup` proven.**
+      The deficit lives on the array, not on the block:
+      `proc_priv = proc_priv_core ∗ proc_ofiles` (`proc_priv_split`), and
+      `proc_ofiles_owe γf pa fs D` is the array with `D`'s payloads on loan.
+      Full rationale in the `sys_dup` entry of
+      [`design/file-table.md`](../design/file-table.md). Four things worth
+      carrying forward:
 
-      Two things make it worth doing before more syscalls rather than after:
+      * **The first plan (`proc_priv_owe` on the whole block) was wrong**, and
+        the reason generalises: a deficit block is not `proc_priv ∗ anything`,
+        so it cannot be handed to a callee, and every file-operation callee
+        (`piperead`, `pipewrite`, `fdalloc`) takes `proc_priv`. Splitting at
+        the fd table costs 3 restated specs instead of 19, because the callees
+        that must be callable across a loan do not touch the array at all.
+      * **The non-null clause on the lent case is load-bearing.** It is what
+        lets `fdalloc` — generic in `D`, and never told what `D` is — conclude
+        `fd ∉ D` from "the cell I found is null". Without it, fdalloc could
+        install a second reference over a loan.
+      * **`proc_ofiles_owe_acc` is the only bigop surgery**, and it needs a new
+        general lemma `big_sepL_delete_insert`: a descriptor going on loan
+        changes both the value at `fd` and the predicate everywhere else, and
+        `big_sepL_insert_acc` / `big_sepL_lookup_acc_impl` each do only one.
+        Lend / repay / install / read are one-liners over it.
+      * **`fdalloc`'s spec got strictly weaker** — no `file_ref` premise, no
+        `q`, no `Cf` — and re-proving it was a four-line edit, because its loop
+        only ever read cells. `sys_pipe`'s two call sites settle the deficit
+        with `proc_priv_settle` immediately after each call.
 
-      * **`fdalloc`'s spec gets STRICTLY WEAKER and more honest.** Restated
-        over `proc_priv_owe … D → proc_priv_owe … (D ∪ {fd})`, it drops the
-        `file_ref` premise entirely — fdalloc's code only writes a pointer;
-        the reference was never what it consumed, only what its caller needed
-        in order to restore the invariant. The loop is unaffected
-        (`proc_priv_ofile_read` reads cells, so a payload-less descriptor
-        costs it nothing), so this is a spec edit plus a small change to the
-        install arm, not a re-proof.
-      * **Nothing else restates.** Every other function keeps `proc_priv`.
-        The tempting alternative — a third `ofile_slot` disjunct for a
-        loaned-out descriptor — is what to AVOID: it would force every
-        consumer of a non-null descriptor (argfd's callers, sys_close) to
-        refute the new case, which none of them can do from `v ≠ 0`.
+      Fallout that had to be done alongside: **`argfd`'s `pfd` went generic**
+      (`SpecArgfd.ofd_out`), because sys_dup passes 0 there. `ProofArgfd.af_pfd`
+      is the `if (pfd)` test as ONE sub-block — both arms rejoin at +0x40 with
+      identical registers, so a case split there would have duplicated the whole
+      tail. **sys_read will want the same for `pf`.**
 
-      Fallout: `sys_pipe`'s two fdalloc call sites each settle their deficit
-      from the `file_ref` they already hold, immediately after the call.
+      `sys_dup` itself: `SpecSysDup.v` / `CodeSysDup.v` / `ProofSysDup.v` /
+      `LinkSysDup.v`, 24 instructions, three exits over one epilogue
+      (`sd_tail`), ~9 min to check. Its ledger closes with **zero** fd-slot
+      allowance. Note the frame asymmetry: s1/s2 are pushed only AFTER the
+      argfd call, so on the early-failure path slots 3/4 are never written —
+      `sd_tail` takes them at arbitrary values.
 
-- [x] **S4a — `argfd` proven** (`CodeArgfd.v` / `ProofArgfd.v`), over
-      `ARGINT` + `MYPROC`, 33 instructions. Like sys_close it is NOT linked:
-      `ARGINT` has no implementation while `argraw` is parked (S3a), so there
-      is no `LinkArgint.v` and hence no `LinkArgfd.v`. Three things worth
+      Also written while here: **`LinkArgfd.v`**, which had been possible ever
+      since argraw was un-parked and simply had not been written. It flips
+      `argfd` to proven in the coverage tool.
+
+- [x] **S4a — `argfd` proven AND linked** (`CodeArgfd.v` / `ProofArgfd.v` /
+      `LinkArgfd.v`), over `ARGINT` + `MYPROC`, 33 instructions. Three things worth
       reusing:
       * **THREE arms join at the epilogue** (+0x46) — the success fall-through
         and two `c.li a0,-1; c.j` tails — so `af_tail` is applied three times.

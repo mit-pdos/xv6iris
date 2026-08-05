@@ -54,13 +54,18 @@
    resource for the syscall argument at all, only the pure fact saying which
    word of [pv_tf V] it is.
 
-   THE TWO NULL PREMISES.  argfd tests [pfd]/[pf] against 0 before storing,
-   because two of its five callers pass a null there (sys_read passes
-   [pf = 0]).  This spec covers the both-non-null shape -- the one every
-   caller that wants the fd AND the file uses -- and takes the two
-   disequalities as premises.  A caller passing a stack local discharges
-   them from the stack's own geometry ([StackOwn.stack_own_sp_nonzero]),
-   not as an assumption: an address the kernel stack occupies is never 0. *)
+   THE NULL OUT-PARAMETERS.  argfd tests [pfd]/[pf] against 0 before storing,
+   because its five callers disagree about which they want: sys_close passes
+   both, sys_dup passes [pfd = 0], sys_read passes [pf = 0].
+     [pfd] is handled GENERICALLY, by [ofd_out] below -- a null pointer
+   carries no resource and its store does not happen -- so this one contract
+   serves sys_close and sys_dup alike.  That is strictly weaker than a
+   [pfd <> 0] premise, and without it sys_dup could not call argfd at all.
+   [pf] still takes the disequality, because no landed caller passes 0 there;
+   sys_read will want the same treatment, and it is the same two-line move.
+     A caller passing a stack local discharges [pf <> 0] from the stack's own
+   geometry ([StackOwn.stack_own_sp_nonzero]), not as an assumption: an address
+   the kernel stack occupies is never 0. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -140,13 +145,42 @@ Section SpecArgfd.
   (* argfd's result, keyed by the returned a0 -- the [filealloc_post]
      shape.  Both disjuncts carry the pure guard, so the caller learns
      WHICH case ran from [arg_fd] alone. *)
+  (* THE [int *pfd] OUT-PARAMETER, which may be NULL.  argfd tests it
+     ([if (pfd) *pfd = fd]) because its callers disagree: sys_close wants the
+     descriptor index and passes a stack local, sys_dup does not and passes 0.
+     One contract covers both -- a null pointer carries no resource and the
+     store does not happen -- which is strictly more general than taking
+     [pfd <> 0] as a premise, and it is what lets sys_dup call argfd at all.
+     ([pf] keeps its non-null premise: no landed caller passes 0 there.
+     sys_read does, and will want the same treatment.) *)
+  Definition ofd_out (a : mword 64) (w : mword 32) : iProp Σ :=
+    (if bool_decide (a = (zero_reg : mword 64)) then emp else a ↦₄ w)%I.
+
+  (* wand-shaped, so proofs compose with iDestruct/iPoseProof rather than
+     needing a setoid rewrite inside the proofmode context *)
+  Lemma ofd_out_null (a : mword 64) (w : mword 32) :
+    a = (zero_reg : mword 64) -> ⊢ ofd_out a w.
+  Proof. intro Hz. rewrite /ofd_out bool_decide_true; [|exact Hz]. done. Qed.
+
+  Lemma ofd_out_intro (a : mword 64) (w : mword 32) :
+    a <> (zero_reg : mword 64) -> a ↦₄ w -∗ ofd_out a w.
+  Proof.
+    intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
+  Qed.
+
+  Lemma ofd_out_elim (a : mword 64) (w : mword 32) :
+    a <> (zero_reg : mword 64) -> ofd_out a w -∗ a ↦₄ w.
+  Proof.
+    intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
+  Qed.
+
   Definition argfd_post (pfd pf : mword 64) (oldfd : mword 32) (oldf : mword 64)
       (v : mword 64) (fs : list (mword 64)) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v fs = None⌝ ∗
-       pfd ↦₄ oldfd ∗ pf ↦₈ oldf
+       ofd_out pfd oldfd ∗ pf ↦₈ oldf
      ∨ ∃ (fd : nat) (fv : mword 64),
          ⌜r = (zero_reg : mword 64) /\ arg_fd v fs = Some (fd, fv)⌝ ∗
-         pfd ↦₄ trunc32 v ∗ pf ↦₈ fv)%I.
+         ofd_out pfd (trunc32 v) ∗ pf ↦₈ fv)%I.
 
 End SpecArgfd.
 
@@ -165,8 +199,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (* the argument itself: word [tf_arg_idx i] of this proc's trapframe page,
      which [proc_priv] carries (so argfd needs no separate resource for it) *)
   pv_tf V !! tf_arg_idx i = Some v ->
-  (* neither out-parameter is null (see the header) *)
-  pfd <> (zero_reg : mword 64) ->
+  (* [pf] is not null (see [ofd_out] above: [pfd] may be) *)
   pf <> (zero_reg : mword 64) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (argfd_stack <= av)%nat ->
@@ -174,7 +207,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   cpu_own n eb p C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
-  pfd ↦₄ oldfd -∗
+  ofd_out pfd oldfd -∗
   pf ↦₈ oldf -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
