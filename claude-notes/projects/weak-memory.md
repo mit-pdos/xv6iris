@@ -67,17 +67,45 @@ Validate the operational design before anything depends on it.
 - [ ] Disk-agent view; notify-carries-view MMIO coupling; `DiskStepDma`
       through the device view; virtio cone re-proof (the fence sites).
 
-## M6 — closing the LB gap (research)
+## M6 — closing the store-reordering gap (research)
 
-- [ ] Robustness theorem (preferred): for the release-fenced/lock-mediated
-      store discipline the kernel obeys, full Promising-RISC-V behaviors =
-      promise-free behaviors. Operational-level, no Iris. Retires the
-      store-reordering-gap assumption.
+Two-layer proof plan (the quantification over all executions is the one
+the Iris proof already pays for — no separate whole-kernel analysis):
+
+- [ ] **Layer 1, program-independent operational lemma** (once, about the
+      machine; no xv6/Sail in the statement): if no promise-free execution
+      of P reaches the violation pattern, then every full-machine
+      execution of P is matched by a promise-free one (same observable
+      states + reducibility). Proof = delay-simulation: a promise matters
+      only if read by another agent before fulfilment; unread promises
+      commute forward to their fulfilment point; an early read implies the
+      violation pattern back in the PROMISE-FREE semantics. Precedents:
+      PS1 DRF-Promise (same structure at language level), Shasha–Snir /
+      Bouajjani–Derevenetc–Meyer (TSO) / Lahav–Margalit (RA) robustness.
+- [ ] **Layer 2, the premise, extracted from the WP proofs**: per-store
+      protection certificates emitted by the store leaf rules — every
+      store either consumes `↦ₘ` (exclusively owned ⇒ promise unreadable)
+      or is an enumerated fenced sync-site leaf (certification arithmetic
+      pins the promise: fulfilment po-after `fence rw,w` forces the
+      timestamp above everything the fence covers). Adequacy exports the
+      certificate fact alongside reducibility; Layer 1 consumes it.
+- [ ] Resolve early (shapes Layer 1): the PARM Coq machine-step
+      certification granularity — is all-threads-certified invariant, or
+      only the stepping thread checked? Decides whether doomed states
+      (unfulfillable promise ⇒ no certified step ⇒ stuck) are reachable,
+      which a reducibility adequacy must care about. Their Thm 6.3
+      (RISC-V deadlock freedom) suggests well-behaved; read the Coq, not
+      the paper. Also: the exact sufficient violation pattern (the
+      fenced case has an empty-predecessor-set wrinkle — a release-fenced
+      store with nothing to order CAN be promised, and must be shown to
+      commute harmlessly), and byte-granularity/mixed-size care.
 - [ ] Axiomatic characterization of the promise-free machine (the PS1
       Thm 5 analog): promise-free ≡ RVWMO ∧ acyclic(po ∪ rf) ∧
       (po ∩ W×W) ⊆ gmo. Pins exactly what the interim assumption says.
-- [ ] Fallback: promises in the semantics + SLR-style logic (transfinite
-      Iris territory — only if robustness fails).
+- [ ] Fallbacks, in order: ship the interim theorem (unconditional for
+      Ztso hardware, explicit assumption otherwise); promises in the
+      semantics + SLR-style logic (transfinite Iris — only if robustness
+      fails).
 
 ## Open questions (resolve by end of M0/M3)
 
