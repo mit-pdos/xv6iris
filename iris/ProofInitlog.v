@@ -1184,14 +1184,15 @@ Section ProofInitlog.
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
-              D2 (K - 6)%nat true C b
+              D2 (K - 6)%nat true C b True%I
               HKwh Hind Hgeomok Hj Hgl eq_refl Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
-                    Hs1u [-]").
+                    Hs1u [] [-]").
     { iExists bs_hdr. iExact "Hfsb". }
+    { iIntros (bs' _). iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                 Hncell _ HLauth Hfsb %Hhn Hs1u".
+                                 Hncell _ HLauth Hfsb %Hhn Hs1u _".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (ILG + 0x74)).
     { rewrite HD2ra. apply bv_eq; vm_compute; reflexivity. }

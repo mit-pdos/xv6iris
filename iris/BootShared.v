@@ -732,6 +732,10 @@ Section BootAlloc.
          exists. *)
       disk_img_bytes disk_img_name 0
         (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
+      (* the era's LOG-REGION MIRROR variable, whole (phase C2b/D1 stage 3):
+         [initlog] splits it, keeping one half in [LogInv.log_batch] and
+         handing the other to [FsCrash.P_fs]'s arm at its swap *)
+      ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -842,6 +846,9 @@ Section BootAlloc.
          yet -- it is what the FS layer's block views will be carved out of
          (claude-notes/design/fs-log.md, stage 4). *)
       disk_bytes γv 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
+      (* the era's log-region mirror variable, straight through: the FS boot
+         client hands it to [initlog] (its [LogInv.log_mirror_full] premise) *)
+      ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗
@@ -856,7 +863,7 @@ Section BootAlloc.
     iIntros "H".
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hpark &
-        Huf & Hpf & Hvf & Hdimg & #Hcinv & #Hcert)".
+        Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
@@ -967,6 +974,7 @@ Section BootAlloc.
        [disk_img_bytes (dn_img γv)], and [Himg] says that gname is the era's *)
     iSplitL "Hdimg".
     { rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
+    iSplitL "Hmir"; [iExact "Hmir" |].
     iExact "Hpages".
   Qed.
 

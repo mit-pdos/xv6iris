@@ -778,6 +778,14 @@ Section power.
         the log's block views) hold image fragments and still boot twice. *)
      disk_img_bytes (era_disk_name HE) 0
        (disk_read (v_disk (g'.(gdev).(dvirtio))) 0 ndisk) ∗
+     (* THE ERA'S LOG-REGION MIRROR VARIABLE, whole (phase C2b/D1 stage 3).
+        Minted here beside the image map and for the same reason: a fixed one
+        could never be re-paired after a crash.  BOTH halves go to the boot
+        client -- the FS layer's [initlog] splits them, keeping one in
+        [LogInv.log_batch] and handing the other to [FsCrash.P_fs]'s
+        checked-out arm at its swap.  The value is the VACUOUS picture; the
+        first true one is what the swap installs. *)
+     ghost_var (era_mirror_name HE) 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
      (* the crash-spanning invariant: FIXED-layer, so every boot gets the
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
@@ -920,10 +928,10 @@ Section power.
       iMod "Hback" as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF
-                Hdfrags]")
+                Hdfrags Hmir]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF Hdfrags".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF Hdfrags Hmir".
         iFrame "Helems".
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].

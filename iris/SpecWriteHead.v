@@ -95,7 +95,7 @@ Definition wp_write_head_sconf_body
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (Q : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -145,6 +145,18 @@ Definition wp_write_head_sconf_body
   (∃ bsh : list (bv 8), fsblock γfs (log_hdr_bno logstart) bsh) -∗
   (* the slot unit for its bread *)
   bslot bn -∗
+  (* THE CRASH PERMIT for the header write (phase C2b/D1 stage 3).  The
+     caller does not know the header IMAGE this function will assemble -- it
+     is built from [n] and [W] by the copy loop -- so the permit is supplied
+     as a FAMILY over the bytes, given the one fact the assembly establishes
+     about them.  At [n = 0] (initlog's clear, and the clear that ends a
+     commit) [hdr_n bs' = 0] plus [FsCrash.hdr_dec_zero] pins the whole
+     decoding, which is all a clear's fupd needs; the COMMIT arm's fupd will
+     want the full [hdr_dec bs' = (n, map uint W)], and that is an ADDITIVE
+     strengthening of this premise's hypothesis when the encoding proof
+     lands. *)
+  (∀ bs' : list (bv 8), ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+     disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bs' : list (bv 8)),
       ⌜callee_saved m mf⌝ -∗
@@ -164,6 +176,8 @@ Definition wp_write_head_sconf_body
          The full (n, W) encoding is stage 4's. *)
       ⌜hdr_n bs' = Z.of_nat n⌝ -∗
       bslot bn -∗
+      (* the permit's RECEIPT, back from the DMA completion *)
+      ▷ Q -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -182,7 +196,7 @@ Module Type WRITE_HEAD.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (Q : iProp Σ),
       wp_write_head_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb C b.
+                               cov logstart dev n W L pidv dq m K eb C b Q.
 End WRITE_HEAD.

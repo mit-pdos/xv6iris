@@ -121,7 +121,7 @@ Section SystemBoot.
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Huart &
-        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hpages)".
+        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".

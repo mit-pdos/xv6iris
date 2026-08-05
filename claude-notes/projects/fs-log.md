@@ -451,7 +451,76 @@ three `disk_write_permit_indifferent _ _ Hind` call sites.
   owes is the `swap_lb (S gen_id)` receipt, which cannot exist before the swap
   that produces it — so it lands with stage 3.
 
+### D1 STAGE 3 (initlog's swap): the INTERFACE landed, the fupd designed
+
+What landed and is green:
+
+- **`SpecWriteHead` carries a real permit.** A `(Q : iProp Σ)` binder (last),
+  the premise
+  `(∀ bs', ⌜hdr_n bs' = Z.of_nat n⌝ -∗ disk_write_permit gen_id (Some (1024 * log_hdr_bno logstart, bs')) Q)`,
+  and `▷ Q` in the continuation. **The permit has to be a FAMILY over the
+  header bytes**: the caller cannot know the image write_head will assemble
+  (the copy loop builds it from `n` and `W`), so it supplies a permit for
+  every image the assembly could produce, given what the assembly
+  establishes. At `n = 0` (initlog's clear, and the clear that ends a commit)
+  `hdr_n bs' = 0` plus `hdr_dec_zero` pins the WHOLE decoding, which is all a
+  clear's fupd needs; the COMMIT arm will want `hdr_dec bs' = (n, map uint W)`
+  — an ADDITIVE strengthening of this premise's hypothesis once the encoding
+  proof exists. `ProofWriteHead` threads it to its bwrite (`wh_cont`, both
+  block lemmas and the capstone gained `Q`); `Hbnou` is what reconciles the
+  contract's `log_hdr_bno logstart` with the bread/bwrite pair's `uint bno`.
+  Both callers (initlog, end_op ×2) currently pass `True` + the indifferent
+  permit, so `crash_pred_indifferent` stays until stage 4 deletes it.
+- **The boot mint.** `power_boot_res` gained
+  `ghost_var (era_mirror_name HE) 1 (MkLogMirror (0, []) (fun _ => []))`
+  (the `"Hmir"` PowerOn already allocated and dropped), threaded through
+  `power_boot_res_unpack` → `boot_shared_alloc`'s post → `SystemAdequacy`'s
+  destructuring, so the FS boot client can feed `initlog`'s
+  `log_mirror_full`.
+
+The fupd itself is fully designed; four findings decide its shape, and the
+first two are load-bearing:
+
+1. **THE BOOT SWAP MUST RE-BASE THE DURABLE STATE, and cannot preserve it.**
+   Every later WAL fupd learns the PRE-image's log region from the custody
+   arm's `log_mirror_ok M (fs_blocks dk) ls` — that is what the mirror is
+   for. The swap is the one fupd that has NO custody yet, so it cannot know
+   the on-disk header was clean, and `initlog`'s `⌜hdr_n bs_hdr = 0⌝` is
+   about the block it READ, which no curryable fact ties to the fupd's
+   universally quantified `dk`. So the swap sets
+   `fr_D := fs_restrict (fs_blocks dk) (fs_home_set cov ls)` and APPENDS it
+   to the history (`fs_hist_update`, a prefix extension — old receipts stay
+   valid). That is the honest reading anyway: at boot, after the clear, the
+   committed state IS what the disk recovers to.
+2. **`fs_arm_swap` needs a TWO-IMAGE generalization** — `fs_arm γs ls dk` in,
+   `fs_arm γs ls dk'` out. Retirement drops the old custody wholesale and the
+   only thing read out of the incoming arm is its counter plus
+   `fs_custody_started` (which does not mention `dk`), so the proof is
+   unchanged; the landed statement is the `dk = dk'` instance.
+3. **The seam goes in a SECOND section of `FsCrash.v`** — `P_fs_any cov ls dk`
+   (`∃ γs, ⌜the three seam equations⌝ ∗ P_fs γs cov ls dk`) and
+   `fs_crash_seam := □ ∀ dk, (riscv_crash_pred dk -∗ P_fs_any … dk) ∗
+   (P_fs_any … dk -∗ riscv_crash_pred dk)`, in a section that DOES take
+   `riscvGS`. `P_fs`'s own section must stay `riscvFixedGS`-free: it is what
+   instantiates `riscv_crash_pred`, so naming the record inside it is
+   circular. `P_fs_any` is timeless (every conjunct is), which is what lets
+   the fupd strip the permit's `▷` inside its `==∗`.
+4. **initlog must curry the WHOLE mirror variable into the closure**, not
+   split it beforehand: the swap sets the value to `mirror_of (fs_blocks dk')
+   ls` (free — `mirror_of_ok`), splits there, hands one half to the arm and
+   returns the other in `Q := log_mirror_clean ∗ swap_lb (S gen_id)`. Its
+   clean-header conjunct comes from the write itself:
+   `fs_blocks_write_eq` gives `fs_blocks dk' (log_hdr_bno ls) = bs'`, and
+   `hdr_dec_zero` turns `hdr_n bs' = 0` into `lm_hdr = (0, [])`.
+   **`fs_blocks_write_eq` needs `length bs' = BSIZE`**, so `SpecWriteHead`'s
+   permit family owes one more hypothesis — `⌜length bs' = 1024%nat⌝` — which
+   `ProofWriteHead` discharges by `length_fmap`/`length_seq`. Not yet added.
+
+Then `log_ctx` gains the `swap_lb (S gen_id)` receipt (its ARGUMENTS do not
+change, so only the two construction sites — ProofInitlog, ProofEndOp — move).
+
 ### C2b/D1 stages 3-5 (remaining)
+
 
 3. `initlog` (stage-2 clean form): the swap rides its final
    `write_head` fupd (`fs_arm_swap`), spending the era boot token; the

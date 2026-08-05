@@ -383,7 +383,8 @@ Section WriteHeadDefs.
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (Q : iProp Σ) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
         ⌜callee_saved m mf⌝ -∗
@@ -399,6 +400,7 @@ Section WriteHeadDefs.
         fsblock γfs (log_hdr_bno logstart) bs' -∗
         ⌜hdr_n bs' = Z.of_nat n⌝ -∗
         bslot bn -∗
+        ▷ Q -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
@@ -442,7 +444,7 @@ Section WriteHeadBlocks.
       (pidv : mword 32) (dq : dfrac)
       (k : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
       (f : nat -> bv 8)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
     (* the phase-C2a bridge, threaded from the whole-function contract *)
     crash_pred_indifferent ->
@@ -479,14 +481,16 @@ Section WriteHeadBlocks.
     fsblock γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b -∗
+    (∀ bs' : list (bv 8), ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+       disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros HK Hind Hbnolt Hbnou Hj Hgl HnB Hk Hf4 Hregs HMs1.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
-              Hncell HW Hcont".
+              Hncell HW Hperm Hcont".
     iPoseProof (whi_46 with "Htext") as "Hi46".
     iPoseProof (whi_48 with "Htext") as "Hi48".
     iPoseProof (whi_4c with "Htext") as "Hi4c".
@@ -551,18 +555,26 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
     assert (HKbw : (K_bwrite <= K - 4)%nat)
       by (unfold K_bwrite, K_write_head in *; lia).
+    (* the header image's [n] field, needed HERE (the permit is deposited at
+       the bwrite, not at the return) *)
+    assert (Hhn_early : hdr_n (f <$> seq 0 1024) = Z.of_nat n).
+    { rewrite (wh_take4 f (mword_of_int (Z.of_nat n) : mword 32) Hf4).
+      apply moi32_small.
+      unfold LOGBLOCKS in HnB.
+      change (2 ^ 32)%Z with 4294967296%Z. lia. }
     iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
-              (f <$> seq 0 1024) bsd0 b True%I
+              (f <$> seq 0 1024) bsd0 b Q
               HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
-                    Hdevi Hdgeom Hdlock Hhold [] [-]").
-    (* THE PHASE-C2a BRIDGE PERMIT: this WAL write kind's real durability
-       fupd lands in C2b; for now it deposits the identity view shift at the
-       trivial receipt, which is sound exactly when the system promises
-       nothing about durability -- the pure premise [Hind]. *)
-    { iApply (disk_write_permit_indifferent _ _ Hind). }
-    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
+                    Hdevi Hdgeom Hdlock Hhold [Hperm] [-]").
+    (* THE CALLER'S OWN PERMIT, at the header image this function assembled
+       (phase C2b/D1 stage 3).  [Hbnou] is what makes the two spellings of
+       the block number agree: the contract states the write's index at
+       [log_hdr_bno logstart], the bread/bwrite pair at [uint bno]. *)
+    { rewrite Hbnou. iApply ("Hperm" $! (f <$> seq 0 1024)).
+      iPureIntro. exact Hhn_early. }
+    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (WH + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc4c) in "Hpc".
@@ -871,7 +883,7 @@ Section WriteHeadBlocks.
     rewrite /wh_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid
-                     Hncell HW HLauth Hfsb [%] Hslot").
+                     Hncell HW HLauth Hfsb [%] Hslot HQ").
     { unfold callee_saved. repeat split; assumption. }
     { exact Hhn. }
   Qed.
@@ -895,7 +907,8 @@ Section WriteHeadBlocks.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (kk : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat)
+      (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
     (* the phase-C2a bridge, threaded from the whole-function contract *)
     crash_pred_indifferent ->
@@ -939,7 +952,9 @@ Section WriteHeadBlocks.
     fsblock γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗
-    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b -∗
+    (∀ bs' : list (bv 8), ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+       disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros HK Hind Hbnolt Hbnou Hj Hgl HnW HnB Hk.
@@ -951,7 +966,7 @@ Section WriteHeadBlocks.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
-              Hncell HW Hcont".
+              Hncell HW Hperm Hcont".
     iPoseProof (whi_3a with "Htext") as "Hi3a".
     iPoseProof (whi_3c with "Htext") as "Hi3c".
     iPoseProof (whi_3e with "Htext") as "Hi3e".
@@ -1107,11 +1122,11 @@ Section WriteHeadBlocks.
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID5) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
-                dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b
+                dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b Q
                 HK Hind Hbnolt Hbnou Hj Hgl HnB Hk Hf4' HS3regs HS3s1
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
-                      Hncell HW Hcont").
+                      Hncell HW Hperm Hcont").
     - (* more entries: branch back to +0x3a *)
       assert (Hcmp : neq_vec (rget S3 Ra5) (rget S3 Ra2) = true).
       { rgne. rgne. rewrite HS3a5 HS3a2. unfold neq_vec.
@@ -1140,7 +1155,7 @@ Section WriteHeadBlocks.
                      HS3a4 HS3a5 HS3a2).
       iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds
                          Hoctx Hpark Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
-                         Hextra HLauth Hfsb Hncell HW Hcont").
+                         Hextra HLauth Hfsb Hncell HW Hperm Hcont").
   Qed.
 
 End WriteHeadBlocks.
@@ -1162,9 +1177,9 @@ Section ProofWriteHead.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (Q : iProp Σ)
     : wp_write_head_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb C b.
+                               cov logstart dev n W L pidv dq m K eb C b Q.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
     intros pcE pj ret_tgt HK Hind Hgeom Hj Hgl Heb Hbatch.
@@ -1173,7 +1188,7 @@ Section ProofWriteHead.
     subst eb.
     unfold K_write_head in HK.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs #Hscheds Hoctx Hpark
-              #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hcont".
+              #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
     iDestruct "Hhdr" as (bsh) "Hfsb".
     iDestruct "Hfroz" as "(#Hdevc & #Hstc)".
     (* the header block is covered, and its number is a small positive int *)
@@ -1190,7 +1205,7 @@ Section ProofWriteHead.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
-    iAssert (wh_cont (CID0 := CID) Φ γfs bn logstart n W L pidv dq j m K true C b)%I
+    iAssert (wh_cont (CID0 := CID) Φ γfs bn logstart n W L pidv dq j m K true C b Q)%I
       with "[Hcont]" as "Hcont"; [rewrite /wh_cont; iExact "Hcont"|].
     iPoseProof (whi_00 with "Htext") as "Hi00".
     iPoseProof (whi_02 with "Htext") as "Hi02".
@@ -1587,11 +1602,11 @@ Section ProofWriteHead.
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID16) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
-                bsh bs0 bsd0 d0 f1 m B2 K C b
+                bsh bs0 bsd0 d0 f1 m B2 K C b Q
                 HK Hind Hbnolt Huint Hj Hgl HnB HA Hf14 HB2regs HB2s1
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
-                      Hncell HW Hcont").
+                      Hncell HW Hperm Hcont").
     - (* ---- n > 0: set the cursors up and enter the loop ---- *)
       assert (Hcmp : zopz0zKzJ_s (zero_reg : mword 64) (rget B2 Ra2) = false).
       { rewrite HB2a2v. rewrite (wh_geb_s0 (Z.of_nat (S n')) Hnb31).
@@ -1746,12 +1761,12 @@ Section ProofWriteHead.
                  with "Hcont") as "Hcont".
       iApply (wh_loop (CID0 := CID21) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
-                bsh bs0 bsd0 d0 m K C b (S n')
+                bsh bs0 bsd0 d0 m K C b (S n') Q
                 HK Hind Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1
                 ltac:(lia) ltac:(lia) Hf14 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
-                      Hncell HW Hcont").
+                      Hncell HW Hperm Hcont").
   Qed.
 
 End ProofWriteHead.

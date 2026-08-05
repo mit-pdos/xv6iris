@@ -1673,12 +1673,13 @@ Section EndOpBlocks.
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa1) Φ j pidv dq m K eb C eb
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (WH.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev n W L pidv dq A1 (K - 8)%nat eb C eb
+              cov logstart dev n W L pidv dq A1 (K - 8)%nat eb C eb True%I
               (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb (conj HnW Hn30)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1").
+                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1 []").
+    { iIntros (bs' _). iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                  Hncell HW HauthL Hhdr %Hhdrn1 Hu1".
+                                  Hncell HW HauthL Hhdr %Hhdrn1 Hu1 _".
     assert (Hpc108 : ret_pc (A1 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x108)).
     { rewrite HA1ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc108) in "Hpc".
@@ -1865,14 +1866,15 @@ Section EndOpBlocks.
       by (split; [reflexivity | unfold LOGBLOCKS; lia]).
     iApply (WH.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
-              A5 (K - 8)%nat eb C eb
+              A5 (K - 8)%nat eb C eb True%I
               (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3").
+                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3 []").
     { by iApply big_sepL_nil. }
     { iExists bs1. iExact "Hhdr". }
+    { iIntros (bs' _). iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CIDb3 Hsb3 mf3 bs2) "%Hcs3 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                  Hncell _ HauthL Hhdr %Hhdrn2 Hu3".
+                                  Hncell _ HauthL Hhdr %Hhdrn2 Hu3 _".
     assert (Hpc11a : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x11a)).
     { rewrite HA5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc11a) in "Hpc".
