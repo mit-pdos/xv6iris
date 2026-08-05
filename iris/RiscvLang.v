@@ -718,19 +718,6 @@ Lemma reset_regs_mideleg (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup mideleg rs = boot_w64 0.
 Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
-(* THE ONE POST-RUN PATCH LEFT, and it is a TEMPORARY proof debt, not a claim
-   about the board.  The privileged spec's [reset_pmp] really does clear A and L
-   in all 64 entries -- exactly what [reset_regs] asks for ([pmp_all_off]) -- but
-   the OPEN-file derivation of that is a 64-way symbolic index resolution over a
-   [vec_update_dec] tower (claude-notes/projects/crash.md); only the loop's FRAME
-   half is proved ([BootReset.exec_reset_pmp]).  Until the other half lands the
-   value is written here, which is why [pmpcfg_boot] is still a name.  Every
-   OTHER assumption about a power-on now lives where it belongs: as an explicit
-   write in [ArchReset.board_init], whose comment is the platform obligation
-   list. *)
-Definition boot_patch (rs : regstate) : regstate :=
-  register_set pmpcfg_n pmpcfg_boot rs.
-
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client
    ([RiscvAdequacy.power_boot_res]'s [Hboot] premise). *)
@@ -748,7 +735,8 @@ Definition boot_facts (g' : gstate) : Prop :=
   (* THE REGISTER SIDE, ANCHORED ON A RUN rather than on a table of values: for
      each hart there are a power-on file [rs0] and a landing file [rs1] such that
      the boot program RAN from the one to the other, and this hart's registers
-     are [rs1] under the (one remaining) patch.  THE POWER-ON MODEL IS THEREFORE
+     ARE [rs1] -- no patch layer, nothing written over the run's output at all.
+     THE POWER-ON MODEL IS THEREFORE
      "arbitrary garbage in every register, plus [ArchReset.board_init]'s short
      list of explicit board-guaranteed writes, plus the privileged spec's own
      [reset] with its configuration validation" -- deliberately NOT "whatever the
@@ -766,7 +754,7 @@ Definition boot_facts (g' : gstate) : Prop :=
   /\ (forall c : CPU, exists rs0 rs1 : regstate,
         run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))) pma_boot)
             (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state)
-        /\ g'.(gregs) c = boot_patch rs1)
+        /\ g'.(gregs) c = rs1)
   (* the devices are reset: FIFOs empty, no interrupt enabled or pending,
      the disk's queue not live (its IMAGE survives -- see [boot_shape]) *)
   /\ g'.(gdev).(duart) = uart0_state

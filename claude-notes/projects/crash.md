@@ -42,11 +42,11 @@ No `wp_consoleintr_sconf`: the boot chain reaches consoleintr only through the
 assumed `kerneltrap`, so it is not in the cone.
 
 **THE COMPOSITION, in one line each** (every file in `_CoqProject`):
-`ArchReset` (the board's explicit power-on writes + the spec's reset/init_model
-with the platform hook elided = the anchored boot program) → `ColdBoot` (that
-program run CLOSED, by the VM, + the board-vs-simulator constant check) +
-`BootReset` (the same program peeled over ARBITRARY power-on garbage —
-`boot_facts`' register anchor) →
+`ArchReset` (the board's ten explicit power-on writes + the spec's
+reset/init_model with the platform hook elided = the anchored boot program) →
+`ColdBoot` (that program run CLOSED, by the VM, + the board-vs-simulator constant
+check) + `BootReset` (the same program peeled over ARBITRARY power-on garbage —
+`boot_facts`' register anchor, with NO patch layer over its output) →
 `BootCarve` + `BootCarveMain` (the image-carving library) → `BootConfig` (the
 register set and the config bundles) → `BootChain` (one hart's whole life,
 twice: `boot_hart_primary` / `boot_hart_secondary`) → `BootShared`
@@ -2182,15 +2182,24 @@ yet.
   measurement in "MSECCFG / MENVCFG PATCH SHARPENING" stays as the record of why
   a FIELD-WISE restatement is still unavailable (the decode bridge consumes all
   64 bits of both).
-- ~~The ∀-garbage anchoring of the register clause~~ — **DONE** (see "THE
-  ∀-GARBAGE ANCHOR" below): `boot_facts`' register clause is now "the boot
-  program RAN, from some power-on file, up to `boot_patch`" — where the program
-  is the board's own short list of explicit writes followed by the privileged
-  spec's validated `reset`, deliberately NOT the simulator's initializers — and
-  `BootReset.reset_regs_of_run` derives `reset_regs` from it for EVERY power-on
-  file. One follow-on remains: **pmpcfg's 64-way `reset_pmp` derivation** — the
-  loop's FRAME half is proved (`BootReset.exec_reset_pmp`), the per-entry
-  `pmp_all_off` half is not, so the value is still written by `boot_patch`.
+- ~~The ∀-garbage anchoring of the register clause~~ — **DONE, AND THERE IS NO
+  PATCH LAYER LEFT AT ALL** (see "THE ∀-GARBAGE ANCHOR" below). `boot_facts`'
+  register clause is now "the boot program RAN, from some power-on file, and
+  these ARE its output registers":
+
+  ```coq
+  /\ (forall c : CPU, exists rs0 rs1 : regstate,
+        run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))) pma_boot)
+            (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state)
+        /\ g'.(gregs) c = rs1)
+  ```
+
+  **THE MILESTONE: every register fact at boot is now either DERIVED by running
+  the model's own validated reset over arbitrary power-on garbage, or one of
+  `ArchReset.board_init`'s ten explicit board writes.** `RiscvLang.boot_patch` is
+  gone — nothing is written over the run's output. That is the directive's end
+  state. The last piece was pmpcfg's per-entry half (`reset_pmp`'s 64-iteration
+  loop); see "PMPCFG" below for its shape.
 
 ### PMA TABLE RETIREMENT — **DONE. `pma_boot` IS THE MODEL'S OWN TABLE**
 
@@ -2385,7 +2394,7 @@ gotchas below.
 /\ (forall c : CPU, exists rs0 rs1 : regstate,
       run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))))
           (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state)
-      /\ g'.(gregs) c = boot_patch rs1)
+      /\ g'.(gregs) c = rs1)
 ```
 
 — "the model's own boot chain RAN, from SOME power-on register file, and this
@@ -2393,7 +2402,8 @@ hart's registers are its output under the named platform patch".  `rs0` is
 arbitrary power-on garbage, and both directions are proved:
 
 - **`BootReset.reset_regs_of_run` (∀ direction, the one consumers use):** for
-  EVERY `rs0`, a run of the chain yields `reset_regs c (boot_patch rs1)`.
+  EVERY `rs0`, a run of the chain yields `reset_regs c rs1` — the output file
+  itself, with nothing written over it.
   `BootShared.boot_regs_of_facts` is its only caller, so nothing above it
   changed — every consumer still asks for `reset_regs` by name.
 - **`PowerBoot.boot_shape_boot_gstate` (∃ direction, the witness):** `rs0 :=
@@ -2410,13 +2420,12 @@ ties, and the program `boot_prog` — it had to move out of ColdBoot because
 `boot_facts` NAMES the program.  `BootReset.v` (new) is the peeling kit and the
 garbage-run theorem.  `ColdBoot.v` keeps the closed run.
 
-**`RiscvLang.boot_patch` IS DOWN TO ONE REGISTER, and it is proof debt rather
-than an assumption:** `pmpcfg := pmpcfg_boot`. The spec's `reset_pmp` really does
-clear A and L in all 64 entries — exactly what `reset_regs` asks for
-(`pmp_all_off`) — but only the loop's FRAME half is proved over an open file; the
-per-entry half is the 64-way index resolution below. Every genuine platform
-assumption is now an explicit write in `board_init` instead (see the table
-below), which is where a reader looks for them.
+**THERE IS NO PATCH LAYER.** `RiscvLang.boot_patch` existed for exactly one
+register (pmpcfg) for exactly one day and is now retired: the spec's own
+`reset_pmp` establishes `pmp_all_off` per entry over an arbitrary power-on
+vector (`BootReset.exec_reset_pmp`), so the clause hands over the run's output
+file unmodified. Every genuine platform assumption is an explicit write in
+`board_init` (the table below), which is where a reader looks for them.
 
 **THE POWER-ON MODEL, AND THE USER'S RULING ON IT (2026-08-05, the SECOND time
 this was decided — do not re-litigate).** The anchored program is
@@ -2564,36 +2573,51 @@ axiom), and `cold_boot_pmp_all_off` rewrites with it and applies the witness.
 Splitting it that way is what keeps the out-of-range `vec_access_dec` indices in
 one place.
 
-**THE OPEN-BASE VERSION IS HALF DONE, AND THE REMAINING HALF IS THE LAST ITEM OF
-THE RESET-ANCHORING TRACK.** `BootReset.pmp_loop_frame` / `exec_reset_pmp` prove
-the FRAME half over an arbitrary power-on file — "the loop touches pmpcfg and
-nothing else", which is what lets the rest of the chain be peeled across it — by
-an induction over `foreach_ZM_up'` that is GENERIC IN THE LOOP BODY (the body is
-taken from the goal with `lazymatch … context[foreach_ZM_up' _ _ _ _ _ ?b]`,
-never transcribed) and keeps the vector abstract. Sealing `reset_pmp` `Opaque` is
-what makes that seam possible: its body reads pmpcfg TWICE and writes a
-`vec_update_dec` built from both, so peeling the 64 iterations would double the
-term 64 times.
-What is left is the per-entry half: `pmp_all_off` of the loop's output, i.e. a
-64-way symbolic index resolution needing (a) `vec_access_dec (vec_update_dec v i
-x) i = x` and its `j ≠ i` twin over `vec (mword 8) 64` (both reduce to
-`nth`/`list_update` facts through the `length_list l - 1` index flip, so
-`destruct v as [l Hl]` first), (b) an out-of-range fact `vec_access_dec v j =
-inhabitant` for `j < 0 \/ 63 < j` — needed because `pmp_all_off` quantifies over
-ALL of `Z` — and (c) the two generic bitvector facts
-`_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF` and
-`pmpLocked (_update_Pmpcfg_ent_L y 0) = false` at an OPEN entry `x`, which is
-where the "bitvector equality does not reduce under the lazy evaluator" rule
-above will bite -- for (c) do NOT try to compute: unfold the Sail wrappers
-(`_get_Pmpcfg_ent_A` / `_update_Pmpcfg_ent_A` are `subrange_vec_dec` /
-`update_subrange_vec_dec`, and those go through `and_vec`/`or_vec`/`shift` --
-`unfold word_binop, with_word', with_word` first, as durable-notes says) and
-finish with stdpp's **`bv_simplify` / `bv_solve`** (`stdpp/bitvector/tactics.v`,
-whose rewrite database is exactly the extract-of-concat/or/and family this
-needs); there is no ready-made `subrange_of_update_subrange` in SailStdpp. Strengthen `pmp_loop_frame`'s conclusion with the two extra
-conjuncts (`∀ j, i <= j <= 63 -> off (access j)` and "unchanged below `i`")
-rather than writing a second loop lemma. When it lands, pmpcfg leaves
-`RiscvLang.boot_patch` and the honest assumption list is exactly mie / mideleg.
+**THE OPEN-BASE VERSION IS DONE — `pmp_all_off` COMES FROM THE RUN.**
+`BootReset.exec_reset_pmp` derives it over an ARBITRARY power-on vector, which is
+what retired the last `boot_patch` entry. The shape, because it is the reusable
+part (the frame half alone had not revealed any of it):
+
+- **The loop** (`BootReset.pmp_loop`) is an induction over `foreach_ZM_up'`,
+  generic in the body (taken FROM THE GOAL with
+  `lazymatch … context[foreach_ZM_up' _ _ _ _ _ ?b]`, never transcribed) and
+  keeping the vector ABSTRACT, with `reset_pmp` sealed `Opaque` so the peel kit
+  cannot wander in (its body reads pmpcfg TWICE, so peeling the 64 iterations
+  would double the term 64 times). Four conjuncts: the exec fact, the frame, "every
+  entry from `i` up is off", and — the one that is easy to leave out and without
+  which the induction does not go through — **"every entry below `i` is
+  untouched"**, which is what carries entry `i`'s off-ness, proved at the body,
+  through the remaining 63 iterations.
+- **`apply`, not `destruct`, at the seam.** The body's fact cannot be named
+  (the body comes from the goal), and `destruct (pmp_loop b _ …)` cannot leave
+  the `_` as a goal — nor can `unshelve edestruct`. The fix is a wrapper lemma
+  whose conclusion IS the shape the call site wants (`pmp_loop_all`), applied
+  with `apply (pmp_loop_all b)`: `apply` leaves the un-inferable premise as the
+  one remaining goal.
+- **The entry algebra** (§3a) is three layers, none of them computable:
+  - *bitvector*: `_update_Pmpcfg_ent_A/_L` are `update_subrange_vec_dec`, i.e.
+    `bv_extract`/`bv_concat` under Sail's `autocast`/`cast_idx` wrappers. At
+    concrete widths the wrappers are conversion, so ONE `change` to the bv-level
+    term does it — and then stdpp's `bv_extract_concat_here`/`_later` do NOT
+    suffice: they cover a window at the bottom or entirely above the split, and
+    the A field (4:3) of an 8-bit entry is in the MIDDLE. `bv_extract_concat_mid`
+    + `bv_extract_extract_0` + `bv_extract_full` (proved once, ~8 lines each by
+    `Z.bits_inj_iff'`, following stdpp's own proofs) close the gap and compose.
+    `bv_simplify`/`bv_solve` alone answer "Cannot find witness", and this stdpp
+    has no `bitblast`.
+  - *vec*: Sail's `vec_update_dec` is `list_update` at index `length - 1 - i`,
+    and **`list_update` IS stdpp's list insert** (`insert_take_drop`), which is
+    where the lookup lemmas live — so `vec_access_update_eq` / `_ne` are
+    `list_lookup_insert` / `_ne` plus `nth_lookup`. The OUT-OF-RANGE read
+    (`vec_access_oob`, the `Inhabited` default) is NOT a corner case to wave
+    away: `pmp_all_off` quantifies over ALL of `Z`, so the boot fact is false
+    without it.
+  - *index arithmetic*: every step is an `mword`-free lemma over plain `Z`/`nat`
+    (`zidx_*`, `loop_*`), because `lia` answers "Cannot find witness" with an
+    `mword` merely in context and every one of these proofs has one.
+
+Cost: `BootReset.v` **47.6 s / 0.78 GB** (from 60.2 s — the file got FASTER while
+gaining ~200 lines, because `boot_patch`'s peel came out of three other proofs).
 
 ### MSECCFG / MENVCFG PATCH SHARPENING — **MEASURED; DECIDED: THE PINS STAY**
 
@@ -2603,7 +2627,7 @@ Zicfilp config flip) was offered with the measurement below and declined:
 PERMANENT named platform assumptions — the supported hardware is not
 shrunk further, and no config regen happens for this. Consequence for the
 ∀-garbage anchoring task: it does NOT try to derive or delete these two;
-they ride in `boot_patch`/`boot_facts` as explicit platform facts (the
+they ride in `ArchReset.board_init` as explicit board WRITES (the
 "not optional" note under menvcfg below is superseded — the third exit is
 "keep the pin as a stated assumption", and that is the chosen one). The
 field-wise decomposition below stays as documentation of which bits are

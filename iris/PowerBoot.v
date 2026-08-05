@@ -26,7 +26,8 @@ Local Open Scope Z_scope.
 (* 1. The reset REGISTER file.                                              *)
 (*                                                                          *)
 (*    [boot_facts]' register clause is "the boot program RAN, from SOME       *)
-(*    power-on file, up to [boot_patch]", so this construction's job is       *)
+(*    power-on file, and these ARE its output registers", so this             *)
+(*    construction's job is                                                  *)
 (*    to EXHIBIT one such run -- and [ColdBoot] has it: the chain from the    *)
 (*    model's own [init_regstate], computed with the VM.  So the reset        *)
 (*    register file no longer depends on the dying generation's registers at  *)
@@ -38,7 +39,7 @@ Local Open Scope Z_scope.
 
 Definition boot_hid (c : CPU) : SailStdpp.Values.mword 64 := boot_w64 (Z.of_nat (fin_to_nat c)).
 
-Definition boot_regs (c : CPU) : regstate := boot_patch (cold_regs (boot_hid c)).
+Definition boot_regs (c : CPU) : regstate := cold_regs (boot_hid c).
 
 (* THE WITNESS IS A REAL RUN: the model's boot chain, from [init_regstate] to
    the register file this construction hands over. *)
@@ -48,21 +49,11 @@ Lemma boot_regs_run (c : CPU) :
       (MState (cold_regs (boot_hid c)) ∅ dev0_state).
 Proof. exact (cold_boot_run_shape (boot_hid c)). Qed.
 
-(* ... and it still satisfies [reset_regs], which is the sanity anchor: the
-   patch writes over the closed run exactly the three registers the run does
-   not pin, at the values the run itself produces. *)
+(* ... and it satisfies [reset_regs], which is the sanity anchor.  It is now
+   [ColdBoot]'s theorem verbatim: with no patch layer left, the register file
+   this construction hands over IS the closed run's output. *)
 Lemma boot_regs_reset (c : CPU) : reset_regs c (boot_regs c).
-Proof.
-  pose proof (reset_regs_cold_boot c) as Hc.
-  unfold reset_regs in Hc.
-  destruct Hc as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12
-                  & H13 & H14 & H15).
-  unfold reset_regs, boot_regs, boot_patch, boot_hid, cold_regs_boot in *.
-  split_and!;
-    first [ apply register_lookup_set
-          | (repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]);
-             first [ assumption | exact pmp_all_off_pmpcfg_boot ]) ].
-Qed.
+Proof. exact (reset_regs_cold_boot c). Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 2. The reset MEMORY: every RAM byte present, holding the loaded image    *)

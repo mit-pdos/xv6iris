@@ -51,15 +51,14 @@
 (* [ArchReset.board_init]'s ten explicit board-guaranteed writes, plus the     *)
 (* privileged spec's own [reset] with its configuration validation.  That      *)
 (* file's header carries the write list and the reason the anchored program    *)
-(* deliberately does NOT run [sail_model_init].  What is left over after the   *)
-(* peel is ONE register: pmpcfg, whose [pmp_all_off] the spec's [reset_pmp]    *)
-(* does establish but whose open-file derivation is unfinished (§3 proves the  *)
-(* frame half only), so it rides in [RiscvLang.boot_patch] as proof debt.      *)
-(* Everything else in [reset_regs] -- PC, nextPC, cur_privilege, hart_state,   *)
-(* elp and misa's extension bits from the spec's reset; the board's nine other *)
-(* writes carried through -- is DERIVED here at an ARBITRARY power-on file.    *)
+(* deliberately does NOT run [sail_model_init].  NOTHING IS LEFT OVER: every   *)
+(* one of [reset_regs]' fifteen facts is either one of those ten writes        *)
+(* carried through a chain that does not touch it, or DERIVED here from the    *)
+(* spec's reset at an ARBITRARY power-on file -- PC, nextPC, cur_privilege,    *)
+(* hart_state, elp, misa's extension bits, and pmpcfg's [pmp_all_off] per      *)
+(* entry (§3/§3a).  There is no patch layer over the run's output.            *)
 (* ====================================================================== *)
-From stdpp Require Import gmap finite bitvector.definitions.
+From stdpp Require Import gmap finite list bitvector.definitions bitvector.tactics.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import ArchReset.
@@ -343,6 +342,231 @@ Lemma exec_config_is_valid (rs : regstate) (m : _) (d : _) :
 Proof. intro Hpma. peel. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 3a. THE ENTRY ALGEBRA: what ONE iteration of [reset_pmp] does to ONE      *)
+(*     entry, and what a read of any OTHER entry sees.                       *)
+(*                                                                         *)
+(*     [reset_pmp]'s body is a read-modify-write of a 64-entry [vec] through  *)
+(*     [vec_update_dec], and its per-entry effect is two bit-field writes     *)
+(*     (A := OFF, L := 0) on an OPEN byte.  So the per-entry half of the loop  *)
+(*     needs exactly three things, none of them computable: the [bv_extract] / *)
+(*     [bv_concat] algebra of a bit-field update (below), the [vec] index      *)
+(*     algebra including the OUT-OF-RANGE read (because                        *)
+(*     [RiscvLang.pmp_all_off] quantifies over ALL of [Z]), and the index      *)
+(*     arithmetic -- which lives in [mword]-free lemmas because [lia] answers  *)
+(*     "Cannot find witness" with an [mword] merely in context.               *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma bv_extract_concat_mid m n1 n2 s l (b1 : bv n1) (b2 : bv n2) :
+  (s + l <= n2)%N -> (m = n1 + n2)%N ->
+  bv_extract s l (bv_concat m b1 b2) = bv_extract s l b2.
+Proof.
+  intros Hs ->. apply bv_eq.
+  rewrite !bv_extract_unsigned, bv_concat_unsigned, !bv_wrap_land by done.
+  apply Z.bits_inj_iff' => i Hi.
+  rewrite !Z.land_spec, !Z.shiftr_spec, !Z.ones_spec, Z.lor_spec, Z.shiftl_spec;
+    [| lia ..].
+  case_bool_decide as Hc; rewrite ?andb_false_r, ?andb_true_r; [| done].
+  rewrite (Z.testbit_neg_r (bv_unsigned b1)); [| lia].
+  by rewrite orb_false_l.
+Qed.
+
+Lemma bv_extract_extract_0 n k s l (w : bv n) :
+  (s + l <= k)%N ->
+  bv_extract s l (bv_extract 0 k w) = bv_extract s l w.
+Proof.
+  intro Hs. apply bv_eq.
+  rewrite !bv_extract_unsigned, Z.shiftr_0_r, !bv_wrap_land.
+  apply Z.bits_inj_iff' => i Hi.
+  rewrite !Z.land_spec, !Z.shiftr_spec, !Z.ones_spec; [| lia ..].
+  repeat (case_bool_decide; simpl); try done; try lia.
+  rewrite !andb_true_r, Z.land_spec.
+  rewrite Z.ones_spec by lia.
+  case_bool_decide; [ by rewrite andb_true_r | lia ].
+Qed.
+
+Lemma bv_extract_full l (v : bv l) : bv_extract 0 l v = v.
+Proof. apply bv_eq. by rewrite bv_extract_0_unsigned, bv_wrap_bv_unsigned. Qed.
+
+(* ---- the two model-level facts, over an OPEN entry.  These are the ones
+       claude-notes/projects/crash.md named as the blockers: bitvector equality
+       does not reduce under the lazy evaluator, so neither is a computation --
+       each is the [bv_extract]/[bv_concat] algebra above, applied. ---- *)
+
+Lemma pmpcfg_L_of_L (x : mword 8) (b : mword 1) :
+  _get_Pmpcfg_ent_L (_update_Pmpcfg_ent_L x b) = b.
+Proof.
+  change (bv_extract 7 1 (bv_concat 8 (bv_extract 8 0 x)
+                            (bv_concat 8 b (bv_extract 0 7 x))) = b).
+  rewrite (bv_extract_concat_mid 8 0 8) by lia.
+  rewrite (bv_extract_concat_later 8 1 7) by lia.
+  by rewrite bv_extract_full.
+Qed.
+
+Lemma pmpcfg_A_of_LA (x : mword 8) (a : mword 2) (b : mword 1) :
+  _get_Pmpcfg_ent_A (_update_Pmpcfg_ent_L (_update_Pmpcfg_ent_A x a) b) = a.
+Proof.
+  change (bv_extract 3 2
+            (bv_concat 8 (bv_extract 8 0 (bv_concat 8 (bv_extract 5 3 x)
+                                            (bv_concat 5 a (bv_extract 0 3 x))))
+               (bv_concat 8 b
+                  (bv_extract 0 7 (bv_concat 8 (bv_extract 5 3 x)
+                                     (bv_concat 5 a (bv_extract 0 3 x)))))) = a).
+  rewrite (bv_extract_concat_mid 8 0 8) by lia.
+  rewrite (bv_extract_concat_mid 8 1 7) by lia.
+  rewrite (bv_extract_extract_0 8 7) by lia.
+  rewrite (bv_extract_concat_mid 8 3 5) by lia.
+  rewrite (bv_extract_concat_later 5 2 3) by lia.
+  by rewrite bv_extract_full.
+Qed.
+
+(* ---- the vec layer: reading a 64-entry vector after one update ---- *)
+
+Local Notation V64 := (SailStdpp.Values.vec (SailStdpp.Values.mword 8) 64).
+
+(* Sail's [list_update] IS stdpp's list insert, which is where the lookup
+   lemmas live. *)
+Lemma list_update_insert {A} (xs : list A) (k : nat) (x : A) :
+  (k < length xs)%nat -> SailStdpp.Values.list_update xs k x = <[k := x]> xs.
+Proof.
+  intro Hk. unfold SailStdpp.Values.list_update.
+  by rewrite (insert_take_drop xs k x Hk).
+Qed.
+
+Lemma vec_len (v : V64) : length (projT1 v) = 64%nat.
+Proof. destruct v as [l Hl]. cbn. exact Hl. Qed.
+
+(* THE INDEX ARITHMETIC, IN [mword]-FREE LEMMAS.  [lia] answers "Cannot find
+   witness" as soon as an [mword] is merely in CONTEXT (durable-notes), and the
+   vec proofs below all have one, so every arithmetic step is a closed lemma
+   over plain [Z]/[nat] applied as a fact. *)
+Lemma zidx_lt (i : Z) : 0 <= i < 64 -> (Z.to_nat (Z.of_nat 64 - 1 - i) < 64)%nat.
+Proof. lia. Qed.
+Lemma zidx_pos (i : Z) : 0 <= i < 64 -> ((Z.of_nat 64 - 1 - i) <? 0) = false.
+Proof. intro. apply Z.ltb_ge. lia. Qed.
+Lemma zidx_ne (i j : Z) : 0 <= i < 64 -> 0 <= j < 64 -> j <> i ->
+  Z.to_nat (Z.of_nat 64 - 1 - i) <> Z.to_nat (Z.of_nat 64 - 1 - j).
+Proof. lia. Qed.
+Lemma zidx_hi (j : Z) : 63 < j -> ((Z.of_nat 64 - 1 - j) <? 0) = true.
+Proof. intro. apply Z.ltb_lt. lia. Qed.
+Lemma zidx_lo (j : Z) : j < 0 -> (64 <= Z.to_nat (Z.of_nat 64 - 1 - j))%nat.
+Proof. lia. Qed.
+Lemma zidx_pos_lo (j : Z) : j < 0 -> ((Z.of_nat 64 - 1 - j) <? 0) = false.
+Proof. intro. apply Z.ltb_ge. lia. Qed.
+Lemma zidx_range_split (j : Z) : ~ (0 <= j < 64) -> (j < 0 \/ 63 < j).
+Proof. lia. Qed.
+Lemma zidx_in_range (i : Z) : (0 <=? i <? 64) = true -> 0 <= i < 64.
+Proof.
+  rewrite andb_true_iff. intros [E1 E2].
+  apply Z.leb_le in E1. apply Z.ltb_lt in E2. lia.
+Qed.
+Lemma zidx_of_range (i : Z) : 0 <= i < 64 -> (0 <=? i <? 64) = true.
+Proof.
+  intros [H1 H2]. rewrite andb_true_iff. split;
+    [ by apply Z.leb_le | by apply Z.ltb_lt ].
+Qed.
+
+(* OUT OF RANGE, EITHER WAY, THE READ IS THE [Inhabited] DEFAULT -- and this is
+   not a corner case to be waved away: [RiscvLang.pmp_all_off] quantifies over
+   ALL of [Z], so the boot fact is false without it. *)
+Lemma vec_access_oob (v : V64) (j : Z) :
+  (j < 0 \/ 63 < j) -> SailStdpp.Values.vec_access_dec v j = inhabitant.
+Proof.
+  intro Hj. pose proof (vec_len v) as Hlen.
+  unfold SailStdpp.Values.vec_access_dec, SailStdpp.Values.access_list_dec,
+         SailStdpp.Values.access_list_inc, SailStdpp.Values.length_list.
+  rewrite Hlen. destruct Hj as [Hj | Hj].
+  - rewrite (zidx_pos_lo j Hj).
+    apply nth_overflow. rewrite Hlen. exact (zidx_lo j Hj).
+  - by rewrite (zidx_hi j Hj).
+Qed.
+
+Lemma vec_access_update_eq (v : V64) (i : Z) (x : SailStdpp.Values.mword 8) :
+  0 <= i < 64 ->
+  SailStdpp.Values.vec_access_dec (SailStdpp.Values.vec_update_dec v i x) i = x.
+Proof.
+  intro Hi. pose proof (vec_len v) as Hlen.
+  unfold SailStdpp.Values.vec_access_dec, SailStdpp.Values.vec_update_dec,
+         SailStdpp.Values.access_list_dec, SailStdpp.Values.access_list_inc,
+         SailStdpp.Values.update_list_dec, SailStdpp.Values.update_list_inc,
+         SailStdpp.Values.length_list.
+  destruct (sumbool_of_bool (0 <=? i <? 64)) as [E | E]; cbn [projT1];
+    [| by rewrite (zidx_of_range i Hi) in E ].
+  rewrite Hlen, list_update_insert by (rewrite Hlen; exact (zidx_lt i Hi)).
+  rewrite length_insert, Hlen, (zidx_pos i Hi).
+  apply nth_lookup_Some, list_lookup_insert.
+  rewrite Hlen. exact (zidx_lt i Hi).
+Qed.
+
+Lemma vec_access_update_ne (v : V64) (i j : Z) (x : SailStdpp.Values.mword 8) :
+  0 <= i < 64 -> j <> i ->
+  SailStdpp.Values.vec_access_dec (SailStdpp.Values.vec_update_dec v i x) j
+  = SailStdpp.Values.vec_access_dec v j.
+Proof.
+  intros Hi Hne.
+  destruct (decide (0 <= j < 64)) as [Hj | Hj];
+    [| rewrite !(vec_access_oob _ j (zidx_range_split j Hj)); reflexivity ].
+  pose proof (vec_len v) as Hlen.
+  unfold SailStdpp.Values.vec_access_dec, SailStdpp.Values.vec_update_dec,
+         SailStdpp.Values.access_list_dec, SailStdpp.Values.access_list_inc,
+         SailStdpp.Values.update_list_dec, SailStdpp.Values.update_list_inc,
+         SailStdpp.Values.length_list.
+  destruct (sumbool_of_bool (0 <=? i <? 64)) as [E | E]; cbn [projT1];
+    [| by rewrite (zidx_of_range i Hi) in E ].
+  rewrite Hlen, list_update_insert by (rewrite Hlen; exact (zidx_lt i Hi)).
+  rewrite length_insert, Hlen, (zidx_pos j Hj).
+  rewrite !nth_lookup, list_lookup_insert_ne by exact (zidx_ne i j Hi Hj Hne).
+  reflexivity.
+Qed.
+
+(* "this entry is disabled and unlocked" -- the two conjuncts of
+   [RiscvLang.pmp_all_off], at one entry. *)
+Definition pmp_entry_off (e : SailStdpp.Values.mword 8) : Prop :=
+  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A e) = OFF
+  /\ pmpLocked e = false.
+
+(* the value [reset_pmp]'s body stores, at an ARBITRARY old entry *)
+Lemma pmp_entry_off_cleared (x : SailStdpp.Values.mword 8) :
+  pmp_entry_off (_update_Pmpcfg_ent_L
+                   (_update_Pmpcfg_ent_A x (pmpAddrMatchType_encdec_forwards OFF))
+                   ('b"0")).
+Proof.
+  split.
+  - rewrite pmpcfg_A_of_LA. reflexivity.
+  - unfold pmpLocked. rewrite pmpcfg_L_of_L. reflexivity.
+Qed.
+
+(* and the entry an out-of-range read hands back *)
+Lemma pmp_entry_off_inhabitant : pmp_entry_off inhabitant.
+Proof. split; reflexivity. Qed.
+
+(* THE LOOP'S INDEX ARITHMETIC, [mword]-free (see the section header). *)
+Lemma loop_range (i : Z) (n : nat) :
+  0 <= i -> i + Z.of_nat (S n) = 64 -> 0 <= i < 64.
+Proof. lia. Qed.
+Lemma loop_le63 (i : Z) (n : nat) :
+  0 <= i -> i + Z.of_nat (S n) = 64 -> i <= 63.
+Proof. lia. Qed.
+Lemma loop_next_nonneg (i : Z) : 0 <= i -> 0 <= i + 1.
+Proof. lia. Qed.
+Lemma loop_next_sum (i : Z) (n : nat) :
+  i + Z.of_nat (S n) = 64 -> (i + 1) + Z.of_nat n = 64.
+Proof. lia. Qed.
+Lemma loop_empty (i j : Z) : i + Z.of_nat 0%nat = 64 -> i <= j -> j <= 63 -> False.
+Proof. lia. Qed.
+Lemma loop_here_below (i : Z) : i < i + 1.
+Proof. lia. Qed.
+Lemma loop_next_le (i j : Z) : i <= j -> j <> i -> i + 1 <= j.
+Proof. lia. Qed.
+Lemma loop_below_next (i j : Z) : j < i -> j < i + 1.
+Proof. lia. Qed.
+Lemma loop_all_range (j : Z) : 0 <= j -> j <= 63 -> 0 <= j < 64.
+Proof. lia. Qed.
+Lemma pmp_oob (j : Z) : ~ (0 <= j /\ j <= 63) -> (j < 0 \/ 63 < j).
+Proof. lia. Qed.
+Lemma loop_lt_ne (i j : Z) : j < i -> j <> i.
+Proof. lia. Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 3. [reset_pmp]: THE ONE LOOP THE KIT MUST NOT PEEL.                     *)
 (* ---------------------------------------------------------------------- *)
 
@@ -351,46 +575,116 @@ Definition pmp_frame (rs' rs : regstate) : Prop :=
   forall r, register_beq r pmpcfg_n = false ->
             register_lookup r rs' = register_lookup r rs.
 
-Lemma pmp_loop_frame (body : Z -> unit -> M unit)
-      (Hb : forall (i : Z) (rs : regstate) m d,
+(* THE LOOP, AND IT PROVES BOTH HALVES.  Generic in the body (taken FROM THE
+   GOAL below, never transcribed) and keeping the vector ABSTRACT: the frame
+   ("only pmpcfg was touched", which is what lets the rest of the chain be
+   peeled across the seam) and the PER-ENTRY half ("every entry from [i] up is
+   off, and every entry below [i] is untouched").  The second "untouched"
+   conjunct is not decoration -- it is what carries entry [i]'s off-ness, proved
+   at the body, through the remaining 63 iterations. *)
+Lemma pmp_loop (body : Z -> unit -> M unit)
+      (Hb : forall (i : Z) (rs : regstate) m d, 0 <= i < 64 ->
               exists rs', exec (body i tt) (MState rs m d) = Some (tt, MState rs' m d)
-                          /\ pmp_frame rs' rs)
+                /\ pmp_frame rs' rs
+                /\ pmp_entry_off
+                     (SailStdpp.Values.vec_access_dec
+                        (register_lookup pmpcfg_n rs') i)
+                /\ (forall j, j <> i ->
+                      SailStdpp.Values.vec_access_dec
+                        (register_lookup pmpcfg_n rs') j
+                      = SailStdpp.Values.vec_access_dec
+                          (register_lookup pmpcfg_n rs) j))
       (n : nat) :
   forall (i : Z) (rs : regstate) m d,
+    0 <= i -> i + Z.of_nat n = 64 ->
     exists rs', exec (foreach_ZM_up' i 63 1 n tt body) (MState rs m d)
                 = Some (tt, MState rs' m d)
-                /\ pmp_frame rs' rs.
+                /\ pmp_frame rs' rs
+                /\ (forall j, i <= j -> j <= 63 ->
+                      pmp_entry_off
+                        (SailStdpp.Values.vec_access_dec
+                           (register_lookup pmpcfg_n rs') j))
+                /\ (forall j, j < i ->
+                      SailStdpp.Values.vec_access_dec
+                        (register_lookup pmpcfg_n rs') j
+                      = SailStdpp.Values.vec_access_dec
+                          (register_lookup pmpcfg_n rs) j).
 Proof.
-  induction n as [| n IH]; intros i rs m d.
-  - exists rs. split.
+  induction n as [| n IH]; intros i rs m d Hi Hn.
+  - (* out of fuel, i.e. i = 64: the range is empty and nothing moved *)
+    exists rs. split_and!.
     + cbn [foreach_ZM_up']. destruct (i <=? 63); reflexivity.
     + intros r _. reflexivity.
-  - destruct (i <=? 63) eqn:Hi.
-    + destruct (Hb i rs m d) as (rs1 & H1 & Hf1).
-      destruct (IH (i + 1) rs1 m d) as (rs2 & H2 & Hf2).
-      exists rs2. split.
-      * rewrite (unroll_foreach_ZM_up' _ _ i 63 1 n tt body
-                   (proj1 (Z.leb_le i 63) Hi)).
-        refine (pk_step _ tt _ _ _ _ H1 _). exact H2.
-      * intros r Hr. rewrite (Hf2 r Hr). exact (Hf1 r Hr).
-    + exists rs. split.
-      * cbn [foreach_ZM_up']. rewrite Hi. reflexivity.
-      * intros r _. reflexivity.
+    + intros j Hj1 Hj2. exfalso. exact (loop_empty i j Hn Hj1 Hj2).
+    + intros j _. reflexivity.
+  - destruct (Hb i rs m d (loop_range i n Hi Hn)) as (rs1 & H1 & Hf1 & Hoff1 & Hne1).
+    destruct (IH (i + 1) rs1 m d (loop_next_nonneg i Hi) (loop_next_sum i n Hn))
+      as (rs2 & H2 & Hf2 & Hoff2 & Hunch2).
+    exists rs2. split_and!.
+    + rewrite (unroll_foreach_ZM_up' _ _ i 63 1 n tt body
+                 (loop_le63 i n Hi Hn)).
+      refine (pk_step _ tt _ _ _ _ H1 _). exact H2.
+    + intros r Hr. rewrite (Hf2 r Hr). exact (Hf1 r Hr).
+    + intros j Hj1 Hj2. destruct (decide (j = i)) as [-> | Hne].
+      * rewrite (Hunch2 i (loop_here_below i)). exact Hoff1.
+      * exact (Hoff2 j (loop_next_le i j Hj1 Hne) Hj2).
+    + intros j Hj. rewrite (Hunch2 j (loop_below_next i j Hj)).
+      exact (Hne1 j (loop_lt_ne i j Hj)).
+Qed.
+
+(* the loop at the model's own bounds, with [pmp_all_off] read off it.  A
+   separate wrapper so the call site can [apply] it and be left with ONE goal --
+   the body's -- rather than having to name the body's fact: [destruct] needs a
+   complete term and would demand the statement be transcribed. *)
+Lemma pmp_loop_all (body : Z -> unit -> M unit)
+      (Hb : forall (i : Z) (rs : regstate) m d, 0 <= i < 64 ->
+              exists rs', exec (body i tt) (MState rs m d) = Some (tt, MState rs' m d)
+                /\ pmp_frame rs' rs
+                /\ pmp_entry_off
+                     (SailStdpp.Values.vec_access_dec
+                        (register_lookup pmpcfg_n rs') i)
+                /\ (forall j, j <> i ->
+                      SailStdpp.Values.vec_access_dec
+                        (register_lookup pmpcfg_n rs') j
+                      = SailStdpp.Values.vec_access_dec
+                          (register_lookup pmpcfg_n rs) j))
+      (rs : regstate) m d :
+  exists rs', exec (foreach_ZM_up' 0 63 1 64 tt body) (MState rs m d)
+              = Some (tt, MState rs' m d)
+              /\ pmp_frame rs' rs
+              /\ pmp_all_off (register_lookup pmpcfg_n rs').
+Proof.
+  destruct (pmp_loop body Hb 64 0 rs m d (Z.le_refl 0) eq_refl)
+    as (rs' & Hex & Hfr & Hoff & _).
+  exists rs'. split_and!; [ exact Hex | exact Hfr |].
+  (* [pmp_all_off] quantifies over ALL of [Z]: in range from the loop, out of
+     range from the vector's [Inhabited] default. *)
+  intro j. destruct (decide (0 <= j /\ j <= 63)) as [[Hj1 Hj2] | Hj].
+  - exact (Hoff j Hj1 Hj2).
+  - rewrite (vec_access_oob _ j (pmp_oob j Hj)).
+    exact pmp_entry_off_inhabitant.
 Qed.
 
 (* the model's own [reset_pmp], with its body taken FROM THE GOAL (a
    transcription would be one more thing to keep in step with the model). *)
 Lemma exec_reset_pmp (rs : regstate) (m : _) (d : _) :
   exists rs', exec (reset_pmp tt) (MState rs m d) = Some (tt, MState rs' m d)
-              /\ pmp_frame rs' rs.
+              /\ pmp_frame rs' rs
+              /\ pmp_all_off (register_lookup pmpcfg_n rs').
 Proof.
   unfold reset_pmp, foreach_ZM_up.
   lazymatch goal with
-  | |- context[foreach_ZM_up' _ _ _ _ _ ?b] => apply (pmp_loop_frame b)
+  | |- context[foreach_ZM_up' _ _ _ _ _ ?b] => apply (pmp_loop_all b)
   end.
-  intros i rsb mb db. eexists. split.
+  (* THE BODY: two reads of pmpcfg and one write of a [vec_update_dec] at the
+     loop index.  Everything about the entry is §3a's algebra. *)
+  clear rs m d. intros i rs m d Hi. eexists. split_and!.
   - peel. reflexivity.
   - intros r Hr. rewrite irrelevant_register_set; [reflexivity | exact Hr].
+  - rewrite register_lookup_set, (vec_access_update_eq _ i _ Hi).
+    exact (pmp_entry_off_cleared _).
+  - intros j Hne. rewrite register_lookup_set.
+    exact (vec_access_update_ne _ i j _ Hi Hne).
 Qed.
 
 (* From here on the kit must NOT descend into it. *)
@@ -400,12 +694,12 @@ Qed.
 (* 4. [init_model]: THE ASSERT AND THE ARCHITECTURAL RESET.                *)
 (* ---------------------------------------------------------------------- *)
 
-(* [reset_regs] minus ONLY pmpcfg's predicate (§3 proves just the frame half of
-   [reset_pmp]'s loop) -- i.e. everything the boot program establishes at an
-   ARBITRARY power-on register file: five values the privileged spec's own
-   [reset] writes (PC, nextPC, cur_privilege, hart_state, elp), misa's extension
-   bits from [reset_misa] over the board's MXL, and the board's own nine other
-   writes carried through a chain that does not touch them. *)
+(* EXACTLY [reset_regs], at an ARBITRARY power-on register file: five values the
+   privileged spec's own [reset] writes (PC, nextPC, cur_privilege, hart_state,
+   elp), misa's extension bits from [reset_misa] over the board's MXL, pmpcfg's
+   [pmp_all_off] from [reset_pmp] per entry (§3), and the board's own nine other
+   writes carried through a chain that does not touch them.  Nothing is left over
+   for a patch layer. *)
 Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
   register_lookup PC rs = boot_w64 0x80000000
   /\ register_lookup nextPC rs = boot_w64 0x80000000
@@ -420,7 +714,10 @@ Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
   /\ register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED
   /\ register_lookup pma_regions rs = pma_boot
   /\ register_lookup mie rs = boot_w64 0
-  /\ register_lookup mideleg rs = boot_w64 0.
+  /\ register_lookup mideleg rs = boot_w64 0
+  (* the spec's own [reset_pmp], derived per entry over the open file (§3) --
+     no longer a patched value *)
+  /\ pmp_all_off (register_lookup pmpcfg_n rs).
 
 Lemma exec_init_model (hid : mword 64) (s0 : mstate) (rs : regstate) :
   board_ok hid rs ->
@@ -434,7 +731,8 @@ Proof.
   peel.
   (* THE SEAM: [reset_pmp] is sealed, so the loop stopped on it. *)
   lazymatch goal with
-  | |- pfin _ _ _ ?rsx => destruct (exec_reset_pmp rsx s0.(mem) s0.(mdev)) as (rsp & Hp & Hfr)
+  | |- pfin _ _ _ ?rsx =>
+      destruct (exec_reset_pmp rsx s0.(mem) s0.(mdev)) as (rsp & Hp & Hfr & Hpmp)
   end.
   refine (px_step _ _ _ tt _ _ _ Hp _).
   (* re-establish, at the loop's output file, every fact the rest of the chain
@@ -469,7 +767,7 @@ Proof.
   clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid Hmie Hmdl.
   peel.
   apply px_done. unfold post_ok. split_and!; lkres;
-    first [ reflexivity | apply bv_eq; vm_compute; reflexivity ].
+    first [ reflexivity | assumption | apply bv_eq; vm_compute; reflexivity ].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -480,9 +778,10 @@ Lemma exec_init_boot_requirements (hid : mword 64) (s0 : mstate) (rs : regstate)
   post_ok hid rs -> pfin s0 (post_ok hid) (init_boot_requirements tt) rs.
 Proof.
   intros (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec & Hmenv
-          & Hhtif & Help & Hpma & Hmie & Hmdl).
+          & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp).
   unfold init_boot_requirements. peel.
-  apply px_done. unfold post_ok. split_and!; lkres; reflexivity.
+  apply px_done. unfold post_ok. split_and!; lkres;
+    first [ reflexivity | assumption ].
 Qed.
 
 Lemma exec_boot_prog (hid : mword 64) (s0 : mstate) (rs : regstate) :
@@ -511,7 +810,7 @@ Qed.
 Theorem reset_regs_of_run (c : CPU) (rs0 rs1 : regstate) :
   run (boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))) pma_boot)
       (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state) ->
-  reset_regs c (boot_patch rs1).
+  reset_regs c rs1.
 Proof.
   intro Hrun.
   destruct (exec_boot_prog (boot_w64 (Z.of_nat (fin_to_nat c)))
@@ -521,7 +820,6 @@ Proof.
   destruct (Huniq _ _ Hrun) as [_ Heq].
   injection Heq as Heq. subst rs1.
   destruct Hpost as (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec
-                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl).
-  unfold reset_regs, boot_patch. split_and!; lkres;
-    first [ reflexivity | exact pmp_all_off_pmpcfg_boot ].
+                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp).
+  unfold reset_regs. split_and!; assumption.
 Qed.
