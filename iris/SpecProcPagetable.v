@@ -35,6 +35,36 @@ Notation PPGT := KernelSyms.proc_pagetable.
    ProcPt.ppt_missing_tf_zero). *)
 Definition K_proc_pagetable : nat := 3.
 
+(* WHAT proc_pagetable RETURNS, with the resources that go with it.  [rv] is
+   the returned pointer -- a0 at the [ret], and s1 at the +0x4c join where
+   all four exits meet (the two error tails both end [li s1,0; j +0x4c], and
+   uvmcreate's null exit reaches +0x4c straight from the [beqz] at +0x14).
+
+   SUCCESS: the table that was built, its map, its node count, and the
+   consumption ledger.
+
+   FAILURE: a null return, and NOTHING OWED -- whatever table existed has
+   gone back through the tails' uvmunmap/uvmfree.  But the COUNT is gone with
+   it: uvmfree exists only at [kalloc_env _ None], so the tails reseal the
+   environment ([KvmSpec.kalloc_env_seal]).  The arm carries the exhaustion
+   witness that made the tail reachable in the first place -- [avail_zero
+   (avail_sub on n)] for the [n <= K_proc_pagetable] pages consumed before
+   the failure.  THAT CARRIAGE IS THE WHOLE POINT: it is what lets a caller
+   who knows [on = Some nb] with [K_proc_pagetable < nb] refute this arm, and
+   so what lets one proof serve both the counted contract below and the
+   uncounted one allocproc's failure tails need. *)
+Definition ppt_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (on : option nat) (tfp : mword 44) (rv : mword 64) : iProp Σ :=
+  ((∃ t : ptree,
+      ⌜rv = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ ∗
+      ptree_own 2 (DfracOwn 1) t ∗
+      ⌜pt_rep0 t (ppt_map tfp)⌝ ∗
+      ⌜(pt_nodes t <= K_proc_pagetable)%nat⌝ ∗
+      kalloc_env γa (avail_sub on (pt_nodes t)))
+   ∨ (⌜rv = (mword_of_int 0 : mword 64)⌝ ∗
+      ⌜exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n)⌝ ∗
+      kalloc_env γa None))%I.
+
 (* proc_pagetable(p): build a user page table with no user memory --
    uvmcreate() an empty root, then map TRAMPOLINE (R|X, at the kernel's
    trampoline page) and TRAPFRAME (R|W, at p->trapframe).  Returns (a0) the
