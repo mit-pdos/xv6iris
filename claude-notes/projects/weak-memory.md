@@ -1,22 +1,58 @@
 # Project: weak memory (RVWMO) — staged worklist
 
 Design: [`design/weak-memory.md`](../design/weak-memory.md) (PROPOSAL).
-Nothing landed. Branch: `weak-memory`.
+Branch: `weak-memory`. M0 has landed (`iris/WeakMem.v`, `iris/WeakLitmus.v`);
+nothing else has.
 
 ## M0 — model spike (no Iris)
 
 Validate the operational design before anything depends on it.
 
-- [ ] `WeakMem.v`: `wmsg`, `wstate`, the log (`gmem0` + `glog`), per-byte
+- [x] `WeakMem.v`: `wmsg`, `wstate`, the log (`gmem0` + `glog`), per-byte
       readability, the load/store/AMO/fence update functions. Pure stdpp.
 - [ ] Modified `run`/`exec` on a COPY (`WeakLang.v` scratch): MemRead/
       MemWrite/Barrier arms consult `wstate` + log; `exec` takes the read
-      oracle χ; `exec_run` bridge per oracle.
-- [ ] Litmus suite as executable lemmas (SB, MP±fences, CoRR, IRIW,
+      oracle χ; `exec_run` bridge per oracle. **Deferred to M1** — the spike
+      exercised the model through the toy hart language in `WeakLitmus.v`
+      instead of a Sail copy, so the oracle shape is still unvalidated.
+- [x] Litmus suite as executable lemmas (SB, MP±fences, CoRR, IRIW,
       MP+amoswap.aq; LB must be unobservable — documents the promise-free
       gap). Verdicts cross-checked against riscv.cat/herd expectations.
 - [ ] Spike report: does the oracle shape hold up? is the per-byte View
       workable as a monPred index? Feed corrections back into the design.
+
+### What M0 established (read before M1)
+
+- **`readable` wants ONE workhorse lemma, not a monotonicity theory.**
+  `readable img log ws vpre a t := t writes a ∧ ¬ writes_in log a t (vpre ⊔ coh(a))`
+  is anti-monotone in `vpre` and has NO monotonicity in `t` in either
+  direction (both directions are the coherence constraint). Every forbidden
+  litmus proof goes through exactly one corollary,
+  `readable_not_init : readable … → writes_in log a 0 vpre → t ≠ 0` — "if my
+  pre-view already covers a write to this byte, the era-initial image is no
+  longer readable". Expect the Iris load leaf to be built on that shape.
+- **`writes_in log a lo hi` is the right primitive**, and it is what makes the
+  invariants stable: monotone in the log (`writes_in_app`), invertible below
+  the old length (`writes_in_app_inv`), and clippable to `min hi (length log)`
+  — the last one is what lets a *negative* fact ("no write to y below my
+  view") survive later appends, which is the whole IRIW proof.
+- **`coh` with a `default 0` lookup never had to be reasoned about
+  pointwise** — only `t ≤ coh (load_post …) a` and the insert/lookup pair.
+- **Each hart's stores enter the log in program order BY CONSTRUCTION**
+  (a store appends at `S (length log)` and the hart cannot reach its next
+  store first), so no invariant is needed for it — which is precisely why the
+  machine is stronger than RVWMO on W→W (gap witness #2 below).
+- **Two documented over-strengthenings**, both proven as unreachability
+  theorems in `WeakLitmus.v`: `lb_forbidden` (the LB gap, Decision 1) and
+  `mp_reader_fence_only_forbidden` (MP with no writer fence — RVWMO allows
+  it, this machine does not). Plus one M0-local simplification: `load_post`
+  ignores the forward bank and always uses `t` for `vpost`, so `w_fwd` is
+  written and never read. Wire it in at M1 or delete the field.
+- **Instantiating addresses at `Arch.pa`** needs only `EqDecision` +
+  `Countable` + "byte i of a message" arithmetic; the spike keeps addresses
+  as `Z` under `Z.le`/`Z.sub` and as `gmap` keys only. Mind the
+  `gmap Arch.pa _` Countable-instance trap in the durable notes when the real
+  file also imports `SailStdpp.Values`.
 
 ## M1 — language + base logic
 

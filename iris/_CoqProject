@@ -742,3 +742,5 @@ SpecSysDup.v
 ProofSysDup.v
 LinkArgfd.v
 LinkSysDup.v
+WeakMem.v
+WeakLitmus.v
