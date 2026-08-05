@@ -1083,6 +1083,38 @@ Section BioInv.
       (pidv dev bno : mword 32) (bs bsd : list (bv 8)) (d : bool) : iProp Σ :=
     bio_held bn V k pidv dev bno bs bs bsd d.
 
+  (* the handle MINUS its payload: what bwrite consumes.  A
+     content-changing write (write_head rewriting the header) necessarily
+     has logical ≠ disk on one side of the call WHATEVER the order of the
+     ghost update and the write, so the clean payload's ⌜bsd = bsl⌝ tie
+     cannot appear in bwrite's pre or post: the caller holds the payload
+     aside across the call and re-pairs afterwards (bio_held_split). *)
+  Definition bio_hold0 (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (pidv dev bno : mword 32) (bs bsd : list (bv 8)) : iProp Σ :=
+    (⌜(k < NBUF)%nat⌝ ∗
+     ⌜uint bno ∈ bv_cov V⌝ ∗
+     ⌜dev = bv_dev V⌝ ∗
+     sleeplocked (snd (bn_slk bn k)) ∗
+     sl_pid (buf_lock (bnode k)) ↦₄ pidv ∗
+     b_valid (bpa k) ↦₄ (mword_of_int 1 : mword 32) ∗
+     b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
+     buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+     disk_block (bv_gd V) (uint bno) bsd)%I.
+
+  Lemma bio_held_split bn V k pidv dev bno bs bsl bsd d :
+    bio_held bn V k pidv dev bno bs bsl bsd d ⊣⊢
+    bio_hold0 bn V k pidv dev bno bs bsd ∗
+    bio_pay bn V k dev bno bsl bsd d.
+  Proof.
+    rewrite /bio_held /bio_hold0.
+    iSplit.
+    - iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+      iSplitR "H7"; [|iExact "H7"].
+      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iFrame.
+    - iIntros "[(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6) H7]".
+      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  Construction: binit's postcondition + the .bss-zeroed buffers       *)
   (* ------------------------------------------------------------------ *)

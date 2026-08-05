@@ -195,11 +195,18 @@ and no ghost laws about Ψ).
   `∃ k bs bsd st, bio_locked bn k pidv dev bno bs bsd st` — bytes = the
   Ψ-index = L(bno). The caller learns bs by agreeing its own
   `fsblock bno bs₀` against the handle's L-half. No mystery disjunct.
-- **bwrite(b)**: pre `bio_locked … bs bsd st`; post
-  `bio_locked … bs bs st'` — disk now equals bytes (st' = st, with the
-  Clean tie now at bs; for Dirty the caller sees ⌜bsd' = bs⌝ directly and
-  can later flip Dirty→Clean at bunpin). Stage 4 adds the crash-permit
-  premise here (see below); stages 1–3 keep rw's identity permit.
+- **bwrite(b)**: pre `bio_hold0 … bs bsd` — the PAYLOAD-LESS handle —
+  post `bio_hold0 … bs bs` (disk now equals bytes). NOT bio_locked, and
+  the reason is a real discovery (found at write_head's proof): a
+  content-changing write necessarily has logical ≠ disk on one side of
+  the call whatever the order of the ghost update and the write, so the
+  clean payload's ⌜bsd = bsl⌝ tie cannot appear in bwrite's pre or post.
+  The caller splits the handle (`bio_held_split`), holds the payload
+  aside across the call, and re-pairs after: write_head does its γL
+  update AFTER the write (exactly when the clean tie holds again);
+  install_trans's dirty payload never mentions the disk value at all.
+  Stage 4 adds the crash-permit premise here (see below); stages 1–3
+  keep rw's identity permit.
 - **brelse(b)**: pre `bio_locked … bs bsd st` (consistency is internal to
   the definition); post `bslot`. Parks the arm back.
 - **bpin/bunpin**: statements essentially as today (bslot ⇄ bref); they get
@@ -326,6 +333,16 @@ settling these):
    shadow, is part of fork 1's resolution).
 
 ## Decision record (rejected shapes)
+
+- **A committer-side contract must witness HOME-block content through the
+  auth it holds (`ghost_map_lookup` + a pure `L !! bno = Some …` premise),
+  never through a client `fsblock`**: home blocks' client halves are with
+  the FS callers by construction (log_write hands them back; log_batch
+  holds only the log region's own), so a committer spec demanding one is
+  unsatisfiable at its only real call site — and compiles anyway, because
+  the n = 0 caller discharges it vacuously. Found twice while proving
+  stage 3 (install_trans's per-entry home half; the same shape was
+  avoided in write_head by keeping it d-generic).
 
 - **Client view-shifts as bio parameters** (load/evict fill in fs_inv):
   rejected — once the pool and the disk_block ride inside bio, every

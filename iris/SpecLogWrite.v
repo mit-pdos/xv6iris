@@ -102,8 +102,12 @@ Definition wp_log_write_sconf_body
   let pcE : mword 64 := mword_of_int KernelSyms.log_write in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_log_write <= K)%nat ->
-  (* bpin's push-depth premise (its refcnt++ runs one level deeper) *)
-  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* bpin runs UNDER log.lock, i.e. at nesting level S n, and its own
+     acquire pushes again: the premise must cover TWO pushes above the
+     entry level (the SpecPipeclose/SpecConsoleintr convention -- the +1
+     form is underivable at the bpin call site, cpu_cells' own bound at
+     level S n gives back only +1). *)
+  (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (* a0 is the buffer being logged *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->

@@ -104,20 +104,55 @@ Note for ProofLogWrite (from the spec round): the append path must peel
 the refunded unit out of the batch's pool AT THE `lh.n++` store — the
 pool's index is `(LOGBLOCKS − n) + 2` and only the n++ re-establishes it.
 
-## Stage 3 — the log.c proofs
+## Cleanup queue (post-stage-3; none blocks anything)
 
-- [ ] log_write (no sleeps; log.lock critical section; the γL/γdirty/bpin
-      choreography).
-- [ ] begin_op (sleep loop over SLEEP; precedent: acquiresleep's retry
-      iLöb).
-- [ ] end_op + commit (the batch checkout across release; write_log /
-      write_head / install_trans loops are fuel inductions over the
-      revised bread/bwrite specs; memmove via the proven spec — note
-      memmove's contract is non-overlapping-by-separation, two buffers'
-      byte ranges are separate conjuncts, fine here).
-- [ ] initlog (boot wiring: builds log_res; called under fsinit? — check
-      the actual call chain in this kernel's main/forkret path when
-      wiring).
+- [ ] Promote the four missing WP leaves now proved locally TWICE or
+      needed broadly: `wp_addw4_s_sconf` (base 3-operand addw — Local in
+      BOTH ProofInstallTrans and ProofEndOp, the promotion trigger) to
+      WpSconfAlu.v; `wp_bgtz_{fall,taken}_s_sconf` (BLT with rs1 = x0 —
+      only the rs2 = x0 bltz twin exists) and `wp_blt_taken_s_sconf`
+      (the general two-register BLT taken arm; every loop back edge of
+      this shape needs it) to WpSconfBtype.v. All four route through
+      WpSconfBtype's Local exec lemmas by qualified name — copy-paste
+      promotions.
+- [ ] The byte↔word bridge vocabulary is now duplicated: ProofWriteHead's
+      `wh_align4`/`wh_word_acc`/byte-list bridges and ProofInitlog's
+      `il_*` near-copies. Promote to a shared home (ByteBuf.v or
+      InstrBytes.v) when a third consumer appears.
+- [ ] The decode-dedup sweep flagged by the log.c Code files: the words
+      duplicated WITHIN the six new files (0x060a, 0x0711, 0x0791,
+      0x962a, 0x4314, 0x00c05f63, 0xfec79ce3, 0x509c, 0x2585, 0x0a91,
+      0x000aa583, 0x018a2583, 0x024a2503, 0x02ca2783) and the
+      cross-file candidates listed in each Code header.
+- [ ] `wp_next_shift` (WpSconfVc) subsumes the bespoke `*_cont` +
+      `*_cont_shift` pairs — ProofWriteHead's could be retired the next
+      time that file is touched (ProofInitlog already uses the direct
+      form).
+
+## Stage 3 — the log.c proofs (COMPLETE: log.c 6/7 fns, 91.0% of bytes;
+## only sys_sync remains, deferred to stage 4)
+
+- [x] log_write (ProofLogWrite: the two closing wands built once after
+      acquire and carried as an ∧ keyed on ⌜bno ∈ W⌝ / ⌜∉⌝ — NO case
+      split on d in the whole-function proof; both duplicated slot-store
+      blocks feed one shared tail at +0x66).
+- [x] begin_op (ProofBeginOp: iLöb retry loop, the W-form guard
+      arithmetic as mword-free lemmas, l_cmt's `if cmt` cell making both
+      branch conditions a destruct).
+- [x] write_head + the ProofBwrite adaptation to bio_hold0 (ProofWriteHead:
+      d0-generic payload handling; the γL update AFTER the bwrite is when
+      the clean tie re-holds; the wh_* byte↔word window vocabulary).
+- [x] install_trans (ProofInstallTrans: home content witnessed through
+      the committer's auth — it_pay_bs_auth — after the spec fix; the
+      dirty flip at bunpin; per-entry fuel induction with the write set
+      split at the cursor).
+- [x] end_op + commit (ProofEndOp, 4471 lines: six blocks each with its
+      own CID binder; the batch checkout across release; the copy loop's
+      log-region client halves split at the cursor; the pool arithmetic
+      exact end-to-end).
+- [x] initlog (ProofInitlog: clean-image form — the header-copy loop is
+      dead; delayed lock seal with the ∀R wand; word4_pointsto_persist →
+      log_frozen; assembles log_batch 0 / log_res inline).
 
 ## Stage 4 — the crash instantiation (DO NOT START until the two forks in
 ## the design doc's stage-4 section are settled)

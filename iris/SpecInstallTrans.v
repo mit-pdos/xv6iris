@@ -37,23 +37,38 @@
    STAGE 4's, and gets added with the crash invariant.
 
    WHAT IT TAKES, AND WHY.  install_trans breads both blocks itself, so per
-   write-set entry it wants no handle; it wants the CLIENT halves of the two
-   logged views the two breads will hand it payloads for, and the log side's
-   DIRTY half of the home block:
+   write-set entry it wants no handle; it wants the log copy's CLIENT half
+   and the log side's DIRTY half of the home block:
 
      [∗ list] i |-> w in W,
-        fsblock (uint w)                    (Lw i) *   (* the home block  *)
         fsblock (log_slot_bno logstart i)   (Lw i) *   (* its log copy    *)
         (uint w) |->[fs_dirty]{1/2} true
 
-   The two [fsblock]s AT THE SAME CONTENT [Lw i] is the write_log invariant
-   made a precondition: after write_log ran, log slot i holds exactly the
-   logged content of W[i], and the committer's authority has FROZEN both
-   ever since.  It is what makes the memmove a content-preserving copy and
-   therefore makes the destination handle [bio_locked] again (bytes = the
-   payload's index), which is what bwrite and brelse demand.  Nothing is
-   assumed about the DISK content of either -- bwrite moves the home block's
-   disk cell, which is the whole point of the pass.
+   plus the PURE tie for the home side:
+
+     forall i w, W !! i = Some w -> L !! uint w = Some (Lw i)
+
+   A COMMITTER-SIDE CONTRACT WITNESSES HOME CONTENT THROUGH THE AUTHORITY IT
+   HOLDS, NOT THROUGH A CLIENT HALF -- a home block's [fsblock] is
+   UNOBTAINABLE here.  The home blocks' client halves belong to the FS layer
+   above by construction (log_write hands each one back to its caller, and
+   [log_batch] retains only the log REGION's), so end_op -- the only caller
+   with a non-empty write set -- could never discharge such a premise.  What
+   the committer does hold is [ghost_map_auth (fs_L γfs) 1 L], and one
+   [ghost_map_lookup] against the payload the bread returns pins the home
+   block's bytes to [L !! uint w], which the pure premise identifies with
+   [Lw i].  The log slot's client half stays a resource: it rides in
+   [log_batch], so the caller has it for free.
+
+   Both sides therefore land at content [Lw i], which is the write_log
+   invariant made a precondition: after write_log ran, log slot i holds
+   exactly the logged content of W[i], and the committer's authority has
+   FROZEN both ever since.  It is what makes the memmove a
+   content-preserving copy and therefore makes the destination handle
+   [bio_locked] again (bytes = the payload's index), which is what bwrite
+   and brelse demand.  Nothing is assumed about the DISK content of either
+   -- bwrite moves the home block's disk cell, which is the whole point of
+   the pass.
 
    [ghost_map_auth (fs_L γfs) 1 L] rides through UNCHANGED: install writes
    the DISK, not the logical view (the memmove writes bytes already equal to
@@ -150,6 +165,11 @@ Definition wp_install_trans_sconf_body
   (n = length W /\ (n <= LOGBLOCKS)%nat) ->
   NoDup (map uint W) ->
   (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
+  (* THE HOME SIDE'S CONTENT WITNESS, as a fact about the authority below:
+     a client [fsblock] for a home block cannot be had on the committer's
+     side (see the header). *)
+  (forall (i : nat) (w : SailStdpp.Values.mword 32),
+     W !! i = Some w -> L !! uint w = Some (Lw i)) ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
@@ -176,11 +196,12 @@ Definition wp_install_trans_sconf_body
   ghost_map_auth (fs_L γfs) 1 L -∗
   (* the pinned-set authority: exactly W's entries go back to false *)
   ghost_map_auth (fs_dirty γfs) 1 D -∗
-  (* per entry: the home block's and its log copy's client halves AT THE
-     SAME CONTENT (write_log's postcondition, frozen by the authority
-     above), plus the log side's dirty half of the home block *)
+  (* per entry: the LOG COPY's client half at the logged content
+     (write_log's postcondition, frozen by the authority above), plus the
+     log side's dirty half of the home block.  The home block's own content
+     comes from the authority (the pure premise above), not from a client
+     half -- see the header. *)
   ([∗ list] i ↦ w ∈ W,
-     fsblock γfs (uint w) (Lw i) ∗
      fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
      (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
@@ -200,7 +221,6 @@ Definition wp_install_trans_sconf_body
       ghost_map_auth (fs_L γfs) 1 L -∗
       ghost_map_auth (fs_dirty γfs) 1 (dirty_clear D (map uint W)) -∗
       ([∗ list] i ↦ w ∈ W,
-         fsblock γfs (uint w) (Lw i) ∗
          fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
          (uint w) ↪[fs_dirty γfs]{#(1/2)} false) -∗
       (* the two units back, PLUS one per entry: each bunpin frees the pin

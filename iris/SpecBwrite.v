@@ -7,13 +7,18 @@
        virtio_disk_rw(b, 1);
      }
 
-   The write-through: the caller's locked buffer goes to the disk.  The
+   The write-through: the caller's held buffer goes to the disk.  The
    block's [disk_block] rides INSIDE the handle (claude-notes/design/
    fs-log.md), so the exchange is interior: the handle comes back with its
-   disk value equal to its bytes -- for a Clean handle that was already
-   true, for a Dirty one this is the install step's write, after which the
-   caller can extract the pinning bref (its bunpin argument) and flip the
-   payload clean.
+   disk value equal to its bytes.  The handle is the PAYLOAD-LESS
+   [bio_hold0]: a content-changing write (write_head rewriting the
+   header) necessarily has logical /= disk on one side of the call
+   whatever the order of the ghost update and the write, so the clean
+   payload's disk tie cannot appear here -- the caller holds its
+   [bio_pay] aside across the call ([BioInv.bio_held_split]) and
+   re-pairs afterwards (write_head: gamma_L update AFTER the write, then
+   the clean tie holds; install_trans: the dirty payload never mentions
+   the disk value at all).
    The panic arm is dead: [bio_locked] carries the sleeplock token and the
    holder-carried pid cell, and the caller's own pid cell agrees, so
    holdingsleep returns 1 (SpecHoldingsleep.v's holder variant).
@@ -63,7 +68,7 @@ Definition wp_bwrite_sconf_body
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (bs bsd : list (bv 8)) (d : bool) (b : bool) :=
+    (bs bsd : list (bv 8)) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -108,8 +113,8 @@ Definition wp_bwrite_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  (* the locked buffer (its interior disk fragment included) *)
-  bio_locked bn V k pidv dev bno bs bsd d -∗
+  (* the held buffer, payload aside (its interior disk fragment included) *)
+  bio_hold0 bn V k pidv dev bno bs bsd -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -120,7 +125,7 @@ Definition wp_bwrite_sconf_body
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the write-through: the handle's disk value is now its bytes *)
-      bio_locked bn V k pidv dev bno bs bs d -∗
+      bio_hold0 bn V k pidv dev bno bs bs -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -135,7 +140,7 @@ Module Type BWRITE.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool),
+      (bs bsd : list (bv 8)) (b : bool),
       wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd d b.
+                           pidv dev bno dq m K eb C bs bsd b.
 End BWRITE.

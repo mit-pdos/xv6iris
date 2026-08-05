@@ -19,10 +19,13 @@
      buffer comes back unchanged.  That is exactly bwrite's postcondition.
      The [disk_block] is no longer a spec argument: it rides INSIDE the handle
      (claude-notes/design/fs-log.md), at the view's own ghost [bv_gd V], so it
-     is taken out of [bio_locked], restated at the fabric's [γd] through the
+     is taken out of [bio_hold0], restated at the fabric's [γd] through the
      [bv_gd V = γd] premise for rw's spec, and put back afterwards.  The
-     handle's [bio_pay] conjunct is untouched by the call -- only its [bsd]
-     index moves, which is [bio_pay_reindex].
+     PAYLOAD is not here at all: bwrite's handle is the payload-less
+     [bio_hold0], because a content-changing write has logical /= disk on one
+     side of the call whatever the order of the ghost update and the write, so
+     the caller holds its [bio_pay] aside ([BioInv.bio_held_split]) and
+     re-pairs afterwards.
 
    * rw's [addr_is_kdata] premise on [b->data].  [b] is [bnode k] for
      k < NBUF, i.e. an element of bio.c's static [bcache] object at
@@ -122,19 +125,6 @@ Section ProofBwrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* the handle's payload is UNTOUCHED by the write, but its [bsd] index
-     moves (the disk cell now holds the buffer's bytes).  For a dirty
-     payload the index is not mentioned at all; for a clean one it was
-     already tied to [bsl], and the post's tie is [bsl = bsl]. *)
-  Local Lemma bio_pay_reindex (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (dev bno : mword 32) (bsl bsd : list (bv 8)) (d : bool) :
-    bio_pay bn V k dev bno bsl bsd d -∗ bio_pay bn V k dev bno bsl bsl d.
-  Proof.
-    destruct d; rewrite /bio_pay.
-    - iIntros "$".
-    - iIntros "[$ _]". done.
-  Qed.
-
   Lemma wp_bwrite_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -142,9 +132,9 @@ Section ProofBwrite.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool)
+      (bs bsd : list (bv 8)) (b : bool)
     : wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd d b.
+                           pidv dev bno dq m K eb C bs bsd b.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Heb.
@@ -153,9 +143,9 @@ Section ProofBwrite.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs #Hscheds Hoctx Hpark
               Hdev Hgeom Hdlock Hlocked Hcont".
-    iEval (rewrite /bio_locked /bio_held) in "Hlocked".
+    iEval (rewrite /bio_hold0) in "Hlocked".
     iDestruct "Hlocked" as
-      "(%Hk2 & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdisk & Hpay)".
+      "(%Hk2 & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdisk)".
     (* the handle's disk fragment, restated at the fabric's ghost so rw's
        spec can take it; it is rewritten back at re-assembly. *)
     iEval (rewrite HgdV) in "Hdisk".
@@ -442,20 +432,19 @@ Section ProofBwrite.
     iEval (rewrite HD3a0) in "Hbuf".
     (* back to the handle's spelling of the fabric ghost *)
     iEval (rewrite -HgdV) in "Hdisk".
-    iDestruct (bio_pay_reindex with "Hpay") as "Hpay".
     assert (Hpc1c : ret_pc (D3 !!! Regidx Rra) = mword_of_int (BW + 0x1c)).
     { rewrite HD3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc1c) in "Hpc".
     (* the handle, rebuilt: valid and the dev half were framed across both
        calls, the token and pid came back from holdingsleep, the bundle from
        virtio_disk_rw.  All of it is hart-free, so it is rebuilt here. *)
-    iAssert (bio_locked bn V k pidv dev bno bs bs d)
-      with "[Hstok Hpid Hvalid Hbdev Hbuf Hdisk Hpay]" as "Hlocked".
-    { rewrite /bio_locked /bio_held /bpa.
+    iAssert (bio_hold0 bn V k pidv dev bno bs bs)
+      with "[Hstok Hpid Hvalid Hbdev Hbuf Hdisk]" as "Hlocked".
+    { rewrite /bio_hold0 /bpa.
       iSplitR; [iPureIntro; exact Hk2|].
       iSplitR; [iPureIntro; exact Hcov|].
       iSplitR; [iPureIntro; exact Hdv|].
-      iFrame "Hstok Hpid Hvalid Hbdev Hbuf Hdisk Hpay". }
+      iFrame "Hstok Hpid Hvalid Hbdev Hbuf Hdisk". }
     assert (HmRsp : mR !!! Regidx csp_rs1 = spr)
       by (rewrite (callee_saved_lookup Hcs2 csp_rs1 ltac:(vm_compute; reflexivity)); exact HD3sp).
     assert (HmRthr : forall c : mword 5, is_cs_idx c = true ->
