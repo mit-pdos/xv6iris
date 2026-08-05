@@ -816,8 +816,11 @@ Section ProofSysDup.
     { (* ============ the table was full: return -1, undo nothing ============ *)
       iDestruct "Hf2" as "([%Hr2 %Hnone2] & Hof)".
       (* the reference goes straight back where it came from *)
+      (* NOT [set_solver]: it runs naive_solver over the WHOLE context, which
+         here is ~200 hypotheses of large mword terms -- 106 s for [fd0 not in
+         {}].  See claude-notes/optimization.md. *)
       iDestruct (proc_ofiles_repay γf p (pv_ofile V) ∅ fd0 k q Cf
-                   ltac:(set_solver)
+                   ltac:(apply not_elem_of_empty)
                    ltac:(rewrite Hlk0 Hfvk; reflexivity) Hklt
                    with "[Hof] Href") as "Hof".
       { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
@@ -1001,9 +1004,10 @@ Section ProofSysDup.
       rewrite Hlk0 Hfvk. reflexivity. }
     iDestruct (proc_ofiles_repay γf p (pv_ofile (upd_ofile V fd1 (fnode k)))
                  {[fd0]} fd1 k (q/2)%Qp Cf
-                 ltac:(set_solver) Hlk1 Hklt with "Hof Href0") as "Hof".
+                 ltac:(apply not_elem_of_singleton_2; exact Hne01)
+                 Hlk1 Hklt with "Hof Href0") as "Hof".
     iDestruct (proc_ofiles_repay γf p (pv_ofile (upd_ofile V fd1 (fnode k)))
-                 ∅ fd0 k (q/2)%Qp Cf ltac:(set_solver) Hlk0' Hklt
+                 ∅ fd0 k (q/2)%Qp Cf ltac:(apply not_elem_of_empty) Hlk0' Hklt
                  with "[Hof] Href1") as "Hof".
     { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
     iDestruct (proc_priv_join with "[Hcore] Hof") as "Hpriv".

@@ -1,5 +1,53 @@
 # Proof performance & build optimization
 
+## RULE ZERO: run `-time` FIRST, before believing any theory
+
+The section below ("`Qed` time is term size") is true and was the answer for a
+whole class of files.  It is not the answer for every slow proof, and reaching
+for it first cost real time once already.  **`coqc -time` prints a line per
+command; look at that before profiling `Qed` at all.**  If the slow line is a
+tactic, no amount of term-size work will help.
+
+### The trap it found: `ltac:(set_solver)` in a large proof context
+
+`ProofSysDup.wp_sys_dup_sconf` took **9 min 10 s**.  `-time` put 467 s of it on
+three lines, all of the same shape — a set-membership side condition passed
+positionally to a lemma:
+
+```coq
+iDestruct (proc_ofiles_repay γf p (pv_ofile V) ∅ fd0 k q Cf
+             ltac:(set_solver) Hlk0 Hklt with "Hof Href") as "Hof".
+```
+
+Those goals are `fd0 ∉ ∅` and `fd1 ∉ {[fd0]}` — trivial.  They cost **106 s,
+180 s and 180 s**.  `set_solver` ends in `naive_solver`, which searches over
+*every hypothesis in scope*; at those points the context held ~200 hypotheses
+of large mword terms (a whole-function proof's register-chain facts), and the
+search is superlinear in that.  The goal's own size is irrelevant.
+
+Replacing them with the one lemma that actually applies:
+
+```coq
+ltac:(apply not_elem_of_empty)
+ltac:(apply not_elem_of_singleton_2; exact Hne01)
+```
+
+**9 min 10 s → 25.6 s (21x).**  Afterwards the slowest single item in the file
+is the final `Qed` at 3.3 s, i.e. entirely ordinary.
+
+**The rule: never `set_solver` (or `naive_solver`, `lia` on a big context,
+`done` with a wide hint database) inside a whole-function proof.**  Discharge
+set side conditions with the named lemma — `not_elem_of_empty`,
+`not_elem_of_singleton_2`, `elem_of_union_l`, `elem_of_singleton_2` — or hoist
+the obligation into a `Local Lemma` at the top of the file, where the context is
+two hypotheses wide.  `set_solver` is fine *inside* the small definitional
+lemmas (`ProcInv.v`'s own uses cost nothing); it is the call site that matters,
+not the tactic.
+
+Corollary for the sweep: any `ltac:(set_solver)` / `ltac:(lia)` appearing as a
+positional argument in a `Proof<F>.v` capstone is a suspect, because that is
+exactly where the context is widest.
+
 ## WHERE `Qed` TIME ACTUALLY GOES: proof-term TREE size, not typechecking
 
 Measured 2026-08-05 with `rocq compile -profile`, which breaks a `Qed` down by
