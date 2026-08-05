@@ -126,6 +126,44 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
+(* THE GENERAL CONTRACT, from which the counted one below is derived.
+   Everything proc_pagetable actually does is here; the only difference is
+   that the post is [ppt_post] rather than the success arm alone, so this one
+   is stated at an ARBITRARY [on] -- including [None], which is where
+   allocproc's own failure tails (and anything else outside the counted
+   regime) have to call it. *)
+Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+  let pp := mm !!! Regidx (mword_of_int 10) in
+  let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (40 <= K)%nat ->
+  subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->
+  (uint tf + 4096 < 2 ^ 56)%Z ->
+  sie_cap_gpr mm K b p -∗
+  cpu_own lvl eb p C b -∗ kernel_text -∗
+  pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
+  p_trapframe pp ↦₈{dqtf} tf -∗
+  kalloc_env γa on -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b p -∗
+    cpu_own lvl eb p C b -∗
+    pc_is ret_tgt -∗
+    p_trapframe pp ↦₈{dqtf} tf -∗
+    ppt_post γa on tfp (mr !!! Regidx (mword_of_int 10)) -∗
+    ⌜callee_saved mm mr⌝ -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type PROC_PAGETABLE_GEN.
+  Parameter wp_proc_pagetable_core :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_proc_pagetable_core_body γa Φ mm tf dqtf lvl K eb p C on b.
+End PROC_PAGETABLE_GEN.
+
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}

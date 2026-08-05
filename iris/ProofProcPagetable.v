@@ -81,25 +81,11 @@ Lemma ppt_cap_bounds (K : nat) : (40 <= K)%nat ->
   /\ (22 <= K - 4)%nat.
 Proof. lia. Qed.
 
-Lemma ppt_pos (nb : nat) : (3 < nb)%nat -> (0 < nb)%nat.
-Proof. lia. Qed.
-
-(* the first mappages run cannot exhaust the budget: it allocates <= 2 *)
-Lemma ppt_nz1 (nb g1 : nat) : (3 < nb)%nat -> (g1 <= 2)%nat -> (nb - 1 - g1)%nat <> 0%nat.
-Proof. lia. Qed.
-
-(* neither can the second, which allocates nothing *)
-Lemma ppt_nz2 (nb g1 g2 : nat) :
-  (3 < nb)%nat -> (g1 <= 2)%nat -> (g2 <= 0)%nat -> (nb - 1 - g1 - g2)%nat <> 0%nat.
-Proof. lia. Qed.
-
-Lemma ppt_env_recomb (nb g1 g2 : nat) :
-  Some (nb - 1 - g1 - g2)%nat = avail_sub (Some nb) (1 + g1 + g2)%nat.
-Proof. rewrite avail_sub_Some. f_equal. lia. Qed.
-
-(* the counted premise refutes uvmcreate's out-of-memory arm *)
-Lemma ppt_not_zero (nb : nat) : (3 < nb)%nat -> avail_zero (Some nb) -> False.
-Proof. unfold avail_zero. lia. Qed.
+(* the consumption ledger, per-step [avail_sub]s recombined into one:
+   uvmcreate's root, then each walk's nodes. *)
+Lemma ppt_env_recomb (on : option nat) (g1 g2 : nat) :
+  avail_sub (avail_sub (avail_sub on 1) g1) g2 = avail_sub on (1 + g1 + g2)%nat.
+Proof. rewrite !avail_sub_add. reflexivity. Qed.
 
 Lemma ppt_nodes_sum (n1 n2 g1 g2 : nat) :
   n1 = (1 + g1)%nat -> n2 = (n1 + g2)%nat -> n2 = (1 + g1 + g2)%nat.
@@ -120,25 +106,20 @@ Proof. lia. Qed.
    mappages hands back: the run consumed [1 + g] pages (uvmcreate's root plus
    the walk's [g]), and [g <= 2] because one TRAMPOLINE page needs at most an
    l1 and an l0. *)
-Lemma ppt_fail_n1 (nb g : nat) : (g <= 2)%nat ->
-  avail_zero (avail_sub (Some (nb - 1)%nat) g) ->
-  exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub (Some nb) n).
+Lemma ppt_fail_n1 (on : option nat) (g : nat) : (g <= 2)%nat ->
+  avail_zero (avail_sub (avail_sub on 1) g) ->
+  exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n).
 Proof.
   intros Hg Hz. exists (1 + g)%nat.
-  split; [unfold K_proc_pagetable; lia |].
-  rewrite avail_sub_add. rewrite (avail_sub_Some nb 1). exact Hz.
+  split; [unfold K_proc_pagetable; lia |]. rewrite avail_sub_add. exact Hz.
 Qed.
 
-Lemma ppt_fail_n2 (nb g1 g2 : nat) : (g1 <= 2)%nat -> (g2 <= 0)%nat ->
-  avail_zero (avail_sub (Some (nb - 1 - g1)%nat) g2) ->
-  exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub (Some nb) n).
+Lemma ppt_fail_n2 (on : option nat) (g1 g2 : nat) : (g1 <= 2)%nat -> (g2 <= 0)%nat ->
+  avail_zero (avail_sub (avail_sub (avail_sub on 1) g1) g2) ->
+  exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n).
 Proof.
   intros H1 H2 Hz. exists (1 + g1 + g2)%nat.
-  split; [unfold K_proc_pagetable; lia |].
-  replace (1 + g1 + g2)%nat with ((1 + g1) + g2)%nat by lia.
-  rewrite avail_sub_add. rewrite (avail_sub_Some nb (1 + g1)).
-  replace (nb - (1 + g1))%nat with (nb - 1 - g1)%nat by lia.
-  exact Hz.
+  split; [unfold K_proc_pagetable; lia |]. rewrite -ppt_env_recomb. exact Hz.
 Qed.
 
 Lemma ppt_fail_refute (nb n : nat) :
@@ -146,8 +127,8 @@ Lemma ppt_fail_refute (nb n : nat) :
   avail_zero (avail_sub (Some nb) n) -> False.
 Proof. rewrite avail_sub_Some. unfold avail_zero, K_proc_pagetable. lia. Qed.
 
-Module ProcPagetableProof (UV : UVMCREATE) (MP : MAPPAGES)
-                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE.
+Module ProcPagetableCore (UV : UVMCREATE) (MP : MAPPAGES)
+                         (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE_GEN.
 
 Section ProofProcPagetable.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
@@ -243,15 +224,13 @@ Section ProofProcPagetable.
       | apply ppt_thr_ins;
         [ intros c Hc H2 H8 H9 H18; thr_side Hc H2 H8 H9 H18 |] ].
 
-  Lemma wp_proc_pagetable_sconf (γa : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_proc_pagetable_core (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
       (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
-    : wp_proc_pagetable_sconf_body γa Φ mm tf dqtf lvl K eb p C on b.
+    : wp_proc_pagetable_core_body γa Φ mm tf dqtf lvl K eb p C on b.
   Proof.
-    cbv beta delta [wp_proc_pagetable_sconf_body].
-    intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb.
-    destruct Hex as (nb & Hon & Hnb). subst on.
-    assert (Hnb' : (3 < nb)%nat) by (unfold K_proc_pagetable in Hnb; exact Hnb).
+    cbv beta delta [wp_proc_pagetable_core_body].
+    intros pp tfp ret_tgt Hlvl HK Htfal Htfb.
     pose proof (ppt_cap_bounds K HK) as (Hc4 & Hc18 & Hc32 & Hc36 & Hc22).
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -378,7 +357,7 @@ Section ProofProcPagetable.
         cpu_own lvl eb p C b -∗
         pc_is (mword_of_int (PPT + 0x4c) : mword 64) -∗
         p_trapframe pp ↦₈{dqtf} tf -∗
-        ppt_post γa (Some nb) tfp rv -∗
+        ppt_post γa on tfp rv -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I
       with "[Hcont Hc1 Hc2 Hc3 Hc4]" as "EPI".
     { iIntros (CIDe Hse me rv).
@@ -393,13 +372,6 @@ Section ProofProcPagetable.
       iPoseProof (ppti_54 with "Htext") as "Hj54".
       iPoseProof (ppti_56 with "Htext") as "Hj56".
       iPoseProof (ppti_58 with "Htext") as "Hj58".
-      (* COUNTED: the failure arm cannot be here.  When the tails are proved
-         and this becomes [ProcPagetableCore], this refutation is the ONLY
-         thing that moves out -- into the counted seal. *)
-      iDestruct "Hpost" as "[(%t & %Hrv & Hptree & %Hrept & %Hntt & Henv)
-                             | (_ & %Hfail & _)]";
-        [| destruct Hfail as (n & Hn & Hz);
-           exfalso; exact (ppt_fail_refute nb n Hnb' Hn Hz)].
       (* +0x4c mv a0,s1 *)
       iApply (wp_cmv_s_sconf Φ (mword_of_int (PPT + 0x4c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                 me (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -486,19 +458,18 @@ Section ProofProcPagetable.
       iIntros (CID35 Hs35) "Hcg Hpc".
       iEval (rgne) in "Hpc".
       iEval (rewrite Hrt) in "Hpc".
-      assert (HE5a0 : E5 !!! Regidx (mword_of_int 10 : mword 5)
-                      = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
+      (* a0 = s1 = rv, so [ppt_post] rides through unexamined -- which is
+         what makes ONE epilogue serve all four exits. *)
+      assert (HE5a0 : E5 !!! Regidx (mword_of_int 10 : mword 5) = rv).
       { rewrite /E5. rewrite upd_ne; [| reg_neq]. rewrite /E4. rewrite upd_ne; [| reg_neq].
         rewrite /E3. rewrite upd_ne; [| reg_neq]. rewrite /E2. rewrite upd_ne; [| reg_neq].
         rewrite /E1. rewrite upd_ne; [| reg_neq]. rewrite /E0 upd_eq. rewrite add_vec_zero_l.
-        rewrite Hmes1. exact Hrv. }
+        exact Hmes1. }
+      iEval (rewrite -HE5a0) in "Hpost".
       iDestruct (cpu_own_transport CIDe CID35 lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CID35 with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! E5 t with "Hcg Hcnt Hpc Htfcell Hptree [%] [%] [%] Henv [%]").
-      { exact HE5a0. }
-      { exact Hrept. }
-      { exact Hntt. }
+      iApply ("Hcont" $! E5 with "Hcg Hcnt Hpc Htfcell Hpost [%]").
       { (* callee_saved mm E5 *)
         (* the four frame registers are restored explicitly from the stack;
            everything else callee-saved rides the threaded [ppt_thr]. *)
@@ -580,7 +551,7 @@ Section ProofProcPagetable.
        so uvmcreate wants [Hcnt] at CID8. *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (UV.wp_uvmcreate_sconf γa Φ Jp lvl (K - 4)%nat eb p C (Some nb) b
+    iApply (UV.wp_uvmcreate_sconf γa Φ Jp lvl (K - 4)%nat eb p C on b
               Hlvl Hc18 HcidJp
               with "Hcg Hcnt Htext Hpc Henv [-]").
     iIntros (CIDuv Hsuv mr0) "Hcg Hcnt Hpc %Hucs Hpost".
@@ -653,8 +624,6 @@ Section ProofProcPagetable.
         rewrite avail_sub_0. exact Hav0. } }
     assert (Hroot0r : root0 = zero_extend' 64 (concat_vec b0 (zeros' 12 : mword 12)))
       by exact Hroot0.
-    assert (Hav1 : avail_sub (Some nb) 1 = Some (nb - 1)%nat) by (rewrite avail_sub_Some; reflexivity).
-    iEval (rewrite Hav1) in "Henv".
     (* +0x14 beqz a0 -- FALLS: uvmcreate returned a valid page *)
     iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (PPT + 0x14)) (mword_of_int 28 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               M1 (K - 4)%nat b
@@ -757,7 +726,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages wants [Hcnt] at CID18. *)
     iDestruct (cpu_own_transport CIDuv CID18 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf γa Φ M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p C (Some (nb - 1)%nat) b
+    iApply (MP.wp_mappages_sconf γa Φ M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p C (avail_sub on 1) b
               Hlvl Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
@@ -775,9 +744,6 @@ Section ProofProcPagetable.
     (* the budget refutes the -1 arm *)
     assert (Hg1 : (g1 <= 2)%nat).
     { apply (Nat.le_trans _ _ _ Hg1miss). rewrite Hsvpn1. apply pt_missing_1_le_2. }
-    assert (Hav2 : avail_sub (Some (nb - 1)%nat) g1 = Some (nb - 1 - g1)%nat)
-      by (rewrite avail_sub_Some; reflexivity).
-    iEval (rewrite Hav2) in "Henv".
     (* the register column at mappages#1's return -- needed by BOTH arms, so
        it is established before the split. *)
     assert (Hmr1sp : mr1 !!! Regidx csp_rs1 = spr).
@@ -907,7 +873,7 @@ Section ProofProcPagetable.
         iApply ("EPI" $! U1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
         { split_and!; [exact HU1sp | exact HU1s1 | exact HU1thr]. }
         { iRight. iFrame "Henv0". iPureIntro; split_and!;
-            [ reflexivity | exact (ppt_fail_n1 nb g1 Hg1 Havz1) ]. } }
+            [ reflexivity | exact (ppt_fail_n1 on g1 Hg1 Havz1) ]. } }
     subst k1.
     rewrite Hsvpn1 Hppn1 in Hrep1.
     (* +0x2e bltz a0 -- FALLS: mappages returned 0 *)
@@ -1013,7 +979,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages#2 wants [Hcnt] at CID27. *)
     iDestruct (cpu_own_transport CIDmp1 CID27 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf γa Φ N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p C (Some (nb - 1 - g1)%nat) b
+    iApply (MP.wp_mappages_sconf γa Φ N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p C (avail_sub (avail_sub on 1) g1) b
               Hlvl Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)
@@ -1031,9 +997,6 @@ Section ProofProcPagetable.
     iEval (rewrite Hretm2) in "Hpc".
     assert (Hg2 : (g2 <= 0)%nat).
     { rewrite Hsvpn2 in Hg2miss. rewrite (ppt_missing_tf_zero t1 Hrepm1) in Hg2miss. exact Hg2miss. }
-    assert (Hav3 : avail_sub (Some (nb - 1 - g1)%nat) g2 = Some (nb - 1 - g1 - g2)%nat)
-      by (rewrite avail_sub_Some; reflexivity).
-    iEval (rewrite Hav3) in "Henv".
     (* the register column at mappages#2's return -- both arms need it *)
     assert (Hmr2sp : mr2 !!! Regidx csp_rs1 = spr).
     { rewrite (callee_saved_lookup Hcs2 csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -1280,7 +1243,7 @@ Section ProofProcPagetable.
         iApply ("EPI" $! W7 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
         { split_and!; [exact HW7sp | exact HW7s1 | exact HW7thr]. }
         { iRight. iFrame "Henv0". iPureIntro; split_and!;
-            [ reflexivity | exact (ppt_fail_n2 nb g1 g2 Hg1 Hg2 Havz2) ]. } }
+            [ reflexivity | exact (ppt_fail_n2 on g1 g2 Hg1 Hg2 Havz2) ]. } }
     subst k2.
     rewrite Hsvpn2 Hppn2 in Hrep2.
     assert (Hrepfin : pt_rep0 t2 (ppt_map tfp)) by (unfold ppt_map; exact Hrep2).
@@ -1300,7 +1263,8 @@ Section ProofProcPagetable.
     (* ---------------- the shared epilogue ---------------- *)
     (* the success exit: s1 still holds uvmcreate's root, which is what
        +0x4c moves into a0. *)
-    assert (Havf : Some (nb - 1 - g1 - g2)%nat = avail_sub (Some nb) (pt_nodes t2))
+    assert (Havf : avail_sub (avail_sub (avail_sub on 1) g1) g2
+                   = avail_sub on (pt_nodes t2))
       by (rewrite Hnt; apply ppt_env_recomb).
     iEval (rewrite Havf) in "Henv".
     assert (Hs1fin : mr2 !!! Regidx (mword_of_int 9 : mword 5)
@@ -1318,5 +1282,49 @@ Section ProofProcPagetable.
   Qed.
 
 End ProofProcPagetable.
+
+End ProcPagetableCore.
+
+(* ===================================================================== *)
+(* THE COUNTED SEAL.  Statement unchanged from before the tails existed:  *)
+(* a caller who promises more than [K_proc_pagetable] free pages gets the *)
+(* success arm, full stop.  All this module does is destruct [ppt_post]   *)
+(* and kill the failure arm with [ppt_fail_refute] -- the arm carries the *)
+(* [avail_zero (avail_sub on n)] witness precisely so that it can.        *)
+(* ===================================================================== *)
+Module ProcPagetableProof (UV : UVMCREATE) (MP : MAPPAGES)
+                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE.
+
+Module Core := ProcPagetableCore UV MP UF UUF.
+
+Section SealProcPagetable.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma wp_proc_pagetable_sconf (γa : gname) (Φ : mval -> iProp Σ)
+      (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
+      (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
+    : wp_proc_pagetable_sconf_body γa Φ mm tf dqtf lvl K eb p C on b.
+  Proof.
+    cbv beta delta [wp_proc_pagetable_sconf_body].
+    intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb.
+    destruct Hex as (nb & Hon & Hnb). subst on.
+    iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hcont".
+    iApply (Core.wp_proc_pagetable_core γa Φ mm tf dqtf lvl K eb p C (Some nb) b
+              Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv [Hcont]").
+    iIntros (CIDr Hsr mr) "Hcg Hcnt Hpc Htfcell Hpost %Hcs".
+    iDestruct "Hpost" as "[(%t & %Hrv & Hptree & %Hrep & %Hnt & Henv)
+                           | (_ & %Hfail & _)]";
+      [| destruct Hfail as (n & Hn & Hz);
+         exfalso; exact (ppt_fail_refute nb n Hnb Hn Hz)].
+    iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
+    iApply ("Hcont" $! mr t with "Hcg Hcnt Hpc Htfcell Hptree [%] [%] [%] Henv [%]").
+    { exact Hrv. }
+    { exact Hrep. }
+    { exact Hnt. }
+    { exact Hcs. }
+  Qed.
+
+End SealProcPagetable.
 
 End ProcPagetableProof.

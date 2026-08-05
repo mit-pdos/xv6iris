@@ -5,4 +5,10 @@
 Require Import LinkUvmcreate LinkMappages LinkUvmfree LinkUvmunmapFixed.
 Require Import ProofProcPagetable.
 
+(* the counted contract, unchanged: what allocproc's SUCCESS path uses *)
 Module ProcPagetable := ProcPagetableProof Uvmcreate Mappages Uvmfree UvmunmapFixed.
+
+(* the general one, at an arbitrary [on] -- what a caller outside the counted
+   regime (allocproc's own failure tails, and anything reached from them)
+   needs, since there is no way back to a count once uvmfree has resealed. *)
+Module ProcPagetableGen := ProcPagetableCore Uvmcreate Mappages Uvmfree UvmunmapFixed.
