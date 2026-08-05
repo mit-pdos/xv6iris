@@ -106,12 +106,16 @@ are working on that effort — the relevant `projects/` file.
   `BootShared` → `SystemAdequacy`). Remaining is future work only: the FS
   instantiation of `P_fs`/`Pc` (the theorem passes `True` today) and the
   torn-write knob. Design in [`design/crash.md`](design/crash.md).
-- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer: the staged
-  worklist for [`design/fs-log.md`](design/fs-log.md) — stage 1 the
-  Ψ-parametric bio rework (escrow arms, uncached pool in `bcache_res`, the
-  five revised specs re-proven), stage 2 `LogInv.v` + the log.c specs,
-  stage 3 their proofs, stage 4 the `P_fs` crash instantiation (gated on
-  the design doc's two open forks). Nothing landed yet.
+- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
+  crash instantiation) only; stages 1–3 are finished and archived in
+  [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
+  log.c is 6/7 proven, `xv6_fs_adequacy` carries `P_fs` in the crash slot,
+  and all four steady-state WAL writes prove real durability fupds. Left:
+  initlog's real (n > 0) recovery spec, sys_sync, and the boot composition —
+  plus the phase-D2 finding that caps what recovery can CLAIM (an era learns
+  the on-disk header only by having written it, so closing the gap needs
+  read-data-indexed permits). Design in
+  [`design/fs-log.md`](design/fs-log.md).
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
@@ -262,6 +266,14 @@ their durable design notes, gotchas, and reusable recipes.
   provable), why the two obvious models fail, `BufOwn.v`'s ½-blockno
   `buf_own`, the five function contracts, and the worklist (binit was
   already proven; bget is inlined into bread).
+- **[`fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md)** — stages
+  1–3 of the FS block layer: the Ψ-parametric bio rework (the three escrow
+  arms, the uncached pool, the three interface facts the re-proofs turned up,
+  and `ProofBreadParts.v`'s reusable vocabulary), `LogInv.v` + the six log.c
+  specs (the reservation LEDGER and why a flat counter is not inductive; the
+  batch's slot pool), and their whole-function proofs. Stage 4 (the crash
+  instantiation) is still in flight — see
+  [`projects/fs-log.md`](projects/fs-log.md).
 - **[`virtio-disk.md`](completed/virtio-disk.md)** — the virtio disk device,
   end to end: the machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease,
   `wp_dev_loop`), the whole driver side (`virtio_disk_init`/`_rw`/`_intr` +

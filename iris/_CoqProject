@@ -444,8 +444,10 @@ CodeInitlog.v
 CodeBeginOp.v
 CodeEndOp.v
 CodeLogWrite.v
+CodeSysSync.v
 LogInv.v
 FsCrash.v
+FsBoot.v
 SpecWriteHead.v
 SpecInstallTrans.v
 SpecInitlog.v

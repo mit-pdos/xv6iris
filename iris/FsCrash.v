@@ -1503,4 +1503,187 @@ Section fs_crash_seam.
     rewrite /mirror_of /= Hhit. exact (hdr_dec_zero bs Hn0).
   Qed.
 
+  (* ==================================================================== *)
+  (* (5) THE RECOVERY-SIDE PERMIT FAMILY (phase D2).                       *)
+  (*                                                                       *)
+  (* RECOVERY'S WRITES CANNOT CLAIM TO PRESERVE [fr_D], AND THAT IS FORCED  *)
+  (* BY THE SEAM, not by laziness.  install_trans's home writes at boot run  *)
+  (* BEFORE the header write that the boot swap rides, so at each of them    *)
+  (* the era either has no custody yet or has custody taken at an image it   *)
+  (* knows nothing about: a swap installs the mirror at [mirror_of           *)
+  (* (fs_blocks dk) ls] for the fupd's UNIVERSALLY QUANTIFIED [dk], so the   *)
+  (* header picture it records is opaque to the client, and [Q] -- fixed at  *)
+  (* permit-creation time -- cannot name it.  The only way for the era to    *)
+  (* learn the ON-DISK header is to have WRITTEN it (that is what            *)
+  (* [fs_commit_permit] does for the steady state); recovery has only READ   *)
+  (* it, and a read's permit carries no data (its [disk_wr] is [None]).      *)
+  (* Closing that gap means making a READ's [Q] a FUNCTION of the delivered  *)
+  (* bytes -- a machine-layer interface change (saved predicates in          *)
+  (* [PermInv], a read-data equation at the completion in [WpUart]); see     *)
+  (* claude-notes/projects/fs-log.md, phase D2's finding.                    *)
+  (*                                                                        *)
+  (* So the honest recovery-side permit RE-BASES: it takes custody (or keeps *)
+  (* it), sets [fr_D] to whatever the POST-write image recovers to -- always  *)
+  (* possible, since [fs_recovery] is a TOTAL FUNCTION of the image           *)
+  (* ([fs_recovery_total]) -- and EXTENDS the history by it.  Sound, and it   *)
+  (* costs nothing that is cashed later: every receipt handed out before      *)
+  (* stays valid (the history only grows), and the state recovery actually    *)
+  (* leaves behind is pinned by the FINAL header write anyway                 *)
+  (* ([fs_boot_head_permit] below), which is the same clear the steady state  *)
+  (* uses.  What is NOT provable this way is the WAL's completeness claim     *)
+  (* ("the state after recovery IS the last committed one"); that needs the   *)
+  (* read-data interface above.                                              *)
+  (*                                                                        *)
+  (* ONE PERMIT COVERS EVERY RECOVERY WRITE, and it has to: install_trans     *)
+  (* takes its permits as a UNIFORM GENERATOR over the entries               *)
+  (* ([SpecInstallTrans]'s [□ ∀ i w bs', …]), so the first entry -- the one   *)
+  (* that performs the swap -- cannot have a different contract from the      *)
+  (* rest.  [fs_era_custody] is the disjunction that makes it uniform: the    *)
+  (* era holds either the whole mirror variable (no custody taken yet) or its *)
+  (* half plus the swap receipt (custody taken).  [fs_recover_permit]         *)
+  (* consumes and re-establishes it, swapping on first use.                   *)
+  (* ==================================================================== *)
+
+  (* the era's mirror half at an UNRECORDED picture: all a re-basing write
+     needs, and all a swap at an unknown image can hand back *)
+  Definition log_mirror_any : iProp Σ :=
+    (∃ h : nat * list Z, log_mirror_at h)%I.
+
+  Global Instance log_mirror_any_timeless : Timeless log_mirror_any.
+  Proof. rewrite /log_mirror_any /log_mirror_at. apply _. Qed.
+
+  Lemma log_mirror_any_intro (h : nat * list Z) :
+    log_mirror_at h -∗ log_mirror_any.
+  Proof. iIntros "H". rewrite /log_mirror_any. iExists h. iExact "H". Qed.
+
+  (* THE UNIFORM RECOVERY-SIDE RESOURCE: before the swap the era owns the
+     whole mirror variable (the boot mint), after it the half plus the swap
+     receipt.  Timeless, so a permit strips it inside its own [={∅}=∗]. *)
+  Definition fs_era_custody `{GEN : GenId} : iProp Σ :=
+    (log_mirror_full ∨ (log_mirror_any ∗ swap_lb (S gen_id)))%I.
+
+  Global Instance fs_era_custody_timeless `{GEN : GenId} :
+    Timeless fs_era_custody.
+  Proof.
+    rewrite /fs_era_custody /log_mirror_full /log_mirror_any /log_mirror_at.
+    apply _.
+  Qed.
+
+  Lemma fs_era_custody_boot `{GEN : GenId} :
+    log_mirror_full -∗ fs_era_custody.
+  Proof. iIntros "H". rewrite /fs_era_custody. by iLeft. Qed.
+
+  (* ---- (5a) THE RE-BASING WRITE, at ANY write identity. ---- *)
+  Lemma fs_recover_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    ▷ fs_era_custody -∗
+    disk_write_permit gen_id w fs_era_custody.
+  Proof.
+    iIntros "#Hseam #Hreg #Hst Hcust".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    set (dk' := wr_apply w dk).
+    (* through the seam; the record is timeless, so the [▷] strips *)
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & _ & Harm)".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    (* THE NEW DURABLE STATE: whatever the POST-write image recovers to *)
+    set (D' := fs_install (fs_blocks dk') ls
+                 (hdr_dec (fs_blocks dk' (log_hdr_bno ls))).2
+                 (fs_restrict (fs_blocks dk') (fs_home_set cov ls))).
+    iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
+            with "Hhist") as "Hhist"; [by eexists|].
+    (* the arm: SWAP on first use, ACCESS afterwards -- either way it comes
+       back at the post-write image, with this era's custody installed *)
+    iMod "Hcust".
+    iAssert (|==> fs_arm γs ls dk' ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+                  log_mirror_any ∗ swap_lb (S gen_id))%I
+      with "[Hcust Hsa Harm]" as ">(Harm & Hsa & Hmir & #Hswlb)".
+    { rewrite /fs_era_custody. iDestruct "Hcust" as "[Hfull | [Hany #Hswlb]]".
+      - (* THE SWAP: retirement needs no identification, so it always goes *)
+        rewrite /log_mirror_full. iDestruct "Hfull" as (M0) "Hmir".
+        iMod (ghost_var_update (mirror_of (fs_blocks dk') ls) with "Hmir")
+          as "Hmir".
+        iEval (rewrite -Qp.half_half) in "Hmir".
+        iDestruct (ghost_var_split with "Hmir") as "[Hm1 Hm2]".
+        iAssert (fs_started γs gen_id) as "#Hst2".
+        { rewrite /fs_started Hstn. iExact "Hst". }
+        iMod (fs_arm_swap γs ls dk dk' gen_id riscv_eraGS n
+                (mirror_of (fs_blocks dk') ls) Hn1 (mirror_of_ok _ _)
+                with "Hreg2 Hst2 Hsa Hm2 Harm") as "(Harm & Hsa & #Hswlb)".
+        iModIntro. iFrame "Harm Hsa".
+        iSplitL "Hm1".
+        { rewrite /log_mirror_any /log_mirror_at.
+          iExists (lm_hdr (mirror_of (fs_blocks dk') ls)).
+          iExists (mirror_of (fs_blocks dk') ls). iFrame "Hm1". done. }
+        rewrite /swap_lb -Hsw. iExact "Hswlb".
+      - (* THE ACCESS: the squeeze, then re-close at the post-write image *)
+        rewrite /log_mirror_any /log_mirror_at.
+        iDestruct "Hany" as (h M0) "[Hmir %HM0]".
+        iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+        { rewrite Hsw. iExact "Hswlb". }
+        iDestruct (fs_arm_acc γs ls dk gen_id riscv_eraGS n M0 Hn1
+                     with "Hreg2 Hswlb2 Hsa Hmir Harm")
+          as "(_ & Hsa & Hclose)".
+        iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
+                with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
+        iModIntro. iFrame "Harm Hsa Hswlb".
+        iExists (lm_hdr (mirror_of (fs_blocks dk') ls)).
+        iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". done. }
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
+      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split.
+      - rewrite /fs_recovery. reflexivity.
+      - rewrite last_snoc. reflexivity. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    rewrite /fs_era_custody. iRight. iFrame "Hmir Hswlb".
+  Qed.
+
+  (* ---- (5b) THE BOOT'S FINAL HEADER WRITE, uniform in whether the era
+     already took custody. ---- *)
+  (* [initlog]'s closing [write_head] writes an n = 0 header whether or not
+     recovery installed anything, so its permit must accept both arms of
+     [fs_era_custody]: at [n = 0] no install ran and the era still holds the
+     whole mirror variable (this IS [fs_swap_permit]); at [n > 0] the first
+     install already swapped and the era holds the half (this is
+     [fs_clear_permit], with the swap receipt merely carried through).  Both
+     land the same [Q], which is what makes [initlog]'s postcondition -- and
+     therefore [log_ctx] -- independent of [n]. *)
+  Lemma fs_boot_head_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    fs_era_custody -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id)).
+  Proof.
+    intros Hlen Hn0. iIntros "#Hseam #Hreg #Hst Hcust".
+    rewrite /fs_era_custody. iDestruct "Hcust" as "[Hfull | [Hany #Hswlb]]".
+    { iApply (fs_swap_permit cov ls bs Hlen Hn0 with "Hseam Hreg Hst Hfull"). }
+    rewrite /log_mirror_any. iDestruct "Hany" as (h) "Hmir".
+    iPoseProof (fs_clear_permit cov ls h bs Hlen Hn0
+                  with "Hseam Hreg Hswlb Hmir") as "Hp".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    iMod ("Hp" $! dk n with "Hsa [%] HP") as "(HP & Hsa & Hmir)";
+      [exact Hn1|].
+    iModIntro. iFrame "HP Hsa Hmir Hswlb".
+  Qed.
+
 End fs_crash_seam.
