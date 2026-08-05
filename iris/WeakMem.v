@@ -752,9 +752,36 @@ Proof. rewrite /fence_post /=. lia. Qed.
 (* ------------------------------------------------------------------ *)
 (** ** Own-write read-back *)
 
+(** THE COLLAPSE LEMMA — the pure heart of the M2 load rule.  If [t] is the
+    LATEST write to [a] and the reader's FLOOR (its load pre-view joined with
+    its coherence floor for [a]) already covers [t], then [t] is the ONLY
+    admissible timestamp: the ∀-over-oracles quantifier of a weak read
+    collapses to a single value.
+
+    The floor premise is deliberately stated at [Nat.max vpre (coh ws a)] —
+    exactly [readable]'s own window — because the floor the vProp layer owns
+    is the hart's index [w_vrNew ⊔ coh(a)], not [coh(a)] alone. *)
+Lemma readable_latest_pin img log ws vpre a t t' :
+  latest img log a t →
+  (t ≤ Nat.max vpre (coh ws a))%nat →
+  readable img log ws vpre a t' →
+  t' = t.
+Proof.
+  intros [Ht Htop] Hfloor [Ht' Hn'].
+  destruct (decide (t' = t)) as [->|Hne]; [done|exfalso].
+  destruct (decide (t' < t)%nat) as [Hlt|Hge].
+  - (* [t] itself is a write in [t']'s forbidden window *)
+    apply Hn'. eapply (writes_in_log_byte img). exists t.
+    split_and!; [lia|lia|done].
+  - (* [t'] is a write strictly above [t], contradicting latest-ness *)
+    apply Htop. eapply (writes_in_log_byte img). exists t'.
+    split_and!; [lia| |done]. exact (log_byte_bounded _ _ _ _ Ht').
+Qed.
+
 (** If [t] writes [a], the agent's coherence floor already covers [t], and no
     LATER timestamp in the whole log writes [a], then [t] is the ONLY readable
-    timestamp for [a] — the reader is pinned to the top message. *)
+    timestamp for [a] — the reader is pinned to the top message.  The
+    [vpre = 0] instance of [readable_latest_pin]. *)
 Lemma readable_top_unique img log ws vpre a t t' :
   is_Some (log_byte img log t a) →
   (t ≤ coh ws a)%nat →
@@ -762,15 +789,8 @@ Lemma readable_top_unique img log ws vpre a t t' :
   readable img log ws vpre a t' →
   t' = t.
 Proof.
-  intros Ht Hcoh Htop [Ht' Hn'].
-  destruct (decide (t' = t)) as [->|Hne]; [done|exfalso].
-  destruct (decide (t' < t)%nat) as [Hlt|Hge].
-  - (* [t] itself is a write in [t']'s forbidden window *)
-    apply Hn'. eapply (writes_in_log_byte img). exists t.
-    split_and!; [lia|lia|done].
-  - (* [t'] is a write strictly above [t], contradicting topness *)
-    apply Htop. eapply (writes_in_log_byte img). exists t'.
-    split_and!; [lia| |done]. exact (log_byte_bounded _ _ _ _ Ht').
+  intros Ht Hcoh Htop Hr.
+  eapply readable_latest_pin; [split; [exact Ht|exact Htop]| |exact Hr]. lia.
 Qed.
 
 (** The store case: right after a store, the storer can only read back its own

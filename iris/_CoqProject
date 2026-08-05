@@ -749,3 +749,5 @@ WeakLang.v
 WeakGhost.v
 WeakExec.v
 WeakAdequacy.v
+WeakView.v
+WeakVProp.v

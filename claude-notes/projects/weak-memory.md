@@ -3,8 +3,9 @@
 Design: [`design/weak-memory.md`](../design/weak-memory.md) (PROPOSAL).
 Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`),
 M1a (`iris/WeakInterp.v` + fwd-bank wire-in), M1b (`iris/WeakLang.v`),
-M1c (`iris/WeakGhost.v`, `iris/WeakExec.v`, `iris/WeakAdequacy.v`).
-Next: M2.
+M1c (`iris/WeakGhost.v`, `iris/WeakExec.v`, `iris/WeakAdequacy.v`),
+M2a (`iris/WeakView.v`, `iris/WeakVProp.v`).
+Next: M2b.
 
 ## M0 — model spike (no Iris)
 
@@ -163,11 +164,121 @@ Validate the operational design before anything depends on it.
 
 ## M2 — the vProp surface
 
-- [ ] `View`, `vProp = monPred`, `⊒V`, `@V`, `objective`, split axiom;
-      `Objective` instances for registers/devices/ghosts/`↦□` family.
-- [ ] `↦ₘ{dq}` redefinition + its SC-shaped load/store leaf rules; the
-      `↦₈`/`↦₄`/`↦ₛ` towers on top; fence modalities + fence leaf WPs;
-      AMO leaf WPs.
+- [x] **M2a — the vProp core + the two memory rules**
+      (`WeakView.v` 479 / `WeakVProp.v` 672 lines; 2.6 / 5.5 s): DONE.
+      `View`, `vProp = monPred`, `⊒V`, `P @@ V`, the split axiom, the
+      `Objective` inventory; the byte points-to `↦w`, the `vwp_hold`
+      discipline, the load and store rules at the event altitude + their
+      monPred restatements, and an access-altitude demo.
+      Two forced extensions to existing files:
+      `WeakMem.readable_latest_pin` (the collapse lemma; `readable_top_unique`
+      is now its `vpre = 0` corollary) and `WeakGhost.wlat_agree_store`.
+- [ ] **M2b** — the `↦₈`/`↦₄`/`↦ₛ` towers on `↦w`; the fetch/`instr`/decode
+      bridge onto `wpt_img`; the `wexec`↔`exec` pinned-read transfer (see
+      the seam facts below); fence modalities + fence leaf WPs; AMO leaf WPs.
+
+### What M2a established (read before M2b/M3)
+
+- **The vProp core is 95 % INHERITED from `iris/bi/monpred.v`.** The `biIndex`
+  is the whole added content: `Record view := View { v_scl : nat; v_map :
+  gmap Z nat }`, `flr V a := v_scl V ⊔ default 0 (v_map V !! a)`, order
+  pointwise on `flr` (a PREORDER — deliberately unquotiented, `biIndex` asks
+  for no more), join componentwise, `BiIndexBottom view_bot`. Everything
+  else — the BI structure, `BiAffine`/`BiBUpd`/`BiFUpd`/`BiEmbed`, `⊒V`'s
+  persistence and anti-monotonicity (`monPred_in`), the `Objective` class and
+  its ~20 connective instances, the proofmode — comes for free.
+  **`⊒V` IS `monPred_in V`**; do not hand-roll it.
+- **`P @@ V := ⎡ monPred_at P V ⎤` is the right view-at, and Iris does not
+  name it.** It is objective by `embed_objective` with NO proof obligation,
+  and every embedding lemma applies. `<obj> P` ("P at every index") is the
+  wrong object and much too strong. The split axiom is then Iris's own
+  `monPred_in_intro`/`monPred_in_elim` modulo ∧↔∗ — but BOTH are proved here
+  index-wise (`constructor => V; rewrite monPred_at_…`), because rewriting
+  with `monPred_in_intro` in a goal that mentions `P` twice dies with
+  *"_pattern_value_ is used in conclusion"*, and `bi.sep_and`/
+  `persistent_and_sep_1` leave TC side goals that a following `rewrite` then
+  lands on. **Index-wise proofs are the reliable idiom for anything
+  structural about `⊒`/`@@`.**
+- **ONE objectivity instance covers the whole design doc's list.**
+  `embed_objective` (⎡P⎤ for any `iProp`) makes every register/CSR
+  assertion, every device assertion, all ghost state and the whole base layer
+  objective at a stroke — nothing per-family had to be added.
+- **THE vwp_hold DISCIPLINE WORKS, AND ITS SEAM IS `wpt_at`.** The design
+  call (no new WP connective; the vProp layer is a discipline over the base
+  logic) landed: `vwp_hold P ws := monPred_at P (ws_view ws)` with
+  `ws_view ws := View (w_vrNew ws) (w_coh ws)` — and `flr (ws_view ws) a =
+  w_vrNew ws ⊔ coh ws a` holds by `reflexivity`, `ws_le ws ws' →
+  ws_view ws ⊑ ws_view ws'` in three lines. Two facts make it pay:
+  (1) `vwp_hold_mono` carries EVERY untouched premise across a step for
+  free, out of `WeakInterp`'s own `wread_post_ws_le`/`wwrite_post_ws_le`,
+  so a leaf rule's side conditions are only ever about the byte it touches;
+  (2) `wpt_at : vwp_hold (a ↦w{dq} v) ws ⊣⊢ ∃ t, wlat_pointsto a dq t v ∗
+  ⌜t ≤ flr (ws_view ws) a⌝` decodes the points-to into base-logic terms,
+  after which BOTH rules are pure `WeakMem`/`WeakGhost` reasoning with no
+  monPred in sight. The monPred altitude is re-entered in exactly two
+  three-line lemmas (`wpt_load_vprop`, `wpt_store_vprop`). Verdict: keep
+  both altitudes; state leaves at `vwp_hold`, publish `@@`-forms for M3.
+- **The points-to is `a ↦w{dq} v := ∃ t, ⎡wlat_pointsto a dq t v⎤ ∗
+  ⊒(view_byte a t)`** — the base element (objective) plus the receipt (the
+  entire subjectivity). Fractions/agreement/persist all lift from
+  `ghost_map`; `wlat_pointsto_agree` (t AND v agree) is the base-altitude
+  lemma the vProp-level `wpt_agree`/`wpt_split` are built on — and note that
+  the ← direction of `wpt_split` is NOT free, two points-to for one byte may
+  a priori carry different timestamps and it is element agreement that
+  forces them equal.
+- **OBJECTIVITY OF THE ERA IMAGE.** `view_byte a 0 ⊑ view_bot`, so a
+  points-to whose latest write is timestamp 0 has NO receipt: `wpt_img a dq v
+  := ⎡wlat_pointsto a dq 0 v⎤` is objective, and `wpt_img_wpt` turns it into
+  an ordinary `↦w`. This is the resource `kernel_text`/`instr`/the `↦□`
+  family port onto at M2b. **The converse is false**: a `↦w□` at t > 0 is
+  persistent but NOT objective — putting one in an invariant is unsound.
+  Persistence and objectivity are independent here.
+- **THE COLLAPSE LEMMA IS `WeakMem.readable_latest_pin`:**
+  `latest img log a t → t ≤ vpre ⊔ coh ws a → readable img log ws vpre a t' →
+  t' = t`. The floor premise must be at `Nat.max vpre (coh ws a)` (not at
+  `coh ws a`, which is all `readable_top_unique` gave) because the floor the
+  vProp layer owns is the hart's index `w_vrNew ⊔ coh(a)`; `load_vpre_vrNew`
+  is what bridges it. Feed it `wlat_lookup` (my element IS the latest) and
+  the ∀-over-oracles quantifier of `wp_wexec_step` collapses: **the timestamp
+  still varies, the VALUE cannot.**
+- **The store rule's whole content is `wlat_agree_store`** — a message that
+  writes exactly byte `a` keeps every other element accurate by
+  `latest_val_app`, and `a`'s new element is a fresh top so nothing can be
+  above it. The post-view premise is the honest one (`S (length log) ≤
+  flr (ws_view ws') a`), discharged at the machine's own `store_post` by
+  `flr_store_post`.
+- **THE DEMO REACHED THE ACCESS ALTITUDE, NOT THE INSTRUCTION ALTITUDE.**
+  `wpt_wread_word` : owning the `n` bytes at the hart's index pins the whole
+  word `wrun`/`wexec` returns for a single `Interface.MemRead`, at any width
+  (`w = Z_to_bv (8*n) (assemble_bytes bs)`); `wpt_wwrite_byte` runs the store
+  rule through `wwrite_post` for a 1-byte store. Recipe worth reusing: a
+  "for every byte" pure conclusion is obtained WITHOUT induction by making
+  `j` a Coq-level parameter and, where the ∀ is really needed,
+  `rewrite bi.pure_forall; iIntros (j)` — the `wlat_interp` authority is
+  consumed once and the ∀ is introduced before it is spent.
+- **WHERE THE INSTRUCTION ALTITUDE FIGHTS BACK (shapes M2b).** It is NOT
+  views. An SC leaf (`WpMmodeLoad.wp_ld_gpr`, ~130 lines) spends ONE line on
+  memory — `∀ j, σ.(mem) !! pa_add ea j = Some (nth_byte v j)` — and all the
+  rest on `wp_instr` (fetch + decode bridge), the
+  `mmode_config`/`hw_config`/PMP/PMA/clint/htif tower, and one
+  `exec_execute_LOAD_8_gpr`. The blocker is that that whole layer is stated
+  over `RiscvExec.exec` / `RiscvLang.mstate` (with a flat `mem` map), while
+  the weak side is `wexec` / `wmstate`: a PARALLEL type, so none of the
+  ~1220 decode lemmas or the execute lemmas apply. The config tower itself
+  is register-side and therefore objective — it rides through `⎡·⎤` with no
+  view plumbing at all. **Recommended M2b shape: a `wexec`↔`exec` transfer
+  lemma on the PINNED-READ fragment** — if every read of a run is pinned
+  (owned `↦w` at the hart's index, or timestamp-0 text), the collapse lemma
+  says it returns `WeakLang.wflat`'s value, so `wexec tid m χ σ = Some
+  (x, σ', χ')` corresponds to `exec m (MState (wm_regs σ) (wflat …)
+  (wm_dev σ))`. That single bridge transfers EVERY existing exec-level leaf;
+  racy sites (the lock word, `started`) drop to the weak arm, which is
+  exactly the design's split. Do that before porting any leaf by hand.
+- Axiom footprint: `view_at_intro`/`view_at_elim`/`view_at_split`,
+  `wpt_load_rule`, `wpt_store_rule`, `wpt_load_vprop`, `wpt_store_vprop`,
+  `wpt_wread_word`, `wpt_wwrite_byte` are ALL **closed under the global
+  context** — the vProp layer adds nothing, not even the 5 platform axioms
+  (it never touches `try_step`).
 
 ## M3 — vertical slice (the interface test)
 
@@ -274,7 +385,11 @@ the Iris proof already pays for — no separate whole-kernel analysis):
 - Oracle granularity: per-MemRead per-byte timestamp list vs one global
   choice sequence; what shape keeps leaf statements smallest.
 - [x] View index: DECIDED `View := nat * gmap Z nat` (scalar ⊔ sparse,
-  pointwise floor order) — see design doc Decision 5. Validate at M2.
+  pointwise floor order) — see design doc Decision 5. **VALIDATED at M2a**
+  (`WeakView.view`): the scalar/map pair is exactly `(w_vrNew, w_coh)`, so
+  `flr (ws_view ws) a = w_vrNew ws ⊔ coh ws a` is `reflexivity` and
+  `ws_le → ⊑` is three lines; a points-to needs only `view_byte a t` and a
+  release will need only `view_scl t`. No quotient was needed.
 - Forward-bank view: store-time `w_vwNew` vs 0 (both sound; pick the one
   that never surfaces in leaf statements).
 - Whether `wp_dead`/corpse arms and the power thread need any view plumbing

@@ -205,6 +205,30 @@ Proof.
   - rewrite lookup_insert_ne // in Ha'. by apply Hag.
 Qed.
 
+(** THE STORE FRAMING FACT (added at M2a, consumed by [WeakVProp]'s store
+    rule).  Appending a message that writes EXACTLY the byte [a] keeps the
+    whole map accurate once [a]'s element is retargeted at the new top
+    timestamp: [a]'s new element is the fresh message (nothing is above it),
+    and every OTHER element survives by [latest_val_app] because the message
+    does not write its byte. *)
+Lemma wlat_agree_store img log m a v' mm :
+  msg_byte m a = Some v' ->
+  (forall a', a' <> a -> msg_byte m a' = None) ->
+  wlat_agree img log mm ->
+  wlat_agree img (log ++ [m]) (<[a := (S (length log), v')]> mm).
+Proof.
+  intros Hma Hother Hag a' tv Ha'.
+  destruct (decide (a' = a)) as [->|Hne].
+  - rewrite lookup_insert in Ha'. simplify_eq. simpl. split.
+    + rewrite log_byte_S (lookup_app_r log [m] (length log) (Nat.le_refl _))
+              Nat.sub_diag /=. exact Hma.
+    + rewrite length_app /=. intros (t & Hlo & Hhi & _). lia.
+  - rewrite lookup_insert_ne // in Ha'.
+    apply latest_val_app; [by apply Hag|].
+    apply not_writes_in_app_new. intros m0 Hm0.
+    apply elem_of_list_singleton in Hm0 as ->. by apply Hother.
+Qed.
+
 (** The INITIAL map of an era: one element per byte of the era-initial
     image, at timestamp 0.  Keyed by [Z] through [pa_z]; injectivity of
     [pa_z] is what makes the key translation lossless. *)
