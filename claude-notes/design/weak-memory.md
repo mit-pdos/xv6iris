@@ -69,27 +69,106 @@ real ordering obligations.
 
 We adopt the **Promising-RISC-V machine shape with the promise machinery
 deliberately omitted** (empty promise set, every store = append-at-end).
-What that machine is, honestly:
 
-- It is RVWMO **minus load buffering**: reads may be arbitrarily stale
-  (bounded by views), stores enter the global order in each hart's program
-  order. SB, MP-weak, CoRR, IRIW-MCA behaviors all present; LB absent.
-- The gap is *directional in our favor for every fenced idiom*: a store
-  preceded (transitively) by `fence rw,w`/`fence rw,rw`, or ordered after an
-  acquire-AMO, cannot be promised early in the full machine anyway — its
-  fulfilment pre-view would exceed the promised timestamp. xv6's entire
-  cross-hart discipline (lock CS stores bracketed by aq-AMO and
-  fence-release; the `started`/`first`/virtio sites bracketed by
-  `fence rw,rw`) is in that class. The gap is real only for racy unfenced
-  stores, which the verified kernel should not have.
-- **The LB gap is a documented model assumption until M6** (the robustness
-  theorem: for release-fenced/lock-mediated programs, full-machine behaviors
-  = promise-free behaviors — provable at the operational level, no Iris,
-  as a separable research artifact; SLR/PS1's DRF-promise theorems are the
-  language-level precedent). This is the same epistemic category as the 5
-  `rv64d.*` platform axioms: stated once, visible in the final theorem's
-  footprint, discharged by later work. Full promises-in-logic (SLR-style)
-  stays on the shelf unless robustness fails.
+### The promise-free gap, precisely
+
+**What load buffering is.** The LB litmus test:
+
+```
+Hart 0:            Hart 1:
+r1 := load x       r2 := load y
+store y := 1       store x := 1
+```
+
+Can r1 = r2 = 1? RVWMO says YES: no ppo rule orders a load before a
+po-later store to a different address with no syntactic dependency (rule 1
+needs overlapping addresses, rules 9–11 need deps, rule 13 needs an
+intervening address dep), so there is a legal global memory order with both
+stores before both loads. Microarchitecturally: a core may commit a store
+(make it globally visible) before a po-earlier load to a different address
+has resolved. RVWMO's syntactic-dependency rules make the *dangerous*
+variants forbidden — LB with a data/address dep on both sides (= out of
+thin air) cannot happen — but plain and fake-dep LB is architecturally
+allowed.
+
+**Why no interleaving machine can represent it.** In any interleaving
+semantics where (a) threads execute their instructions in program order and
+(b) a load can only return a value some already-executed store put in
+memory — no matter how stale — every reads-from edge points backward in
+real time, so `po ∪ rf` is acyclic in every execution. LB *is* a `po ∪ rf`
+cycle: for r1 = 1, H1's store must precede H0's load in real time, hence
+(H1 in-order) H1's load precedes it too, hence (r2 = 1) H0's store precedes
+THAT, hence (H0 in-order) H0's load precedes its own rf-source. The
+mechanisms that break (b) are exactly the known heavyweight ones: promises +
+certification (Promising), speculative execution + restarts (Flat/rmem, the
+spec's own operational appendix), event structures, or guessing the whole
+execution graph up front (AxSL's opax). For a WP logic, promises are the
+lightest of these and STILL force transfinite step-indexing (SLR) — an
+unbounded certification run is re-verified at every step, giving ℕ×ℕ
+lexicographic indices vanilla Iris cannot express.
+
+**What the promise-free machine actually excludes — more than LB.** Because
+the log is append-at-execution and threads run in po, each hart's stores
+enter the global order in program order — for ALL addresses, not just
+same-address (RVWMO rule 1). So observable **W→W reordering** is also
+excluded: MP with an unfenced writer and a `fence r,rw` reader has its weak
+outcome allowed by RVWMO (nothing orders the writer's two stores) but
+unreachable in this machine. In PARM, promises are the *sole* mechanism for
+any early store, so the honest name for the gap is "store reordering", not
+"load buffering". Conjectured axiomatic characterization (an M6-adjacent
+lemma to prove, precedented by PS1 Thm 5, which characterizes promise-free
+PS1 as acyclic(sb ∪ rf ∪ sc)):
+
+    promise-free machine  ≡  RVWMO ∧ acyclic(po ∪ rf) ∧ (po ∩ W×W) ⊆ gmo
+
+**Is this an established model class, or an invention?** The *genre* is
+established; the RVWMO instance is ours to define. RC11 (Lahav et al., PLDI
+2017) is exactly this move at the C11 level — C11 strengthened with
+acyclic(po ∪ rf), adopted precisely to kill thin-air and enable
+reasoning — and ORC11/iRC11 operationalize and build the logic over it;
+Cosmo's OCaml model and iGPS's RA are likewise LB-free by construction.
+SLR is the only logic ever built on the far side of the line, and paid the
+transfinite toll. So: crisply axiomatizable, well-precedented shape, but
+nobody has written down "promise-free RVWMO" — the definition and its
+characterization lemma are our artifact, and the characterization is what
+keeps it from being ad hoc.
+
+**The alternative machine that makes the gap exactly LB** (recorded,
+rejected): an ORC11-shaped machine with per-byte timestamp orders and
+view-carrying messages represents W→W reordering without promises (a
+relaxed write takes a fresh per-location timestamp and carries no view of
+the hart's other stores; a fenced reader can then see the writes out of
+order). Cost: views become per-location timemaps everywhere, messages carry
+views (infecting the log, the base state interpretation, and every leaf
+rule), and the PARM lineage (equivalence theorem, deadlock-freedom) is
+lost. Rejected because the M6 robustness obligation is the same shape
+either way — the fencing discipline that discharges LB discharges W→W
+identically, promises being the single mechanism behind both — and the
+single-list state is simpler at every other point of the design.
+
+**Why the gap is safe for THIS kernel, and how it is accounted.** A store
+preceded (transitively) by `fence rw,w`/`fence rw,rw`, or ordered after an
+acquire-AMO, cannot be promised early in the full machine: its fulfilment
+pre-view would exceed the promised timestamp (certification runs the real
+code, so the fence raises `w_vwNew` before the store can fulfil). xv6's
+entire cross-hart discipline — lock CS stores bracketed by aq-AMO and
+fence-release; the `started`/`first`/virtio sites bracketed by `fence
+rw,rw` — is in that class; the gap is real only for racy unfenced stores,
+which the verified kernel should not have. **Until M6 this is a documented
+model assumption** in the same epistemic category as the 5 `rv64d.*`
+platform axioms: stated once, visible in the final theorem's footprint,
+discharged by later work (M6 = the robustness theorem: for
+release-fenced/lock-mediated programs, full-machine behaviors =
+promise-free behaviors; operational-level, no Iris; PS1's DRF-Promise /
+PS2's Thm 6.5 are the language-level precedent). Full promises-in-logic
+(SLR-style) stays on the shelf unless robustness fails.
+
+**Polarity note.** Decision 3 (dropping dependency tracking) makes the
+model *weaker* than hardware — sound for adequacy, costs nothing. THIS
+decision makes it *stronger* — adequacy needs hardware ⊆ model, and the
+strengthening is exactly what the declared assumption covers. Keep the two
+directions straight when evaluating any future simplification: adding
+behaviors is free, removing them needs a theorem.
 
 Why not promises from day 1: (a) no vanilla-Iris logic over promises exists,
 for the transfinite-indexing reason above; (b) reads can observe
@@ -260,12 +339,24 @@ support is battle-tested (iRC11/gpfsl track modern Iris). The pieces:
   `mem_view` reads through the device's view (per-byte staleness allowed
   below it) instead of the flat map. DMA writes append to `glog` as the disk
   agent. The wild/stalled arms are unchanged.
-- **MMIO ordering is a declared platform assumption.** Strictly, `fence
-  rw,rw` (I/O bits clear) does not order RAM writes before an MMIO store —
-  xv6 would need `fence w,o`; QEMU and common implementations order them
-  anyway. We model MMIO stores as waiting on `w_vwNew` (so `fence rw,rw`
-  covers the virtio ring→notify edge) and record this next to the platform
-  axioms. Revisit if the model should someday expose the strict reading.
+- **MMIO ordering is a declared platform assumption.** RISC-V FENCE has
+  separate device-I/O bits (PI/PO/SI/SO); accesses to the virtio-mmio window
+  (PMA IOMemory) are class I (reads) / O (writes), not R/W. So strictly,
+  xv6's `fence rw,rw` before the QUEUE_NOTIFY store orders nothing — the
+  RAM ring writes (class W) vs an MMIO store (class O) need `fence w,o`,
+  and the completion path's MMIO status read vs RAM used-ring reads need
+  `fence i,r` (this is exactly what Linux's riscv `writel`/`readl` emit:
+  `__io_bw() = fence w,o`, `__io_ar() = fence i,r`). QEMU and typical
+  interconnects order them anyway, which is why xv6 works. Decision for
+  now: model MMIO stores as waiting on `w_vwNew` (so `fence rw,rw` covers
+  the ring→notify edge) and record the assumption next to the platform
+  axioms. The strict alternative — classify MMIO by I/O fence bits — would
+  make xv6's driver unverifiable as-is and force a `fence w,o` patch to
+  virtio_disk.c + re-dump: arguably the RIGHT outcome (the verification
+  catching a real portability bug); decide at M5. Caveat discovered en
+  route: the generated Sail model's `barrier_kind` vocabulary
+  (`Barrier_RISCV_rw_rw` … `_tso`, `_i`) is MEMORY-only — check at M5 what
+  the model does with I/O fence bits before choosing the strict reading.
 - **Instruction fetch (AK_ifetch)**: reads stay coherent-SC. Kernel text is
   immutable post-boot (single message per byte ⇒ no weakening exists to
   express); user text written by exec is covered by xv6's own

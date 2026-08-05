@@ -64,7 +64,10 @@ Validate the operational design before anything depends on it.
 - [ ] Robustness theorem (preferred): for the release-fenced/lock-mediated
       store discipline the kernel obeys, full Promising-RISC-V behaviors =
       promise-free behaviors. Operational-level, no Iris. Retires the
-      LB-gap assumption.
+      store-reordering-gap assumption.
+- [ ] Axiomatic characterization of the promise-free machine (the PS1
+      Thm 5 analog): promise-free ≡ RVWMO ∧ acyclic(po ∪ rf) ∧
+      (po ∩ W×W) ⊆ gmo. Pins exactly what the interim assumption says.
 - [ ] Fallback: promises in the semantics + SLR-style logic (transfinite
       Iris territory — only if robustness fails).
 
