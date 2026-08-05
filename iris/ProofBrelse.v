@@ -18,9 +18,14 @@
      the very first frame store ([sd ra,24(sp)]) is proved with a mask-carrying
      store leaf ([wp_store_s_sconf_au], WpSconfMem.v) and [buf_escrow] opened
      around exactly that instruction: [BioInv.escrow_swap_park] deposits the
-     valid/dev/buf_own bundle and withdraws the chain's own reference plus the
-     checkout token [bown].  Nothing physical happens to the buffer at that
-     instruction; the swap is pure ghost bookkeeping that has to be atomic.
+     valid/dev/buf_own bundle TOGETHER WITH the handle's payload (the disk
+     cell and [bio_pay], re-packaged as the escrow's [buf_pay] at v = true --
+     the blockno is covered, so the [decide] resolves left) and withdraws the
+     chain's own reference plus the checkout token [bown].  Nothing physical
+     happens to the buffer at that instruction; the swap is pure ghost
+     bookkeeping that has to be atomic.  The body is NOT timeless (the view's
+     [bv_clean]/[bv_dirty] are opaque), so the swap runs under the [iInv]'s
+     [▷] and only the withdrawn bundle -- all timeless -- is stripped.
 
    * the panic arm is DEAD.  [bio_locked] carries the sleeplock's exclusive
      token and the lock's pid field, and the caller's own [p_pid] cell agrees
@@ -75,6 +80,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import KernelText.
 Require Import InstrBytes.
+Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 Require Import CodeBrelse.
 Require Import SpecHoldingsleep SpecReleasesleep.
@@ -106,7 +112,7 @@ Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
                    (Aq : ACQUIRE) (Rl : RELEASE) : BRELSE.
 
 Section ProofBrelse.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BR := KernelSyms.brelse.
@@ -183,8 +189,8 @@ Section ProofBrelse.
   Qed.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
-  Local Lemma buf_escrow_inv (bn : bio_names) (k : nat) :
-    buf_escrow bn k -∗ inv bioN (buf_escrow_body bn k).
+  Local Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
+    buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -236,6 +242,7 @@ Section ProofBrelse.
      saved base enable.  The level is fixed at 1 (brelse's only call site),
      so no [nn] binder survives. *)
   Local Lemma brelse_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ) (bn : bio_names)
+      (V : bio_view Σ)
       (m M : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
     (K_brelse <= K)%nat ->
     M !!! Regidx csp_rs1
@@ -247,9 +254,9 @@ Section ProofBrelse.
     sie_cap_gpr M (K - 4)%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (BR + 0x60) : mword 64) -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) -∗
+    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
     locked (bn_lk bn) cpu_id -∗
-    bcache_res bn -∗
+    bcache_res bn V -∗
     cpu_own 1%nat eb p C false -∗
     trap_csrs_pay 0%nat eb -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
@@ -328,7 +335,7 @@ Section ProofBrelse.
       by (rewrite (HT3thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HMsp).
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (BR + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
-    iApply (Rl.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) T3
+    iApply (Rl.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
               0%nat eb p C (K - 4)%nat
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -505,11 +512,11 @@ Section ProofBrelse.
 
   Lemma wp_brelse_sconf (Φ : mval -> iProp Σ)
       (γs : list gname)
-      (bn : bio_names) (k : nat)
+      (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs : list (bv 8)) (b : bool)
-    : wp_brelse_sconf_body Φ γs bn k pidv dev bno dq m K eb p C bs b.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool)
+    : wp_brelse_sconf_body Φ γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
     intros pcE ret_tgt HK Hk Ha0.
@@ -523,9 +530,18 @@ Section ProofBrelse.
        index rather than stating it". *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb. cbn in Heb. subst eb.
     iDestruct (bio_ctx_lock with "Hbio") as "#Hlock".
-    iDestruct (bio_ctx_buf bn k Hk with "Hbio") as "[#Hslk #Hesc0]".
+    iDestruct (bio_ctx_buf bn V k Hk with "Hbio") as "[#Hslk #Hesc0]".
     iDestruct (buf_escrow_inv with "Hesc0") as "#Hesc".
-    iDestruct "Hlocked" as "(_ & Hstok & Hpid & Hvalid & Hbdev & Hbuf)".
+    iDestruct "Hlocked"
+      as "(_ & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdb & Hbpay)".
+    (* the payload the park deposits: the handle's disk cell and [bio_pay],
+       re-packaged at the escrow's [buf_pay] shape.  The blockno is covered
+       (bio_held's second conjunct), so the [decide] resolves LEFT and the
+       valid bit is [true]. *)
+    iAssert (buf_pay bn V k true dev bno bs) with "[Hdb Hbpay]" as "Hbpayload".
+    { rewrite /buf_pay. case_decide as Hc; [|contradiction].
+      iSplitR; [iPureIntro; exact Hdv|].
+      iExists bsd, d. iFrame "Hdb Hbpay". }
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (bri_00 with "Htext") as "Hi00".
@@ -599,10 +615,25 @@ Section ProofBrelse.
                   b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗ bown bn k))%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) b p
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi02 [Hr24 Hvalid Hbdev Hbuf] [-]").
-    { iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (escrow_swap_park bn k (mword_of_int 1 : mword 32) dev bno bs
-                   (or_intror eq_refl) with "Hbody Hvalid Hbdev Hbuf") as "[Hbody Hpark]".
+              with "Hcg Hpc Hi02 [Hr24 Hvalid Hbdev Hbuf Hbpayload] [-]").
+    (* The escrow body is NOT timeless any more: the parked arm's [buf_pay]
+       carries the view's opaque payload ([bv_clean] / [bv_dirty]), so the
+       [▷] the [iInv] hands out cannot be stripped up front.  It does not
+       have to be: run the swap UNDER the later ([iNext] strips the body's
+       [▷] and weakens the non-later inputs), give the invariant back its
+       [▷ body] as usual, and strip the later off the WITHDRAWN bundle --
+       which is a reference fragment, two word cells and a lock token, all
+       timeless -- with one [iMod] inside the accessor's own fupd. *)
+    { iInv "Hesc" as "Hbody" "Hclose".
+      iAssert (▷ (buf_escrow_body bn V k ∗
+                  (∃ q : Qp, bref_tok bn k q ∗
+                     b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
+                     b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗ bown bn k)))%I
+        with "[Hbody Hvalid Hbdev Hbuf Hbpayload]" as "Hsw".
+      { iNext. iApply (escrow_swap_park bn V k true dev bno bs
+                         with "Hbody Hvalid Hbdev Hbuf Hbpayload"). }
+      iDestruct "Hsw" as "[Hbody Hpark]".
+      iMod "Hpark".
       iModIntro. iExists vr24. iFrame "Hr24".
       iIntros "Hcell". iEval (rgpeel) in "Hcell".
       iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
@@ -895,7 +926,7 @@ Section ProofBrelse.
       by (rewrite /U3; apply upd_eq).
     iDestruct (cpu_own_transport CID15 CID18 0%nat b p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Aq.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn) U3
+    iApply (Aq.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn V) U3
               0%nat b p C (K - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -925,7 +956,8 @@ Section ProofBrelse.
     iPoseProof (bri_2e with "Htext") as "Hi2e".
     iPoseProof (bri_30 with "Htext") as "Hi30".
     iPoseProof (bri_32 with "Htext") as "Hi32".
-    iDestruct "HRres" as (Mg ord devs bnos) "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
+    iDestruct "HRres" as (Mg ord devs bnos)
+      "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
     iDestruct (bref_tok_lookup with "Hauth Hrtok")
       as %(qt & cnt & HMk & Hsole & _ & Hltn).
     iDestruct (bio_slots_acc bn Mg devs bnos k Hk with "Hslots") as "[Hslot Hback]".
@@ -1291,12 +1323,14 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp60) in "Hpc".
       (* ---- rebuild the bcache resource and run the tail ---- *)
-      iAssert (bcache_res bn) with "[Hauth Hsauth Hlru Hslots]" as "HRres".
+      iAssert (bcache_res bn V) with "[Hauth Hsauth Hlru Hpool Hslots]" as "HRres".
       { iExists (delete k Mg), (k :: (o1 ++ o2))%list, devs, bnos.
         iFrame "Hauth Hsauth".
         iSplitR; [iPureIntro; exact Hdom'|].
         iSplitR; [iPureIntro; exact Hord'|].
-        iFrame "Hlru Hslots". }
+        iSplitR; [iPureIntro; exact Hinj|].
+          iSplitR; [iPureIntro; exact Hdev|].
+        iFrame "Hlru Hpool Hslots". }
       assert (HE9sp : E9 !!! Regidx csp_rs1 = spr).
       { rewrite /E9 upd_ne; [| vm_compute; discriminate].
         rewrite /E8 upd_ne; [| vm_compute; discriminate].
@@ -1324,7 +1358,7 @@ Section ProofBrelse.
         rewrite /E1 upd_ne; [| regne].
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa) Φ bn m E9 K b p C HK HE9sp HE9thr
+      iApply (brelse_tail (CID0 := CIDa) Φ bn V m E9 K b p C HK HE9sp HE9thr
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4 [-]").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
@@ -1416,7 +1450,7 @@ Section ProofBrelse.
       iDestruct ("Hback" $! (<[k := (qr', cnt')]> Mg) devs bnos with "[%] Hslot") as "Hslots".
       { intros j Hj. split_and!;
           [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
-      iAssert (bcache_res bn) with "[Hauth Hsauth Hlru Hslots]" as "HRres".
+      iAssert (bcache_res bn V) with "[Hauth Hsauth Hlru Hpool Hslots]" as "HRres".
       { iExists (<[k := (qr', cnt')]> Mg), ord, devs, bnos.
         iFrame "Hauth Hsauth".
         iSplitR.
@@ -1424,7 +1458,9 @@ Section ProofBrelse.
           destruct (decide (j = k)) as [->|Hnk]; [exact Hk|].
           apply Hdom. by rewrite lookup_insert_ne in Hj. }
         iSplitR; [iPureIntro; exact Hord|].
-        iFrame "Hlru Hslots". }
+        iSplitR; [iPureIntro; exact Hinj|].
+          iSplitR; [iPureIntro; exact Hdev|].
+        iFrame "Hlru Hpool Hslots". }
       (* ===== +0x32 c.bnez a5 : TAKEN, straight to the release ===== *)
       assert (Hbnez : neq_vec (D2 !!! Regidx Ra5) zero_reg = true).
       { rewrite HD2a5. apply brc_word_nonzero_neqv.
@@ -1453,7 +1489,7 @@ Section ProofBrelse.
       { intros c Hcs N2 N8 N9 N18.
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa) Φ bn m D2 K b p C HK HD2sp HD2thr
+      iApply (brelse_tail (CID0 := CIDa) Φ bn V m D2 K b p C HK HD2sp HD2thr
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4 [-]").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].

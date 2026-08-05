@@ -2,6 +2,12 @@
    its instruction chain, factored out so the chain file stays about control
    flow.  (ProofBread.v is the chain; this file is its vocabulary.)
 
+   (2) THE GHOST STEPS over [BioInv.bcache_scan] (the OPEN form of the bcache
+       resource) and (3) the (c)-SWAPS of the recycle block -- the pool
+       exchange, the eviction, the mid-recycle window -- live below, so
+       ProofBread.v's recycle block is three [wp_sw_au_s_sconf]s over three
+       one-line lemma applications.
+
    (1) The two MASK-CARRYING width-4 memory leaves.  bread opens the
        per-buffer escrow around four single instructions -- the three field
        stores of the recycle block ([sw s2,8(s1)] / [sw s3,12(s1)] /
@@ -43,6 +49,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpSconfMem.
 Require Import BufOwn.
+Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -54,13 +61,13 @@ Set Printing Depth 40.
 (* ===================================================================== *)
 
 Section BreadEscrowLeaves.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
-  Lemma buf_escrow_inv (bn : bio_names) (k : nat) :
-    buf_escrow bn k -∗ inv bioN (buf_escrow_body bn k).
+  Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
+    buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
   Proof. iIntros "H". iExact "H". Qed.
 
   (* [lw rd, imm(rs1)] with the cell produced and returned inside the
@@ -172,7 +179,112 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 (* ===================================================================== *)
 
 Section BreadScan.
-  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
+
+  (* the one-slot update of the scan's [devs] / [bnos] functions.  Named (not
+     an inline [fun j => if decide (j = k) then v else f j]) because the
+     recycle's pool exchange, the injectivity re-establishment and the
+     [bio_slots_acc] update wand all mention it, and an inline copy makes
+     every one of those unify against a different beta-redex. *)
+  Definition bfun_upd (f : nat -> mword 32) (k : nat) (v : mword 32)
+    : nat -> mword 32 :=
+    fun j => if decide (j = k) then v else f j.
+
+  Lemma bfun_upd_eq (f : nat -> mword 32) (k : nat) (v : mword 32) :
+    bfun_upd f k v k = v.
+  Proof. rewrite /bfun_upd. case_decide as Hd; [reflexivity | congruence]. Qed.
+
+  Lemma bfun_upd_ne (f : nat -> mword 32) (k : nat) (v : mword 32) (j : nat) :
+    j ≠ k -> bfun_upd f k v j = f j.
+  Proof. intro Hj. rewrite /bfun_upd. case_decide as Hd; [congruence | reflexivity]. Qed.
+
+  (* [uint] IS [bv_unsigned] (RiscvExtras.uint_unsigned's proof, at width 32
+     -- restated here rather than pulling UserBits in for one equation), so a
+     blockno compare on [uint] is a compare on the word. *)
+  Lemma bd_uint32 (a : mword 32) : uint a = bv_unsigned a.
+  Proof.
+    pose proof (bv_unsigned_in_range _ a) as Hr.
+    unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+    rewrite Z2N.id; [ reflexivity | lia ].
+  Qed.
+
+  Lemma bd_uint32_inj (a b : mword 32) : uint a = uint b -> a = b.
+  Proof. rewrite !bd_uint32. intro H. by apply bv_eq. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE MISS FACT, out of the forward scan's exit tie.                  *)
+  (*                                                                     *)
+  (*  The scan's per-slot exit fact is the negation of the code's [&&]    *)
+  (*  -- [devs i ≠ dev \/ bnos i ≠ bno] -- which alone does NOT say the   *)
+  (*  block is uncached.  The scan's DEV PIN closes it: a slot claiming a *)
+  (*  covered block is on the view's device, and the request is too, so   *)
+  (*  the dev disjunct is impossible at the requested block and the       *)
+  (*  blockno disjunct is what remains.                                   *)
+  (* ------------------------------------------------------------------ *)
+  Lemma bd_miss_of_tie (V : bio_view Σ) (devs bnos : nat -> mword 32)
+      (D B : mword 32) :
+    D = bv_dev V ->
+    uint B ∈ bv_cov V ->
+    (forall i, (i < NBUF)%nat -> uint (bnos i) ∈ bv_cov V -> devs i = bv_dev V) ->
+    (forall i, (i < NBUF)%nat -> ¬ (devs i = D /\ bnos i = B)) ->
+    forall j, (j < NBUF)%nat -> uint (bnos j) ≠ uint B.
+  Proof.
+    intros HD Hcov Hpin Htie j Hj Heq.
+    apply (Htie j Hj). split; [| exact (bd_uint32_inj _ _ Heq)].
+    rewrite (Hpin j Hj ltac:(rewrite Heq; exact Hcov)) HD. reflexivity.
+  Qed.
+
+  (* the DEV PIN survives the recycle: slot k's new dev IS the view's
+     device (bread's spec premise), every other slot is untouched. *)
+  Lemma bd_devpin_upd (V : bio_view Σ) (devs bnos : nat -> mword 32)
+      (k : nat) (D B : mword 32) :
+    D = bv_dev V ->
+    (forall k', (k' < NBUF)%nat -> uint (bnos k') ∈ bv_cov V ->
+       devs k' = bv_dev V) ->
+    forall k', (k' < NBUF)%nat ->
+      uint (bfun_upd bnos k B k') ∈ bv_cov V ->
+      bfun_upd devs k D k' = bv_dev V.
+  Proof.
+    intros HD Hpin k' Hk' Hcov.
+    destruct (decide (k' = k)) as [->|Hne].
+    - rewrite bfun_upd_eq. exact HD.
+    - rewrite (bfun_upd_ne devs k D k' Hne).
+      rewrite (bfun_upd_ne bnos k B k' Hne) in Hcov.
+      exact (Hpin k' Hk' Hcov).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  The covered-blockno INJECTIVITY, re-established at the recycle.     *)
+  (*                                                                     *)
+  (*  Slot k's claim moves to the requested block [B]; every OTHER slot's *)
+  (*  claim is untouched, and the forward scan's exit says none of them   *)
+  (*  claims [B] -- so the only new pair to check is (k, j), which that   *)
+  (*  same miss fact kills.  Pure, and stated over variables so no solver *)
+  (*  ever runs inside the WP context.                                   *)
+  (* ------------------------------------------------------------------ *)
+  Lemma bd_inj_upd (V : bio_view Σ) (bnos : nat -> mword 32)
+      (k : nat) (B : mword 32) :
+    (k < NBUF)%nat ->
+    uint B ∈ bv_cov V ->
+    (forall jj, (jj < NBUF)%nat -> uint (bnos jj) ≠ uint B) ->
+    (forall k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
+       uint (bnos k1) ∈ bv_cov V ->
+       uint (bnos k1) = uint (bnos k2) -> k1 = k2) ->
+    forall k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
+      uint (bfun_upd bnos k B k1) ∈ bv_cov V ->
+      uint (bfun_upd bnos k B k1) = uint (bfun_upd bnos k B k2) -> k1 = k2.
+  Proof.
+    intros Hk HcovB Hmiss Hinj k1 k2 Hk1 Hk2 Hcov Heq.
+    destruct (decide (k1 = k)) as [->|Hn1]; destruct (decide (k2 = k)) as [->|Hn2].
+    - reflexivity.
+    - exfalso. rewrite bfun_upd_eq (bfun_upd_ne _ _ _ _ Hn2) in Heq.
+      exact (Hmiss k2 Hk2 (eq_sym Heq)).
+    - exfalso. rewrite bfun_upd_eq (bfun_upd_ne _ _ _ _ Hn1) in Heq.
+      exact (Hmiss k1 Hk1 Heq).
+    - rewrite (bfun_upd_ne _ _ _ _ Hn1) (bfun_upd_ne _ _ _ _ Hn2) in Heq.
+      rewrite (bfun_upd_ne _ _ _ _ Hn1) in Hcov.
+      exact (Hinj k1 k2 Hk1 Hk2 Hcov Heq).
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  The HIT path's refcnt++.                                           *)
@@ -189,6 +301,9 @@ Section BreadScan.
   (*  dev/blockno still match a previous user's key is a legitimate hit,   *)
   (*  and then the mint is the FIRST reference (1/4 off the bcache half)   *)
   (*  rather than a split of the retainder.                               *)
+  (*                                                                     *)
+  (*  Neither the pool nor the injectivity conjunct moves here: [bnos] is  *)
+  (*  unchanged, so both ride through untouched.                          *)
   (* ------------------------------------------------------------------ *)
   Definition incr32 (cw : mword 32) : mword 32 :=
     trunc32 (sign_extend' 64 (subrange_vec_dec
@@ -200,17 +315,18 @@ Section BreadScan.
     incr32 (mword_of_int z : mword 32) = (mword_of_int (z + 1) : mword 32).
   Proof. intros H0 H1. rewrite /incr32. by apply moi32_storeval_succ. Qed.
 
-  Lemma bcache_scan_incr (bn : bio_names) M ord devs bnos (k : nat) :
+  Lemma bcache_scan_incr (bn : bio_names) (V : bio_view Σ) M ord devs bnos (k : nat) :
     (k < NBUF)%nat ->
-    bcache_scan bn M ord devs bnos -∗ bslot bn -∗
+    bcache_scan bn V M ord devs bnos -∗ bslot bn -∗
     ∃ cw : mword 32,
       brefcnt k ↦₄ cw ∗
       (brefcnt k ↦₄ (incr32 cw) ==∗
-         bcache_res bn ∗ ∃ q : Qp, bref bn k q (devs k) (bnos k)).
+         bcache_res bn V ∗ ∃ q : Qp, bref bn k q (devs k) (bnos k)).
   Proof.
     iIntros (Hk) "Hscan Hbslot".
     rewrite /bcache_scan.
-    iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
     iDestruct (bio_slots_acc bn M devs bnos k Hk with "Hslots") as "[Hslot Hback]".
     destruct (M !! k) as [[qt cnt]|] eqn:HMk.
     - (* ---- busy buffer: halve the retained share ---- *)
@@ -254,14 +370,16 @@ Section BreadScan.
       { intros j Hj. split_and!;
           [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
       iModIntro. iSplitR "Htok Hdev2 Hbno2".
-      + iApply (bcache_scan_to_res bn (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ord devs bnos).
+      + iApply (bcache_scan_to_res bn V (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ord devs bnos).
         rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR.
         { iPureIntro. intros j Hj.
           destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           apply Hdom. by rewrite lookup_insert_ne in Hj. }
         iSplitR; [iPureIntro; exact Hord|].
-        iFrame "Hlru Hslots".
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots".
       + iExists (qr/2)%Qp. rewrite /bref. iFrame "Htok Hdev2 Hbno2".
     - (* ---- parked idle buffer with a matching key: the FIRST reference ---- *)
       iEval (rewrite /bio_slot_res HMk) in "Hslot".
@@ -295,14 +413,16 @@ Section BreadScan.
       { intros j Hj. split_and!;
           [ rewrite lookup_insert_ne; [reflexivity | congruence] | reflexivity | reflexivity ]. }
       iModIntro. iSplitR "Htok Hdev2 Hbno2".
-      + iApply (bcache_scan_to_res bn (<[k := ((1/4)%Qp, 1%positive)]> M) ord devs bnos).
+      + iApply (bcache_scan_to_res bn V (<[k := ((1/4)%Qp, 1%positive)]> M) ord devs bnos).
         rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR.
         { iPureIntro. intros j Hj.
           destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
           apply Hdom. by rewrite lookup_insert_ne in Hj. }
         iSplitR; [iPureIntro; exact Hord|].
-        iFrame "Hlru Hslots".
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots".
       + iExists (1/4)%Qp. rewrite /bref. iFrame "Htok Hdev2 Hbno2".
   Qed.
 
@@ -316,46 +436,74 @@ Section BreadScan.
   (*  authority -- which the escrow open needs, since [M !! k = None] is  *)
   (*  what refutes the checked-out arm ([BioInv.escrow_open_free]).        *)
   (*                                                                     *)
+  (*  NEW over the physical layer: the UNCACHED POOL comes out too (the   *)
+  (*  blockno store performs the one-shot exchange, which is the instant  *)
+  (*  [bnos] -- the function the pool's domain subtracts -- changes), and *)
+  (*  the covered-blockno injectivity is handed out as a PURE fact (the   *)
+  (*  eviction deposit's uniqueness premise) and re-established for the   *)
+  (*  updated [bnos] from the forward scan's miss fact.                   *)
+  (*                                                                     *)
   (*  The closing wand takes the three cells back AT THE NEW VALUES and   *)
   (*  performs the [refcnt = 1] ghost step in one go: mint the chain's     *)
   (*  first reference at 1/4 off the returned half, retain 1/4 (the tie    *)
   (*  1/4 + 1/4 = 1/2), and absorb the caller's [bslot].                  *)
   (* ------------------------------------------------------------------ *)
-  Lemma bcache_scan_recycle (bn : bio_names) M ord devs bnos (k : nat) :
+  Lemma bcache_scan_recycle (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (Qp * positive)) (ord : list nat)
+      (devs bnos : nat -> mword 32) (k : nat) (D B : mword 32) :
     (k < NBUF)%nat ->
     M !! k = None ->
-    bcache_scan bn M ord devs bnos -∗ bslot bn -∗
+    D = bv_dev V ->
+    uint B ∈ bv_cov V ->
+    (* the forward scan's exit tie, at EVERY slot (the negation of the
+       code's [b->dev == dev && b->blockno == blockno]) *)
+    (forall i, (i < NBUF)%nat -> ¬ (devs i = D /\ bnos i = B)) ->
+    bcache_scan bn V M ord devs bnos -∗ bslot bn -∗
+    (* the two pure facts the escrow's blockno store needs, read off the
+       scan's own conjuncts: the block really is uncached, and the evicted
+       block is claimed by no other slot *)
+    ⌜(forall jj, (jj < NBUF)%nat -> uint (bnos jj) ≠ uint B)
+     /\ (uint (bnos k) ∈ bv_cov V ->
+           forall j, (j < NBUF)%nat -> j ≠ k -> uint (bnos j) ≠ uint (bnos k))⌝ ∗
     own (bn_auth bn) (● M) ∗
     brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
     b_dev (bpa k) ↦₄{DfracOwn (1/2)} (devs k) ∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k) ∗
-    (∀ dv bv : mword 32,
-       own (bn_auth bn) (● M) -∗
-       brefcnt k ↦₄ (mword_of_int 1 : mword 32) -∗
-       b_dev (bpa k) ↦₄{DfracOwn (1/2)} dv -∗
-       b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bv ==∗
-       bcache_res bn ∗ bref bn k (1/4)%Qp dv bv).
+    bio_pool V bnos ∗
+    (own (bn_auth bn) (● M) -∗
+     brefcnt k ↦₄ (mword_of_int 1 : mword 32) -∗
+     b_dev (bpa k) ↦₄{DfracOwn (1/2)} D -∗
+     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B -∗
+     bio_pool V (bfun_upd bnos k B) ==∗
+     bcache_res bn V ∗ bref bn k (1/4)%Qp D B).
   Proof.
-    iIntros (Hk HMk) "Hscan Hbslot".
+    iIntros (Hk HMk HD HcovB Htie) "Hscan Hbslot".
     rewrite /bcache_scan.
-    iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
+    pose proof (bd_miss_of_tie V devs bnos D B HD HcovB Hdevpin Htie) as Hmiss.
     iDestruct (bio_slots_acc bn M devs bnos k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /bio_slot_res HMk) in "Hslot".
     iDestruct "Hslot" as "(Hcell & Hdev & Hbno)".
-    iFrame "Hauth Hcell Hdev Hbno".
-    iIntros (dv bv) "Hauth Hcell Hdev Hbno".
+    iSplitR.
+    { iPureIntro. split; [exact Hmiss|].
+      intros Hcov j Hj Hjk Heq. apply Hjk. symmetry.
+      exact (Hinj k j Hk Hj Hcov (eq_sym Heq)). }
+    iFrame "Hauth Hcell Hdev Hbno Hpool".
+    iIntros "Hauth Hcell Hdev Hbno Hpool".
+    set (dv := D).
     iMod (bio_first_ref_step bn M k (1/4)%Qp HMk bd_quarter_valid
             with "Hauth") as "[Hauth Htok]".
     iAssert (b_dev (bpa k) ↦₄{DfracOwn (1/4)} dv ∗
              b_dev (bpa k) ↦₄{DfracOwn (1/4)} dv)%I
       with "[Hdev]" as "[Hdev1 Hdev2]".
     { rewrite -word4_pointsto_frac_split bd_quarter_half. iExact "Hdev". }
-    iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} bv ∗
-             b_blockno (bpa k) ↦₄{DfracOwn (1/4)} bv)%I
+    iAssert (b_blockno (bpa k) ↦₄{DfracOwn (1/4)} B ∗
+             b_blockno (bpa k) ↦₄{DfracOwn (1/4)} B)%I
       with "[Hbno]" as "[Hbno1 Hbno2]".
     { rewrite -word4_pointsto_frac_split bd_quarter_half. iExact "Hbno". }
     iEval (rewrite /bslot) in "Hbslot".
-    iAssert (bio_slot_res bn (<[k := ((1/4)%Qp, 1%positive)]> M) k dv bv)
+    iAssert (bio_slot_res bn (<[k := ((1/4)%Qp, 1%positive)]> M) k dv B)
       with "[Hcell Hbslot Hdev1 Hbno1]" as "Hslot".
     { rewrite /bio_slot_res lookup_insert.
       iSplitR. { iPureIntro. vm_compute. reflexivity. }
@@ -364,25 +512,27 @@ Section BreadScan.
       iExists (1/4)%Qp. iSplitR; [iPureIntro; exact bd_quarter_half|].
       iFrame "Hdev1 Hbno1". }
     iDestruct ("Hback" $! (<[k := ((1/4)%Qp, 1%positive)]> M)
-                 (fun j => if decide (j = k) then dv else devs j)
-                 (fun j => if decide (j = k) then bv else bnos j)
+                 (bfun_upd devs k dv) (bfun_upd bnos k B)
                  with "[%] [Hslot]") as "Hslots".
     { intros j Hj. split_and!;
         [ rewrite lookup_insert_ne; [reflexivity | congruence]
-        | case_decide as Hd; [exfalso; exact (Hj Hd) | reflexivity]
-        | case_decide as Hd; [exfalso; exact (Hj Hd) | reflexivity] ]. }
-    { case_decide as Hd; [iExact "Hslot" | congruence]. }
+        | exact (bfun_upd_ne devs k dv j Hj)
+        | exact (bfun_upd_ne bnos k B j Hj) ]. }
+    { rewrite (bfun_upd_eq devs k dv) (bfun_upd_eq bnos k B). iExact "Hslot". }
     iModIntro. iSplitR "Htok Hdev2 Hbno2".
-    - iApply (bcache_scan_to_res bn (<[k := ((1/4)%Qp, 1%positive)]> M) ord
-                (fun j => if decide (j = k) then dv else devs j)
-                (fun j => if decide (j = k) then bv else bnos j)).
+    - iApply (bcache_scan_to_res bn V (<[k := ((1/4)%Qp, 1%positive)]> M) ord
+                (bfun_upd devs k dv) (bfun_upd bnos k B)).
       rewrite /bcache_scan. iFrame "Hauth Hsauth".
       iSplitR.
       { iPureIntro. intros j Hj.
         destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         apply Hdom. by rewrite lookup_insert_ne in Hj. }
       iSplitR; [iPureIntro; exact Hord|].
-      iFrame "Hlru Hslots".
+      iSplitR.
+      { iPureIntro. exact (bd_inj_upd V bnos k B Hk HcovB Hmiss Hinj). }
+      iSplitR.
+      { iPureIntro. exact (bd_devpin_upd V devs bnos k dv B HD Hdevpin). }
+      iFrame "Hlru Hpool Hslots".
     - rewrite /bref. iFrame "Htok Hdev2 Hbno2".
   Qed.
 
@@ -390,101 +540,174 @@ Section BreadScan.
   (*  (4) The (c) swap: the recycle block's THREE field rewrites.         *)
   (*                                                                     *)
   (*  Each of [sw s2,8(s1)] / [sw s3,12(s1)] / [sw zero,0(s1)] opens       *)
-  (*  [buf_escrow] around ITSELF, so the parked bundle is whole at every   *)
+  (*  [buf_escrow] around ITSELF, so no bundle is carried across an        *)
   (*  instruction boundary -- which is what makes the recycler-vs-hit-     *)
   (*  thread race safe for free (whoever wins the sleeplock takes the       *)
   (*  parked bundle; whoever sees valid = 0 at the tail does the read).     *)
   (*                                                                     *)
-  (*  The two 1/2-fraction cells (dev, blockno) must be JOINED with the     *)
-  (*  bcache slot's other half to be storable, and fractional agreement     *)
-  (*  is what says the two halves hold the same word -- no key ghost.      *)
-  (*  [b->valid] is FULL inside the parked arm, so it needs no join, only   *)
-  (*  the {0,1} pin re-established at the stored 0.                        *)
+  (*  The three stores are NOT symmetric any more (design/fs-log.md, the   *)
+  (*  A3 bullet).  The dev store re-parks a NORMAL arm (the payload only    *)
+  (*  has to be re-aimed at the new dev value, which is legal because a     *)
+  (*  covered payload pins its dev to [bv_dev V] and the request is on      *)
+  (*  that device).  The blockno store OPENS the mid-recycle window: it     *)
+  (*  evicts the old payload into the pool, exchanges the pool bundles and  *)
+  (*  re-closes with cells only, the dev cell FULL and the recycle token    *)
+  (*  in the recycler's hand.  The valid store closes the window.           *)
   (*                                                                     *)
   (*  Each lemma is used INSIDE one [iInv] of [buf_escrow] (mask           *)
   (*  ⊤ ∖ ↑minstretN ∖ ↑bioN) wrapped around one [wp_sw_au_s_sconf].       *)
   (* ------------------------------------------------------------------ *)
 
-  (* dev: escrow half + slot half -> full; re-park at the stored value *)
-  Lemma escrow_free_dev (bn : bio_names) (k : nat)
-      (M : gmap nat (Qp * positive)) (dslot : mword 32) :
-    M !! k = None ->
-    own (bn_auth bn) (● M) -∗
-    buf_escrow_body bn k -∗
-    b_dev (bpa k) ↦₄{DfracOwn (1/2)} dslot -∗
-    own (bn_auth bn) (● M) ∗
-    b_dev (bpa k) ↦₄ dslot ∗
-    (∀ d' : mword 32,
-       b_dev (bpa k) ↦₄ d' -∗
-       buf_escrow_body bn k ∗ b_dev (bpa k) ↦₄{DfracOwn (1/2)} d').
+  (* re-aiming a parked payload at a new dev value.  A COVERED payload
+     pins its dev to the view's device, and the recycler stores exactly
+     that device (bread's spec premise [dev = bv_dev V]), so the two
+     values coincide and the payload re-forms verbatim; an uncovered
+     payload is [emp] on both sides.  (The dirty arm's [bref] mentions the
+     dev value too -- it re-forms for the same reason.) *)
+  Lemma bd_pay_retarget (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (v : bool) (d1 d2 bno : mword 32) (bs : list (bv 8)) :
+    d2 = bv_dev V ->
+    buf_pay bn V k v d1 bno bs -∗ buf_pay bn V k v d2 bno bs.
   Proof.
-    iIntros (HMk) "Hauth Hbody Hslot".
-    iDestruct (escrow_open_free bn k M HMk with "Hauth Hbody") as "(Hauth & Hpark & Hclose)".
-    iDestruct "Hpark" as (vld de bno bs) "(%Hpin & Hvld & Hdev & Hbuf)".
+    iIntros (Hd2) "H". rewrite /buf_pay.
+    case_decide as Hc; [| iExact "H"].
+    iDestruct "H" as "[%Hd1 H]". subst d1 d2.
+    iSplitR; [done|]. iExact "H".
+  Qed.
+
+  (* dev: escrow half + slot half -> full; re-park at the stored value *)
+  Lemma escrow_recyc_dev (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (M : gmap nat (Qp * positive)) (devr dnew : mword 32) :
+    M !! k = None ->
+    dnew = bv_dev V ->
+    own (bn_auth bn) (● M) -∗
+    buf_escrow_body bn V k -∗
+    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr -∗
+    own (bn_auth bn) (● M) ∗
+    b_dev (bpa k) ↦₄ devr ∗
+    (b_dev (bpa k) ↦₄ dnew -∗
+       buf_escrow_body bn V k ∗ b_dev (bpa k) ↦₄{DfracOwn (1/2)} dnew).
+  Proof.
+    iIntros (HMk Hdnew) "Hauth Hbody Hslot".
+    iDestruct (escrow_open_free bn V k M devr HMk with "Hauth Hslot Hbody")
+      as "(Hauth & Hslot & Hpark & Hclose)".
+    iDestruct "Hpark" as (v de bno bs) "(Hvld & Hdev & Hbuf & Hpay & Hbmid)".
     iDestruct (word4_pointsto_agree with "Hslot Hdev") as %Heq. subst de.
     iFrame "Hauth".
     iSplitL "Hslot Hdev".
     { iApply (word4_pointsto_half_join with "Hslot Hdev"). }
-    iIntros (d') "Hfull".
+    iIntros "Hfull".
     iDestruct (word4_pointsto_half_split with "Hfull") as "[Hd1 Hd2]".
     iSplitR "Hd2"; [| iExact "Hd2"].
     iApply "Hclose". rewrite /buf_parked.
-    iExists vld, d', bno, bs. iSplitR; [by iPureIntro|].
-    iFrame "Hvld Hd1 Hbuf".
+    iExists v, dnew, bno, bs.
+    iDestruct (bd_pay_retarget bn V k v devr dnew bno bs Hdnew with "Hpay") as "Hpay".
+    iFrame "Hvld Hd1 Hbuf Hpay Hbmid".
   Qed.
 
-  (* blockno: the escrow's half lives inside [buf_own]; the rest of the
-     bundle (disk, the 1024 data bytes) rides in the closing wand. *)
-  Lemma escrow_free_bno (bn : bio_names) (k : nat)
-      (M : gmap nat (Qp * positive)) (bslot0 : mword 32) :
+  (* blockno: the escrow's half lives inside [buf_own]; joining it with the
+     slot's makes the cell storable.  This is where the CACHE MEMBERSHIP
+     moves, so it is also where the pool exchange happens -- the evicted
+     block's payload is read out with [buf_pay_evict] (the authority kills
+     the dirty arm: only clean, disk-agreeing content ever leaves the
+     cache) and deposited, and the requested block's bundle is withdrawn.
+     The escrow re-closes as the MID window: cells only, the dev cell FULL
+     (the bcache-retained half joined in), the recycle token OUT. *)
+  Lemma escrow_recyc_bno (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (M : gmap nat (Qp * positive)) (bnos : nat -> mword 32)
+      (devr B : mword 32) :
     M !! k = None ->
+    (k < NBUF)%nat ->
+    uint B ∈ bv_cov V ->
+    (forall j, (j < NBUF)%nat -> uint (bnos j) ≠ uint B) ->
+    (uint (bnos k) ∈ bv_cov V ->
+       forall j, (j < NBUF)%nat -> j ≠ k -> uint (bnos j) ≠ uint (bnos k)) ->
+    devr = bv_dev V ->
     own (bn_auth bn) (● M) -∗
-    buf_escrow_body bn k -∗
-    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bslot0 -∗
+    buf_escrow_body bn V k -∗
+    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr -∗
+    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} (bnos k) -∗
+    bio_pool V bnos -∗
     own (bn_auth bn) (● M) ∗
-    b_blockno (bpa k) ↦₄ bslot0 ∗
-    (∀ b' : mword 32,
-       b_blockno (bpa k) ↦₄ b' -∗
-       buf_escrow_body bn k ∗ b_blockno (bpa k) ↦₄{DfracOwn (1/2)} b').
+    b_blockno (bpa k) ↦₄ (bnos k) ∗
+    (b_blockno (bpa k) ↦₄ B -∗
+       buf_escrow_body bn V k ∗ bmid bn k ∗ pool_blk V (uint B) ∗
+       b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B ∗
+       bio_pool V (bfun_upd bnos k B)).
   Proof.
-    iIntros (HMk) "Hauth Hbody Hslot".
-    iDestruct (escrow_open_free bn k M HMk with "Hauth Hbody") as "(Hauth & Hpark & Hclose)".
-    iDestruct "Hpark" as (vld de bno bs) "(%Hpin & Hvld & Hdev & Hbuf)".
+    iIntros (HMk Hk HcovB Hmiss Huniq Hdevr) "Hauth Hbody Hdevr Hbno Hpool".
+    iDestruct (escrow_open_free bn V k M devr HMk with "Hauth Hdevr Hbody")
+      as "(Hauth & Hdevr & Hpark & _)".
+    iDestruct "Hpark" as (v de bno bs) "(Hvld & Hdev & Hbuf & Hpay & Hbmid)".
+    iDestruct (word4_pointsto_agree with "Hdevr Hdev") as %Heqd. subst de.
     rewrite /buf_own.
-    iDestruct "Hbuf" as "(Hbno & Hdisk & %Hlen & Hdata)".
-    iDestruct (word4_pointsto_agree with "Hslot Hbno") as %Heq. subst bno.
+    iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
+    iDestruct (word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
+    iDestruct (buf_pay_evict bn V k M v devr (bnos k) bs HMk with "Hauth Hpay")
+      as "[Hauth Hold]".
     iFrame "Hauth".
-    iSplitL "Hslot Hbno".
-    { iApply (word4_pointsto_half_join with "Hslot Hbno"). }
-    iIntros (b') "Hfull".
+    iSplitL "Hbno Hbno0".
+    { iApply (word4_pointsto_half_join with "Hbno Hbno0"). }
+    iIntros "Hfull".
     iDestruct (word4_pointsto_half_split with "Hfull") as "[Hb1 Hb2]".
-    iSplitR "Hb2"; [| iExact "Hb2"].
-    iApply "Hclose". rewrite /buf_parked.
-    iExists vld, de, b', bs. iSplitR; [by iPureIntro|].
-    iFrame "Hvld Hdev". rewrite /buf_own. iFrame "Hb1 Hdisk Hdata". done.
+    (* the pool exchange, at the one instant [bnos] changes *)
+    iDestruct (bio_pool_recycle V bnos (bfun_upd bnos k B) k (bnos k) B
+                 Hk eq_refl (bfun_upd_eq bnos k B)
+                 (fun j Hj => bfun_upd_ne bnos k B j Hj)
+                 HcovB Hmiss Huniq with "Hpool") as "[HpoolB Hpoolback]".
+    iDestruct ("Hpoolback" with "[Hold]") as "Hpool".
+    { case_decide as Hc; [iDestruct "Hold" as "[_ $]" | done]. }
+    (* and re-close as the mid-recycle window *)
+    iDestruct (word4_pointsto_half_join with "Hdevr Hdev") as "Hdevfull".
+    iSplitL "Hvld Hdevfull Hb1 Hdisk Hdata".
+    { iApply (escrow_close_mid bn V k). rewrite /buf_mid.
+      iExists (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)),
+              B, bs.
+      iSplitR. { iPureIntro. destruct v; [by right | by left]. }
+      rewrite -Hdevr.
+      iFrame "Hvld Hdevfull". rewrite /buf_own. iFrame "Hb1 Hdisk Hdata". done. }
+    iFrame "Hbmid HpoolB Hb2 Hpool".
   Qed.
 
-  (* valid: FULL inside the parked arm, and the stored 0 re-establishes the
-     {0,1} pin that bread's tail turns into its [= 1] postcondition. *)
-  Lemma escrow_free_valid (bn : bio_names) (k : nat)
-      (M : gmap nat (Qp * positive)) :
-    M !! k = None ->
-    own (bn_auth bn) (● M) -∗
-    buf_escrow_body bn k -∗
-    own (bn_auth bn) (● M) ∗
+  (* valid: the recycle token refutes BOTH normal arms, so what comes out is
+     the window this recycler itself parked -- with the dev cell FULL at the
+     view's device, which is what lets the re-parked payload's dev pin (and
+     the handle's dev half) be identified at all.  The stored 0 is what makes
+     the arm INVALID, i.e. what hands the block's pool bundle -- withdrawn at
+     the blockno store -- to WHOEVER wins the sleeplock race and does the
+     fill.  The retained blockno half pins the window's block to [B]. *)
+  Lemma escrow_recyc_valid (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (B : mword 32) :
+    uint B ∈ bv_cov V ->
+    bmid bn k -∗
+    buf_escrow_body bn V k -∗
+    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B -∗
+    pool_blk V (uint B) -∗
     (∃ vld : mword 32, b_valid (bpa k) ↦₄ vld) ∗
-    (b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗ buf_escrow_body bn k).
+    b_blockno (bpa k) ↦₄{DfracOwn (1/2)} B ∗
+    (b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) -∗
+       buf_escrow_body bn V k ∗
+       b_dev (bpa k) ↦₄{DfracOwn (1/2)} (bv_dev V)).
   Proof.
-    iIntros (HMk) "Hauth Hbody".
-    iDestruct (escrow_open_free bn k M HMk with "Hauth Hbody") as "(Hauth & Hpark & Hclose)".
-    iDestruct "Hpark" as (vld de bno bs) "(%Hpin & Hvld & Hdev & Hbuf)".
-    iFrame "Hauth".
+    iIntros (HcovB) "Hbmid Hbody Hbno Hpool".
+    iDestruct (escrow_open_mid bn V k with "Hbmid Hbody")
+      as "(Hbmid & Hmid & Hclose)".
+    iDestruct "Hmid" as (vld bno bs) "(%Hpin & Hvld & Hdevfull & Hbuf)".
+    rewrite /buf_own.
+    iDestruct "Hbuf" as "(Hbno0 & Hdisk & %Hlen & Hdata)".
+    iDestruct (word4_pointsto_agree with "Hbno Hbno0") as %Heqb. subst bno.
     iSplitL "Hvld"; [by iExists vld|].
+    iFrame "Hbno".
     iIntros "Hvld".
+    iDestruct (word4_pointsto_half_split with "Hdevfull") as "[Hd1 Hd2]".
+    iSplitR "Hd2"; [| iExact "Hd2"].
+    iAssert (buf_pay bn V k false (bv_dev V) B bs) with "[Hpool]" as "Hpay".
+    { rewrite /buf_pay. case_decide as Hc; [| exfalso; exact (Hc HcovB)].
+      iSplitR; [done|]. iExact "Hpool". }
     iApply "Hclose". rewrite /buf_parked.
-    iExists (mword_of_int 0 : mword 32), de, bno, bs.
-    iSplitR; [by iPureIntro; left|].
-    iFrame "Hvld Hdev Hbuf".
+    iExists false, (bv_dev V), B, bs. cbv iota.
+    iFrame "Hvld Hd1 Hpay Hbmid".
+    rewrite /buf_own. iFrame "Hbno0 Hdisk Hdata". done.
   Qed.
 
 End BreadScan.

@@ -1,8 +1,10 @@
 (* BioInv.v -- the bio.c ownership layer over the buffer cache: the
    reference-count algebra, the per-buffer content ESCROW, the bcache lock's
-   resource, and the persistent [bio_ctx] every bio function shares.
+   resource (with the UNCACHED POOL), and the persistent [bio_ctx] every bio
+   function shares.
 
-   Design (claude-notes/projects/bio.md).  The two facts that force the shape:
+   Design (claude-notes/design/fs-log.md; the physical base is
+   claude-notes/completed/bio.md).  The two facts that force the escrow:
 
    (1) A releasing holder's content must be reachable from the sleeplock side
        BY THE END of releasesleep -- a blocked waiter's acquiresleep can
@@ -14,22 +16,44 @@
        the bcache resource.
 
    So the traveling content lives in a per-buffer ESCROW -- a namespace
-   invariant, openable atomically at any instruction -- with two arms:
+   invariant, openable atomically at any instruction.  The layer is
+   PARAMETRIC over a client view [bio_view]: the covered device+block range,
+   and two opaque per-block payloads [bv_clean]/[bv_dirty] ("bs is the
+   block's logical content", clean = the disk home cell agrees, dirty = the
+   block is pinned by a log reference).  Bio only MOVES the payloads --
+   pool -> escrow -> handle and back -- and never converts clean <-> dirty;
+   holders do that with their own (log-layer) ghosts.  Three arms:
 
-     A1 (parked):      valid (full) + dev (1/2) + buf_own (blockno 1/2,
-                       disk pinned 0, the 1024 data bytes)
+     A1 (parked):      valid cell (full, keyed by a bool v) + dev (1/2) +
+                       buf_own (blockno 1/2, disk pinned 0, the 1024 data
+                       bytes) + the payload [buf_pay] (v = true: the bytes
+                       ARE the logical content and the disk cell is carried
+                       alongside; v = false: the block's pool bundle rides
+                       here so that WHOEVER wins the fill race finds it) +
+                       the recycle token [bmid].
      A2 (checked out): the chain's own reference fragment with its
-                       dev/blockno fraction q, plus the checkout token
-                       [bown k]
+                       dev/blockno fraction q, the checkout token [bown k],
+                       and the recycle token.
+     A3 (mid-recycle): the recycler's window between the blockno store and
+                       the valid store, where the blockno cell already names
+                       the NEW block but the valid cell is stale: cells only,
+                       decoupled from any payload, with the dev cell FULL
+                       (the bcache-retained half joined in).  The recycle
+                       token is OUT (in the recycler's hand): that is what
+                       lets the recycler refute A1/A2 when it closes the
+                       window, while every other opener refutes A3 by a dev
+                       or valid cell fraction.
 
-   and the buffer's sleeplock protects EXACTLY [bown k].  A checkout
-   (post-acquiresleep) refutes A2 with the bown in hand and swaps its ref +
-   bown in for the parked bundle; a park (brelse's first instruction) refutes
-   A1 with the full valid cell in hand (fraction 1+1 > 1) and swaps back.
-   The miss path (refcnt==0, bcache.lock held) refutes A2 with the auth
-   (M !! k = None vs the arm's fragment) and mutates the parked cells one
-   atomic store at a time -- the bundle is parked at every instruction
-   boundary, which is also what makes the recycler-vs-hit-thread race safe.
+   The buffer's sleeplock protects EXACTLY [bown k].  A checkout
+   (post-acquiresleep) refutes A2 with the bown in hand and A3 with its
+   reference's dev fraction, and swaps its ref + bown in for the parked
+   bundle; a park (brelse's first instruction) refutes A1 and A3 with the
+   full valid cell in hand and swaps back.  The miss path (refcnt==0,
+   bcache.lock held) refutes A2 with the auth (M !! k = None vs the arm's
+   fragment) and A3 with the bcache-retained dev half, and mutates the
+   parked cells one atomic store at a time.  The dirty payload holds a real
+   [bref], so the recycler's auth ALSO refutes "dirty" at eviction: only
+   clean, disk-agreeing content ever returns to the pool.
 
    The count algebra is FileInv's Arc algebra verbatim: auth (gmap nat
    (frac * positive)); M !! k = Some (q, n) means n outstanding references
@@ -51,6 +75,7 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import SleepLock.
 Require Import BufOwn.
+Require Import DiskPtsto.
 Require Import BcacheInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -90,15 +115,50 @@ Proof. solve_inG. Qed.
 
 (* every ghost name of the layer, as one record (uart_names precedent):
    the bcache spinlock's gname, the count authority, the slot supply, and
-   per buffer the inner-sleeplock pair (γl, γsl) and the checkout token's
-   gname. *)
+   per buffer the inner-sleeplock pair (γl, γsl), the checkout token's
+   gname and the recycle token's gname. *)
 Record bio_names := MkBioNames {
   bn_lk   : gname;                (* the "bcache" spinlock               *)
   bn_auth : gname;                (* ● (gmap nat (frac * positive))      *)
   bn_slot : gname;                (* the bslot supply                    *)
   bn_slk  : nat -> gname * gname; (* buffer k's sleeplock (γl, γsl)      *)
   bn_own  : nat -> gname;         (* buffer k's checkout token           *)
+  bn_mid  : nat -> gname;         (* buffer k's recycle token            *)
 }.
+
+(* THE CLIENT VIEW the whole layer is parametric over: the disk ghost the
+   covered blocks' [disk_block] fragments live at, the ONE covered device,
+   the covered block-number range, and the two opaque content payloads.
+   The log layer instantiates the payloads with its logged-view ghost
+   halves (claude-notes/design/fs-log.md); bio itself never opens them.
+   [bv_cov] must not contain 0 (binit leaves every buffer's blockno cell
+   at 0) -- [bio_init] takes that as a premise. *)
+Record bio_view (Σ : gFunctors) := MkBioView {
+  bv_gd    : disk_names;
+  bv_dev   : SailStdpp.Values.mword 32;
+  bv_cov   : gset Z;
+  bv_clean : Z -> list (bv 8) -> iProp Σ;
+  bv_dirty : Z -> list (bv 8) -> iProp Σ;
+  (* the payloads must be TIMELESS: they ride the escrow, whose every open
+     happens inside a store's atomic update with no step left to absorb a
+     ▷ (the disk_inv precedent -- projects/crash.md M5b).  No real client
+     payload is hurt: "bs is the logical content" is ghost state. *)
+  bv_clean_tl : forall b bs, Timeless (bv_clean b bs);
+  bv_dirty_tl : forall b bs, Timeless (bv_dirty b bs);
+}.
+Arguments bv_gd {Σ} _.
+Arguments bv_dev {Σ} _.
+Arguments bv_cov {Σ} _.
+Arguments bv_clean {Σ} _.
+Arguments bv_dirty {Σ} _.
+Arguments bv_clean_tl {Σ} _ _ _.
+Arguments bv_dirty_tl {Σ} _ _ _.
+Arguments MkBioView {Σ} _ _ _ _ _ _ _.
+
+Global Instance bio_view_clean_timeless {Σ} (V : bio_view Σ) b bs :
+  Timeless (bv_clean V b bs) := bv_clean_tl V b bs.
+Global Instance bio_view_dirty_timeless {Σ} (V : bio_view Σ) b bs :
+  Timeless (bv_dirty V b bs) := bv_dirty_tl V b bs.
 
 (* the count component's [⋅] IS [Pos.add] (FileInv.pos_op_add, restated so
    this file does not pull the whole file table in). *)
@@ -218,7 +278,7 @@ Proof.
 Qed.
 
 Section BioInv.
-  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
 
   (* full ownership of a 4-byte cell is exclusive: the escrow's park swap
      refutes the parked arm with the full valid cell in hand. *)
@@ -301,118 +361,282 @@ Section BioInv.
 
   Definition bioN : namespace := nroot .@ "xv6bio".
 
-  (* A1: the buffer's traveling content, parked.  disk is pinned 0 -- only
-     rw flips it, and always back before returning; the valid word is pinned
-     to {0,1} -- the only writers are the miss path (0), bread's tail (1) and
-     [bio_init] (0), and that pin is what turns bread's hit-path branch fact
-     ("nonzero") into the [= 1] its postcondition states. *)
-  Definition buf_parked (k : nat) : iProp Σ :=
-    (∃ (vld dev bno : mword 32) (bs : list (bv 8)),
-       ⌜vld = (mword_of_int 0 : mword 32) \/ vld = (mword_of_int 1 : mword 32)⌝ ∗
-       b_valid (bpa k) ↦₄ vld ∗
-       b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs)%I.
+  (* the recycle token: parked in A1/A2, in the recycler's hand during the
+     A3 window (which is what lets the recycler refute A1/A2 when it closes
+     the window -- see the header). *)
+  Definition bmid (bn : bio_names) (k : nat) : iProp Σ :=
+    lock_tok_excl (bn_mid bn k).
 
-  (* A2: checked out by a sleeplock chain; the chain's own reference and the
-     checkout token wait here until brelse brings the content back. *)
+  Lemma bmid_exclusive bn k : bmid bn k -∗ bmid bn k -∗ False.
+  Proof. apply lock_tok_excl_exclusive. Qed.
+
+  (* one uncached covered block's pool bundle: its disk cell and its clean
+     payload at the SAME content -- uncached implies clean, because the
+     dirty arm parks a real [bref] and a referenced buffer is never
+     evicted. *)
+  Definition pool_blk (V : bio_view Σ) (b : Z) : iProp Σ :=
+    (∃ bs : list (bv 8), disk_block (bv_gd V) b bs ∗ bv_clean V b bs)%I.
+
+  (* a HELD covered block's payload: the logical content [bsl] against the
+     disk cell's value [bsd], keyed by the dirty flag.  Clean ties the disk
+     to the logical content; dirty parks the pinning reference instead. *)
+  Definition bio_pay (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (dev bno : mword 32) (bsl bsd : list (bv 8)) (d : bool) : iProp Σ :=
+    (if d
+     then bv_dirty V (uint bno) bsl ∗ ∃ q : Qp, bref bn k q dev bno
+     else bv_clean V (uint bno) bsl ∗ ⌜bsd = bsl⌝)%I.
+
+  (* the payload a PARKED buffer carries, keyed on its valid bit: a valid
+     covered buffer's bytes ARE the logical content (with the block's disk
+     cell alongside); an invalid covered buffer carries the block's pool
+     bundle, so that WHOEVER wins the sleeplock race after a recycle finds
+     the fragment the fill needs.  Uncovered blocknos (only block 0 in
+     practice -- binit's zeroed cells) carry nothing. *)
+  Definition buf_pay (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (v : bool) (dev bno : mword 32) (bs : list (bv 8)) : iProp Σ :=
+    (if decide (uint bno ∈ bv_cov V) then
+       ⌜dev = bv_dev V⌝ ∗
+       (if v
+        then ∃ (bsd : list (bv 8)) (d : bool),
+               disk_block (bv_gd V) (uint bno) bsd ∗
+               bio_pay bn V k dev bno bs bsd d
+        else pool_blk V (uint bno))
+     else emp)%I.
+
+  (* A1: the buffer's traveling content, parked.  disk is pinned 0 -- only
+     rw flips it, and always back before returning.  The valid cell is
+     keyed by the bool [v], which is what couples it to the payload's
+     form. *)
+  Definition buf_parked (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
+    (∃ (v : bool) (dev bno : mword 32) (bs : list (bv 8)),
+       b_valid (bpa k) ↦₄
+         (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
+       b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
+       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+       buf_pay bn V k v dev bno bs ∗
+       bmid bn k)%I.
+
+  (* A2: checked out by a sleeplock chain; the chain's own reference, the
+     checkout token and the recycle token wait here until brelse brings
+     the content back. *)
   Definition buf_chain (bn : bio_names) (k : nat) : iProp Σ :=
     (∃ (q : Qp) (dev bno : mword 32),
        bref_tok bn k q ∗
        b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
        b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
-       bown bn k)%I.
+       bown bn k ∗
+       bmid bn k)%I.
 
-  Definition buf_escrow_body (bn : bio_names) (k : nat) : iProp Σ :=
-    (buf_parked k ∨ buf_chain bn k)%I.
+  (* A3: the recycler's window between its blockno store and its valid
+     store, where the blockno cell already names the NEW block but the
+     valid cell is stale: cells only, decoupled from any payload.  The dev
+     cell is FULL (the recycler joins the bcache-retained half in), which
+     is what every OTHER opener refutes this arm by; the recycle token is
+     out, in the recycler's hand.  The dev cell's VALUE is pinned to the
+     view's device: the only creator is the recycler, right after its dev
+     store, and the recycler itself holds no fraction across the window,
+     so an existential value here would be unrecoverable at the valid
+     store (and the re-parked arm's dev pin unprovable). *)
+  Definition buf_mid (V : bio_view Σ) (k : nat) : iProp Σ :=
+    (∃ (vld bno : mword 32) (bs : list (bv 8)),
+       ⌜vld = (mword_of_int 0 : mword 32) \/ vld = (mword_of_int 1 : mword 32)⌝ ∗
+       b_valid (bpa k) ↦₄ vld ∗
+       b_dev (bpa k) ↦₄ (bv_dev V) ∗
+       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs)%I.
 
-  Definition buf_escrow (bn : bio_names) (k : nat) : iProp Σ :=
-    inv bioN (buf_escrow_body bn k).
+  Definition buf_escrow_body (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
+    (buf_parked bn V k ∨ buf_chain bn k ∨ buf_mid V k)%I.
 
-  (* ---- the three swaps (used inside an [iInv] open of [buf_escrow]) ---- *)
+  Definition buf_escrow (bn : bio_names) (V : bio_view Σ) (k : nat) : iProp Σ :=
+    inv bioN (buf_escrow_body bn V k).
 
-  (* (a) checkout, post-acquiresleep: the opener's bown refutes A2; its
+  (* the whole body is TIMELESS (the view's payload fields carry their own
+     Timeless proofs), so every opener strips the ▷ up front with the usual
+     [iInv … as ">Hbody"] -- exactly as the physical layer did. *)
+  Global Instance bio_pay_timeless bn V k dev bno bsl bsd d :
+    Timeless (bio_pay bn V k dev bno bsl bsd d).
+  Proof. rewrite /bio_pay. destruct d; apply _. Qed.
+
+  Global Instance pool_blk_timeless V b : Timeless (pool_blk V b).
+  Proof. apply _. Qed.
+
+  Global Instance buf_pay_timeless bn V k v dev bno bs :
+    Timeless (buf_pay bn V k v dev bno bs).
+  Proof. rewrite /buf_pay. case_decide; [destruct v|]; apply _. Qed.
+
+  Global Instance buf_parked_timeless bn V k : Timeless (buf_parked bn V k).
+  Proof. apply _. Qed.
+
+  Global Instance buf_chain_timeless bn k : Timeless (buf_chain bn k).
+  Proof. apply _. Qed.
+
+  Global Instance buf_mid_timeless V k : Timeless (buf_mid V k).
+  Proof. apply _. Qed.
+
+  Global Instance buf_escrow_body_timeless bn V k :
+    Timeless (buf_escrow_body bn V k).
+  Proof. apply _. Qed.
+
+  (* a reference fragment against an authority showing NO references: the
+     refutation the free-open and the eviction reading both turn on. *)
+  Lemma bref_tok_free_absurd bn (M : gmap nat (Qp * positive)) k q :
+    M !! k = None ->
+    own (bn_auth bn) (● M) -∗ bref_tok bn k q -∗ False.
+  Proof.
+    iIntros (HM) "Ha Htok". rewrite /bref_tok.
+    iDestruct (own_valid_2 with "Ha Htok")
+      as %[Hincl _]%auth_both_valid_discrete.
+    iPureIntro.
+    apply singleton_included_l in Hincl as [y [Hy _]].
+    rewrite HM in Hy. inversion Hy.
+  Qed.
+
+  (* ---- the swaps (used inside an [iInv] open of [buf_escrow]) ---- *)
+
+  (* (a) checkout, post-acquiresleep: the opener's bown refutes A2 and its
+     reference's dev fraction refutes A3 (whose dev cell is full); its
      reference's cell fractions AGREE with the parked bundle's, pinning the
-     withdrawn dev/bno to the requested key. *)
-  Lemma escrow_swap_checkout bn k q (dev bno : mword 32) :
-    buf_escrow_body bn k -∗
+     withdrawn dev/bno to the requested key.  The deposited A2 absorbs the
+     parked arm's recycle token, so the handle needn't carry it. *)
+  Lemma escrow_swap_checkout bn V k q (dev bno : mword 32) :
+    buf_escrow_body bn V k -∗
     bown bn k -∗
     bref_tok bn k q -∗
     b_dev (bpa k) ↦₄{DfracOwn q} dev -∗
     b_blockno (bpa k) ↦₄{DfracOwn q} bno -∗
-    buf_escrow_body bn k ∗
-    (∃ (vld : mword 32) (bs : list (bv 8)),
-       ⌜vld = (mword_of_int 0 : mword 32) \/ vld = (mword_of_int 1 : mword 32)⌝ ∗
-       b_valid (bpa k) ↦₄ vld ∗
+    buf_escrow_body bn V k ∗
+    (∃ (v : bool) (bs : list (bv 8)),
+       b_valid (bpa k) ↦₄
+         (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) ∗
        b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs).
+       buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+       buf_pay bn V k v dev bno bs).
   Proof.
     iIntros "Hbody Hown Htok Hdev Hbno".
-    iDestruct "Hbody" as "[Hparked | Hchain]"; last first.
-    { iDestruct "Hchain" as (q' dev' bno') "(_ & _ & _ & Hown')".
-      iExFalso. iApply (bown_exclusive with "Hown Hown'"). }
-    iDestruct "Hparked" as (vld dev' bno' bs) "(%Hpin & Hvld & Hdev' & Hbuf)".
-    iDestruct (word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
-    rewrite /buf_own.
-    iDestruct "Hbuf" as "(Hbno' & Hdisk & %Hlen & Hdata)".
-    iDestruct (word4_pointsto_agree with "Hbno Hbno'") as %Heqb. subst bno'.
-    iSplitL "Htok Hdev Hbno Hown".
-    { iRight. rewrite /buf_chain. iExists q, dev, bno. iFrame. }
-    iExists vld, bs. iSplitR; [by iPureIntro|]. iFrame "Hvld Hdev'".
-    rewrite /buf_own. iFrame "Hbno' Hdisk Hdata". done.
+    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
+    - iDestruct "Hparked" as (v dev' bno' bs) "(Hvld & Hdev' & Hbuf & Hpay & Hbmid)".
+      iDestruct (word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
+      rewrite /buf_own.
+      iDestruct "Hbuf" as "(Hbno' & Hdisk & %Hlen & Hdata)".
+      iDestruct (word4_pointsto_agree with "Hbno Hbno'") as %Heqb. subst bno'.
+      iSplitL "Htok Hdev Hbno Hown Hbmid".
+      { iRight; iLeft. rewrite /buf_chain. iExists q, dev, bno. iFrame. }
+      iExists v, bs. iFrame "Hvld Hdev' Hpay".
+      rewrite /buf_own. iFrame "Hbno' Hdisk Hdata". done.
+    - iDestruct "Hchain" as (q' dev' bno') "(_ & _ & _ & Hown' & _)".
+      iExFalso. iApply (bown_exclusive with "Hown Hown'").
+    - iDestruct "Hmid" as (vld bno' bs) "(_ & _ & Hdev' & _)".
+      iExFalso. iApply (word4_pointsto_excl with "Hdev' Hdev").
   Qed.
 
   (* (b) park, brelse's first instruction: the opener's full valid cell
-     refutes A1 (fraction 1 + 1 is invalid); the chain's reference and bown
-     come back out.  The withdrawn fractions agree with the deposited
-     bundle's, so the recovered reference is at the SAME key. *)
-  Lemma escrow_swap_park bn k (vld dev bno : mword 32) (bs : list (bv 8)) :
-    vld = (mword_of_int 0 : mword 32) \/ vld = (mword_of_int 1 : mword 32) ->
-    buf_escrow_body bn k -∗
-    b_valid (bpa k) ↦₄ vld -∗
+     refutes A1 AND A3 (both hold the cell full); the chain's reference and
+     bown come back out, and the deposited A1 re-absorbs the recycle token
+     the chain arm was keeping.  The withdrawn fractions agree with the
+     deposited bundle's, so the recovered reference is at the SAME key. *)
+  Lemma escrow_swap_park bn V k (v : bool) (dev bno : mword 32) (bs : list (bv 8)) :
+    buf_escrow_body bn V k -∗
+    b_valid (bpa k) ↦₄
+      (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) -∗
     b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev -∗
     buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs -∗
-    buf_escrow_body bn k ∗
+    buf_pay bn V k v dev bno bs -∗
+    buf_escrow_body bn V k ∗
     (∃ q : Qp,
        bref_tok bn k q ∗
        b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
        b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
        bown bn k).
   Proof.
-    iIntros (Hpin) "Hbody Hvld Hdev Hbuf".
-    iDestruct "Hbody" as "[Hparked | Hchain]".
-    { iDestruct "Hparked" as (vld' dev' bno' bs') "(_ & Hvld' & _ & _)".
-      iExFalso. iApply (word4_pointsto_excl with "Hvld Hvld'"). }
-    iDestruct "Hchain" as (q dev' bno') "(Htok & Hdev' & Hbno' & Hown)".
-    iDestruct (word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
-    rewrite /buf_own.
-    iDestruct "Hbuf" as "(Hbno & Hdisk & %Hlen & Hdata)".
-    iDestruct (word4_pointsto_agree with "Hbno' Hbno") as %Heqb. subst bno'.
-    iSplitR "Htok Hdev' Hbno' Hown".
-    { iLeft. rewrite /buf_parked. iExists vld, dev, bno, bs.
-      iSplitR; [by iPureIntro|].
-      iFrame "Hvld Hdev". rewrite /buf_own. iFrame "Hbno Hdisk Hdata". done. }
-    iExists q. iFrame.
+    iIntros "Hbody Hvld Hdev Hbuf Hpay".
+    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
+    - iDestruct "Hparked" as (v' dev' bno' bs') "(Hvld' & _)".
+      iExFalso. iApply (word4_pointsto_excl with "Hvld Hvld'").
+    - iDestruct "Hchain" as (q dev' bno') "(Htok & Hdev' & Hbno' & Hown & Hbmid)".
+      iDestruct (word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
+      rewrite /buf_own.
+      iDestruct "Hbuf" as "(Hbno & Hdisk & %Hlen & Hdata)".
+      iDestruct (word4_pointsto_agree with "Hbno' Hbno") as %Heqb. subst bno'.
+      iSplitR "Htok Hdev' Hbno' Hown".
+      { iLeft. rewrite /buf_parked. iExists v, dev, bno, bs.
+        iFrame "Hvld Hdev Hpay Hbmid".
+        rewrite /buf_own. iFrame "Hbno Hdisk Hdata". done. }
+      iExists q. iFrame.
+    - iDestruct "Hmid" as (vld bno' bs') "(_ & Hvld' & _)".
+      iExFalso. iApply (word4_pointsto_excl with "Hvld' Hvld").
   Qed.
 
-  (* (c) the miss path's view: with the authority showing no references,
-     A2 is impossible, so the body IS the parked bundle. *)
-  Lemma escrow_open_free bn k (M : gmap nat (Qp * positive)) :
+  (* (c) the miss path's view: with the authority showing no references, A2
+     is impossible, and the bcache-retained dev half refutes A3 (whose dev
+     cell is full), so the body IS the parked bundle. *)
+  Lemma escrow_open_free bn V k (M : gmap nat (Qp * positive)) (devr : mword 32) :
     M !! k = None ->
     own (bn_auth bn) (● M) -∗
-    buf_escrow_body bn k -∗
-    own (bn_auth bn) (● M) ∗ buf_parked k ∗
-    (buf_parked k -∗ buf_escrow_body bn k).
+    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr -∗
+    buf_escrow_body bn V k -∗
+    own (bn_auth bn) (● M) ∗
+    b_dev (bpa k) ↦₄{DfracOwn (1/2)} devr ∗
+    buf_parked bn V k ∗
+    (buf_parked bn V k -∗ buf_escrow_body bn V k).
   Proof.
-    iIntros (HM) "Ha Hbody".
-    iDestruct "Hbody" as "[Hparked | Hchain]"; last first.
-    { iDestruct "Hchain" as (q dev bno) "(Htok & _)".
-      rewrite /bref_tok.
-      iDestruct (own_valid_2 with "Ha Htok")
-        as %[Hincl _]%auth_both_valid_discrete.
-      iExFalso. iPureIntro.
-      apply singleton_included_l in Hincl as [y [Hy _]].
-      rewrite HM in Hy. inversion Hy. }
-    iFrame "Ha Hparked". iIntros "Hp". by iLeft.
+    iIntros (HM) "Ha Hdevr Hbody".
+    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
+    - iFrame "Ha Hdevr Hparked". iIntros "Hp". by iLeft.
+    - iDestruct "Hchain" as (q dev bno) "(Htok & _)".
+      iExFalso. iApply (bref_tok_free_absurd bn M k q HM with "Ha Htok").
+    - iDestruct "Hmid" as (vld bno bs) "(_ & _ & Hdev & _)".
+      iExFalso. iApply (word4_pointsto_excl with "Hdev Hdevr").
+  Qed.
+
+  (* (d) the recycler's re-open at its valid store: its recycle token
+     refutes BOTH normal arms, so the body is the mid window it parked; the
+     reclose is at a normal parked arm, which re-absorbs the token. *)
+  Lemma escrow_open_mid bn V k :
+    bmid bn k -∗
+    buf_escrow_body bn V k -∗
+    bmid bn k ∗ buf_mid V k ∗
+    (buf_parked bn V k -∗ buf_escrow_body bn V k).
+  Proof.
+    iIntros "Hbmid Hbody".
+    iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
+    - iDestruct "Hparked" as (v dev bno bs) "(_ & _ & _ & _ & Hbmid')".
+      iExFalso. iApply (bmid_exclusive with "Hbmid Hbmid'").
+    - iDestruct "Hchain" as (q dev bno) "(_ & _ & _ & _ & Hbmid')".
+      iExFalso. iApply (bmid_exclusive with "Hbmid Hbmid'").
+    - iFrame "Hbmid Hmid". iIntros "Hp". by iLeft.
+  Qed.
+
+  (* closing the window OPEN (at the blockno store): any mid bundle is a
+     legal body. *)
+  Lemma escrow_close_mid bn V k :
+    buf_mid V k -∗ buf_escrow_body bn V k.
+  Proof. iIntros "H". iRight; iRight. iExact "H". Qed.
+
+  (* the eviction reading of a parked payload: with the authority showing
+     no references the dirty arm (which parks a real bref) is impossible,
+     so a covered payload yields exactly the block's pool bundle.  This is
+     the "only clean content ever leaves the cache" fact. *)
+  Lemma buf_pay_evict bn V k (M : gmap nat (Qp * positive))
+      (v : bool) (dev bno : mword 32) (bs : list (bv 8)) :
+    M !! k = None ->
+    own (bn_auth bn) (● M) -∗
+    buf_pay bn V k v dev bno bs -∗
+    own (bn_auth bn) (● M) ∗
+    (if decide (uint bno ∈ bv_cov V)
+     then ⌜dev = bv_dev V⌝ ∗ pool_blk V (uint bno)
+     else emp).
+  Proof.
+    iIntros (HM) "Ha Hpay". rewrite /buf_pay.
+    case_decide as Hc; last by iFrame.
+    iDestruct "Hpay" as "[%Hdev Hpay]".
+    destruct v.
+    - iDestruct "Hpay" as (bsd d) "[Hdb Hpay]".
+      destruct d; rewrite /bio_pay.
+      + iDestruct "Hpay" as "[_ Hq]". iDestruct "Hq" as (q) "(Htok & _ & _)".
+        iExFalso. iApply (bref_tok_free_absurd bn M k q HM with "Ha Htok").
+      + iDestruct "Hpay" as "[Hcl %Hbsd]". subst bsd.
+        iFrame "Ha". iSplitR; [done|]. rewrite /pool_blk. iExists bs. iFrame.
+    - iFrame "Ha". iSplitR; [done|]. iExact "Hpay".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -595,6 +819,124 @@ Section BioInv.
            b_blockno (bpa k) ↦₄{DfracOwn qr} bno)%I
     end.
 
+  (* ------------------------------------------------------------------ *)
+  (*  The uncached pool                                                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the blocknos currently claimed by SOME buffer slot, valid or not (an
+     invalid slot's blockno still names the block whose fill is in flight;
+     binit's slots all claim 0, which [bv_cov] excludes). *)
+  Definition bcache_cached (bnos : nat -> mword 32) : gset Z :=
+    list_to_set ((fun k => uint (bnos k)) <$> seq 0 NBUF).
+
+  Lemma bcache_cached_spec (bnos : nat -> mword 32) (b : Z) :
+    b ∈ bcache_cached bnos <-> exists j, (j < NBUF)%nat /\ b = uint (bnos j).
+  Proof.
+    rewrite /bcache_cached elem_of_list_to_set elem_of_list_fmap.
+    split.
+    - intros (j & -> & Hj). apply elem_of_seq in Hj. exists j.
+      split; [lia | done].
+    - intros (j & Hj & ->). exists j. split; [done|]. apply elem_of_seq. lia.
+  Qed.
+
+  (* every covered block no slot claims carries its pool bundle here: the
+     cache overlay's "uncached => home disk content IS the logical
+     content".  Rides inside the bcache lock's resource because every
+     cached/uncached transition happens under bcache.lock. *)
+  Definition bio_pool (V : bio_view Σ) (bnos : nat -> mword 32) : iProp Σ :=
+    ([∗ set] b ∈ bv_cov V ∖ bcache_cached bnos, pool_blk V b)%I.
+
+  (* the recycle's one-shot pool exchange, at the blockno store: slot k's
+     claim moves old -> B, so B's bundle leaves the pool (into the
+     recycler's hand, and from there into the escrow's invalid arm at the
+     valid store) and old's bundle -- extracted from the evicted arm by
+     [buf_pay_evict] -- comes back in, when old is covered at all. *)
+  Lemma bio_pool_recycle (V : bio_view Σ) (bnos bnos' : nat -> mword 32)
+      (k : nat) (old B : mword 32) :
+    (k < NBUF)%nat ->
+    bnos k = old ->
+    bnos' k = B ->
+    (forall j, j ≠ k -> bnos' j = bnos j) ->
+    uint B ∈ bv_cov V ->
+    (forall j, (j < NBUF)%nat -> uint (bnos j) ≠ uint B) ->
+    (uint old ∈ bv_cov V ->
+       forall j, (j < NBUF)%nat -> j ≠ k -> uint (bnos j) ≠ uint old) ->
+    bio_pool V bnos -∗
+    pool_blk V (uint B) ∗
+    ((if decide (uint old ∈ bv_cov V) then pool_blk V (uint old) else emp) -∗
+     bio_pool V bnos').
+  Proof.
+    iIntros (Hk Hbk Hbk' Hother HcovB HmissB Holdu) "Hpool".
+    rewrite /bio_pool.
+    assert (HBin : uint B ∈ bv_cov V ∖ bcache_cached bnos).
+    { apply elem_of_difference. split; [exact HcovB|].
+      intros Hc. apply bcache_cached_spec in Hc as (j & Hj & Heq).
+      exact (HmissB j Hj (eq_sym Heq)). }
+    rewrite (big_sepS_delete _ _ _ HBin).
+    iDestruct "Hpool" as "[$ Hpool]".
+    case_decide as Hcovold.
+    - (* old covered: it joins the pool *)
+      assert (Hset : bv_cov V ∖ bcache_cached bnos' =
+                     {[uint old]} ∪ (bv_cov V ∖ bcache_cached bnos ∖ {[uint B]})).
+      { apply set_eq. intros b.
+        rewrite elem_of_union elem_of_singleton !elem_of_difference
+                elem_of_singleton.
+        split.
+        - intros [Hbcov Hbnc].
+          destruct (decide (b = uint old)) as [->|Hne]; [by left|].
+          right. split; [split; [exact Hbcov|]|].
+          + intros Hc. apply bcache_cached_spec in Hc as (j & Hj & ->).
+            destruct (decide (j = k)) as [->|Hjk].
+            * apply Hne. rewrite Hbk. done.
+            * apply Hbnc. apply bcache_cached_spec. exists j.
+              split; [done|]. rewrite (Hother j Hjk). done.
+          + intros ->. apply Hbnc. apply bcache_cached_spec.
+            exists k. split; [done|]. rewrite Hbk'. done.
+        - intros [-> | [[Hbcov Hbnc] HneB]].
+          + split; [exact Hcovold|].
+            intros Hc. apply bcache_cached_spec in Hc as (j & Hj & Heq).
+            destruct (decide (j = k)) as [->|Hjk].
+            * rewrite Hbk' in Heq. apply (HmissB k Hk).
+              rewrite Hbk -Heq. done.
+            * rewrite (Hother j Hjk) in Heq.
+              exact (Holdu Hcovold j Hj Hjk (eq_sym Heq)).
+          + split; [exact Hbcov|].
+            intros Hc. apply bcache_cached_spec in Hc as (j & Hj & Heq).
+            destruct (decide (j = k)) as [->|Hjk].
+            * apply HneB. rewrite Heq Hbk'. done.
+            * apply Hbnc. apply bcache_cached_spec. exists j.
+              split; [done|]. rewrite -(Hother j Hjk). done. }
+      rewrite Hset big_sepS_union; last first.
+      { apply disjoint_singleton_l. intros Hc.
+        apply elem_of_difference in Hc as [Hc _].
+        apply elem_of_difference in Hc as [_ Hnc].
+        apply Hnc. apply bcache_cached_spec. exists k.
+        split; [done|]. rewrite Hbk. done. }
+      rewrite big_sepS_singleton.
+      iIntros "Hold". iFrame.
+    - (* old uncovered: the pool just shrinks by B *)
+      assert (Hset : bv_cov V ∖ bcache_cached bnos' =
+                     bv_cov V ∖ bcache_cached bnos ∖ {[uint B]}).
+      { apply set_eq. intros b.
+        rewrite !elem_of_difference elem_of_singleton.
+        split.
+        - intros [Hbcov Hbnc]. split; [split; [exact Hbcov|]|].
+          + intros Hc. apply bcache_cached_spec in Hc as (j & Hj & ->).
+            destruct (decide (j = k)) as [->|Hjk].
+            * apply Hcovold. rewrite -Hbk. exact Hbcov.
+            * apply Hbnc. apply bcache_cached_spec. exists j.
+              split; [done|]. rewrite (Hother j Hjk). done.
+          + intros ->. apply Hbnc. apply bcache_cached_spec.
+            exists k. split; [done|]. rewrite Hbk'. done.
+        - intros [[Hbcov Hbnc] HneB]. split; [exact Hbcov|].
+          intros Hc. apply bcache_cached_spec in Hc as (j & Hj & Heq).
+          destruct (decide (j = k)) as [->|Hjk].
+          + apply HneB. rewrite Heq Hbk'. done.
+          + apply Hbnc. apply bcache_cached_spec. exists j.
+            split; [done|]. rewrite -(Hother j Hjk). done. }
+      rewrite Hset. iIntros "_". iExact "Hpool".
+  Qed.
+
   (* THE OPEN FORM: the whole resource with its four existentials NAMED.
      This is not cosmetic.  bread's forward scan establishes its exit fact by
      COMPARING the dev/blockno words it reads out of [bio_slot_res] against
@@ -606,28 +948,46 @@ Section BioInv.
      unprovable.  (Same family as the virtio [vs_data] lesson in
      claude-notes/durable-notes.md: a resource that crosses a boundary must
      RECORD the value the other side needs to identify.)  So both scans carry
-     the open form and only the release path closes it. *)
-  Definition bcache_scan (bn : bio_names) (M : gmap nat (Qp * positive))
+     the open form and only the release path closes it.
+
+     NEW over the physical layer: the covered-blockno INJECTIVITY (two slots
+     never claim the same covered block -- what makes the pool's set
+     subtraction and the eviction deposit sound; the miss scan's exit ties
+     re-establish it at the recycle) and the pool itself. *)
+  Definition bcache_scan (bn : bio_names) (V : bio_view Σ)
+      (M : gmap nat (Qp * positive))
       (ord : list nat) (devs bnos : nat -> mword 32) : iProp Σ :=
     (own (bn_auth bn) (● M) ∗
      bslots_auth bn ∗
      ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
      ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
+     ⌜∀ k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
+        uint (bnos k1) ∈ bv_cov V ->
+        uint (bnos k1) = uint (bnos k2) -> k1 = k2⌝ ∗
+     (* the DEV PIN: a slot claiming a covered blockno is on the view's
+        device.  This is what upgrades the forward scan's per-slot exit tie
+        (dev ≠ OR bno ≠, the negation of the code's && ) to the miss fact
+        the pool exchange needs (∀ j, bnos j ≠ B): the payload's own dev
+        pin is unreachable mid-scan (a checked-out arm carries no payload),
+        so the fact must be RECORDED here -- the vs_data rule again. *)
+     ⌜∀ k, (k < NBUF)%nat -> uint (bnos k) ∈ bv_cov V ->
+        devs k = bv_dev V⌝ ∗
      bcache_lru bhead (map bnode ord) ∗
+     bio_pool V bnos ∗
      [∗ list] k ∈ seq 0 NBUF, bio_slot_res bn M k (devs k) (bnos k))%I.
 
   (* ...and the CLOSED form the bcache spinlock is sealed over: its closure. *)
-  Definition bcache_res (bn : bio_names) : iProp Σ :=
+  Definition bcache_res (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
     (∃ (M : gmap nat (Qp * positive)) (ord : list nat)
        (devs bnos : nat -> mword 32),
-       bcache_scan bn M ord devs bnos)%I.
+       bcache_scan bn V M ord devs bnos)%I.
 
-  Lemma bcache_res_to_scan (bn : bio_names) :
-    bcache_res bn -∗ ∃ M ord devs bnos, bcache_scan bn M ord devs bnos.
+  Lemma bcache_res_to_scan (bn : bio_names) (V : bio_view Σ) :
+    bcache_res bn V -∗ ∃ M ord devs bnos, bcache_scan bn V M ord devs bnos.
   Proof. rewrite /bcache_res. iIntros "H". iExact "H". Qed.
 
-  Lemma bcache_scan_to_res (bn : bio_names) M ord devs bnos :
-    bcache_scan bn M ord devs bnos -∗ bcache_res bn.
+  Lemma bcache_scan_to_res (bn : bio_names) (V : bio_view Σ) M ord devs bnos :
+    bcache_scan bn V M ord devs bnos -∗ bcache_res bn V.
   Proof.
     rewrite /bcache_res. iIntros "H". iExists M, ord, devs, bnos. iExact "H".
   Qed.
@@ -667,43 +1027,61 @@ Section BioInv.
   (*  The persistent context and the caller-facing handle                 *)
   (* ------------------------------------------------------------------ *)
 
-  Definition bio_ctx (bn : bio_names) : iProp Σ :=
-    (is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) ∗
+  Definition bio_ctx (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
+    (is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) ∗
      [∗ list] k ∈ seq 0 NBUF,
        (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
           (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
-        buf_escrow bn k))%I.
+        buf_escrow bn V k))%I.
 
-  Global Instance bio_ctx_persistent bn : Persistent (bio_ctx bn).
+  Global Instance bio_ctx_persistent bn V : Persistent (bio_ctx bn V).
   Proof. apply _. Qed.
 
-  Lemma bio_ctx_lock bn :
-    bio_ctx bn -∗ is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn).
+  Lemma bio_ctx_lock bn V :
+    bio_ctx bn V -∗
+    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V).
   Proof. iIntros "[$ _]". Qed.
 
-  Lemma bio_ctx_buf bn k :
+  Lemma bio_ctx_buf bn V k :
     (k < NBUF)%nat ->
-    bio_ctx bn -∗
+    bio_ctx bn V -∗
     is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
       (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
-    buf_escrow bn k.
+    buf_escrow bn V k.
   Proof.
     iIntros (Hk) "[_ Hbufs]".
     assert (Hlk : seq 0 NBUF !! k = Some k) by (apply lookup_seq; lia).
     iDestruct (big_sepL_lookup with "Hbufs") as "[$ $]"; [exact Hlk].
   Qed.
 
-  (* the locked-buffer handle bread returns and bwrite/brelse consume: the
-     sleeplock holder's bundle plus the traveling content, at valid=1 and
-     disk=0.  The chain's reference is NOT here -- it rides in the escrow. *)
-  Definition bio_locked (bn : bio_names) (k : nat)
-      (pidv dev bno : mword 32) (bs : list (bv 8)) : iProp Σ :=
+  (* the held-buffer handle bread returns and bwrite/brelse (and the log
+     layer's log_write) consume: the sleeplock holder's bundle, the
+     traveling content at [bs], the block's disk cell at [bsd], and the
+     payload at logical content [bsl] with dirty flag [d].  The chain's
+     reference is NOT here (it rides in the escrow); the DIRTY payload's
+     pinning reference is.
+
+     [bio_held] leaves [bs] and [bsl] independent -- a holder who has
+     edited the bytes has bs ≠ bsl until log_write re-indexes the payload
+     -- and [bio_locked] (what bread returns and bwrite/brelse demand)
+     ties them.  That tie IS the brelse obligation: modified bytes cannot
+     be parked until the payload says they are the logical content. *)
+  Definition bio_held (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (pidv dev bno : mword 32) (bs bsl bsd : list (bv 8)) (d : bool) : iProp Σ :=
     (⌜(k < NBUF)%nat⌝ ∗
+     ⌜uint bno ∈ bv_cov V⌝ ∗
+     ⌜dev = bv_dev V⌝ ∗
      sleeplocked (snd (bn_slk bn k)) ∗
      sl_pid (buf_lock (bnode k)) ↦₄ pidv ∗
      b_valid (bpa k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-     buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs)%I.
+     buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+     disk_block (bv_gd V) (uint bno) bsd ∗
+     bio_pay bn V k dev bno bsl bsd d)%I.
+
+  Definition bio_locked (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (pidv dev bno : mword 32) (bs bsd : list (bv 8)) (d : bool) : iProp Σ :=
+    bio_held bn V k pidv dev bno bs bs bsd d.
 
   (* ------------------------------------------------------------------ *)
   (*  Construction: binit's postcondition + the .bss-zeroed buffers       *)
@@ -757,8 +1135,15 @@ Section BioInv.
      [bcache_res], seal every buffer's sleeplock over its checkout token,
      park every buffer's content in a fresh escrow, and hand the caller the
      whole [bslot] supply.  Everything starts at refcnt 0 / valid 0, so the
-     authority map is empty and the LRU list is binit's [blist 0 NBUF]. *)
-  Lemma bio_init E :
+     authority map is empty and the LRU list is binit's [blist 0 NBUF].
+
+     NEW over the physical layer: the client supplies the whole covered
+     range's pool bundles (its [disk_block]s paired with clean payloads --
+     for the log layer, the mkfs image's content against the logged-view
+     ghost), and 0 must be outside the covered range because every zeroed
+     blockno cell claims it. *)
+  Lemma bio_init (V : bio_view Σ) E :
+    (0 ∉ bv_cov V) ->
     bcache_addr ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name bcache_addr "bcache"%string -∗
     add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
@@ -772,12 +1157,16 @@ Section BioInv.
        brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
        (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
           [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte)) -∗
-    bcache_lru bhead (blist 0 NBUF) ={E}=∗
-    ∃ bn : bio_names, bio_ctx bn ∗ bslots bn BSLOTS.
+    bcache_lru bhead (blist 0 NBUF) -∗
+    ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
+    ∃ bn : bio_names, bio_ctx bn V ∗ bslots bn BSLOTS.
   Proof.
-    iIntros "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru".
-    (* the NBUF checkout tokens, as a function *)
+    iIntros (Hnc0) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
+    assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
+      by (vm_compute; reflexivity).
+    (* the NBUF checkout tokens and the NBUF recycle tokens, as functions *)
     iMod (tok_fun_alloc NBUF 0) as (fown) "Htoks".
+    iMod (tok_fun_alloc NBUF 0) as (fmid) "Hmids".
     (* the count authority (no buffer has a reference) and the slot supply *)
     iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
@@ -801,16 +1190,23 @@ Section BioInv.
             (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                           "buffer"%string (lock_tok_excl (fown k)))
             NBUF 0 with "Hsl") as (fslk) "#Hsls".
-    set (bn := MkBioNames γlk γb γs fslk fown).
+    set (bn := MkBioNames γlk γb γs fslk fown fmid).
+    (* every initial payload is empty: blockno 0 is uncovered *)
+    assert (Hpay0 : forall k bs,
+        buf_pay bn V k false (mword_of_int 0 : mword 32)
+          (mword_of_int 0 : mword 32) bs = emp%I).
+    { intros k bs. rewrite /buf_pay. case_decide as Hd; [|reflexivity].
+      exfalso. apply Hnc0. rewrite -Hu0. exact Hd. }
     (* park every buffer's content in a fresh escrow, keeping the bcache half
        of dev/blockno and the refcnt cell for [bcache_res] *)
-    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=> buf_escrow bn k) ∗
+    iDestruct (big_sepL_sep_2 with "Hbufs Hmids") as "Hbm".
+    iAssert (([∗ list] k ∈ seq 0 NBUF, |={E}=> buf_escrow bn V k) ∗
              ([∗ list] k ∈ seq 0 NBUF,
                 bio_slot_res bn ∅ k (mword_of_int 0 : mword 32)
                   (mword_of_int 0 : mword 32)))%I
-      with "[Hbufs]" as "[Hesc Hslots]".
-    { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbufs").
-      intros i k Hk. iIntros "(Hv & Hdk & Hdev & Hbno & Hrc & Hdata)".
+      with "[Hbm]" as "[Hesc Hslots]".
+    { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
+      intros i k Hk. iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
       (* the split every buffer's dev/blockno cell undergoes exactly once:
          one half into the escrow's parked bundle, one half into the bcache
          resource, forever. *)
@@ -819,16 +1215,32 @@ Section BioInv.
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
       iSplitR "Hrc Hdev2 Hbno2".
       - rewrite /buf_escrow.
-        iApply (inv_alloc bioN E (buf_escrow_body bn k)).
+        iApply (inv_alloc bioN E (buf_escrow_body bn V k)).
         iNext. iLeft. rewrite /buf_parked.
-        iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
+        iExists false, (mword_of_int 0 : mword 32),
                 (mword_of_int 0 : mword 32), bs.
-        iSplitR; [by iPureIntro; left|].
-        iFrame "Hv Hdev1". rewrite /buf_own. iFrame "Hbno1 Hdk Hdata". done.
+        rewrite Hpay0. cbv iota.
+        iFrame "Hv Hdev1 Hmid". rewrite /buf_own.
+        iFrame "Hbno1 Hdk Hdata". done.
       - rewrite /bio_slot_res lookup_empty. iFrame "Hrc Hdev2 Hbno2". }
     iMod (big_sepL_fupd with "Hesc") as "#Hescs".
+    (* the initial pool covers the whole range: the zeroed slots claim only
+       the uncovered 0 *)
+    iAssert (bio_pool V (fun _ => (mword_of_int 0 : mword 32)))
+      with "[Hpool]" as "Hpool".
+    { rewrite /bio_pool.
+      assert (Hc0 : bv_cov V ∖
+                    bcache_cached (fun _ => (mword_of_int 0 : mword 32))
+                    = bv_cov V).
+      { apply set_eq. intros b. rewrite elem_of_difference. split.
+        - intros [Hb _]. exact Hb.
+        - intros Hb. split; [exact Hb|]. intros Hc.
+          apply bcache_cached_spec in Hc as (j & Hj & ->).
+          apply Hnc0. rewrite -Hu0. exact Hb. }
+      rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock over the assembled resource *)
-    iMod ("Hmk" $! (bcache_res bn) with "[Hauth Hsa Hslots Hlru]") as "#Hlock".
+    iMod ("Hmk" $! (bcache_res bn V) with "[Hauth Hsa Hslots Hlru Hpool]")
+      as "#Hlock".
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),
@@ -838,9 +1250,15 @@ Section BioInv.
       { iPureIntro. intros k [x Hx]. rewrite lookup_empty in Hx. done. }
       iSplitR.
       { iPureIntro. symmetry. apply Permutation_rev. }
+      iSplitR.
+      { iPureIntro. intros k1 k2 Hk1 Hk2 Hcov _.
+        exfalso. apply Hnc0. rewrite -Hu0. exact Hcov. }
+      iSplitR.
+      { iPureIntro. intros k1 Hk1 Hcov.
+        exfalso. apply Hnc0. rewrite -Hu0. exact Hcov. }
       assert (Hml : map bnode (rev (seq 0 NBUF)) = blist 0 NBUF)
         by (rewrite /blist map_rev //).
-      rewrite Hml. iFrame "Hlru Hslots". }
+      rewrite Hml. iFrame "Hlru Hslots Hpool". }
     (* Split STRUCTURALLY before framing.  A bare [iFrame "H"] against this
        goal has to search [bio_ctx]'s big-op (NBUF sleeplocks + escrows) for
        each named hypothesis: the two frames here were 25 s of the file's

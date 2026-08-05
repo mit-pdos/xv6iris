@@ -58,6 +58,13 @@ are working on that effort — the relevant `projects/` file.
   types: the `SpecF.v` / sealed-functor / `LinkF.v` shape that keeps a function
   proof off its callees' proofs, so the build does not serialize along the
   kernel call graph.
+- **[`fs-log.md`](design/fs-log.md)** — the FS block layer (DESIGN, nothing
+  landed): the three block-content states (physical / durable / logged), the
+  `γL` logged-view ghost with its freeze-by-auth commit discipline, the
+  Ψ-parametric rework of the bio escrow (the coherent client view that
+  retires bread's mystery disjunct), the revised bread/bwrite/brelse
+  contracts, the `log_res` invariant and begin_op/end_op/log_write specs,
+  and the stage-4 `P_fs` plan with its two recorded open forks.
 - **[`file-table.md`](design/file-table.md)** — the open-file table: `struct
   file`'s geometry, the reference-count algebra (`auth (gmap nat (frac *
   positive))`) that ties `f->ref` to fractional ownership of the immutable
@@ -99,6 +106,12 @@ are working on that effort — the relevant `projects/` file.
   `BootShared` → `SystemAdequacy`). Remaining is future work only: the FS
   instantiation of `P_fs`/`Pc` (the theorem passes `True` today) and the
   torn-write knob. Design in [`design/crash.md`](design/crash.md).
+- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer: the staged
+  worklist for [`design/fs-log.md`](design/fs-log.md) — stage 1 the
+  Ψ-parametric bio rework (escrow arms, uncached pool in `bcache_res`, the
+  five revised specs re-proven), stage 2 `LogInv.v` + the log.c specs,
+  stage 3 their proofs, stage 4 the `P_fs` crash instantiation (gated on
+  the design doc's two open forks). Nothing landed yet.
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, `killed`, `sys_getpid`, `sys_close`,

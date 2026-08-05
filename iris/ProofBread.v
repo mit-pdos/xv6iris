@@ -25,17 +25,31 @@
    Five things carry it.
 
    * THE SCANS CARRY [BioInv.bcache_scan], the bcache resource with
-     its existentials OPEN.  The forward scan's exit fact is [devs k = dev /\
-     bnos k = bno] -- a statement about the functions [bcache_res] hides -- so
-     re-packaging the resource per iteration would lose the tie the instant it
-     was established and the minted [bref] could not be at the requested key.
+     its existentials OPEN.  The forward scan's exit facts are statements
+     about the functions [bcache_res] hides: POSITIVELY [devs k = dev /\
+     bnos k = bno] at a hit (or the minted [bref] would not be at the
+     requested key), and NEGATIVELY -- accumulated over the prefix it has
+     walked, and at the wrap over every slot -- [¬ (devs i = dev /\ bnos i =
+     bno)].  With the scan's DEV PIN (a slot claiming a covered block is on
+     the view's device) that negative tie becomes the recycle's MISS FACT
+     [∀ i, uint (bnos i) ≠ uint bno], which is what licenses the pool
+     exchange and re-establishes the covered-blockno injectivity.
 
    * THE FOUR ESCROW OPENS are each around ONE instruction, with the
      mask-carrying width-4 leaves of ProofBreadParts.v: the recycle block's
-     three field stores ([escrow_free_dev]/[_bno]/[_valid]) and the tail's
-     [lw a5,0(s1)] ([BioInv.escrow_swap_checkout]).  So the parked bundle is
-     whole at every instruction boundary, which is what makes the
-     recycler-vs-hit-thread race safe for free.
+     three field stores ([escrow_recyc_dev]/[_bno]/[_valid]) and the tail's
+     [lw a5,0(s1)] ([BioInv.escrow_swap_checkout]).  So no bundle is carried
+     across an instruction boundary, which is what makes the
+     recycler-vs-hit-thread race safe for free.  The three stores are NOT
+     symmetric: the dev store re-parks a normal arm (the payload is re-aimed
+     at the stored dev, legal because a covered payload pins its dev to the
+     view's device and the request is on it); the blockno store performs the
+     eviction (the old payload's clean bundle goes back to the pool) and the
+     pool withdrawal, and re-closes the escrow as the MID-RECYCLE WINDOW
+     (cells only, dev cell FULL, the recycle token in the recycler's hand);
+     the valid store closes the window, depositing the new block's pool
+     bundle in the now-INVALID parked arm for whoever wins the sleeplock
+     race to fill.
 
    * THE SENTINEL TESTS AT 0x2e AND 0x74 ARE DEAD.  [ord] is a permutation of
      [seq 0 NBUF] with NBUF = 30, hence nonempty, so head.next and head.prev
@@ -43,10 +57,16 @@
      panic arm at 0x84 is genuinely reachable (every buffer pinned) and is
      closed by [panic_wp].
 
-   * THE VALID PIN.  [buf_parked] pins b->valid to {0,1}, so the tail's
-     [c.beqz] fall-through arm KNOWS the cell holds 1 -- which is exactly what
-     [bio_locked] states -- and the taken arm knows it holds 0 and may
-     therefore be overwritten with 1 after the read.
+   * THE VALID BIT KEYS THE PAYLOAD.  [buf_parked] carries its valid cell at
+     [if v then 1 else 0] for a BOOL [v] that also selects the payload's
+     shape, so the tail's [c.beqz] does not merely learn a bit: the
+     fall-through arm (v = true) gets the block's disk cell and the client
+     payload indexing the buffer's own bytes, and assembles [bio_locked] with
+     NO disk read; the taken arm (v = false) gets the block's pool bundle,
+     spends it on [virtio_disk_rw] READ (which makes the bytes the disk's),
+     stores valid := 1 with the cell in its own hands, and assembles the
+     handle clean at the filled content.  BOTH arms are live on BOTH paths --
+     a racer can fill a buffer this thread recycled.
 
    * THE HART, AND WHERE IT CANNOT MOVE.  Every leaf returns through
      [wp_next b p (fun CID => ...)]; the rebound [CID] carries every resource
@@ -124,6 +144,17 @@ Proof.
   assert (Hlen : length (seq 0 NBUF) = 0%nat) by (rewrite -Hperm; reflexivity).
   rewrite length_seq in Hlen. unfold NBUF in Hlen. lia.
 Qed.
+
+(* every buffer index is somewhere in the order list: what turns the forward
+   scan's accumulated exit tie (over the list it walked) into the recycle's
+   per-slot miss fact. *)
+Lemma bd_ord_mem (ord : list nat) :
+  ord ≡ₚ seq 0 NBUF -> forall i, (i < NBUF)%nat -> i ∈ ord.
+Proof. intros Hperm i Hi. rewrite Hperm. apply elem_of_seq. lia. Qed.
+
+(* the scan's tie at the empty prefix *)
+Lemma bd_done_nil (P : nat -> Prop) : forall i, i ∈ ([] : list nat) -> P i.
+Proof. intros i Hi. apply elem_of_nil in Hi. destruct Hi. Qed.
 
 (* the head of a nonempty order list, as a split *)
 Lemma bd_ord_hd (ord : list nat) :
@@ -216,12 +247,12 @@ Section BreadDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
 
   Definition bd_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (j : nat) (γd : disk_names) (bn : bio_names)
+      (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (bs_disk : list (bv 8)) : iProp Σ :=
+      : iProp Σ :=
     wp_next eb pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (k : nat) (bs_out : list (bv 8)),
+      ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
         ⌜callee_saved m mf
          /\ mf !!! Regidx Ra0 = bnode k⌝ -∗
         sie_cap_gpr mf K eb pj -∗
@@ -230,8 +261,7 @@ Section BreadDefs.
         own_ctx (p_context pj) -∗
         park_hlf j true -∗
         p_pid pj ↦₄{dq} pidv -∗
-        bio_locked bn k pidv dev bno bs_out -∗
-        disk_block γd (uint bno) bs_disk -∗
+        bio_locked bn V k pidv dev bno bs bsd d -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
   (* Re-anchor [bd_cont] from the hart a block lemma entered at to the hart it
@@ -239,13 +269,12 @@ Section BreadDefs.
      this, but cannot see [wp_next]'s [K] through the named [Definition]
      (durable-notes), so it is re-proved here at the unfolded body. *)
   Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} (Φ : mval -> iProp Σ)
-      (j : nat) (γd : disk_names) (bn : bio_names)
+      (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (bs_disk : list (bv 8)) :
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) :
     (eb = false \/ pj = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    bd_cont (CID0 := CIDa) Φ j γd bn pidv dev bno dq m K eb pj C bs_disk -∗
-    bd_cont (CID0 := CIDb) Φ j γd bn pidv dev bno dq m K eb pj C bs_disk.
+    bd_cont (CID0 := CIDa) Φ j bn V pidv dev bno dq m K eb pj C -∗
+    bd_cont (CID0 := CIDb) Φ j bn V pidv dev bno dq m K eb pj C.
   Proof.
     intros Hs. rewrite /bd_cont /wp_next.
     iIntros "H" (CID2 Hs2). iApply "H". iPureIntro.
@@ -290,10 +319,10 @@ Section BreadBlocks.
   (* ================================================================== *)
 
   Local Lemma bread_epi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (j : nat) (γd : disk_names) (bn : bio_names) (k : nat)
+      (j : nat) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_out bs_disk : list (bv 8)) :
+      (bs_out bsd : list (bv 8)) (d : bool) :
     (K_bread <= K)%nat ->
     bd_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
@@ -305,16 +334,15 @@ Section BreadBlocks.
     own_ctx (p_context (proc_addr j)) -∗
     park_hlf j true -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    bio_locked bn k pidv dev bno bs_out -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bio_locked bn V k pidv dev bno bs_out bsd d -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros HK (HMsp & HMs2 & HMs3 & HMthr) HMs1.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                   (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg #Htext Hpc Hframe Hcnt Hoctx Hpark Hppid Hlk Hdisk Hcont".
+    iIntros "Hcg #Htext Hpc Hframe Hcnt Hoctx Hpark Hppid Hlk Hcont".
     rewrite /bd_frame.
     iDestruct "Hframe" as "(Hr40 & Hr32 & Hr24 & Hr16 & Hr8 & Hg0)".
     iDestruct "Hg0" as (vg0) "Hg0".
@@ -489,7 +517,7 @@ Section BreadBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /bd_cont.
     iSpecialize ("Hcont" $! CIDe8 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E7 k bs_out with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlk Hdisk").
+    iApply ("Hcont" $! E7 k bs_out bsd d with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlk").
     split; [| exact HE7a0].
     (* callee_saved m E7 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -539,13 +567,15 @@ Section BreadBlocks.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (k : nat) (q : Qp)
+      (bn : bio_names) (V : bio_view Σ) (k : nat) (q : Qp)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
+    bv_gd V = γd ->
+    uint bno ∈ bv_cov V ->
+    dev = bv_dev V ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     bd_regs m M ->
@@ -555,7 +585,7 @@ Section BreadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (BD + 0xb4) : mword 64) -∗
     panic_wp_any -∗
-    inv bioN (buf_escrow_body bn k) -∗
+    inv bioN (buf_escrow_body bn V k) -∗
     bd_frame m -∗
     cpu_own 0 eb (proc_addr j) C eb -∗
     procs_inv Φ γs -∗
@@ -570,14 +600,13 @@ Section BreadBlocks.
     sl_pid (buf_lock (bnode k)) ↦₄ pidv -∗
     bown bn k -∗
     bref bn k q dev bno -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hbno Hk Hj Hgl Hregs HMs1 Heb.
+    intros HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hregs HMs1 Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     iIntros "Hcg #Htext Hpc #Hpanic #Hesc Hframe Hcnt #Hprocs #Hscheds Hoctx Hpark Hppid".
-    iIntros "#Hdev #Hgeom #Hdlock Hstok Hpid Hbown Hbref Hdisk Hcont".
+    iIntros "#Hdev #Hgeom #Hdlock Hstok Hpid Hbown Hbref Hcont".
     iDestruct "Hbref" as "(Hrtok & Hrdev & Hrbno)".
     iPoseProof (bdi_b4 with "Htext") as "Hib4".
     iPoseProof (bdi_b6 with "Htext") as "Hib6".
@@ -589,25 +618,30 @@ Section BreadBlocks.
               (mword_of_int (BD + 0xb4)) Ra5 Rs1 (mword_of_int 0 : mword 12)
               M (K - 6)%nat
               (fun v : mword 32 =>
-                 (⌜v = (mword_of_int 0 : mword 32) \/ v = (mword_of_int 1 : mword 32)⌝ ∗
-                  b_valid (bpa k) ↦₄ v ∗
-                  b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
-                  ∃ bs : list (bv 8), buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs)%I)
+                 (∃ (vb : bool) (bs : list (bv 8)),
+                    ⌜v = (if vb then (mword_of_int 1 : mword 32)
+                          else (mword_of_int 0 : mword 32))⌝ ∗
+                    b_valid (bpa k) ↦₄ v ∗
+                    b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
+                    buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
+                    buf_pay bn V k vb dev bno bs)%I)
               (⊤ ∖ ↑minstretN ∖ ↑bioN) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(solve_ndisj)
               with "Hcg Hpc Hib4 [Hbown Hrtok Hrdev Hrbno] [-]").
     { iInv "Hesc" as ">Hbody" "Hclose".
-      iDestruct (escrow_swap_checkout bn k q dev bno
+      iDestruct (escrow_swap_checkout bn V k q dev bno
                    with "Hbody Hbown Hrtok Hrdev Hrbno") as "[Hbody Hpark2]".
-      iDestruct "Hpark2" as (vld bs) "(%Hpin & Hvld & Hbdev & Hbuf)".
-      iModIntro. iExists vld.
+      iDestruct "Hpark2" as (vb bs) "(Hvld & Hbdev & Hbuf & Hpay)".
+      iModIntro.
+      iExists (if vb then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)).
       iEval (rewrite -Hva) in "Hvld". iFrame "Hvld".
       iIntros "Hvld". iEval (rewrite Hva) in "Hvld".
       iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
-      iModIntro. iSplitR; [by iPureIntro|]. iFrame "Hvld Hbdev". by iExists bs. }
-    iIntros (vld CIDt1 Hst1) "Hcg Hpc (%Hpin & Hvld & Hbdev & Hbuf)".
-    iDestruct "Hbuf" as (bs) "Hbuf".
+      iModIntro. iExists vb, bs. iSplitR; [by iPureIntro|].
+      iFrame "Hvld Hbdev Hbuf Hpay". }
+    iIntros (vld CIDt1 Hst1) "Hcg Hpc H".
+    iDestruct "H" as (vb bs) "(%Hpin & Hvld & Hbdev & Hbuf & Hpay)".
     iDestruct (cpu_own_transport CID0 CIDt1 0%nat eb (proc_addr j) C eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     set (T1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 (vld : mword 32))]> M).
@@ -627,13 +661,56 @@ Section BreadBlocks.
     assert (Hppb6 : add_vec_int (mword_of_int (BD + 0xb4) : mword 64) 2 = mword_of_int (BD + 0xb6))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb6) in "Hpc".
-    destruct Hpin as [Hz | Ho].
+    destruct vb as [|]; cbv iota in Hpin.
+    - (* ============ b->valid = 1: straight to the epilogue ============ *)
+      (* a VALID covered buffer's parked payload says its bytes ARE the
+         block's logical content, with the disk cell alongside: the handle
+         assembles with no disk read at all. *)
+      iEval (rewrite Hpin) in "Hvld".
+      iAssert (∃ (bsd : list (bv 8)) (d : bool),
+                 disk_block (bv_gd V) (uint bno) bsd ∗
+                 bio_pay bn V k dev bno bs bsd d)%I with "[Hpay]" as "Hp".
+      { rewrite /buf_pay. case_decide as Hc; [| exfalso; exact (Hc Hcov)].
+        iDestruct "Hpay" as "[_ Hp]". iExact "Hp". }
+      iDestruct "Hp" as (bsd d) "[Hdb Hpy]".
+      assert (Hbeqz : eq_vec (T1 !!! Regidx Ra5) zero_reg = false).
+      { rewrite HT1a5 Hpin. exact bd_valid1_nonzero. }
+      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (BD + 0xb6)) (mword_of_int 9 : mword 8)
+                (Cregidx (mword_of_int 7)) Ra5 T1 (K - 6)%nat eb
+                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
+                ltac:(rgne; exact Hbeqz)
+                with "Hcg Hpc Hib6 [-]").
+      iIntros (CIDv2 Hsv2) "Hcg Hpc".
+      assert (Hppb8 : add_vec_int (mword_of_int (BD + 0xb6) : mword 64) 2 = mword_of_int (BD + 0xb8))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hppb8) in "Hpc".
+      iDestruct (cpu_own_transport CIDt1 CIDv2 0%nat eb (proc_addr j) C eb
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDv2) Φ j bn V pidv dev bno dq
+                   m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iApply (bread_epi (CID0 := CIDv2) Φ j bn V k pidv dev bno dq m T1 K eb C
+                bs bsd d HK HT1regs HT1s1
+                with "Hcg Htext Hpc Hframe Hcnt Hoctx Hpark Hppid
+                      [Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy] Hcont").
+      rewrite /bio_locked /bio_held /bpa.
+      iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|].
+      iSplitR; [by iPureIntro|].
+      iFrame "Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy".
     - (* ============ b->valid = 0: the disk read ============ *)
+      (* the parked payload of an INVALID covered buffer IS the block's pool
+         bundle: whoever wins the sleeplock race after a recycle finds it
+         here and does the fill.  That is this thread. *)
+      iAssert (pool_blk V (uint bno)) with "[Hpay]" as "Hpool".
+      { rewrite /buf_pay. case_decide as Hc; [| exfalso; exact (Hc Hcov)].
+        iDestruct "Hpay" as "[_ Hp]". iExact "Hp". }
+      iDestruct "Hpool" as (bsl) "[Hdb Hcl]".
+      iEval (rewrite Hgd) in "Hdb".
       iPoseProof (bdi_c8 with "Htext") as "Hic8".
       iPoseProof (bdi_ca with "Htext") as "Hica".
       iPoseProof (bdi_cc with "Htext") as "Hicc".
       assert (Hbeqz : eq_vec (T1 !!! Regidx Ra5) zero_reg = true).
-      { rewrite HT1a5 Hz. exact brc_word_zero_eqv. }
+      { rewrite HT1a5 Hpin. exact brc_word_zero_eqv. }
       iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (BD + 0xb6)) (mword_of_int 9 : mword 8)
                 (Cregidx (mword_of_int 7)) Ra5 T1 (K - 6)%nat eb
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -709,18 +786,19 @@ Section BreadBlocks.
       iDestruct (cpu_own_transport CIDt1 CIDt5 0%nat eb (proc_addr j) C eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu T4
-                (K - 6)%nat eb C bno (mword_of_int 0 : mword 32) bs bs_disk eb
+                (K - 6)%nat eb C bno (mword_of_int 0 : mword 32) bs bsl eb
                 HKrw Hbno Hkdata Hj Hgl Heb
                 with "Hcg Hcnt Htext Hpc Hpanic Hprocs Hscheds Hoctx Hpark
-                      Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
+                      Hdev Hgeom Hdlock [Hbuf] Hdb [-]").
       { iEval (rewrite HT4a0). rewrite /bpa. iExact "Hbuf". }
       (* rw PARKS: it returns on hart [CIDrw]. *)
-      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk".
+      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdb".
       iPoseProof (bdi_d0 with "Htext") as "Hid0".
       iPoseProof (bdi_d2 with "Htext") as "Hid2".
       iPoseProof (bdi_d4 with "Htext") as "Hid4".
-      iEval (rewrite (bd_wr_false _ bs bs_disk HT4a1)) in "Hbuf".
-      iEval (rewrite (bd_wr_false _ bs bs_disk HT4a1)) in "Hdisk".
+      iEval (rewrite (bd_wr_false _ bs bsl HT4a1)) in "Hbuf".
+      iEval (rewrite (bd_wr_false _ bs bsl HT4a1)) in "Hdb".
+      iEval (rewrite -Hgd) in "Hdb".
       iEval (rewrite HT4a0) in "Hbuf".
       assert (Hpcd0 : ret_pc (T4 !!! Regidx Rra) = mword_of_int (BD + 0xd0)).
       { rewrite HT4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -796,39 +874,19 @@ Section BreadBlocks.
           exact (HMthr c Hcs N2 N8 N9 N18 N19 N4). }
       iDestruct (cpu_own_transport CIDrw CIDt8 0%nat eb (proc_addr j) C eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDt8) Φ j γd bn pidv dev bno dq
-                   m K eb (proc_addr j) C bs_disk ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (bread_epi (CID0 := CIDt8) Φ j γd bn k pidv dev bno dq m T5 K eb C bs_disk bs_disk
-                HK HT5regs HT5s1
+      iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDt8) Φ j bn V pidv dev bno dq
+                   m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iAssert (bio_pay bn V k dev bno bsl bsl false) with "[Hcl]" as "Hpy".
+      { rewrite /bio_pay. cbv iota. iFrame "Hcl". done. }
+      iApply (bread_epi (CID0 := CIDt8) Φ j bn V k pidv dev bno dq m T5 K eb C
+                bsl bsl false HK HT5regs HT5s1
                 with "Hcg Htext Hpc Hframe Hcnt Hoctx Hpark Hppid
-                      [Hstok Hpid Hvld Hbdev Hbuf] Hdisk Hcont").
-      rewrite /bio_locked /bpa.
+                      [Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy] Hcont").
+      rewrite /bio_locked /bio_held /bpa.
       iSplitR; [by iPureIntro|].
-      iFrame "Hstok Hpid Hvld Hbdev Hbuf".
-    - (* ============ b->valid = 1: straight to the epilogue ============ *)
-      iEval (rewrite Ho) in "Hvld".
-      assert (Hbeqz : eq_vec (T1 !!! Regidx Ra5) zero_reg = false).
-      { rewrite HT1a5 Ho. exact bd_valid1_nonzero. }
-      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (BD + 0xb6)) (mword_of_int 9 : mword 8)
-                (Cregidx (mword_of_int 7)) Ra5 T1 (K - 6)%nat eb
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                ltac:(rgne; exact Hbeqz)
-                with "Hcg Hpc Hib6 [-]").
-      iIntros (CIDv2 Hsv2) "Hcg Hpc".
-      assert (Hppb8 : add_vec_int (mword_of_int (BD + 0xb6) : mword 64) 2 = mword_of_int (BD + 0xb8))
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hppb8) in "Hpc".
-      iDestruct (cpu_own_transport CIDt1 CIDv2 0%nat eb (proc_addr j) C eb
-                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDv2) Φ j γd bn pidv dev bno dq
-                   m K eb (proc_addr j) C bs_disk ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (bread_epi (CID0 := CIDv2) Φ j γd bn k pidv dev bno dq m T1 K eb C bs bs_disk
-                HK HT1regs HT1s1
-                with "Hcg Htext Hpc Hframe Hcnt Hoctx Hpark Hppid
-                      [Hstok Hpid Hvld Hbdev Hbuf] Hdisk Hcont").
-      rewrite /bio_locked /bpa.
       iSplitR; [by iPureIntro|].
-      iFrame "Hstok Hpid Hvld Hbdev Hbuf".
+      iSplitR; [by iPureIntro|].
+      iFrame "Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy".
   Qed.
 
   (* ================================================================== *)
@@ -841,16 +899,18 @@ Section BreadBlocks.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (k : nat)
+      (bn : bio_names) (V : bio_view Σ) (k : nat)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
     devs k = dev ->
     bnos k = bno ->
+    bv_gd V = γd ->
+    uint bno ∈ bv_cov V ->
+    dev = bv_dev V ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     bd_regs m M ->
@@ -860,12 +920,12 @@ Section BreadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (BD + 0x48) : mword 64) -∗
     panic_wp_any -∗
-    bio_ctx bn -∗
+    bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
     trap_csrs_pay 0 eb -∗
     locked (bn_lk bn) cpu_id -∗
-    bcache_scan bn Mg ord devs bnos -∗
+    bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -875,16 +935,15 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hbno Hk Hdevs Hbnos Hj Hgl Hregs HMs1 Heb.
+    intros HK Hbno Hk Hdevs Hbnos Hgd Hcov Hdv Hj Hgl Hregs HMs1 Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     iIntros "Hcg #Htext Hpc #Hpanic #Hbio Hframe Hcnt Hpay Htok Hscan Hbslot".
-    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hdisk Hcont".
+    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hcont".
     iDestruct (bio_ctx_lock with "Hbio") as "#Hlock".
-    iDestruct (bio_ctx_buf bn k Hk with "Hbio") as "[#Hslk #Hesc0]".
+    iDestruct (bio_ctx_buf bn V k Hk with "Hbio") as "[#Hslk #Hesc0]".
     iDestruct (buf_escrow_inv with "Hesc0") as "#Hesc".
     iPoseProof (bdi_48 with "Htext") as "Hi48".
     iPoseProof (bdi_4a with "Htext") as "Hi4a".
@@ -894,7 +953,7 @@ Section BreadBlocks.
     iPoseProof (bdi_56 with "Htext") as "Hi56".
     iPoseProof (bdi_5a with "Htext") as "Hi5a".
     iPoseProof (bdi_5e with "Htext") as "Hi5e".
-    iDestruct (bcache_scan_incr bn Mg ord devs bnos k Hk with "Hscan Hbslot")
+    iDestruct (bcache_scan_incr bn V Mg ord devs bnos k Hk with "Hscan Hbslot")
       as (cw) "[Hcell Hclose]".
     (* ---- +0x48 c.lw a5,64(s1) ---- *)
     assert (Hpa : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
@@ -1002,7 +1061,7 @@ Section BreadBlocks.
       by (rewrite /H5 upd_ne; [exact HH4a0 | vm_compute; discriminate]).
     assert (HH5ra : H5 !!! Regidx Rra = add_vec_int (mword_of_int (BD + 0x56) : mword 64) 4)
       by (rewrite /H5; apply upd_eq).
-    iApply (R.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) H5
+    iApply (R.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) H5
               0%nat eb (proc_addr j) C (K - 6)%nat
               ltac:(rewrite HH5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(unfold K_bread in HK; lia)
@@ -1093,12 +1152,12 @@ Section BreadBlocks.
     iEval (rewrite Htgtb4) in "Hpc".
     iDestruct (cpu_own_transport CIDs CIDh3 0%nat eb (proc_addr j) C eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDh3) Φ j γd bn pidv dev bno dq
-                 m K eb (proc_addr j) C bs_disk ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (bread_tail (CID0 := CIDh3) Φ γs j γl γu γd γk pd pav pu bn k qref pidv dev bno dq
-              m mf K eb C bs_disk HK Hbno Hk Hj Hgl Hmfregs Hmfs1 Heb
+    iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDh3) Φ j bn V pidv dev bno dq
+                 m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iApply (bread_tail (CID0 := CIDh3) Φ γs j γl γu γd γk pd pav pu bn V k qref pidv dev bno dq
+              m mf K eb C HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1 Heb
               with "Hcg Htext Hpc Hpanic Hesc Hframe Hcnt Hprocs Hscheds Hoctx Hpark Hppid
-                    Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hdisk Hcont").
+                    Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hcont").
   Qed.
 
   (* ================================================================== *)
@@ -1112,15 +1171,20 @@ Section BreadBlocks.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (k : nat)
+      (bn : bio_names) (V : bio_view Σ) (k : nat)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
     Mg !! k = None ->
+    bv_gd V = γd ->
+    uint bno ∈ bv_cov V ->
+    dev = bv_dev V ->
+    (* the forward scan's exit tie, at EVERY slot: the block really is
+       uncached, which is what licenses the pool exchange *)
+    (forall i, (i < NBUF)%nat -> ¬ (devs i = dev /\ bnos i = bno)) ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
     m !!! Regidx Ra1 = sign_extend' 64 bno ->
     (j < NPROC)%nat ->
@@ -1132,12 +1196,12 @@ Section BreadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (BD + 0x90) : mword 64) -∗
     panic_wp_any -∗
-    bio_ctx bn -∗
+    bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
     trap_csrs_pay 0 eb -∗
     locked (bn_lk bn) cpu_id -∗
-    bcache_scan bn Mg ord devs bnos -∗
+    bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -1147,16 +1211,15 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hbno Hk HMk Ha0 Ha1 Hj Hgl Hregs HMs1 Heb.
+    intros HK Hbno Hk HMk Hgd Hcov Hdv Htie Ha0 Ha1 Hj Hgl Hregs HMs1 Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     iIntros "Hcg #Htext Hpc #Hpanic #Hbio Hframe Hcnt Hpay Htok Hscan Hbslot".
-    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hdisk Hcont".
+    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hcont".
     iDestruct (bio_ctx_lock with "Hbio") as "#Hlock".
-    iDestruct (bio_ctx_buf bn k Hk with "Hbio") as "[#Hslk #Hesc0]".
+    iDestruct (bio_ctx_buf bn V k Hk with "Hbio") as "[#Hslk #Hesc0]".
     iDestruct (buf_escrow_inv with "Hesc0") as "#Hesc".
     iPoseProof (bdi_90 with "Htext") as "Hi90".
     iPoseProof (bdi_94 with "Htext") as "Hi94".
@@ -1190,8 +1253,10 @@ Section BreadBlocks.
       by (rgne; rewrite Hx0; exact bd_trunc32_zero).
     (* the recycle ghost step: the auth, the refcnt cell at 0 and the two
        bcache halves out; the closing wand mints the chain's reference. *)
-    iDestruct (bcache_scan_recycle bn Mg ord devs bnos k Hk HMk with "Hscan Hbslot")
-      as "(Hauth & Hcell & Hdevs & Hbnos & Hclose)".
+    iDestruct (bcache_scan_recycle bn V Mg ord devs bnos k dev bno
+                 Hk HMk Hdv Hcov Htie with "Hscan Hbslot")
+      as "(%Hpure & Hauth & Hcell & Hdevs & Hbnos & Hpool & Hclose)".
+    destruct Hpure as [Hmiss Huniq].
     (* ---- +0x90 sw s2,8(s1) : b->dev = dev ---- *)
     iApply (wp_sw_au_s_sconf Φ false (mword_of_int (BD + 0x90)) Rs2 Rs1
               (mword_of_int 8 : mword 12) M (K - 6)%nat
@@ -1199,12 +1264,12 @@ Section BreadBlocks.
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
               with "Hcg Hpc Hi90 [Hauth Hdevs] [-]").
     { iInv "Hesc" as ">Hbody" "Hclose2".
-      iDestruct (escrow_free_dev bn k Mg (devs k) HMk with "Hauth Hbody Hdevs")
-        as "(Hauth & Hfull & Hback)".
+      iDestruct (escrow_recyc_dev bn V k Mg (devs k) dev HMk Hdv
+                   with "Hauth Hbody Hdevs") as "(Hauth & Hfull & Hback)".
       iModIntro. iExists (devs k).
       iEval (rewrite -Hadev) in "Hfull". iFrame "Hfull".
       iIntros "Hfull". iEval (rewrite Hadev Hsvdev) in "Hfull".
-      iDestruct ("Hback" $! dev with "Hfull") as "[Hbody Hhalf]".
+      iDestruct ("Hback" with "Hfull") as "[Hbody Hhalf]".
       iMod ("Hclose2" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
       iModIntro. iFrame "Hauth Hhalf". }
     iApply wp_next_off_intro.
@@ -1212,44 +1277,58 @@ Section BreadBlocks.
     assert (Hpp94 : add_vec_int (mword_of_int (BD + 0x90) : mword 64) 4 = mword_of_int (BD + 0x94))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp94) in "Hpc".
-    (* ---- +0x94 sw s3,12(s1) : b->blockno = blockno ---- *)
+    (* ---- +0x94 sw s3,12(s1) : b->blockno = blockno ----
+       THE CACHE MEMBERSHIP MOVES HERE, so this is where the pool exchange
+       happens and where the escrow enters its mid-recycle window (cells
+       only, dev cell FULL, the recycle token out in our hand). *)
     iApply (wp_sw_au_s_sconf Φ false (mword_of_int (BD + 0x94)) Rs3 Rs1
               (mword_of_int 12 : mword 12) M (K - 6)%nat
-              (own (bn_auth bn) (● Mg) ∗ b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno)%I
+              (own (bn_auth bn) (● Mg) ∗ bmid bn k ∗ pool_blk V (uint bno) ∗
+               b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno ∗
+               bio_pool V (bfun_upd bnos k bno))%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi94 [Hauth Hbnos] [-]").
+              with "Hcg Hpc Hi94 [Hauth Hdevs Hbnos Hpool] [-]").
     { iInv "Hesc" as ">Hbody" "Hclose2".
-      iDestruct (escrow_free_bno bn k Mg (bnos k) HMk with "Hauth Hbody Hbnos")
+      iDestruct (escrow_recyc_bno bn V k Mg bnos dev bno
+                   HMk Hk Hcov Hmiss Huniq Hdv
+                   with "Hauth Hbody Hdevs Hbnos Hpool")
         as "(Hauth & Hfull & Hback)".
       iModIntro. iExists (bnos k).
       iEval (rewrite -Habno) in "Hfull". iFrame "Hfull".
       iIntros "Hfull". iEval (rewrite Habno Hsvbno) in "Hfull".
-      iDestruct ("Hback" $! bno with "Hfull") as "[Hbody Hhalf]".
+      iDestruct ("Hback" with "Hfull")
+        as "(Hbody & Hbmid & HpoolB & Hbnos & Hpool)".
       iMod ("Hclose2" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
-      iModIntro. iFrame "Hauth Hhalf". }
+      iModIntro. iFrame "Hauth Hbmid HpoolB Hbnos Hpool". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc [Hauth Hbnos]".
+    iIntros "Hcg Hpc (Hauth & Hbmid & HpoolB & Hbnos & Hpool)".
     assert (Hpp98 : add_vec_int (mword_of_int (BD + 0x94) : mword 64) 4 = mword_of_int (BD + 0x98))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp98) in "Hpc".
-    (* ---- +0x98 sw zero,0(s1) : b->valid = 0 ---- *)
+    (* ---- +0x98 sw zero,0(s1) : b->valid = 0 ----
+       the recycle token refutes both normal arms, so what we reopen is the
+       window we parked; the stored 0 makes the arm INVALID and deposits the
+       new block's pool bundle for whoever wins the sleeplock race. *)
     iApply (wp_sw_au_s_sconf Φ false (mword_of_int (BD + 0x98)) Rz Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat
-              (own (bn_auth bn) (● Mg))%I
+              (own (bn_auth bn) (● Mg) ∗
+               b_dev (bpa k) ↦₄{DfracOwn (1/2)} (bv_dev V) ∗
+               b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno)%I
               (⊤ ∖ ↑minstretN ∖ ↑bioN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi98 [Hauth] [-]").
+              with "Hcg Hpc Hi98 [Hauth Hbmid HpoolB Hbnos] [-]").
     { iInv "Hesc" as ">Hbody" "Hclose2".
-      iDestruct (escrow_free_valid bn k Mg HMk with "Hauth Hbody")
-        as "(Hauth & Hvld & Hback)".
+      iDestruct (escrow_recyc_valid bn V k bno Hcov
+                   with "Hbmid Hbody Hbnos HpoolB") as "(Hvld & Hbnos & Hback)".
       iDestruct "Hvld" as (vld) "Hvld".
       iModIntro. iExists vld.
       iEval (rewrite -Hava) in "Hvld". iFrame "Hvld".
       iIntros "Hvld". iEval (rewrite Hava Hsvz) in "Hvld".
-      iDestruct ("Hback" with "Hvld") as "Hbody".
+      iDestruct ("Hback" with "Hvld") as "[Hbody Hdevs]".
       iMod ("Hclose2" with "[Hbody]") as "_". { iNext. iExact "Hbody". }
-      iModIntro. iFrame "Hauth". }
+      iModIntro. iFrame "Hauth Hdevs Hbnos". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Hauth".
+    iIntros "Hcg Hpc (Hauth & Hdevs & Hbnos)".
+    iEval (rewrite -Hdv) in "Hdevs".
     assert (Hpp9c : add_vec_int (mword_of_int (BD + 0x98) : mword 64) 4 = mword_of_int (BD + 0x9c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp9c) in "Hpc".
@@ -1284,7 +1363,7 @@ Section BreadBlocks.
     assert (Hstv : trunc32 (rget C1 Ra5) = (mword_of_int 1 : mword 32)).
     { rgne. rewrite HC1a5. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hstv) in "Hcell".
-    iMod ("Hclose" $! dev bno with "Hauth Hcell Hdevs Hbnos") as "[HRres Href]".
+    iMod ("Hclose" with "Hauth Hcell Hdevs Hbnos Hpool") as "[HRres Href]".
     assert (Hppa0 : add_vec_int (mword_of_int (BD + 0x9e) : mword 64) 2 = mword_of_int (BD + 0xa0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa0) in "Hpc".
@@ -1337,7 +1416,7 @@ Section BreadBlocks.
       by (rewrite /C4 upd_ne; [exact HC3a0 | vm_compute; discriminate]).
     assert (HC4ra : C4 !!! Regidx Rra = add_vec_int (mword_of_int (BD + 0xa8) : mword 64) 4)
       by (rewrite /C4; apply upd_eq).
-    iApply (R.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) C4
+    iApply (R.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) C4
               0%nat eb (proc_addr j) C (K - 6)%nat
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(unfold K_bread in HK; lia)
@@ -1412,12 +1491,12 @@ Section BreadBlocks.
       - rewrite (HmfX Rs3 ltac:(vm_compute; reflexivity)). exact HMs3.
       - intros c Hcs N2 N8 N9 N18 N19 N4.
         rewrite (HmfX c Hcs). exact (HMthr c Hcs N2 N8 N9 N18 N19 N4). }
-    iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDs) Φ j γd bn pidv dev bno dq
-                 m K eb (proc_addr j) C bs_disk ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (bread_tail (CID0 := CIDs) Φ γs j γl γu γd γk pd pav pu bn k (1/4)%Qp pidv dev bno dq
-              m mf K eb C bs_disk HK Hbno Hk Hj Hgl Hmfregs Hmfs1 Heb
+    iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDs) Φ j bn V pidv dev bno dq
+                 m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iApply (bread_tail (CID0 := CIDs) Φ γs j γl γu γd γk pd pav pu bn V k (1/4)%Qp pidv dev bno dq
+              m mf K eb C HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1 Heb
               with "Hcg Htext Hpc Hpanic Hesc Hframe Hcnt Hprocs Hscheds Hoctx Hpark Hppid
-                    Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hdisk Hcont").
+                    Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hcont").
   Qed.
 
   (* ================================================================== *)
@@ -1440,17 +1519,21 @@ Section BreadBlocks.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
+      (bn : bio_names) (V : bio_view Σ)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) (n : nat) :
+      (n : nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
     m !!! Regidx Ra1 = sign_extend' 64 bno ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
+    bv_gd V = γd ->
+    uint bno ∈ bv_cov V ->
+    dev = bv_dev V ->
+    (forall i, (i < NBUF)%nat -> ¬ (devs i = dev /\ bnos i = bno)) ->
     forall (pre post : list nat) (M : regfile),
     (length pre <= n)%nat ->
     ord = (pre ++ post)%list ->
@@ -1463,12 +1546,12 @@ Section BreadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (BD + 0x7a) : mword 64) -∗
     panic_wp_any -∗
-    bio_ctx bn -∗
+    bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
     trap_csrs_pay 0 eb -∗
     locked (bn_lk bn) cpu_id -∗
-    bcache_scan bn Mg ord devs bnos -∗
+    bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -1478,24 +1561,24 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hbno Ha0 Ha1 Hj Hgl.
+    intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie.
     induction n as [|n IH];
       intros pre post M Hlen Hord Hne Hregs HMs1 HMa4 Heb.
     { exfalso. destruct pre as [|x l]; [congruence | cbn in Hlen; lia]. }
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     destruct (bd_ord_last pre Hne) as (d & kk & Hpre).
     iIntros "Hcg #Htext Hpc #Hpanic #Hbio Hframe Hcnt Hpay Htok Hscan Hbslot".
-    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hdisk Hcont".
+    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hcont".
     iPoseProof (bdi_7a with "Htext") as "Hi7a".
     iPoseProof (bdi_7c with "Htext") as "Hi7c".
     iPoseProof (bdi_7e with "Htext") as "Hi7e".
     iPoseProof (bdi_80 with "Htext") as "Hi80".
     rewrite /bcache_scan.
-    iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hordp & Hlru & Hslots)".
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hordp & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
     assert (Hord2 : ord = (d ++ kk :: post)%list)
       by (rewrite Hord Hpre -app_assoc; reflexivity).
     assert (Hkk : (kk < NBUF)%nat) by exact (bord_split_lt ord d post kk Hordp Hord2).
@@ -1504,7 +1587,7 @@ Section BreadBlocks.
     (* ---- +0x7a c.lw a5,64(s1) : the refcnt, borrowed out of its slot ---- *)
     iDestruct (bio_slots_acc bn Mg devs bnos kk Hkk with "Hslots") as "[Hslot Hback]".
     iDestruct (bio_slot_refcnt_acc bn Mg kk (devs kk) (bnos kk) with "Hslot")
-      as (cw) "(Hcell & %Htie & Hbackslot)".
+      as (cw) "(Hcell & %Hrct & Hbackslot)".
     assert (Hpa : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                   = brefcnt kk).
     { rgne. rewrite Hcur bd_s64. rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
@@ -1538,7 +1621,7 @@ Section BreadBlocks.
     assert (Hpp7c : add_vec_int (mword_of_int (BD + 0x7a) : mword 64) 2 = mword_of_int (BD + 0x7c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7c) in "Hpc".
-    destruct Htie as [[Hwz HMkNone] | [Hwnz _]].
+    destruct Hrct as [[Hwz HMkNone] | [Hwnz _]].
     - (* ======== refcnt == 0: this buffer is free, RECYCLE it ======== *)
       assert (Hbeqz : eq_vec (B1 !!! Regidx Ra5) zero_reg = true)
         by (rewrite HB1a5; exact Hwz).
@@ -1554,17 +1637,19 @@ Section BreadBlocks.
                        = mword_of_int (BD + 0x90))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt90) in "Hpc".
-      iAssert (bcache_scan bn Mg ord devs bnos)
-        with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+      iAssert (bcache_scan bn V Mg ord devs bnos)
+        with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
       { rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR; [iPureIntro; exact Hdom|].
         iSplitR; [iPureIntro; exact Hordp|].
-        iFrame "Hlru Hslots". }
-      iApply (bread_recyc (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn kk Mg ord devs bnos
-                pidv dev bno dq m B1 K eb C bs_disk
-                HK Hbno Hkk HMkNone Ha0 Ha1 Hj Hgl HB1regs HB1s1 Heb
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
+      iApply (bread_recyc (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn V kk Mg ord devs bnos
+                pidv dev bno dq m B1 K eb C
+                HK Hbno Hkk HMkNone Hgd Hcov Hdv Htie Ha0 Ha1 Hj Hgl HB1regs HB1s1 Heb
                 with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                      Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont").
+                      Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont").
     - (* ======== refcnt <> 0: advance to b->prev ======== *)
       assert (Hbeqz : eq_vec (B1 !!! Regidx Ra5) zero_reg = false)
         by (rewrite HB1a5; exact Hwnz).
@@ -1616,12 +1701,14 @@ Section BreadBlocks.
           rewrite /B1 upd_ne; [| apply not_eq_sym; apply is_cs_idx_true_neq;
                                  [vm_compute; reflexivity | assumption]].
           exact (HMthr c Hcs N2 N8 N9 N18 N19 N4). }
-      iAssert (bcache_scan bn Mg ord devs bnos)
-        with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+      iAssert (bcache_scan bn V Mg ord devs bnos)
+        with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
       { rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR; [iPureIntro; exact Hdom|].
         iSplitR; [iPureIntro; exact Hordp|].
-        iFrame "Hlru Hslots". }
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
       assert (Hpp80 : add_vec_int (mword_of_int (BD + 0x7e) : mword 64) 2 = mword_of_int (BD + 0x80))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp80) in "Hpc".
@@ -1702,7 +1789,7 @@ Section BreadBlocks.
         { rewrite Hpre length_app in Hlen. cbn in Hlen. lia. }
         iApply (IH d (kk :: post) B2 Hlen' Hord2 Hdne HB2regs HB2s1 HB2a4 Heb
                   with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont").
+                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont").
   Qed.
 
   (* ================================================================== *)
@@ -1716,17 +1803,20 @@ Section BreadBlocks.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
+      (bn : bio_names) (V : bio_view Σ)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
     m !!! Regidx Ra1 = sign_extend' 64 bno ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
+    bv_gd V = γd ->
+    uint bno ∈ bv_cov V ->
+    dev = bv_dev V ->
+    (forall i, (i < NBUF)%nat -> ¬ (devs i = dev /\ bnos i = bno)) ->
     ord ≡ₚ seq 0 NBUF ->
     bd_regs m M ->
     eb = true ->
@@ -1735,12 +1825,12 @@ Section BreadBlocks.
     pc_is (mword_of_int (BD + 0x64) : mword 64) -∗
     (* (the arrival map's s1 is irrelevant: 0x64 overwrites it) *)
     panic_wp_any -∗
-    bio_ctx bn -∗
+    bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
     trap_csrs_pay 0 eb -∗
     locked (bn_lk bn) cpu_id -∗
-    bcache_scan bn Mg ord devs bnos -∗
+    bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -1750,17 +1840,16 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hbno Ha0 Ha1 Hj Hgl Hordp Hregs Heb.
+    intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie Hordp Hregs Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     destruct (bd_ord_last ord (bd_ord_nonnil ord Hordp)) as (d0 & k0 & Hordl).
     assert (Hk0 : (k0 < NBUF)%nat)
       by exact (bord_split_lt ord d0 [] k0 Hordp Hordl).
     iIntros "Hcg #Htext Hpc #Hpanic #Hbio Hframe Hcnt Hpay Htok Hscan Hbslot".
-    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hdisk Hcont".
+    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hcont".
     iPoseProof (bdi_64 with "Htext") as "Hi64".
     iPoseProof (bdi_68 with "Htext") as "Hi68".
     iPoseProof (bdi_6c with "Htext") as "Hi6c".
@@ -1768,7 +1857,8 @@ Section BreadBlocks.
     iPoseProof (bdi_74 with "Htext") as "Hi74".
     iPoseProof (bdi_78 with "Htext") as "Hi78".
     rewrite /bcache_scan.
-    iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hordp2 & Hlru & Hslots)".
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hordp2 & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
     (* ---- +0x64 auipc s1,0x1e ---- *)
     iApply (wp_auipc_s_sconf Φ (mword_of_int (BD + 0x64)) Rs1 (mword_of_int 30 : mword 20)
               M (K - 6)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1885,22 +1975,24 @@ Section BreadBlocks.
         exact HMs3.
       - intros c Hcs N2 N8 N9 N18 N19 N4.
         rewrite (HQ5thr c Hcs N9). exact (HMthr c Hcs N2 N8 N9 N18 N19 N4). }
-    iAssert (bcache_scan bn Mg ord devs bnos)
-      with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+    iAssert (bcache_scan bn V Mg ord devs bnos)
+      with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
     { rewrite /bcache_scan. iFrame "Hauth Hsauth".
       iSplitR; [iPureIntro; exact Hdom|].
       iSplitR; [iPureIntro; exact Hordp2|].
-      iFrame "Hlru Hslots". }
+      iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
     assert (Hpp7a : add_vec_int (mword_of_int (BD + 0x78) : mword 64) 2 = mword_of_int (BD + 0x7a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7a) in "Hpc".
-    iApply (bread_bloop (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn Mg ord devs bnos
-              pidv dev bno dq m K eb C bs_disk (length ord)
-              HK Hbno Ha0 Ha1 Hj Hgl ord [] Q5
+    iApply (bread_bloop (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn V Mg ord devs bnos
+              pidv dev bno dq m K eb C (length ord)
+              HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie ord [] Q5
               ltac:(reflexivity) ltac:(rewrite app_nil_r; reflexivity)
               (bd_ord_nonnil ord Hordp) HQ5regs HQ5s1 HQ5a4 Heb
               with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                    Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont").
+                    Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont").
   Qed.
 
   (* ================================================================== *)
@@ -1919,22 +2011,29 @@ Section BreadBlocks.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
+      (bn : bio_names) (V : bio_view Σ)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) (n : nat) :
+      (n : nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
     m !!! Regidx Ra1 = sign_extend' 64 bno ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
+    bv_gd V = γd ->
+    uint bno ∈ bv_cov V ->
+    dev = bv_dev V ->
     ord ≡ₚ seq 0 NBUF ->
     forall (done rest : list nat) (M : regfile),
     (length rest <= n)%nat ->
     ord = (done ++ rest)%list ->
     rest <> [] ->
+    (* the scan's ACCUMULATED exit tie: no slot already visited matches the
+       request.  At the wrap it covers the whole order list, which is what
+       upgrades (with the scan's dev pin) to the recycle's miss fact. *)
+    (forall i, i ∈ done -> ¬ (devs i = dev /\ bnos i = bno)) ->
     bd_regs m M ->
     M !!! Regidx Rs1 = List.hd bhead (map bnode rest) ->
     M !!! Regidx Ra4 = bhead ->
@@ -1943,12 +2042,12 @@ Section BreadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (BD + 0x3c) : mword 64) -∗
     panic_wp_any -∗
-    bio_ctx bn -∗
+    bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
     trap_csrs_pay 0 eb -∗
     locked (bn_lk bn) cpu_id -∗
-    bcache_scan bn Mg ord devs bnos -∗
+    bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -1958,13 +2057,12 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    disk_block γd (uint bno) bs_disk -∗
-    bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+    bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hbno Ha0 Ha1 Hj Hgl Hordp.
+    intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Hordp.
     induction n as [|n IH];
-      intros done rest M Hlen Hord Hne Hregs HMs1 HMa4 Heb.
+      intros done rest M Hlen Hord Hne Hdone Hregs HMs1 HMa4 Heb.
     { exfalso. destruct rest as [|x l]; [congruence | cbn in Hlen; lia]. }
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     destruct (bd_ord_hd rest Hne) as (kk & r & Hrest).
@@ -1973,7 +2071,7 @@ Section BreadBlocks.
     assert (Hcur : M !!! Regidx Rs1 = bnode kk)
       by (rewrite HMs1 Hrest; apply bcur_fwd_cons).
     iIntros "Hcg #Htext Hpc #Hpanic #Hbio Hframe Hcnt Hpay Htok Hscan Hbslot".
-    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hdisk Hcont".
+    iIntros "#Hprocs #Hscheds Hoctx Hpark Hppid #Hdev #Hgeom #Hdlock Hcont".
     iPoseProof (bdi_3c with "Htext") as "Hi3c".
     iPoseProof (bdi_3e with "Htext") as "Hi3e".
     iPoseProof (bdi_42 with "Htext") as "Hi42".
@@ -1981,28 +2079,34 @@ Section BreadBlocks.
     (* ---- the ADVANCE block (0x36 / 0x38), asserted once ---- *)
     iAssert (∀ Mx : regfile,
                ⌜bd_regs m Mx
-                /\ Mx !!! Regidx Rs1 = bnode kk /\ Mx !!! Regidx Ra4 = bhead⌝ -∗
+                /\ Mx !!! Regidx Rs1 = bnode kk /\ Mx !!! Regidx Ra4 = bhead
+                /\ ¬ (devs kk = dev /\ bnos kk = bno)⌝ -∗
                sie_cap_gpr Mx (K - 6)%nat false (proc_addr j) -∗
                pc_is (mword_of_int (BD + 0x36) : mword 64) -∗
                bd_frame m -∗
                cpu_own 1 eb (proc_addr j) C false -∗
                trap_csrs_pay 0 eb -∗
                locked (bn_lk bn) cpu_id -∗
-               bcache_scan bn Mg ord devs bnos -∗
+               bcache_scan bn V Mg ord devs bnos -∗
                bslot bn -∗
                own_ctx (p_context (proc_addr j)) -∗
                park_hlf j true -∗
                p_pid (proc_addr j) ↦₄{dq} pidv -∗
-               disk_block γd (uint bno) bs_disk -∗
-               bd_cont (CID0 := CID0) Φ j γd bn pidv dev bno dq m K eb (proc_addr j) C bs_disk -∗
+               bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
                WP (Loop : expr riscv_lang) {{ Φ }})%I as "HADV".
-    { iIntros (Mx (Hxregs & Hxs1 & Hxa4)).
-      iIntros "Hcg Hpc Hframe Hcnt Hpay Htok Hscan Hbslot Hoctx Hpark Hppid Hdisk Hcont".
+    { iIntros (Mx (Hxregs & Hxs1 & Hxa4 & Hxne)).
+      iIntros "Hcg Hpc Hframe Hcnt Hpay Htok Hscan Hbslot Hoctx Hpark Hppid Hcont".
       pose proof Hxregs as (Hxsp & Hxs2 & Hxs3 & Hxthr).
+      assert (Hdone' : forall i, i ∈ (done ++ [kk])%list ->
+                         ¬ (devs i = dev /\ bnos i = bno)).
+      { intros i Hi. apply elem_of_app in Hi as [Hi | Hi].
+        - exact (Hdone i Hi).
+        - apply elem_of_list_singleton in Hi. subst i. exact Hxne. }
       iPoseProof (bdi_36 with "Htext") as "Hi36".
       iPoseProof (bdi_38 with "Htext") as "Hi38".
       rewrite /bcache_scan.
-      iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hordp2 & Hlru & Hslots)".
+      iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hordp2 & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
       iEval (rewrite Hord2 (bcur_fwd_split done kk r)) in "Hlru".
       iDestruct (bcache_lru_next_acc bhead (bnode kk) (map bnode done) (map bnode r)
                    with "Hlru") as "[Hnextc Hrelink]".
@@ -2035,12 +2139,14 @@ Section BreadBlocks.
                                      end
                                  end].
           exact (Hxthr c Hcs N2 N8 N9 N18 N19 N4). }
-      iAssert (bcache_scan bn Mg ord devs bnos)
-        with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+      iAssert (bcache_scan bn V Mg ord devs bnos)
+        with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
       { rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR; [iPureIntro; exact Hdom|].
         iSplitR; [iPureIntro; exact Hordp2|].
-        iFrame "Hlru Hslots". }
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
       assert (Hpp38 : add_vec_int (mword_of_int (BD + 0x36) : mword 64) 2 = mword_of_int (BD + 0x38))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
@@ -2060,11 +2166,14 @@ Section BreadBlocks.
                          = mword_of_int (BD + 0x64))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt64) in "Hpc".
-        iApply (bread_miss (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn Mg ord devs bnos
-                  pidv dev bno dq m G1 K eb C bs_disk
-                  HK Hbno Ha0 Ha1 Hj Hgl Hordp HG1regs Heb
+        assert (Hordk : ord = (done ++ [kk])%list) by (rewrite Hord2 Hre; reflexivity).
+        assert (Htie : forall i, (i < NBUF)%nat -> ¬ (devs i = dev /\ bnos i = bno)).
+        { intros i Hi. apply Hdone'. rewrite -Hordk. exact (bd_ord_mem ord Hordp i Hi). }
+        iApply (bread_miss (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn V Mg ord devs bnos
+                  pidv dev bno dq m G1 K eb C
+                  HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie Hordp HG1regs Heb
                   with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont").
+                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont").
       + (* another buffer to test: back to the loop head *)
         destruct (bd_ord_hd r Hrne) as (kk2 & r2 & Hr2).
         assert (Hord3 : ord = ((done ++ [kk]) ++ kk2 :: r2)%list).
@@ -2086,12 +2195,14 @@ Section BreadBlocks.
         assert (Hlen' : (length r <= n)%nat).
         { rewrite Hrest in Hlen. cbn in Hlen. lia. }
         iApply (IH (done ++ [kk])%list r G1 Hlen'
-                  ltac:(rewrite Hord2 -app_assoc; reflexivity) Hrne HG1regs HG1s1 HG1a4 Heb
+                  ltac:(rewrite Hord2 -app_assoc; reflexivity) Hrne Hdone'
+                  HG1regs HG1s1 HG1a4 Heb
                   with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont"). }
+                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont"). }
     (* ---- the per-iteration borrow of b->dev and b->blockno ---- *)
     rewrite /bcache_scan.
-    iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hordp2 & Hlru & Hslots)".
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hordp2 & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
     iDestruct (bio_slots_acc bn Mg devs bnos kk Hkk with "Hslots") as "[Hslot Hback]".
     iDestruct (bio_slot_devbno_acc bn Mg kk (devs kk) (bnos kk) with "Hslot")
       as (qc) "(Hdevc & Hbnoc & Hbackslot)".
@@ -2181,12 +2292,14 @@ Section BreadBlocks.
       iDestruct ("Hbackslot" with "Hdevc Hbnoc") as "Hslot".
       iDestruct ("Hback" $! Mg devs bnos with "[%] Hslot") as "Hslots".
       { intros i Hi. split_and!; reflexivity. }
-      iAssert (bcache_scan bn Mg ord devs bnos)
-        with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+      iAssert (bcache_scan bn V Mg ord devs bnos)
+        with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
       { rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR; [iPureIntro; exact Hdom|].
         iSplitR; [iPureIntro; exact Hordp2|].
-        iFrame "Hlru Hslots". }
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
       assert (Hpp44 : add_vec_int (mword_of_int (BD + 0x42) : mword 64) 2 = mword_of_int (BD + 0x44))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp44) in "Hpc".
@@ -2205,11 +2318,11 @@ Section BreadBlocks.
         assert (Hpp48 : add_vec_int (mword_of_int (BD + 0x44) : mword 64) 4 = mword_of_int (BD + 0x48))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp48) in "Hpc".
-        iApply (bread_hit (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn kk Mg ord devs bnos
-                  pidv dev bno dq m F2 K eb C bs_disk
-                  HK Hbno Hkk Hdeq Hbeq2 Hj Hgl HF2regs HF2s1 Heb
+        iApply (bread_hit (CID0 := CID0) Φ γs j γl γu γd γk pd pav pu bn V kk Mg ord devs bnos
+                  pidv dev bno dq m F2 K eb C
+                  HK Hbno Hkk Hdeq Hbeq2 Hgd Hcov Hdv Hj Hgl HF2regs HF2s1 Heb
                   with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont").
+                        Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont").
       + (* blockno mismatch: advance *)
         assert (Hbne3 : neq_vec (F2 !!! Regidx Ra5) (F2 !!! Regidx Rs3) = true).
         { rewrite HF2a5 HF2s3 Ha1 bd_sext_neqv. unfold neq_vec.
@@ -2227,8 +2340,9 @@ Section BreadBlocks.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt36) in "Hpc".
         iApply ("HADV" $! F2 with "[%] Hcg Hpc Hframe Hcnt Hpay Htok Hscan Hbslot
-                                   Hoctx Hpark Hppid Hdisk Hcont").
-        split_and!; [exact HF2regs | exact HF2s1 | exact HF2a4].
+                                   Hoctx Hpark Hppid Hcont").
+        split_and!; [exact HF2regs | exact HF2s1 | exact HF2a4 |].
+        intros [_ Hc]. exact (Hbne2 Hc).
     - (* ---- dev mismatch: advance ---- *)
       assert (Hbne : neq_vec (F1 !!! Regidx Ra5) (F1 !!! Regidx Rs2) = true).
       { rewrite HF1a5 HF1s2 Ha0 bd_sext_neqv. unfold neq_vec.
@@ -2248,15 +2362,18 @@ Section BreadBlocks.
       iDestruct ("Hbackslot" with "Hdevc Hbnoc") as "Hslot".
       iDestruct ("Hback" $! Mg devs bnos with "[%] Hslot") as "Hslots".
       { intros i Hi. split_and!; reflexivity. }
-      iAssert (bcache_scan bn Mg ord devs bnos)
-        with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+      iAssert (bcache_scan bn V Mg ord devs bnos)
+        with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
       { rewrite /bcache_scan. iFrame "Hauth Hsauth".
         iSplitR; [iPureIntro; exact Hdom|].
         iSplitR; [iPureIntro; exact Hordp2|].
-        iFrame "Hlru Hslots". }
+        iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
       iApply ("HADV" $! F1 with "[%] Hcg Hpc Hframe Hcnt Hpay Htok Hscan Hbslot
-                                 Hoctx Hpark Hppid Hdisk Hcont").
-      split_and!; [exact HF1regs | exact HF1s1 | exact HF1a4].
+                                 Hoctx Hpark Hppid Hcont").
+      split_and!; [exact HF1regs | exact HF1s1 | exact HF1a4 |].
+      intros [Hc _]. exact (Hdne Hc).
   Qed.
 
 End BreadBlocks.
@@ -2271,27 +2388,27 @@ Section ProofBread.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
+      (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) (b : bool)
-    : wp_bread_sconf_body Φ γs j γl γu γd γk pd pav pu bn
-                          pidv dev bno dq m K eb C bs_disk b.
+      (b : bool)
+    : wp_bread_sconf_body Φ γs j γl γu γd γk pd pav pu bn V
+                          pidv dev bno dq m K eb C b.
   Proof.
     cbv beta delta [wp_bread_sconf_body].
-    intros pcE pj ret_tgt HK Hbno Hj Hgl Ha0 Ha1 Heb.
+    intros pcE pj ret_tgt HK Hbno Hgd Hcov Hdv Hj Hgl Ha0 Ha1 Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                   (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark".
-    iIntros "#Hdev #Hgeom #Hdlock Hdisk Hbslot Hcont".
+    iIntros "#Hdev #Hgeom #Hdlock Hbslot Hcont".
     (* bread enters at level 0, so the live index IS the saved base: one
        variable [eb] carries both, and release's exit index becomes literally
        the index the postcondition asks for.  (The porting guide's "derive the
        SIE index rather than stating it"; [Heb] keeps [eb = true] available for
        the two parking callees.) *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst b.
-    iAssert (bd_cont (CID0 := CID) Φ j γd bn pidv dev bno dq m K eb pj C bs_disk)
+    iAssert (bd_cont (CID0 := CID) Φ j bn V pidv dev bno dq m K eb pj C)
       with "[Hcont]" as "Hcont".
     { rewrite /bd_cont. iExact "Hcont". }
     iDestruct (bio_ctx_lock with "Hbio") as "#Hlock".
@@ -2521,7 +2638,7 @@ Section ProofBread.
       by (rewrite /R7; apply upd_eq).
     iDestruct (cpu_own_transport CID CID12 0%nat eb pj C eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (A.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn) R7
+    iApply (A.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn V) R7
               0%nat eb pj C (K - 6)%nat eb
               ltac:(vm_compute; reflexivity) ltac:(unfold K_bread in HK; lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -2535,12 +2652,13 @@ Section ProofBread.
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc1e) in "Hpc".
     pose proof Hacqpins as Hacqpins_cs.
-    iDestruct (bd_cont_shift (CIDa := CID) (CIDb := CIDq) Φ j γd bn pidv dev bno dq
-                 m K eb pj C bs_disk ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iDestruct (bd_cont_shift (CIDa := CID) (CIDb := CIDq) Φ j bn V pidv dev bno dq
+                 m K eb pj C ltac:(wp_next_chain) with "Hcont") as "Hcont".
     (* ===== the forward scan's entry ===== *)
-    iDestruct (bcache_res_to_scan bn with "HRres") as (Mg ord devs bnos) "Hscan".
+    iDestruct (bcache_res_to_scan bn V with "HRres") as (Mg ord devs bnos) "Hscan".
     rewrite /bcache_scan.
-    iDestruct "Hscan" as "(Hauth & Hsauth & %Hdom & %Hordp & Hlru & Hslots)".
+    iDestruct "Hscan" as
+      "(Hauth & Hsauth & %Hdom & %Hordp & %Hinj & %Hdevpin & Hlru & Hpool & Hslots)".
     destruct (bd_ord_hd ord (bd_ord_nonnil ord Hordp)) as (k0 & r0 & Hordh).
     assert (Hk0 : (k0 < NBUF)%nat)
       by exact (bord_split_lt ord [] r0 k0 Hordp Hordh).
@@ -2671,12 +2789,14 @@ Section ProofBread.
         rewrite (HW5thr c Hcs N9).
         rewrite (callee_saved_lookup Hacqpins_cs c Hcs).
         exact (HR7thr c Hcs N2 N8 N9 N18 N19). }
-    iAssert (bcache_scan bn Mg ord devs bnos)
-      with "[Hauth Hsauth Hlru Hslots]" as "Hscan".
+    iAssert (bcache_scan bn V Mg ord devs bnos)
+      with "[Hauth Hsauth Hlru Hpool Hslots]" as "Hscan".
     { rewrite /bcache_scan. iFrame "Hauth Hsauth".
       iSplitR; [iPureIntro; exact Hdom|].
       iSplitR; [iPureIntro; exact Hordp|].
-      iFrame "Hlru Hslots". }
+      iSplitR; [iPureIntro; exact Hinj|].
+        iSplitR; [iPureIntro; exact Hdevpin|].
+        iFrame "Hlru Hpool Hslots". }
     assert (Hpp34 : add_vec_int (mword_of_int (BD + 0x32) : mword 64) 2 = mword_of_int (BD + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp34) in "Hpc".
@@ -2693,13 +2813,13 @@ Section ProofBread.
                      = mword_of_int (BD + 0x3c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt3c) in "Hpc".
-    iApply (bread_floop (CID0 := CIDq) Φ γs j γl γu γd γk pd pav pu bn Mg ord devs bnos
-              pidv dev bno dq m K eb C bs_disk (length ord)
-              HK Hbno Ha0 Ha1 Hj Hgl Hordp [] ord W5
+    iApply (bread_floop (CID0 := CIDq) Φ γs j γl γu γd γk pd pav pu bn V Mg ord devs bnos
+              pidv dev bno dq m K eb C (length ord)
+              HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Hordp [] ord W5
               ltac:(reflexivity) ltac:(reflexivity)
-              (bd_ord_nonnil ord Hordp) HW5regs HW5s1 HW5a4 Heb
+              (bd_ord_nonnil ord Hordp) (bd_done_nil _) HW5regs HW5s1 HW5a4 Heb
               with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Htok Hscan Hbslot
-                    Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hdisk Hcont").
+                    Hprocs Hscheds Hoctx Hpark Hppid Hdev Hgeom Hdlock Hcont").
   Qed.
 
 End ProofBread.

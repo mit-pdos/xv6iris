@@ -17,6 +17,12 @@
      [negb (eq_vec (m !!! a1) zero_reg)] -- literally [true], so rw's exchange
      is the write case: [disk_block] leaves holding the BUFFER's bytes and the
      buffer comes back unchanged.  That is exactly bwrite's postcondition.
+     The [disk_block] is no longer a spec argument: it rides INSIDE the handle
+     (claude-notes/design/fs-log.md), at the view's own ghost [bv_gd V], so it
+     is taken out of [bio_locked], restated at the fabric's [γd] through the
+     [bv_gd V = γd] premise for rw's spec, and put back afterwards.  The
+     handle's [bio_pay] conjunct is untouched by the call -- only its [bsd]
+     index moves, which is [bio_pay_reindex].
 
    * rw's [addr_is_kdata] premise on [b->data].  [b] is [bnode k] for
      k < NBUF, i.e. an element of bio.c's static [bcache] object at
@@ -116,26 +122,44 @@ Section ProofBwrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* the handle's payload is UNTOUCHED by the write, but its [bsd] index
+     moves (the disk cell now holds the buffer's bytes).  For a dirty
+     payload the index is not mentioned at all; for a clean one it was
+     already tied to [bsl], and the post's tie is [bsl = bsl]. *)
+  Local Lemma bio_pay_reindex (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (dev bno : mword 32) (bsl bsd : list (bv 8)) (d : bool) :
+    bio_pay bn V k dev bno bsl bsd d -∗ bio_pay bn V k dev bno bsl bsl d.
+  Proof.
+    destruct d; rewrite /bio_pay.
+    - iIntros "$".
+    - iIntros "[$ _]". done.
+  Qed.
+
   Lemma wp_bwrite_sconf (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (k : nat)
+      (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs bs_disk : list (bv 8)) (b : bool)
-    : wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn k
-                           pidv dev bno dq m K eb C bs bs_disk b.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool)
+    : wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
+                           pidv dev bno dq m K eb C bs bsd d b.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
-    intros pcE pj ret_tgt HK Hbno Hj Hgl Hk Ha0 Heb.
+    intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Heb.
     unfold K_bwrite in HK.
     subst eb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs #Hscheds Hoctx Hpark
-              Hdev Hgeom Hdlock Hlocked Hdisk Hcont".
-    iDestruct "Hlocked" as "(%Hk2 & Hstok & Hpid & Hvalid & Hbdev & Hbuf)".
-    iDestruct (bio_ctx_buf bn k Hk with "Hbio") as "[#Hslk _]".
+              Hdev Hgeom Hdlock Hlocked Hcont".
+    iEval (rewrite /bio_locked /bio_held) in "Hlocked".
+    iDestruct "Hlocked" as
+      "(%Hk2 & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdisk & Hpay)".
+    (* the handle's disk fragment, restated at the fabric's ghost so rw's
+       spec can take it; it is rewritten back at re-assembly. *)
+    iEval (rewrite HgdV) in "Hdisk".
+    iDestruct (bio_ctx_buf bn V k Hk with "Hbio") as "[#Hslk _]".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (bwi_00 with "Htext") as "Hi00".
@@ -408,24 +432,30 @@ Section ProofBwrite.
     (* never parks, so it does nothing with the receipt but pass it on.     *)
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu D3
-              (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bs_disk b
+              (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bsd b
               HKrw Hbno Hkdata Hj Hgl eq_refl
               with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hoctx Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
     iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk".
-    iEval (rewrite (bw_wr_true _ bs bs_disk HD3a1)) in "Hbuf".
-    iEval (rewrite (bw_wr_true _ bs bs_disk HD3a1)) in "Hdisk".
+    iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
+    iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
+    (* back to the handle's spelling of the fabric ghost *)
+    iEval (rewrite -HgdV) in "Hdisk".
+    iDestruct (bio_pay_reindex with "Hpay") as "Hpay".
     assert (Hpc1c : ret_pc (D3 !!! Regidx Rra) = mword_of_int (BW + 0x1c)).
     { rewrite HD3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc1c) in "Hpc".
     (* the handle, rebuilt: valid and the dev half were framed across both
        calls, the token and pid came back from holdingsleep, the bundle from
        virtio_disk_rw.  All of it is hart-free, so it is rebuilt here. *)
-    iAssert (bio_locked bn k pidv dev bno bs)
-      with "[Hstok Hpid Hvalid Hbdev Hbuf]" as "Hlocked".
-    { rewrite /bio_locked /bpa. iSplitR; [by iPureIntro|].
-      iFrame "Hstok Hpid Hvalid Hbdev Hbuf". }
+    iAssert (bio_locked bn V k pidv dev bno bs bs d)
+      with "[Hstok Hpid Hvalid Hbdev Hbuf Hdisk Hpay]" as "Hlocked".
+    { rewrite /bio_locked /bio_held /bpa.
+      iSplitR; [iPureIntro; exact Hk2|].
+      iSplitR; [iPureIntro; exact Hcov|].
+      iSplitR; [iPureIntro; exact Hdv|].
+      iFrame "Hstok Hpid Hvalid Hbdev Hbuf Hdisk Hpay". }
     assert (HmRsp : mR !!! Regidx csp_rs1 = spr)
       by (rewrite (callee_saved_lookup Hcs2 csp_rs1 ltac:(vm_compute; reflexivity)); exact HD3sp).
     assert (HmRthr : forall c : mword 5, is_cs_idx c = true ->
@@ -588,7 +618,7 @@ Section ProofBwrite.
     iDestruct (cpu_own_transport CID14 CID19 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlocked Hdisk").
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlocked").
     unfold callee_saved. repeat split; assumption.
   Qed.
 

@@ -7,9 +7,13 @@
        virtio_disk_rw(b, 1);
      }
 
-   The write-through: the caller's locked buffer goes to the disk, so the
-   [disk_block] exchange is rw's WRITE case verbatim -- old disk bytes in,
-   the buffer's bytes out -- and the buffer handle comes back untouched.
+   The write-through: the caller's locked buffer goes to the disk.  The
+   block's [disk_block] rides INSIDE the handle (claude-notes/design/
+   fs-log.md), so the exchange is interior: the handle comes back with its
+   disk value equal to its bytes -- for a Clean handle that was already
+   true, for a Dirty one this is the install step's write, after which the
+   caller can extract the pinning bref (its bunpin argument) and flip the
+   payload clean.
    The panic arm is dead: [bio_locked] carries the sleeplock token and the
    holder-carried pid cell, and the caller's own pid cell agrees, so
    holdingsleep returns 1 (SpecHoldingsleep.v's holder variant).
@@ -56,16 +60,18 @@ Definition wp_bwrite_sconf_body
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names) (k : nat)
+    (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (bs bs_disk : list (bv 8)) (b : bool) :=
+    (bs bsd : list (bv 8)) (d : bool) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_bwrite <= K)%nat ->
   (* rw's honest arithmetic premise: sector = blockno * 2 in 32 bits *)
   (uint bno < 2147483648)%Z ->
+  (* the handle's interior disk fragment lives at the fabric's ghost *)
+  bv_gd V = γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 is the buffer *)
@@ -90,7 +96,7 @@ Definition wp_bwrite_sconf_body
      See claude-notes/completed/sched-hart-generic.md. *)
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  bio_ctx bn -∗
+  bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle rw's sleeps thread through *)
@@ -102,9 +108,8 @@ Definition wp_bwrite_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  (* the locked buffer and the disk block it names *)
-  bio_locked bn k pidv dev bno bs -∗
-  disk_block γd (uint bno) bs_disk -∗
+  (* the locked buffer (its interior disk fragment included) *)
+  bio_locked bn V k pidv dev bno bs bsd d -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -114,9 +119,8 @@ Definition wp_bwrite_sconf_body
       own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
-      bio_locked bn k pidv dev bno bs -∗
-      (* the write-through: the disk now holds the buffer's bytes *)
-      disk_block γd (uint bno) bs -∗
+      (* the write-through: the handle's disk value is now its bytes *)
+      bio_locked bn V k pidv dev bno bs bs d -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -128,10 +132,10 @@ Module Type BWRITE.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (k : nat)
+      (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs bs_disk : list (bv 8)) (b : bool),
-      wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn k
-                           pidv dev bno dq m K eb C bs bs_disk b.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool),
+      wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
+                           pidv dev bno dq m K eb C bs bsd d b.
 End BWRITE.

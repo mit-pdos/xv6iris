@@ -66,6 +66,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import CpuOwn.
+Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 Require Import CodeBpin.
 Require Import SpecAcquire SpecRelease.
@@ -95,7 +96,7 @@ Qed.
 Module BunpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BUNPIN.
 
 Section ProofBunpin.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BU := KernelSyms.bunpin.
@@ -157,10 +158,10 @@ Section ProofBunpin.
     rewrite Heq. reflexivity.
   Qed.
 
-  Lemma wp_bunpin_sconf (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
+  Lemma wp_bunpin_sconf (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (q : Qp) (dev bno : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_bunpin_sconf_body Φ bn k q dev bno m n eb p C K b.
+    : wp_bunpin_sconf_body Φ bn V k q dev bno m n eb p C K b.
   Proof.
     cbv beta delta [wp_bunpin_sconf_body].
     intros pcE ret_tgt HK HnZ Hk Ha0.
@@ -322,7 +323,7 @@ Section ProofBunpin.
        moved us to CID9. *)
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn) mA
+    iApply (Acquire.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn V) mA
               n eb p C (K - 4)%nat b
               HnZ ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -341,9 +342,10 @@ Section ProofBunpin.
       by (apply bv_eq; vm_compute; reflexivity).
     iAssert (∃ cw : mword 32,
                brefcnt k ↦₄ cw ∗
-               (brefcnt k ↦₄ (decr32 cw) ==∗ bcache_res bn ∗ bslot bn))%I
+               (brefcnt k ↦₄ (decr32 cw) ==∗ bcache_res bn V ∗ bslot bn))%I
       with "[HRres Href]" as (cw) "[Hcell Hclose]".
-    { iDestruct "HRres" as (Mg ord devs bnos) "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
+    { iDestruct "HRres" as (Mg ord devs bnos)
+        "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
       iDestruct "Href" as "(Hrtok & Hrdev & Hrbno)".
       iDestruct (bref_tok_lookup with "Hauth Hrtok")
         as %(qt & cnt & HMk & Hsole & _ & Hltn).
@@ -386,7 +388,9 @@ Section ProofBunpin.
             - rewrite Hdel in Hj. by destruct Hj as [x Hx].
             - rewrite lookup_delete_ne in Hj; [exact Hj | congruence]. }
           iSplitR; [iPureIntro; exact Hord|].
-          iFrame "Hlru Hslots".
+          iSplitR; [iPureIntro; exact Hinj|].
+          iSplitR; [iPureIntro; exact Hdev|].
+          iFrame "Hlru Hpool Hslots".
         + rewrite /bslot. change (Pos.to_nat 1) with 1%nat. iFrame "Hfd".
       - (* ---- survivors: the fraction returns to the retainder ---- *)
         assert (Hex : exists c', cnt = Pos.succ c').
@@ -430,7 +434,9 @@ Section ProofBunpin.
             destruct (decide (j = k)) as [->|Hne2]; [exact Hk|].
             apply Hdom. by rewrite lookup_insert_ne in Hj. }
           iSplitR; [iPureIntro; exact Hord|].
-          iFrame "Hlru Hslots".
+          iSplitR; [iPureIntro; exact Hinj|].
+          iSplitR; [iPureIntro; exact Hdev|].
+          iFrame "Hlru Hpool Hslots".
         + rewrite /bslot. iFrame "Hout". }
     iPoseProof (bui_18 with "Htext") as "Hi18".
     iPoseProof (bui_1a with "Htext") as "Hi1a".
@@ -543,7 +549,7 @@ Section ProofBunpin.
       by (rewrite /D5; apply upd_eq).
     (* ===== +0x26 lands us in release; bunpin's own derived index [Houtb]
        absorbs release's [outb]. ===== *)
-    iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) D5
+    iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)

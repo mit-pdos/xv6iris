@@ -38,12 +38,15 @@ Require Import WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import DiskPtsto.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
+Definition wp_bpin_sconf_body
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bpin in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -57,7 +60,7 @@ Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GE
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  bio_ctx bn -∗
+  bio_ctx bn V -∗
   panic_wp_any -∗
   (* THE premise that makes the unchecked [refcnt++] safe *)
   bslot bn -∗
@@ -73,8 +76,9 @@ Definition wp_bpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GE
 
 Module Type BPIN.
   Parameter wp_bpin_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_bpin_sconf_body Φ bn k m n eb p C K b.
+      wp_bpin_sconf_body Φ bn V k m n eb p C K b.
 End BPIN.

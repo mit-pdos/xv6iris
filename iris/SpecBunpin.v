@@ -34,12 +34,15 @@ Require Import WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import DiskPtsto.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Definition wp_bunpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
+Definition wp_bunpin_sconf_body
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
     (q : Qp) (dev bno : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bunpin in
@@ -53,7 +56,7 @@ Definition wp_bunpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  bio_ctx bn -∗
+  bio_ctx bn V -∗
   panic_wp_any -∗
   (* the reference being surrendered *)
   bref bn k q dev bno -∗
@@ -69,9 +72,10 @@ Definition wp_bunpin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{
 
 Module Type BUNPIN.
   Parameter wp_bunpin_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (q : Qp) (dev bno : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_bunpin_sconf_body Φ bn k q dev bno m n eb p C K b.
+      wp_bunpin_sconf_body Φ bn V k q dev bno m n eb p C K b.
 End BUNPIN.

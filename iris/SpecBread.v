@@ -13,18 +13,20 @@
    "bget: no buffers" panic, and both refcnt++/field-rewrite critical
    sections (see claude-notes/projects/bio.md for the instruction map).
 
-   The contract: one [bslot] and the requested block's [disk_block] in;
-   a [bio_locked] handle out -- the buffer's sleeplock held, valid = 1,
-   disk = 0, dev/blockno pinned to the request -- plus the [disk_block]
-   back unchanged (a READ never writes the disk; a hit never touches it).
+   The contract (claude-notes/design/fs-log.md): one [bslot] in, a
+   [bio_locked] handle out -- the buffer's sleeplock held, valid = 1,
+   disk = 0, dev/blockno pinned to the request, and the data bytes EQUAL
+   TO THE BLOCK'S LOGICAL CONTENT (the client payload [bv_clean]/[bv_dirty]
+   inside the handle indexes the same bytes).  No [disk_block] crosses the
+   interface: the covered range's disk fragments live INSIDE the bio layer
+   (pool / escrow / handles), which is also what makes two concurrent
+   breads of the same block specifiable -- both get served off the one
+   interior fragment.
 
-   The returned data bytes are existential.  On the load path they equal
-   [bs_disk], but a valid HIT returns whatever the last holder left in the
-   cache -- possibly newer than the disk (xv6's log brelses dirty pinned
-   blocks) -- and the bio layer alone has no invariant tying the two.  The
-   coherent view ("the cache overlays the disk") is a client-layer ghost
-   (future log/fs work, layered on this spec); an fs-level caller will KNOW
-   the bytes because its own ghost tracks the logical block content.
+   The requested block must be covered by the client view and on the
+   view's device; a caller that knows the block's logical content (its own
+   [fsblock] half against the handle's payload half) learns the returned
+   bytes by agreement -- the bio layer hands the payload out opaquely.
 
    The function sleeps (acquiresleep; rw's two sleeps), so it threads the
    full running-process bundle; it enters and returns at noff 0. *)
@@ -67,16 +69,22 @@ Definition wp_bread_sconf_body
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
+    (bn : bio_names) (V : bio_view Σ)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (bs_disk : list (bv 8)) (b : bool) :=
+    (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_bread <= K)%nat ->
   (* rw's honest arithmetic premise: sector = blockno * 2 in 32 bits *)
   (uint bno < 2147483648)%Z ->
+  (* the request is inside the client view: a covered block on ITS device
+     (the interior fragments and the cached-blockno injectivity are keyed
+     on exactly this) *)
+  bv_gd V = γd ->
+  uint bno ∈ bv_cov V ->
+  dev = bv_dev V ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the two uint arguments arrive sign-extended (RV64 ABI); the scan's
@@ -102,7 +110,7 @@ Definition wp_bread_sconf_body
      See claude-notes/completed/sched-hart-generic.md. *)
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  bio_ctx bn -∗
+  bio_ctx bn V -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
@@ -114,11 +122,10 @@ Definition wp_bread_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  (* the requested block, and the slot unit backing the new reference *)
-  disk_block γd (uint bno) bs_disk -∗
+  (* the slot unit backing the new reference *)
   bslot bn -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (k : nat) (bs_out : list (bv 8)),
+  ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
       sie_cap_gpr mf K b pj -∗
@@ -127,10 +134,9 @@ Definition wp_bread_sconf_body
       own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
-      (* the locked buffer, keyed to the request *)
-      bio_locked bn k pidv dev bno bs_out -∗
-      (* the disk block, untouched (a read reads; a hit never goes near) *)
-      disk_block γd (uint bno) bs_disk -∗
+      (* the locked buffer, keyed to the request: its bytes ARE the
+         block's logical content (the payload inside indexes them) *)
+      bio_locked bn V k pidv dev bno bs bsd d -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -142,10 +148,10 @@ Module Type BREAD.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
+      (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_disk : list (bv 8)) (b : bool),
-      wp_bread_sconf_body Φ γs j γl γu γd γk pd pav pu bn
-                          pidv dev bno dq m K eb C bs_disk b.
+      (b : bool),
+      wp_bread_sconf_body Φ γs j γl γu γd γk pd pav pu bn V
+                          pidv dev bno dq m K eb C b.
 End BREAD.

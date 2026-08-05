@@ -51,6 +51,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import DiskPtsto.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import BufOwn BcacheInv BioInv.
@@ -95,7 +96,7 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 Module BpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BPIN.
 
 Section ProofBpin.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation BP := KernelSyms.bpin.
@@ -125,9 +126,9 @@ Section ProofBpin.
     incr32 (mword_of_int z : mword 32) = (mword_of_int (z + 1) : mword 32).
   Proof. intros H0 H1. rewrite /incr32. by apply moi32_storeval_succ. Qed.
 
-  Lemma wp_bpin_sconf (Φ : mval -> iProp Σ) (bn : bio_names) (k : nat)
+  Lemma wp_bpin_sconf (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_bpin_sconf_body Φ bn k m n eb p C K b.
+    : wp_bpin_sconf_body Φ bn V k m n eb p C K b.
   Proof.
     cbv beta delta [wp_bpin_sconf_body].
     intros pcE ret_tgt HK Hnoffpos Hk Ha0.
@@ -281,7 +282,7 @@ Section ProofBpin.
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (BP + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn) mA
+    iApply (Acquire.wp_acquire_sconf Φ (bn_lk bn) "bcache"%string (bcache_res bn V) mA
               n eb p C (K - 4)%nat b
               Hnoffpos ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -304,9 +305,10 @@ Section ProofBpin.
     iAssert (∃ cw : mword 32,
                brefcnt k ↦₄ cw ∗
                (brefcnt k ↦₄ (incr32 cw) ==∗
-                  bcache_res bn ∗ ∃ (q : Qp) (dev bno : mword 32), bref bn k q dev bno))%I
+                  bcache_res bn V ∗ ∃ (q : Qp) (dev bno : mword 32), bref bn k q dev bno))%I
       with "[HRres Hbslot]" as (cw) "[Hcell Hclose]".
-    { iDestruct "HRres" as (Mg ord devs bnos) "(Hauth & Hsauth & %Hdom & %Hord & Hlru & Hslots)".
+    { iDestruct "HRres" as (Mg ord devs bnos)
+        "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".
       iDestruct (bio_slots_acc bn Mg devs bnos k Hk with "Hslots") as "[Hslot Hback]".
       destruct (Mg !! k) as [[qt cnt]|] eqn:HMk.
       - (* ---- busy buffer: halve the retained share ---- *)
@@ -357,7 +359,9 @@ Section ProofBpin.
             destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
             apply Hdom. by rewrite lookup_insert_ne in Hj. }
           iSplitR; [iPureIntro; exact Hord|].
-          iFrame "Hlru Hslots".
+          iSplitR; [iPureIntro; exact Hinj|].
+          iSplitR; [iPureIntro; exact Hdev|].
+          iFrame "Hlru Hpool Hslots".
         + iExists (qr/2)%Qp, (devs k), (bnos k). rewrite /bref. iFrame "Htok Hdev2 Hbno2".
       - (* ---- free buffer: the first reference, cut 1/4 off the bcache half ---- *)
         iEval (rewrite /bio_slot_res HMk) in "Hslot".
@@ -398,7 +402,9 @@ Section ProofBpin.
             destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
             apply Hdom. by rewrite lookup_insert_ne in Hj. }
           iSplitR; [iPureIntro; exact Hord|].
-          iFrame "Hlru Hslots".
+          iSplitR; [iPureIntro; exact Hinj|].
+          iSplitR; [iPureIntro; exact Hdev|].
+          iFrame "Hlru Hpool Hslots".
         + iExists (1/4)%Qp, (devs k), (bnos k). rewrite /bref. iFrame "Htok Hdev2 Hbno2". }
     iPoseProof (bpi_18 with "Htext") as "Hi18".
     iPoseProof (bpi_1a with "Htext") as "Hi1a".
@@ -511,7 +517,7 @@ Section ProofBpin.
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmsp).
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (BP + 0x26) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
-    iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn) D5
+    iApply (Release.wp_release_sconf Φ (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)

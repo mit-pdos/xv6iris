@@ -436,6 +436,7 @@ SpecBinit.v
 ProofBinit.v
 LinkBinit.v
 BioInv.v
+FsBlocks.v
 SpecBpin.v
 SpecBunpin.v
 SpecBwrite.v

@@ -43,6 +43,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import DiskPtsto.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -53,13 +54,14 @@ Import Defs.
 Definition K_brelse : nat := 26%nat.
 
 Definition wp_brelse_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}
+    `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname)
-    (bn : bio_names) (k : nat)
+    (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (bs : list (bv 8)) (b : bool) :=
+    (bs bsd : list (bv 8)) (d : bool) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.brelse in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_brelse <= K)%nat ->
@@ -70,13 +72,16 @@ Definition wp_brelse_sconf_body
   cpu_own 0 eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  bio_ctx bn -∗
+  bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv Φ γs -∗
-  (* the locked buffer being released *)
-  bio_locked bn k pidv dev bno bs -∗
+  (* the locked buffer being released.  [bio_locked] -- not [bio_held] --
+     is THE brelse obligation: the bytes must be the block's logical
+     content (unmodified since bread, or re-indexed by log_write), or the
+     handle cannot be formed and the park swap is unavailable. *)
+  bio_locked bn V k pidv dev bno bs bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -91,12 +96,13 @@ Definition wp_brelse_sconf_body
 
 Module Type BRELSE.
   Parameter wp_brelse_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}
+      `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname)
-      (bn : bio_names) (k : nat)
+      (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs : list (bv 8)) (b : bool),
-      wp_brelse_sconf_body Φ γs bn k pidv dev bno dq m K eb p C bs b.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool),
+      wp_brelse_sconf_body Φ γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
 End BRELSE.
