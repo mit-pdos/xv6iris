@@ -250,28 +250,60 @@ construction-side map view has to meet a canonical leaf constant.
 
 ### What is left for an uncounted `proc_pagetable`
 
-The remaining work is a RESTRUCTURE of `ProofProcPagetable.v`, and its shape
-is forced by one fact: **`SpecUvmfree` exists only at `kalloc_env γa None`**,
-so the tails are reachable only there and a single `on`-generic spec cannot
-be written (unlike allocproc, whose tails call freeproc, not uvmfree — that
-is why S7 step 5's "one spec with a third arm" advice applies there and NOT
-here). The recipe:
+Everything it needs is now in place and green: the decode catalogue covers
+the whole function (`ppti_5a`..`ppti_82`, added 2026-08-05 — the file used to
+stop at +0x58), the two bridges above, `UVMUNMAP_FIXED`, `UVMFREE`. What
+remains is a restructure of `ProofProcPagetable.v`, and reading the code
+settles its shape.
 
-1. `ProcPagetableCore` proves one lemma generic in `on` whose statement
-   takes the two failure arms as **premises** — wands over
-   `⌜avail_zero (avail_sub on g)⌝` plus the table the tail holds. This is
-   the fdalloc recipe (the continuation as a premise of the statement)
-   applied to a failure arm rather than a loop.
-2. `PROC_PAGETABLE` (counted, unchanged) instantiates both wands by
-   refutation — `ppt_nz1` / `ppt_nz2` are already there and already do
-   exactly this at `ProofProcPagetable.v:455` and `:589`.
-3. `PROC_PAGETABLE_UNCOUNTED` (new, at `on = None`) instantiates them with
-   the real tails, using the two bridges above → `UVMUNMAP_FIXED` (tail #2
-   only) → `UVMFREE`, and returns 0.
+**FOUR exits, not three, and they all converge on +0x4c:**
 
-The `Some nb` arithmetic currently inlined at `Hav2`/`Hav3` disappears when
-`on` goes generic (the rewrites become no-ops on a symbolic `avail_sub`),
-so step 1 should make the file shorter, not longer.
+```
++0x14  beqz a0   uvmcreate returned 0        -> +0x4c, s1 = 0   (no callee)
++0x2e  bltz a0   mappages #1 failed          -> +0x5a tail -> c.j -> +0x4c, s1 = 0
++0x48  bltz a0   mappages #2 failed          -> +0x66 tail -> c.j -> +0x4c, s1 = 0
+       (fall through)  success               -> +0x4c, s1 = root
+```
+
++0x4c..+0x58 (`mv a0,s1` + the four reloads + frame pop + `ret`) is byte-identical
+for all four, and the ONLY thing that varies is `s1` and the resource payload.
+So this is the **return-value-indexed shared epilogue** — the same shape
+`uvmcreate_post` and `allocproc_post` already use, and a better decomposition
+than the "two wands into a Core" sketch recorded earlier in this file
+(which missed both the uvmcreate arm and the fact that the epilogue is shared).
+
+**The recipe:**
+
+1. `SpecProcPagetable.v` gains `ppt_post γa on tfp (mr : regfile) (rv : mword 64)`,
+   a disjunction indexed by the returned pointer:
+   - `⌜rv = zero_reg⌝ ∗ ⌜avail_zero (avail_sub on g)⌝ ∗ kalloc_env γa (avail_sub on g)`
+     for some `g ≤ K_proc_pagetable` — the failure arm, carrying WHY it failed;
+   - the current success payload (`ptree_own t`, `pt_rep0 t (ppt_map tfp)`,
+     `pt_nodes t ≤ 3`, `kalloc_env γa (avail_sub on (pt_nodes t))`).
+   The failure arm MUST carry the `avail_zero`, or the counted seal cannot
+   refute it — that is the whole trick, and it is why this works where a
+   plain disjunction would not.
+2. `ProofProcPagetable.v` becomes `ProcPagetableCore` proving one lemma
+   generic in `on`, ending `(∀ mr rv, … -∗ ppt_post γa on tfp mr rv -∗ WP)`.
+   Factor +0x4c..+0x58 into an `iAssert`ed block over `(me, rv, payload)`;
+   the three failure points then reach it instead of being refuted.
+3. Seal twice. `PROC_PAGETABLE` (counted, statement UNCHANGED) destructs
+   `ppt_post` and kills the failure arm — `ppt_not_zero` / `ppt_nz1` /
+   `ppt_nz2` already do exactly this at `ProofProcPagetable.v:305`, `:455`
+   and `:589`, so the refutations move rather than being written.
+   `PROC_PAGETABLE_UNCOUNTED` (at `on = None`) passes it through.
+
+**The one thing that is NOT a free choice.** `SpecUvmfree` exists only at
+`kalloc_env γa None`, so the tails are reachable only there — a single
+`on`-generic *spec* cannot be written even though a single `on`-generic
+*proof* can. (S7 step 5's "one spec with a third arm is strictly better than
+two Module Types" advice is about `allocproc`, whose tails call `freeproc`,
+not `uvmfree`. It does not transfer here. That was my own error, corrected.)
+
+The `Some nb` arithmetic currently inlined at `Hav1`/`Hav2`/`Hav3`
+(`ProofProcPagetable.v:312`, `:450`, `:583`) disappears when `on` goes
+generic — the rewrites become no-ops on a symbolic `avail_sub` — so step 2
+should make the file shorter, not longer.
 
 ## Worklist
 
