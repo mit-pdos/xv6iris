@@ -1,9 +1,13 @@
-# Design: weak memory (RVWMO) — PROPOSAL, nothing landed
+# Design: weak memory (RVWMO)
 
-STATUS: design proposal (2026-08). No code. The staged worklist is
-[`projects/weak-memory.md`](../projects/weak-memory.md). Everything below is a
-plan to be validated by the M0 spike; decisions here are starting positions,
-not settled law like the other design files.
+STATUS (2026-08): M0–M2 are LANDED on branch `weak-memory` (the promise-free
+machine + litmus suite, the weak interpreter/language/base logic with a
+closed adequacy skeleton, the vProp surface with the split axiom, the
+pinned-fragment transfer bridge, fence/AMO rules). M3 (vertical slice) is
+next. The staged worklist with per-stage established-facts blocks is
+[`projects/weak-memory.md`](../projects/weak-memory.md); where a landed
+stage corrected a decision below, the correction is noted inline at that
+decision.
 
 ## What we are trying to say
 
