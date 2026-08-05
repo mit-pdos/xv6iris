@@ -180,11 +180,37 @@ witness" (the zify hook) — the range relaxation had to become the closed
 `iAssert` needs a *fresh name*, the outer one is still in scope at
 elaboration time.
 
-**Status.** Landed and green (`c3b495d`, `d66cff4`). `CodeProcFreepagetable.v`
-(30/30 instructions) and `SpecProcFreepagetable.v` are written and compile;
-`ProofProcFreepagetable.v` + `LinkProcFreepagetable.v` are the remaining
-step. `ProofUvmfree.v` (900 lines, a 2-call function with one branch) is the
-closest template — proc_freepagetable is 3 calls and no branch at all.
+**Status: DONE, and `proc_freepagetable` is PROVEN AND LINKED**
+(`c3b495d`, `d66cff4`, `eb4e8d0`, + this one). 924 lines, **57.5 s / 1.0 GB**,
+axiom footprint = the 5 `rv64d` platform primitives + funext, nothing else.
+proc.c is 18/28 (56.1 % of bytes).
+
+Three things the function proof turned up, all reusable:
+
+- **`uvmfree`'s `tp = cid_word` premise was dead weight and is gone.** It
+  could not have been discharged here: `callee_saved` does not cover x4, so
+  after two `uvmunmap` calls there is no way to re-establish a raw
+  `m !!! Regidx 4 = cid_word`. The tree had already swept the same premise
+  out of `SpecUvmunmap` — `HartTp.v`'s position is that the register map's
+  tp slot is IGNORED and the true tp is `cid_word_of <the hart we are on>`
+  by construction (the note at `ProofUvmdealloc.v`'s uvmunmap call spells
+  out why a raw register equality cannot cross a hart boundary the way
+  `cpu_own_transport` can). `SpecUvmfree` just had not been swept.
+  **Check for this premise on any spec before writing a caller with two
+  calls in front of it.**
+- **The callee-saved transport peel goes all the way to `mm`.** The
+  intermediate maps are `set`-bound local definitions, so
+  `repeat (rewrite upd_ne; …)` walks straight through them and the residual
+  goal is already reflexive. Close with
+  `first [ reflexivity | apply H<prev>thr; assumption ]`, not `apply` alone.
+- **`vm_compute in Hc` does nothing when `c` is a variable.** The
+  `is_cs_idx c = true` refutation has to `subst` first:
+  `intros Hx; injection Hx as Hx2; subst; vm_compute in Hc; discriminate`.
+  (`ProofUvmunmap`'s `thr_side` uses `is_cs_idx_true_neq` instead; both
+  work, the subst form needs no lemma.)
+
+`ProofUvmfree.v` was the template throughout — same 32-byte frame, same
+epilogue, same `stack_own` reassembly.
 
 ## Worklist
 

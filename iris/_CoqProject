@@ -562,6 +562,8 @@ LinkUvmunmapBare.v
 LinkUvmunmapFixed.v
 SpecProcFreepagetable.v
 CodeProcFreepagetable.v
+ProofProcFreepagetable.v
+LinkProcFreepagetable.v
 SpecUvmdealloc.v
 CodeUvmdealloc.v
 ProofUvmdealloc.v

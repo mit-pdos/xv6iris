@@ -82,7 +82,10 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      transient noff increment in int range.  It used to be pinned at 0 --
      an artifact of the boot-time callers. *)
   (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* NO tp premise.  HartTp.v: the register map's tp slot is IGNORED and the
+     true tp is [cid_word_of <the hart we are on>] by construction, so the
+     one this used to carry was dead weight -- the same sweep SpecUvmunmap
+     already had (see ProofUvmdealloc.v's note at its uvmunmap call). *)
   mm !!! Regidx (mword_of_int 10) = page_base uroot ->
   (* the size stays inside the user region, so PGROUNDUP does not wrap and
      uvmunmap's range premise holds *)

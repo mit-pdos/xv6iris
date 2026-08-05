@@ -230,7 +230,7 @@ Section ProofUvmfree.
     : wp_uvmfree_sconf_body γa Φ mm uroot um K eb p C ilvl b.
   Proof.
     cbv beta delta [wp_uvmfree_sconf_body].
-    intros pcE sz vpn0 n ret_tgt HK Hilvl Htp Hroot Hbnd Hdom.
+    intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
