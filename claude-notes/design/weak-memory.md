@@ -464,6 +464,18 @@ this tractable:
   proofs: the base logic + adequacy, the leaf WP files' memory arms, WpLock,
   the fence leaves, StartedInv-style escrows, and the virtio cone's device
   seam. The interesting *spec* changes are confined to the sync primitives.
+- **The pinned-fragment transfer bridge (found at M2a) is the sweep's
+  force multiplier.** Every existing decode lemma (~1220) and exec-level
+  instruction leaf is stated over `RiscvExec.exec` / `mstate` (flat mem).
+  When every read of a run is PINNED — owned `↦w` at the hart's index, or
+  timestamp-0 text — the collapse lemma (`readable_latest_pin`) says each
+  read returns `wflat`'s value, so `wexec` on `wmstate` corresponds to
+  `exec` on `MState (wm_regs σ) (wflat (wm_img σ) (wm_log σ)) (wm_dev σ)`.
+  ONE transfer lemma on that fragment re-derives the whole existing leaf
+  library; only genuinely racy accesses (lock words, `started`, virtio
+  ring) drop to the weak arm and get new leaves — which is exactly the
+  design's intended split. Build the bridge BEFORE porting any leaf by
+  hand (M2b item 0).
 - Build the new tree in parallel namespaces first (M0–M3 touch no existing
   file), validate the interfaces on a vertical slice (spinlock + one client
   cone + the started handoff), THEN sweep.
