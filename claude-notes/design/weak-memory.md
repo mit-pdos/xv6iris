@@ -234,6 +234,13 @@ Record wstate := {
 }.
 ```
 
+Key type, DECIDED at M1: the weak-memory maps (log addressing, `w_coh`,
+`w_fwd`, histories) are keyed by **`Z`** (`uint` of the physical address),
+converted once at the interpreter seam — `WeakMem.v` is used as-is and the
+`gmap Arch.pa` Countable-instance trap (durable notes) never arises. RAM
+addresses cannot wrap, so `uint (pa_add pa j) = uint pa + j` on every
+address the kernel uses.
+
 `gstate` changes: `gmem : gmap Arch.pa (bv 8)` becomes the **era-initial
 image** `gmem0` plus the **global write log** `glog : list wmsg` (timestamp 0
 = `gmem0`, timestamp i+1 = `glog !! i` — one shared total order, which is

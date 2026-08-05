@@ -54,14 +54,22 @@ Validate the operational design before anything depends on it.
   `gmap Arch.pa _` Countable-instance trap in the durable notes when the real
   file also imports `SailStdpp.Values`.
 
-## M1 — language + base logic
+## M1 — language + base logic (ALL in parallel files; existing tree untouched)
 
-- [ ] Swap `gstate`/`prim_step` to the log + `gws` (the real `RiscvLang.v`);
-      device arms; crash reset of log/views per generation.
-- [ ] Base state interpretation: `mono_list` log auth, per-hart `wstate`
-      auth, per-byte history auth; base points-to and seen-assertions.
-- [ ] `wp_exec_step` tower re-derived (oracle-∀ form); adequacy skeleton
-      (`riscv_system_adequacy` restated over log-initial resources).
+- [ ] **M1a — the weak interpreter** (`WeakInterp.v`, + WeakMem fwd-bank
+      wire-in): `wmstate` (sregs + img/log/wstate + mdev), `wrun`
+      (relational; weak MemRead/MemWrite/Barrier arms, access-kind
+      dispatch: explicit weak / rmw latest-read / ifetch+ttw coherent),
+      `wexec` with the read oracle χ, `wexec_wrun` bridge. Z keys via
+      `uint` at the seam (design doc, Decision 2).
+- [ ] **M1b — the language** (`WeakLang.v`): `wgstate`, prim_step arms
+      (hart via `wrun`, uart/disk/plic/power; disk reads coherent-latest
+      as an interim until M5's device views), boot/crash reset of
+      log+views per generation, language mixin.
+- [ ] **M1c — base logic**: state interpretation (`mono_list` log auth,
+      per-hart `wstate` auth, per-byte latest-write auth), base points-to
+      + seen-assertions, `wp_exec_step` tower analog (oracle-∀ form),
+      adequacy skeleton over log-initial resources.
 
 ## M2 — the vProp surface
 
