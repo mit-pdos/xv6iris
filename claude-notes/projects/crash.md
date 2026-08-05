@@ -2525,7 +2525,13 @@ ALL of `Z` — and (c) the two generic bitvector facts
 `_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF` and
 `pmpLocked (_update_Pmpcfg_ent_L y 0) = false` at an OPEN entry `x`, which is
 where the "bitvector equality does not reduce under the lazy evaluator" rule
-above will bite. Strengthen `pmp_loop_frame`'s conclusion with the two extra
+above will bite -- for (c) do NOT try to compute: unfold the Sail wrappers
+(`_get_Pmpcfg_ent_A` / `_update_Pmpcfg_ent_A` are `subrange_vec_dec` /
+`update_subrange_vec_dec`, and those go through `and_vec`/`or_vec`/`shift` --
+`unfold word_binop, with_word', with_word` first, as durable-notes says) and
+finish with stdpp's **`bv_simplify` / `bv_solve`** (`stdpp/bitvector/tactics.v`,
+whose rewrite database is exactly the extract-of-concat/or/and family this
+needs); there is no ready-made `subrange_of_update_subrange` in SailStdpp. Strengthen `pmp_loop_frame`'s conclusion with the two extra
 conjuncts (`∀ j, i <= j <= 63 -> off (access j)` and "unchanged below `i`")
 rather than writing a second loop lemma. When it lands, pmpcfg leaves
 `RiscvLang.boot_patch` and the honest assumption list is exactly mie / mideleg.
