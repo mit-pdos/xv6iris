@@ -253,11 +253,16 @@ Step rules (the PARM rules, dependency components dropped):
   `w_vwOld ⊔= t`, forward bank updated. (Promise-free: no early stores, so
   the store rule has no constraint to check.)
 - **AMO**: one `prim_step` is a whole instruction, so the read and write
-  halves interleave with nothing. Atomicity + coherence force the read to
-  take the per-byte **latest** message; the write appends. `.aq` applies the
-  acquire updates to the read half; `.rl` the release side (raises the
+  halves interleave with nothing. The read half carries an EXPLICIT
+  latest-read side condition — `¬ writes_in log a t (length log)`, i.e. no
+  message after `t` writes the byte — it does NOT follow from `readable`
+  (which only bounds `t` by the hart's own floor); M0's `amo_latest_unique`
+  shows the condition pins `t` uniquely. The write appends. `.aq` applies
+  the acquire updates to the read half; `.rl` the release side (raises the
   store's effective pre-view — inert constraint promise-free, but keep the
-  bookkeeping so `w_vRel` is honest).
+  bookkeeping so `w_vRel` is honest; NB the `w_vRel` term in the acquire
+  pre-view is faithful-PARM bookkeeping that no xv6 idiom can exercise —
+  flagged unvalidated by M0, keep it faithful).
 - **FENCE pred,succ** (the `Interface.Barrier` arm of `run`/`exec`, today a
   no-op): `v1 := (R ∈ pred ? w_vrOld) ⊔ (W ∈ pred ? w_vwOld)`; then
   `R ∈ succ → w_vrNew ⊔= v1`, `W ∈ succ → w_vwNew ⊔= v1`. `fence.tso` =
@@ -290,7 +295,13 @@ explicit fences). If a future proof needs ppo 9–13 (e.g. a seqlock), register
 views can be added then — the cost lands in `run`/`exec`'s RegRead/RegWrite
 arms and nowhere in the logic's interfaces. The forward bank stores the
 weakest sound view (the store's fence floor `w_vwNew` at store time; 0 is
-also sound) — over-weak is safe, over-strong is not.
+also sound) — over-weak is safe, over-strong is not. DECIDED after M0: the
+bank gets **wired into the load rule at M1** (a load reading the hart's own
+latest store takes the banked view instead of the timestamp). M0 left it
+write-only (`vpost = vpre ⊔ t` unconditionally), which is sound-but-
+stronger; leaving that permanently would silently widen the documented gap
+(a forwarded load would gain ordering hardware does not give it), and the
+wire-in is a one-arm change to `load_post`.
 
 ## Decision 4: exec, the oracle, and the leaf-lemma seam
 
