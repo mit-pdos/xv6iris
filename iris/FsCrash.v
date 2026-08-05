@@ -193,14 +193,30 @@ Qed.
 (* INSTALLING the on-disk log over the home map: entry [i] of the write set
    takes its content from log slot [i].  A [foldr] over the INDEX list
    rather than over [W] itself, because the content's block number
-   ([log_slot_bno logstart i]) is a function of the index. *)
+   ([log_slot_bno logstart i]) is a function of the index.  The step is a
+   NAMED function (not an inline lambda) so that every lemma below unifies
+   against the same head rather than against a fresh beta-redex. *)
+Definition fs_install_step (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (m : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
+  match W !! i with
+  | Some b => <[ b := P (log_slot_bno logstart i) ]> m
+  | None => m
+  end.
+
+Lemma fs_install_step_Some (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (b : Z) (m : gmap Z (list (bv 8))) :
+  W !! i = Some b ->
+  fs_install_step P logstart W i m = <[ b := P (log_slot_bno logstart i) ]> m.
+Proof. rewrite /fs_install_step. by intros ->. Qed.
+
+Lemma fs_install_step_None (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (m : gmap Z (list (bv 8))) :
+  W !! i = None -> fs_install_step P logstart W i m = m.
+Proof. rewrite /fs_install_step. by intros ->. Qed.
+
 Definition fs_install (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
     (D : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
-  foldr (fun i m =>
-           match W !! i with
-           | Some b => <[ b := P (log_slot_bno logstart i) ]> m
-           | None => m
-           end) D (seq 0 (length W)).
+  foldr (fs_install_step P logstart W) D (seq 0 (length W)).
 
 Lemma fs_install_nil (P : Z -> list (bv 8)) (logstart : Z)
     (D : gmap Z (list (bv 8))) :
@@ -259,6 +275,327 @@ Definition mirror_of (P : Z -> list (bv 8)) (ls : Z) : log_mirror :=
 Lemma mirror_of_ok (P : Z -> list (bv 8)) (ls : Z) :
   log_mirror_ok (mirror_of P ls) P ls.
 Proof. split; [reflexivity | intros i _; reflexivity]. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1c''. THE PURE CORE OF THE WAL's CRASH ARGUMENT (phase C2b/D1 stage 1).  *)
+(*                                                                          *)
+(* Four write kinds happen to the disk while the log runs, and each one has  *)
+(* to re-establish [fs_recovery] at the POST-write image.  Every one of the  *)
+(* four is proved here, ONCE, as a statement about an abstract post-image    *)
+(* [P'] constrained POINTWISE:                                               *)
+(*    Hhit :  P' <the written block> = <the new content>                     *)
+(*    Hmiss:  forall c, c <> <the written block> -> P' c = P c               *)
+(* and NOTHING else.  That shape is deliberate: at each call site the fupd    *)
+(* has exactly [FsCrash.fs_blocks_write_eq] and [fs_blocks_write_ne] in       *)
+(* hand, which are precisely those two facts about                            *)
+(* [fs_blocks (disk_write dk …)] -- so no functional extensionality is ever    *)
+(* needed to identify the post-image with a closed term.                      *)
+(*                                                                            *)
+(* The geometry premises are explicit for the same reason: the pure layer      *)
+(* must not silently assume that a decoded (junk-tolerant!) header names        *)
+(* in-range slots or home blocks.                                              *)
+(* ---------------------------------------------------------------------- *)
+
+(* --- the log region's geometry, as membership facts --- *)
+
+Lemma log_slot_ne_hdr (ls : Z) (i : nat) :
+  log_slot_bno ls i <> log_hdr_bno ls.
+Proof.
+  rewrite /log_slot_bno /log_hdr_bno.
+  pose proof (Nat2Z.is_nonneg i). lia.
+Qed.
+
+Lemma log_slot_in_region (ls : Z) (i : nat) :
+  (i < LOGBLOCKS)%nat -> log_slot_bno ls i ∈ log_region_set ls.
+Proof.
+  intros Hi. rewrite /log_region_set elem_of_union. left.
+  rewrite elem_of_list_to_set elem_of_list_fmap. exists i.
+  split; [reflexivity|]. apply elem_of_seq. lia.
+Qed.
+
+Lemma log_hdr_in_region (ls : Z) : log_hdr_bno ls ∈ log_region_set ls.
+Proof.
+  rewrite /log_region_set elem_of_union. right. by apply elem_of_singleton.
+Qed.
+
+Lemma log_region_not_home (cov : gset Z) (ls b : Z) :
+  b ∈ log_region_set ls -> b ∉ fs_home_set cov ls.
+Proof.
+  intros Hb Hc. rewrite /fs_home_set elem_of_difference in Hc. tauto.
+Qed.
+
+(* the two disequalities a HOME-block write needs *)
+Lemma home_ne_slot (ls b : Z) (j : nat) :
+  b ∉ log_region_set ls -> (j < LOGBLOCKS)%nat -> b <> log_slot_bno ls j.
+Proof. intros Hb Hj ->. by apply Hb, log_slot_in_region. Qed.
+
+Lemma home_ne_hdr (ls b : Z) :
+  b ∉ log_region_set ls -> b <> log_hdr_bno ls.
+Proof. intros Hb ->. by apply Hb, log_hdr_in_region. Qed.
+
+(* --- [fs_restrict], pointwise --- *)
+
+Lemma fs_restrict_lookup_None (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  b ∉ s -> fs_restrict P s !! b = None.
+Proof.
+  intros Hb. destruct (fs_restrict P s !! b) as [v|] eqn:Hv; [|reflexivity].
+  apply fs_restrict_lookup_Some in Hv as [Hin _]. done.
+Qed.
+
+Lemma fs_restrict_lookup (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  fs_restrict P s !! b = (if decide (b ∈ s) then Some (P b) else None).
+Proof.
+  destruct (decide (b ∈ s)) as [Hb|Hb].
+  - by apply fs_restrict_lookup_Some.
+  - by apply fs_restrict_lookup_None.
+Qed.
+
+Lemma fs_restrict_ext (P P' : Z -> list (bv 8)) (s : gset Z) :
+  (forall b, b ∈ s -> P' b = P b) -> fs_restrict P' s = fs_restrict P s.
+Proof.
+  intros HP. apply map_eq. intros b. rewrite !fs_restrict_lookup.
+  destruct (decide (b ∈ s)) as [Hb|Hb]; [|reflexivity]. by rewrite (HP b Hb).
+Qed.
+
+(* THE MISSING RESTRICT LEMMA the log-fill / commit / clear transitions all
+   need: a write OUTSIDE the restricted set does not move the restriction. *)
+Lemma fs_restrict_upd_out (P P' : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  b ∉ s -> (forall c, c <> b -> P' c = P c) ->
+  fs_restrict P' s = fs_restrict P s.
+Proof.
+  intros Hb HP. apply fs_restrict_ext. intros c Hc. apply HP.
+  intros ->. done.
+Qed.
+
+(* --- [fs_install], as a LOOKUP characterisation --- *)
+
+Local Lemma fs_install_fold_miss (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (l : list nat) (b : Z) :
+  b ∉ W -> foldr (fs_install_step P ls W) D l !! b = D !! b.
+Proof.
+  intros Hb. induction l as [|i l IH]; [reflexivity|]. cbn [foldr].
+  destruct (W !! i) as [c|] eqn:Hi.
+  - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi).
+    rewrite lookup_insert_ne; [exact IH|].
+    intros ->. apply Hb. eapply elem_of_list_lookup_2. exact Hi.
+  - rewrite (fs_install_step_None _ _ _ _ _ Hi). exact IH.
+Qed.
+
+Local Lemma fs_install_fold_hit (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (l : list nat) (i : nat) (b : Z) :
+  NoDup W -> W !! i = Some b -> i ∈ l ->
+  foldr (fs_install_step P ls W) D l !! b = Some (P (log_slot_bno ls i)).
+Proof.
+  intros Hnd Hi. induction l as [|j l IH]; [by rewrite elem_of_nil|].
+  rewrite elem_of_cons. intros [->|Hin]; cbn [foldr].
+  - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi) lookup_insert //.
+  - destruct (W !! j) as [c|] eqn:Hj.
+    + rewrite (fs_install_step_Some _ _ _ _ _ _ Hj).
+      destruct (decide (c = b)) as [->|Hne].
+      * assert (Hji : j = i) by (eapply NoDup_lookup; [exact Hnd|exact Hj|exact Hi]).
+        subst j. rewrite lookup_insert //.
+      * rewrite lookup_insert_ne //. by apply IH.
+    + rewrite (fs_install_step_None _ _ _ _ _ Hj). by apply IH.
+Qed.
+
+(* A block the write set does not name reads through from the home map. *)
+Lemma fs_install_miss (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (b : Z) :
+  b ∉ W -> fs_install P ls W D !! b = D !! b.
+Proof. intros Hb. by apply fs_install_fold_miss. Qed.
+
+(* A block the write set names at index [i] reads the log's slot [i].  NoDup
+   is what makes "index [i]" well defined -- with a repeated block number the
+   OUTERMOST insert (the smallest index) would win instead. *)
+Lemma fs_install_hit (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (i : nat) (b : Z) :
+  NoDup W -> W !! i = Some b ->
+  fs_install P ls W D !! b = Some (P (log_slot_bno ls i)).
+Proof.
+  intros Hnd Hi. eapply fs_install_fold_hit; [exact Hnd|exact Hi|].
+  apply elem_of_seq. pose proof (lookup_lt_Some _ _ _ Hi). lia.
+Qed.
+
+(* Installing over a map that ALREADY holds the logged values is a no-op --
+   which is what makes the final header CLEAR preserve the durable state. *)
+Lemma fs_install_idem (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) :
+  NoDup W ->
+  (forall i b, W !! i = Some b -> D !! b = Some (P (log_slot_bno ls i))) ->
+  fs_install P ls W D = D.
+Proof.
+  intros Hnd Hall. apply map_eq. intros b.
+  destruct (decide (b ∈ W)) as [Hin|Hout].
+  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+    rewrite (fs_install_hit P ls W D i b Hnd Hi). by rewrite (Hall i b Hi).
+  - by rewrite fs_install_miss.
+Qed.
+
+(* Two congruences.  The first needs no uniqueness (only the slot contents
+   move); the second lets the home map move too, at keys the write set names,
+   and that is where NoDup is unavoidable. *)
+Local Lemma fs_install_fold_extP (P P' : Z -> list (bv 8)) (ls : Z)
+    (W : list Z) (D : gmap Z (list (bv 8))) (l : list nat) :
+  (forall j, j ∈ l -> P' (log_slot_bno ls j) = P (log_slot_bno ls j)) ->
+  foldr (fs_install_step P' ls W) D l = foldr (fs_install_step P ls W) D l.
+Proof.
+  induction l as [|j l IH]; [reflexivity|]. intros Hj.
+  assert (Heq : foldr (fs_install_step P' ls W) D l
+                = foldr (fs_install_step P ls W) D l).
+  { apply IH. intros k Hk. apply Hj. by apply elem_of_list_further. }
+  cbn [foldr]. rewrite Heq.
+  destruct (W !! j) as [b|] eqn:Hb.
+  - rewrite !(fs_install_step_Some _ _ _ _ _ _ Hb).
+    rewrite (Hj j (elem_of_list_here _ _)) //.
+  - rewrite !(fs_install_step_None _ _ _ _ _ Hb) //.
+Qed.
+
+Lemma fs_install_ext_P (P P' : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) :
+  (forall j, (j < length W)%nat -> P' (log_slot_bno ls j) = P (log_slot_bno ls j)) ->
+  fs_install P' ls W D = fs_install P ls W D.
+Proof.
+  intros HP. rewrite /fs_install. apply fs_install_fold_extP.
+  intros j Hj. apply elem_of_seq in Hj. apply HP. lia.
+Qed.
+
+Lemma fs_install_ext (P P' : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D D' : gmap Z (list (bv 8))) :
+  NoDup W ->
+  (forall j b, W !! j = Some b ->
+     P' (log_slot_bno ls j) = P (log_slot_bno ls j)) ->
+  (forall k, k ∉ W -> D' !! k = D !! k) ->
+  fs_install P' ls W D' = fs_install P ls W D.
+Proof.
+  intros Hnd HP HD. apply map_eq. intros k.
+  destruct (decide (k ∈ W)) as [Hin|Hout].
+  - apply elem_of_list_lookup_1 in Hin as [j Hj].
+    rewrite (fs_install_hit P' ls W D' j k Hnd Hj)
+            (fs_install_hit P ls W D j k Hnd Hj).
+    by rewrite (HP j k Hj).
+  - rewrite !fs_install_miss //. by apply HD.
+Qed.
+
+(* --- THE FOUR RECOVERY TRANSITIONS --- *)
+
+(* (1) LOG FILL -- write_log's copy of a logged block into slot [i], with the
+   ON-DISK header still clean.  Recovery does not move at all: the slot is
+   not a home block, and at n = 0 nothing reads the slots. *)
+Lemma fs_recovery_logfill (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) (i : nat) :
+  (i < LOGBLOCKS)%nat ->
+  (forall c, c <> log_slot_bno ls i -> P' c = P c) ->
+  hdr_n (P (log_hdr_bno ls)) = 0 ->
+  fs_recovery P D cov ls ->
+  fs_recovery P' D cov ls.
+Proof.
+  intros Hi Hmiss Hn Hrec.
+  assert (Hhdr : P' (log_hdr_bno ls) = P (log_hdr_bno ls)).
+  { apply Hmiss. apply not_eq_sym, log_slot_ne_hdr. }
+  apply (fs_recovery_clean P' D cov ls); [by rewrite Hhdr|].
+  apply (fs_recovery_clean P D cov ls Hn) in Hrec. rewrite Hrec.
+  symmetry. apply (fs_restrict_upd_out P P' _ (log_slot_bno ls i));
+    [|exact Hmiss].
+  by apply log_region_not_home, log_slot_in_region.
+Qed.
+
+(* (2) COMMIT -- write_head storing a header that decodes to (n, W), n > 0.
+   THE commit point: the durable state jumps, and the new one is computable
+   from the PRE-write image (the header block is neither a home block nor a
+   slot), which is exactly what lets the committer identify it with the
+   batch's logged view. *)
+Lemma fs_recovery_commit (P P' : Z -> list (bv 8)) (cov : gset Z) (ls : Z)
+    (bs : list (bv 8)) :
+  P' (log_hdr_bno ls) = bs ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  fs_recovery P' (fs_install P ls (hdr_dec bs).2
+                    (fs_restrict P (fs_home_set cov ls))) cov ls.
+Proof.
+  intros Hhit Hmiss. rewrite /fs_recovery Hhit.
+  rewrite (fs_restrict_upd_out P P' (fs_home_set cov ls) (log_hdr_bno ls));
+    [|by apply log_region_not_home, log_hdr_in_region|exact Hmiss].
+  rewrite (fs_install_ext_P P P' ls (hdr_dec bs).2) //.
+  intros j _. apply Hmiss, log_slot_ne_hdr.
+Qed.
+
+(* (3) INSTALL -- install_trans writing home block [b] = W[i] with the
+   content of slot [i].  Recovery is UNCHANGED: the home map moves at [b],
+   but the installed picture overwrites [b] with slot [i] anyway, and the
+   slot did not move.  [length W <= LOGBLOCKS] is the geometry bound (a
+   junk-tolerant decode could otherwise name a slot beyond the region, which
+   the home-block write would then be allowed to alias). *)
+Lemma fs_recovery_install (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) (i : nat) (b : Z) :
+  NoDup (hdr_dec (P (log_hdr_bno ls))).2 ->
+  (length (hdr_dec (P (log_hdr_bno ls))).2 <= LOGBLOCKS)%nat ->
+  (hdr_dec (P (log_hdr_bno ls))).2 !! i = Some b ->
+  b ∉ log_region_set ls ->
+  P' b = P (log_slot_bno ls i) ->
+  (forall c, c <> b -> P' c = P c) ->
+  fs_recovery P D cov ls ->
+  fs_recovery P' D cov ls.
+Proof.
+  intros Hnd Hlen Hi Hb Hhit Hmiss Hrec.
+  assert (Hhdr : P' (log_hdr_bno ls) = P (log_hdr_bno ls)).
+  { apply Hmiss, not_eq_sym. by apply home_ne_hdr. }
+  rewrite /fs_recovery Hhdr. rewrite /fs_recovery in Hrec. rewrite Hrec.
+  symmetry. apply fs_install_ext; [exact Hnd| |].
+  - intros j c Hj. apply Hmiss.
+    apply not_eq_sym, (home_ne_slot ls b j Hb).
+    pose proof (lookup_lt_Some _ _ _ Hj). lia.
+  - intros k Hk. rewrite !fs_restrict_lookup.
+    destruct (decide (k ∈ fs_home_set cov ls)) as [Hin|Hin]; [|reflexivity].
+    rewrite Hmiss; [reflexivity|]. intros ->. apply Hk.
+    eapply elem_of_list_lookup_2. exact Hi.
+Qed.
+
+(* (4) CLEAR -- write_head storing a header with n = 0 once every logged
+   block has been installed.  Recovery becomes the plain home restriction. *)
+Lemma fs_recovery_clear (P P' : Z -> list (bv 8)) (cov : gset Z) (ls : Z)
+    (bs : list (bv 8)) :
+  P' (log_hdr_bno ls) = bs ->
+  hdr_n bs = 0 ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  fs_recovery P' (fs_restrict P (fs_home_set cov ls)) cov ls.
+Proof.
+  intros Hhit Hn Hmiss.
+  apply (fs_recovery_clean P' _ cov ls); [by rewrite Hhit|].
+  symmetry. apply (fs_restrict_upd_out P P' _ (log_hdr_bno ls)); [|exact Hmiss].
+  by apply log_region_not_home, log_hdr_in_region.
+Qed.
+
+(* …and the form the fupd actually wants: the clear PRESERVES the durable
+   state, given that the installed values are already in the home map.  This
+   is the one place [fs_install_hit]/[fs_install_miss] are load-bearing. *)
+Lemma fs_recovery_clear_keeps (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) (bs : list (bv 8)) :
+  P' (log_hdr_bno ls) = bs ->
+  hdr_n bs = 0 ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  NoDup (hdr_dec (P (log_hdr_bno ls))).2 ->
+  (forall j b, (hdr_dec (P (log_hdr_bno ls))).2 !! j = Some b ->
+     fs_restrict P (fs_home_set cov ls) !! b = Some (P (log_slot_bno ls j))) ->
+  fs_recovery P D cov ls ->
+  fs_recovery P' D cov ls.
+Proof.
+  intros Hhit Hn Hmiss Hnd Hinst Hrec.
+  rewrite /fs_recovery in Hrec. rewrite Hrec (fs_install_idem _ _ _ _ Hnd Hinst).
+  by eapply fs_recovery_clear.
+Qed.
+
+(* The mirror is untouched by a write OUTSIDE the log region -- what the
+   install fupd re-establishes its custody with. *)
+Lemma log_mirror_ok_out (M : log_mirror) (P P' : Z -> list (bv 8))
+    (ls b : Z) :
+  b ∉ log_region_set ls ->
+  (forall c, c <> b -> P' c = P c) ->
+  log_mirror_ok M P ls -> log_mirror_ok M P' ls.
+Proof.
+  intros Hb Hmiss [Hhdr Hslots]. split.
+  - rewrite Hhdr Hmiss //. by apply not_eq_sym, home_ne_hdr.
+  - intros i Hi. rewrite (Hslots i Hi) Hmiss //.
+    by apply not_eq_sym, (home_ne_slot ls b i Hb).
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1d. The record the escrow is over, and its well-formedness.             *)

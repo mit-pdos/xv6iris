@@ -336,21 +336,120 @@ preserve v_disk: the record-P does not move, so the power arms frame it.
         seam equations, and their CLASSES are bare Section constraints rather
         than `fsCrashG` fields — two sibling class fields would be different
         Σ slots whose resources cannot interact (DiskImg.v's recorded trap).
-- [ ] **C2b/D1 stages 2-5 — REMAINING.**
-      2. `LogInv.v`: the era-side mirror half in `log_res`/`log_batch` (the
-         batch form the committer checks out carries it; between commits
-         `log_res`'s arm), plus the era's `swap_lb (S g)` receipt —
-         `log_ctx` is the natural carrier (persistent, already threaded by
-         every log function).
-      3. `initlog` (stage-2 clean form): the swap rides its final
-         `write_head` fupd (`fs_arm_swap`), spending the era boot token; the
-         mirror is `mirror_of` the post-write image, which is free inside the
-         fupd since `dk` is universally quantified there.
-      4. The three real fupds at the WAL sites, currying the era mirror half
-         + `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is
-         the new `fs_receipt`; delete `crash_pred_indifferent`.
-      5. `xv6_fs_adequacy` passing `Pc := P_fs` with the one initial-recovery
-         hypothesis; `xv6_power_adequacy` untouched.
+- [x] **C2b/D1 stage 1 — THE PURE CORE (FsCrash.v, leaf-only). LANDED.**
+      `fs_install` now folds a NAMED step (`fs_install_step` + its
+      `_Some`/`_None` reducers) so every lemma unifies against one head.
+      - The lookup characterisation: `fs_install_miss` (a block the write
+        set does not name reads through) and `fs_install_hit` (a named
+        block at index i reads log slot i — NoDup is what makes "index i"
+        well defined; without it the OUTERMOST insert, i.e. the smallest
+        index, would win). `fs_install_idem` is the bridge the header
+        CLEAR needs, and the only place hit/miss are load-bearing.
+      - Two congruences: `fs_install_ext_P` (only the slot contents move —
+        no uniqueness needed) and `fs_install_ext` (the home map moves too,
+        at keys the write set names — NoDup unavoidable).
+      - `fs_restrict_lookup` (the pointwise form everything else follows
+        from), `fs_restrict_lookup_None`, `fs_restrict_ext`, and the
+        missing `fs_restrict_upd_out`.
+      - Geometry as membership facts: `log_slot_ne_hdr`,
+        `log_slot_in_region`, `log_hdr_in_region`, `log_region_not_home`,
+        `home_ne_slot`, `home_ne_hdr`.
+      - THE FOUR TRANSITIONS, each stated over an abstract post-image `P'`
+        with only the two pointwise hypotheses `P' <written block> = <new
+        content>` and `∀ c ≠ <written block>, P' c = P c` — which is
+        exactly what `fs_blocks_write_eq`/`_ne` give at a call site, so NO
+        functional extensionality is ever needed:
+        `fs_recovery_logfill` (i < LOGBLOCKS, on-disk header clean →
+        recovery unchanged), `fs_recovery_commit` (the new durable state is
+        computable from the PRE-write image), `fs_recovery_install`
+        (premises: NoDup and `length W ≤ LOGBLOCKS` — the geometry bound,
+        needed because a junk-tolerant decode could otherwise name a slot
+        BEYOND the region that the home write would be allowed to alias —
+        plus `b ∉ log_region_set`; recovery unchanged),
+        `fs_recovery_clear` + `fs_recovery_clear_keeps` (the form the fupd
+        wants: the clear PRESERVES D given the installed values are already
+        in the home map).
+      - `log_mirror_ok_out`: a write outside the log region leaves the
+        mirror valid — what the install fupd re-establishes custody with.
+- [ ] **C2b/D1 stages 2-5 — BLOCKED, see below.**
+
+### THE PERMIT'S ∀-GENERATION HOLE (found doing D1 stage 4; BLOCKS 2-5)
+
+`fs_arm_acc`/`fs_arm_swap` are correct, but NO client can call them under
+the permit's CURRENT shape, so none of the three WAL fupds (nor initlog's
+swap) can be written. The permit is
+`∀ dk g E n, era_registered g E -∗ start_auth n -∗ ⌜n = g+1⌝ -∗ …`,
+i.e. the CONSUMER's generation is universally quantified, while everything
+the client can curry is at ITS OWN `gen_id`: `swap_lb (S gen_id)` and the
+mirror half at `era_mirror_name riscv_eraGS`. `fs_arm_acc` wants both at
+the supplied `(g, E)`. The gap is exactly `⌜g = gen_id⌝`, and it is NOT
+derivable:
+
+- `gen_started gen_id` against the supplied `start_auth (g+1)` gives only
+  `gen_id ≤ g`; the arm's own `gen_started g''` gives `g'' ≤ g`; the
+  client's `swap_lb (S gen_id)` gives `gen_id ≤ g''`. So
+  `gen_id ≤ g'' ≤ g` — the UPPER bound `g ≤ gen_id` is missing.
+- Nothing supplies it. The registry is a plain `ghost_map nat riscvEraGS`
+  with no injectivity (two keys may carry the same era record, and the
+  base rules never need injectivity — `RiscvExec` identifies
+  `E = riscv_eraGS` only in the `ggen = gen_id` case and parks a stale
+  thread with `wp_dead`). `mono_nat` lower bounds cannot be raised.
+  Making the client hold a FRACTION of `swap_auth` would supply the bound
+  (`mono_nat_auth_own` agreement) but then a fresh era could not retire
+  the dead era's arm unilaterally — which is the one property the counter
+  exists for.
+- And it MUST not be derivable: a stale era's permit must fail, or the
+  crash predicate is unsound. So the freshness certificate has to come
+  from the completion, and the completion has no idea which generation
+  authored the permit.
+
+**RECOMMENDED FIX (leaves FsCrash.v byte-identical — `fs_arm_acc` /
+`fs_arm_swap` are then instantiated at `(gen_id, riscv_eraGS)` exactly as
+written): index the permit by the DEPOSITING generation.**
+
+```
+disk_write_permit (gd : nat) (w : disk_wr) (Q : iProp Σ) :=
+  ∀ dk n, start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
+    ▷ Pc dk ==∗ ▷ Pc (wr_apply w dk) ∗ start_auth n ∗ Q
+```
+
+The `era_registered g E` premise DISAPPEARS (the client curries its own,
+out of `gen_cert`), and the squeeze closes: `swap_lb (S gen_id)` gives
+`S gen_id ≤ c`, `start_auth (gen_id+1)` against the arm's `gen_started g''`
+gives `g'' ≤ gen_id`, hence `c = S gen_id`, `g'' = gen_id`, and registry
+agreement AT THE SHARED KEY `gen_id` gives `E'' = riscv_eraGS`.
+
+Consumption side: the completion must know `gd = gen_id`. Get it from the
+ERA-LOCALITY that already exists rather than from per-entry data —
+parameterize `PermInv.perm_inv`/`perm_inv_body`/`perm_ent` by `gd`, so
+every permit in the era's channel is at the era's generation by
+construction; `perm_deposit` then requires the client's permit at that
+`gd`, and `perm_consume`/`_kq` drop the `era_registered` premise and take
+`⌜n = gd+1⌝` (which `wp_disk_loop` already has in hand — it is the `[//]`
+it passes today). Files: `RiscvPtsto.v` (permit + trivial/indifferent),
+`PermInv.v`, `WpUart.v` (`dev_inv`/`dev_inv_alloc`/`wp_disk_loop` at
+`gen_id`), `ProofVirtioDiskRwF.v`, `SpecVirtioDiskRw.v`, `SpecBwrite.v`,
+and the boot site that allocates `dev_inv` for the new era (its generation
+is known there, and every era thread's `GenId` is instantiated to it).
+`RiscvExec.wp_disk_step` needs no change — it already threads
+`start_auth n` with `⌜n = gen_id+1⌝`; only the registry element it hands
+the callback becomes unused.
+
+### C2b/D1 stages 2-5 (unchanged plan, to run after the fix)
+2. `LogInv.v`: the era-side mirror half in `log_res`/`log_batch` (the
+   batch form the committer checks out carries it; between commits
+   `log_res`'s arm), plus the era's `swap_lb (S g)` receipt —
+   `log_ctx` is the natural carrier (persistent, already threaded by
+   every log function).
+3. `initlog` (stage-2 clean form): the swap rides its final
+   `write_head` fupd (`fs_arm_swap`), spending the era boot token; the
+   mirror is `mirror_of` the post-write image, which is free inside the
+   fupd since `dk` is universally quantified there.
+4. The three real fupds at the WAL sites, currying the era mirror half
+   + `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is
+   the new `fs_receipt`; delete `crash_pred_indifferent`.
+5. `xv6_fs_adequacy` passing `Pc := P_fs` with the one initial-recovery
+   hypothesis; `xv6_power_adequacy` untouched.
 
 ### Phase D — recovery + sys_sync
 
