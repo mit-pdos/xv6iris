@@ -745,3 +745,4 @@ LinkSysDup.v
 WeakMem.v
 WeakLitmus.v
 WeakInterp.v
+WeakLang.v

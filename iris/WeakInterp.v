@@ -73,6 +73,41 @@ Proof.
   apply Z_to_bv_bv_unsigned.
 Qed.
 
+(** The other direction of the seam, valid exactly on the address space:
+    [z_pa] wraps modulo 2^64, so the round trip needs the range.  M1b's
+    [WeakLang.wflat] — the flat projection of the log for the interim disk
+    step — is the consumer, and it is where the wrap-freedom side condition
+    of a whole log ([WeakLang.wmsg_wf]) is discharged. *)
+Lemma pa_z_z_pa (z : Z) :
+  0 ≤ z < 18446744073709551616 → pa_z (z_pa z) = z.
+Proof.
+  intros Hr. rewrite /pa_z /z_pa pa_uint_unsigned.
+  unfold SailStdpp.Values.mword_of_int, SailStdpp.Values.to_word,
+    SailStdpp.Values.get_word, SailStdpp.MachineWord.MachineWord.Z_to_word.
+  rewrite Z_to_bv_unsigned. apply bv_wrap_small. unfold bv_modulus.
+  change (2 ^ Z.of_N (SailStdpp.MachineWord.MachineWord.Z_idx
+                        (if 64 =? 32 then 34 else 64)))
+    with 18446744073709551616. lia.
+Qed.
+
+Lemma pa_z_range (a : Arch.pa) : 0 ≤ pa_z a < 18446744073709551616.
+Proof.
+  rewrite /pa_z pa_uint_unsigned.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (SailStdpp.MachineWord.MachineWord.Z_idx
+                        (if 64 =? 32 then 34 else 64)))
+    with 18446744073709551616 in Hr. lia.
+Qed.
+
+(** [z_pa] is therefore injective on the address space. *)
+Lemma z_pa_inj (z1 z2 : Z) :
+  0 ≤ z1 < 18446744073709551616 → 0 ≤ z2 < 18446744073709551616 →
+  z_pa z1 = z_pa z2 → z1 = z2.
+Proof.
+  intros H1 H2 Heq.
+  rewrite -(pa_z_z_pa z1 H1) -(pa_z_z_pa z2 H2) Heq //.
+Qed.
+
 Lemma acc_addr_0 (a : Arch.pa) : acc_addr a 0 = pa_z a.
 Proof. rewrite /acc_addr /=. lia. Qed.
 
@@ -241,6 +276,15 @@ Definition barrier_post (ws : wstate) (b : barrier_kind) : wstate :=
   | Barrier_RISCV_i     => ws
   end.
 
+(** A fence only ever RAISES the view floors — including [fence.tso], which is
+    two fences in a row.  Together with [WeakMem]'s [load_post_run_le] /
+    [store_post_run_le] this is what makes [wrun_ws_le] below go through. *)
+Lemma barrier_post_le ws b : ws_le ws (barrier_post ws b).
+Proof.
+  destruct b; rewrite /barrier_post;
+    first [ reflexivity | apply fence_post_le | etrans; apply fence_post_le ].
+Qed.
+
 (* ====================================================================== *)
 (** ** 4. Reads: admissibility, the post-state, and the decision procedure *)
 
@@ -396,16 +440,21 @@ Qed.
     Promise-free: one message, appended at the log's fresh top, covering the
     [n] little-endian bytes of the value.
 
-    [wm_tid := None].  The CPU id is not visible inside [wrun] (an [mstate] is
-    one hart's view and carries no identity), so the interpreter cannot stamp
-    it; M1b's language layer, which does know which hart stepped, is where the
-    tid is filled in.  Nothing in [WeakMem] inspects [wm_tid]. *)
-Definition wwrite_msg (pa : Arch.pa) (n : N) {w : N} (v : bv w) : wmsg :=
-  WMsg (pa_z pa) (map (λ j : nat, nth_byte v j) (seq 0 (N.to_nat n))) None.
+    THE TID IS A PARAMETER of the whole interpreter ([wrun]/[wexec] take it and
+    stamp it on every message they append).  An [wmstate] is one agent's view
+    and carries no identity of its own, so the id has to come from outside; the
+    language layer ([WeakLang]) passes [Some (fin_to_nat c)] for a hart and the
+    disk agent passes [None].  Nothing in [WeakMem] — and nothing in this file —
+    INSPECTS [wm_tid]: it exists for the M6 robustness statements and for the
+    disk agent, and the own-store forwarding a hart needs is already carried by
+    its own [wstate]'s forward bank. *)
+Definition wwrite_msg (tid : option nat) (pa : Arch.pa) (n : N) {w : N}
+    (v : bv w) : wmsg :=
+  WMsg (pa_z pa) (map (λ j : nat, nth_byte v j) (seq 0 (N.to_nat n))) tid.
 
-Lemma wwrite_msg_byte pa n {w : N} (v : bv w) (j : nat) :
+Lemma wwrite_msg_byte tid pa n {w : N} (v : bv w) (j : nat) :
   (j < N.to_nat n)%nat →
-  msg_byte (wwrite_msg pa n v) (acc_addr pa j) = Some (nth_byte v j).
+  msg_byte (wwrite_msg tid pa n v) (acc_addr pa j) = Some (nth_byte v j).
 Proof.
   intros Hj. rewrite /msg_byte /wwrite_msg /acc_addr /=.
   rewrite bool_decide_eq_true_2; [lia|].
@@ -413,10 +462,18 @@ Proof.
   rewrite Nat2Z.id list_lookup_fmap lookup_seq_lt //.
 Qed.
 
-Definition wwrite_post (s : wmstate) (ak : akinfo) (pa : Arch.pa) (n : N)
-    (v : bv (8 * n)) : wmstate :=
+Lemma wwrite_msg_pa tid pa n {w : N} (v : bv w) :
+  wm_pa (wwrite_msg tid pa n v) = pa_z pa.
+Proof. reflexivity. Qed.
+
+Lemma wwrite_msg_length tid pa n {w : N} (v : bv w) :
+  length (wm_data (wwrite_msg tid pa n v)) = N.to_nat n.
+Proof. rewrite /wwrite_msg /= length_map length_seq //. Qed.
+
+Definition wwrite_post (tid : option nat) (s : wmstate) (ak : akinfo)
+    (pa : Arch.pa) (n : N) (v : bv (8 * n)) : wmstate :=
   WMState s.(wm_regs) s.(wm_img)
-          (s.(wm_log) ++ [wwrite_msg pa n v])
+          (s.(wm_log) ++ [wwrite_msg tid pa n v])
           (store_post_run s.(wm_ws) (ak_sync ak) (pa_z pa) (N.to_nat n)
                           (S (length s.(wm_log))))
           s.(wm_dev).
@@ -426,33 +483,36 @@ Definition wwrite_post (s : wmstate) (ak : akinfo) (pa : Arch.pa) (n : N)
 
     Structurally identical to [RiscvLang.run] — a dependent [Fixpoint] over
     the monad, so no UIP — with three arms changed: MemRead, MemWrite and
-    Barrier.  Every other outcome behaves exactly as today. *)
+    Barrier.  Every other outcome behaves exactly as today.
 
-Fixpoint wrun {X} (m : M X) (s : wmstate) (x : X) (s' : wmstate) {struct m}
-    : Prop :=
+    [tid] is the stepping agent's identity, stamped on every message this run
+    appends (see §5); it affects nothing else. *)
+
+Fixpoint wrun (tid : option nat) {X} (m : M X) (s : wmstate) (x : X)
+    (s' : wmstate) {struct m} : Prop :=
   match m with
   | Interface.Ret y => x = y /\ s' = s
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M X) -> Prop with
        (* registers: untouched by weak memory (no register views — Decision 3) *)
        | Interface.RegRead r _ =>
-           fun k => wrun (k (register_lookup r s.(wm_regs))) s x s'
+           fun k => wrun tid (k (register_lookup r s.(wm_regs))) s x s'
        | Interface.RegWrite r _ v =>
-           fun k => wrun (k tt) (wset_reg s r v) x s'
+           fun k => wrun tid (k tt) (wset_reg s r v) x s'
        (* memory.  Device addresses are serviced synchronously exactly as
           today (device views are M5); RAM reads pick per-byte timestamps. *)
        | Interface.MemRead n req =>
            fun k =>
              if dev_addr (Interface.ReadReq.pa req) then
                match dev_read s.(wm_dev) (Interface.ReadReq.pa req) n with
-               | Some (w, d') => wrun (k (inl (w, None))) (wset_dev s d') x s'
+               | Some (w, d') => wrun tid (k (inl (w, None))) (wset_dev s d') x s'
                | None => False
                end
              else
                exists (w : bv (8 * n)) (ts : list nat),
                  wread_ok s (classify (Interface.ReadReq.access_kind req))
                           (Interface.ReadReq.pa req) n ts w
-                 /\ wrun (k (inl (w, None)))
+                 /\ wrun tid (k (inl (w, None)))
                          (wread_post s
                             (classify (Interface.ReadReq.access_kind req))
                             (Interface.ReadReq.pa req) ts) x s'
@@ -461,32 +521,32 @@ Fixpoint wrun {X} (m : M X) (s : wmstate) (x : X) (s' : wmstate) {struct m}
              if dev_addr (Interface.WriteReq.pa req) then
                match dev_write s.(wm_dev) (Interface.WriteReq.pa req) n
                                (Interface.WriteReq.value req) with
-               | Some d' => wrun (k (inl None)) (wset_dev s d') x s'
+               | Some d' => wrun tid (k (inl None)) (wset_dev s d') x s'
                | None => False
                end
              else
-               wrun (k (inl None))
-                    (wwrite_post s
+               wrun tid (k (inl None))
+                    (wwrite_post tid s
                        (classify (Interface.WriteReq.access_kind req))
                        (Interface.WriteReq.pa req) n
                        (Interface.WriteReq.value req)) x s'
        (* FENCE: today's no-op becomes the view update *)
        | Interface.Barrier b =>
-           fun k => wrun (k tt) (wset_ws s (barrier_post s.(wm_ws) b)) x s'
+           fun k => wrun tid (k tt) (wset_ws s (barrier_post s.(wm_ws) b)) x s'
        (* trace / announce outcomes: state no-ops *)
-       | Interface.InstrAnnounce _   => fun k => wrun (k tt) s x s'
-       | Interface.BranchAnnounce _ _=> fun k => wrun (k tt) s x s'
-       | Interface.CacheOp _         => fun k => wrun (k tt) s x s'
-       | Interface.TlbOp _           => fun k => wrun (k tt) s x s'
-       | Interface.TakeException _   => fun k => wrun (k tt) s x s'
-       | Interface.ReturnException _ => fun k => wrun (k tt) s x s'
-       | Interface.TranslationStart _=> fun k => wrun (k tt) s x s'
-       | Interface.TranslationEnd _  => fun k => wrun (k tt) s x s'
-       | Interface.CycleCount        => fun k => wrun (k tt) s x s'
-       | Interface.Message _         => fun k => wrun (k tt) s x s'
-       | Interface.GetCycleCount     => fun k => wrun (k 0%Z) s x s'
+       | Interface.InstrAnnounce _   => fun k => wrun tid (k tt) s x s'
+       | Interface.BranchAnnounce _ _=> fun k => wrun tid (k tt) s x s'
+       | Interface.CacheOp _         => fun k => wrun tid (k tt) s x s'
+       | Interface.TlbOp _           => fun k => wrun tid (k tt) s x s'
+       | Interface.TakeException _   => fun k => wrun tid (k tt) s x s'
+       | Interface.ReturnException _ => fun k => wrun tid (k tt) s x s'
+       | Interface.TranslationStart _=> fun k => wrun tid (k tt) s x s'
+       | Interface.TranslationEnd _  => fun k => wrun tid (k tt) s x s'
+       | Interface.CycleCount        => fun k => wrun tid (k tt) s x s'
+       | Interface.Message _         => fun k => wrun tid (k tt) s x s'
+       | Interface.GetCycleCount     => fun k => wrun tid (k 0%Z) s x s'
        (* nondeterminism: branch over every choice *)
-       | Interface.Choose _          => fun k => exists c, wrun (k c) s x s'
+       | Interface.Choose _          => fun k => exists c, wrun tid (k c) s x s'
        (* failure / discard / injected exception: stuck *)
        | _ => fun _ => False
        end) k
@@ -502,21 +562,21 @@ Fixpoint wrun {X} (m : M X) (s : wmstate) (x : X) (s' : wmstate) {struct m}
     is CHECKED: a wrong length, an inadmissible timestamp, or an exhausted
     oracle all give [None]. *)
 
-Fixpoint wexec {X} (m : M X) (χ : list (list nat)) (s : wmstate) {struct m}
-    : option (X * wmstate * list (list nat)) :=
+Fixpoint wexec (tid : option nat) {X} (m : M X) (χ : list (list nat))
+    (s : wmstate) {struct m} : option (X * wmstate * list (list nat)) :=
   match m with
   | Interface.Ret y => Some (y, s, χ)
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T
              return (T -> M X) -> option (X * wmstate * list (list nat)) with
        | Interface.RegRead r _ =>
-           fun k => wexec (k (register_lookup r s.(wm_regs))) χ s
-       | Interface.RegWrite r _ v => fun k => wexec (k tt) χ (wset_reg s r v)
+           fun k => wexec tid (k (register_lookup r s.(wm_regs))) χ s
+       | Interface.RegWrite r _ v => fun k => wexec tid (k tt) χ (wset_reg s r v)
        | Interface.MemRead n req =>
            fun k =>
              if dev_addr (Interface.ReadReq.pa req) then
                match dev_read s.(wm_dev) (Interface.ReadReq.pa req) n with
-               | Some (w, d') => wexec (k (inl (w, None))) χ (wset_dev s d')
+               | Some (w, d') => wexec tid (k (inl (w, None))) χ (wset_dev s d')
                | None => None
                end
              else
@@ -525,7 +585,7 @@ Fixpoint wexec {X} (m : M X) (χ : list (list nat)) (s : wmstate) {struct m}
                if ak_coh ak then
                  match wread_bytes s ak pa n (coh_ts s pa n) with
                  | Some w =>
-                     wexec (k (inl (w, None))) χ
+                     wexec tid (k (inl (w, None))) χ
                            (wread_post s ak pa (coh_ts s pa n))
                  | None => None
                  end
@@ -535,7 +595,7 @@ Fixpoint wexec {X} (m : M X) (χ : list (list nat)) (s : wmstate) {struct m}
                  | ts :: χ' =>
                      match wread_bytes s ak pa n ts with
                      | Some w =>
-                         wexec (k (inl (w, None))) χ' (wread_post s ak pa ts)
+                         wexec tid (k (inl (w, None))) χ' (wread_post s ak pa ts)
                      | None => None
                      end
                  end
@@ -544,28 +604,28 @@ Fixpoint wexec {X} (m : M X) (χ : list (list nat)) (s : wmstate) {struct m}
              if dev_addr (Interface.WriteReq.pa req) then
                match dev_write s.(wm_dev) (Interface.WriteReq.pa req) n
                                (Interface.WriteReq.value req) with
-               | Some d' => wexec (k (inl None)) χ (wset_dev s d')
+               | Some d' => wexec tid (k (inl None)) χ (wset_dev s d')
                | None => None
                end
              else
-               wexec (k (inl None)) χ
-                     (wwrite_post s
+               wexec tid (k (inl None)) χ
+                     (wwrite_post tid s
                         (classify (Interface.WriteReq.access_kind req))
                         (Interface.WriteReq.pa req) n
                         (Interface.WriteReq.value req))
        | Interface.Barrier b =>
-           fun k => wexec (k tt) χ (wset_ws s (barrier_post s.(wm_ws) b))
-       | Interface.InstrAnnounce _   => fun k => wexec (k tt) χ s
-       | Interface.BranchAnnounce _ _=> fun k => wexec (k tt) χ s
-       | Interface.CacheOp _         => fun k => wexec (k tt) χ s
-       | Interface.TlbOp _           => fun k => wexec (k tt) χ s
-       | Interface.TakeException _   => fun k => wexec (k tt) χ s
-       | Interface.ReturnException _ => fun k => wexec (k tt) χ s
-       | Interface.TranslationStart _=> fun k => wexec (k tt) χ s
-       | Interface.TranslationEnd _  => fun k => wexec (k tt) χ s
-       | Interface.CycleCount        => fun k => wexec (k tt) χ s
-       | Interface.Message _         => fun k => wexec (k tt) χ s
-       | Interface.GetCycleCount     => fun k => wexec (k 0%Z) χ s
+           fun k => wexec tid (k tt) χ (wset_ws s (barrier_post s.(wm_ws) b))
+       | Interface.InstrAnnounce _   => fun k => wexec tid (k tt) χ s
+       | Interface.BranchAnnounce _ _=> fun k => wexec tid (k tt) χ s
+       | Interface.CacheOp _         => fun k => wexec tid (k tt) χ s
+       | Interface.TlbOp _           => fun k => wexec tid (k tt) χ s
+       | Interface.TakeException _   => fun k => wexec tid (k tt) χ s
+       | Interface.ReturnException _ => fun k => wexec tid (k tt) χ s
+       | Interface.TranslationStart _=> fun k => wexec tid (k tt) χ s
+       | Interface.TranslationEnd _  => fun k => wexec tid (k tt) χ s
+       | Interface.CycleCount        => fun k => wexec tid (k tt) χ s
+       | Interface.Message _         => fun k => wexec tid (k tt) χ s
+       | Interface.GetCycleCount     => fun k => wexec tid (k 0%Z) χ s
        (* Choose / GenericFail / Discard / ExtraOutcome: stuck, as in [exec] *)
        | _ => fun _ => None
        end) k
@@ -579,8 +639,8 @@ Fixpoint wexec {X} (m : M X) (χ : list (list nat)) (s : wmstate) {struct m}
     oracle did not.  Per-oracle determinism does hold ([wexec] is a function),
     and [wread_bytes_complete] above supplies the converse direction one read
     at a time. *)
-Lemma wexec_wrun {X} (m : M X) :
-  forall χ s x s' χ', wexec m χ s = Some (x, s', χ') -> wrun m s x s'.
+Lemma wexec_wrun tid {X} (m : M X) :
+  forall χ s x s' χ', wexec tid m χ s = Some (x, s', χ') -> wrun tid m s x s'.
 Proof.
   induction m as [y|T oc k IH]; intros χ s x s' χ' Hex.
   - simpl in Hex. by injection Hex as <- <- _.
@@ -611,8 +671,8 @@ Proof.
 Qed.
 
 (** Per-oracle determinism, for free: [wexec] is a function. *)
-Lemma wexec_det {X} (m : M X) χ s x1 s1 χ1 x2 s2 χ2 :
-  wexec m χ s = Some (x1, s1, χ1) → wexec m χ s = Some (x2, s2, χ2) →
+Lemma wexec_det tid {X} (m : M X) χ s x1 s1 χ1 x2 s2 χ2 :
+  wexec tid m χ s = Some (x1, s1, χ1) → wexec tid m χ s = Some (x2, s2, χ2) →
   x1 = x2 ∧ s1 = s2 ∧ χ1 = χ2.
 Proof. intros H1 H2. rewrite H1 in H2. by simplify_eq. Qed.
 
@@ -643,16 +703,25 @@ Lemma wread_post_coh_id s ak pa ts :
   ak_coh ak = true → wread_post s ak pa ts = s.
 Proof. rewrite /wread_post. by move=> ->. Qed.
 
-Lemma wwrite_post_log s ak pa n v :
-  wm_log (wwrite_post s ak pa n v) = wm_log s ++ [wwrite_msg pa n v].
+Lemma wwrite_post_log tid s ak pa n v :
+  wm_log (wwrite_post tid s ak pa n v) = wm_log s ++ [wwrite_msg tid pa n v].
 Proof. reflexivity. Qed.
+
+Lemma wread_post_ws_le s ak pa ts : ws_le (wm_ws s) (wm_ws (wread_post s ak pa ts)).
+Proof.
+  rewrite /wread_post. destruct (ak_coh ak); [reflexivity|apply load_post_run_le].
+Qed.
+
+Lemma wwrite_post_ws_le tid s ak pa n v :
+  ws_le (wm_ws s) (wm_ws (wwrite_post tid s ak pa n v)).
+Proof. apply store_post_run_le. Qed.
 
 (** A CPU step never moves the disk IMAGE — the mirror of
     [RiscvLang.run_v_disk], and the same proof: register effects and RAM
     accesses do not touch the device fabric, and an MMIO transaction goes
     through [dev_read]/[dev_write], which preserve [v_disk]. *)
-Lemma wrun_v_disk {X} (m : M X) :
-  forall s x s', wrun m s x s' ->
+Lemma wrun_v_disk tid {X} (m : M X) :
+  forall s x s', wrun tid m s x s' ->
     v_disk (dvirtio (wm_dev s')) = v_disk (dvirtio (wm_dev s)).
 Proof.
   induction m as [y|T oc k IH]; intros s x s' Hrun.
@@ -679,8 +748,8 @@ Qed.
 (** The ERA-INITIAL IMAGE IS NEVER WRITTEN.  Every memory effect is an append
     to the log; the image moves only at a power-on/crash reset (M1b).  This is
     what lets the state interpretation hold [wm_img] fixed for a whole era. *)
-Lemma wrun_img {X} (m : M X) :
-  forall s x s', wrun m s x s' -> wm_img s' = wm_img s.
+Lemma wrun_img tid {X} (m : M X) :
+  forall s x s', wrun tid m s x s' -> wm_img s' = wm_img s.
 Proof.
   induction m as [y|T oc k IH]; intros s x s' Hrun.
   - destruct Hrun as [_ ->]. reflexivity.
@@ -704,8 +773,8 @@ Qed.
 (** THE LOG IS APPEND-ONLY.  The invariant every [WeakMem] monotonicity lemma
     ([writes_in_app], [log_byte_app]) is stated against, and the reason M1c can
     use a [mono_list] authority for it. *)
-Lemma wrun_log_app {X} (m : M X) :
-  forall s x s', wrun m s x s' -> exists l, wm_log s' = wm_log s ++ l.
+Lemma wrun_log_app tid {X} (m : M X) :
+  forall s x s', wrun tid m s x s' -> exists l, wm_log s' = wm_log s ++ l.
 Proof.
   induction m as [y|T oc k IH]; intros s x s' Hrun.
   - destruct Hrun as [_ ->]. exists []. by rewrite app_nil_r.
@@ -726,10 +795,40 @@ Proof.
         exact (IH _ _ _ _ Hrun).
       * destruct (IH _ _ _ _ Hrun) as (l & Hl).
         lazymatch goal with
-        | Hr0 : wrun _ (wwrite_post _ _ ?pa ?nn ?vv) _ _ |- _ =>
-            exists (wwrite_msg pa nn vv :: l)
+        | Hr0 : wrun _ _ (wwrite_post ?tt0 _ _ ?pa ?nn ?vv) _ _ |- _ =>
+            exists (wwrite_msg tt0 pa nn vv :: l)
         end.
         rewrite Hl wwrite_post_log -app_assoc //.
+Qed.
+
+(** THE AGENT'S VIEWS ONLY EVER RISE.  Every arm that touches [wm_ws] does so
+    through [load_post_run] / [store_post_run] / [barrier_post], each of which
+    is [ws_le]-increasing, and the [Barrier] arm is the only one that can raise
+    a PRE-view floor without a memory access.  M1b's [WeakLang.wprim_step_ws_le]
+    lifts this to the stepping hart's component of the global state; the M1c
+    per-hart [wstate] authority is what consumes it. *)
+Lemma wrun_ws_le tid {X} (m : M X) :
+  forall s x s', wrun tid m s x s' -> ws_le (wm_ws s) (wm_ws s').
+Proof.
+  induction m as [y|T oc k IH]; intros s x s' Hrun.
+  - destruct Hrun as [_ ->]. reflexivity.
+  - destruct oc; simpl in Hrun;
+      try (exact (IH _ _ _ _ Hrun));
+      try (exfalso; exact Hrun);
+      try (destruct Hrun as (c & Hrun); exact (IH _ _ _ _ Hrun)).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        exact (IH _ _ _ _ Hrun).
+      * destruct Hrun as (w & ts & _ & Hrun).
+        etrans; [apply wread_post_ws_le|exact (IH _ _ _ _ Hrun)].
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        exact (IH _ _ _ _ Hrun).
+      * etrans; [apply wwrite_post_ws_le|exact (IH _ _ _ _ Hrun)].
+    + (* Barrier *)
+      etrans; [apply barrier_post_le|exact (IH _ _ _ _ Hrun)].
 Qed.
 
 (** SC DEGENERACY.  In a state whose read floor already covers the whole log,

@@ -617,6 +617,34 @@ Proof.
   intros a. apply Nat.le_refl.
 Qed.
 
+(** ... and so do the multi-byte folds, which is what the interpreter's
+    read/write arms actually build ([WeakInterp.wrun_ws_le]). *)
+Lemma load_post_fold_le aq vpre ats ws :
+  ws_le ws (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats).
+Proof.
+  revert ws. induction ats as [|at_ l IH]; intros ws; [reflexivity|].
+  etrans; [apply load_post_at_le|apply IH].
+Qed.
+
+Lemma load_post_bytes_le ws aq ats : ws_le ws (load_post_bytes ws aq ats).
+Proof. apply load_post_fold_le. Qed.
+
+Lemma load_post_run_le ws aq base ts : ws_le ws (load_post_run ws aq base ts).
+Proof. apply load_post_bytes_le. Qed.
+
+Lemma store_post_fold_le rl t as_ ws :
+  ws_le ws (foldl (λ w a, store_post w rl a t) ws as_).
+Proof.
+  revert ws. induction as_ as [|a l IH]; intros ws; [reflexivity|].
+  etrans; [apply store_post_le|apply IH].
+Qed.
+
+Lemma store_post_bytes_le ws rl as_ t : ws_le ws (store_post_bytes ws rl as_ t).
+Proof. apply store_post_fold_le. Qed.
+
+Lemma store_post_run_le ws rl base n t : ws_le ws (store_post_run ws rl base n t).
+Proof. apply store_post_bytes_le. Qed.
+
 (* ------------------------------------------------------------------ *)
 (** ** The individual view facts the litmus proofs consume *)
 
